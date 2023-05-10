@@ -1,0 +1,8 @@
+//
+// Created by Henry Scott on 5/7/23.
+//
+
+#ifndef CRAFTING_INTERPRETERS_OBJECT_H
+#define CRAFTING_INTERPRETERS_OBJECT_H
+
+#endif //CRAFTING_INTERPRETERS_OBJECT_H
