@@ -1,0 +1,76 @@
+// First class functions
+fun areWeHavingItYet() {
+  print "Yes we are!";
+}
+
+print areWeHavingItYet;
+
+// Arguments
+fun sum(a, b, c) {
+  return a + b + c;
+}
+
+print 4 + sum(5, 6, 7);
+
+// Recursion
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+// Native Functions
+var start = clock();
+print fib(10);
+print clock() - start;
+
+// Closures
+fun makeClosure() {
+  var local = "local";
+  fun closure() {
+    print local;
+  }
+  return closure;
+}
+
+var closure = makeClosure();
+closure();
+
+// Middle Closures
+fun outer() {
+  var a = 1;
+  var b = 2;
+  fun middle() {
+    var c = 3;
+    var d = 4;
+    fun inner() {
+      print a + c + b + d;
+    }
+  }
+}
+
+// Sibling Closures
+{
+  var a = 1;
+  fun f() {
+    print a;
+  }
+  var b = 2;
+  fun g() {
+    print b;
+  }
+  var c = 3;
+  fun h() {
+    print c;
+  }
+}
+
+
+
+// Errors
+fun a() { b(); }
+fun b() { c(); }
+fun c() {
+  c("too", "many");
+}
+
+a();
