@@ -26,7 +26,7 @@ static Obj *allocateObject(size_t size, ObjType type) {
     vm.objects = object;
 
 #ifdef DEBUG_LOG_GC
-    printf("%p allocate %zu for %d\n", (void*)object, size, type);
+    printf("%p allocate %zu for %d\n", (void *) object, size, type);
 #endif
 
     return object;
@@ -58,15 +58,15 @@ ObjString *copyString(const char *chars, int length) {
     return allocateString(heapChars, length, hash);
 }
 
-ObjUpvalue* newUpvalue(Value* slot) {
-    ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+ObjUpvalue *newUpvalue(Value *slot) {
+    ObjUpvalue *upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
     upvalue->location = slot;
     upvalue->next = NULL;
     upvalue->closed = NIL_VAL;
     return upvalue;
 }
 
-static void printFunction(ObjFunction* function) {
+static void printFunction(ObjFunction *function) {
     if (function->name == NULL) {
         printf("<script>");
         return;
@@ -91,6 +91,16 @@ void printObject(Value value) {
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
+        case OBJ_CLASS:
+            printf("<type %s>", AS_CLASS(value)->name->chars);
+            break;
+        case OBJ_INSTANCE:
+            printf("<%s instance>",
+                   AS_INSTANCE(value)->klass->name->chars);
+            break;
+        case OBJ_BOUND_METHOD:
+            printFunction(AS_BOUND_METHOD(value)->method->function);
+            break;
     }
 }
 
@@ -105,8 +115,8 @@ ObjString *takeString(char *chars, int length) {
     return allocateString(chars, length, hash);
 }
 
-ObjFunction* newFunction() {
-    ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+ObjFunction *newFunction() {
+    ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
     function->arity = 0;
     function->upvalueCount = 0;
     function->name = NULL;
@@ -114,22 +124,45 @@ ObjFunction* newFunction() {
     return function;
 }
 
-ObjClosure* newClosure(ObjFunction* function) {
-    ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*,
+ObjInstance *newInstance(ObjClass *klass) {
+    ObjInstance *instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->klass = klass;
+    initTable(&instance->fields);
+    return instance;
+}
+
+ObjBoundMethod* newBoundMethod(Value receiver,
+                               ObjClosure* method) {
+    ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod,
+                                         OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
+ObjClosure *newClosure(ObjFunction *function) {
+    ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue*,
                                      function->upvalueCount);
     for (int i = 0; i < function->upvalueCount; i++) {
         upvalues[i] = NULL;
     }
 
-    ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+    ObjClosure *closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
     closure->function = function;
     closure->upvalues = upvalues;
     closure->upvalueCount = function->upvalueCount;
     return closure;
 }
 
-ObjNative* newNative(NativeFn function) {
-    ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+ObjNative *newNative(NativeFn function) {
+    ObjNative *native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
     native->function = function;
     return native;
+}
+
+ObjClass *newClass(ObjString *name) {
+    ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name = name;
+    initTable(&klass->methods);
+    return klass;
 }
