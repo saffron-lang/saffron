@@ -1,4 +1,10 @@
-#ifndef CRAFTING_INTERPRETERS_COMPILER_H
-#define CRAFTING_INTERPRETERS_COMPILER_H
+#ifndef clox_compiler_h
+#define clox_compiler_h
 
-#endif //CRAFTING_INTERPRETERS_COMPILER_H
+#include "vm.h"
+#include "object.h"
+
+ObjFunction* compile(const char* source);
+void markCompilerRoots();
+
+#endif
