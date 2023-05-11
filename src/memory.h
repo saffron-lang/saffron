@@ -4,6 +4,7 @@
 #include "common.h"
 #include "value.h"
 
+// Growth factor MUST be a power of 2 for optimized lookups
 #define GROW_CAPACITY(capacity) \
     ((capacity) < 8 ? 8 : (capacity) * 2)
 
