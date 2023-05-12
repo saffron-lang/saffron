@@ -21,9 +21,17 @@ static void resetStack() {
     vm.frameCount = 0;
 }
 
-static void defineNative(const char *name, NativeFn function) {
+void defineNative(const char *name, NativeFn function) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(OBJ_VAL(newNative(function)));
+    tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    pop();
+    pop();
+}
+
+void defineGlobal(const char *name, Value value) {
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(value);
     tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
     pop();
     pop();
@@ -77,7 +85,7 @@ static void concatenate() {
     push(OBJ_VAL(result));
 }
 
-static void runtimeError(const char *format, ...) {
+void runtimeError(const char *format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -138,6 +146,13 @@ static bool callValue(Value callee, int argCount) {
             case OBJ_NATIVE: {
                 NativeFn native = AS_NATIVE(callee);
                 Value result = native(argCount, vm.stackTop - argCount);
+                vm.stackTop -= argCount + 1;
+                push(result);
+                return true;
+            }
+            case OBJ_BUILTIN_TYPE: {
+                ObjBuiltinType *type = AS_BUILTIN_TYPE(callee);
+                Value result = type->typeCallFn(argCount, vm.stackTop - argCount);
                 vm.stackTop -= argCount + 1;
                 push(result);
                 return true;
@@ -520,7 +535,7 @@ static InterpretResult run() {
             }
             case OP_INHERIT: {
                 Value superclass = peek(1);
-                if (!IS_CLASS(superclass)) {
+                if (!IS_CLASS(superclass) && !IS_BUILTIN_TYPE(superclass)) {
                     runtimeError("Superclass must be a class.");
                     return INTERPRET_RUNTIME_ERROR;
                 }

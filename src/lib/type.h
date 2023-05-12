@@ -5,7 +5,8 @@
 #include "../vm.h"
 
 #define AS_NATIVE_METHOD(value)       (((ObjNativeMethod*)AS_OBJ(value))->function)
-
+#define AS_BUILTIN_TYPE(value)       (((ObjBuiltinType *)AS_OBJ(value)))
+#define IS_BUILTIN_TYPE(value)        isObjType(value, OBJ_BUILTIN_TYPE)
 
 typedef void (*InitFn)(Obj *object);
 
