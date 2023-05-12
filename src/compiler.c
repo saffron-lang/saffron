@@ -818,8 +818,6 @@ static void forStatement() {
         emitByte(OP_POP); // Condition.
     }
 
-    consume(TOKEN_SEMICOLON, "Expect ';'.");
-
     if (!match(TOKEN_RIGHT_PAREN)) {
         int bodyJump = emitJump(OP_JUMP);
         int incrementStart = currentChunk()->count;

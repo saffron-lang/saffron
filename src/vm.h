@@ -29,6 +29,7 @@ typedef struct {
     size_t nextGC;
 
     Table globals;
+    Table builtins;
     Table strings;
     ObjString* initString;
     ObjUpvalue* openUpvalues;
@@ -48,9 +49,11 @@ InterpretResult interpret(const char* source);
 
 void push(Value value);
 Value pop();
+Value peek(int distance);
 
 void defineNative(const char *name, NativeFn function);
 void defineGlobal(const char *name, Value value);
+void defineBuiltin(const char *name, Value value);
 void runtimeError(const char *format, ...);
 
 #endif

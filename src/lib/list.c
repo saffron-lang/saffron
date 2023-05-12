@@ -61,17 +61,15 @@ void listPush(ObjList *list, Value item) {
     writeValueArray(&list->items, item);
 }
 
-ObjBuiltinType *createListType() {
-    ObjBuiltinType* type = newBuiltinType(copyString("list", 4));
-
+void listInit(ObjBuiltinType* type) {
     type->freeFn = (FreeFn) &freeList;
     type->markFn = (MarkFn) &markList;
     type->printFn = (PrintFn) &printList;
     type->typeCallFn = (TypeCallFn) &listCall;
-
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
-    defineGlobal("list", OBJ_VAL(type));
+}
 
-    listType = type;
-    return type;
+ObjBuiltinType *createListType() {
+    listType = newBuiltinType("list", listInit);
+    return listType;
 }

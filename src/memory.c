@@ -51,6 +51,10 @@ static void freeObject(Obj *object) {
         }
         case OBJ_STRING: {
             ObjString *string = (ObjString *) object;
+#ifdef DEBUG_LOG_GC
+            printf(string->chars, strlen(string->chars));
+            printf("\n");
+#endif
             FREE_ARRAY(char, string->chars, string->length + 1);
             FREE(ObjString, object);
             break;
@@ -149,6 +153,7 @@ static void markRoots() {
     }
 
     markTable(&vm.globals);
+    markTable(&vm.builtins);
     markCompilerRoots();
     markObject((Obj *) vm.initString);
 }

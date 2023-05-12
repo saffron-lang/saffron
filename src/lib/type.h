@@ -8,7 +8,6 @@
 #define AS_BUILTIN_TYPE(value)       (((ObjBuiltinType *)AS_OBJ(value)))
 #define IS_BUILTIN_TYPE(value)        isObjType(value, OBJ_BUILTIN_TYPE)
 
-typedef void (*InitFn)(Obj *object);
 
 typedef Obj *(*NewObjectFn)();
 
@@ -30,7 +29,6 @@ typedef struct {
 
 typedef struct {
     ObjClass obj;
-    InitFn initFn;
     FreeFn freeFn;
     MarkFn markFn;
 //    NewObjectFn *newObjectFn;
@@ -38,8 +36,11 @@ typedef struct {
     TypeCallFn typeCallFn;
 } ObjBuiltinType;
 
+typedef void (*InitFn)(ObjBuiltinType *klass);
+
 ObjNativeMethod *newNativeMethod(NativeMethodFn function);
-ObjBuiltinType *newBuiltinType(ObjString* name);
+
+ObjBuiltinType *newBuiltinType(const char *name, InitFn initFn);
 
 void defineBuiltinMethod(ObjBuiltinType *type, const char *name, NativeMethodFn function);
 
