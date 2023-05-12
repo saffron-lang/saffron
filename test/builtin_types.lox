@@ -1,16 +1,17 @@
+// for (var i = 0; i < 10; i = i + 1) {
 var a = [1,2,3,4];
-print a;
-print a.length;
-print a.length();
+a;
+a.length;
+a.length();
 
 var b = a.length;
-print b;
-print b();
+b;
+b();
 
-print list("asd");
+list("asd");
 
 class EpicList < list {}
 
 var c = EpicList();
-print c.length();
-
+c.length();
+// }

@@ -82,6 +82,8 @@ void printObject(Value value) {
             printf("%s", AS_CSTRING(value));
             break;
         case OBJ_NATIVE_METHOD:
+            printf("<native method>");
+            break;
         case OBJ_NATIVE:
             printf("<native fn>");
             break;
@@ -91,9 +93,13 @@ void printObject(Value value) {
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
-        case OBJ_BUILTIN_TYPE:
-            printf("<builtin type %s>", AS_CLASS(value)->name->chars);
+        case OBJ_BUILTIN_TYPE: {
+            ObjClass *klass = AS_CLASS(value);
+            printf("<builtin type ");
+            printf(klass->name->chars, strlen(klass->name->chars));
+            printf(">");
             break;
+        }
         case OBJ_CLASS:
             printf("<type %s>", AS_CLASS(value)->name->chars);
             break;
@@ -129,6 +135,9 @@ void printObject(Value value) {
                     break;
             }
             break;
+        }
+        default: {
+            printf("<unknown %d>", OBJ_TYPE(value));
         }
     }
 }

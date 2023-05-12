@@ -1,3 +1,4 @@
+#include <printf.h>
 #include "type.h"
 
 ObjNativeMethod *newNativeMethod(NativeMethodFn function) {
@@ -9,14 +10,19 @@ ObjNativeMethod *newNativeMethod(NativeMethodFn function) {
 void defineBuiltinMethod(ObjBuiltinType *type, const char *name, NativeMethodFn function) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(OBJ_VAL(newNativeMethod(function)));
-    tableSet(&type->obj.methods, AS_STRING(vm.stack[0]), vm.stack[1]);
+    tableSet(&type->obj.methods, AS_STRING(peek(1)), peek(0));
     pop();
     pop();
 }
 
-ObjBuiltinType *newBuiltinType(ObjString *name) {
+ObjBuiltinType *newBuiltinType(const char *name, InitFn initFn) {
+    push(OBJ_VAL(copyString(name, strlen(name))));
     ObjBuiltinType *klass = ALLOCATE_OBJ(ObjBuiltinType, OBJ_BUILTIN_TYPE);
-    klass->obj.name = name;
+    klass->obj.name = AS_STRING(peek(0));
     initTable(&klass->obj.methods);
+    push(OBJ_VAL(klass));
+    initFn(klass);
+    pop();
+    pop();
     return klass;
 }

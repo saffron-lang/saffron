@@ -32,7 +32,15 @@ void defineNative(const char *name, NativeFn function) {
 void defineGlobal(const char *name, Value value) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(value);
-    tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    tableSet(&vm.globals, AS_STRING(peek(1)), peek(0));
+    pop();
+    pop();
+}
+
+void defineBuiltin(const char *name, Value value) {
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(value);
+    tableSet(&vm.builtins, AS_STRING(peek(1)), peek(0));
     pop();
     pop();
 }
@@ -48,24 +56,28 @@ void initVM() {
     vm.nextGC = 1024 * 1024;
 
     initTable(&vm.globals);
+    initTable(&vm.builtins);
     initTable(&vm.strings);
 
     vm.initString = NULL;
     vm.initString = copyString("init", 4);
     vm.openUpvalues = NULL;
 
+    defineBuiltin("list", OBJ_VAL(createListType()));
+    defineGlobal("list", OBJ_VAL(createListType()));
+//    defineGlobal("list", OBJ_VAL(type));
     defineNative("clock", clockNative);
-    createListType();
 }
 
 void freeVM() {
     freeTable(&vm.globals);
+    freeTable(&vm.builtins);
     freeTable(&vm.strings);
     vm.initString = NULL;
     freeObjects();
 }
 
-static Value peek(int distance) {
+Value peek(int distance) {
     return vm.stackTop[-1 - distance];
 }
 
