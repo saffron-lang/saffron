@@ -5,9 +5,7 @@
 #include "object.h"
 #include "value.h"
 #include "vm.h"
-
-#define ALLOCATE_OBJ(type, objectType) \
-    (type*)allocateObject(sizeof(type), objectType)
+#include "lib/list.h"
 
 static uint32_t hashString(const char *key, int length) {
     uint32_t hash = 2166136261u;
@@ -18,7 +16,7 @@ static uint32_t hashString(const char *key, int length) {
     return hash;
 }
 
-static Obj *allocateObject(size_t size, ObjType type) {
+Obj *allocateObject(size_t size, ObjType type) {
     Obj *object = (Obj *) reallocate(NULL, 0, size);
     object->type = type;
     object->isMarked = false;
@@ -82,6 +80,7 @@ void printObject(Value value) {
         case OBJ_STRING:
             printf("%s", AS_CSTRING(value));
             break;
+        case OBJ_NATIVE_METHOD:
         case OBJ_NATIVE:
             printf("<native fn>");
             break;
@@ -91,13 +90,32 @@ void printObject(Value value) {
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
+        case OBJ_BUILTIN_TYPE:
+            printf("<builtin type %s>", AS_CLASS(value)->name->chars);
+            break;
         case OBJ_CLASS:
             printf("<type %s>", AS_CLASS(value)->name->chars);
             break;
-        case OBJ_INSTANCE:
-            printf("<%s instance>",
-                   AS_INSTANCE(value)->klass->name->chars);
+        case OBJ_INSTANCE: {
+            ObjInstance *instance = AS_INSTANCE(value);
+            ObjType objType = instance->klass->obj.type;
+            switch (objType) {
+                case OBJ_CLASS: {
+                    printf("<%s instance>",
+                           AS_INSTANCE(value)->klass->name->chars);
+                    break;
+                }
+                case OBJ_BUILTIN_TYPE: {
+                    ObjBuiltinType *type = (ObjBuiltinType *)AS_INSTANCE(value)->klass;
+                    type->printFn((Obj*) instance);
+                    break;
+                }
+                default: {
+
+                }
+            }
             break;
+        }
         case OBJ_BOUND_METHOD:
             printFunction(AS_BOUND_METHOD(value)->method->function);
             break;

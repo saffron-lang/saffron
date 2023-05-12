@@ -4,6 +4,7 @@
 #include "object.h"
 #include "compiler.h"
 #include "vm.h"
+#include "lib/list.h"
 
 #ifdef DEBUG_LOG_GC
 
@@ -54,6 +55,7 @@ static void freeObject(Obj *object) {
             FREE(ObjString, object);
             break;
         }
+        case OBJ_NATIVE_METHOD:
         case OBJ_NATIVE: {
             FREE(ObjNative, object);
             break;
@@ -69,16 +71,25 @@ static void freeObject(Obj *object) {
             FREE(ObjUpvalue, object);
             break;
         }
+        case OBJ_BUILTIN_TYPE:
         case OBJ_CLASS: {
-            ObjClass* klass = (ObjClass*)object;
+            ObjClass *klass = (ObjClass *) object;
             freeTable(&klass->methods);
             FREE(ObjClass, object);
             break;
         }
         case OBJ_INSTANCE: {
-            ObjInstance* instance = (ObjInstance*)object;
+            ObjInstance *instance = (ObjInstance *) object;
+            ObjType objType = instance->klass->obj.type;
             freeTable(&instance->fields);
-            FREE(ObjInstance, object);
+
+            if (objType == OBJ_BUILTIN_TYPE) {
+                ObjBuiltinType *type = (ObjBuiltinType *) instance->klass;
+                type->freeFn((Obj *) instance);
+            } else {
+                FREE(ObjInstance, object);
+            }
+
             break;
         }
         case OBJ_BOUND_METHOD:
@@ -139,10 +150,10 @@ static void markRoots() {
 
     markTable(&vm.globals);
     markCompilerRoots();
-    markObject((Obj*)vm.initString);
+    markObject((Obj *) vm.initString);
 }
 
-static void markArray(ValueArray *array) {
+void markArray(ValueArray *array) {
     for (int i = 0; i < array->count; i++) {
         markValue(array->values[i]);
     }
@@ -157,6 +168,7 @@ static void blackenObject(Obj *object) {
 
     switch (object->type) {
         case OBJ_NATIVE:
+        case OBJ_NATIVE_METHOD:
         case OBJ_STRING:
             break;
         case OBJ_UPVALUE:
@@ -176,22 +188,29 @@ static void blackenObject(Obj *object) {
             markArray(&function->chunk.constants);
             break;
         }
+        case OBJ_BUILTIN_TYPE:
         case OBJ_CLASS: {
-            ObjClass* klass = (ObjClass*)object;
-            markObject((Obj*)klass->name);
+            ObjClass *klass = (ObjClass *) object;
+            markObject((Obj *) klass->name);
             markTable(&klass->methods);
             break;
         }
         case OBJ_INSTANCE: {
-            ObjInstance* instance = (ObjInstance*)object;
-            markObject((Obj*)instance->klass);
+            ObjInstance *instance = (ObjInstance *) object;
+            markObject((Obj *) instance->klass);
             markTable(&instance->fields);
+
+            ObjType objType = instance->klass->obj.type;
+            if (objType == OBJ_BUILTIN_TYPE) {
+                ObjBuiltinType *type = (ObjBuiltinType *) instance->klass;
+                type->markFn((Obj *) instance);
+            }
             break;
         }
         case OBJ_BOUND_METHOD: {
-            ObjBoundMethod* bound = (ObjBoundMethod*)object;
+            ObjBoundMethod *bound = (ObjBoundMethod *) object;
             markValue(bound->receiver);
-            markObject((Obj*)bound->method);
+            markObject((Obj *) bound->method);
             break;
         }
     }

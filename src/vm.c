@@ -4,16 +4,13 @@
 #include "compiler.h"
 #include "object.h"
 #include "memory.h"
-#include <time.h>
+#include "lib/time.h"
+#include "lib/list.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 
 VM vm;
-
-static Value clockNative(int argCount, Value* args) {
-    return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
-}
 
 static bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
@@ -50,6 +47,7 @@ void initVM() {
     vm.openUpvalues = NULL;
 
     defineNative("clock", clockNative);
+    createListType();
 }
 
 void freeVM() {
@@ -391,6 +389,16 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
+            case OP_LIST: {
+                int argCount = READ_BYTE();
+                ObjList* list = newList();
+                for (int i = 0; i < argCount; i++) {
+                    listPush(list, peek(0));
+                    pop();
+                }
+                push(OBJ_VAL(list));
                 break;
             }
             case OP_CLOSURE: {

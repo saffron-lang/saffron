@@ -5,6 +5,7 @@
 #include "value.h"
 
 typedef enum {
+    OP_LIST,
     OP_CONSTANT,
     OP_CLOSURE,
     OP_NEGATE,
