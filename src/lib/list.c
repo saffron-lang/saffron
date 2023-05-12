@@ -4,11 +4,11 @@
 #include "../memory.h"
 
 
-ObjBuiltinType* listType = NULL;
+ObjBuiltinType *listType = NULL;
 
 ObjList *newList() {
     ObjList *instance = ALLOCATE_OBJ(ObjList, OBJ_INSTANCE);
-    instance->obj.klass = (ObjClass*) listType;
+    instance->obj.klass = (ObjClass *) listType;
     initTable(&instance->obj.fields);
     initValueArray(&instance->items);
     return instance;
@@ -40,13 +40,14 @@ Value listCall(int argCount, Value *args) {
         return OBJ_VAL(newList());
     } else if (argCount == 1) {
         if (IS_STRING(args[0])) {
-            ObjList * list = newList();
+            ObjList *list = newList();
+            push(OBJ_VAL(list));
             ObjString *str = AS_STRING(args[0]);
             for (int i = 0; i < str->length; i++) {
                 listPush(list, OBJ_VAL(copyString(&str->chars[i], 1)));
             }
 
-            return OBJ_VAL(list);
+            return pop();
         } else {
             runtimeError("Unexpected type");
             return NIL_VAL;
@@ -61,7 +62,7 @@ void listPush(ObjList *list, Value item) {
     writeValueArray(&list->items, item);
 }
 
-void listInit(ObjBuiltinType* type) {
+void listInit(ObjBuiltinType *type) {
     type->freeFn = (FreeFn) &freeList;
     type->markFn = (MarkFn) &markList;
     type->printFn = (PrintFn) &printList;

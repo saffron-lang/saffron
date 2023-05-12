@@ -463,8 +463,11 @@ static InterpretResult run() {
             case OP_LIST: {
                 int argCount = READ_BYTE();
                 ObjList *list = newList();
-                for (int i = 0; i < argCount; i++) {
-                    listPush(list, peek(0));
+                push(OBJ_VAL(list));
+                for (int i = 1; i < argCount + 1; i++) {
+                    listPush(list, peek(i));
+                }
+                for (int i = 0; i < argCount + 1; i++) {
                     pop();
                 }
                 push(OBJ_VAL(list));
@@ -615,11 +618,29 @@ InterpretResult interpret(const char *source) {
 }
 
 void push(Value value) {
+#ifdef DEBUG_TRACE_EXECUTION
+    printf("          ");
+    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        printf("[ ");
+        printValue(*slot);
+        printf(" ]");
+    }
+    printf("\n");
+#endif
     *vm.stackTop = value;
     vm.stackTop++;
 }
 
 Value pop() {
+#ifdef DEBUG_TRACE_EXECUTION
+    printf("          ");
+    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        printf("[ ");
+        printValue(*slot);
+        printf(" ]");
+    }
+    printf("\n");
+#endif
     vm.stackTop--;
     return *vm.stackTop;
 }
