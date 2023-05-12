@@ -36,7 +36,25 @@ Value getLength(ObjList *list, int argCount, Value *args) {
 }
 
 Value listCall(int argCount, Value *args) {
-    return OBJ_VAL(newList());
+    if (argCount == 0) {
+        return OBJ_VAL(newList());
+    } else if (argCount == 1) {
+        if (IS_STRING(args[0])) {
+            ObjList * list = newList();
+            ObjString *str = AS_STRING(args[0]);
+            for (int i = 0; i < str->length; i++) {
+                listPush(list, OBJ_VAL(copyString(&str->chars[i], 1)));
+            }
+
+            return OBJ_VAL(list);
+        } else {
+            runtimeError("Unexpected type");
+            return NIL_VAL;
+        }
+    } else {
+        runtimeError("Expected 0 or 1 arguments");
+        return NIL_VAL;
+    }
 }
 
 void listPush(ObjList *list, Value item) {
@@ -52,6 +70,7 @@ ObjBuiltinType *createListType() {
     type->typeCallFn = (TypeCallFn) &listCall;
 
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
+    defineGlobal("list", OBJ_VAL(type));
 
     listType = type;
     return type;

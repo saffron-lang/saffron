@@ -6,3 +6,11 @@ print a.length();
 var b = a.length;
 print b;
 print b();
+
+print list("asd");
+
+class EpicList < list {}
+
+var c = EpicList();
+print c.length();
+
