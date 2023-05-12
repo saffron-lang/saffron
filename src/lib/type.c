@@ -1,7 +1,7 @@
 #include "type.h"
 
 ObjNativeMethod *newNativeMethod(NativeMethodFn function) {
-    ObjNativeMethod *native = ALLOCATE_OBJ(ObjNativeMethod, OBJ_NATIVE);
+    ObjNativeMethod *native = ALLOCATE_OBJ(ObjNativeMethod, OBJ_NATIVE_METHOD);
     native->function = function;
     return native;
 }

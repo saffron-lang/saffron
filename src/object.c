@@ -69,6 +69,7 @@ static void printFunction(ObjFunction *function) {
         printf("<script>");
         return;
     }
+
     printf("<fn %s>", function->name->chars);
 }
 
@@ -116,9 +117,19 @@ void printObject(Value value) {
             }
             break;
         }
-        case OBJ_BOUND_METHOD:
-            printFunction(AS_BOUND_METHOD(value)->method->function);
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod * boundMethod = AS_BOUND_METHOD(value);
+
+            switch (boundMethod->method->obj.type) {
+                case OBJ_CLOSURE:
+                    printFunction(boundMethod->method->function);
+                    break;
+                case OBJ_NATIVE_METHOD:
+                    printf("<builtin method>");
+                    break;
+            }
             break;
+        }
     }
 }
 
