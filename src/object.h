@@ -19,8 +19,7 @@
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
-#define AS_NATIVE(value) \
-    (((ObjNative*)AS_OBJ(value))->function)
+#define AS_NATIVE(value)       (((ObjNative*)AS_OBJ(value))->function)
 #define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
 #define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
 #define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
@@ -92,28 +91,28 @@ typedef struct {
 
 typedef struct {
     Obj obj;
-    ObjClass* klass;
+    ObjClass *klass;
     Table fields;
 } ObjInstance;
 
 typedef struct {
     Obj obj;
     Value receiver;
-    ObjClosure* method;
+    ObjClosure *method;
 } ObjBoundMethod;
 
 ObjFunction *newFunction();
 
-ObjInstance* newInstance(ObjClass* klass);
+ObjInstance *newInstance(ObjClass *klass);
 
-ObjBoundMethod* newBoundMethod(Value receiver,
-                               ObjClosure* method);
+ObjBoundMethod *newBoundMethod(Value receiver,
+                               ObjClosure *method);
 
 ObjClosure *newClosure(ObjFunction *function);
 
 ObjNative *newNative(NativeFn function);
 
-ObjClass* newClass(ObjString* name);
+ObjClass *newClass(ObjString *name);
 
 static inline bool isObjType(Value value, ObjType type) {
     return IS_OBJ(value) && AS_OBJ(value)->type == type;

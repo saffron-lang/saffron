@@ -4,6 +4,9 @@
 #include "../object.h"
 #include "../vm.h"
 
+#define AS_NATIVE_METHOD(value)       (((ObjNativeMethod*)AS_OBJ(value))->function)
+
+
 typedef void (*InitFn)(Obj *object);
 
 typedef Obj *(*NewObjectFn)();

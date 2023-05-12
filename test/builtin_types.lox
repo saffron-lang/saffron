@@ -1,2 +1,8 @@
 var a = [1,2,3,4];
 print a;
+print a.length;
+print a.length();
+
+var b = a.length;
+print b;
+print b();

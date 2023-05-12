@@ -36,7 +36,6 @@ Value getLength(ObjList *list, int argCount, Value *args) {
 }
 
 Value listCall(int argCount, Value *args) {
-
     return OBJ_VAL(newList());
 }
 
