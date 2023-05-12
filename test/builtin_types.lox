@@ -1,17 +1,17 @@
-// for (var i = 0; i < 10; i = i + 1) {
-var a = [1,2,3,4];
-a;
-a.length;
-a.length();
+for (var i = 0; i < 1000; i = i + 1) {
+    var a = [22,23,24,25];
+    a;
+    a.length;
+    a.length();
 
-var b = a.length;
-b;
-b();
+    var b = a.length;
+    b;
+    b();
 
-list("asd");
+    list("asd");
 
-class EpicList < list {}
+    class EpicList < list {}
 
-var c = EpicList();
-c.length();
-// }
+    var c = EpicList();
+    c.length();
+}
