@@ -644,8 +644,24 @@ static uint8_t parseVariable(const char *errorMessage) {
     return identifierConstant(&parser.previous);
 }
 
+static void list() {
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_BRACKET)) {
+        do {
+            expression();
+            argCount++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list items.");
+    emitBytes(OP_LIST, argCount);
+}
+
 static void expression() {
-    parsePrecedence(PREC_ASSIGNMENT);
+    if (match(TOKEN_LEFT_BRACKET)) {
+        list();
+    } else {
+        parsePrecedence(PREC_ASSIGNMENT);
+    }
 }
 
 static void printStatement() {

@@ -26,13 +26,18 @@
 #define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 
+#define ALLOCATE_OBJ(type, objectType) \
+    (type*)allocateObject(sizeof(type), objectType)
+
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
     OBJ_NATIVE,
+    OBJ_NATIVE_METHOD,
     OBJ_CLOSURE,
     OBJ_UPVALUE,
     OBJ_CLASS,
+    OBJ_BUILTIN_TYPE,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
 } ObjType;
@@ -121,5 +126,7 @@ ObjUpvalue *newUpvalue(Value *slot);
 void printObject(Value value);
 
 ObjString *takeString(char *chars, int length);
+
+Obj *allocateObject(size_t size, ObjType type);
 
 #endif
