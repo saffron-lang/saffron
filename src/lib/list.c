@@ -24,7 +24,14 @@ void markList(ObjList *list) {
 }
 
 void printList(ObjList *list) {
-    printf("<list %d>", list->items.count);
+    printf("[");
+    for (int i = 0; i < list->items.count; i++) {
+        printValue(list->items.values[i]);
+        if (i != list->items.count - 1) {
+            printf(", ");
+        }
+    }
+    printf("]\n");
 }
 
 Value getLength(ObjList *list, int argCount, Value *args) {
