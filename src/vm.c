@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "lib/time.h"
 #include "lib/list.h"
+#include "lib/io.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -67,6 +68,8 @@ void initVM() {
     defineGlobal("list", OBJ_VAL(createListType()));
 //    defineGlobal("list", OBJ_VAL(type));
     defineNative("clock", clockNative);
+    defineNative("println", printlnNative);
+    defineNative("print", printNative);
 }
 
 void freeVM() {
@@ -392,11 +395,6 @@ static InterpretResult run() {
                 Value b = pop();
                 Value a = pop();
                 push(BOOL_VAL(valuesEqual(a, b)));
-                break;
-            }
-            case OP_PRINT: {
-                printValue(pop());
-                printf("\n");
                 break;
             }
             case OP_POP:

@@ -31,7 +31,7 @@ void printList(ObjList *list) {
             printf(", ");
         }
     }
-    printf("]\n");
+    printf("]");
 }
 
 Value getLength(ObjList *list, int argCount, Value *args) {
