@@ -99,6 +99,9 @@ static void freeObject(Obj *object) {
         case OBJ_BOUND_METHOD:
             FREE(ObjBoundMethod, object);
             break;
+        case OBJ_CALL_FRAME:
+            FREE(ObjCallFrame, object);
+            break;
     }
 }
 
@@ -142,10 +145,6 @@ static void markRoots() {
         markValue(*slot);
     }
 
-    for (int i = 0; i < vm.frameCount; i++) {
-        markObject((Obj *) vm.frames[i].closure);
-    }
-
     for (ObjUpvalue *upvalue = vm.openUpvalues;
          upvalue != NULL;
          upvalue = upvalue->next) {
@@ -154,6 +153,7 @@ static void markRoots() {
 
     markTable(&vm.globals);
     markTable(&vm.builtins);
+    markArray(&vm.frames);
     markCompilerRoots();
     markObject((Obj *) vm.initString);
 }
@@ -217,6 +217,13 @@ static void blackenObject(Obj *object) {
             markValue(bound->receiver);
             markObject((Obj *) bound->method);
             break;
+        }
+        case OBJ_CALL_FRAME: {
+            ObjCallFrame *frame = (ObjCallFrame *) object;
+            markObject((Obj *) frame->closure);
+            if (frame->parent) {
+                markObject((Obj *) frame->parent);
+            }
         }
     }
 }

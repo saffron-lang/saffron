@@ -24,6 +24,7 @@
 #define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
 #define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
+#define AS_CALL_FRAME(value) ((ObjCallFrame*)AS_OBJ(value))
 
 #define ALLOCATE_OBJ(type, objectType) \
     (type*)allocateObject(sizeof(type), objectType)
@@ -39,6 +40,7 @@ typedef enum {
     OBJ_BUILTIN_TYPE,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
+    OBJ_CALL_FRAME,
 } ObjType;
 
 struct Obj {

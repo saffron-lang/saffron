@@ -96,6 +96,8 @@ void writeValueArray(ValueArray *array, Value value);
 
 void freeValueArray(ValueArray *array);
 
+void popValueArray(ValueArray *array, int index);
+
 void printValue(Value value);
 
 bool valuesEqual(Value a, Value b);
