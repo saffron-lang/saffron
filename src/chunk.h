@@ -20,7 +20,6 @@ typedef enum {
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
-    OP_PRINT,
     OP_POP,
     OP_CLOSE_UPVALUE,
     OP_DEFINE_GLOBAL,

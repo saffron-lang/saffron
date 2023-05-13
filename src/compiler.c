@@ -549,7 +549,6 @@ ParseRule rules[] = {
         [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
-        [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
         [TOKEN_SUPER]         = {super_,   NULL,   PREC_NONE},
         [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
@@ -662,12 +661,6 @@ static void expression() {
     } else {
         parsePrecedence(PREC_ASSIGNMENT);
     }
-}
-
-static void printStatement() {
-    expression();
-    consume(TOKEN_SEMICOLON, "Expect ';' after value.");
-    emitByte(OP_PRINT);
 }
 
 static void expressionStatement() {
@@ -860,9 +853,7 @@ static void returnStatement() {
 }
 
 static void statement() {
-    if (match(TOKEN_PRINT)) {
-        printStatement();
-    } else if (match(TOKEN_IF)) {
+    if (match(TOKEN_IF)) {
         ifStatement();
     } else if (match(TOKEN_RETURN)) {
         returnStatement();
@@ -891,7 +882,6 @@ static void synchronize() {
             case TOKEN_FOR:
             case TOKEN_IF:
             case TOKEN_WHILE:
-            case TOKEN_PRINT:
             case TOKEN_RETURN:
                 return;
 
