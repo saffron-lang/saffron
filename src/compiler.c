@@ -24,7 +24,7 @@ typedef struct {
 
 typedef enum {
     PREC_NONE,
-    PREC_ASSIGNMENT,  // =
+    PREC_ASSIGNMENT,  // = |>
     PREC_OR,          // or
     PREC_AND,         // and
     PREC_EQUALITY,    // == !=
@@ -481,6 +481,11 @@ static void call(bool canAssign) {
     emitBytes(OP_CALL, argCount);
 }
 
+static void pipeCall(bool canAssign) {
+    parsePrecedence(PREC_ASSIGNMENT + 1);
+    emitByte(OP_PIPE);
+}
+
 static void dot(bool canAssign) {
     consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
     uint8_t name = identifierConstant(&parser.previous);
@@ -541,8 +546,9 @@ ParseRule rules[] = {
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACKET]    = {list, NULL, PREC_NONE},
-        [TOKEN_RIGHT_BRACKET]   = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET]  = {list, NULL, PREC_NONE},
+        [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
+        [TOKEN_PIPE]          = {NULL, pipeCall, PREC_ASSIGNMENT},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
