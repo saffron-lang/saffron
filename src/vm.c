@@ -458,6 +458,18 @@ static InterpretResult run() {
                 frame = &vm.frames[vm.frameCount - 1];
                 break;
             }
+            case OP_PIPE: {
+                Value callee = pop();
+                Value argument = pop();
+                push(callee);
+                push(argument);
+
+                if (!callValue(peek(1), 1)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
             case OP_LIST: {
                 int argCount = READ_BYTE();
                 ObjList *list = newList();
