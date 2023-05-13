@@ -64,8 +64,8 @@ typedef enum {
 
 
 typedef struct Compiler {
-    struct Compiler* enclosing;
-    ObjFunction* function;
+    struct Compiler *enclosing;
+    ObjFunction *function;
     FunctionType type;
     Local locals[UINT8_COUNT];
     int localCount;
@@ -74,15 +74,15 @@ typedef struct Compiler {
 } Compiler;
 
 typedef struct ClassCompiler {
-    struct ClassCompiler* enclosing;
+    struct ClassCompiler *enclosing;
     bool hasSuperclass;
 } ClassCompiler;
 
 Parser parser;
-ClassCompiler* currentClass = NULL;
-Compiler* current = NULL;
+ClassCompiler *currentClass = NULL;
+Compiler *current = NULL;
 
-static Chunk* currentChunk() {
+static Chunk *currentChunk() {
     return &current->function->chunk;
 }
 
@@ -160,9 +160,9 @@ static void emitReturn() {
     emitByte(OP_RETURN);
 }
 
-static ObjFunction* endCompiler() {
+static ObjFunction *endCompiler() {
     emitReturn();
-    ObjFunction* function = current->function;
+    ObjFunction *function = current->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
         disassembleChunk(currentChunk(), function->name != NULL
@@ -219,7 +219,7 @@ static void patchJump(int offset) {
     currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static void initCompiler(Compiler* compiler, FunctionType type) {
+static void initCompiler(Compiler *compiler, FunctionType type) {
     compiler->enclosing = current;
     compiler->function = NULL;
     compiler->type = type;
@@ -232,7 +232,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
                                              parser.previous.length);
     }
 
-    Local* local = &current->locals[current->localCount++];
+    Local *local = &current->locals[current->localCount++];
     local->depth = 0;
     local->isCaptured = false;
     if (type != TYPE_FUNCTION) {
@@ -268,6 +268,22 @@ static void unary(bool canAssign) {
         default:
             return; // Unreachable.
     }
+}
+
+
+static void list(bool canAssign) {
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_BRACKET)) {
+        do {
+            if (parser.current.type == TOKEN_RIGHT_BRACKET) {
+                break;
+            }
+            expression();
+            argCount++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list items.");
+    emitBytes(OP_LIST, argCount);
 }
 
 static void binary(bool canAssign) {
@@ -321,14 +337,14 @@ static void string(bool canAssign) {
                                     parser.previous.length - 2)));
 }
 
-static bool identifiersEqual(Token* a, Token* b) {
+static bool identifiersEqual(Token *a, Token *b) {
     if (a->length != b->length) return false;
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static int resolveLocal(Compiler* compiler, Token* name) {
+static int resolveLocal(Compiler *compiler, Token *name) {
     for (int i = compiler->localCount - 1; i >= 0; i--) {
-        Local* local = &compiler->locals[i];
+        Local *local = &compiler->locals[i];
         if (identifiersEqual(name, &local->name)) {
             if (local->depth == -1) {
                 error("Can't read local variable in its own initializer.");
@@ -340,12 +356,12 @@ static int resolveLocal(Compiler* compiler, Token* name) {
     return -1;
 }
 
-static int addUpvalue(Compiler* compiler, uint8_t index,
+static int addUpvalue(Compiler *compiler, uint8_t index,
                       bool isLocal) {
     int upvalueCount = compiler->function->upvalueCount;
 
     for (int i = 0; i < upvalueCount; i++) {
-        Upvalue* upvalue = &compiler->upvalues[i];
+        Upvalue *upvalue = &compiler->upvalues[i];
         if (upvalue->index == index && upvalue->isLocal == isLocal) {
             return i;
         }
@@ -361,18 +377,18 @@ static int addUpvalue(Compiler* compiler, uint8_t index,
     return compiler->function->upvalueCount++;
 }
 
-static int resolveUpvalue(Compiler* compiler, Token* name) {
+static int resolveUpvalue(Compiler *compiler, Token *name) {
     if (compiler->enclosing == NULL) return -1;
 
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
         compiler->enclosing->locals[local].isCaptured = true;
-        return addUpvalue(compiler, (uint8_t)local, true);
+        return addUpvalue(compiler, (uint8_t) local, true);
     }
 
     int upvalue = resolveUpvalue(compiler->enclosing, name);
     if (upvalue != -1) {
-        return addUpvalue(compiler, (uint8_t)upvalue, false);
+        return addUpvalue(compiler, (uint8_t) upvalue, false);
     }
 
 
@@ -396,9 +412,9 @@ static void namedVariable(Token name, bool canAssign) {
 
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitBytes(setOp, (uint8_t)arg);
+        emitBytes(setOp, (uint8_t) arg);
     } else {
-        emitBytes(getOp, (uint8_t)arg);
+        emitBytes(getOp, (uint8_t) arg);
     }
 }
 
@@ -446,6 +462,9 @@ static uint8_t argumentList() {
     uint8_t argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
+            if (parser.current.type == TOKEN_RIGHT_PAREN) {
+                break;
+            }
             expression();
             if (argCount == 255) {
                 error("Can't have more than 255 arguments.");
@@ -487,10 +506,10 @@ static void this_(bool canAssign) {
     variable(false);
 }
 
-static Token syntheticToken(const char* text) {
+static Token syntheticToken(const char *text) {
     Token token;
     token.start = text;
-    token.length = (int)strlen(text);
+    token.length = (int) strlen(text);
     return token;
 }
 
@@ -518,12 +537,14 @@ static void super_(bool canAssign) {
 }
 
 ParseRule rules[] = {
-        [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_CALL},
+        [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET]    = {list, NULL, PREC_NONE},
+        [TOKEN_RIGHT_BRACKET]   = {NULL, NULL, PREC_NONE},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
-        [TOKEN_DOT]           = {NULL,     dot,    PREC_CALL},
+        [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
@@ -540,7 +561,7 @@ ParseRule rules[] = {
         [TOKEN_IDENTIFIER]    = {variable, NULL, PREC_NONE},
         [TOKEN_STRING]        = {string, NULL, PREC_NONE},
         [TOKEN_NUMBER]        = {number, NULL, PREC_NONE},
-        [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
+        [TOKEN_AND]           = {NULL, and_, PREC_AND},
         [TOKEN_CLASS]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
         [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
@@ -548,10 +569,10 @@ ParseRule rules[] = {
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
         [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
-        [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
+        [TOKEN_OR]            = {NULL, or_, PREC_OR},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
-        [TOKEN_SUPER]         = {super_,   NULL,   PREC_NONE},
-        [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
+        [TOKEN_SUPER]         = {super_, NULL, PREC_NONE},
+        [TOKEN_THIS]          = {this_, NULL, PREC_NONE},
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
@@ -593,7 +614,7 @@ static void addLocal(Token name) {
         return;
     }
 
-    Local* local = &current->locals[current->localCount++];
+    Local *local = &current->locals[current->localCount++];
     local->name = name;
     local->depth = -1;
     local->isCaptured = false;
@@ -602,10 +623,10 @@ static void addLocal(Token name) {
 static void declareVariable() {
     if (current->scopeDepth == 0) return;
 
-    Token* name = &parser.previous;
+    Token *name = &parser.previous;
 
     for (int i = current->localCount - 1; i >= 0; i--) {
-        Local* local = &current->locals[i];
+        Local *local = &current->locals[i];
         if (local->depth != -1 && local->depth < current->scopeDepth) {
             break;
         }
@@ -643,24 +664,8 @@ static uint8_t parseVariable(const char *errorMessage) {
     return identifierConstant(&parser.previous);
 }
 
-static void list() {
-    uint8_t argCount = 0;
-    if (!check(TOKEN_RIGHT_BRACKET)) {
-        do {
-            expression();
-            argCount++;
-        } while (match(TOKEN_COMMA));
-    }
-    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list items.");
-    emitBytes(OP_LIST, argCount);
-}
-
 static void expression() {
-    if (match(TOKEN_LEFT_BRACKET)) {
-        list();
-    } else {
-        parsePrecedence(PREC_ASSIGNMENT);
-    }
+    parsePrecedence(PREC_ASSIGNMENT);
 }
 
 static void expressionStatement() {
@@ -718,7 +723,7 @@ static void function(FunctionType type) {
     consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
     block();
 
-    ObjFunction* function = endCompiler();
+    ObjFunction *function = endCompiler();
     emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
     for (int i = 0; i < function->upvalueCount; i++) {
@@ -942,7 +947,6 @@ static void classDeclaration() {
     }
 
 
-
     namedVariable(className, false);
 
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
@@ -975,7 +979,7 @@ static void declaration() {
     if (parser.panicMode) synchronize();
 }
 
-ObjFunction* compile(const char* source) {
+ObjFunction *compile(const char *source) {
     initScanner(source);
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT);
@@ -991,14 +995,14 @@ ObjFunction* compile(const char* source) {
 
     consume(TOKEN_EOF, "Expect end of expression.");
 
-    ObjFunction* function = endCompiler();
+    ObjFunction *function = endCompiler();
     return parser.hadError ? NULL : function;
 }
 
 void markCompilerRoots() {
-    Compiler* compiler = current;
+    Compiler *compiler = current;
     while (compiler != NULL) {
-        markObject((Obj*)compiler->function);
+        markObject((Obj *) compiler->function);
         compiler = compiler->enclosing;
     }
 }
