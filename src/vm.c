@@ -19,7 +19,7 @@ static bool isFalsey(Value value) {
 
 static void resetStack() {
     vm.stackTop = vm.stack;
-    vm.frameCount = 0;
+    initValueArray(&vm.frames);
 }
 
 void defineNative(const char *name, NativeFn function) {
@@ -48,6 +48,8 @@ void defineBuiltin(const char *name, Value value) {
 
 void initVM() {
     resetStack();
+
+    vm.currentFrame = 0;
     vm.objects = NULL;
 
     vm.grayCount = 0;
@@ -107,8 +109,7 @@ void runtimeError(const char *format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    for (int i = vm.frameCount - 1; i >= 0; i--) {
-        CallFrame *frame = &vm.frames[i];
+    for (ObjCallFrame *frame = CURRENT_FRAME; frame->parent != NULL; frame = frame->parent) {
         ObjFunction *function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
         fprintf(stderr, "[line %d] in ",
@@ -132,19 +133,29 @@ static bool call(ObjClosure *closure, int argCount) {
                 return false;
             }
 
-            if (vm.frameCount == FRAMES_MAX) {
+            if (vm.frames.count == FRAMES_MAX) {
                 runtimeError("Stack overflow.");
                 return false;
             }
 
-            CallFrame *frame = &vm.frames[vm.frameCount++];
+            ObjCallFrame *frame = ALLOCATE_OBJ(ObjCallFrame, OBJ_CALL_FRAME);
             frame->closure = closure;
             frame->ip = closure->function->chunk.code;
             frame->slots = vm.stackTop - argCount - 1;
+            frame->state = EXECUTING;
+
+            if (vm.frames.count == 0) {
+                frame->parent = NULL;
+                writeValueArray(&vm.frames, OBJ_VAL(frame));
+            } else {
+                frame->parent = CURRENT_FRAME;
+                vm.frames.values[vm.currentFrame] = OBJ_VAL(frame);
+            }
+
             return true;
         }
         case OBJ_NATIVE_METHOD: {
-            ObjNativeMethod *nativeMethod = (ObjNativeMethod*) closure;
+            ObjNativeMethod *nativeMethod = (ObjNativeMethod *) closure;
             NativeMethodFn native = nativeMethod->function;
             Value result = native(AS_OBJ(peek(0)), argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
@@ -299,7 +310,7 @@ static bool invoke(ObjString *name, int argCount) {
 }
 
 static InterpretResult run() {
-    CallFrame *frame = &vm.frames[vm.frameCount - 1];
+    ObjCallFrame *frame = AS_CALL_FRAME(vm.frames.values[vm.frames.count - 1]);
 
 #define READ_BYTE() (*frame->ip++)
 
@@ -322,10 +333,17 @@ static InterpretResult run() {
       push(valueType(a op b)); \
     } while (false)
 
+#define POP_CALL() \
+    vm.frames.values[vm.currentFrame] = OBJ_VAL(AS_CALL_FRAME(vm.frames.values[vm.currentFrame])->parent); \
+    if (CURRENT_FRAME == NULL) {                               \
+        popValueArray(&vm.frames, vm.currentFrame);                                                           \
+        vm.currentFrame = 0;\
+    }
+
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         printf("          ");
-        for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        for (Value *slot = vm.stack; slot < vm.stackTop; slot++) {
             printf("[ ");
             printValue(*slot);
             printf(" ]");
@@ -333,7 +351,7 @@ static InterpretResult run() {
         printf("\n");
 
         disassembleInstruction(&frame->closure->function->chunk,
-                               (int)(frame->ip - frame->closure->function->chunk.code));
+                               (int) (frame->ip - frame->closure->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -455,7 +473,8 @@ static InterpretResult run() {
                 if (!callValue(peek(argCount), argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = &vm.frames[vm.frameCount - 1];
+
+                frame = CURRENT_FRAME;
                 break;
             }
             case OP_PIPE: {
@@ -467,7 +486,8 @@ static InterpretResult run() {
                 if (!callValue(peek(1), 1)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = &vm.frames[vm.frameCount - 1];
+
+                frame = CURRENT_FRAME;
                 break;
             }
             case OP_LIST: {
@@ -555,7 +575,7 @@ static InterpretResult run() {
                 if (!invoke(method, argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = &vm.frames[vm.frameCount - 1];
+                frame = CURRENT_FRAME;
                 break;
             }
             case OP_INHERIT: {
@@ -587,21 +607,23 @@ static InterpretResult run() {
                 if (!invokeFromClass(superclass, method, argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = &vm.frames[vm.frameCount - 1];
+
+                frame = CURRENT_FRAME;
                 break;
             }
             case OP_RETURN: {
                 Value result = pop();
                 closeUpvalues(frame->slots);
-                vm.frameCount--;
-                if (vm.frameCount == 0) {
+
+                POP_CALL();
+                if (frame->parent == NULL) {
                     pop();
                     return INTERPRET_OK;
                 }
 
                 vm.stackTop = frame->slots;
                 push(result);
-                frame = &vm.frames[vm.frameCount - 1];
+                frame = CURRENT_FRAME;
                 break;
             }
         }
@@ -628,29 +650,11 @@ InterpretResult interpret(const char *source) {
 }
 
 void push(Value value) {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
-        printf("[ ");
-        printValue(*slot);
-        printf(" ]");
-    }
-    printf("\n");
-#endif
     *vm.stackTop = value;
     vm.stackTop++;
 }
 
 Value pop() {
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
-        printf("[ ");
-        printValue(*slot);
-        printf(" ]");
-    }
-    printf("\n");
-#endif
     vm.stackTop--;
     return *vm.stackTop;
 }

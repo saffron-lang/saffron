@@ -28,6 +28,15 @@ void freeValueArray(ValueArray *array) {
     initValueArray(array);
 }
 
+void popValueArray(ValueArray *array, int index) {
+    // Move everything to the left 1
+    for (int i = index; i < array->capacity; i++) {
+        array->values[i] = array->values[i + 1];
+    }
+    array->capacity -= 1;
+}
+
+
 void printValue(Value value) {
 #ifdef NAN_BOXING
     if (IS_BOOL(value)) {
