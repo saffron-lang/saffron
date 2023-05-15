@@ -29,6 +29,8 @@ typedef struct ObjCallFrame {
     CallState state;
 } ObjCallFrame;
 
+ObjCallFrame *currentFrame;
+
 typedef struct {
     ValueArray frames;
     int currentFrame;

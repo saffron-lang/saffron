@@ -24,7 +24,8 @@ typedef struct {
 
 typedef enum {
     PREC_NONE,
-    PREC_ASSIGNMENT,  // = |>
+    PREC_ASSIGNMENT,  // =
+    PREC_YIELD,       // yield |>
     PREC_OR,          // or
     PREC_AND,         // and
     PREC_EQUALITY,    // == !=
@@ -541,6 +542,29 @@ static void super_(bool canAssign) {
     }
 }
 
+static void yield(bool canAssign) {
+    printf("YIELDING\n");
+    if (current->type == TYPE_SCRIPT) {
+        error("Can't yield from top-level code.");
+    }
+
+    if (check(TOKEN_SEMICOLON)) {
+        emitByte(OP_YIELD);
+    } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Can't yield a value from an initializer.");
+        }
+
+        parsePrecedence(PREC_YIELD);
+        emitByte(OP_YIELD);
+    }
+}
+
+static void resume(bool canAssign) {
+    parsePrecedence(PREC_ASSIGNMENT + 1);
+    emitByte(OP_RESUME);
+}
+
 ParseRule rules[] = {
         [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
@@ -548,7 +572,7 @@ ParseRule rules[] = {
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACKET]  = {list, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
-        [TOKEN_PIPE]          = {NULL, pipeCall, PREC_ASSIGNMENT},
+        [TOKEN_PIPE]          = {NULL, pipeCall, PREC_YIELD},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
@@ -582,7 +606,8 @@ ParseRule rules[] = {
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
-        [TOKEN_YIELD]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_YIELD]         = {yield, NULL, PREC_NONE},
+        [TOKEN_RESUME]         = {NULL, resume, PREC_YIELD},
         [TOKEN_AWAIT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},

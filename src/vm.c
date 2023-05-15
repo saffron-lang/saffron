@@ -7,6 +7,7 @@
 #include "lib/time.h"
 #include "lib/list.h"
 #include "lib/io.h"
+#include "lib/async.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -72,6 +73,9 @@ void initVM() {
     defineNative("clock", clockNative);
     defineNative("println", printlnNative);
     defineNative("print", printNative);
+
+    defineBuiltin("generator", OBJ_VAL(createGeneratorType()));
+    defineNative("yield2", yield);
 }
 
 void freeVM() {
@@ -146,9 +150,11 @@ static bool call(ObjClosure *closure, int argCount) {
 
             if (vm.frames.count == 0) {
                 frame->parent = NULL;
+                frame->index = 0;
                 writeValueArray(&vm.frames, OBJ_VAL(frame));
             } else {
                 frame->parent = CURRENT_FRAME;
+                frame->index = frame->parent->index + 1;
                 vm.frames.values[vm.currentFrame] = OBJ_VAL(frame);
             }
 
@@ -157,7 +163,7 @@ static bool call(ObjClosure *closure, int argCount) {
         case OBJ_NATIVE_METHOD: {
             ObjNativeMethod *nativeMethod = (ObjNativeMethod *) closure;
             NativeMethodFn native = nativeMethod->function;
-            Value result = native(AS_OBJ(peek(0)), argCount, vm.stackTop - argCount);
+            Value result = native(AS_OBJ(peek(argCount)), argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
             push(result);
         }
@@ -174,6 +180,7 @@ static bool callValue(Value callee, int argCount) {
                 Value result = native(argCount, vm.stackTop - argCount);
                 vm.stackTop -= argCount + 1;
                 push(result);
+
                 return true;
             }
             case OBJ_BUILTIN_TYPE: {
@@ -309,17 +316,18 @@ static bool invoke(ObjString *name, int argCount) {
     return invokeFromClass(instance->klass, name, argCount);
 }
 
+ObjCallFrame *currentFrame;
 static InterpretResult run() {
-    ObjCallFrame *frame = AS_CALL_FRAME(vm.frames.values[vm.frames.count - 1]);
+    currentFrame = AS_CALL_FRAME(vm.frames.values[vm.frames.count - 1]);
 
-#define READ_BYTE() (*frame->ip++)
+#define READ_BYTE() (*currentFrame->ip++)
 
 #define READ_SHORT() \
-    (frame->ip += 2, \
-    (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+    (currentFrame->ip += 2, \
+    (uint16_t)((currentFrame->ip[-2] << 8) | currentFrame->ip[-1]))
 
 #define READ_CONSTANT() \
-    (frame->closure->function->chunk.constants.values[READ_BYTE()])
+    (currentFrame->closure->function->chunk.constants.values[READ_BYTE()])
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op) \
@@ -350,8 +358,8 @@ static InterpretResult run() {
         }
         printf("\n");
 
-        disassembleInstruction(&frame->closure->function->chunk,
-                               (int) (frame->ip - frame->closure->function->chunk.code));
+        disassembleInstruction(&currentFrame->closure->function->chunk,
+                               (int) (currentFrame->ip - currentFrame->closure->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -445,27 +453,27 @@ static InterpretResult run() {
             }
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                push(frame->slots[slot]);
+                push(currentFrame->slots[slot]);
                 break;
             }
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                frame->slots[slot] = peek(0);
+                currentFrame->slots[slot] = peek(0);
                 break;
             }
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip += offset;
+                currentFrame->ip += offset;
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
-                if (isFalsey(peek(0))) frame->ip += offset;
+                if (isFalsey(peek(0))) currentFrame->ip += offset;
                 break;
             }
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
-                frame->ip -= offset;
+                currentFrame->ip -= offset;
                 break;
             }
             case OP_CALL: {
@@ -474,7 +482,7 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                frame = CURRENT_FRAME;
+                currentFrame = CURRENT_FRAME;
                 break;
             }
             case OP_PIPE: {
@@ -487,7 +495,7 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                frame = CURRENT_FRAME;
+                currentFrame = CURRENT_FRAME;
                 break;
             }
             case OP_LIST: {
@@ -512,9 +520,9 @@ static InterpretResult run() {
                     uint8_t isLocal = READ_BYTE();
                     uint8_t index = READ_BYTE();
                     if (isLocal) {
-                        closure->upvalues[i] = captureUpvalue(frame->slots + index);
+                        closure->upvalues[i] = captureUpvalue(currentFrame->slots + index);
                     } else {
-                        closure->upvalues[i] = frame->closure->upvalues[index];
+                        closure->upvalues[i] = currentFrame->closure->upvalues[index];
                     }
                 }
 
@@ -522,12 +530,12 @@ static InterpretResult run() {
             }
             case OP_GET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
-                push(*frame->closure->upvalues[slot]->location);
+                push(*currentFrame->closure->upvalues[slot]->location);
                 break;
             }
             case OP_SET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
-                *frame->closure->upvalues[slot]->location = peek(0);
+                *currentFrame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
             case OP_CLOSE_UPVALUE:
@@ -575,7 +583,7 @@ static InterpretResult run() {
                 if (!invoke(method, argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                frame = CURRENT_FRAME;
+                currentFrame = CURRENT_FRAME;
                 break;
             }
             case OP_INHERIT: {
@@ -608,22 +616,72 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                frame = CURRENT_FRAME;
+                currentFrame = CURRENT_FRAME;
+                break;
+            }
+            case OP_YIELD: {
+                Value value = pop();
+                pop();
+
+                currentFrame->state = PAUSED;
+
+                ObjGenerator *generator = newGenerator(currentFrame);
+                printf("GENERATING GENERATOR %p\n", generator);
+                push(OBJ_VAL(generator));
+                generator->frame = currentFrame;
+                generator->stored = AS_OBJ(value);
+
+                Value *stackBottom = currentFrame->slots;
+                int i = 0;
+                while (&stackBottom[i] <= vm.stackTop) {
+                    writeValueArray(&generator->stack, stackBottom[i]);
+                    i++;
+                }
+
+                pop();
+
+                vm.stackTop = currentFrame->slots;
+                push(OBJ_VAL(generator));
+                currentFrame = currentFrame->parent;
+                vm.frames.values[vm.currentFrame] = OBJ_VAL(currentFrame);
+
+                break;
+            }
+
+            case OP_RESUME: {
+                Value arg = pop();
+                ObjGenerator *generator = AS_GENERATOR(pop());
+                generator->frame->state = EXECUTING;
+                generator->frame->parent = currentFrame;
+                generator->frame->slots = vm.stackTop + 1;
+
+
+                for (int i = 0; i < generator->stack.count; i++) {
+                    push(generator->stack.values[i]);
+                }
+
+                freeValueArray(&generator->stack);
+
+                push(arg);
+
+                currentFrame = generator->frame;
+                vm.frames.values[vm.currentFrame] = OBJ_VAL(generator->frame);
+
                 break;
             }
             case OP_RETURN: {
                 Value result = pop();
-                closeUpvalues(frame->slots);
+                closeUpvalues(currentFrame->slots);
 
                 POP_CALL();
-                if (frame->parent == NULL) {
+                if (currentFrame->parent == NULL) {
                     pop();
                     return INTERPRET_OK;
                 }
 
-                vm.stackTop = frame->slots;
+                vm.stackTop = currentFrame->slots;
                 push(result);
-                frame = CURRENT_FRAME;
+                currentFrame = CURRENT_FRAME;
                 break;
             }
         }
