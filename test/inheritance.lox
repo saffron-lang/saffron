@@ -1,11 +1,13 @@
+var b = 6;
+
 class Doughnut {
   cook() {
-    print "Dunk in the fryer.";
+    print("Dunk in the fryer.");
     this.finish("sprinkles");
   }
 
   finish(ingredient) {
-    print "Finish with " + ingredient;
+    print("Finish with " + ingredient);
   }
 }
 
@@ -18,4 +20,4 @@ class Cruller < Doughnut {
 
 var a = Cruller();
 a.finish();
-print a.finish;
+print(a.finish);

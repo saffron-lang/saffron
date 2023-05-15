@@ -169,7 +169,15 @@ static TokenType identifierType() {
         case 'o':
             return checkKeyword(1, 1, "r", TOKEN_OR);
         case 'r':
-            return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
+            if (scanner.current - scanner.start > 1 && scanner.start[1] == 'e') {
+                switch (scanner.start[2]) {
+                    case 't':
+                        return checkKeyword(3, 3, "urn", TOKEN_RETURN);
+                    case 's':
+                        return checkKeyword(3, 3, "ume", TOKEN_RESUME);
+                }
+            }
+            break;
         case 's':
             return checkKeyword(1, 4, "uper", TOKEN_SUPER);
         case 't':
@@ -186,7 +194,7 @@ static TokenType identifierType() {
             return checkKeyword(1, 2, "ar", TOKEN_VAR);
         case 'w':
             return checkKeyword(1, 4, "hile", TOKEN_WHILE);
-//        case 'y': return checkKeyword(1, 4, "ield", TOKEN_YIELD);
+        case 'y': return checkKeyword(1, 4, "ield", TOKEN_YIELD);
     }
     return TOKEN_IDENTIFIER;
 }

@@ -1,0 +1,13 @@
+fun finish() {
+  var x = "First print";
+  var r = yield (x + "...oh");
+
+  print("result is ", r);
+  return r + " ok!";
+}
+
+var gen = finish();
+print("Generated generator ", gen);
+"Expression";
+var result = gen resume "asd";
+print("What did we yield? ", result);
