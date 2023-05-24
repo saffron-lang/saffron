@@ -2,22 +2,23 @@ fun function2(x) {
     yield 16384;
     println(x);
     yield 342;
+
+    if (x == 1214) {
+        spawn(function2, 24480);
+    }
 }
 
 fun finish() {
     var x = "First print";
-    var r = yield (x + "...oh");
+    var r = yield nil;
 
-    print("resumed with ", r);
+    println("resumed with ", r);
     spawn(function2, 343);
     spawn(function2, 686);
     spawn(function2, 969);
     spawn(function2, 1214);
-    return r + " ok!";
+    return " ok!";
 }
 
 var gen = finish();
-print("Generated generator ", gen);
-"Expression";
-// var result = gen resume "asdddd";
-// print("What did we yield? ", result);
+println("Function returned", gen);

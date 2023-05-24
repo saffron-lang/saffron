@@ -324,38 +324,45 @@ static bool invoke(ObjString *name, int argCount) {
 ObjCallFrame *currentFrame;
 
 static void load_new_frame() {
+    vm.stackTop = vm.stack;
+    ObjCallFrame *cfr = CURRENT_FRAME;
+
+    CURRENT_FRAME->state = (CURRENT_FRAME->state & (SPAWNED | GENERATOR)) | EXECUTING;
+
+    for (int i = 0; i < CURRENT_FRAME->stack.count; i++) {
+//        printValue(CURRENT_FRAME->stack.values[i]);
+//        printf("\n");
+        push(CURRENT_FRAME->stack.values[i]);
+    }
+
+    freeValueArray(&CURRENT_FRAME->stack);
+
+    push(NIL_VAL);
+}
+
+static void pop_frame() {
     popValueArray(&vm.frames, vm.currentFrame);                                                           \
     vm.currentFrame = 0;
 
     if (CURRENT_FRAME) {
-        ObjCallFrame *cfr = CURRENT_FRAME;
-
-        CURRENT_FRAME->state = (CURRENT_FRAME->state & (SPAWNED | GENERATOR)) | EXECUTING;
-        CURRENT_FRAME->slots = vm.stackTop;
-
-        for (int i = 0; i < CURRENT_FRAME->stack.count; i++) {
-            printValue(CURRENT_FRAME->stack.values[i]);
-            printf("\n");
-            push(CURRENT_FRAME->stack.values[i]);
-        }
-
-        freeValueArray(&CURRENT_FRAME->stack);
-
-        push(NIL_VAL);
+        load_new_frame();
     }
 }
 
-static void POP_CALL() {
+static void POP_CALL(Value result) {
     if (CURRENT_FRAME->state & SPAWNED) {
-        load_new_frame();
+        pop_frame();
     } else {
         if (CURRENT_FRAME->parent == NULL) {
-            load_new_frame();
+            pop_frame();
         } else {
             vm.frames.values[vm.currentFrame] = OBJ_VAL(CURRENT_FRAME->parent);
+            vm.stackTop = currentFrame->slots;
+            push(result);
         }
-
     }
+
+    currentFrame = CURRENT_FRAME;
 }
 
 static InterpretResult run() {
@@ -658,62 +665,14 @@ static InterpretResult run() {
                 Value value = pop();
                 pop();
 
-                ObjTask *generator = newTask(currentFrame);
-//                printf("GENERATING GENERATOR %p\n", generator);
-                push(OBJ_VAL(generator));
-                generator->frame = currentFrame;
-                Value oldStored = currentFrame->stored;
-                currentFrame->stored = value;
-
-                Value *stackBottom = currentFrame->slots;
-                int i = 0;
-                while (&stackBottom[i] <= vm.stackTop) {
-                    writeValueArray(&currentFrame->stack, stackBottom[i]);
-                    i++;
+                Value *stackBottom = vm.stack;
+                while (stackBottom < vm.stackTop + 1) {
+                    writeValueArray(&currentFrame->stack, *stackBottom);
+                    stackBottom++;
                 }
 
-                pop();
-
-                vm.stackTop = currentFrame->slots - 1;
-                int s = currentFrame->state ^ SPAWNED;
-                if (!(currentFrame->state & SPAWNED)) {
-                    if (currentFrame->state ^ GENERATOR) {
-                        push(OBJ_VAL(generator));
-                    } else {
-                        push(oldStored);
-                    }
-//                    currentFrame = currentFrame->parent;
-                    vm.currentFrame = (vm.currentFrame + 1) % vm.frames.count;
-                    currentFrame = CURRENT_FRAME;
-                    vm.frames.values[vm.currentFrame] = OBJ_VAL(currentFrame);
-                }
-
-                ObjCallFrame *nframe = currentFrame;
-                VM *xvm = &vm;
-//                ObjCallFrame *nframe2 = CURRENT_FRAME;
-                printf("count %d\n", vm.frames.count);
+                load_new_frame();
                 currentFrame->state = (currentFrame->state & SPAWNED) | PAUSED | GENERATOR;
-
-                break;
-            }
-
-            case OP_RESUME: {
-                Value arg = pop();
-                ObjTask *generator = AS_GENERATOR(pop());
-                generator->frame->state = (generator->frame->state & (GENERATOR | SPAWNED)) | EXECUTING | GENERATOR;
-                generator->frame->parent = currentFrame;
-                generator->frame->slots = vm.stackTop + 1;
-
-                for (int i = 0; i < generator->frame->stack.count; i++) {
-                    push(generator->frame->stack.values[i]);
-                }
-
-                freeValueArray(&generator->frame->stack);
-
-                push(arg);
-
-                currentFrame = generator->frame;
-                vm.frames.values[vm.currentFrame] = OBJ_VAL(generator->frame);
 
                 break;
             }
@@ -721,30 +680,11 @@ static InterpretResult run() {
                 Value result = pop();
                 closeUpvalues(currentFrame->slots);
 
-                printf("epic count %d\n", vm.frames.count);
-                if (currentFrame->state & GENERATOR) {
-                    POP_CALL();
-                    if (vm.frames.count == 0) {
-                        pop();
-                        return INTERPRET_OK;
-                    }
-
-                    currentFrame->result = result;
-                    vm.stackTop = currentFrame->slots;
-                    if (currentFrame->state ^ SPAWNED) {
-                        push(currentFrame->stored);
-                    }
-                    currentFrame = CURRENT_FRAME;
-                } else {
-                    POP_CALL();
-                    if (currentFrame == NULL) {
-                        pop();
-                        return INTERPRET_OK;
-                    }
-
-                    vm.stackTop = currentFrame->slots;
-                    push(result);
-                    currentFrame = CURRENT_FRAME;
+//                printf("epic count %d\n", vm.frames.count);
+                POP_CALL(result);
+                if (currentFrame == NULL) {
+                    pop();
+                    return INTERPRET_OK;
                 }
 
                 break;

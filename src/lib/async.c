@@ -36,12 +36,12 @@ Value spawn(int argCount, Value *args) {
     writeValueArray(&vm.frames, OBJ_VAL(frame));
     frame->closure = closure;
     frame->ip = closure->function->chunk.code;
-    frame->slots = vm.stackTop - argCount;
+    frame->slots = vm.stack;
     frame->state = EXECUTING | SPAWNED;
     frame->stored = NIL_VAL;
 
     initValueArray(&frame->stack);
-    printf("EPIC ARGCOUNT, %d\n", argCount);
+//    printf("EPIC ARGCOUNT, %d\n", argCount);
     for (int i = 0; i < argCount; i++) {
         writeValueArray(&frame->stack, args[i]);
     }
