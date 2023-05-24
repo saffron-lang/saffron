@@ -5,6 +5,7 @@
 #include "compiler.h"
 #include "vm.h"
 #include "lib/list.h"
+#include "lib/async.h"
 
 #ifdef DEBUG_LOG_GC
 
@@ -82,6 +83,7 @@ static void freeObject(Obj *object) {
             FREE(ObjClass, object);
             break;
         }
+        case OBJ_LIST:
         case OBJ_INSTANCE: {
             ObjInstance *instance = (ObjInstance *) object;
             ObjType objType = instance->klass->obj.type;
@@ -153,8 +155,9 @@ static void markRoots() {
 
     markTable(&vm.globals);
     markTable(&vm.builtins);
-    markArray(&vm.frames);
+    markArray(&vm.tasks);
     markCompilerRoots();
+    markAsyncRoots();
     markObject((Obj *) vm.initString);
 }
 
@@ -200,6 +203,7 @@ static void blackenObject(Obj *object) {
             markTable(&klass->methods);
             break;
         }
+        case OBJ_LIST:
         case OBJ_INSTANCE: {
             ObjInstance *instance = (ObjInstance *) object;
             markObject((Obj *) instance->klass);

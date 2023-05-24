@@ -39,6 +39,7 @@ typedef enum {
     OBJ_CLASS,
     OBJ_BUILTIN_TYPE,
     OBJ_INSTANCE,
+    OBJ_LIST,
     OBJ_BOUND_METHOD,
     OBJ_CALL_FRAME,
 } ObjType;

@@ -5,6 +5,7 @@
 #include "type.h"
 
 #define AS_LIST(value) ((ObjList *)AS_OBJ(value))
+#define IS_LIST(value)     isObjType(value, OBJ_LIST)
 
 typedef struct {
     ObjInstance obj;
@@ -24,6 +25,7 @@ Value listCall(int argCount, Value *args);
 void listPush(ObjList *list, Value item);
 
 Value getLength(ObjList *list, int argCount, Value *args);
+Value* getItem(ObjList *list, int index);
 
 ObjBuiltinType *createListType();
 

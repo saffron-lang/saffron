@@ -20,5 +20,7 @@ fun finish() {
     return " ok!";
 }
 
+yield;
+
 var gen = finish();
 println("Function returned", gen);

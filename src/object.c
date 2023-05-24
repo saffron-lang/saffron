@@ -103,6 +103,7 @@ void printObject(Value value) {
         case OBJ_CLASS:
             printf("<type %s>", AS_CLASS(value)->name->chars);
             break;
+        case OBJ_LIST:
         case OBJ_INSTANCE: {
             ObjInstance *instance = AS_INSTANCE(value);
             ObjType objType = instance->klass->obj.type;

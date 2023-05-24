@@ -1,13 +1,12 @@
 #include <printf.h>
 #include "list.h"
-#include "../object.h"
 #include "../memory.h"
 
 
 ObjBuiltinType *listType = NULL;
 
 ObjList *newList() {
-    ObjList *instance = ALLOCATE_OBJ(ObjList, OBJ_INSTANCE);
+    ObjList *instance = ALLOCATE_OBJ(ObjList, OBJ_LIST);
     instance->obj.klass = (ObjClass *) listType;
     initTable(&instance->obj.fields);
     initValueArray(&instance->items);
@@ -39,6 +38,14 @@ Value getLength(ObjList *list, int argCount, Value *args) {
         return NIL_VAL;
     } else {
         return NUMBER_VAL(list->items.count);
+    }
+}
+
+Value* getItem(ObjList *list, int index) {
+    if (index > list->items.count) {
+        return NULL;
+    } else {
+        return &list->items.values[index];
     }
 }
 
