@@ -5,11 +5,10 @@
 
 ObjBuiltinType *generatorType;
 
-ObjGenerator *newGenerator(ObjCallFrame *frame) {
-    ObjGenerator *instance = ALLOCATE_OBJ(ObjGenerator, OBJ_INSTANCE);
+ObjTask *newTask(ObjCallFrame *frame) {
+    ObjTask *instance = ALLOCATE_OBJ(ObjTask, OBJ_INSTANCE);
     instance->obj.klass = (ObjClass *) generatorType;
     initTable(&instance->obj.fields);
-    initValueArray(&instance->stack);
     instance->frame = frame;
     return instance;
 }
@@ -31,28 +30,46 @@ Value await(int argCount, Value *args) {
 }
 
 Value spawn(int argCount, Value *args) {
+    ObjClosure *closure = AS_CLOSURE(args[0]);
 
+    ObjCallFrame *frame = ALLOCATE_OBJ(ObjCallFrame, OBJ_CALL_FRAME);
+    writeValueArray(&vm.frames, OBJ_VAL(frame));
+    frame->closure = closure;
+    frame->ip = closure->function->chunk.code;
+    frame->slots = vm.stackTop - argCount;
+    frame->state = EXECUTING | SPAWNED;
+    frame->stored = NIL_VAL;
+
+    initValueArray(&frame->stack);
+    printf("EPIC ARGCOUNT, %d\n", argCount);
+    for (int i = 0; i < argCount; i++) {
+        writeValueArray(&frame->stack, args[i]);
+    }
+
+    frame->result = NIL_VAL;
+    frame->parent = NULL;
+    frame->index = currentFrame->index + 1;
 
     return NIL_VAL;
 }
 
-Value resume(ObjGenerator *generator, int argCount, Value *args) {
+Value resume(ObjTask *generator, int argCount, Value *args) {
 
-    return OBJ_VAL(generator->stored);
+    return generator->frame->stored;
 }
 
 
-void freeGenerator(ObjGenerator *generator) {
-    FREE(ObjGenerator, generator);
+void freeGenerator(ObjTask *generator) {
+    FREE(ObjTask, generator);
 }
 
-void markGenerator(ObjGenerator *generator) {
+void markGenerator(ObjTask *generator) {
     markObject((Obj *) generator->frame);
-    markObject((Obj *) generator->stored);
-    markArray(&generator->stack);
+    markValue(generator->frame->stored);
+    markArray(&generator->frame->stack);
 }
 
-void printGenerator(ObjGenerator *generator) {
+void printGenerator(ObjTask *generator) {
     printf("<generator object %p>", generator);
 }
 

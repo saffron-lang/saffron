@@ -30,10 +30,11 @@ void freeValueArray(ValueArray *array) {
 
 void popValueArray(ValueArray *array, int index) {
     // Move everything to the left 1
-    for (int i = index; i < array->capacity; i++) {
+    for (int i = index; i < array->count; i++) {
         array->values[i] = array->values[i + 1];
     }
-    array->capacity -= 1;
+    array->values[array->count - 1] = NIL_VAL;
+    array->count -= 1;
 }
 
 
