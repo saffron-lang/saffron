@@ -20,7 +20,7 @@ static bool isFalsey(Value value) {
 
 static void resetStack() {
     vm.stackTop = vm.stack;
-    initValueArray(&vm.frames);
+    initValueArray(&vm.tasks);
 }
 
 void defineNative(const char *name, NativeFn function) {
@@ -50,7 +50,7 @@ void defineBuiltin(const char *name, Value value) {
 void initVM() {
     resetStack();
 
-    vm.currentFrame = 0;
+    vm.currentTask = 0;
     vm.objects = NULL;
 
     vm.grayCount = 0;
@@ -69,17 +69,21 @@ void initVM() {
 
     defineBuiltin("list", OBJ_VAL(createListType()));
     defineGlobal("list", OBJ_VAL(createListType()));
-//    defineGlobal("list", OBJ_VAL(type));
+
     defineNative("clock", clockNative);
+
     defineNative("println", printlnNative);
     defineNative("print", printNative);
 
-    defineBuiltin("generator", OBJ_VAL(createGeneratorType()));
-    defineNative("yield2", yield);
     defineNative("spawn", spawn);
+    defineNative("sleep", sleep);
+
+    initAsyncHandler();
 }
 
 void freeVM() {
+    freeAsyncHandler();
+
     freeTable(&vm.globals);
     freeTable(&vm.builtins);
     freeTable(&vm.strings);
@@ -114,7 +118,7 @@ void runtimeError(const char *format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    for (ObjCallFrame *frame = CURRENT_FRAME; frame->parent != NULL; frame = frame->parent) {
+    for (ObjCallFrame *frame = CURRENT_TASK; frame->parent != NULL; frame = frame->parent) {
         ObjFunction *function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
         fprintf(stderr, "[line %d] in ",
@@ -138,7 +142,7 @@ static bool call(ObjClosure *closure, int argCount) {
                 return false;
             }
 
-            if (vm.frames.count == FRAMES_MAX) {
+            if (vm.tasks.count == FRAMES_MAX) {
                 runtimeError("Stack overflow.");
                 return false;
             }
@@ -147,20 +151,20 @@ static bool call(ObjClosure *closure, int argCount) {
             frame->closure = closure;
             frame->ip = closure->function->chunk.code;
             frame->slots = vm.stackTop - argCount - 1;
-            frame->state = EXECUTING;
+            frame->state = AWAITED;
             frame->stored = NIL_VAL;
 
             initValueArray(&frame->stack);
             frame->result = NIL_VAL;
 
-            if (vm.frames.count == 0) {
+            if (vm.tasks.count == 0) {
                 frame->parent = NULL;
                 frame->index = 0;
-                writeValueArray(&vm.frames, OBJ_VAL(frame));
+                writeValueArray(&vm.tasks, OBJ_VAL(frame));
             } else {
-                frame->parent = CURRENT_FRAME;
+                frame->parent = CURRENT_TASK;
                 frame->index = frame->parent->index + 1;
-                vm.frames.values[vm.currentFrame] = OBJ_VAL(frame);
+                vm.tasks.values[vm.currentTask] = OBJ_VAL(frame);
             }
 
             return true;
@@ -323,50 +327,56 @@ static bool invoke(ObjString *name, int argCount) {
 
 ObjCallFrame *currentFrame;
 
+static void save_current_frame() {
+    Value *stackBottom = vm.stack;
+    while (stackBottom < vm.stackTop + 1) {
+        writeValueArray(&currentFrame->stack, *stackBottom);
+        stackBottom++;
+    }
+}
+
+
 static void load_new_frame() {
     vm.stackTop = vm.stack;
-    ObjCallFrame *cfr = CURRENT_FRAME;
 
-    CURRENT_FRAME->state = (CURRENT_FRAME->state & (SPAWNED | GENERATOR)) | EXECUTING;
-
-    for (int i = 0; i < CURRENT_FRAME->stack.count; i++) {
-//        printValue(CURRENT_FRAME->stack.values[i]);
+    for (int i = 0; i < CURRENT_TASK->stack.count; i++) {
+//        printValue(CURRENT_TASK->stack.values[i]);
 //        printf("\n");
-        push(CURRENT_FRAME->stack.values[i]);
+        push(CURRENT_TASK->stack.values[i]);
     }
 
-    freeValueArray(&CURRENT_FRAME->stack);
+    freeValueArray(&CURRENT_TASK->stack);
 
     push(NIL_VAL);
 }
 
 static void pop_frame() {
-    popValueArray(&vm.frames, vm.currentFrame);                                                           \
-    vm.currentFrame = 0;
+    popValueArray(&vm.tasks, vm.currentTask);                                                           \
+    vm.currentTask = vm.currentTask % vm.tasks.count;
 
-    if (CURRENT_FRAME) {
+    if (CURRENT_TASK) {
         load_new_frame();
     }
 }
 
 static void POP_CALL(Value result) {
-    if (CURRENT_FRAME->state & SPAWNED) {
+    if (CURRENT_TASK->state & SPAWNED) {
         pop_frame();
     } else {
-        if (CURRENT_FRAME->parent == NULL) {
+        if (CURRENT_TASK->parent == NULL) {
             pop_frame();
         } else {
-            vm.frames.values[vm.currentFrame] = OBJ_VAL(CURRENT_FRAME->parent);
+            vm.tasks.values[vm.currentTask] = OBJ_VAL(CURRENT_TASK->parent);
             vm.stackTop = currentFrame->slots;
             push(result);
         }
     }
 
-    currentFrame = CURRENT_FRAME;
+    currentFrame = CURRENT_TASK;
 }
 
 static InterpretResult run() {
-    currentFrame = AS_CALL_FRAME(vm.frames.values[vm.frames.count - 1]);
+    currentFrame = AS_CALL_FRAME(vm.tasks.values[vm.tasks.count - 1]);
 
 #define READ_BYTE() (*currentFrame->ip++)
 
@@ -399,8 +409,8 @@ static InterpretResult run() {
         }
         printf("\n");
 
-        disassembleInstruction(&currentFrame->closure->function->chunk,
-                               (int) (currentFrame->ip - currentFrame->closure->function->chunk.code));
+        disassembleInstruction(&currentTask->closure->function->chunk,
+                               (int) (currentTask->ip - currentTask->closure->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -524,7 +534,7 @@ static InterpretResult run() {
                 }
 
                 VM *localVM = &vm;
-                currentFrame = CURRENT_FRAME;
+                currentFrame = CURRENT_TASK;
                 break;
             }
             case OP_PIPE: {
@@ -537,7 +547,7 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                currentFrame = CURRENT_FRAME;
+                currentFrame = CURRENT_TASK;
                 break;
             }
             case OP_LIST: {
@@ -625,7 +635,7 @@ static InterpretResult run() {
                 if (!invoke(method, argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                currentFrame = CURRENT_FRAME;
+                currentFrame = CURRENT_TASK;
                 break;
             }
             case OP_INHERIT: {
@@ -658,21 +668,18 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                currentFrame = CURRENT_FRAME;
+                currentFrame = CURRENT_TASK;
                 break;
             }
             case OP_YIELD: {
                 Value value = pop();
-                pop();
+                // I don't remember why this second pop was here
+                // Hope removing it doesn't mess anything up
+                // pop();
 
-                Value *stackBottom = vm.stack;
-                while (stackBottom < vm.stackTop + 1) {
-                    writeValueArray(&currentFrame->stack, *stackBottom);
-                    stackBottom++;
-                }
-
+                save_current_frame();
+                handle_yield_value(value);
                 load_new_frame();
-                currentFrame->state = (currentFrame->state & SPAWNED) | PAUSED | GENERATOR;
 
                 break;
             }
@@ -680,7 +687,7 @@ static InterpretResult run() {
                 Value result = pop();
                 closeUpvalues(currentFrame->slots);
 
-//                printf("epic count %d\n", vm.frames.count);
+//                printf("epic count %d\n", vm.tasks.count);
                 POP_CALL(result);
                 if (currentFrame == NULL) {
                     pop();

@@ -4,25 +4,31 @@
 #ifndef CRAFTING_INTERPRETERS_ASYNC_H
 #define CRAFTING_INTERPRETERS_ASYNC_H
 
-#define AS_GENERATOR(value)       ((ObjTask *)AS_OBJ(value))
-#define IS_GENERATOR(value)     isObjType(value, OBJ_GENERATOR)
-
-
-Value yield(int argCount, Value* args);
-Value spawn(int argCount, Value* args);
-
-
-#define AS_LIST(value) ((ObjList *)AS_OBJ(value))
+typedef enum {
+    SLEEP = 1,
+    WAIT_IO_READ = 2,
+    WAIT_IO_WRITE = 4,
+} YieldType;
 
 typedef struct {
-    ObjInstance obj;
-    ObjCallFrame *frame;
-} ObjTask;
+    ObjCallFrame *task;
+    double time;
+} Sleeper;
 
-ObjTask *newTask(ObjCallFrame *frame);
+#define AS_SLEEPER(value) ((Sleeper*)AS_OBJ(value))
 
-Value resume(ObjTask *generator, int argCount, Value *args);
+Value spawn(int argCount, Value* args);
+Value sleep(int argCount, Value* args);
 
-ObjBuiltinType *createGeneratorType();
+typedef struct {
+    ValueArray sleepers;
+} AsyncHandler;
+
+extern AsyncHandler asyncHandler;
+
+void initAsyncHandler();
+void freeAsyncHandler();
+void markAsyncRoots();
+void handle_yield_value(Value value);
 
 #endif //CRAFTING_INTERPRETERS_ASYNC_H

@@ -543,18 +543,16 @@ static void super_(bool canAssign) {
 }
 
 static void yield(bool canAssign) {
-    printf("YIELDING\n");
-    if (current->type == TYPE_SCRIPT) {
-        error("Can't yield from top-level code.");
-    }
-
+//    if (current->type == TYPE_SCRIPT) {
+//        error("Can't yield from top-level code.");
+//    }
     if (check(TOKEN_SEMICOLON)) {
+        emitByte(OP_NIL);
         emitByte(OP_YIELD);
     } else {
-        if (current->type == TYPE_INITIALIZER) {
-            error("Can't yield a value from an initializer.");
-        }
-
+//        if (current->type == TYPE_INITIALIZER) {
+//            error("Can't yield a value from an initializer.");
+//        }
         parsePrecedence(PREC_YIELD);
         emitByte(OP_YIELD);
     }

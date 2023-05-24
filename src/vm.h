@@ -9,15 +9,9 @@
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
-//#define PUSH_FRAME(value)
-#define CURRENT_FRAME \
-    AS_CALL_FRAME(vm.frames.values[vm.currentFrame])
-
 typedef enum {
-    EXECUTING = 1,
-    PAUSED = 2,
-    GENERATOR = 4,
-    SPAWNED = 8,
+    AWAITED = 0,
+    SPAWNED = 1,
 } CallState;
 
 typedef struct ObjCallFrame {
@@ -36,9 +30,12 @@ typedef struct ObjCallFrame {
 
 ObjCallFrame *currentFrame;
 
+#define CURRENT_TASK \
+    AS_CALL_FRAME(vm.tasks.values[vm.currentTask])
+
 typedef struct {
-    ValueArray frames;
-    int currentFrame;
+    ValueArray tasks;
+    int currentTask;
 
     Value stack[STACK_MAX];
     Value* stackTop;
