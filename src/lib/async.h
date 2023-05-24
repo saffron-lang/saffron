@@ -4,7 +4,8 @@
 #ifndef CRAFTING_INTERPRETERS_ASYNC_H
 #define CRAFTING_INTERPRETERS_ASYNC_H
 
-#define AS_GENERATOR(value)       ((ObjGenerator *)AS_OBJ(value))
+#define AS_GENERATOR(value)       ((ObjTask *)AS_OBJ(value))
+#define IS_GENERATOR(value)     isObjType(value, OBJ_GENERATOR)
 
 
 Value yield(int argCount, Value* args);
@@ -16,13 +17,11 @@ Value spawn(int argCount, Value* args);
 typedef struct {
     ObjInstance obj;
     ObjCallFrame *frame;
-    Obj *stored;
-    ValueArray stack;
-} ObjGenerator;
+} ObjTask;
 
-ObjGenerator *newGenerator(ObjCallFrame *frame);
+ObjTask *newTask(ObjCallFrame *frame);
 
-Value resume(ObjGenerator *generator, int argCount, Value *args);
+Value resume(ObjTask *generator, int argCount, Value *args);
 
 ObjBuiltinType *createGeneratorType();
 

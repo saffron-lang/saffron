@@ -14,9 +14,10 @@
     AS_CALL_FRAME(vm.frames.values[vm.currentFrame])
 
 typedef enum {
-    EXECUTING,
-    PAUSED,
-    AWAITING,
+    EXECUTING = 1,
+    PAUSED = 2,
+    GENERATOR = 4,
+    SPAWNED = 8,
 } CallState;
 
 typedef struct ObjCallFrame {
@@ -27,6 +28,10 @@ typedef struct ObjCallFrame {
     Value* slots;
     struct ObjCallFrame* parent;
     CallState state;
+
+    Value stored;
+    ValueArray stack;
+    Value result;
 } ObjCallFrame;
 
 ObjCallFrame *currentFrame;
