@@ -1,9 +1,9 @@
 #include <math.h>
-#include <printf.h>
 #include "async.h"
 #include "../memory.h"
 #include "list.h"
 #include "time.h"
+#include "future.h"
 
 AsyncHandler asyncHandler;
 
@@ -28,7 +28,7 @@ Value spawnNative(int argCount, Value *args) {
     frame->parent = NULL;
     frame->index = currentFrame->index + 1;
 
-    return NIL_VAL;
+    return OBJ_VAL(newFuture(frame));
 }
 
 void initAsyncHandler() {
@@ -82,6 +82,7 @@ void handle_yield_value(Value value) {
     }
 }
 
+// TODO: Make the queue a heapq
 int getTasks() {
     if (!asyncHandler.sleepers.count) {
         return 0;

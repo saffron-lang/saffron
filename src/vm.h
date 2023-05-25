@@ -13,6 +13,7 @@ typedef enum {
     AWAITED = 0,
     SPAWNED = 1,
     INITIATED = 2,
+    FINISHED = 4,
 } CallState;
 
 typedef struct ObjCallFrame {

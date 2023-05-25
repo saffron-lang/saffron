@@ -8,6 +8,7 @@
 #include "lib/list.h"
 #include "lib/io.h"
 #include "lib/async.h"
+#include "lib/future.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -77,6 +78,7 @@ void initVM() {
     defineNative("print", printNative);
 
     defineNative("spawn", spawnNative);
+    defineBuiltin("future", OBJ_VAL(createFutureType()));
 //    defineNative("sleep", sleepNative);
 
     initAsyncHandler();
@@ -360,8 +362,7 @@ void load_new_frame() {
 
     freeValueArray(&CURRENT_TASK->stack);
 
-    // TODO: So the yield evaluates to an expression before popping
-
+    // So the yield evaluates to an expression before popping
     if (CURRENT_TASK->state & INITIATED) {
         push(CURRENT_TASK->stored);
     } else {
@@ -381,6 +382,7 @@ static void pop_frame() {
 }
 
 static void POP_CALL(Value result) {
+    CURRENT_TASK->result = result;
     if (CURRENT_TASK->state & SPAWNED) {
         pop_frame();
     } else {
@@ -715,6 +717,7 @@ static InterpretResult run() {
                             case -1: {
                                 unsigned int utime = 10000;
                                 usleep(utime);
+                                // TODO: Sleep until the first timer instead of bit by bit
                                 continue;
                             }
                             case 1: {
@@ -731,6 +734,7 @@ static InterpretResult run() {
             }
             case OP_RETURN: {
                 Value result = pop();
+                currentFrame->state |= FINISHED;
                 closeUpvalues(currentFrame->slots);
 
 //                printf("epic count %d\n", vm.tasks.count);

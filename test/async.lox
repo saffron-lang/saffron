@@ -3,6 +3,7 @@ var SLEEP = 1;
 fun function2(x) {
     yield [SLEEP, x];
     println("Slept ", x, " seconds");
+    return x + 1;
 }
 
 fun finish() {
@@ -13,7 +14,14 @@ fun finish() {
     spawn(function2, 1);
     spawn(function2, 2);
     spawn(function2, 3);
-    spawn(function2, 4);
+    var future = spawn(function2, 4);
+
+    println(future);
+    println("Future is done: ", future.isReady());
+    yield [SLEEP, 5];
+    println("Future is done: ", future.isReady());
+    println("Future result: ", future.getResult());
+
     return " ok!";
 }
 
