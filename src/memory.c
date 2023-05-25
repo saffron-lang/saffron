@@ -4,8 +4,8 @@
 #include "object.h"
 #include "compiler.h"
 #include "vm.h"
-#include "lib/list.h"
-#include "lib/async.h"
+#include "libc/list.h"
+#include "libc/async.h"
 
 #ifdef DEBUG_LOG_GC
 

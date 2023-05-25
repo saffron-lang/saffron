@@ -4,11 +4,11 @@
 #include "compiler.h"
 #include "object.h"
 #include "memory.h"
-#include "lib/time.h"
-#include "lib/list.h"
-#include "lib/io.h"
-#include "lib/async.h"
-#include "lib/future.h"
+#include "libc/time.h"
+#include "libc/list.h"
+#include "libc/io.h"
+#include "libc/async.h"
+#include "libc/task.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -78,7 +78,7 @@ void initVM() {
     defineNative("print", printNative);
 
     defineNative("spawn", spawnNative);
-    defineBuiltin("future", OBJ_VAL(createFutureType()));
+    defineBuiltin("future", OBJ_VAL(createTaskType()));
 //    defineNative("sleep", sleepNative);
 
     initAsyncHandler();
