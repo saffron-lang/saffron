@@ -1,9 +1,17 @@
 var SLEEP = 1;
 
+fun join(future) {
+    while (!future.isReady()) {
+        yield;
+    }
+
+    return future.getResult();
+}
+
 fun function2(x) {
     yield [SLEEP, x];
     println("Slept ", x, " seconds");
-    return x + 1;
+    return true;
 }
 
 fun finish() {
@@ -18,7 +26,7 @@ fun finish() {
 
     println(future);
     println("Future is done: ", future.isReady());
-    yield [SLEEP, 5];
+    join(future);
     println("Future is done: ", future.isReady());
     println("Future result: ", future.getResult());
 

@@ -154,7 +154,7 @@ static bool call(ObjClosure *closure, int argCount) {
             frame->closure = closure;
             frame->ip = closure->function->chunk.code;
             frame->slots = vm.stackTop - argCount - 1;
-            frame->state = AWAITED;
+            frame->state = AWAITED | INITIATED;
             frame->stored = NIL_VAL;
 
             initValueArray(&frame->stack);
@@ -337,7 +337,7 @@ static void save_current_frame() {
 //    printValue(OBJ_VAL(currentFrame));
 //    printf("\n");
 
-    while (stackBottom < vm.stackTop + 1) {
+    while (stackBottom < vm.stackTop) {
 //        printf("Saving value: ");
 //        printValue(*stackBottom);
 //        printf("\n");
@@ -373,7 +373,10 @@ void load_new_frame() {
 }
 
 static void pop_frame() {
-    popValueArray(&vm.tasks, vm.currentTask);                                                           \
+    popValueArray(&vm.tasks, vm.currentTask);
+    if (vm.currentTask >= vm.tasks.count) {
+        getTasks();
+    }
     vm.currentTask = vm.currentTask % vm.tasks.count;
 
     if (CURRENT_TASK) {
@@ -717,7 +720,7 @@ static InterpretResult run() {
                             case -1: {
                                 unsigned int utime = 10000;
                                 usleep(utime);
-                                // TODO: Sleep until the first timer instead of bit by bit
+                                // TODO: Sleep until a task is ready bit by bit
                                 continue;
                             }
                             case 1: {

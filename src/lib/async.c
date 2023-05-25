@@ -69,6 +69,9 @@ void handle_yield_value(Value value) {
                 writeValueArray(&asyncHandler.sleeper_times, NUMBER_VAL(getTime() + time));
 
                 popValueArray(&vm.tasks, vm.currentTask);
+                if (vm.currentTask >= vm.tasks.count) {
+                    getTasks();
+                }
                 vm.currentTask = vm.currentTask % vm.tasks.count;
 
                 break;
@@ -78,6 +81,9 @@ void handle_yield_value(Value value) {
                 return;
         }
     } else {
+        if ((vm.currentTask + 1) >= vm.tasks.count) {
+            getTasks();
+        }
         vm.currentTask = (vm.currentTask + 1) % vm.tasks.count;
     }
 }
