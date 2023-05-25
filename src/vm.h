@@ -12,6 +12,7 @@
 typedef enum {
     AWAITED = 0,
     SPAWNED = 1,
+    INITIATED = 2,
 } CallState;
 
 typedef struct ObjCallFrame {
@@ -74,5 +75,6 @@ void defineNative(const char *name, NativeFn function);
 void defineGlobal(const char *name, Value value);
 void defineBuiltin(const char *name, Value value);
 void runtimeError(const char *format, ...);
+void load_new_frame();
 
 #endif

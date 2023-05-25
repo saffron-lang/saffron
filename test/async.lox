@@ -1,26 +1,23 @@
-fun function2(x) {
-    yield 16384;
-    println(x);
-    yield 342;
+var SLEEP = 1;
 
-    if (x == 1214) {
-        spawn(function2, 24480);
-    }
+fun function2(x) {
+    yield [SLEEP, x];
+    println("Slept ", x, " seconds");
 }
 
 fun finish() {
     var x = "First print";
-    var r = yield nil;
+    var r = yield;
 
     println("resumed with ", r);
-    spawn(function2, 343);
-    spawn(function2, 686);
-    spawn(function2, 969);
-    spawn(function2, 1214);
+    spawn(function2, 1);
+    spawn(function2, 2);
+    spawn(function2, 3);
+    spawn(function2, 4);
     return " ok!";
 }
 
-yield;
+println("Clocky time", clock());
 
 var gen = finish();
 println("Function returned", gen);

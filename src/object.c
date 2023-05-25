@@ -87,6 +87,9 @@ void printObject(Value value) {
         case OBJ_NATIVE:
             printf("<native fn %p>", AS_NATIVE(value));
             break;
+        case OBJ_CALL_FRAME:
+            printf("<callframe %p>", AS_CALL_FRAME(value));
+            break;
         case OBJ_CLOSURE:
             printFunction(AS_CLOSURE(value)->function);
             break;
