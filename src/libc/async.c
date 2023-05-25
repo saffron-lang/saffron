@@ -3,7 +3,7 @@
 #include "../memory.h"
 #include "list.h"
 #include "time.h"
-#include "future.h"
+#include "task.h"
 
 AsyncHandler asyncHandler;
 
@@ -28,7 +28,7 @@ Value spawnNative(int argCount, Value *args) {
     frame->parent = NULL;
     frame->index = currentFrame->index + 1;
 
-    return OBJ_VAL(newFuture(frame));
+    return OBJ_VAL(newTask(frame));
 }
 
 void initAsyncHandler() {

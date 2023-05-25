@@ -5,7 +5,7 @@
 #include "object.h"
 #include "value.h"
 #include "vm.h"
-#include "lib/list.h"
+#include "libc/list.h"
 
 static uint32_t hashString(const char *key, int length) {
     uint32_t hash = 2166136261u;

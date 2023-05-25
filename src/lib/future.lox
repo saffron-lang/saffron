@@ -1,0 +1,25 @@
+class Future {
+    init() {
+        this.result = nil;
+    }
+
+    setResult(result) {
+        this.result = result;
+    }
+
+    getResult() {
+        return this.result;
+    }
+
+    isReady() {
+        return this.result != nil;
+    }
+
+    join() {
+        while (!this.isReady()) {
+            yield;
+        }
+
+        return this.getResult();
+    }
+}
