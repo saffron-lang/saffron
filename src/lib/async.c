@@ -1,11 +1,13 @@
 #include <math.h>
+#include <printf.h>
 #include "async.h"
 #include "../memory.h"
 #include "list.h"
+#include "time.h"
 
 AsyncHandler asyncHandler;
 
-Value spawn(int argCount, Value *args) {
+Value spawnNative(int argCount, Value *args) {
     ObjClosure *closure = AS_CLOSURE(args[0]);
 
     ObjCallFrame *frame = ALLOCATE_OBJ(ObjCallFrame, OBJ_CALL_FRAME);
@@ -31,14 +33,17 @@ Value spawn(int argCount, Value *args) {
 
 void initAsyncHandler() {
     initValueArray(&asyncHandler.sleepers);
+    initValueArray(&asyncHandler.sleeper_times);
 }
 
 void freeAsyncHandler() {
     freeValueArray(&asyncHandler.sleepers);
+    freeValueArray(&asyncHandler.sleeper_times);
 }
 
 void markAsyncRoots() {
     markArray(&asyncHandler.sleepers);
+    markArray(&asyncHandler.sleeper_times);
 }
 
 void handle_yield_value(Value value) {
@@ -50,14 +55,51 @@ void handle_yield_value(Value value) {
         }
 
         int op = trunc(AS_NUMBER(*arg));
+
         switch (op) {
             case SLEEP: {
-                writeValueArray(&asyncHandler.sleepers, currentFrame)
+                Value *timeArg = getItem(list, 1);
+                if (arg == NULL || !IS_NUMBER(*timeArg)) {
+                    runtimeError("Yielded invalid type");
+                }
+
+                double time = AS_NUMBER(*timeArg);
+
+                writeValueArray(&asyncHandler.sleepers, OBJ_VAL(currentFrame));
+                writeValueArray(&asyncHandler.sleeper_times, NUMBER_VAL(getTime() + time));
+
+                popValueArray(&vm.tasks, vm.currentTask);
+                vm.currentTask = vm.currentTask % vm.tasks.count;
+
                 break;
             }
             default:
-                runtimeError("Invalid op");
+                runtimeError("Invalid yield op %d", op);
                 return;
         }
+    } else {
+        vm.currentTask = (vm.currentTask + 1) % vm.tasks.count;
+    }
+}
+
+int getTasks() {
+    if (!asyncHandler.sleepers.count) {
+        return 0;
+    } else {
+        int found = -1;
+        for (int i = 0; i < asyncHandler.sleepers.count; i++) {
+//            printf("Sleeper time: %f %f\n", AS_NUMBER(asyncHandler.sleeper_times.values[i]), getTime());
+            if (AS_NUMBER(asyncHandler.sleeper_times.values[i]) < getTime()) {
+                popValueArray(&asyncHandler.sleeper_times, i);
+                Value sleeper = asyncHandler.sleepers.values[i];
+                AS_CALL_FRAME(sleeper)->stored = BOOL_VAL(true);
+                writeValueArray(&vm.tasks, sleeper);
+                popValueArray(&asyncHandler.sleepers, i);
+                found = 1;
+                i--;
+            }
+        }
+
+        return found;
     }
 }

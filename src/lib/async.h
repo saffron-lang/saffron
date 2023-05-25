@@ -17,11 +17,12 @@ typedef struct {
 
 #define AS_SLEEPER(value) ((Sleeper*)AS_OBJ(value))
 
-Value spawn(int argCount, Value* args);
-Value sleep(int argCount, Value* args);
+Value spawnNative(int argCount, Value* args);
+//Value sleepNative(int argCount, Value* args);
 
 typedef struct {
     ValueArray sleepers;
+    ValueArray sleeper_times;
 } AsyncHandler;
 
 extern AsyncHandler asyncHandler;
@@ -30,5 +31,6 @@ void initAsyncHandler();
 void freeAsyncHandler();
 void markAsyncRoots();
 void handle_yield_value(Value value);
+int getTasks();
 
 #endif //CRAFTING_INTERPRETERS_ASYNC_H

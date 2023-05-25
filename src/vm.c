@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <libc.h>
 
 VM vm;
 
@@ -75,8 +76,8 @@ void initVM() {
     defineNative("println", printlnNative);
     defineNative("print", printNative);
 
-    defineNative("spawn", spawn);
-    defineNative("sleep", sleep);
+    defineNative("spawn", spawnNative);
+//    defineNative("sleep", sleepNative);
 
     initAsyncHandler();
 }
@@ -328,18 +329,30 @@ static bool invoke(ObjString *name, int argCount) {
 ObjCallFrame *currentFrame;
 
 static void save_current_frame() {
+    freeValueArray(&currentFrame->stack);
     Value *stackBottom = vm.stack;
+//    printf("Saving into: ");
+//    printValue(OBJ_VAL(currentFrame));
+//    printf("\n");
+
     while (stackBottom < vm.stackTop + 1) {
+//        printf("Saving value: ");
+//        printValue(*stackBottom);
+//        printf("\n");
         writeValueArray(&currentFrame->stack, *stackBottom);
         stackBottom++;
     }
 }
 
 
-static void load_new_frame() {
+void load_new_frame() {
     vm.stackTop = vm.stack;
 
+//    printf("Loading from: ");
+//    printValue(OBJ_VAL(CURRENT_TASK));
+//    printf("\n");
     for (int i = 0; i < CURRENT_TASK->stack.count; i++) {
+//        printf("Loading value: ");
 //        printValue(CURRENT_TASK->stack.values[i]);
 //        printf("\n");
         push(CURRENT_TASK->stack.values[i]);
@@ -347,7 +360,15 @@ static void load_new_frame() {
 
     freeValueArray(&CURRENT_TASK->stack);
 
-    push(NIL_VAL);
+    // TODO: So the yield evaluates to an expression before popping
+
+    if (CURRENT_TASK->state & INITIATED) {
+        push(CURRENT_TASK->stored);
+    } else {
+        CURRENT_TASK->state |= INITIATED;
+    }
+
+    currentFrame = CURRENT_TASK;
 }
 
 static void pop_frame() {
@@ -409,8 +430,8 @@ static InterpretResult run() {
         }
         printf("\n");
 
-        disassembleInstruction(&currentTask->closure->function->chunk,
-                               (int) (currentTask->ip - currentTask->closure->function->chunk.code));
+        disassembleInstruction(&currentFrame->closure->function->chunk,
+                               (int) (currentFrame->ip - currentFrame->closure->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -554,7 +575,7 @@ static InterpretResult run() {
                 int argCount = READ_BYTE();
                 ObjList *list = newList();
                 push(OBJ_VAL(list));
-                for (int i = 1; i < argCount + 1; i++) {
+                for (int i = argCount; i > 0; i--) {
                     listPush(list, peek(i));
                 }
                 for (int i = 0; i < argCount + 1; i++) {
@@ -679,7 +700,32 @@ static InterpretResult run() {
 
                 save_current_frame();
                 handle_yield_value(value);
-                load_new_frame();
+
+                if (vm.tasks.count) {
+                    load_new_frame();
+                } else {
+                    int status;
+                    while (true) {
+                        status = getTasks();
+                        switch (status) {
+                            case 0: {
+                                pop();
+                                return INTERPRET_OK;
+                            }
+                            case -1: {
+                                unsigned int utime = 10000;
+                                usleep(utime);
+                                continue;
+                            }
+                            case 1: {
+                                load_new_frame();
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                currentFrame = CURRENT_TASK;
 
                 break;
             }
@@ -690,8 +736,26 @@ static InterpretResult run() {
 //                printf("epic count %d\n", vm.tasks.count);
                 POP_CALL(result);
                 if (currentFrame == NULL) {
-                    pop();
-                    return INTERPRET_OK;
+                    int status;
+                    while (true) {
+                        status = getTasks();
+                        switch (status) {
+                            case 0: {
+                                pop();
+                                return INTERPRET_OK;
+                            }
+                            case -1: {
+                                unsigned int utime = 10000;
+                                usleep(utime);
+                                continue;
+                            }
+                            case 1: {
+                                load_new_frame();
+                                break;
+                            }
+                        }
+                        break;
+                    }
                 }
 
                 break;
