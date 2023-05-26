@@ -50,6 +50,7 @@ static void freeObject(Obj *object) {
             FREE(ObjFunction, object);
             break;
         }
+        case OBJ_ATOM:
         case OBJ_STRING: {
             ObjString *string = (ObjString *) object;
 #ifdef DEBUG_LOG_GC
@@ -178,6 +179,7 @@ static void blackenObject(Obj *object) {
     switch (object->type) {
         case OBJ_NATIVE:
         case OBJ_NATIVE_METHOD:
+        case OBJ_ATOM:
         case OBJ_STRING:
             break;
         case OBJ_UPVALUE:
@@ -271,6 +273,7 @@ void collectGarbage() {
     markRoots();
     traceReferences();
     tableRemoveWhite(&vm.strings);
+    tableRemoveWhite(&vm.atoms);
     sweep();
 
     vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;

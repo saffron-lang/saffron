@@ -31,6 +31,7 @@
 
 typedef enum {
     OBJ_STRING,
+    OBJ_ATOM,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_NATIVE_METHOD,
@@ -72,6 +73,10 @@ struct ObjString {
     char *chars;
     uint32_t hash;
 };
+
+typedef struct {
+    ObjString obj;
+} ObjAtom;
 
 typedef struct ObjUpvalue {
     Obj obj;
@@ -123,6 +128,7 @@ static inline bool isObjType(Value value, ObjType type) {
 }
 
 ObjString *copyString(const char *chars, int length);
+ObjAtom *copyAtom(const char *chars, int length);
 
 ObjUpvalue *newUpvalue(Value *slot);
 
