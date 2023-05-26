@@ -42,6 +42,7 @@ typedef enum {
     OBJ_LIST,
     OBJ_BOUND_METHOD,
     OBJ_CALL_FRAME,
+    OBJ_MODULE,
 } ObjType;
 
 struct Obj {

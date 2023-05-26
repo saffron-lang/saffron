@@ -153,7 +153,8 @@ static void markRoots() {
         markObject((Obj *) upvalue);
     }
 
-    markTable(&vm.globals);
+    markTable(&vm.types);
+    markTable(&vm.modules);
     markTable(&vm.builtins);
     markArray(&vm.tasks);
     markCompilerRoots();

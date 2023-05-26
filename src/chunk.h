@@ -44,8 +44,8 @@ typedef enum {
     OP_INHERIT,
     OP_YIELD,
     OP_RESUME,
-    OP_AWAIT,
     OP_RETURN,
+    OP_IMPORT,
 } OpCode;
 
 typedef struct {

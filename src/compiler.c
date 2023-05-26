@@ -868,6 +868,13 @@ static void forStatement() {
     endScope();
 }
 
+static void importStatement() {
+    consume(TOKEN_STRING, "Expect '\"' after import.");
+    string(false);
+    consume(TOKEN_SEMICOLON, "Expect ';' after import.");
+    emitByte(OP_IMPORT);
+}
+
 static void returnStatement() {
     if (current->type == TYPE_SCRIPT) {
         error("Can't return from top-level code.");
@@ -899,6 +906,8 @@ static void statement() {
         beginScope();
         block();
         endScope();
+    } else if (match(TOKEN_IMPORT)) {
+        importStatement();
     } else {
         expressionStatement();
     }
