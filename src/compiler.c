@@ -245,8 +245,6 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
     }
 }
 
-static void expression();
-
 static void number(bool canAssign) {
     double value = strtod(parser.previous.start, NULL);
     emitConstant(NUMBER_VAL(value));
@@ -693,8 +691,47 @@ static uint8_t parseVariable(const char *errorMessage) {
     return identifierConstant(&parser.previous);
 }
 
+static void beginScope();
+static void block();
+
+static void anonFunction() {
+    Compiler compiler;
+    initCompiler(&compiler, TYPE_FUNCTION);
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after fun keyword.");
+
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            current->function->arity++;
+            if (current->function->arity > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+            uint8_t constant = parseVariable("Expect parameter name.");
+            defineVariable(constant);
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TOKEN_ARROW, "Expect '=>' after parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    ObjFunction *function = endCompiler();
+    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+    for (int i = 0; i < function->upvalueCount; i++) {
+        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+        emitByte(compiler.upvalues[i].index);
+    }
+}
+
 static void expression() {
-    parsePrecedence(PREC_ASSIGNMENT);
+    if (match(TOKEN_FUN)) {
+        anonFunction();
+    } else {
+        parsePrecedence(PREC_ASSIGNMENT);
+    }
 }
 
 static void expressionStatement() {
