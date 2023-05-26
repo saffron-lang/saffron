@@ -3,4 +3,6 @@ var a = fun () => {
 };
 
 println(a());
+println(:atom == "atom");
+println(:atom == :atom);
 

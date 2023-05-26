@@ -208,6 +208,11 @@ static TokenType identifierType() {
     return TOKEN_IDENTIFIER;
 }
 
+static Token atom() {
+    while (isAlpha(peek()) || isDigit(peek())) advance();
+    return makeToken(TOKEN_ATOM);
+}
+
 static Token identifier() {
     while (isAlpha(peek()) || isDigit(peek())) advance();
     return makeToken(identifierType());
@@ -220,6 +225,7 @@ Token scanToken() {
     if (isAtEnd()) return makeToken(TOKEN_EOF);
 
     char c = advance();
+    if (c == ':') return atom();
     if (isAlpha(c)) return identifier();
     if (isDigit(c)) return number();
 

@@ -58,6 +58,7 @@ typedef struct {
     Table modules;
     Table builtins;
     Table strings;
+    Table atoms;
     ObjString* initString;
     ObjUpvalue* openUpvalues;
 } VM;

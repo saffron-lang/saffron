@@ -421,6 +421,12 @@ static void variable(bool canAssign) {
     namedVariable(parser.previous, canAssign);
 }
 
+static void atom(bool canAssign) {
+    ObjAtom *key = copyAtom(parser.previous.start + 1,
+                                                        parser.previous.length - 1);
+    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(key)));
+}
+
 static void literal(bool canAssign) {
     switch (parser.previous.type) {
         case TOKEN_FALSE:
@@ -585,6 +591,7 @@ ParseRule rules[] = {
         [TOKEN_LESS]          = {NULL, binary, PREC_COMPARISON},
         [TOKEN_LESS_EQUAL]    = {NULL, binary, PREC_COMPARISON},
         [TOKEN_IDENTIFIER]    = {variable, NULL, PREC_NONE},
+        [TOKEN_ATOM]    = {atom, NULL, PREC_NONE},
         [TOKEN_STRING]        = {string, NULL, PREC_NONE},
         [TOKEN_NUMBER]        = {number, NULL, PREC_NONE},
         [TOKEN_AND]           = {NULL, and_, PREC_AND},
@@ -692,6 +699,7 @@ static uint8_t parseVariable(const char *errorMessage) {
 }
 
 static void beginScope();
+
 static void block();
 
 static void anonFunction() {

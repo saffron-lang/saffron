@@ -44,6 +44,20 @@ static ObjString *allocateString(char *chars, int length,
     return string;
 }
 
+static ObjAtom *allocateAtom(char *chars, int length,
+                                 uint32_t hash) {
+    ObjString *string = ALLOCATE_OBJ(ObjString, OBJ_ATOM);
+    string->length = length;
+    string->chars = chars;
+    string->hash = hash;
+
+    push(OBJ_VAL(string));
+    tableSet(&vm.atoms, string, NIL_VAL);
+    pop();
+
+    return (ObjAtom *) string;
+}
+
 ObjString *copyString(const char *chars, int length) {
     uint32_t hash = hashString(chars, length);
     ObjString *interned = tableFindString(&vm.strings, chars, length,
@@ -54,6 +68,19 @@ ObjString *copyString(const char *chars, int length) {
     memcpy(heapChars, chars, length);
     heapChars[length] = '\0';
     return allocateString(heapChars, length, hash);
+}
+
+ObjAtom *copyAtom(const char *chars, int length) {
+    uint32_t hash = hashString(chars, length);
+    ObjString *interned = tableFindString(&vm.atoms, chars, length,
+                                          hash);
+    if (interned != NULL) return interned;
+
+    char *heapChars = ALLOCATE(char, length + 1);
+    memcpy(heapChars, chars, length);
+    heapChars[length] = '\0';
+
+    return allocateAtom(heapChars, length, hash);
 }
 
 ObjUpvalue *newUpvalue(Value *slot) {
@@ -80,6 +107,9 @@ void printObject(Value value) {
             break;
         case OBJ_STRING:
             printf("%s", AS_CSTRING(value));
+            break;
+        case OBJ_ATOM:
+            printf(":%s", AS_CSTRING(value));
             break;
         case OBJ_NATIVE_METHOD:
             printf("<native method>");
