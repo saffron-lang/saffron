@@ -1,5 +1,6 @@
-var a = if (true) {
-    5
-} else {
-    nil
-}
+var a = fun () => {
+    println("Wow!");
+};
+
+println(a());
+

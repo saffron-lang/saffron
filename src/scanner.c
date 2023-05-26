@@ -202,7 +202,8 @@ static TokenType identifierType() {
             return checkKeyword(1, 2, "ar", TOKEN_VAR);
         case 'w':
             return checkKeyword(1, 4, "hile", TOKEN_WHILE);
-        case 'y': return checkKeyword(1, 4, "ield", TOKEN_YIELD);
+        case 'y':
+            return checkKeyword(1, 4, "ield", TOKEN_YIELD);
     }
     return TOKEN_IDENTIFIER;
 }
@@ -254,7 +255,14 @@ Token scanToken() {
                     match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '=':
             return makeToken(
-                    match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+                    match('=')
+                    ? TOKEN_EQUAL_EQUAL
+                    : (
+                            match('>')
+                            ? TOKEN_ARROW
+                            : TOKEN_EQUAL
+                    )
+            );
         case '<':
             return makeToken(
                     match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
