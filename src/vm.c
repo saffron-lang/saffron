@@ -8,11 +8,14 @@
 #include "libc/list.h"
 #include "libc/io.h"
 #include "libc/async.h"
+#include "libc/module.h"
 #include "libc/task.h"
+#include "files.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include <libc.h>
+#include <libgen.h>
 
 VM vm;
 
@@ -28,15 +31,15 @@ static void resetStack() {
 void defineNative(const char *name, NativeFn function) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(OBJ_VAL(newNative(function)));
-    tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    tableSet(&vm.builtins, AS_STRING(vm.stack[0]), vm.stack[1]);
     pop();
     pop();
 }
 
-void defineGlobal(const char *name, Value value) {
+void defineType(const char *name, Value value) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(value);
-    tableSet(&vm.globals, AS_STRING(peek(1)), peek(0));
+    tableSet(&vm.types, AS_STRING(peek(1)), peek(0));
     pop();
     pop();
 }
@@ -61,7 +64,8 @@ void initVM() {
     vm.bytesAllocated = 0;
     vm.nextGC = 1024 * 1024;
 
-    initTable(&vm.globals);
+    initTable(&vm.types);
+    initTable(&vm.modules);
     initTable(&vm.builtins);
     initTable(&vm.strings);
 
@@ -70,7 +74,6 @@ void initVM() {
     vm.openUpvalues = NULL;
 
     defineBuiltin("list", OBJ_VAL(createListType()));
-    defineGlobal("list", OBJ_VAL(createListType()));
 
     defineNative("clock", clockNative);
 
@@ -79,6 +82,8 @@ void initVM() {
 
     defineNative("spawn", spawnNative);
     defineBuiltin("future", OBJ_VAL(createTaskType()));
+
+    defineBuiltin("module", OBJ_VAL(createModuleType()));
 //    defineNative("sleep", sleepNative);
 
     initAsyncHandler();
@@ -87,7 +92,8 @@ void initVM() {
 void freeVM() {
     freeAsyncHandler();
 
-    freeTable(&vm.globals);
+    freeTable(&vm.types);
+    freeTable(&vm.modules);
     freeTable(&vm.builtins);
     freeTable(&vm.strings);
     vm.initString = NULL;
@@ -135,6 +141,8 @@ void runtimeError(const char *format, ...) {
 
     resetStack();
 }
+
+ObjModule* executeModule(ObjString *name);
 
 static bool call(ObjClosure *closure, int argCount) {
     switch (closure->obj.type) {
@@ -287,6 +295,7 @@ static void defineMethod(ObjString *name) {
 static bool bindMethod(ObjClass *klass, ObjString *name) {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
+        printValue(peek(0));
         runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
@@ -401,8 +410,10 @@ static void POP_CALL(Value result) {
     currentFrame = CURRENT_TASK;
 }
 
-static InterpretResult run() {
-    currentFrame = AS_CALL_FRAME(vm.tasks.values[vm.tasks.count - 1]);
+ModuleContext moduleContext = MAIN;
+
+static InterpretResult run(ObjModule *module) {
+    currentFrame = CURRENT_TASK;
 
 #define READ_BYTE() (*currentFrame->ip++)
 
@@ -505,14 +516,14 @@ static InterpretResult run() {
                 break;
             case OP_DEFINE_GLOBAL: {
                 ObjString *name = READ_STRING();
-                tableSet(&vm.globals, name, peek(0));
+                tableSet(&module->obj.fields, name, peek(0));
                 pop();
                 break;
             }
             case OP_GET_GLOBAL: {
                 ObjString *name = READ_STRING();
                 Value value;
-                if (!tableGet(&vm.globals, name, &value)) {
+                if (!tableGet(&module->obj.fields, name, &value)) {
                     runtimeError("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -521,8 +532,8 @@ static InterpretResult run() {
             }
             case OP_SET_GLOBAL: {
                 ObjString *name = READ_STRING();
-                if (tableSet(&vm.globals, name, peek(0))) {
-                    tableDelete(&vm.globals, name);
+                if (tableSet(&module->obj.fields, name, peek(0))) {
+                    tableDelete(&module->obj.fields, name);
                     runtimeError("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -735,12 +746,23 @@ static InterpretResult run() {
 
                 break;
             }
+            case OP_IMPORT: {
+                Value relPath = peek(0);
+                ObjModule *newModule = executeModule(AS_STRING(relPath));
+                tableSet(&module->obj.fields, newModule->name, OBJ_VAL(newModule));
+                pop();
+                printf("FINISHED IMPORT\n");
+            }
             case OP_RETURN: {
                 Value result = pop();
                 currentFrame->state |= FINISHED;
                 closeUpvalues(currentFrame->slots);
 
 //                printf("epic count %d\n", vm.tasks.count);
+                if (currentFrame->closure->function->name == NULL && moduleContext == IMPORT) {
+                    pop();
+                    return INTERPRET_OK;
+                }
                 POP_CALL(result);
                 if (currentFrame == NULL) {
                     int status;
@@ -777,9 +799,13 @@ static InterpretResult run() {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(const char *source) {
+ObjModule* interpret(const char *source, const char *name, const char *path) {
+    ObjModule *module = newModule(name, path);
     ObjFunction *function = compile(source);
-    if (function == NULL) return INTERPRET_COMPILE_ERROR;
+    if (function == NULL) {
+        module->result = INTERPRET_COMPILE_ERROR;
+        return module;
+    }
 
     push(OBJ_VAL(function));
     ObjClosure *closure = newClosure(function);
@@ -787,7 +813,38 @@ InterpretResult interpret(const char *source) {
     push(OBJ_VAL(closure));
     call(closure, 0);
 
-    return run();
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    tableSet(&vm.modules, AS_STRING(peek(0)), OBJ_VAL(module));
+    pop();
+    InterpretResult result = run(module);
+
+    module->result = result;
+
+    return module;
+}
+
+char *remove_n(char *dst, const char *filename, int n) {
+    size_t len = strlen(filename);
+    memcpy(dst, filename, len-n);
+    dst[len - n] = 0;
+    return dst;
+}
+
+ObjModule* executeModule(ObjString *relPath) {
+    ModuleContext temp = moduleContext;
+    moduleContext = IMPORT;
+    char *path = findModule(relPath->chars);
+    char *source = readFile(path);
+    char chars[64];
+    remove_n(chars, basename(relPath->chars), 4);
+
+    ObjModule* module = interpret(source, chars, path);
+    free(source);
+    moduleContext = temp;
+    if (module->result == INTERPRET_COMPILE_ERROR) runtimeError("Compile error");
+    if (module->result == INTERPRET_RUNTIME_ERROR) runtimeError("Runtime error");
+
+    return module;
 }
 
 void push(Value value) {

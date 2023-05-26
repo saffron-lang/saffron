@@ -16,6 +16,11 @@ typedef enum {
     FINISHED = 4,
 } CallState;
 
+typedef enum {
+    MAIN = 0,
+    IMPORT = 1,
+} ModuleContext;
+
 typedef struct ObjCallFrame {
     Obj obj;
     ObjClosure* closure;
@@ -49,7 +54,8 @@ typedef struct {
     size_t bytesAllocated;
     size_t nextGC;
 
-    Table globals;
+    Table types;
+    Table modules;
     Table builtins;
     Table strings;
     ObjString* initString;
@@ -62,11 +68,18 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR
 } InterpretResult;
 
+typedef struct {
+    ObjInstance obj;
+    ObjString* name;
+    ObjString* path;
+    InterpretResult result;
+} ObjModule;
+
 extern VM vm;
 
 void initVM();
 void freeVM();
-InterpretResult interpret(const char* source);
+ObjModule* interpret(const char* source, const char* name, const char* path);
 
 void push(Value value);
 Value pop();

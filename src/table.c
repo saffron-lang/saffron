@@ -14,6 +14,11 @@ void initTable(Table *table) {
     table->entries = NULL;
 }
 
+void copyTable(Table *source, Table *dest) {
+    initTable(dest);
+    tableAddAll(source, dest);
+}
+
 void freeTable(Table *table) {
     FREE_ARRAY(Entry, table->entries, table->capacity);
     initTable(table);

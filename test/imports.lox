@@ -1,0 +1,6 @@
+import "../test/inheritance.lox";
+
+var k = inheritance.Cruller();
+k.finish();
+println(k.finish);
+println("Successfully imported another module!");

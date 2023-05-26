@@ -7,13 +7,17 @@ class Doughnut {
   }
 
   finish(ingredient) {
-    print("Finish with " + ingredient);
+    println("Finish with " + ingredient);
   }
 }
+
+var b = Doughnut();
+b.finish("cheese");
 
 class Cruller < Doughnut {
   finish() {
     // No sprinkles, always icing.
+    println(super.finish);
     super.finish("icing");
   }
 }
