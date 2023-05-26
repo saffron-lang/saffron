@@ -5,7 +5,7 @@
 
 ObjBuiltinType *moduleType = NULL;
 
-ObjModule *newModule(const char *name, const char *path) {
+ObjModule *newModule(const char *name, const char *path, bool includeBuiltins) {
     ObjModule *instance = ALLOCATE_OBJ(ObjModule, OBJ_INSTANCE);
     push(OBJ_VAL(instance));
     instance->obj.klass = (ObjClass *) moduleType;
@@ -16,9 +16,12 @@ ObjModule *newModule(const char *name, const char *path) {
 
     instance->path = AS_STRING(peek(0));
     instance->name = AS_STRING(peek(1));
+    tableSet(&vm.modules, instance->path, OBJ_VAL(instance));
 
     pop(); pop();
-    tableAddAll(&vm.builtins, &instance->obj.fields);
+    if (includeBuiltins) {
+        tableAddAll(&vm.builtins, &instance->obj.fields);
+    }
     pop();
     return instance;
 }
@@ -53,4 +56,20 @@ void moduleInit(ObjBuiltinType *type) {
 ObjBuiltinType *createModuleType() {
     moduleType = newBuiltinType("module", moduleInit);
     return moduleType;
+}
+
+void defineModuleFunction(ObjModule *module, const char *name, NativeFn function) {
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(OBJ_VAL(newNative(function)));
+    tableSet(&module->obj.fields, AS_STRING(peek(1)), peek(0));
+    pop();
+    pop();
+}
+
+void defineModuleMember(ObjModule *module, const char *name, Value value) {
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(value);
+    tableSet(&module->obj.fields, AS_STRING(peek(1)), peek(0));
+    pop();
+    pop();
 }

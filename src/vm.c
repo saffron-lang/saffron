@@ -31,7 +31,7 @@ static void resetStack() {
 void defineNative(const char *name, NativeFn function) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(OBJ_VAL(newNative(function)));
-    tableSet(&vm.builtins, AS_STRING(vm.stack[0]), vm.stack[1]);
+    tableSet(&vm.builtins, AS_STRING(peek(1)), peek(0));
     pop();
     pop();
 }
@@ -40,6 +40,14 @@ void defineType(const char *name, Value value) {
     push(OBJ_VAL(copyString(name, (int) strlen(name))));
     push(value);
     tableSet(&vm.types, AS_STRING(peek(1)), peek(0));
+    pop();
+    pop();
+}
+
+void defineModule(const char *name, Value value) {
+    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(value);
+    tableSet(&vm.modules, AS_STRING(peek(1)), peek(0));
     pop();
     pop();
 }
@@ -75,15 +83,15 @@ void initVM() {
 
     defineBuiltin("list", OBJ_VAL(createListType()));
 
-    defineNative("clock", clockNative);
-
     defineNative("println", printlnNative);
     defineNative("print", printNative);
 
     defineNative("spawn", spawnNative);
-    defineBuiltin("future", OBJ_VAL(createTaskType()));
 
-    defineBuiltin("module", OBJ_VAL(createModuleType()));
+    defineType("task", OBJ_VAL(createTaskType()));
+    defineType("module", OBJ_VAL(createModuleType()));
+
+    defineModule("time", OBJ_VAL(createTimeModule()));
 //    defineNative("sleep", sleepNative);
 
     initAsyncHandler();
@@ -329,7 +337,8 @@ static bool invoke(ObjString *name, int argCount) {
     ObjInstance *instance = AS_INSTANCE(receiver);
 
     Value value;
-    if (tableGet(&instance->fields, name, &value)) {
+    bool foundField = tableGet(&instance->fields, name, &value);
+    if (foundField) {
         vm.stackTop[-argCount - 1] = value;
         return callValue(value, argCount);
     }
@@ -751,15 +760,18 @@ static InterpretResult run(ObjModule *module) {
                 ObjModule *newModule = executeModule(AS_STRING(relPath));
                 tableSet(&module->obj.fields, newModule->name, OBJ_VAL(newModule));
                 pop();
-                printf("FINISHED IMPORT\n");
+                break;
             }
             case OP_RETURN: {
                 Value result = pop();
                 currentFrame->state |= FINISHED;
                 closeUpvalues(currentFrame->slots);
 
-//                printf("epic count %d\n", vm.tasks.count);
                 if (currentFrame->closure->function->name == NULL && moduleContext == IMPORT) {
+                    vm.tasks.values[vm.currentTask] = OBJ_VAL(CURRENT_TASK->parent);
+                    vm.stackTop = currentFrame->slots;
+                    push(result);
+                    currentFrame = CURRENT_TASK;
                     pop();
                     return INTERPRET_OK;
                 }
@@ -800,7 +812,7 @@ static InterpretResult run(ObjModule *module) {
 }
 
 ObjModule* interpret(const char *source, const char *name, const char *path) {
-    ObjModule *module = newModule(name, path);
+    ObjModule *module = newModule(name, path, true);
     ObjFunction *function = compile(source);
     if (function == NULL) {
         module->result = INTERPRET_COMPILE_ERROR;
@@ -813,9 +825,6 @@ ObjModule* interpret(const char *source, const char *name, const char *path) {
     push(OBJ_VAL(closure));
     call(closure, 0);
 
-    push(OBJ_VAL(copyString(path, (int) strlen(path))));
-    tableSet(&vm.modules, AS_STRING(peek(0)), OBJ_VAL(module));
-    pop();
     InterpretResult result = run(module);
 
     module->result = result;
