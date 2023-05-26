@@ -813,7 +813,7 @@ ObjModule* interpret(const char *source, const char *name, const char *path) {
     push(OBJ_VAL(closure));
     call(closure, 0);
 
-    push(OBJ_VAL(copyString(name, (int) strlen(name))));
+    push(OBJ_VAL(copyString(path, (int) strlen(path))));
     tableSet(&vm.modules, AS_STRING(peek(0)), OBJ_VAL(module));
     pop();
     InterpretResult result = run(module);
@@ -834,6 +834,11 @@ ObjModule* executeModule(ObjString *relPath) {
     ModuleContext temp = moduleContext;
     moduleContext = IMPORT;
     char *path = findModule(relPath->chars);
+
+    Value cachedModule;
+    if (tableGet(&vm.modules, copyString(path, (int) strlen(path)), &cachedModule)) {
+        return AS_MODULE(cachedModule);
+    }
     char *source = readFile(path);
     char chars[64];
     remove_n(chars, basename(relPath->chars), 4);
