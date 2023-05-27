@@ -3,6 +3,8 @@
 
 #include "common.h"
 #include "scanner.h"
+#include "chunk.h"
+#include "memory.h"
 
 typedef struct {
     const char *start;
@@ -284,4 +286,48 @@ Token scanToken() {
     }
 
     return errorToken("Unexpected character.");
+}
+
+void initTokenArray(TokenArray* tokenArray) {
+    tokenArray->count = 0;
+    tokenArray->capacity = 0;
+    tokenArray->tokens = NULL;
+    tokenArray->lines = NULL;
+}
+
+void writeTokenArray(TokenArray * tokenArray, Token token, int line) {
+    if (tokenArray->capacity < tokenArray->count + 1) {
+        int oldCapacity = tokenArray->capacity;
+        tokenArray->capacity = GROW_CAPACITY(oldCapacity);
+        tokenArray->tokens = GROW_ARRAY(uint8_t, tokenArray->tokens,
+                                 oldCapacity, tokenArray->capacity);
+        tokenArray->lines = GROW_ARRAY(int, tokenArray->lines,
+                                  oldCapacity, tokenArray->capacity);
+    }
+
+    tokenArray->tokens[tokenArray->count] = token;
+    tokenArray->lines[tokenArray->count] = line;
+    tokenArray->count++;
+}
+
+void freeTokenArray(TokenArray * tokenArray) {
+    FREE_ARRAY(uint8_t, tokenArray->tokens, tokenArray->capacity);
+    FREE_ARRAY(int, tokenArray->lines, tokenArray->capacity);
+    initTokenArray(tokenArray);
+}
+
+TokenArray tokenize() {
+    int i = 0;
+    TokenArray tokenArray;
+    initTokenArray(&tokenArray);
+
+    while (true) {
+        Token token = scanToken();
+        writeTokenArray(&tokenArray, token, scanner.line);
+        if (token.type == TOKEN_EOF) {
+            break;
+        }
+    }
+
+    return tokenArray;
 }
