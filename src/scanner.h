@@ -37,7 +37,15 @@ typedef struct {
     int line;
 } Token;
 
+typedef struct {
+    int count;
+    int capacity;
+    Token* tokens;
+    int* lines;
+} TokenArray;
+
 void initScanner(const char* source);
 Token scanToken();
+TokenArray tokenize();
 
 #endif
