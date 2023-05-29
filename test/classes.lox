@@ -3,7 +3,7 @@ class Pair {}
 var pair = Pair();
 pair.first = 1;
 pair.second = 2;
-print pair.first + pair.second; // 3.
+println(pair.first + pair.second); // 3.
 
 class Brunch {
   eggs() {}
@@ -14,7 +14,7 @@ var eggs = brunch.eggs;
 
 class Scone {
   topping(first, second) {
-    print "scone with " + first + " and " + second;
+    println("scone with " + first + " and " + second);
   }
 }
 
@@ -27,7 +27,7 @@ class CoffeeMaker {
   }
 
   brew() {
-    print "Enjoy your cup of " + this.coffee;
+    println("Enjoy your cup of " + this.coffee);
 
     // No reusing the grounds!
     this.coffee = nil;

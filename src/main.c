@@ -1,6 +1,9 @@
 #include "common.h"
 #include "vm.h"
 #include "files.h"
+#include "ast/ast.h"
+#include "ast/astprint.h"
+#include "ast/astparse.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -28,12 +31,23 @@ static void runFile(const char *path) {
 }
 
 
+static void parseFile(const char *path) {
+    char *source = readFile(path);
+    StmtArray* body = parseAST(source);
+    printTree(body);
+    free(source);
+
+    if (body==NULL) exit(65);
+}
+
+
 int main(int argc, const char *argv[]) {
     initVM();
     if (argc == 1) {
         repl();
     } else if (argc == 2) {
         runFile(argv[1]);
+        parseFile(argv[1]);
     } else {
         fprintf(stderr, "Usage: clox [path]\n");
         exit(64);
