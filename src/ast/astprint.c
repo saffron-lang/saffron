@@ -2,40 +2,6 @@
 #include "astprint.h"
 #include "../object.h"
 
-void printTree(StmtArray *statements) {
-    if (statements == NULL) {
-        return;
-    }
-    for (int i = 0; i < statements->count; i++) {
-        printNode((Node *) statements->stmts[i]);
-        printf("\n");
-    }
-}
-
-static void printToken(Token token) {
-    for (int i = 0; i < token.length; i++) {
-        printf("%c", token.start[i]);
-    }
-}
-
-static void printExprArray(ExprArray exprArray) {
-    for (int i = 0; i < exprArray.count; i++) {
-        printNode((Node *) exprArray.exprs[i]);
-        if (i != exprArray.count - 1) {
-            printf(", ");
-        }
-    }
-}
-
-static void printTokenArray(TokenArray tokenArray) {
-    for (int i = 0; i < tokenArray.count; i++) {
-        printToken(tokenArray.tokens[i]);
-        if (i != tokenArray.count - 1) {
-            printf(", ");
-        }
-    }
-}
-
 int indent = 0;
 
 void printIndent() {
@@ -44,21 +10,131 @@ void printIndent() {
     }
 }
 
-void printNode(Node *node) {
+void astUnparse(StmtArray *statements) {
+    if (statements == NULL) {
+        return;
+    }
+    for (int i = 0; i < statements->count; i++) {
+        unparseNode((Node *) statements->stmts[i]);
+        printf("\n");
+    }
+}
+
+static void unparseToken(Token token) {
+    for (int i = 0; i < token.length; i++) {
+        printf("%c", token.start[i]);
+    }
+}
+static void printToken(Token token) {
+    printf("Token(\"");
+    for (int i = 0; i < token.length; i++) {
+        printf("%c", token.start[i]);
+    }
+    printf("\")");
+}
+
+static void unparseExprArray(ExprArray exprArray) {
+    for (int i = 0; i < exprArray.count; i++) {
+        unparseNode((Node *) exprArray.exprs[i]);
+        if (i != exprArray.count - 1) {
+            printf(", ");
+        }
+    }
+}
+
+static void printExprArray(ExprArray exprArray) {
+    if (exprArray.count == 0) {
+        printf("[]");
+        return;
+    }
+    printf("[\n");
+    indent++;
+    for (int i = 0; i < exprArray.count; i++) {
+        printIndent();
+        unparseNode((Node *) exprArray.exprs[i]);
+        if (i != exprArray.count - 1) {
+            printf(", ");
+        }
+    }
+
+    indent--;
+    printf("\n");
+    printIndent();
+    printf("]");
+}
+
+static void unparseTokenArray(TokenArray tokenArray) {
+    for (int i = 0; i < tokenArray.count; i++) {
+        unparseToken(tokenArray.tokens[i]);
+        if (i != tokenArray.count - 1) {
+            printf(", ");
+        }
+    }
+}
+
+static void printTokenArray(TokenArray tokenArray) {
+    if (tokenArray.count == 0) {
+        printf("[]");
+        return;
+    }
+    printf("[\n");
+    indent++;
+    for (int i = 0; i < tokenArray.count; i++) {
+        printIndent();
+        printToken(tokenArray.tokens[i]);
+        if (i != tokenArray.count - 1) {
+            printf(",\n");
+        }
+    }
+    indent--;
+    printf("\n");
+    printIndent();
+    printf("]");
+}
+
+static void printFunctionType(FunctionType type) {
+    printf("%d", type);
+}
+
+void printTree(StmtArray *statements) {
+    if (statements == NULL) {
+        return;
+    }
+    if (statements->count == 0) {
+        printf("[]");
+        return;
+    }
+    printf("[\n");
+    indent++;
+    for (int i = 0; i < statements->count; i++) {
+        printIndent();
+        printNode((Node *) statements->stmts[i]);
+        if (i != statements->count - 1) {
+            printf(",\n");
+        }
+    }
+
+    indent--;
+    printf("\n");
+    printIndent();
+    printf("]");
+}
+
+void unparseNode(Node *node) {
     switch (node->type) {
         case NODE_BINARY: {
-            struct Logical *casted = (struct Logical *) node;
-            printNode((Node *) casted->left);
+            struct Binary *casted = (struct Binary *) node;
+            unparseNode((Node *) casted->left);
             printf(" ");
-            printToken(casted->operator);
+            unparseToken(casted->operator);
             printf(" ");
-            printNode((Node *) casted->right);
+            unparseNode((Node *) casted->right);
             break;
         }
         case NODE_GROUPING: {
             struct Grouping *casted = (struct Grouping *) node;
             printf("(");
-            printNode((Node *) casted->expression);
+            unparseNode((Node *) casted->expression);
             printf(")");
             break;
         }
@@ -75,61 +151,61 @@ void printNode(Node *node) {
         }
         case NODE_UNARY: {
             struct Unary *casted = (struct Unary *) node;
-            printToken(casted->operator);
-            printNode((Node *) casted->right);
+            unparseToken(casted->operator);
+            unparseNode((Node *) casted->right);
             break;
         }
         case NODE_VARIABLE: {
             struct Variable *casted = (struct Variable *) node;
-            printToken(casted->name);
+            unparseToken(casted->name);
             break;
         }
         case NODE_ASSIGN: {
             struct Assign *casted = (struct Assign *) node;
             printIndent();
-            printToken(casted->name);
+            unparseToken(casted->name);
             printf(" = ");
-            printNode((Node *) casted->value);
+            unparseNode((Node *) casted->value);
             break;
         }
         case NODE_LOGICAL: {
             struct Logical *casted = (struct Logical *) node;
-            printNode((Node *) casted->left);
+            unparseNode((Node *) casted->left);
             printf(" ");
-            printToken(casted->operator);
+            unparseToken(casted->operator);
             printf(" ");
-            printNode((Node *) casted->right);
+            unparseNode((Node *) casted->right);
             break;
         }
         case NODE_CALL: {
             struct Call *casted = (struct Call *) node;
-            printNode((Node *) casted->callee);
+            unparseNode((Node *) casted->callee);
             printf("(");
-            printExprArray(casted->arguments);
+            unparseExprArray(casted->arguments);
             printf(")");
             break;
         }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
-            printNode((Node *) casted->object);
+            unparseNode((Node *) casted->object);
             printf(".");
-            printToken(casted->name);
+            unparseToken(casted->name);
             break;
         }
         case NODE_SET: {
             struct Set *casted = (struct Set *) node;
-            printNode((Node *) casted->object);
+            unparseNode((Node *) casted->object);
             printf(".");
-            printToken(casted->name);
+            unparseToken(casted->name);
             printf(" = ");
-            printNode((Node *) casted->value);
+            unparseNode((Node *) casted->value);
             printf(";");
             break;
         }
         case NODE_SUPER: {
             struct Super *casted = (struct Super *) node;
             printf("super.");
-            printToken(casted->method);
+            unparseToken(casted->method);
             break;
         }
         case NODE_THIS:
@@ -138,16 +214,16 @@ void printNode(Node *node) {
         case NODE_YIELD: {
             struct Yield *casted = (struct Yield *) node;
             printf("yield ");
-            printNode((Node *) casted->expression);
+            unparseNode((Node *) casted->expression);
             break;
         }
         case NODE_LAMBDA: {
             struct Lambda *casted = (struct Lambda *) node;
             printf("fun (");
-            printTokenArray(casted->params);
+            unparseTokenArray(casted->params);
             printf(") => {\n");
             indent++;
-            printTree(&casted->body);
+            astUnparse(&casted->body);
             indent--;
             printf("}");
             break;
@@ -155,14 +231,14 @@ void printNode(Node *node) {
         case NODE_LIST: {
             struct List *casted = (struct List *) node;
             printf("[");
-            printExprArray(casted->items);
+            unparseExprArray(casted->items);
             printf("]");
             break;
         }
         case NODE_EXPRESSION: {
             struct Expression *casted = (struct Expression *) node;
             printIndent();
-            printNode((Node *) casted->expression);
+            unparseNode((Node *) casted->expression);
             printf(";");
             break;
         }
@@ -170,10 +246,10 @@ void printNode(Node *node) {
             struct Var *casted = (struct Var *) node;
             printIndent();
             printf("var ");
-            printToken(casted->name);
+            unparseToken(casted->name);
             if (casted->initializer) {
                 printf(" = ");
-                printNode((Node *) casted->initializer);
+                unparseNode((Node *) casted->initializer);
             }
             printf(";");
             break;
@@ -183,7 +259,7 @@ void printNode(Node *node) {
             printIndent();
             printf("{\n");
             indent++;
-            printTree(&casted->statements);
+            astUnparse(&casted->statements);
             indent--;
             printf("}");
             break;
@@ -195,12 +271,12 @@ void printNode(Node *node) {
                 printf("fun ");
             }
 
-            printToken(casted->name);
+            unparseToken(casted->name);
             printf("(");
-            printTokenArray(casted->params);
+            unparseTokenArray(casted->params);
             printf(") {\n");
             indent++;
-            printTree(&casted->body);
+            astUnparse(&casted->body);
             indent--;
             printIndent();
             printf("}");
@@ -210,16 +286,16 @@ void printNode(Node *node) {
             struct Class *casted = (struct Class *) node;
             printIndent();
             printf("class ");
-            printToken(casted->name);
+            unparseToken(casted->name);
             if (casted->superclass) {
                 printf("< ");
-                printNode((Node *) casted->superclass);
+                unparseNode((Node *) casted->superclass);
             }
 
             printf(" {\n");
             indent++;
             for (int i = 0; i < casted->methods.count; i++) {
-                printNode((Node *) casted->methods.stmts[i]);
+                unparseNode((Node *) casted->methods.stmts[i]);
                 if (i != casted->methods.count - 1) {
                     printf("\n\n");
                 }
@@ -234,17 +310,17 @@ void printNode(Node *node) {
             struct If *casted = (struct If *) node;
             printIndent();
             printf("if (");
-            printNode((Node *) casted->condition);
+            unparseNode((Node *) casted->condition);
             printf(")\n");
             indent++;
-            printNode((Node *) casted->thenBranch);
+            unparseNode((Node *) casted->thenBranch);
             indent--;
 
             if (casted->elseBranch) {
                 printIndent();
                 printf("else ");
                 indent++;
-                printNode((Node *) casted->elseBranch);
+                unparseNode((Node *) casted->elseBranch);
                 indent--;
             }
             break;
@@ -253,10 +329,10 @@ void printNode(Node *node) {
             struct While *casted = (struct While *) node;
             printIndent();
             printf("while (");
-            printNode((Node *) casted->condition);
+            unparseNode((Node *) casted->condition);
             printf(")\n");
             indent++;
-            printNode((Node *) casted->body);
+            unparseNode((Node *) casted->body);
             indent--;
             break;
         }
@@ -264,13 +340,13 @@ void printNode(Node *node) {
             struct For *casted = (struct For *) node;
             printIndent();
             printf("for (");
-            printNode((Node *) casted->initializer);
-            printNode((Node *) casted->condition);
+            unparseNode((Node *) casted->initializer);
+            unparseNode((Node *) casted->condition);
             printf(";");
-            printNode((Node *) casted->increment);
+            unparseNode((Node *) casted->increment);
             printf(")\n");
             indent++;
-            printNode((Node *) casted->body);
+            unparseNode((Node *) casted->body);
             indent--;
             break;
         }
@@ -282,7 +358,7 @@ void printNode(Node *node) {
             struct Return *casted = (struct Return *) node;
             printIndent();
             printf("return ");
-            printNode((Node *) casted->value);
+            unparseNode((Node *) casted->value);
             printf(";");
             break;
         }
@@ -290,8 +366,445 @@ void printNode(Node *node) {
             struct Import *casted = (struct Import *) node;
             printIndent();
             printf("import ");
-            printNode((Node *) casted->expression);
+            unparseNode((Node *) casted->expression);
             printf(";");
+            break;
+        }
+    }
+}
+
+
+
+void printNode(Node *node) {
+    if (node==NULL) {
+        printf("NULL");
+        return;
+    }
+
+    switch (node->type) {
+        case NODE_BINARY: {
+            struct Binary *casted = (struct Binary *) node;
+            printf("Binary(\n");
+            indent++;
+            printIndent();
+            printf("left=");
+            printNode((Node *) casted->left);
+            printf(",\n");
+            printIndent();
+            printf("right=");
+            printNode((Node *) casted->right);
+            printf(",\n");
+            printIndent();
+            printf("op=");
+            printToken(casted->operator);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_GROUPING: {
+            struct Grouping *casted = (struct Grouping *) node;
+            printf("Grouping(\n");
+            indent++;
+            printIndent();
+            printf("expression=");
+            printNode((Node *) casted->expression);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_LITERAL: {
+            struct Literal *casted = (struct Literal *) node;
+            printf("Literal(\n");
+            indent++;
+            printIndent();
+            printf("value=");
+            if (casted->value.type == VAL_OBJ) {
+                printf("\"");
+                printValue(casted->value);
+                printf("\"");
+            } else {
+                printValue(casted->value);
+            }
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_UNARY: {
+            struct Unary *casted = (struct Unary *) node;
+            printf("Unary(\n");
+            indent++;
+            printIndent();
+            printf("right=");
+            printNode((Node *) casted->right);
+            printIndent();
+            printf("operator=");
+            printToken(casted->operator);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_VARIABLE: {
+            struct Variable *casted = (struct Variable *) node;
+            printf("Variable(\n");
+            indent++;
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_ASSIGN: {
+            struct Assign *casted = (struct Assign *) node;
+            printf("Unary(\n");
+            indent++;
+            printIndent();
+            printf("value=");
+            printNode((Node *) casted->value);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_LOGICAL: {
+            struct Logical *casted = (struct Logical *) node;
+            printf("Logical(\n");
+            indent++;
+            printIndent();
+            printf("left=");
+            printNode((Node *) casted->left);
+            printf(",\n");
+            printIndent();
+            printf("right=");
+            printNode((Node *) casted->right);
+            printf(",\n");
+            printIndent();
+            printf("op=");
+            printToken(casted->operator);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_CALL: {
+            struct Call *casted = (struct Call *) node;
+            printf("Binary(\n");
+            indent++;
+            printIndent();
+            printf("callee=");
+            printNode((Node *) casted->callee);
+            printf(",\n");
+            printIndent();
+            printf("arguments=");
+            printExprArray(casted->arguments);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_GET: {
+            struct Get *casted = (struct Get *) node;
+            printf("Get(\n");
+            indent++;
+            printIndent();
+            printf("object=");
+            printNode((Node *) casted->object);
+            printf(",\n");
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_SET: {
+            struct Set *casted = (struct Set *) node;
+            printf("Set(\n");
+            indent++;
+            printIndent();
+            printf("object=");
+            printNode((Node *) casted->object);
+            printf(",\n");
+            printIndent();
+            printf("value=");
+            printNode((Node *) casted->value);
+            printf(",\n");
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_SUPER: {
+            struct Super *casted = (struct Super *) node;
+            printf("Super(\n");
+            indent++;
+            printIndent();
+            printf("keyword=");
+            printToken(casted->keyword);
+            printf(",\n");
+            printIndent();
+            printf("method=");
+            printToken(casted->method);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_THIS: {
+            struct This *casted = (struct This *) node;
+            printf("This(\n");
+            indent++;
+            printIndent();
+            printf("keyword=");
+            printToken(casted->keyword);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_YIELD: {
+            struct Yield *casted = (struct Yield *) node;
+            printf("Binary(\n");
+            indent++;
+            printIndent();
+            printf("expression=");
+            printNode((Node *) casted->expression);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_LAMBDA: {
+            struct Lambda *casted = (struct Lambda *) node;
+            printf("Lambda(\n");
+            indent++;
+            printIndent();
+            printf("params=");
+            printTokenArray(casted->params);
+            printf(",\n");
+            printIndent();
+            printf("body=");
+            printTree(&casted->body);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_LIST: {
+            struct List *casted = (struct List *) node;
+            printf("List(\n");
+            indent++;
+            printIndent();
+            printf("items=");
+            printExprArray(casted->items);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_EXPRESSION: {
+            struct Expression *casted = (struct Expression *) node;
+            printf("Expression(\n");
+            indent++;
+            printIndent();
+            printf("expression=");
+            printNode((Node *) casted->expression);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_VAR: {
+            struct Var *casted = (struct Var *) node;
+            printf("Binary(\n");
+            indent++;
+            printIndent();
+            printf("initializer=");
+            printNode((Node *) casted->initializer);
+            printf(",\n");
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_BLOCK: {
+            struct Block *casted = (struct Block *) node;
+            printf("Block(\n");
+            indent++;
+            printIndent();
+            printf("statements=");
+            printTree(&casted->statements);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_FUNCTION: {
+            struct Function *casted = (struct Function *) node;
+            printf("Function(\n");
+            indent++;
+            printIndent();
+            printf("params=");
+            printTokenArray(casted->params);
+            printf(",\n");
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            printf(",\n");
+            printIndent();
+            printf("functionType=");
+            printFunctionType(casted->functionType);
+            printf(",\n");
+            printIndent();
+            printf("body=");
+            printTree(&casted->body);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_CLASS: {
+            struct Class *casted = (struct Class *) node;
+            printf("Class(\n");
+            indent++;
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
+            printf(",\n");
+            printIndent();
+            printf("superclass=");
+            printNode((Node *) casted->superclass);
+            printf(",\n");
+            printIndent();
+            printf("methods=");
+            printTree(&casted->methods);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_IF: {
+            struct If *casted = (struct If *) node;
+            printf("If(\n");
+            indent++;
+            printIndent();
+            printf("condition=");
+            printNode((Node *) casted->condition);
+            printf(",\n");
+            printIndent();
+            printf("thenBranch=");
+            printNode(casted->thenBranch);
+            printf(",\n");
+            printIndent();
+            printf("elseBranch=");
+            printNode(casted->elseBranch);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_WHILE: {
+            struct While *casted = (struct While *) node;
+            printf("While(\n");
+            indent++;
+            printIndent();
+            printf("condition=");
+            printNode((Node *) casted->condition);
+            printf(",\n");
+            printIndent();
+            printf("body=");
+            printNode((Node *) casted->body);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_FOR: {
+            struct For *casted = (struct For *) node;
+            printf("For(\n");
+            indent++;
+            printIndent();
+            printf("initializer=");
+            printNode((Node *) casted->initializer);
+            printf(",\n");
+            printIndent();
+            printf("condition=");
+            printNode((Node *) casted->condition);
+            printf(",\n");
+            printIndent();
+            printf("increment=");
+            printNode((Node *) casted->increment);
+            printf(",\n");
+            printIndent();
+            printf("body=");
+            printNode((Node *) casted->body);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_BREAK:
+            printf("Break()");
+            break;
+        case NODE_RETURN: {
+            struct Return *casted = (struct Return *) node;
+            printf("Return(\n");
+            indent++;
+            printIndent();
+            printf("value=");
+            printNode((Node *) casted->value);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_IMPORT: {
+            struct Import *casted = (struct Import *) node;
+            printf("Import(\n");
+            indent++;
+            printIndent();
+            printf("expression=");
+            printNode((Node *) casted->expression);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
             break;
         }
     }
