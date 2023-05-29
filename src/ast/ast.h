@@ -44,6 +44,7 @@ typedef enum {
 
 typedef struct {
     NodeType type;
+    int lineno;
     bool isMarked;
     struct Node *next;
 } Node;

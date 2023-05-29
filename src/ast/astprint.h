@@ -3,6 +3,9 @@
 
 #include "ast.h"
 
+void astUnparse(StmtArray* statements);
+void unparseNode(Node* node);
+
 void printTree(StmtArray* statements);
 void printNode(Node* node);
 

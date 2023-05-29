@@ -35,7 +35,7 @@ stmts = [
     "Break      : Token keyword",
     "Return     : Token keyword, Expr* value",
     "Import     : Expr* expression",
-    ]
+]
 
 # TODO: Argument list, etc
 
@@ -108,6 +108,7 @@ with redirect_stdout(file):
 
     print("typedef struct {")
     print(f"    NodeType type;")
+    print(f"    int lineno;")
     print(f"    bool isMarked;")
     print(f"    struct Node *next;")
     print("} Node;")
