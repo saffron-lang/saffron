@@ -1,16 +1,16 @@
 // First class functions
 fun areWeHavingItYet() {
-  print "Yes we are!";
+  print("Yes we are!");
 }
 
-print areWeHavingItYet;
+print(areWeHavingItYet);
 
 // Arguments
 fun sum(a, b, c) {
   return a + b + c;
 }
 
-print 4 + sum(5, 6, 7);
+print(4 + sum(5, 6, 7));
 
 // Recursion
 fun fib(n) {
@@ -20,14 +20,14 @@ fun fib(n) {
 
 // Native Functions
 var start = clock();
-print fib(10);
-print clock() - start;
+print(fib(10));
+print(clock() - start);
 
 // Closures
 fun makeClosure() {
   var local = "local";
   fun closure() {
-    print local;
+    print(local);
   }
   return closure;
 }
@@ -43,7 +43,7 @@ fun outer() {
     var c = 3;
     var d = 4;
     fun inner() {
-      print a + c + b + d;
+      print(a + c + b + d);
     }
   }
 }
@@ -52,15 +52,15 @@ fun outer() {
 {
   var a = 1;
   fun f() {
-    print a;
+    print(a);
   }
   var b = 2;
   fun g() {
-    print b;
+    print(b);
   }
   var c = 3;
   fun h() {
-    print c;
+    print(c);
   }
 }
 

@@ -32,7 +32,7 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-    const char* start;
+    const char *start;
     int length;
     int line;
 } Token;
@@ -40,12 +40,20 @@ typedef struct {
 typedef struct {
     int count;
     int capacity;
-    Token* tokens;
-    int* lines;
+    Token *tokens;
+    int *lines;
 } TokenArray;
 
-void initScanner(const char* source);
+void initScanner(const char *source);
+
+void writeTokenArray(TokenArray *tokenArray, Token token, int line);
+
+void initTokenArray(TokenArray *tokenArray);
+
+void freeTokenArray(TokenArray * tokenArray);
+
 Token scanToken();
+
 TokenArray tokenize();
 
 #endif
