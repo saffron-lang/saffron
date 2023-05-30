@@ -509,7 +509,7 @@ void printNode(Node *node) {
         }
         case NODE_CALL: {
             struct Call *casted = (struct Call *) node;
-            printf("Binary(\n");
+            printf("Call(\n");
             indent++;
             printIndent();
             printf("callee=");

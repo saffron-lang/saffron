@@ -66,7 +66,7 @@ Node *allocateNode(size_t size, NodeType type) {
     parser.nodes = node;
 
 #ifdef DEBUG_LOG_GC
-    printf("%p allocate %zu for %d\n", (void *) object, size, type);
+    printf("%p allocate %zu for %d\n", (void *) node, size, type);
 #endif
 
     return node;

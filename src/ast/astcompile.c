@@ -150,7 +150,7 @@ static void patchJump(int offset) {
     currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static void initCompiler(Compiler *compiler, FunctionType type, Token* name) {
+static void initCompiler(Compiler *compiler, FunctionType type, Token *name) {
     compiler->enclosing = current;
     compiler->function = NULL;
     compiler->type = type;
@@ -160,7 +160,7 @@ static void initCompiler(Compiler *compiler, FunctionType type, Token* name) {
     current = compiler;
     if (type != TYPE_SCRIPT) {
         current->function->name = copyString(name->start,
-                                                name->length);
+                                             name->length);
     }
 
     Local *local = &current->locals[current->localCount++];
@@ -345,7 +345,7 @@ void compileTree(StmtArray *statements) {
 }
 
 
-ObjFunction *compile(StmtArray* body) {
+ObjFunction *compile(StmtArray *body) {
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT, NULL);
 
@@ -465,11 +465,19 @@ void compileNode(Node *node) {
         case NODE_CALL: {
             struct Call *casted = (struct Call *) node;
             if (casted->callee->self.type == NODE_GET) {
-                struct Get *callee = (struct Get*) casted->callee;
+                struct Get *callee = (struct Get *) casted->callee;
                 compileNode((Node *) callee->object);
                 uint8_t name = identifierConstant(&callee->name);
                 compileExprArray(casted->arguments);
                 emitBytes(OP_INVOKE, name);
+                emitByte(casted->arguments.count);
+            } else if (casted->callee->self.type == NODE_SUPER) {
+                struct Super *callee = (struct Super *) casted->callee;
+                getVariable(syntheticToken("this"));
+                uint8_t name = identifierConstant(&callee->method);
+                compileExprArray(casted->arguments);
+                getVariable(syntheticToken("super"));
+                emitBytes(OP_SUPER_INVOKE, name);
                 emitByte(casted->arguments.count);
             } else {
                 compileNode((Node *) casted->callee);
@@ -503,16 +511,9 @@ void compileNode(Node *node) {
 
             uint8_t name = identifierConstant(&casted->method);
             getVariable(syntheticToken("this"));
-//            if (match(TOKEN_LEFT_PAREN)) {
-//                uint8_t argCount = argumentList();
-//                getVariable(syntheticToken("super"));
-//                emitBytes(OP_SUPER_INVOKE, name);
-//                emitByte(argCount);
-//            } else {
-//                getVariable(syntheticToken("super"));
-//                emitBytes(OP_GET_SUPER, name);
-//            }
-// TODO
+            getVariable(syntheticToken("super"));
+            emitBytes(OP_GET_SUPER, name);
+            break;
         }
         case NODE_THIS: {
             struct This *casted = (struct This *) node;
