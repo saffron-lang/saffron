@@ -4,6 +4,7 @@
 #include "ast/ast.h"
 #include "ast/astprint.h"
 #include "ast/astparse.h"
+#include "compiler.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,13 +18,17 @@ static void repl() {
             break;
         }
 
-        interpret(line, "<repl>", "<repl>");
+//        interpret(line, "<repl>", "<repl>");
     }
 }
 
 static void runFile(const char *path) {
     char *source = readFile(path);
-    ObjModule* module = interpret(source, "<script>", path);
+    compileOld(source);
+    StmtArray* body = parseAST(source);
+    printTree(body);
+    astUnparse(body);
+    ObjModule* module = interpret(body, "<script>", path);
     free(source);
 
     if (module->result == INTERPRET_COMPILE_ERROR) exit(65);
@@ -47,7 +52,7 @@ int main(int argc, const char *argv[]) {
         repl();
     } else if (argc == 2) {
         runFile(argv[1]);
-        parseFile(argv[1]);
+//        parseFile(argv[1]);
     } else {
         fprintf(stderr, "Usage: clox [path]\n");
         exit(64);

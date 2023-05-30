@@ -5,6 +5,7 @@
 #include "value.h"
 #include "table.h"
 #include "object.h"
+#include "ast/ast.h"
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
@@ -23,11 +24,11 @@ typedef enum {
 
 typedef struct ObjCallFrame {
     Obj obj;
-    ObjClosure* closure;
-    uint8_t* ip;
+    ObjClosure *closure;
+    uint8_t *ip;
     int index;
-    Value* slots;
-    struct ObjCallFrame* parent;
+    Value *slots;
+    struct ObjCallFrame *parent;
     CallState state;
 
     Value stored;
@@ -45,12 +46,12 @@ typedef struct {
     int currentTask;
 
     Value stack[STACK_MAX];
-    Value* stackTop;
-    Obj* objects;
+    Value *stackTop;
+    Obj *objects;
 
     int grayCount;
     int grayCapacity;
-    Obj** grayStack;
+    Obj **grayStack;
     size_t bytesAllocated;
     size_t nextGC;
 
@@ -59,8 +60,8 @@ typedef struct {
     Table builtins;
     Table strings;
     Table atoms;
-    ObjString* initString;
-    ObjUpvalue* openUpvalues;
+    ObjString *initString;
+    ObjUpvalue *openUpvalues;
 } VM;
 
 typedef enum {
@@ -71,25 +72,33 @@ typedef enum {
 
 typedef struct {
     ObjInstance obj;
-    ObjString* name;
-    ObjString* path;
+    ObjString *name;
+    ObjString *path;
     InterpretResult result;
 } ObjModule;
 
 extern VM vm;
 
 void initVM();
+
 void freeVM();
-ObjModule* interpret(const char* source, const char* name, const char* path);
+
+ObjModule *interpret(StmtArray *body, const char *name, const char *path);
 
 void push(Value value);
+
 Value pop();
+
 Value peek(int distance);
 
 void defineNative(const char *name, NativeFn function);
+
 void defineGlobal(const char *name, Value value);
+
 void defineBuiltin(const char *name, Value value);
+
 void runtimeError(const char *format, ...);
+
 void load_new_frame();
 
 #endif

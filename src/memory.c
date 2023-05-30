@@ -2,7 +2,7 @@
 
 #include "memory.h"
 #include "object.h"
-#include "compiler.h"
+#include "ast/astcompile.h"
 #include "vm.h"
 #include "libc/list.h"
 #include "libc/async.h"
