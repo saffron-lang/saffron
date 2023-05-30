@@ -340,7 +340,6 @@ void compileTree(StmtArray *statements) {
     }
     for (int i = 0; i < statements->count; i++) {
         compileNode((Node *) statements->stmts[i]);
-        printf("\n");
     }
 }
 

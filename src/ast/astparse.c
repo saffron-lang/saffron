@@ -12,6 +12,7 @@
 #ifdef DEBUG_PRINT_CODE
 
 #include "../debug.h"
+#include "../types.h"
 
 #endif
 
@@ -313,7 +314,7 @@ static Expr *dot(Expr *left, bool canAssign) {
     Token name = parser.previous;
 
     if (match(TOKEN_EQUAL)) {
-        struct Set *result = ALLOCATE_NODE(struct Set, NODE_GET);
+        struct Set *result = ALLOCATE_NODE(struct Set, NODE_SET);
         result->object = left;
         result->name = name;
         result->value = expression();
@@ -451,10 +452,15 @@ static void beginScope();
 
 static Stmt *block();
 
+static Type *typeAnnotation();
+
 static Expr *anonFunction(bool canAssign) {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after fun keyword.");
     TokenArray tokens;
     initTokenArray(&tokens);
+
+    TypeArray types;
+    initTypeArray(&types);
 
     int argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
@@ -465,16 +471,24 @@ static Expr *anonFunction(bool canAssign) {
             }
             Token name = parseVariable("Expect parameter name.");
             writeTokenArray(&tokens, name, name.line);
+
+            if (match(TOKEN_COLON)) {
+                writeTypeArray(&types, typeAnnotation());
+            } else {
+                writeTypeArray(&types, NULL);
+            }
         } while (match(TOKEN_COMMA));
     }
 
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
     consume(TOKEN_ARROW, "Expect '=>' after parameters.");
     consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
-    struct Block *bl = block();
+    struct Block *bl = (struct Block *) block();
     struct Lambda *result = ALLOCATE_NODE(struct Lambda, NODE_LAMBDA);
     result->body = bl->statements;
     result->params = tokens;
+
+    result->self.type = (Type *) initFunctor(types, NULL);
     return result;
 }
 
@@ -564,10 +578,46 @@ static Stmt *whileStatement() {
     return result;
 }
 
+static Type *typeAnnotation() {
+    if (match(TOKEN_LEFT_PAREN)) {
+        struct Functor *result = ALLOCATE_NODE(struct Functor, NODE_FUNCTOR);
+        TypeArray arguments;
+        initTypeArray(&arguments);
+
+        while (!match(TOKEN_RIGHT_PAREN)) {
+            Type *type = typeAnnotation();
+            writeTypeArray(&arguments, type);
+        }
+
+        consume(TOKEN_ARROW,
+                "Expect '=>' after functor type arguments.");
+
+        result->returnType = typeAnnotation();
+        result->arguments = arguments;
+
+        return (Type *) result;
+    } else {
+        if (!match(TOKEN_IDENTIFIER)) {
+            error("Expect identifier or functor type.");
+            return NULL;
+        } else {
+            Token name = parser.previous;
+
+            struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
+            result->name = name;
+            return (Type *) result;
+        }
+    }
+}
 
 static Stmt *varDeclaration() {
     Token name = parseVariable("Expect variable name.");
     Expr *value = NULL;
+    Type *type = NULL;
+
+    if (match(TOKEN_COLON)) {
+        type = typeAnnotation();
+    }
 
     if (match(TOKEN_EQUAL)) {
         value = expression();
@@ -579,6 +629,7 @@ static Stmt *varDeclaration() {
     struct Var *var = ALLOCATE_NODE(struct Var, NODE_VAR);
     var->name = name;
     var->initializer = value;
+    var->type = type;
     return var;
 }
 
@@ -727,7 +778,7 @@ static Stmt *classDeclaration() {
     result->methods = methods;
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 
-    return result;
+    return (Stmt *) result;
 }
 
 static Stmt *declaration() {

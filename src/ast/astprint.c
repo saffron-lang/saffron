@@ -63,6 +63,27 @@ static void printExprArray(ExprArray exprArray) {
     printf("]");
 }
 
+static void printTypeArray(TypeArray typeArray) {
+    if (typeArray.count == 0) {
+        printf("[]");
+        return;
+    }
+    printf("[\n");
+    indent++;
+    for (int i = 0; i < typeArray.count; i++) {
+        printIndent();
+        printNode((Node *) typeArray.types[i]);
+        if (i != typeArray.count - 1) {
+            printf(",\n");
+        }
+    }
+
+    indent--;
+    printf("\n");
+    printIndent();
+    printf("]");
+}
+
 static void unparseTokenArray(TokenArray tokenArray) {
     for (int i = 0; i < tokenArray.count; i++) {
         unparseToken(tokenArray.tokens[i]);
@@ -255,6 +276,10 @@ void unparseNode(Node *node) {
             printIndent();
             printf("var ");
             unparseToken(casted->name);
+            if (casted->type) {
+                printf(": ");
+                unparseNode((Node *) casted->type);
+            }
             if (casted->initializer) {
                 printf(" = ");
                 unparseNode((Node *) casted->initializer);
@@ -377,6 +402,24 @@ void unparseNode(Node *node) {
             printf("import ");
             unparseNode((Node *) casted->expression);
             printf(";");
+            break;
+        }
+        case NODE_FUNCTOR: {
+            struct Functor *casted = (struct Functor *) node;
+            printf("(");
+            for (int i = 0; i < casted->arguments.count; i++) {
+                unparseNode((Node *) casted->arguments.types[i]);
+                if (i != casted->arguments.count-  1) {
+                    printf(", ");
+                }
+            }
+            printf(") => ");
+            unparseNode((Node *) casted->returnType);
+            break;
+        }
+        case NODE_SIMPLE: {
+            struct Simple *casted = (struct Simple *) node;
+            unparseToken(casted->name);
             break;
         }
     }
@@ -659,6 +702,10 @@ void printNode(Node *node) {
             printIndent();
             printf("initializer=");
             printNode((Node *) casted->initializer);
+            printf(",\n");
+            printIndent();
+            printf("type=");
+            printNode((Node *) casted->type);
             indent--;
             printf("\n");
             printIndent();
@@ -810,6 +857,36 @@ void printNode(Node *node) {
             printIndent();
             printf("expression=");
             printNode((Node *) casted->expression);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_FUNCTOR: {
+            struct Functor *casted = (struct Functor *) node;
+            printf("Functor(\n");
+            indent++;
+            printIndent();
+            printf("arguments=");
+            printTypeArray(casted->arguments);
+            printf("\n");
+            printIndent();
+            printf("returnType=");
+            printNode((Node *) casted->returnType);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_SIMPLE: {
+            struct Simple *casted = (struct Simple *) node;
+            printf("Simple(\n");
+            indent++;
+            printIndent();
+            printf("name=");
+            printToken(casted->name);
             indent--;
             printf("\n");
             printIndent();

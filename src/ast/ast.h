@@ -14,6 +14,8 @@ typedef enum {
 #define ALLOCATE_NODE(type, nodeType) (type*) allocateNode(sizeof(type), nodeType)
 
 typedef enum {
+    NODE_SIMPLE,
+    NODE_FUNCTOR,
     NODE_BINARY,
     NODE_GROUPING,
     NODE_LITERAL,
@@ -53,6 +55,21 @@ Node *allocateNode(size_t size, NodeType type);
 
 typedef struct {
     Node self;
+} Type;
+
+typedef struct {
+    int count;
+    int capacity;
+    Type** types;
+} TypeArray;
+
+void initTypeArray(TypeArray* typeArray);
+void writeTypeArray(TypeArray * typeArray, Type* type);
+void freeTypeArray(TypeArray * typeArray);
+
+typedef struct {
+    Node self;
+    Type *type;
 } Expr;
 
 typedef struct {
@@ -64,6 +81,7 @@ typedef struct {
 void initExprArray(ExprArray* exprArray);
 void writeExprArray(ExprArray * exprArray, Expr* expr);
 void freeExprArray(ExprArray * exprArray);
+
 typedef struct {
     Node self;
 } Stmt;
@@ -77,6 +95,18 @@ typedef struct {
 void initStmtArray(StmtArray* stmtArray);
 void writeStmtArray(StmtArray * stmtArray, Stmt* stmt);
 void freeStmtArray(StmtArray * stmtArray);
+
+struct Simple {
+    Type self;
+    Token name;
+};
+
+struct Functor {
+    Type self;
+    TypeArray arguments;
+    Type *returnType;
+};
+
 struct Binary {
     Expr self;
     Expr *left;
@@ -174,6 +204,7 @@ struct Var {
     Stmt self;
     Token name;
     Expr* initializer;
+    Type *type;
 };
 
 struct Block {

@@ -1,6 +1,7 @@
 from contextlib import redirect_stdout
 
 exprs = [
+    "Expr     : Node self, Type *type",
     "Binary   : Expr *left, Token operator, Expr* right",
     "Grouping : Expr* expression",
     "Literal  : Value value",
@@ -21,8 +22,9 @@ exprs = [
 ]
 
 stmts = [
+    "Stmt       : Node self",
     "Expression : Expr* expression",
-    "Var        : Token name, Expr* initializer",
+    "Var        : Token name, Expr* initializer, Type *type",
     "Block      : StmtArray statements",
     "Function   : Token name, TokenArray params," +
     " StmtArray body, FunctionType functionType",
@@ -37,9 +39,15 @@ stmts = [
     "Import     : Expr* expression",
 ]
 
+type_items = [
+    "Type     : Node self",
+    "Simple   : Token name",
+    "Functor  : TypeArray arguments, Type *returnType"
+]
+
 # TODO: Argument list, etc
 
-types = dict(expr=exprs, stmt=stmts)
+types = dict(type=type_items, expr=exprs, stmt=stmts)
 
 file = open("src/ast/ast.c", "w")
 with redirect_stdout(file):
@@ -71,7 +79,7 @@ void free{titleGroup}Array({titleGroup}Array * {group}Array) {{
     FREE_ARRAY({titleGroup}*, {group}Array->{group}s, {group}Array->capacity);
     init{titleGroup}Array({group}Array);
 }}
-        """)
+""")
 file = open("src/ast/ast.h", "w")
 with redirect_stdout(file):
     all_types = []
@@ -95,7 +103,7 @@ with redirect_stdout(file):
     print()
 
     for group, items in types.items():
-        for item in items:
+        for item in items[1:]:
             name, args = item.split(":")
             name = name.strip()
             all_types.append(name)
@@ -117,12 +125,19 @@ with redirect_stdout(file):
     print()
 
     for group, items in types.items():
-        print("typedef struct {")
-        print(f"    Node self;")
-        print("}", f"{group.title()};")
-        print()
-
         titleGroup = group.title()
+
+        item = items[0]
+        name, args = item.split(":")
+        name = name.strip()
+        args = args.split(",")
+
+        print("typedef struct {")
+        for arg in args:
+            print(f"    {arg.strip()};")
+
+        print("}", f"{name.title()};")
+        print()
 
         print("typedef struct {")
         print(f"    int count;")
@@ -134,9 +149,10 @@ with redirect_stdout(file):
         print(f'void init{titleGroup}Array({titleGroup}Array* {group}Array);')
         print(f'void write{titleGroup}Array({titleGroup}Array * {group}Array, {titleGroup}* {group});')
         print(f'void free{titleGroup}Array({titleGroup}Array * {group}Array);')
+        print()
 
     for group, items in types.items():
-        for item in items:
+        for item in items[1:]:
             name, args = item.split(":")
             name = name.strip()
             args = args.split(",")

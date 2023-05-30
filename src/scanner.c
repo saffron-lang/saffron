@@ -227,7 +227,7 @@ Token scanToken() {
     if (isAtEnd()) return makeToken(TOKEN_EOF);
 
     char c = advance();
-    if (c == ':') return atom();
+    if (c == ':' && isAlpha(peek())) return atom();
     if (isAlpha(c)) return identifier();
     if (isDigit(c)) return number();
 
@@ -280,6 +280,8 @@ Token scanToken() {
         case '|':
             return makeToken(
                     match('>') ? TOKEN_PIPE : TOKEN_BITWISE_OR);
+        case ':':
+            return makeToken(TOKEN_COLON);
         case '"':
             return string();
 
