@@ -5,6 +5,7 @@
 #include "ast/astprint.h"
 #include "ast/astparse.h"
 #include "compiler.h"
+#include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -24,10 +25,10 @@ static void repl() {
 
 static void runFile(const char *path) {
     char *source = readFile(path);
-    compileOld(source);
     StmtArray* body = parseAST(source);
-    printTree(body);
-    astUnparse(body);
+    populateTypes(body);
+//    printTree(body);
+//    astUnparse(body);
     ObjModule* module = interpret(body, "<script>", path);
     free(source);
 

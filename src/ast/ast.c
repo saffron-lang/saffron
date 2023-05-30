@@ -1,6 +1,30 @@
 #include "ast.h"
 
 
+void initTypeArray(TypeArray* typeArray) {
+    typeArray->count = 0;
+    typeArray->capacity = 0;
+    typeArray->types = NULL;
+}      
+        
+void writeTypeArray(TypeArray * typeArray, Type* type) {
+    if (typeArray->capacity < typeArray->count + 1) {
+        int oldCapacity = typeArray->capacity;
+        typeArray->capacity = GROW_CAPACITY(oldCapacity);
+        typeArray->types = GROW_ARRAY(Type*, typeArray->types,
+                                       oldCapacity, typeArray->capacity);
+    }
+
+    typeArray->types[typeArray->count] = type;
+    typeArray->count++;
+}
+
+void freeTypeArray(TypeArray * typeArray) {
+    FREE_ARRAY(Type*, typeArray->types, typeArray->capacity);
+    initTypeArray(typeArray);
+}
+
+
 void initExprArray(ExprArray* exprArray) {
     exprArray->count = 0;
     exprArray->capacity = 0;
@@ -23,7 +47,7 @@ void freeExprArray(ExprArray * exprArray) {
     FREE_ARRAY(Expr*, exprArray->exprs, exprArray->capacity);
     initExprArray(exprArray);
 }
-        
+
 
 void initStmtArray(StmtArray* stmtArray) {
     stmtArray->count = 0;
@@ -47,4 +71,4 @@ void freeStmtArray(StmtArray * stmtArray) {
     FREE_ARRAY(Stmt*, stmtArray->stmts, stmtArray->capacity);
     initStmtArray(stmtArray);
 }
-        
+
