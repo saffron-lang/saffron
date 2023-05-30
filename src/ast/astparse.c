@@ -5,14 +5,13 @@
 #include <stdio.h>
 
 #include "../common.h"
-#include "../compiler.h"
 #include "../scanner.h"
 #include "../object.h"
 #include "../memory.h"
 
 #ifdef DEBUG_PRINT_CODE
 
-#include "debug.h"
+#include "../debug.h"
 
 #endif
 
@@ -149,10 +148,11 @@ static Expr *number(bool canAssign) {
 
 static Expr *unary(bool canAssign) {
     // Parse the operand.
+    Token operator = parser.previous;
     Expr *expr = parsePrecedence(PREC_UNARY);
 
     struct Unary *result = ALLOCATE_NODE(struct Unary, NODE_UNARY);
-    result->operator = parser.previous;
+    result->operator = operator;
     result->right = expr;
 
     return result;
@@ -214,9 +214,18 @@ static bool identifiersEqual(Token *a, Token *b) {
 }
 
 static Expr *variable(bool canAssign) {
-    struct Variable *var = ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
-    var->name = parser.previous;
-    return var;
+    Token name = parser.previous;
+    Token next = parser.current;
+    if (canAssign && match(TOKEN_EQUAL)) {
+        struct Assign *var = ALLOCATE_NODE(struct Assign, NODE_ASSIGN);
+        var->name = name;
+        var->value = expression();
+        return (Expr *) var;
+    } else {
+        struct Variable *var = ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
+        var->name = name;
+        return (Expr *) var;
+    }
 }
 
 static Expr *atom(bool canAssign) {
@@ -343,7 +352,9 @@ static Expr *super_(bool canAssign) {
 
 static Expr *yield(bool canAssign) {
     struct Yield *result = ALLOCATE_NODE(struct Yield, NODE_YIELD);
-    result->expression = parsePrecedence(PREC_YIELD);
+    if (!check(TOKEN_SEMICOLON)) {
+        result->expression = parsePrecedence(PREC_YIELD);
+    }
     return result;
 }
 
@@ -412,6 +423,9 @@ static Expr *parsePrecedence(Precedence precedence) {
 
     bool canAssign = precedence <= PREC_ASSIGNMENT;
     Expr *result = prefixRule(canAssign);
+
+    Token last = parser.previous;
+    Token current = parser.current;
 
     while (precedence <= getRule(parser.current.type)->precedence) {
         advance();
@@ -613,13 +627,13 @@ static Stmt *returnStatement() {
     if (match(TOKEN_SEMICOLON)) {
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = NULL;
-        return result;
+        return (Stmt *) result;
     } else {
         Expr *value = expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = value;
-        return result;
+        return (Stmt *) result;
     }
 }
 

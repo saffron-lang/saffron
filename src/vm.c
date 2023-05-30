@@ -1,7 +1,7 @@
 #include "common.h"
 #include "vm.h"
 #include "debug.h"
-#include "compiler.h"
+#include "ast/astcompile.h"
 #include "object.h"
 #include "memory.h"
 #include "libc/time.h"
@@ -150,7 +150,7 @@ void runtimeError(const char *format, ...) {
     resetStack();
 }
 
-ObjModule* executeModule(ObjString *name);
+ObjModule *executeModule(ObjString *name);
 
 static bool call(ObjClosure *closure, int argCount) {
     switch (closure->obj.type) {
@@ -811,9 +811,9 @@ static InterpretResult run(ObjModule *module) {
 #undef BINARY_OP
 }
 
-ObjModule* interpret(const char *source, const char *name, const char *path) {
+ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
     ObjModule *module = newModule(name, path, true);
-    ObjFunction *function = compile(source);
+    ObjFunction *function = compile(body);
     if (function == NULL) {
         module->result = INTERPRET_COMPILE_ERROR;
         return module;
@@ -834,12 +834,12 @@ ObjModule* interpret(const char *source, const char *name, const char *path) {
 
 char *remove_n(char *dst, const char *filename, int n) {
     size_t len = strlen(filename);
-    memcpy(dst, filename, len-n);
+    memcpy(dst, filename, len - n);
     dst[len - n] = 0;
     return dst;
 }
 
-ObjModule* executeModule(ObjString *relPath) {
+ObjModule *executeModule(ObjString *relPath) {
     ModuleContext temp = moduleContext;
     moduleContext = IMPORT;
     char *path = findModule(relPath->chars);
@@ -852,7 +852,7 @@ ObjModule* executeModule(ObjString *relPath) {
     char chars[64];
     remove_n(chars, basename(relPath->chars), 4);
 
-    ObjModule* module = interpret(source, chars, path);
+    ObjModule *module = interpret(source, chars, path);
     free(source);
     moduleContext = temp;
     if (module->result == INTERPRET_COMPILE_ERROR) runtimeError("Compile error");

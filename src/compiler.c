@@ -56,13 +56,6 @@ typedef struct {
     bool isLocal;
 } Upvalue;
 
-typedef enum {
-    TYPE_FUNCTION,
-    TYPE_SCRIPT,
-    TYPE_METHOD,
-    TYPE_INITIALIZER,
-} FunctionType;
-
 
 typedef struct Compiler {
     struct Compiler *enclosing;
@@ -80,11 +73,11 @@ typedef struct ClassCompiler {
 } ClassCompiler;
 
 Parser parser;
-ClassCompiler *currentClass = NULL;
-Compiler *current = NULL;
+ClassCompiler *currentClassOld = NULL;
+Compiler *currentOld = NULL;
 
 static Chunk *currentChunk() {
-    return &current->function->chunk;
+    return &currentOld->function->chunk;
 }
 
 static void errorAt(Token *token, const char *message) {
@@ -152,7 +145,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 }
 
 static void emitReturn() {
-    if (current->type == TYPE_INITIALIZER) {
+    if (currentOld->type == TYPE_INITIALIZER) {
         emitBytes(OP_GET_LOCAL, 0);
     } else {
         emitByte(OP_NIL);
@@ -163,7 +156,7 @@ static void emitReturn() {
 
 static ObjFunction *endCompiler() {
     emitReturn();
-    ObjFunction *function = current->function;
+    ObjFunction *function = currentOld->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
         disassembleChunk(currentChunk(), function->name != NULL
@@ -171,7 +164,7 @@ static ObjFunction *endCompiler() {
     }
 #endif
 
-    current = current->enclosing;
+    currentOld = currentOld->enclosing;
     return function;
 }
 
@@ -221,19 +214,19 @@ static void patchJump(int offset) {
 }
 
 static void initCompiler(Compiler *compiler, FunctionType type) {
-    compiler->enclosing = current;
+    compiler->enclosing = currentOld;
     compiler->function = NULL;
     compiler->type = type;
     compiler->localCount = 0;
     compiler->function = newFunction();
     compiler->scopeDepth = 0;
-    current = compiler;
+    currentOld = compiler;
     if (type != TYPE_SCRIPT) {
-        current->function->name = copyString(parser.previous.start,
-                                             parser.previous.length);
+        currentOld->function->name = copyString(parser.previous.start,
+                                                parser.previous.length);
     }
 
-    Local *local = &current->locals[current->localCount++];
+    Local *local = &currentOld->locals[currentOld->localCount++];
     local->depth = 0;
     local->isCaptured = false;
     if (type != TYPE_FUNCTION) {
@@ -396,11 +389,11 @@ static int resolveUpvalue(Compiler *compiler, Token *name) {
 
 static void namedVariable(Token name, bool canAssign) {
     uint8_t getOp, setOp;
-    int arg = resolveLocal(current, &name);
+    int arg = resolveLocal(currentOld, &name);
     if (arg != -1) {
         getOp = OP_GET_LOCAL;
         setOp = OP_SET_LOCAL;
-    } else if ((arg = resolveUpvalue(current, &name)) != -1) {
+    } else if ((arg = resolveUpvalue(currentOld, &name)) != -1) {
         getOp = OP_GET_UPVALUE;
         setOp = OP_SET_UPVALUE;
     } else {
@@ -508,7 +501,7 @@ static void dot(bool canAssign) {
 }
 
 static void this_(bool canAssign) {
-    if (currentClass == NULL) {
+    if (currentClassOld == NULL) {
         error("Can't use 'this' outside of a class.");
         return;
     }
@@ -524,9 +517,9 @@ static Token syntheticToken(const char *text) {
 }
 
 static void super_(bool canAssign) {
-    if (currentClass == NULL) {
+    if (currentClassOld == NULL) {
         error("Can't use 'super' outside of a class.");
-    } else if (!currentClass->hasSuperclass) {
+    } else if (!currentClassOld->hasSuperclass) {
         error("Can't use 'super' in a class with no superclass.");
     }
 
@@ -547,14 +540,14 @@ static void super_(bool canAssign) {
 }
 
 static void yield(bool canAssign) {
-//    if (current->type == TYPE_SCRIPT) {
+//    if (currentOld->type == TYPE_SCRIPT) {
 //        error("Can't yield from top-level code.");
 //    }
     if (check(TOKEN_SEMICOLON)) {
         emitByte(OP_NIL);
         emitByte(OP_YIELD);
     } else {
-//        if (current->type == TYPE_INITIALIZER) {
+//        if (currentOld->type == TYPE_INITIALIZER) {
 //            error("Can't yield a value from an initializer.");
 //        }
         parsePrecedence(PREC_YIELD);
@@ -631,12 +624,8 @@ static void parsePrecedence(Precedence precedence) {
     bool canAssign = precedence <= PREC_ASSIGNMENT;
     prefixRule(canAssign);
 
-    Token prev = parser.previous;
-    Token current = parser.current;
     while (precedence <= getRule(parser.current.type)->precedence) {
         advance();
-        prev = parser.previous;
-        current = parser.current;
         ParseFn infixRule = getRule(parser.previous.type)->infix;
         infixRule(canAssign);
     }
@@ -648,25 +637,25 @@ static void parsePrecedence(Precedence precedence) {
 }
 
 static void addLocal(Token name) {
-    if (current->localCount == UINT8_COUNT) {
+    if (currentOld->localCount == UINT8_COUNT) {
         error("Too many local variables in function.");
         return;
     }
 
-    Local *local = &current->locals[current->localCount++];
+    Local *local = &currentOld->locals[currentOld->localCount++];
     local->name = name;
     local->depth = -1;
     local->isCaptured = false;
 }
 
 static void declareVariable() {
-    if (current->scopeDepth == 0) return;
+    if (currentOld->scopeDepth == 0) return;
 
     Token *name = &parser.previous;
 
-    for (int i = current->localCount - 1; i >= 0; i--) {
-        Local *local = &current->locals[i];
-        if (local->depth != -1 && local->depth < current->scopeDepth) {
+    for (int i = currentOld->localCount - 1; i >= 0; i--) {
+        Local *local = &currentOld->locals[i];
+        if (local->depth != -1 && local->depth < currentOld->scopeDepth) {
             break;
         }
 
@@ -679,13 +668,13 @@ static void declareVariable() {
 }
 
 static void markInitialized() {
-    if (current->scopeDepth == 0) return;
-    current->locals[current->localCount - 1].depth =
-            current->scopeDepth;
+    if (currentOld->scopeDepth == 0) return;
+    currentOld->locals[currentOld->localCount - 1].depth =
+            currentOld->scopeDepth;
 }
 
 static void defineVariable(uint8_t global) {
-    if (current->scopeDepth > 0) {
+    if (currentOld->scopeDepth > 0) {
         markInitialized();
         return;
     }
@@ -698,7 +687,7 @@ static uint8_t parseVariable(const char *errorMessage) {
     consume(TOKEN_IDENTIFIER, errorMessage);
 
     declareVariable();
-    if (current->scopeDepth > 0) return 0;
+    if (currentOld->scopeDepth > 0) return 0;
 
     return identifierConstant(&parser.previous);
 }
@@ -716,8 +705,8 @@ static void anonFunction() {
 
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
-            current->function->arity++;
-            if (current->function->arity > 255) {
+            currentOld->function->arity++;
+            if (currentOld->function->arity > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
             uint8_t constant = parseVariable("Expect parameter name.");
@@ -762,21 +751,21 @@ static void block() {
 }
 
 static void beginScope() {
-    current->scopeDepth++;
+    currentOld->scopeDepth++;
 }
 
 static void endScope() {
-    current->scopeDepth--;
+    currentOld->scopeDepth--;
 
-    while (current->localCount > 0 &&
-           current->locals[current->localCount - 1].depth >
-           current->scopeDepth) {
-        if (current->locals[current->localCount - 1].isCaptured) {
+    while (currentOld->localCount > 0 &&
+           currentOld->locals[currentOld->localCount - 1].depth >
+           currentOld->scopeDepth) {
+        if (currentOld->locals[currentOld->localCount - 1].isCaptured) {
             emitByte(OP_CLOSE_UPVALUE);
         } else {
             emitByte(OP_POP);
         }
-        current->localCount--;
+        currentOld->localCount--;
     }
 }
 
@@ -789,8 +778,8 @@ static void function(FunctionType type) {
 
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
-            current->function->arity++;
-            if (current->function->arity > 255) {
+            currentOld->function->arity++;
+            if (currentOld->function->arity > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
             uint8_t constant = parseVariable("Expect parameter name.");
@@ -926,14 +915,14 @@ static void importStatement() {
 }
 
 static void returnStatement() {
-    if (current->type == TYPE_SCRIPT) {
+    if (currentOld->type == TYPE_SCRIPT) {
         error("Can't return from top-level code.");
     }
 
     if (match(TOKEN_SEMICOLON)) {
         emitReturn();
     } else {
-        if (current->type == TYPE_INITIALIZER) {
+        if (currentOld->type == TYPE_INITIALIZER) {
             error("Can't return a value from an initializer.");
         }
 
@@ -1014,9 +1003,9 @@ static void classDeclaration() {
     defineVariable(nameConstant);
 
     ClassCompiler classCompiler;
-    classCompiler.enclosing = currentClass;
+    classCompiler.enclosing = currentClassOld;
     classCompiler.hasSuperclass = false;
-    currentClass = &classCompiler;
+    currentClassOld = &classCompiler;
 
     if (match(TOKEN_LESS)) {
         consume(TOKEN_IDENTIFIER, "Expect superclass name.");
@@ -1050,7 +1039,7 @@ static void classDeclaration() {
         endScope();
     }
 
-    currentClass = currentClass->enclosing;
+    currentClassOld = currentClassOld->enclosing;
 }
 
 static void declaration() {
@@ -1067,7 +1056,7 @@ static void declaration() {
     if (parser.panicMode) synchronize();
 }
 
-ObjFunction *compile(const char *source) {
+ObjFunction *compileOld(const char *source) {
     initScanner(source);
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT);
@@ -1087,8 +1076,8 @@ ObjFunction *compile(const char *source) {
     return parser.hadError ? NULL : function;
 }
 
-void markCompilerRoots() {
-    Compiler *compiler = current;
+void markCompilerRootsOld() {
+    Compiler *compiler = currentOld;
     while (compiler != NULL) {
         markObject((Obj *) compiler->function);
         compiler = compiler->enclosing;

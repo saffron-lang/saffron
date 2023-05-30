@@ -51,9 +51,9 @@ static void printExprArray(ExprArray exprArray) {
     indent++;
     for (int i = 0; i < exprArray.count; i++) {
         printIndent();
-        unparseNode((Node *) exprArray.exprs[i]);
+        printNode((Node *) exprArray.exprs[i]);
         if (i != exprArray.count - 1) {
-            printf(", ");
+            printf(",\n");
         }
     }
 
@@ -118,9 +118,14 @@ void printTree(StmtArray *statements) {
     printf("\n");
     printIndent();
     printf("]");
+    printf("\n");
 }
 
 void unparseNode(Node *node) {
+    if (node == NULL) {
+        printf("NULL");
+        return;
+    }
     switch (node->type) {
         case NODE_BINARY: {
             struct Binary *casted = (struct Binary *) node;
@@ -213,8 +218,11 @@ void unparseNode(Node *node) {
             break;
         case NODE_YIELD: {
             struct Yield *casted = (struct Yield *) node;
-            printf("yield ");
-            unparseNode((Node *) casted->expression);
+            printf("yield");
+            if (casted->expression) {
+                printf(" ");
+                unparseNode((Node *) casted->expression);
+            }
             break;
         }
         case NODE_LAMBDA: {
@@ -261,6 +269,7 @@ void unparseNode(Node *node) {
             indent++;
             astUnparse(&casted->statements);
             indent--;
+            printIndent();
             printf("}");
             break;
         }
@@ -585,7 +594,7 @@ void printNode(Node *node) {
         }
         case NODE_YIELD: {
             struct Yield *casted = (struct Yield *) node;
-            printf("Binary(\n");
+            printf("Yield(\n");
             indent++;
             printIndent();
             printf("expression=");
@@ -641,15 +650,15 @@ void printNode(Node *node) {
         }
         case NODE_VAR: {
             struct Var *casted = (struct Var *) node;
-            printf("Binary(\n");
+            printf("Var(\n");
             indent++;
-            printIndent();
-            printf("initializer=");
-            printNode((Node *) casted->initializer);
-            printf(",\n");
             printIndent();
             printf("name=");
             printToken(casted->name);
+            printf(",\n");
+            printIndent();
+            printf("initializer=");
+            printNode((Node *) casted->initializer);
             indent--;
             printf("\n");
             printIndent();
