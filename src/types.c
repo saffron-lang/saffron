@@ -187,6 +187,9 @@ static Type *getTypeDef(Token name) {
 
 static bool typesEqual(Type *left, Type *right) {
     // TODO: Make this actually work
+    // TODO: Maybe this should actually be "isSubClass", left to right
+    // If right is subclass of left, then we can assign right to left
+    // Subclasses include generics
     return true;
 }
 

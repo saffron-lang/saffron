@@ -42,7 +42,7 @@ typedef struct {
 // types for builtins / primitives.
 
 // Should 2 type equivalent classes be comparable? Probably not on type alone.
-// Also todo: Inheritance, this, super, class attributes, instance attributes
+// Also todo: Inheritance, this, super, class attributes, instance attributes, generic types
 
 typedef struct TypeEnvironment {
     struct TypeEnvironment *enclosing;
