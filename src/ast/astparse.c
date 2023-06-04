@@ -452,15 +452,15 @@ static void beginScope();
 
 static Stmt *block();
 
-static Type *typeAnnotation();
+static TypeNode *typeAnnotation();
 
 static Expr *anonFunction(bool canAssign) {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after fun keyword.");
     TokenArray tokens;
     initTokenArray(&tokens);
 
-    TypeArray types;
-    initTypeArray(&types);
+    TypeNodeArray types;
+    initTypeNodeArray(&types);
 
     int argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
@@ -473,9 +473,9 @@ static Expr *anonFunction(bool canAssign) {
             writeTokenArray(&tokens, name, name.line);
 
             if (match(TOKEN_COLON)) {
-                writeTypeArray(&types, typeAnnotation());
+                writeTypeNodeArray(&types, typeAnnotation());
             } else {
-                writeTypeArray(&types, NULL);
+                writeTypeNodeArray(&types, NULL);
             }
         } while (match(TOKEN_COMMA));
     }
@@ -487,8 +487,9 @@ static Expr *anonFunction(bool canAssign) {
     struct Lambda *result = ALLOCATE_NODE(struct Lambda, NODE_LAMBDA);
     result->body = bl->statements;
     result->params = tokens;
+    result->paramTypes = types;
 
-    result->self.type = (Type *) initFunctor(types, NULL);
+    result->self.type = (TypeNode *) initFunctor(types, NULL);
     return result;
 }
 
@@ -527,6 +528,9 @@ static struct Function *function(FunctionType type) {
     TokenArray tokens;
     initTokenArray(&tokens);
 
+    TypeNodeArray types;
+    initTypeNodeArray(&types);
+
     int argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
@@ -534,18 +538,32 @@ static struct Function *function(FunctionType type) {
             if (argCount > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
-            Token token = parseVariable("Expect parameter name.");
-            writeTokenArray(&tokens, token, token.line);
+            Token name = parseVariable("Expect parameter name.");
+            writeTokenArray(&tokens, name, name.line);
+
+            if (match(TOKEN_COLON)) {
+                writeTypeNodeArray(&types, typeAnnotation());
+            } else {
+                writeTypeNodeArray(&types, NULL);
+            }
         } while (match(TOKEN_COMMA));
     }
 
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+    TypeNode *returnType = NULL;
+    if (match(TOKEN_COLON)) {
+        returnType = typeAnnotation();
+    }
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
     struct Block *body = (struct Block *) block();
     struct Function *result = ALLOCATE_NODE(struct Function, NODE_FUNCTION);
     result->body = body->statements;
     result->params = tokens;
+    result->paramTypes = types;
     result->functionType = type;
+    result->returnType = returnType;
     return result;
 }
 
@@ -578,15 +596,15 @@ static Stmt *whileStatement() {
     return result;
 }
 
-static Type *typeAnnotation() {
+static TypeNode *typeAnnotation() {
     if (match(TOKEN_LEFT_PAREN)) {
         struct Functor *result = ALLOCATE_NODE(struct Functor, NODE_FUNCTOR);
-        TypeArray arguments;
-        initTypeArray(&arguments);
+        TypeNodeArray arguments;
+        initTypeNodeArray(&arguments);
 
         while (!match(TOKEN_RIGHT_PAREN)) {
-            Type *type = typeAnnotation();
-            writeTypeArray(&arguments, type);
+            TypeNode *type = typeAnnotation();
+            writeTypeNodeArray(&arguments, type);
         }
 
         consume(TOKEN_ARROW,
@@ -595,7 +613,7 @@ static Type *typeAnnotation() {
         result->returnType = typeAnnotation();
         result->arguments = arguments;
 
-        return (Type *) result;
+        return (TypeNode *) result;
     } else {
         if (!match(TOKEN_IDENTIFIER)) {
             error("Expect identifier or functor type.");
@@ -605,7 +623,7 @@ static Type *typeAnnotation() {
 
             struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
             result->name = name;
-            return (Type *) result;
+            return (TypeNode *) result;
         }
     }
 }
@@ -613,7 +631,7 @@ static Type *typeAnnotation() {
 static Stmt *varDeclaration() {
     Token name = parseVariable("Expect variable name.");
     Expr *value = NULL;
-    Type *type = NULL;
+    TypeNode *type = NULL;
 
     if (match(TOKEN_COLON)) {
         type = typeAnnotation();
@@ -746,7 +764,7 @@ static Stmt *method() {
 
     struct Function *func = function(type);
     func->name = name;
-    return func;
+    return (Stmt*) func;
 }
 
 static Stmt *classDeclaration() {

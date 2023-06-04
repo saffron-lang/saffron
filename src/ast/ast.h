@@ -55,21 +55,21 @@ Node *allocateNode(size_t size, NodeType type);
 
 typedef struct {
     Node self;
-} Type;
+} TypeNode;
 
 typedef struct {
     int count;
     int capacity;
-    Type** types;
-} TypeArray;
+    TypeNode** typeNodes;
+} TypeNodeArray;
 
-void initTypeArray(TypeArray* typeArray);
-void writeTypeArray(TypeArray * typeArray, Type* type);
-void freeTypeArray(TypeArray * typeArray);
+void initTypeNodeArray(TypeNodeArray* typeNodeArray);
+void writeTypeNodeArray(TypeNodeArray * typeNodeArray, TypeNode* typeNode);
+void freeTypeNodeArray(TypeNodeArray * typeNodeArray);
 
 typedef struct {
     Node self;
-    Type *type;
+    TypeNode *type;
 } Expr;
 
 typedef struct {
@@ -97,14 +97,14 @@ void writeStmtArray(StmtArray * stmtArray, Stmt* stmt);
 void freeStmtArray(StmtArray * stmtArray);
 
 struct Simple {
-    Type self;
+    TypeNode self;
     Token name;
 };
 
 struct Functor {
-    Type self;
-    TypeArray arguments;
-    Type *returnType;
+    TypeNode self;
+    TypeNodeArray arguments;
+    TypeNode *returnType;
 };
 
 struct Binary {
@@ -187,7 +187,9 @@ struct Yield {
 struct Lambda {
     Expr self;
     TokenArray params;
+    TypeNodeArray paramTypes;
     StmtArray body;
+    TypeNode *returnType;
 };
 
 struct List {
@@ -204,7 +206,7 @@ struct Var {
     Stmt self;
     Token name;
     Expr* initializer;
-    Type *type;
+    TypeNode *type;
 };
 
 struct Block {
@@ -216,8 +218,10 @@ struct Function {
     Stmt self;
     Token name;
     TokenArray params;
+    TypeNodeArray paramTypes;
     StmtArray body;
     FunctionType functionType;
+    TypeNode *returnType;
 };
 
 struct Class {

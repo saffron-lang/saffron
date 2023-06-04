@@ -1,27 +1,27 @@
 #include "ast.h"
 
 
-void initTypeArray(TypeArray* typeArray) {
-    typeArray->count = 0;
-    typeArray->capacity = 0;
-    typeArray->types = NULL;
+void initTypeNodeArray(TypeNodeArray* typeNodeArray) {
+    typeNodeArray->count = 0;
+    typeNodeArray->capacity = 0;
+    typeNodeArray->typeNodes = NULL;
 }      
         
-void writeTypeArray(TypeArray * typeArray, Type* type) {
-    if (typeArray->capacity < typeArray->count + 1) {
-        int oldCapacity = typeArray->capacity;
-        typeArray->capacity = GROW_CAPACITY(oldCapacity);
-        typeArray->types = GROW_ARRAY(Type*, typeArray->types,
-                                       oldCapacity, typeArray->capacity);
+void writeTypeNodeArray(TypeNodeArray * typeNodeArray, TypeNode* typeNode) {
+    if (typeNodeArray->capacity < typeNodeArray->count + 1) {
+        int oldCapacity = typeNodeArray->capacity;
+        typeNodeArray->capacity = GROW_CAPACITY(oldCapacity);
+        typeNodeArray->typeNodes = GROW_ARRAY(TypeNode*, typeNodeArray->typeNodes,
+                                       oldCapacity, typeNodeArray->capacity);
     }
 
-    typeArray->types[typeArray->count] = type;
-    typeArray->count++;
+    typeNodeArray->typeNodes[typeNodeArray->count] = typeNode;
+    typeNodeArray->count++;
 }
 
-void freeTypeArray(TypeArray * typeArray) {
-    FREE_ARRAY(Type*, typeArray->types, typeArray->capacity);
-    initTypeArray(typeArray);
+void freeTypeNodeArray(TypeNodeArray * typeNodeArray) {
+    FREE_ARRAY(TypeNode*, typeNodeArray->typeNodes, typeNodeArray->capacity);
+    initTypeNodeArray(typeNodeArray);
 }
 
 

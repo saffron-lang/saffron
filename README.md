@@ -12,4 +12,4 @@
 - File I/O
 - Sensible syntax for piping with higher arity
   - Maybe something to do with currying?
-- 
+- Statements as expressions

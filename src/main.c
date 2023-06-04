@@ -26,7 +26,7 @@ static void repl() {
 static void runFile(const char *path) {
     char *source = readFile(path);
     StmtArray* body = parseAST(source);
-//    populateTypes(body);
+    evaluateTree(body);
 //    printTree(body);
 //    astUnparse(body);
     ObjModule* module = interpret(body, "<script>", path);
