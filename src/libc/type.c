@@ -21,6 +21,11 @@ ObjBuiltinType *newBuiltinType(const char *name, InitFn initFn) {
     klass->obj.name = AS_STRING(peek(0));
     initTable(&klass->obj.methods);
     push(OBJ_VAL(klass));
+    klass->freeFn = NULL;
+    klass->markFn = NULL;
+    klass->printFn = NULL;
+    klass->typeCallFn = NULL;
+    klass->typeDefFn = NULL;
     initFn(klass);
     pop();
     pop();

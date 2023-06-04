@@ -54,4 +54,14 @@ typedef struct TypeEnvironment {
     int scopeDepth;
 } TypeEnvironment;
 
+SimpleType *newSimpleType();
+GenericType *newGenericType();
+
+SimpleType* numberType;
+SimpleType* boolType;
+SimpleType* nilType;
+SimpleType* atomType;
+SimpleType* stringType;
+SimpleType* neverType;
+
 #endif //CRAFTING_INTERPRETERS_TYPES_H
