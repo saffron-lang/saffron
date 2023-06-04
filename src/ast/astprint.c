@@ -63,7 +63,7 @@ static void printExprArray(ExprArray exprArray) {
     printf("]");
 }
 
-static void printTypeArray(TypeArray typeArray) {
+static void printTypeArray(TypeNodeArray typeArray) {
     if (typeArray.count == 0) {
         printf("[]");
         return;
@@ -72,7 +72,7 @@ static void printTypeArray(TypeArray typeArray) {
     indent++;
     for (int i = 0; i < typeArray.count; i++) {
         printIndent();
-        printNode((Node *) typeArray.types[i]);
+        printNode((Node *) typeArray.typeNodes[i]);
         if (i != typeArray.count - 1) {
             printf(",\n");
         }
@@ -408,7 +408,7 @@ void unparseNode(Node *node) {
             struct Functor *casted = (struct Functor *) node;
             printf("(");
             for (int i = 0; i < casted->arguments.count; i++) {
-                unparseNode((Node *) casted->arguments.types[i]);
+                unparseNode((Node *) casted->arguments.typeNodes[i]);
                 if (i != casted->arguments.count-  1) {
                     printf(", ");
                 }

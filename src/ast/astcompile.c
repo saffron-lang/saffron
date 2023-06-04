@@ -338,6 +338,7 @@ void compileTree(StmtArray *statements) {
     if (statements == NULL) {
         return;
     }
+
     for (int i = 0; i < statements->count; i++) {
         compileNode((Node *) statements->stmts[i]);
     }

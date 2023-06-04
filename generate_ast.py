@@ -1,7 +1,7 @@
 from contextlib import redirect_stdout
 
 exprs = [
-    "Expr     : Node self, Type *type",
+    "Expr     : Node self, TypeNode *type",
     "Binary   : Expr *left, Token operator, Expr* right",
     "Grouping : Expr* expression",
     "Literal  : Value value",
@@ -15,7 +15,7 @@ exprs = [
     "Super    : Token keyword, Token method",
     "This     : Token keyword",
     "Yield    : Expr* expression",
-    "Lambda   : TokenArray params, StmtArray body",
+    "Lambda   : TokenArray params, TypeNodeArray paramTypes, StmtArray body, TypeNode *returnType",
     "List     : ExprArray items",
     # "Arguments: Expr* items",
     # "Parameters: "
@@ -24,10 +24,10 @@ exprs = [
 stmts = [
     "Stmt       : Node self",
     "Expression : Expr* expression",
-    "Var        : Token name, Expr* initializer, Type *type",
+    "Var        : Token name, Expr* initializer, TypeNode *type",
     "Block      : StmtArray statements",
-    "Function   : Token name, TokenArray params," +
-    " StmtArray body, FunctionType functionType",
+    "Function   : Token name, TokenArray params, TypeNodeArray paramTypes," +
+    " StmtArray body, FunctionType functionType, TypeNode *returnType",
     "Class      : Token name, struct Variable* superclass," +
     " StmtArray methods",
     "If         : Expr* condition, Stmt* thenBranch," +
@@ -40,14 +40,16 @@ stmts = [
 ]
 
 type_items = [
-    "Type     : Node self",
+    "TypeNode : Node self",
     "Simple   : Token name",
-    "Functor  : TypeArray arguments, Type *returnType"
+    "Functor  : TypeNodeArray arguments, TypeNode *returnType"
 ]
 
 # TODO: Argument list, etc
 
-types = dict(type=type_items, expr=exprs, stmt=stmts)
+capfirst = lambda x: x[0].upper() + x[1:]
+
+types = dict(typeNode=type_items, expr=exprs, stmt=stmts)
 
 file = open("src/ast/ast.c", "w")
 with redirect_stdout(file):
@@ -55,7 +57,7 @@ with redirect_stdout(file):
     print()
 
     for group, items in types.items():
-        titleGroup = group.title()
+        titleGroup = capfirst(group)
         print(f"""
 void init{titleGroup}Array({titleGroup}Array* {group}Array) {{
     {group}Array->count = 0;
@@ -125,7 +127,7 @@ with redirect_stdout(file):
     print()
 
     for group, items in types.items():
-        titleGroup = group.title()
+        titleGroup = capfirst(group)
 
         item = items[0]
         name, args = item.split(":")
@@ -136,14 +138,14 @@ with redirect_stdout(file):
         for arg in args:
             print(f"    {arg.strip()};")
 
-        print("}", f"{name.title()};")
+        print("}", f"{capfirst(name)};")
         print()
 
         print("typedef struct {")
         print(f"    int count;")
         print(f"    int capacity;")
-        print(f"    {group.title()}** {group.lower()}s;")
-        print("}", f"{group.title()}Array;")
+        print(f"    {capfirst(group)}** {group}s;")
+        print("}", f"{capfirst(group)}Array;")
         print()
 
         print(f'void init{titleGroup}Array({titleGroup}Array* {group}Array);')
@@ -157,8 +159,8 @@ with redirect_stdout(file):
             name = name.strip()
             args = args.split(",")
 
-            print(f"struct {name.title()}", "{")
-            print(f"    {group.title()} self;")
+            print(f"struct {capfirst(name)}", "{")
+            print(f"    {capfirst(group)} self;")
             for arg in args:
                 print(f"    {arg.strip()};")
 
@@ -166,3 +168,5 @@ with redirect_stdout(file):
             print()
 
     print("#endif //CRAFTING_INTERPRETERS_AST_H")
+
+# TODO: Write free function to recursively free tree
