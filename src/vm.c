@@ -396,7 +396,7 @@ static void pop_frame() {
     if (vm.currentTask >= vm.tasks.count) {
         getTasks();
     }
-    vm.currentTask = vm.currentTask % vm.tasks.count;
+    vm.currentTask = vm.tasks.count ? vm.currentTask % vm.tasks.count : 0;
 
     if (CURRENT_TASK) {
         load_new_frame();
@@ -776,6 +776,7 @@ static InterpretResult run(ObjModule *module) {
                     pop();
                     return INTERPRET_OK;
                 }
+
                 POP_CALL(result);
                 if (currentFrame == NULL) {
                     int status;
