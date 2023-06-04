@@ -75,14 +75,42 @@ static TypeLocal *defineTypeDef(TypeEnvironment *typeEnvironment, const char *na
     return &typeEnvironment->typeDefs[typeEnvironment->typeDefCount - 1];
 }
 
+static TypeLocal *defineLocal(TypeEnvironment *typeEnvironment, const char *name, Type *type) {
+    TypeLocal typeLocal = {
+            syntheticToken(name),
+            0,
+            false,
+            (Type *) type,
+    };
+
+    typeEnvironment->locals[currentEnv->localCount] = typeLocal;
+    typeEnvironment->localCount++;
+
+    return &typeEnvironment->locals[typeEnvironment->localCount - 1];
+}
+
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "bool", (Type *) newSimpleType());
-    defineTypeDef(typeEnvironment, "number", (Type *) newSimpleType());
-    defineTypeDef(typeEnvironment, "list", (Type *) newSimpleType());
+    SimpleType* numberType = newSimpleType();
+    defineTypeDef(typeEnvironment, "number", numberType);
+    SimpleType* listType = newSimpleType();
+    SimpleType* lengthType = newSimpleType();
+    lengthType->returnType = numberType;
+    tableSet(
+            &listType->methods,
+            copyString("length", 6),
+            OBJ_VAL(lengthType)
+    );
+    defineTypeDef(typeEnvironment, "list", listType);
     defineTypeDef(typeEnvironment, "atom", (Type *) newSimpleType());
-    defineTypeDef(typeEnvironment, "nil", (Type *) newSimpleType());
+    SimpleType* nilType = newSimpleType();
+    defineTypeDef(typeEnvironment, "nil", nilType);
     defineTypeDef(typeEnvironment, "never", (Type *) newSimpleType());
     defineTypeDef(typeEnvironment, "string", (Type *) newSimpleType());
+    SimpleType* printlnType = newSimpleType();
+    printlnType->returnType = nilType;
+    writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
+    defineLocal(typeEnvironment, "println", printlnType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
