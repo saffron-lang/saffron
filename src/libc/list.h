@@ -20,6 +20,8 @@ void markList(ObjList *list);
 
 void printList(ObjList *list);
 
+Type* listTypeDef();
+
 Value listCall(int argCount, Value *args);
 
 void listPush(ObjList *list, Value item);

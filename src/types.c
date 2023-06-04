@@ -2,6 +2,7 @@
 #include "types.h"
 #include "object.h"
 #include "vm.h"
+#include "libc/list.h"
 
 
 Type *evaluateNode(Node *node);
@@ -89,28 +90,33 @@ static TypeLocal *defineLocal(TypeEnvironment *typeEnvironment, const char *name
     return &typeEnvironment->locals[typeEnvironment->localCount - 1];
 }
 
+SimpleType* numberType;
+SimpleType* boolType;
+SimpleType* nilType;
+SimpleType* atomType;
+SimpleType* stringType;
+SimpleType* neverType;
+
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
-    defineTypeDef(typeEnvironment, "bool", (Type *) newSimpleType());
-    SimpleType* numberType = newSimpleType();
-    defineTypeDef(typeEnvironment, "number", numberType);
-    SimpleType* listType = newSimpleType();
-    SimpleType* lengthType = newSimpleType();
-    lengthType->returnType = numberType;
-    tableSet(
-            &listType->methods,
-            copyString("length", 6),
-            OBJ_VAL(lengthType)
-    );
-    defineTypeDef(typeEnvironment, "list", listType);
-    defineTypeDef(typeEnvironment, "atom", (Type *) newSimpleType());
-    SimpleType* nilType = newSimpleType();
-    defineTypeDef(typeEnvironment, "nil", nilType);
-    defineTypeDef(typeEnvironment, "never", (Type *) newSimpleType());
-    defineTypeDef(typeEnvironment, "string", (Type *) newSimpleType());
+    numberType = newSimpleType();
+    defineTypeDef(typeEnvironment, "number", (Type *) numberType);
+    nilType = newSimpleType();
+    defineTypeDef(typeEnvironment, "nil", (Type *) nilType);
+    boolType = newSimpleType();
+    defineTypeDef(typeEnvironment, "bool", (Type *) boolType);
+    atomType = newSimpleType();
+    defineTypeDef(typeEnvironment, "atom", (Type *) atomType);
+    stringType = newSimpleType();
+    defineTypeDef(typeEnvironment, "string", (Type *) stringType);
+    neverType = newSimpleType();
+    defineTypeDef(typeEnvironment, "never", (Type *) neverType);
+
+    defineTypeDef(typeEnvironment, "list", listTypeDef());
+
     SimpleType* printlnType = newSimpleType();
-    printlnType->returnType = nilType;
+    printlnType->returnType = (Type *) nilType;
     writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
-    defineLocal(typeEnvironment, "println", printlnType);
+    defineLocal(typeEnvironment, "println", (Type *) printlnType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {

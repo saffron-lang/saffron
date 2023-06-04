@@ -3,6 +3,7 @@
 
 #include "../object.h"
 #include "../vm.h"
+#include "../types.h"
 
 #define AS_NATIVE_METHOD(value)       (((ObjNativeMethod*)AS_OBJ(value))->function)
 #define AS_BUILTIN_TYPE(value)       (((ObjBuiltinType *)AS_OBJ(value)))
@@ -19,6 +20,8 @@ typedef void (*PrintFn)(Obj *object);
 
 typedef Value (*TypeCallFn)(int argCount, Value *args);
 
+typedef Type* (*GetTypeDefFn)();
+
 typedef Value (*NativeMethodFn)(Obj *object, int argCount, Value *args);
 
 typedef struct {
@@ -34,6 +37,7 @@ typedef struct {
 //    NewObjectFn *newObjectFn;
     PrintFn printFn;
     TypeCallFn typeCallFn;
+    GetTypeDefFn typeDefFn;
 } ObjBuiltinType;
 
 typedef void (*InitFn)(ObjBuiltinType *klass);

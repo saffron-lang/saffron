@@ -76,11 +76,28 @@ void listPush(ObjList *list, Value item) {
     writeValueArray(&list->items, item);
 }
 
+Type* listTypeDef() {
+    // Class
+    SimpleType* listTypeDef = newSimpleType();
+
+    // Methods
+    SimpleType* lengthType = newSimpleType();
+    lengthType->returnType = (Type *) numberType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("length", 6),
+            OBJ_VAL(lengthType)
+    );
+
+    return (Type *) listTypeDef;
+}
+
 void listInit(ObjBuiltinType *type) {
     type->freeFn = (FreeFn) &freeList;
     type->markFn = (MarkFn) &markList;
     type->printFn = (PrintFn) &printList;
     type->typeCallFn = (TypeCallFn) &listCall;
+    type->typeDefFn = (GetTypeDefFn) &listTypeDef;
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
 }
 
