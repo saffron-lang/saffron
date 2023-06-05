@@ -1,2 +1,8 @@
 var a: list = [1,2,3];
-println(a.length());
+println("Initial List: ", a);
+println("List Length : ", a.length());
+a.push(4);
+println("After Push  : ", a);
+var b: int = a.pop();
+println("After Pop   : ", a);
+println("Pop Value   : ", b);
