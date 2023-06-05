@@ -92,6 +92,17 @@ Value listPopBuiltin(ObjList *list, int argCount) {
     return poppedValue;
 }
 
+void listReverseBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount > 0) {
+        return;
+    }
+    for (int i = 0; i < list->items.count / 2; i++) {
+        Value tmp = list->items.values[i];
+        list->items.values[i] = list->items.values[list->items.count-i-1];
+        list->items.values[list->items.count-i-1] = tmp;
+    }
+}
+
 Type* listTypeDef() {
     // Class
     SimpleType *listTypeDef = newSimpleType();
@@ -114,7 +125,6 @@ Type* listTypeDef() {
             OBJ_VAL(pushType)
     );
 
-
     SimpleType *popType = newSimpleType();
     popType->returnType = newSimpleType();
     tableSet(
@@ -123,8 +133,15 @@ Type* listTypeDef() {
             OBJ_VAL(popType)
     );
 
-    return (Type *) listTypeDef;
+    SimpleType *reverseType = newSimpleType();
+    reverseType->returnType = nilType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("reverse", 7),
+            OBJ_VAL(reverseType)
+    );
 
+    return (Type *) listTypeDef;
 }
 
 void listInit(ObjBuiltinType *type) {
@@ -136,6 +153,7 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
     defineBuiltinMethod(type, "push", (NativeMethodFn) listPushBuiltin);
     defineBuiltinMethod(type, "pop", (NativeMethodFn) listPopBuiltin);
+    defineBuiltinMethod(type, "reverse", (NativeMethodFn) listReverseBuiltin);
 }
 
 ObjBuiltinType *createListType() {
