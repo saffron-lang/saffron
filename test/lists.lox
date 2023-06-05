@@ -6,3 +6,5 @@ println("After Push  : ", a);
 var b: int = a.pop();
 println("After Pop   : ", a);
 println("Pop Value   : ", b);
+a.reverse();
+println("Reversed    : ", a);
