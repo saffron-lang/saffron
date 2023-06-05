@@ -76,20 +76,55 @@ void listPush(ObjList *list, Value item) {
     writeValueArray(&list->items, item);
 }
 
+void listPushBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount != 1) {
+        return;
+    }
+    writeValueArray(&list->items, args[0]);
+}
+
+Value listPopBuiltin(ObjList *list, int argCount) {
+    if (argCount > 0 || list->items.count == 0) {
+        return NIL_VAL;
+    }
+    Value poppedValue = list->items.values[0];
+    popValueArray(&list->items, 0);
+    return poppedValue;
+}
+
 Type* listTypeDef() {
     // Class
-    SimpleType* listTypeDef = newSimpleType();
+    SimpleType *listTypeDef = newSimpleType();
 
     // Methods
-    SimpleType* lengthType = newSimpleType();
-    lengthType->returnType = (Type *) numberType;
+    SimpleType *lengthType = newSimpleType();
+    lengthType->returnType = numberType;
     tableSet(
             &listTypeDef->methods,
             copyString("length", 6),
             OBJ_VAL(lengthType)
     );
 
+    SimpleType *pushType = newSimpleType();
+    writeValueArray(&pushType->arguments, OBJ_VAL(numberType));
+    pushType->returnType = nilType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("push", 4),
+            OBJ_VAL(pushType)
+    );
+
+
+    SimpleType *popType = newSimpleType();
+    popType->returnType = newSimpleType();
+    tableSet(
+            &listTypeDef->methods,
+            copyString("pop", 3),
+            OBJ_VAL(popType)
+    );
+
     return (Type *) listTypeDef;
+
 }
 
 void listInit(ObjBuiltinType *type) {
@@ -99,6 +134,8 @@ void listInit(ObjBuiltinType *type) {
     type->typeCallFn = (TypeCallFn) &listCall;
     type->typeDefFn = (GetTypeDefFn) &listTypeDef;
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
+    defineBuiltinMethod(type, "push", (NativeMethodFn) listPushBuiltin);
+    defineBuiltinMethod(type, "pop", (NativeMethodFn) listPopBuiltin);
 }
 
 ObjBuiltinType *createListType() {
