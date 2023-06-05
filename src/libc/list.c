@@ -103,6 +103,17 @@ void listReverseBuiltin(ObjList *list, int argCount, Value *args) {
     }
 }
 
+Value listCopyBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount > 0) {
+        return NIL_VAL;
+    }
+    ObjList *copy = newList();
+    for (int i = 0; i < list->items.count; i++) {
+        writeValueArray(&copy->items, list->items.values[i]);
+    }
+    return OBJ_VAL(copy);
+}
+
 Type* listTypeDef() {
     // Class
     SimpleType *listTypeDef = newSimpleType();
@@ -141,6 +152,14 @@ Type* listTypeDef() {
             OBJ_VAL(reverseType)
     );
 
+    SimpleType *copyType = newSimpleType();
+    copyType->returnType = listType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("copy", 4),
+            OBJ_VAL(copyType)
+    );
+
     return (Type *) listTypeDef;
 }
 
@@ -154,6 +173,7 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "push", (NativeMethodFn) listPushBuiltin);
     defineBuiltinMethod(type, "pop", (NativeMethodFn) listPopBuiltin);
     defineBuiltinMethod(type, "reverse", (NativeMethodFn) listReverseBuiltin);
+    defineBuiltinMethod(type, "copy", (NativeMethodFn) listCopyBuiltin);
 }
 
 ObjBuiltinType *createListType() {
