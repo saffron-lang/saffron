@@ -42,7 +42,8 @@ Value getLength(ObjList *list, int argCount, Value *args) {
 }
 
 Value* getItem(ObjList *list, int index) {
-    if (index > list->items.count) {
+    if (index > list->items.count-1 || index < 0) {
+        runtimeError("Index out of bounds");
         return NULL;
     } else {
         return &list->items.values[index];

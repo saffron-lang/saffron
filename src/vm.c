@@ -4,6 +4,7 @@
 #include "ast/astcompile.h"
 #include "object.h"
 #include "memory.h"
+#include <math.h>
 #include "libc/time.h"
 #include "libc/list.h"
 #include "libc/io.h"
@@ -330,7 +331,7 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name,
 static bool invoke(ObjString *name, int argCount) {
     Value receiver = peek(argCount);
 
-    if (!IS_INSTANCE(receiver) && !IS_LIST(receiver)) {
+    if (!(IS_INSTANCE(receiver) || IS_LIST(receiver))) {
         runtimeError("Only instances have methods.");
         return false;
     }
@@ -582,6 +583,12 @@ static InterpretResult run(ObjModule *module) {
 
                 VM *localVM = &vm;
                 currentFrame = CURRENT_TASK;
+                break;
+            }
+            case OP_GETITEM: {
+                int index = trunc(AS_NUMBER(pop()));
+                ObjList *list = AS_OBJ(pop());
+                push(*getItem(list, index));
                 break;
             }
             case OP_PIPE: {
