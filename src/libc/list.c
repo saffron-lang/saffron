@@ -115,6 +115,76 @@ Value listCopyBuiltin(ObjList *list, int argCount, Value *args) {
     return OBJ_VAL(copy);
 }
 
+void insertionSort(ObjList *list, int l, int r) {
+    for (int i = l + 1; i <= r; i++) {
+        Value tmp = list->items.values[i];
+        int j = i - 1;
+        while (j >= l && valuesCmp(list->items.values[j], tmp) > 0) {
+            list->items.values[j+1] = list->items.values[j];
+            j--;
+        }
+        list->items.values[j+1] = tmp;
+    }
+}
+
+void merge(ObjList *list, int l, int  m, int r) {
+    int len1 = m - l + 1;
+    int len2 = r - m;
+
+    ObjList *left = newList();
+    ObjList *right = newList();
+    for (int i = 0; i < len1; i++) {
+        writeValueArray(&left->items, list->items.values[l + i]);
+    }
+    for (int i = 0; i < len2; i++) {
+        writeValueArray(&right->items, list->items.values[m + 1 + i]);
+    }
+    int i = 0, j = 0, k = 0;
+    while (i < len1 && j < len2) {
+        if (valuesCmp(left->items.values[i], right->items.values[j]) <= 0) {
+            list->items.values[k] = left->items.values[i];
+            i++;
+        } else {
+            list->items.values[k] = right->items.values[j];
+            j++;
+        }
+        k++;
+    }
+    while (i < len1) {
+        list->items.values[k] = left->items.values[i];
+        k++;
+        i++;
+    }
+    while (j < len2) {
+        list->items.values[k] = right->items.values[j];
+        k++;
+        j++;
+    }
+}
+
+void timSort(ObjList *list, int n) {
+    const int RUN = 32;
+    for (int i = 0; i < n; i += RUN) {
+        insertionSort(list, i, MIN((i + RUN - 1), (n - 1)));
+    }
+    for (int size = RUN; size < n; size = 2 * size) {
+        for (int l = 0; l < n; l += 2 * size) {
+            int m = l + size - 1;
+            int r = MIN((l + 2 * size - 1), (n - 1));
+            if (m < r) {
+                merge(list, l, m, r);
+            }
+        }
+    }
+}
+
+void listSortBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount > 0) {
+        return;
+    }
+    timSort(list, list->items.count);
+}
+
 Type* listTypeDef() {
     // Class
     SimpleType *listTypeDef = newSimpleType();
@@ -161,6 +231,14 @@ Type* listTypeDef() {
             OBJ_VAL(copyType)
     );
 
+    SimpleType *sortType = newSimpleType();
+    sortType->returnType = nilType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("sort", 4),
+            OBJ_VAL(sortType)
+    );
+
     return (Type *) listTypeDef;
 }
 
@@ -175,6 +253,7 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "pop", (NativeMethodFn) listPopBuiltin);
     defineBuiltinMethod(type, "reverse", (NativeMethodFn) listReverseBuiltin);
     defineBuiltinMethod(type, "copy", (NativeMethodFn) listCopyBuiltin);
+    defineBuiltinMethod(type, "sort", (NativeMethodFn) listSortBuiltin);
 }
 
 ObjBuiltinType *createListType() {
