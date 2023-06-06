@@ -90,12 +90,12 @@ static TypeLocal *defineLocal(TypeEnvironment *typeEnvironment, const char *name
     return &typeEnvironment->locals[typeEnvironment->localCount - 1];
 }
 
-SimpleType* numberType;
-SimpleType* boolType;
-SimpleType* nilType;
-SimpleType* atomType;
-SimpleType* stringType;
-SimpleType* neverType;
+SimpleType *numberType;
+SimpleType *boolType;
+SimpleType *nilType;
+SimpleType *atomType;
+SimpleType *stringType;
+SimpleType *neverType;
 
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     numberType = newSimpleType();
@@ -113,7 +113,7 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
 
     defineTypeDef(typeEnvironment, "list", listTypeDef());
 
-    SimpleType* printlnType = newSimpleType();
+    SimpleType *printlnType = newSimpleType();
     printlnType->returnType = (Type *) nilType;
     writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
     defineLocal(typeEnvironment, "println", (Type *) printlnType);
@@ -473,19 +473,23 @@ Type *evaluateNode(Node *node) {
             struct Var *casted = (struct Var *) node;
             Type *varType = evaluateNode((Node *) casted->type);
 
+            if (casted->initializer != NULL) {
+                Type *valType = evaluateNode((Node *) casted->initializer);
+                if (varType) {
+                    if (!typesEqual(valType, varType)) {
+                        errorAt(&casted->name, "Type mismatch in var");
+                    }
+                } else {
+                    varType = valType;
+                }
+            }
+
             TypeLocal typeLocal = {
                     casted->name,
                     0,
                     false,
                     varType,
             };
-
-            if (casted->initializer != NULL) {
-                Type *valType = evaluateNode((Node *) casted->initializer);
-                if (!typesEqual(valType, varType)) {
-                    errorAt(&casted->name, "Type mismatch in var");
-                }
-            }
 
             if (currentEnv->localCount > UINT8_COUNT) {
                 errorAt(&casted->name, "Too many locals");
