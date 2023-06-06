@@ -307,6 +307,7 @@ static Expr *pipeCall(Expr *left, bool canAssign) {
     result->operator = parser.previous;
     result->right = expr;
     result->left = left;
+    return (Expr *) result;
 }
 
 static Expr *dot(Expr *left, bool canAssign) {
