@@ -348,16 +348,33 @@ Type *evaluateNode(Node *node) {
 
             if (casted->arguments.count > calleeType->arguments.count) {
                 error("Too many arguments provided");
+                return(NULL);
             }
 
             for (int i = 0; i < casted->arguments.count; i++) {
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
                 if (!typesEqual(argType, AS_OBJ(calleeType->arguments.values[i]))) {
                     error("Type mismatch");
+                    return(NULL);
                 }
             }
 
             return calleeType->returnType;
+        }
+        case NODE_GETITEM: {
+            struct GetItem *casted = (struct GetItem *) node;
+            Type *type = evaluateNode((Node *) casted->object);
+            if (!typesEqual(type, getTypeDef(syntheticToken("list")))) {
+                error("GetItem on something other than a list");
+                return(NULL);
+            }
+            GenericType *genericType = (GenericType *) type;
+            Type* indexType = evaluateNode(casted->index);
+            if (!typesEqual(indexType, numberType)) {
+                error("Index must be a number");
+                return(NULL);
+            }
+            return AS_OBJ(genericType->generics.values[0]);
         }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;

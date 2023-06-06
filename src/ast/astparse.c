@@ -301,6 +301,15 @@ static Expr *call(Expr *left, bool canAssign) {
     return (Expr *) result;
 }
 
+static Expr *getItem(Expr *left, bool canAssign) {
+    Expr* expr = expression();
+    struct GetItem *result = ALLOCATE_NODE(struct GetItem, NODE_GETITEM);
+    result->object = left;
+    result->index = expr;
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index.");
+    return (Expr *) result;
+}
+
 static Expr *pipeCall(Expr *left, bool canAssign) {
     Expr *expr = parsePrecedence(PREC_ASSIGNMENT + 1);
     struct Binary *result = ALLOCATE_NODE(struct Binary, NODE_BINARY);
@@ -367,7 +376,7 @@ ParseRule parseRules[] = {
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACKET]  = {list, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET]  = {list, getItem, PREC_CALL},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
         [TOKEN_PIPE]          = {NULL, pipeCall, PREC_YIELD},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
