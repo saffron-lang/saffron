@@ -1,4 +1,4 @@
-var a: number = 5;
-var b: string = "asd";
-var d: atom = :asd;
-var c: (number) => number = fun (x: number) => { return x + 1; };
+var a: Number = 5;
+var b: String = "asd";
+var d: Atom = :asd;
+var c: (Number) => Number = fun (x: Number) => { return x + 1; };

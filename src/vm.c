@@ -83,15 +83,15 @@ void initVM() {
     vm.initString = copyString("init", 4);
     vm.openUpvalues = NULL;
 
-    defineBuiltin("list", OBJ_VAL(createListType()));
+    defineBuiltin("List", OBJ_VAL(createListType()));
 
     defineNative("println", printlnNative);
     defineNative("print", printNative);
 
     defineNative("spawn", spawnNative);
 
-    defineType("task", OBJ_VAL(createTaskType()));
-    defineType("module", OBJ_VAL(createModuleType()));
+    defineType("Task", OBJ_VAL(createTaskType()));
+    defineType("Module", OBJ_VAL(createModuleType()));
 
     defineModule("time", OBJ_VAL(createTimeModule()));
 //    defineNative("sleep", sleepNative);

@@ -54,7 +54,7 @@ void moduleInit(ObjBuiltinType *type) {
 }
 
 ObjBuiltinType *createModuleType() {
-    moduleType = newBuiltinType("module", moduleInit);
+    moduleType = newBuiltinType("Module", moduleInit);
     return moduleType;
 }
 
