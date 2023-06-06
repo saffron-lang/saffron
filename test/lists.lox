@@ -1,4 +1,4 @@
-var a: list = [1,2,3];
+var a = [1,2,3];
 println("Initial List: ", a);
 println("List Length : ", a.length());
 println("Copying List");
@@ -10,4 +10,6 @@ println("After Pop   : ", a);
 println("Pop Value   : ", b);
 a.reverse();
 println("Reversed    : ", a);
+var c: number = a[1];
+println("Val at idx 1: ", c);
 println("Copied List : ", a2);
