@@ -116,7 +116,9 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     SimpleType *printlnType = newSimpleType();
     printlnType->returnType = (Type *) nilType;
     writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
+    writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
     defineLocal(typeEnvironment, "println", (Type *) printlnType);
+    defineLocal(typeEnvironment, "print", (Type *) printlnType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
@@ -214,7 +216,7 @@ static Type *getTypeDef(Token name) {
     if (arg != -1) {
         return currentEnv->typeDefs[arg].type;
     } else {
-        error("Undefined type");
+        errorAt(&name, "Undefined type");
         return NULL;
     }
 }
@@ -347,15 +349,15 @@ Type *evaluateNode(Node *node) {
             SimpleType *calleeType = evaluateNode((Node *) casted->callee);
 
             if (casted->arguments.count > calleeType->arguments.count) {
-                error("Too many arguments provided");
-                return(NULL);
+//                errorAt(&casted->paren, "Too many arguments provided");
+//                return(NULL);
             }
 
             for (int i = 0; i < casted->arguments.count; i++) {
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
                 if (!typesEqual(argType, AS_OBJ(calleeType->arguments.values[i]))) {
                     error("Type mismatch");
-                    return(NULL);
+                    return (NULL);
                 }
             }
 
@@ -366,15 +368,20 @@ Type *evaluateNode(Node *node) {
             Type *type = evaluateNode((Node *) casted->object);
             if (!typesEqual(type, getTypeDef(syntheticToken("list")))) {
                 error("GetItem on something other than a list");
-                return(NULL);
+                return (NULL);
             }
             GenericType *genericType = (GenericType *) type;
-            Type* indexType = evaluateNode(casted->index);
+            Type *indexType = evaluateNode(casted->index);
             if (!typesEqual(indexType, numberType)) {
                 error("Index must be a number");
-                return(NULL);
+                return (NULL);
             }
-            return AS_OBJ(genericType->generics.values[0]);
+
+            if (genericType->generics.count) {
+                return AS_OBJ(genericType->generics.values[0]);
+            } else {
+                return getTypeDef(syntheticToken("never"));
+            }
         }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
