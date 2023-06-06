@@ -1,11 +1,11 @@
-var a = [1,2,3];
+var a: list<number> = [1,2,3];
 println("Initial List: ", a);
 println("List Length : ", a.length());
-println("Copying List");
+println("Copying List", "");
 var a2: list = a.copy();
 a.push(4);
 println("After Push  : ", a);
-var b: int = a.pop();
+var b: number = a.pop();
 println("After Pop   : ", a);
 println("Pop Value   : ", b);
 a.reverse();

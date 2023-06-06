@@ -100,12 +100,14 @@ void freeStmtArray(StmtArray * stmtArray);
 struct Simple {
     TypeNode self;
     Token name;
+    TypeNodeArray generics;
 };
 
 struct Functor {
     TypeNode self;
     TypeNodeArray arguments;
     TypeNode *returnType;
+    TypeNodeArray generics;
 };
 
 struct Binary {

@@ -296,13 +296,14 @@ static ExprArray argumentList() {
 static Expr *call(Expr *left, bool canAssign) {
     ExprArray arguments = argumentList();
     struct Call *result = ALLOCATE_NODE(struct Call, NODE_CALL);
+    result->paren = parser.previous;
     result->arguments = arguments;
     result->callee = left;
     return (Expr *) result;
 }
 
 static Expr *getItem(Expr *left, bool canAssign) {
-    Expr* expr = expression();
+    Expr *expr = expression();
     struct GetItem *result = ALLOCATE_NODE(struct GetItem, NODE_GETITEM);
     result->object = left;
     result->index = expr;
@@ -612,13 +613,13 @@ static TypeNode *typeAnnotation() {
         TypeNodeArray arguments;
         initTypeNodeArray(&arguments);
 
-        while (!match(TOKEN_RIGHT_PAREN)) {
+        do {
             TypeNode *type = typeAnnotation();
             writeTypeNodeArray(&arguments, type);
-        }
+        } while (!match(TOKEN_COMMA));
 
-        consume(TOKEN_ARROW,
-                "Expect '=>' after functor type arguments.");
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after functor type arguments.");
+        consume(TOKEN_ARROW, "Expect '=>' after functor type arguments.");
 
         result->returnType = typeAnnotation();
         result->arguments = arguments;
@@ -629,11 +630,25 @@ static TypeNode *typeAnnotation() {
             error("Expect identifier or functor type.");
             return NULL;
         } else {
-            Token name = parser.previous;
+            Token name = parser.previous; // TODO: We don't ever initialize the value arrays...
+            // TODO: How is everything still working?
 
-            struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
-            result->name = name;
-            return (TypeNode *) result;
+            if (match(TOKEN_LESS)) {
+                struct Simple *target = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
+                target->name = name;
+
+                do {
+                    TypeNode *argument = typeAnnotation();
+                    writeTypeNodeArray(&target->generics, argument);
+                } while (match(TOKEN_COMMA));
+
+                consume(TOKEN_GREATER, "Expect '>' after generic type argument.");
+                return (TypeNode *) target;
+            } else {
+                struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
+                result->name = name;
+                return (TypeNode *) result;
+            }
         }
     }
 }
@@ -774,7 +789,7 @@ static Stmt *method() {
 
     struct Function *func = function(type);
     func->name = name;
-    return (Stmt*) func;
+    return (Stmt *) func;
 }
 
 static Stmt *classDeclaration() {

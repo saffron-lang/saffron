@@ -7,7 +7,7 @@
   - Import bytecode file
 - Discover files for import
 - List methods and accessing
-- Map types
+- Map and linked list types
 - Async networking
 - File I/O
 - Sensible syntax for piping with higher arity
