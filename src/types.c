@@ -90,28 +90,37 @@ static TypeLocal *defineLocal(TypeEnvironment *typeEnvironment, const char *name
     return &typeEnvironment->locals[typeEnvironment->localCount - 1];
 }
 
+static TypeLocal *defineLocalAndTypeDef(TypeEnvironment *typeEnvironment, const char *name, SimpleType *type) {
+    Value initTypeValue;
+    tableGet(&type->methods, copyString("init", 4), &initTypeValue);
+    Type *initType = (Type *) AS_OBJ(initTypeValue);
+    defineTypeDef(typeEnvironment, name, (Type *) type);
+    return defineLocal(typeEnvironment, name, initType);
+}
+
 SimpleType *numberType;
 SimpleType *boolType;
 SimpleType *nilType;
 SimpleType *atomType;
 SimpleType *stringType;
 SimpleType *neverType;
+SimpleType *listTypeDef;
 
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     numberType = newSimpleType();
-    defineTypeDef(typeEnvironment, "number", (Type *) numberType);
+    defineTypeDef(typeEnvironment, "Number", (Type *) numberType);
     nilType = newSimpleType();
-    defineTypeDef(typeEnvironment, "nil", (Type *) nilType);
+    defineTypeDef(typeEnvironment, "Nil", (Type *) nilType);
     boolType = newSimpleType();
-    defineTypeDef(typeEnvironment, "bool", (Type *) boolType);
+    defineTypeDef(typeEnvironment, "Bool", (Type *) boolType);
     atomType = newSimpleType();
-    defineTypeDef(typeEnvironment, "atom", (Type *) atomType);
+    defineTypeDef(typeEnvironment, "Atom", (Type *) atomType);
     stringType = newSimpleType();
-    defineTypeDef(typeEnvironment, "string", (Type *) stringType);
+    defineTypeDef(typeEnvironment, "String", (Type *) stringType);
     neverType = newSimpleType();
-    defineTypeDef(typeEnvironment, "never", (Type *) neverType);
-
-    defineTypeDef(typeEnvironment, "list", listTypeDef());
+    defineTypeDef(typeEnvironment, "Never", (Type *) neverType);
+    listTypeDef = createListTypeDef();
+    defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
 
     SimpleType *printlnType = newSimpleType();
     printlnType->returnType = (Type *) nilType;
@@ -244,19 +253,19 @@ Type *getTypeOf(Value value) {
 #else
     switch (value.type) {
         case VAL_BOOL:
-            return getTypeDef(syntheticToken("bool"));
+            return boolType;
         case VAL_NIL:
-            return getTypeDef(syntheticToken("nil"));
+            return nilType;
         case VAL_NUMBER:
-            return getTypeDef(syntheticToken("number"));
+            return numberType;
         case VAL_OBJ: {
             Obj *obj = AS_OBJ(value);
             switch (obj->type) {
                 case OBJ_STRING: {
-                    return getTypeDef(syntheticToken("atom"));
+                    return stringType;
                 }
                 case OBJ_ATOM: {
-                    return getTypeDef(syntheticToken("string"));
+                    return atomType;
                 }
             }
         }
@@ -264,8 +273,7 @@ Type *getTypeOf(Value value) {
 
 #endif
 
-    Token token;
-    return (TypeNode *) getTypeDef(token);
+    return NULL;
 }
 
 void evaluateTypes(StmtArray *statements) {
@@ -366,7 +374,7 @@ Type *evaluateNode(Node *node) {
         case NODE_GETITEM: {
             struct GetItem *casted = (struct GetItem *) node;
             Type *type = evaluateNode((Node *) casted->object);
-            if (!typesEqual(type, getTypeDef(syntheticToken("list")))) {
+            if (!typesEqual(type, listTypeDef)) {
                 error("GetItem on something other than a list");
                 return (NULL);
             }
@@ -380,7 +388,7 @@ Type *evaluateNode(Node *node) {
             if (genericType->generics.count) {
                 return AS_OBJ(genericType->generics.values[0]);
             } else {
-                return getTypeDef(syntheticToken("never"));
+                return neverType;
             }
         }
         case NODE_GET: {
@@ -485,7 +493,7 @@ Type *evaluateNode(Node *node) {
 
             GenericType *type = newGenericType();
             writeValueArray(&type->generics, OBJ_VAL(itemType));
-            type->target = getTypeDef(syntheticToken("list"));
+            type->target = listTypeDef;
             return (Type *) type;
         }
         case NODE_EXPRESSION: {

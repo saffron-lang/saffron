@@ -22,7 +22,7 @@ void markTask(ObjTask *task) {
 }
 
 void printTask(ObjTask *task) {
-    printf("<task %p>", task);
+    printf("<Task %p>", task);
 }
 
 Value taskCall(int argCount, Value *args) {
@@ -48,6 +48,6 @@ void taskInit(ObjBuiltinType *type) {
 }
 
 ObjBuiltinType *createTaskType() {
-    taskType = newBuiltinType("task", taskInit);
+    taskType = newBuiltinType("Task", taskInit);
     return taskType;
 }

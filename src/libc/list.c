@@ -185,13 +185,13 @@ void listSortBuiltin(ObjList *list, int argCount, Value *args) {
     timSort(list, list->items.count);
 }
 
-Type* listTypeDef() {
+SimpleType* createListTypeDef() {
     // Class
     SimpleType *listTypeDef = newSimpleType();
 
     // Methods
     SimpleType *lengthType = newSimpleType();
-    lengthType->returnType = numberType;
+    lengthType->returnType = (Type *) numberType;
     tableSet(
             &listTypeDef->methods,
             copyString("length", 6),
@@ -200,7 +200,7 @@ Type* listTypeDef() {
 
     SimpleType *pushType = newSimpleType();
     writeValueArray(&pushType->arguments, OBJ_VAL(numberType));
-    pushType->returnType = nilType;
+    pushType->returnType = (Type *) nilType;
     tableSet(
             &listTypeDef->methods,
             copyString("push", 4),
@@ -239,6 +239,14 @@ Type* listTypeDef() {
             OBJ_VAL(sortType)
     );
 
+    SimpleType *initType = newSimpleType();
+    sortType->returnType = (Type *) listTypeDef;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("init", 4),
+            OBJ_VAL(initType)
+    );
+
     return (Type *) listTypeDef;
 }
 
@@ -247,7 +255,7 @@ void listInit(ObjBuiltinType *type) {
     type->markFn = (MarkFn) &markList;
     type->printFn = (PrintFn) &printList;
     type->typeCallFn = (TypeCallFn) &listCall;
-    type->typeDefFn = (GetTypeDefFn) &listTypeDef;
+    type->typeDefFn = (GetTypeDefFn) &createListTypeDef;
     defineBuiltinMethod(type, "length", (NativeMethodFn) getLength);
     defineBuiltinMethod(type, "push", (NativeMethodFn) listPushBuiltin);
     defineBuiltinMethod(type, "pop", (NativeMethodFn) listPopBuiltin);
@@ -257,6 +265,6 @@ void listInit(ObjBuiltinType *type) {
 }
 
 ObjBuiltinType *createListType() {
-    listType = newBuiltinType("list", listInit);
+    listType = newBuiltinType("List", listInit);
     return listType;
 }

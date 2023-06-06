@@ -616,7 +616,7 @@ static TypeNode *typeAnnotation() {
         do {
             TypeNode *type = typeAnnotation();
             writeTypeNodeArray(&arguments, type);
-        } while (!match(TOKEN_COMMA));
+        } while (match(TOKEN_COMMA));
 
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after functor type arguments.");
         consume(TOKEN_ARROW, "Expect '=>' after functor type arguments.");

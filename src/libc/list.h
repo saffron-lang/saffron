@@ -22,7 +22,7 @@ void markList(ObjList *list);
 
 void printList(ObjList *list);
 
-Type* listTypeDef();
+SimpleType* createListTypeDef();
 
 Value listCall(int argCount, Value *args);
 
