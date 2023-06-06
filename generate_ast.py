@@ -10,6 +10,7 @@ exprs = [
     "Assign   : Token name, Expr* value",
     "Logical  : Expr* left, Token operator, Expr* right",
     "Call     : Expr* callee, Token paren, ExprArray arguments",
+    "GetItem  : Expr* object, Token bracket, Expr* index",
     "Get      : Expr* object, Token name",
     "Set      : Expr* object, Token name, Expr* value",
     "Super    : Token keyword, Token method",

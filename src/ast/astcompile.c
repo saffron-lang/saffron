@@ -486,6 +486,13 @@ void compileNode(Node *node) {
             }
             break;
         }
+        case NODE_GETITEM: {
+            struct GetItem *casted = (struct GetItem *) node;
+            compileNode(casted->object);
+            compileNode(casted->index);
+            emitByte(OP_GETITEM);
+            break;
+        }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             compileNode((Node *) casted->object);

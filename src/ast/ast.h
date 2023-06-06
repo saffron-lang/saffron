@@ -24,6 +24,7 @@ typedef enum {
     NODE_ASSIGN,
     NODE_LOGICAL,
     NODE_CALL,
+    NODE_GETITEM,
     NODE_GET,
     NODE_SET,
     NODE_SUPER,
@@ -153,6 +154,13 @@ struct Call {
     Expr* callee;
     Token paren;
     ExprArray arguments;
+};
+
+struct GetItem {
+    Expr self;
+    Expr* object;
+    Token bracket;
+    Expr* index;
 };
 
 struct Get {
