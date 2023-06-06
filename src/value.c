@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "value.h"
 #include "object.h"
+#include <math.h>
 
 void initValueArray(ValueArray *array) {
     array->values = NULL;
@@ -81,4 +82,15 @@ bool valuesEqual(Value a, Value b) {
         default:         return false; // Unreachable.
     }
 #endif
+}
+
+double valuesCmp(Value a, Value b) {
+    if (a.type != b.type) return NAN;
+    switch (a.type) {
+        case VAL_BOOL:   return NAN;
+        case VAL_NIL:    return NAN;
+        case VAL_NUMBER: return AS_NUMBER(a) - AS_NUMBER(b);
+        case VAL_OBJ:    return NAN;
+        default:         return NAN; // Unreachable.
+    }
 }

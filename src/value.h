@@ -102,4 +102,6 @@ void printValue(Value value);
 
 bool valuesEqual(Value a, Value b);
 
+double valuesCmp(Value a, Value b);
+
 #endif
