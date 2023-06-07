@@ -512,9 +512,10 @@ static Expr *expression() {
 }
 
 static Stmt *expressionStatement() {
-    Expr *expr = expression();
-    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
     struct Expression *result = ALLOCATE_NODE(struct Expression, NODE_EXPRESSION);
+    result->self.self.lineno = parser.current.line;
+    Expr *expr = expression();
+    match(TOKEN_SEMICOLON);
     result->expression = expr;
     return result;
 }
@@ -711,7 +712,7 @@ static Stmt *forStatement() {
 static Stmt *importStatement() {
     consume(TOKEN_STRING, "Expect '\"' after import.");
     Expr *s = string(false);
-    consume(TOKEN_SEMICOLON, "Expect ';' after import.");
+    match(TOKEN_SEMICOLON);
     struct Import *result = ALLOCATE_NODE(struct Import, NODE_IMPORT);
     result->expression = s;
     return result;
@@ -724,7 +725,7 @@ static Stmt *returnStatement() {
         return (Stmt *) result;
     } else {
         Expr *value = expression();
-        consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
+        match(TOKEN_SEMICOLON);
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = value;
         return (Stmt *) result;
@@ -732,21 +733,26 @@ static Stmt *returnStatement() {
 }
 
 static Stmt *statement() {
+    Stmt* result;
     if (match(TOKEN_IF)) {
-        return ifStatement();
+        result = ifStatement();
     } else if (match(TOKEN_RETURN)) {
-        return returnStatement();
+        result = returnStatement();
     } else if (match(TOKEN_WHILE)) {
-        return whileStatement();
+        result = whileStatement();
     } else if (match(TOKEN_FOR)) {
-        return forStatement();
+        result = forStatement();
     } else if (match(TOKEN_LEFT_BRACE)) {
-        return block();
+        result = block();
     } else if (match(TOKEN_IMPORT)) {
-        return importStatement();
+        result = importStatement();
     } else {
-        return expressionStatement();
+        result = expressionStatement();
     }
+
+    while (match(TOKEN_SEMICOLON));
+
+    return result;
 }
 
 static void synchronize() {
