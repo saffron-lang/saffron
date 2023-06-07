@@ -16,6 +16,7 @@ typedef enum {
 typedef enum {
     NODE_SIMPLE,
     NODE_FUNCTOR,
+    NODE_UNION,
     NODE_BINARY,
     NODE_GROUPING,
     NODE_LITERAL,
@@ -108,6 +109,12 @@ struct Functor {
     TypeNodeArray arguments;
     TypeNode *returnType;
     TypeNodeArray generics;
+};
+
+struct Union {
+    TypeNode self;
+    TypeNode* left;
+    TypeNode* right;
 };
 
 struct Binary {
