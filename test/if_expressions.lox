@@ -1,0 +1,15 @@
+import "time"
+
+if (true) {
+    3
+    -4
+} else if (false) {
+    4
+} else {
+    5
+}
+
+fun a() {
+    return
+    512
+}
