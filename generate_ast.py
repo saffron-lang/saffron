@@ -43,7 +43,8 @@ stmts = [
 type_items = [
     "TypeNode : Node self",
     "Simple   : Token name, TypeNodeArray generics",
-    "Functor  : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics"
+    "Functor  : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
+    "Union    : TypeNode* left, TypeNode* right"
 ]
 
 # TODO: Argument list, etc

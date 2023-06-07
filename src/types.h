@@ -5,8 +5,10 @@
 #include "table.h"
 #include "object.h"
 
-struct Functor* initFunctor(TypeNodeArray types, TypeNode* returnType);
-struct Simple* initSimple(Token name);
+struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType);
+
+struct Simple *initSimple(Token name);
+
 void evaluateTree(StmtArray *statements);
 
 #define AS_TYPE(value)       (((Type *)AS_OBJ(value)))
@@ -20,21 +22,38 @@ typedef struct SimpleType {
     Table fields;
     Table methods;
     int genericCount;
-    ValueArray arguments;
-    Type* returnType;
+    Type *superType;
 } SimpleType;
+
+typedef struct FunctorType {
+    int genericCount;
+    ValueArray arguments;
+    Type *returnType;
+} FunctorType;
 
 typedef struct GenericType {
     Type self;
-    Type* target;
+    Type *target;
     ValueArray generics;
 } GenericType;
+
+typedef struct UnionType {
+    Type self;
+    Type *left;
+    Type *right;
+} UnionType;
+
+typedef struct InterfaceType {
+    Table fields;
+    Table methods;
+    int genericCount;
+} TypeUnion;
 
 typedef struct {
     Token name;
     int depth;
     bool isCaptured;
-    Type* type;
+    Type *type;
 } TypeLocal;
 
 // Todo: Maybe some sort of type for intrinsic simple types
@@ -55,13 +74,17 @@ typedef struct TypeEnvironment {
 } TypeEnvironment;
 
 SimpleType *newSimpleType();
+FunctorType *newFunctorType();
+UnionType *newUnionType();
+
 GenericType *newGenericType();
 
-SimpleType* numberType;
-SimpleType* boolType;
-SimpleType* nilType;
-SimpleType* atomType;
-SimpleType* stringType;
-SimpleType* neverType;
+SimpleType *numberType;
+SimpleType *boolType;
+SimpleType *nilType;
+SimpleType *atomType;
+SimpleType *stringType;
+SimpleType *neverType;
+SimpleType *listTypeDef;
 
 #endif //CRAFTING_INTERPRETERS_TYPES_H

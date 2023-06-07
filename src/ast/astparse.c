@@ -609,6 +609,8 @@ static Stmt *whileStatement() {
 }
 
 static TypeNode *typeAnnotation() {
+    TypeNode *leftType;
+
     if (match(TOKEN_LEFT_PAREN)) {
         struct Functor *result = ALLOCATE_NODE(struct Functor, NODE_FUNCTOR);
         TypeNodeArray arguments;
@@ -625,7 +627,7 @@ static TypeNode *typeAnnotation() {
         result->returnType = typeAnnotation();
         result->arguments = arguments;
 
-        return (TypeNode *) result;
+        leftType = (TypeNode *) result;
     } else {
         if (!match(TOKEN_IDENTIFIER)) {
             error("Expect identifier or functor type.");
@@ -644,13 +646,23 @@ static TypeNode *typeAnnotation() {
                 } while (match(TOKEN_COMMA));
 
                 consume(TOKEN_GREATER, "Expect '>' after generic type argument.");
-                return (TypeNode *) target;
+                leftType = (TypeNode *) target;
             } else {
                 struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
                 result->name = name;
-                return (TypeNode *) result;
+                leftType = (TypeNode *) result;
             }
         }
+    }
+
+    if (!match(TOKEN_BITWISE_OR)) {
+        return leftType;
+    } else {
+        TypeNode *rightType = typeAnnotation();
+        struct Union *result = ALLOCATE_NODE(struct Union, NODE_UNION);
+        result->left = leftType;
+        result->right = rightType;
+        return (TypeNode *) result;
     }
 }
 
@@ -667,8 +679,7 @@ static Stmt *varDeclaration() {
         value = expression();
     }
 
-    consume(TOKEN_SEMICOLON,
-            "Expect ';' after variable declaration.");
+    match(TOKEN_SEMICOLON);
 
     struct Var *var = ALLOCATE_NODE(struct Var, NODE_VAR);
     var->name = name;

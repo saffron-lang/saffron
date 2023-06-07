@@ -190,7 +190,7 @@ SimpleType* createListTypeDef() {
     SimpleType *listTypeDef = newSimpleType();
 
     // Methods
-    SimpleType *lengthType = newSimpleType();
+    FunctorType *lengthType = newFunctorType();
     lengthType->returnType = (Type *) numberType;
     tableSet(
             &listTypeDef->methods,
@@ -198,7 +198,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(lengthType)
     );
 
-    SimpleType *pushType = newSimpleType();
+    FunctorType *pushType = newFunctorType();
     writeValueArray(&pushType->arguments, OBJ_VAL(numberType));
     pushType->returnType = (Type *) nilType;
     tableSet(
@@ -207,7 +207,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(pushType)
     );
 
-    SimpleType *popType = newSimpleType();
+    FunctorType *popType = newFunctorType();
     popType->returnType = newSimpleType();
     tableSet(
             &listTypeDef->methods,
@@ -215,7 +215,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(popType)
     );
 
-    SimpleType *reverseType = newSimpleType();
+    FunctorType *reverseType = newFunctorType();
     reverseType->returnType = nilType;
     tableSet(
             &listTypeDef->methods,
@@ -223,7 +223,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(reverseType)
     );
 
-    SimpleType *copyType = newSimpleType();
+    FunctorType *copyType = newFunctorType();
     copyType->returnType = listType;
     tableSet(
             &listTypeDef->methods,
@@ -231,7 +231,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(copyType)
     );
 
-    SimpleType *sortType = newSimpleType();
+    FunctorType *sortType = newFunctorType();
     sortType->returnType = nilType;
     tableSet(
             &listTypeDef->methods,
@@ -239,7 +239,7 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(sortType)
     );
 
-    SimpleType *initType = newSimpleType();
+    FunctorType *initType = newFunctorType();
     sortType->returnType = (Type *) listTypeDef;
     tableSet(
             &listTypeDef->methods,

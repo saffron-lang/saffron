@@ -14,8 +14,26 @@ SimpleType *newSimpleType() {
     push(OBJ_VAL(type));
     initTable(&type->methods);
     initTable(&type->fields);
+    type->genericCount = 0;
+    pop();
+    return type;
+}
+
+FunctorType *newFunctorType() {
+    FunctorType *type = ALLOCATE_OBJ(FunctorType, OBJ_PARSE_FUNCTOR_TYPE);
+    push(OBJ_VAL(type));
     initValueArray(&type->arguments);
     type->genericCount = 0;
+    type->returnType = NULL;
+    pop();
+    return type;
+}
+
+UnionType *newUnionType() {
+    UnionType *type = ALLOCATE_OBJ(UnionType, OBJ_PARSE_UNION_TYPE);
+    push(OBJ_VAL(type));
+    type->left = NULL;
+    type->right = NULL;
     pop();
     return type;
 }
@@ -104,6 +122,7 @@ SimpleType *nilType;
 SimpleType *atomType;
 SimpleType *stringType;
 SimpleType *neverType;
+SimpleType *anyType;
 SimpleType *listTypeDef;
 
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
@@ -119,10 +138,12 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "String", (Type *) stringType);
     neverType = newSimpleType();
     defineTypeDef(typeEnvironment, "Never", (Type *) neverType);
+    anyType = newSimpleType();
+    defineTypeDef(typeEnvironment, "Never", (Type *) anyType);
     listTypeDef = createListTypeDef();
     defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
 
-    SimpleType *printlnType = newSimpleType();
+    FunctorType *printlnType = newFunctorType();
     printlnType->returnType = (Type *) nilType;
     writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
     writeValueArray(&printlnType->arguments, OBJ_VAL(nilType));
@@ -230,11 +251,66 @@ static Type *getTypeDef(Token name) {
     }
 }
 
-static bool typesEqual(Type *left, Type *right) {
+static bool isSubType(Type *subclass, Type *superclass) {
     // TODO: Make this actually work
     // TODO: Maybe this should actually be "isSubClass", left to right
     // If right is subclass of left, then we can assign right to left
     // Subclasses include generics
+
+    if (subclass == superclass) {
+        return true;
+    }
+
+    switch (superclass->obj.type) {
+        case (OBJ_PARSE_TYPE): {
+            if (subclass->obj.type != OBJ_PARSE_TYPE) {
+                return false;
+            }
+
+            SimpleType *subclassType = (SimpleType *) subclass;
+            if (!subclassType->superType) {
+                return false;
+            } else {
+                return isSubType(subclassType->superType, superclass);
+            }
+        }
+        case (OBJ_PARSE_FUNCTOR_TYPE): {
+            FunctorType *superclassType = (FunctorType *) superclass;
+            if (subclass->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
+                return false;
+            }
+
+            FunctorType *subclassType = (FunctorType *) subclass;
+
+            if (superclassType->arguments.count != subclassType->arguments.count) {
+                return false;
+            }
+
+            for (int i = 0; i < superclassType->arguments.count; i++) {
+                Type* superArgType = AS_OBJ(superclassType->arguments.values[i]);
+                Type* subArgType = AS_OBJ(subclassType->arguments.values[i]);
+                if (!isSubType(subArgType, superArgType)) {
+                    return false;
+                }
+            }
+
+            return isSubType(subclassType->returnType, superclassType->returnType);
+        }
+        case (OBJ_PARSE_GENERIC_TYPE): {
+
+            break;
+        }
+        case (OBJ_PARSE_UNION_TYPE): {
+            UnionType *superclassType = (UnionType *) superclass;
+            return isSubType(subclass, superclassType->left)
+                   || isSubType(subclass, superclassType->right);
+        }
+        case (OBJ_PARSE_INTERFACE_TYPE): {
+
+            break;
+        }
+    }
+
     return true;
 }
 
@@ -340,7 +416,7 @@ Type *evaluateNode(Node *node) {
             Type *valueType = evaluateNode((Node *) casted->value);
             Type *namedType = getVariableType(casted->name);
 
-            if (!typesEqual(namedType, valueType)) {
+            if (!isSubType(namedType, valueType)) {
                 errorAt(&casted->name, "Type mismatch");
             }
 
@@ -354,33 +430,40 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_CALL: {
             struct Call *casted = (struct Call *) node;
-            SimpleType *calleeType = evaluateNode((Node *) casted->callee);
+            Type *calleeType = evaluateNode((Node *) casted->callee);
 
-            if (casted->arguments.count > calleeType->arguments.count) {
+            if (calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
+//                errorAt(&casted->paren, "Type is not callable");
+//                return(NULL);
+            }
+
+            FunctorType *calleeFunctor = calleeType;
+
+            if (casted->arguments.count > calleeFunctor->arguments.count) {
 //                errorAt(&casted->paren, "Too many arguments provided");
 //                return(NULL);
             }
 
             for (int i = 0; i < casted->arguments.count; i++) {
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
-                if (!typesEqual(argType, AS_OBJ(calleeType->arguments.values[i]))) {
+                if (!isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
                     error("Type mismatch");
                     return (NULL);
                 }
             }
 
-            return calleeType->returnType;
+            return calleeFunctor->returnType;
         }
         case NODE_GETITEM: {
             struct GetItem *casted = (struct GetItem *) node;
             Type *type = evaluateNode((Node *) casted->object);
-            if (!typesEqual(type, listTypeDef)) {
+            if (!isSubType(type, listTypeDef)) {
                 error("GetItem on something other than a list");
                 return (NULL);
             }
             GenericType *genericType = (GenericType *) type;
             Type *indexType = evaluateNode(casted->index);
-            if (!typesEqual(indexType, numberType)) {
+            if (!isSubType(indexType, numberType)) {
                 error("Index must be a number");
                 return (NULL);
             }
@@ -429,7 +512,7 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            if (!typesEqual(valueType, AS_TYPE(fieldType))) {
+            if (!isSubType(valueType, AS_TYPE(fieldType))) {
                 error("Type mismatch in setter");
             }
 
@@ -451,7 +534,7 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
 
-            SimpleType *type = newSimpleType();
+            FunctorType *type = newFunctorType();
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = casted->paramTypes.typeNodes[i];
                 if (typeNode != NULL) {
@@ -508,7 +591,7 @@ Type *evaluateNode(Node *node) {
             if (casted->initializer != NULL) {
                 Type *valType = evaluateNode((Node *) casted->initializer);
                 if (varType) {
-                    if (!typesEqual(valType, varType)) {
+                    if (!isSubType(valType, varType)) {
                         errorAt(&casted->name, "Type mismatch in var");
                     }
                 } else {
@@ -542,7 +625,7 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);
 
-            SimpleType *type = newSimpleType();
+            FunctorType *type = newFunctorType();
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = casted->paramTypes.typeNodes[i];
                 if (typeNode != NULL) {
@@ -584,13 +667,13 @@ Type *evaluateNode(Node *node) {
             struct Class *casted = (struct Class *) node;
 
             SimpleType *classType = newSimpleType();
-            SimpleType *classFunctionType = newSimpleType();
+            FunctorType *classFunctionType = newFunctorType();
             for (int j = 0; j < casted->methods.count; j++) {
                 struct Function *method = (struct Function *) casted->methods.stmts[j];
                 TypeEnvironment typeEnv;
                 initTypeEnvironment(&typeEnv, method->functionType);
 
-                SimpleType *type = newSimpleType();
+                FunctorType *type = newFunctorType();
                 for (int i = 0; i < method->paramTypes.count; i++) {
                     TypeNode *typeNode = method->paramTypes.typeNodes[i];
                     if (typeNode != NULL) {
@@ -630,6 +713,12 @@ Type *evaluateNode(Node *node) {
                 evaluateTypes(&method->body);
 
                 currentEnv = currentEnv->enclosing;
+            }
+
+            classType->superType = NULL;
+
+            if (casted->superclass) {
+                classType->superType = getTypeDef(casted->superclass->name);
             }
 
             classFunctionType->returnType = (Type *) classType;
@@ -733,7 +822,7 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_FUNCTOR: {
             struct Functor *casted = (struct Functor *) node;
-            SimpleType *type = newSimpleType();
+            FunctorType *type = newFunctorType();
 
             for (int i = 0; i < casted->arguments.count; i++) {
                 TypeNode *typeNode = casted->arguments.typeNodes[i];
@@ -752,6 +841,13 @@ Type *evaluateNode(Node *node) {
         case NODE_SIMPLE: {
             struct Simple *casted = (struct Simple *) node;
             Type *type = getTypeDef(casted->name);
+            return type;
+        }
+        case NODE_UNION: {
+            struct Union *casted = (struct Union *) node;
+            UnionType *type = newUnionType();
+            type->left = evaluateNode((Node *) casted->left);
+            type->right = evaluateNode((Node *) casted->right);
             return type;
         }
     }
