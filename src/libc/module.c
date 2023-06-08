@@ -1,11 +1,11 @@
 #include <printf.h>
 #include "module.h"
-#include "../memory.h"
 
 
 ObjBuiltinType *moduleType = NULL;
 
 ObjModule *newModule(const char *name, const char *path, bool includeBuiltins) {
+//    printf("New module %s\n", name);
     ObjModule *instance = ALLOCATE_OBJ(ObjModule, OBJ_INSTANCE);
     push(OBJ_VAL(instance));
     instance->obj.klass = (ObjClass *) moduleType;
@@ -31,13 +31,17 @@ void freeModule(ObjModule *module) {
 }
 
 void markModule(ObjModule *module) {
-    markObject(module->name);
-    markObject(module->path);
+    markObject((Obj *) module->name);
+    markObject((Obj *) module->path);
 }
 
 void printModule(ObjModule *module) {
     printf("<module ");
-    printValue(OBJ_VAL(module->path));
+    if (module->path) {
+        printValue(OBJ_VAL(module->path));
+    } else {
+        printf("uninitialized");
+    }
     printf(">");
 }
 

@@ -910,3 +910,16 @@ void markType(Type* type) {
         }
     }
 }
+
+void markTypecheckerRoots() {
+    TypeEnvironment *typeEnvironment = currentEnv;
+    while (typeEnvironment != NULL) {
+        for (int i = 0; i < typeEnvironment->localCount; i++) {
+            markObject((Obj*) typeEnvironment->locals[i].type);
+        }
+        for (int i = 0; i < typeEnvironment->typeDefCount; i++) {
+            markObject((Obj*) typeEnvironment->typeDefs[i].type);
+        }
+        typeEnvironment = typeEnvironment->enclosing;
+    }
+}

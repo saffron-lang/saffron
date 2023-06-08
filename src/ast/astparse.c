@@ -8,24 +8,17 @@
 #include "../scanner.h"
 #include "../object.h"
 #include "../memory.h"
+#include "../types.h"
 
 #ifdef DEBUG_PRINT_CODE
 
 #include "../debug.h"
-#include "../types.h"
 
 #endif
 
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    Token current;
-    Token previous;
-    bool hadError;
-    bool panicMode;
-    Node *nodes;
-} Parser;
 
 typedef enum {
     PREC_NONE,
@@ -67,7 +60,7 @@ Node *allocateNode(size_t size, NodeType type) {
     parser.nodes = node;
 
 #ifdef DEBUG_LOG_GC
-    printf("%p allocate %zu for %d\n", (void *) node, size, type);
+    printf("%p allocate %zu for node %d\n", (void *) node, size, type);
 #endif
 
     return node;

@@ -64,6 +64,7 @@ void defineBuiltin(const char *name, Value value) {
 
 void initVM() {
     resetStack();
+    vm.vmReady = false;
 
     vm.currentTask = 0;
     vm.objects = NULL;
@@ -107,6 +108,7 @@ void freeVM() {
     freeTable(&vm.builtins);
     freeTable(&vm.strings);
     vm.initString = NULL;
+    freeNodes();
     freeObjects();
 }
 
@@ -822,6 +824,7 @@ static InterpretResult run(ObjModule *module) {
 
 ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
     ObjModule *module = newModule(name, path, true);
+    push(OBJ_VAL(module));
     ObjFunction *function = compile(body);
     if (function == NULL) {
         module->result = INTERPRET_COMPILE_ERROR;
@@ -833,11 +836,13 @@ ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
     pop();
     push(OBJ_VAL(closure));
     call(closure, 0);
+    vm.vmReady = true;
 
     InterpretResult result = run(module);
 
     module->result = result;
 
+    pop();
     return module;
 }
 

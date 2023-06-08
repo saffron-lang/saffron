@@ -88,5 +88,6 @@ SimpleType *neverType;
 SimpleType *listTypeDef;
 
 void freeType(Type *type);
+void markTypecheckerRoots();
 
 #endif //CRAFTING_INTERPRETERS_TYPES_H
