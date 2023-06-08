@@ -14,7 +14,7 @@ ObjList *newList() {
 }
 
 void freeList(ObjList *list) {
-    freeValueArray(&list->items);
+//    freeValueArray(&list->items);
     FREE(ObjList, list);
 }
 

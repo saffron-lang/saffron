@@ -492,15 +492,18 @@ static Expr *anonFunction(bool canAssign) {
     }
 
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+    TypeNode* returnType = NULL;
+    if (match(TOKEN_COLON)) {
+        returnType = typeAnnotation();
+    }
     consume(TOKEN_ARROW, "Expect '=>' after parameters.");
     consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
     struct Block *bl = (struct Block *) block();
     struct Lambda *result = ALLOCATE_NODE(struct Lambda, NODE_LAMBDA);
     result->body = bl->statements;
     result->params = tokens;
-    result->paramTypes = types;
-
-    result->self.type = (TypeNode *) initFunctor(types, NULL);
+    result->self.type = (TypeNode *) initFunctor(types, returnType);
     return result;
 }
 
