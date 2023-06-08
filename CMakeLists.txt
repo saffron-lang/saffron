@@ -14,7 +14,6 @@ add_executable(crafting_interpreters
         src/common.h
         src/chunk.h
         src/chunk.c src/memory.h src/memory.c src/debug.h src/debug.c src/value.h src/value.c src/vm.h src/vm.c
-        src/compiler.c src/compiler.h
         src/ast/astcompile.c src/ast/astcompile.h
         src/scanner.h src/scanner.c
         src/object.c src/object.h src/table.c src/table.h src/libc/list.c src/libc/list.h src/libc/map.c src/libc/map.h src/libc/time.c src/libc/time.h src/libc/type.c src/libc/type.h src/libc/io.c src/libc/io.h src/libc/async.c src/libc/async.h src/libc/task.c src/libc/task.h src/libc/module.c src/libc/module.h src/files.h src/files.c src/ast/ast.c src/ast/ast.h src/ast/astprint.c src/ast/astprint.h src/ast/astparse.c src/ast/astparse.h src/types.c src/types.h)

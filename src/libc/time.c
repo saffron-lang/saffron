@@ -17,6 +17,8 @@ Value clockNative(int argCount, Value *args) {
 
 ObjModule *createTimeModule() {
     ObjModule *module = newModule("time", "time", false);
+    push(OBJ_VAL(module));
     defineModuleFunction(module, "clock", clockNative);
+    pop();
     return module;
 }

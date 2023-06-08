@@ -26,5 +26,6 @@ void markArray(ValueArray *array);
 void markObject(Obj* object);
 void collectGarbage();
 void freeObjects();
+void freeNodes();
 
 #endif

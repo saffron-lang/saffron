@@ -4,7 +4,6 @@
 #include "ast/ast.h"
 #include "ast/astprint.h"
 #include "ast/astparse.h"
-#include "compiler.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>

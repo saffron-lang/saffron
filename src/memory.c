@@ -7,6 +7,7 @@
 #include "libc/list.h"
 #include "libc/async.h"
 #include "libc/module.h"
+#include "ast/astparse.h"
 
 #ifdef DEBUG_LOG_GC
 
@@ -120,13 +121,27 @@ static void freeObject(Obj *object) {
 }
 
 void freeObjects() {
+    Obj *objects = vm.objects;
+    Obj *doublePrev = NULL;
+    Obj *previous = NULL;
     Obj *object = vm.objects;
     while (object != NULL) {
         Obj *next = object->next;
-        freeObject(object);
+//        freeObject(object);
+        doublePrev = previous;
+        previous = object;
         object = next;
     }
     free(vm.grayStack);
+}
+
+void freeNodes() {
+    Node *node = parser.nodes;
+    while (node != NULL) {
+        Node *next = node->next;
+//        freeObject(object);
+        node = next;
+    }
 }
 
 void markObject(Obj *object) {
@@ -155,6 +170,7 @@ void markValue(Value value) {
 }
 
 static void markRoots() {
+    VM* vm2 = &vm;
     for (Value *slot = vm.stack; slot < vm.stackTop; slot++) {
         markValue(*slot);
     }
@@ -170,6 +186,7 @@ static void markRoots() {
     markTable(&vm.builtins);
     markArray(&vm.tasks);
     markCompilerRoots();
+    markTypecheckerRoots();
     markAsyncRoots();
     markObject((Obj *) vm.initString);
 }
