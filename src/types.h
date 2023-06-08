@@ -26,6 +26,7 @@ typedef struct SimpleType {
 } SimpleType;
 
 typedef struct FunctorType {
+    Type self;
     int genericCount;
     ValueArray arguments;
     Type *returnType;

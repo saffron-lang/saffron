@@ -253,7 +253,7 @@ static Type *getTypeDef(Token name) {
 static bool isSubType(Type *subclass, Type *superclass) {
     // TODO: Make this actually work
     // TODO: Maybe this should actually be "isSubClass", left to right
-    // If right is subclass of left, then we can assign right to left
+    // If left is a subclass of right, then we can assign right to left
     // Subclasses include generics
 
     if (subclass == superclass) {
@@ -381,6 +381,7 @@ void evaluateExprTypes(ExprArray *exprs) {
 }
 
 Type *currentClassType = NULL;
+FunctorType *currentFuncType = NULL;
 
 Type *evaluateNode(Node *node) {
     if (node == NULL) {
@@ -442,8 +443,8 @@ Type *evaluateNode(Node *node) {
             Type *calleeType = evaluateNode((Node *) casted->callee);
 
             if (calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
-//                errorAt(&casted->paren, "Type is not callable");
-//                return(NULL);
+                errorAt(&casted->paren, "Type is not callable");
+                return(NULL);
             }
 
             FunctorType *calleeFunctor = calleeType;
@@ -546,6 +547,8 @@ Type *evaluateNode(Node *node) {
             initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
 
             FunctorType *type = newFunctorType();
+            FunctorType *oldFuncType = currentFuncType;
+            currentFuncType = type;
             struct Functor *functorNode = casted->self.type;
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = functorNode->arguments.typeNodes[i];
@@ -570,14 +573,19 @@ Type *evaluateNode(Node *node) {
             type->returnType = evaluateNode((Node *) functorNode->returnType);
             evaluateTypes(&casted->body);
 
+            if (!type->returnType) {
+                type->returnType = (Type *) nilType;
+            }
+
             currentEnv = currentEnv->enclosing;
+            currentFuncType = oldFuncType;
 
             return type;
         }
         case NODE_LIST: {
             struct List *casted = (struct List *) node;
 
-            Type *itemType = getTypeOf(NIL_VAL); // TODO: Never
+            Type *itemType = neverType;
             if (casted->items.count > 0) {
                 if (casted->items.count > 1) {
                     evaluateExprTypes(&casted->items);
@@ -637,15 +645,18 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);
 
+            Type* oldFuncType = currentFuncType;
             FunctorType *type = newFunctorType();
+            currentFuncType = type;
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = casted->paramTypes.typeNodes[i];
                 Type *argType;
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
                 } else {
-                    argType = anyType;
+                    argType = (Type *) anyType;
                 }
+
                 writeValueArray(&type->arguments, OBJ_VAL(argType));
 
                 TypeLocal typeLocal = {
@@ -662,6 +673,9 @@ Type *evaluateNode(Node *node) {
 
             type->returnType = evaluateNode((Node *) casted->returnType);
             evaluateTypes(&casted->body);
+            if (!type->returnType) {
+                type->returnType = (Type *) nilType;
+            }
 
             currentEnv = currentEnv->enclosing;
 
@@ -675,6 +689,7 @@ Type *evaluateNode(Node *node) {
             currentEnv->locals[currentEnv->localCount] = typeLocal;
             currentEnv->localCount++;
 
+            currentFuncType = oldFuncType;
             return (Type *) type;
         }
         case NODE_CLASS: {
@@ -702,6 +717,8 @@ Type *evaluateNode(Node *node) {
                     typeEnv.localCount++;
 
                     FunctorType *type = newFunctorType();
+                    FunctorType *oldFuncType = currentFuncType;
+                    currentFuncType = type;
                     for (int i = 0; i < method->paramTypes.count; i++) {
                         TypeNode *typeNode = method->paramTypes.typeNodes[i];
                         Type *argType;
@@ -739,8 +756,12 @@ Type *evaluateNode(Node *node) {
                     }
 
                     evaluateTypes(&method->body);
+                    if (!type->returnType) {
+                        type->returnType = (Type *) nilType;
+                    }
 
                     currentEnv = currentEnv->enclosing;
+                    currentFuncType = oldFuncType;
                 } else {
                     struct Var *var = (struct Var *) casted->body.stmts[j];
                     Type *type = evaluateNode((Node *) var->type);
@@ -815,7 +836,16 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
-            return evaluateNode((Node *) casted->value);
+            Type* value = evaluateNode((Node *) casted->value);
+            if (currentFuncType->returnType) {
+                if (!isSubType(value, currentFuncType->returnType)) {
+                    errorAt(&casted->keyword, "Return type mismatch");
+                }
+            } else {
+                currentFuncType->returnType = value;
+            }
+            FunctorType* current = currentFuncType;
+            return value;
         }
         case NODE_IMPORT: {
             struct Import *casted = (struct Import *) node;
