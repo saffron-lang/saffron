@@ -204,9 +204,7 @@ struct Yield {
 struct Lambda {
     Expr self;
     TokenArray params;
-    TypeNodeArray paramTypes;
     StmtArray body;
-    TypeNode *returnType;
 };
 
 struct List {

@@ -6,6 +6,7 @@
 #include "vm.h"
 #include "libc/list.h"
 #include "libc/async.h"
+#include "libc/module.h"
 
 #ifdef DEBUG_LOG_GC
 
@@ -104,6 +105,16 @@ static void freeObject(Obj *object) {
             break;
         case OBJ_CALL_FRAME:
             FREE(ObjCallFrame, object);
+            break;
+        case OBJ_MODULE:
+            freeModule((ObjModule *) object);
+            break;
+        case OBJ_PARSE_FUNCTOR_TYPE:
+        case OBJ_PARSE_UNION_TYPE:
+        case OBJ_PARSE_INTERFACE_TYPE:
+        case OBJ_PARSE_TYPE:
+        case OBJ_PARSE_GENERIC_TYPE:
+            freeType((Type *) object);
             break;
     }
 }

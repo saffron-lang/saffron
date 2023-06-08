@@ -189,14 +189,14 @@ static bool identifiersEqual(Token *a, Token *b) {
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static int resolveLocal(struct TypeEnvironment *typeEnvironment, Token *name) {
+static TypeLocal* resolveLocal(struct TypeEnvironment *typeEnvironment, Token *name) {
     for (int i = typeEnvironment->localCount - 1; i >= 0; i--) {
         TypeLocal *local = &typeEnvironment->locals[i];
         if (identifiersEqual(name, &local->name)) {
             if (local->depth == -1) {
                 error("Can't read local variable in its own initializer.");
             }
-            return i;
+            return local;
         }
     }
 
@@ -204,17 +204,17 @@ static int resolveLocal(struct TypeEnvironment *typeEnvironment, Token *name) {
         return resolveLocal(currentEnv->enclosing, name);
     }
 
-    return -1;
+    return NULL;
 }
 
-static int resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name) {
+static TypeLocal* resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name) {
     for (int i = typeEnvironment->typeDefCount - 1; i >= 0; i--) {
         TypeLocal *local = &typeEnvironment->typeDefs[i];
         if (identifiersEqual(name, &local->name)) {
             if (local->depth == -1) {
                 error("Can't read local variable in its own initializer.");
             }
-            return i;
+            return local;
         }
     }
 
@@ -222,18 +222,17 @@ static int resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name) 
         return resolveTypeDef(currentEnv->enclosing, name);
     }
 
-    return -1;
+    return NULL;
 }
-
 
 // Get types from vm.types
 // Types will include methods
 // Add attributes to types
 // Builtin types will also get added to vm.types
 static Type *getVariableType(Token name) {
-    int arg = resolveLocal(currentEnv, &name);
-    if (arg != -1) {
-        return currentEnv->locals[arg].type;
+    TypeLocal* arg = resolveLocal(currentEnv, &name);
+    if (arg) {
+        return arg->type;
     } else {
         error("Undefined variable");
         return NULL;
@@ -242,9 +241,9 @@ static Type *getVariableType(Token name) {
 
 static Type *getTypeDef(Token name) {
     TypeEnvironment *tenv = currentEnv;
-    int arg = resolveTypeDef(currentEnv, &name);
-    if (arg != -1) {
-        return currentEnv->typeDefs[arg].type;
+    TypeLocal* arg = resolveTypeDef(currentEnv, &name);
+    if (arg) {
+        return arg->type;
     } else {
         errorAt(&name, "Undefined type");
         return NULL;
@@ -287,8 +286,8 @@ static bool isSubType(Type *subclass, Type *superclass) {
             }
 
             for (int i = 0; i < superclassType->arguments.count; i++) {
-                Type* superArgType = AS_OBJ(superclassType->arguments.values[i]);
-                Type* subArgType = AS_OBJ(subclassType->arguments.values[i]);
+                Type *superArgType = AS_OBJ(superclassType->arguments.values[i]);
+                Type *subArgType = AS_OBJ(subclassType->arguments.values[i]);
                 if (!isSubType(subArgType, superArgType)) {
                     return false;
                 }
@@ -535,8 +534,9 @@ Type *evaluateNode(Node *node) {
             initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
 
             FunctorType *type = newFunctorType();
+            struct Functor* functorNode = casted->self.type;
             for (int i = 0; i < casted->params.count; i++) {
-                TypeNode *typeNode = casted->paramTypes.typeNodes[i];
+                TypeNode *typeNode = functorNode->arguments.typeNodes[i];
                 if (typeNode != NULL) {
                     Type *argType = evaluateNode((Node *) typeNode);
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
@@ -555,7 +555,7 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            type->returnType = evaluateNode((Node *) casted->returnType);
+            type->returnType = evaluateNode((Node *) functorNode->returnType);
             evaluateTypes(&casted->body);
 
             currentEnv = currentEnv->enclosing;
@@ -853,4 +853,60 @@ Type *evaluateNode(Node *node) {
     }
 
     return NULL;
+}
+
+void freeType(Type *type) {
+    switch (type->obj.type) {
+        case OBJ_PARSE_FUNCTOR_TYPE:
+            FREE(FunctorType, type);
+            break;
+        case OBJ_PARSE_UNION_TYPE:
+            FREE(UnionType, type);
+            break;
+        case OBJ_PARSE_INTERFACE_TYPE:
+            FREE(InterfaceType, type);
+            break;
+        case OBJ_PARSE_TYPE:
+            FREE(SimpleType, type);
+            break;
+        case OBJ_PARSE_GENERIC_TYPE:
+            FREE(GenericType, type);
+            break;
+    }
+}
+
+void markType(Type* type) {
+    switch (type->obj.type) {
+        case OBJ_PARSE_FUNCTOR_TYPE: {
+            FunctorType *casted = (FunctorType *) type;
+            markArray(&casted->arguments);
+            markObject((Obj *) casted->returnType);
+            break;
+        }
+        case OBJ_PARSE_UNION_TYPE:{
+            UnionType *casted = (UnionType *) type;
+            markObject((Obj *) casted->left);
+            markObject((Obj *) casted->right);
+            break;
+        }
+        case OBJ_PARSE_INTERFACE_TYPE: {
+            struct InterfaceType *casted = (InterfaceType *) type;
+            markTable(&casted->fields);
+            markTable(&casted->methods);
+            break;
+        }
+        case OBJ_PARSE_TYPE: {
+            struct SimpleType *casted = (SimpleType *) type;
+            markObject((Obj *) casted->superType);
+            markTable(&casted->fields);
+            markTable(&casted->methods);
+            break;
+        }
+        case OBJ_PARSE_GENERIC_TYPE:{
+            struct GenericType *casted = (GenericType *) type;
+            markObject((Obj *) casted->target);
+            markArray(&casted->generics);
+            break;
+        }
+    }
 }

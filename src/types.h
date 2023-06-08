@@ -47,7 +47,7 @@ typedef struct InterfaceType {
     Table fields;
     Table methods;
     int genericCount;
-} TypeUnion;
+} InterfaceType;
 
 typedef struct {
     Token name;
@@ -86,5 +86,7 @@ SimpleType *atomType;
 SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *listTypeDef;
+
+void freeType(Type *type);
 
 #endif //CRAFTING_INTERPRETERS_TYPES_H
