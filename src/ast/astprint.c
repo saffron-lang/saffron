@@ -328,9 +328,9 @@ void unparseNode(Node *node) {
 
             printf(" {\n");
             indent++;
-            for (int i = 0; i < casted->methods.count; i++) {
-                unparseNode((Node *) casted->methods.stmts[i]);
-                if (i != casted->methods.count - 1) {
+            for (int i = 0; i < casted->body.count; i++) {
+                unparseNode((Node *) casted->body.stmts[i]);
+                if (i != casted->body.count - 1) {
                     printf("\n\n");
                 }
             }
@@ -763,8 +763,8 @@ void printNode(Node *node) {
             printNode((Node *) casted->superclass);
             printf(",\n");
             printIndent();
-            printf("methods=");
-            printTree(&casted->methods);
+            printf("body=");
+            printTree(&casted->body);
             indent--;
             printf("\n");
             printIndent();

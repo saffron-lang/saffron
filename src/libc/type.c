@@ -20,6 +20,7 @@ ObjBuiltinType *newBuiltinType(const char *name, InitFn initFn) {
     ObjBuiltinType *klass = ALLOCATE_OBJ(ObjBuiltinType, OBJ_BUILTIN_TYPE);
     klass->obj.name = AS_STRING(peek(0));
     initTable(&klass->obj.methods);
+    initTable(&klass->obj.fields);
     push(OBJ_VAL(klass));
     klass->freeFn = NULL;
     klass->markFn = NULL;

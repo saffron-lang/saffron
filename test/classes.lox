@@ -1,4 +1,11 @@
-class Pair {}
+class Pair {
+    var first: Number
+    var second: Number
+}
+
+fun my_func(a) {
+    println(a)
+}
 
 var pair = Pair();
 pair.first = 1;
@@ -6,7 +13,11 @@ pair.second = 2;
 println(pair.first + pair.second); // 3.
 
 class Brunch {
-  eggs() {}
+  eggs() {
+    println("10")
+  }
+
+  var egg2: String = "woah!"
 }
 
 var brunch = Brunch();
@@ -22,6 +33,8 @@ var scone = Scone();
 scone.topping("berries", "cream");
 
 class CoffeeMaker {
+  var coffee: String
+
   init(coffee) {
     this.coffee = coffee;
   }

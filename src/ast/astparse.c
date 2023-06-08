@@ -662,7 +662,7 @@ static TypeNode *typeAnnotation() {
     }
 }
 
-static Stmt *varDeclaration() {
+static Stmt *varDeclaration(AssignmentType assignmentType) {
     Token name = parseVariable("Expect variable name.");
     Expr *value = NULL;
     TypeNode *type = NULL;
@@ -681,6 +681,7 @@ static Stmt *varDeclaration() {
     var->name = name;
     var->initializer = value;
     var->type = type;
+    var->assignmentType = assignmentType;
     return var;
 }
 
@@ -692,7 +693,7 @@ static Stmt *forStatement() {
     if (match(TOKEN_SEMICOLON)) {
         // No initializer.
     } else if (match(TOKEN_VAR)) {
-        initializer = varDeclaration();
+        initializer = varDeclaration(TYPE_VARIABLE);
     } else {
         initializer = expressionStatement();
     }
@@ -825,13 +826,17 @@ static Stmt *classDeclaration() {
 
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 
-    StmtArray methods;
-    initStmtArray(&methods);
+    StmtArray body;
+    initStmtArray(&body);
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-        writeStmtArray(&methods, method());
+        if (match(TOKEN_VAR)) {
+            writeStmtArray(&body, varDeclaration(TYPE_FIELD));
+        } else {
+            writeStmtArray(&body, method());
+        }
     }
 
-    result->methods = methods;
+    result->body = body;
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 
     return (Stmt *) result;
@@ -843,7 +848,7 @@ static Stmt *declaration() {
     } else if (match(TOKEN_FUN)) {
         return funDeclaration();
     } else if (match(TOKEN_VAR)) {
-        return varDeclaration();
+        return varDeclaration(TYPE_VARIABLE);
     } else {
         return statement();
     }

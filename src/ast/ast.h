@@ -11,6 +11,11 @@ typedef enum {
     TYPE_INITIALIZER,
 } FunctionType;
 
+typedef enum {
+    TYPE_FIELD,
+    TYPE_VARIABLE,
+} AssignmentType;
+
 #define ALLOCATE_NODE(type, nodeType) (type*) allocateNode(sizeof(type), nodeType)
 
 typedef enum {
@@ -222,6 +227,7 @@ struct Var {
     Token name;
     Expr* initializer;
     TypeNode *type;
+    AssignmentType assignmentType;
 };
 
 struct Block {
@@ -243,7 +249,7 @@ struct Class {
     Stmt self;
     Token name;
     struct Variable* superclass;
-    StmtArray methods;
+    StmtArray body;
 };
 
 struct If {
