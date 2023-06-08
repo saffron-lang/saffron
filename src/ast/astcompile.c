@@ -590,9 +590,10 @@ void compileNode(Node *node) {
             } else {
                 emitByte(OP_NIL);
             }
-            defineVariable(nameConstant);
 
-
+            if (casted->assignmentType != TYPE_FIELD) {
+                defineVariable(nameConstant);
+            }
             break;
         }
         case NODE_BLOCK: {
@@ -659,10 +660,16 @@ void compileNode(Node *node) {
             getVariable(className);
 
 
-            for (int i = 0; i < casted->methods.count; i++) {
-                uint8_t constant = identifierConstant(&((struct Function *) casted->methods.stmts[i])->name);
-                compileNode((Node *) casted->methods.stmts[i]);
-                emitBytes(OP_METHOD, constant);
+            for (int i = 0; i < casted->body.count; i++) {
+                if (casted->body.stmts[i]->self.type == NODE_FUNCTION) {
+                    uint8_t constant = identifierConstant(&((struct Function *) casted->body.stmts[i])->name);
+                    compileNode((Node *) casted->body.stmts[i]);
+                    emitBytes(OP_METHOD, constant);
+                } else {
+                    uint8_t constant = identifierConstant(&((struct Var *) casted->body.stmts[i])->name);
+                    compileNode((Node *) casted->body.stmts[i]);
+                    emitBytes(OP_FIELD, constant);
+                }
             }
 
             emitByte(OP_POP);

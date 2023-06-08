@@ -25,12 +25,12 @@ exprs = [
 stmts = [
     "Stmt       : Node self",
     "Expression : Expr* expression",
-    "Var        : Token name, Expr* initializer, TypeNode *type",
+    "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
     "Function   : Token name, TokenArray params, TypeNodeArray paramTypes," +
     " StmtArray body, FunctionType functionType, TypeNode *returnType",
     "Class      : Token name, struct Variable* superclass," +
-    " StmtArray methods",
+    " StmtArray body",
     "If         : Expr* condition, Stmt* thenBranch," +
     " Stmt* elseBranch",
     "While      : Expr* condition, Stmt* body",
@@ -101,6 +101,12 @@ with redirect_stdout(file):
     TYPE_METHOD,
     TYPE_INITIALIZER,
 } FunctionType;
+""")
+
+    print("""typedef enum {
+    TYPE_FIELD,
+    TYPE_VARIABLE,
+} AssignmentType;
 """)
 
     print('#define ALLOCATE_NODE(type, nodeType) (type*) allocateNode(sizeof(type), nodeType)')

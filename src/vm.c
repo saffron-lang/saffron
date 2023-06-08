@@ -304,6 +304,13 @@ static void defineMethod(ObjString *name) {
     pop();
 }
 
+static void defineField(ObjString *name) {
+    Value method = peek(0);
+    ObjClass *klass = AS_CLASS(peek(1));
+    tableSet(&klass->fields, name, method);
+    pop();
+}
+
 static bool bindMethod(ObjClass *klass, ObjString *name) {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
@@ -684,6 +691,9 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_METHOD:
                 defineMethod(READ_STRING());
+                break;
+            case OP_FIELD:
+                defineField(READ_STRING());
                 break;
             case OP_INVOKE: {
                 ObjString *method = READ_STRING();
