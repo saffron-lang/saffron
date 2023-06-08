@@ -1,10 +1,11 @@
+fun my_func(a): String {
+    println(a)
+    return 5 + 2
+}
+
 class Pair {
     var first: Number
     var second: Number
-}
-
-fun my_func(a) {
-    println(a)
 }
 
 var pair = Pair();
@@ -34,8 +35,10 @@ scone.topping("berries", "cream");
 
 class CoffeeMaker {
   var coffee: String
+  var tube: (Number) => String
 
   init(coffee) {
+    this.tube = fun (a: Number) => { return "beans" }
     this.coffee = coffee;
   }
 
@@ -49,3 +52,4 @@ class CoffeeMaker {
 
 var maker = CoffeeMaker("coffee and chicory");
 maker.brew();
+maker.tube(5);

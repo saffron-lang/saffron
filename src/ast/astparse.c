@@ -727,15 +727,18 @@ static Stmt *importStatement() {
 }
 
 static Stmt *returnStatement() {
+    Token keyword = parser.previous;
     if (match(TOKEN_SEMICOLON)) {
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = NULL;
+        result->keyword = keyword;
         return (Stmt *) result;
     } else {
         Expr *value = expression();
         match(TOKEN_SEMICOLON);
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = value;
+        result->keyword = keyword;
         return (Stmt *) result;
     }
 }
