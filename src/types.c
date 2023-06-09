@@ -268,6 +268,13 @@ static bool isSubType(Type *subclass, Type *superclass) {
         return true;
     }
 
+    if (subclass->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+        GenericType *subclassType = (GenericType *) subclass;
+        if (isSubType(subclassType->target, superclass)) {
+            return true;
+        }
+    }
+
     switch (superclass->obj.type) {
         case (OBJ_PARSE_TYPE): {
             if (subclass->obj.type != OBJ_PARSE_TYPE) {
@@ -318,7 +325,7 @@ static bool isSubType(Type *subclass, Type *superclass) {
         }
     }
 
-    return true;
+    return false;
 }
 
 
@@ -381,6 +388,7 @@ void evaluateExprTypes(ExprArray *exprs) {
 }
 
 Type *currentClassType = NULL;
+Type *currentAssignmentType = NULL;
 FunctorType *currentFuncType = NULL;
 
 Type *evaluateNode(Node *node) {
@@ -585,18 +593,45 @@ Type *evaluateNode(Node *node) {
         case NODE_LIST: {
             struct List *casted = (struct List *) node;
 
-            Type *itemType = neverType;
-            if (casted->items.count > 0) {
-                if (casted->items.count > 1) {
-                    evaluateExprTypes(&casted->items);
-                }
+            GenericType *type = currentAssignmentType;
+            if (currentAssignmentType == NULL) {
+                type = newGenericType();
+                initValueArray(&type->generics);
+                Type *itemType = neverType;
+                if (casted->items.count > 0) {
+                    if (casted->items.count > 1) {
+                        evaluateExprTypes(&casted->items);
+                    }
 
-                itemType = evaluateNode((Node *) casted->items.exprs[0]);
+                    itemType = evaluateNode((Node *) casted->items.exprs[0]);
+                }
+                writeValueArray(&type->generics, OBJ_VAL(itemType));
+                type->target = listTypeDef;
+            } else {
+                if (currentAssignmentType->obj.type != OBJ_PARSE_GENERIC_TYPE) {
+                    errorAt(&casted->bracket, "Type mismatch");
+                    return type;
+                }
+                if (!isSubType(listTypeDef, type->target)) {
+                    errorAt(&casted->bracket, "Type mismatch, incompatible type");
+                    return type;
+                }
+                if (type->generics.count != 1) {
+                    errorAt(&casted->bracket, "Type mismatch, missing type annotation");
+                    return type;
+                }
+                Type *itemType = AS_OBJ(type->generics.values[0]);
+                Type *tmp = currentAssignmentType;
+                currentAssignmentType = itemType;
+                for (int i = 0; i < casted->items.count; i++) {
+                    Type* evalType = evaluateNode(casted->items.exprs[i]);
+                    if (!isSubType(evalType, itemType)) {
+                        errorAt(&casted->bracket, "Type mismatch, incompatible types");
+                    }
+                }
+                currentAssignmentType = tmp;
             }
 
-            GenericType *type = newGenericType();
-            writeValueArray(&type->generics, OBJ_VAL(itemType));
-            type->target = listTypeDef;
             return (Type *) type;
         }
         case NODE_EXPRESSION: {
@@ -609,6 +644,8 @@ Type *evaluateNode(Node *node) {
             Type *varType = evaluateNode((Node *) casted->type);
 
             if (casted->initializer != NULL) {
+                Type* oldAssignmentType = currentAssignmentType;
+                currentAssignmentType = varType;
                 Type *valType = evaluateNode((Node *) casted->initializer);
                 if (varType) {
                     if (!isSubType(valType, varType)) {
@@ -617,6 +654,7 @@ Type *evaluateNode(Node *node) {
                 } else {
                     varType = valType;
                 }
+                currentAssignmentType = oldAssignmentType;
             }
 
             TypeLocal typeLocal = {
@@ -914,6 +952,17 @@ Type *evaluateNode(Node *node) {
         case NODE_SIMPLE: {
             struct Simple *casted = (struct Simple *) node;
             Type *type = getTypeDef(casted->name);
+
+            if (casted->generics.count > 0) {
+                GenericType *genericType = newGenericType();
+                genericType->target = type;
+
+                for (int i = 0; i < casted->generics.count; i++) {
+                    writeValueArray(&genericType->generics, OBJ_VAL(evaluateNode(casted->generics.typeNodes[i])));
+                }
+                return genericType;
+            }
+
             return type;
         }
         case NODE_UNION: {
