@@ -17,7 +17,7 @@ exprs = [
     "This     : Token keyword",
     "Yield    : Expr* expression",
     "Lambda   : TokenArray params, StmtArray body",
-    "List     : ExprArray items",
+    "List     : ExprArray items, Token bracket",
     # "Arguments: Expr* items",
     # "Parameters: "
 ]

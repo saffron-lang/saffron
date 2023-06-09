@@ -215,6 +215,7 @@ struct Lambda {
 struct List {
     Expr self;
     ExprArray items;
+    Token bracket;
 };
 
 struct Expression {
