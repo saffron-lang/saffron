@@ -256,7 +256,8 @@ struct Block {
 struct Function {
     Stmt self;
     Token name;
-    ParameterArray params StmtArray body;
+    ParameterArray params;
+    StmtArray body;
     FunctionType functionType;
     TypeNode *returnType;
 };
