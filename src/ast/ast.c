@@ -72,3 +72,27 @@ void freeStmtArray(StmtArray * stmtArray) {
     initStmtArray(stmtArray);
 }
 
+
+void initParameterArray(ParameterArray* parameterArray) {
+    parameterArray->count = 0;
+    parameterArray->capacity = 0;
+    parameterArray->parameters = NULL;
+}      
+        
+void writeParameterArray(ParameterArray * parameterArray, Parameter* parameter) {
+    if (parameterArray->capacity < parameterArray->count + 1) {
+        int oldCapacity = parameterArray->capacity;
+        parameterArray->capacity = GROW_CAPACITY(oldCapacity);
+        parameterArray->parameters = GROW_ARRAY(Parameter*, parameterArray->parameters,
+                                       oldCapacity, parameterArray->capacity);
+    }
+
+    parameterArray->parameters[parameterArray->count] = parameter;
+    parameterArray->count++;
+}
+
+void freeParameterArray(ParameterArray * parameterArray) {
+    FREE_ARRAY(Parameter*, parameterArray->parameters, parameterArray->capacity);
+    initParameterArray(parameterArray);
+}
+
