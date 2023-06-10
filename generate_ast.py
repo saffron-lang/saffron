@@ -27,7 +27,7 @@ stmts = [
     "Expression : Expr* expression",
     "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
-    "Function   : Token name, ParameterArray params" +
+    "Function   : Token name, ParameterArray params," +
     " StmtArray body, FunctionType functionType, TypeNode *returnType",
     "Class      : Token name, struct Variable* superclass," +
     " StmtArray body",
