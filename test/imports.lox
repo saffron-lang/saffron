@@ -1,14 +1,14 @@
-import "../test/inheritance.lox";
+import "../src/lib/future.lox" as future; // Builtin module
+import "../test/inheritance.lox" as inheritance;
 
 var k = inheritance.Cruller();
 k.finish();
 println(k.finish);
 println("Successfully imported another module! ", inheritance);
 
-import "lib/future.lox"; // Builtin module
 
 println("New totally cool type, ", future.Future);
 
-import "time";
+import "time" as time;
 println("New time module: ", time);
 println("The time is: ", time.clock());

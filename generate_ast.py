@@ -37,7 +37,7 @@ stmts = [
     "For        : Stmt* initializer, Expr* condition, Expr* increment, Stmt* body",
     "Break      : Token keyword",
     "Return     : Token keyword, Expr* value",
-    "Import     : Expr* expression",
+    "Import     : Expr* expression, Token name",
 ]
 
 type_items = [
@@ -48,10 +48,10 @@ type_items = [
 ]
 
 param_types = [
-    "Parameter  : Node self",
-    "Positional : Token name, TypeNode* type",
-    "Keyword    : Token name, TypeNode* type, Expr* default_",
-    "Variadic   : Token name, TypeNode* type",
+    "Parameter  : Node self, Token name, TypeNode* type",
+    "Positional : ",
+    "Keyword    : Expr* default_",
+    "Variadic   : ",
 ]
 
 # TODO: Argument list, etc

@@ -50,13 +50,6 @@ typedef struct InterfaceType {
     int genericCount;
 } InterfaceType;
 
-typedef struct {
-    Token name;
-    int depth;
-    bool isCaptured;
-    Type *type;
-} TypeLocal;
-
 // Todo: Maybe some sort of type for intrinsic simple types
 // Or maybe just recursive compare all children and provide more complex
 // types for builtins / primitives.
@@ -67,10 +60,8 @@ typedef struct {
 typedef struct TypeEnvironment {
     struct TypeEnvironment *enclosing;
     FunctionType type;
-    TypeLocal locals[UINT8_COUNT];
-    int localCount;
-    TypeLocal typeDefs[UINT8_COUNT];
-    int typeDefCount;
+    Table locals;
+    Table typeDefs;
     int scopeDepth;
 } TypeEnvironment;
 
@@ -87,6 +78,8 @@ SimpleType *atomType;
 SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *listTypeDef;
+
+void makeTypes();
 
 void freeType(Type *type);
 void markTypecheckerRoots();

@@ -108,6 +108,8 @@ void freeStmtArray(StmtArray * stmtArray);
 
 typedef struct {
     Node self;
+    Token name;
+    TypeNode* type;
 } Parameter;
 
 typedef struct {
@@ -304,25 +306,22 @@ struct Return {
 struct Import {
     Stmt self;
     Expr* expression;
+    Token name;
 };
 
 struct Positional {
     Parameter self;
-    Token name;
-    TypeNode* type;
+    ;
 };
 
 struct Keyword {
     Parameter self;
-    Token name;
-    TypeNode* type;
     Expr* default_;
 };
 
 struct Variadic {
     Parameter self;
-    Token name;
-    TypeNode* type;
+    ;
 };
 
 #endif //CRAFTING_INTERPRETERS_AST_H

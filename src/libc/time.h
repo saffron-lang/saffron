@@ -9,5 +9,6 @@
 double getTime();
 Value clockNative(int argCount, Value* args);
 ObjModule* createTimeModule();
+SimpleType *createTimeModuleType();
 
 #endif //CRAFTING_INTERPRETERS_TIME_H

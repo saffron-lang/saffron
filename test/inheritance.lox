@@ -1,13 +1,13 @@
 var b = 6;
 
 class Doughnut {
-  cook() {
-    print("Dunk in the fryer.");
-    this.finish("sprinkles");
+  finish(ingredient: String) {
+    println("Finish with " + ingredient);
   }
 
-  finish(ingredient) {
-    println("Finish with " + ingredient);
+  cook() {
+    println("Dunk in the fryer.");
+    this.finish("sprinkles");
   }
 }
 
@@ -24,4 +24,4 @@ class Cruller < Doughnut {
 
 var a = Cruller();
 a.finish();
-print(a.finish);
+println(a.finish);
