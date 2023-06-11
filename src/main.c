@@ -25,6 +25,7 @@ static void repl() {
 static void runFile(const char *path) {
     char *source = readFile(path);
     StmtArray* body = parseAST(source);
+    makeTypes();
     evaluateTree(body);
 //    printTree(body);
 //    astUnparse(body);

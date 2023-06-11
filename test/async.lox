@@ -1,5 +1,3 @@
-import "time";
-
 var SLEEP = 1;
 
 fun join(future) {
@@ -34,8 +32,6 @@ fun finish() {
 
     return " ok!";
 }
-
-println("Clocky time", time.clock());
 
 var gen = finish();
 println("Function returned", gen);

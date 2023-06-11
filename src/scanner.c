@@ -144,7 +144,7 @@ static TokenType identifierType() {
                 switch (scanner.start[1]) {
                     case 'n':
                         return checkKeyword(2, 1, "d", TOKEN_AND);
-//                    case 'w': return checkKeyword(2, 3, "ait", TOKEN_AWAIT);
+                    case 's': return TOKEN_AS;
                 }
             }
             break;

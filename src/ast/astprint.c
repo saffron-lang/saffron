@@ -42,6 +42,15 @@ static void unparseExprArray(ExprArray exprArray) {
     }
 }
 
+static void unparseParamArray(ParameterArray parameterArray) {
+    for (int i = 0; i < parameterArray.count; i++) {
+        unparseNode((Node *) parameterArray.parameters[i]);
+        if (i != parameterArray.count - 1) {
+            printf(", ");
+        }
+    }
+}
+
 static void printExprArray(ExprArray exprArray) {
     if (exprArray.count == 0) {
         printf("[]");
@@ -249,7 +258,7 @@ void unparseNode(Node *node) {
         case NODE_LAMBDA: {
             struct Lambda *casted = (struct Lambda *) node;
             printf("fun (");
-            unparseTokenArray(casted->params);
+            unparseParamArray(casted->params);
             printf(") => {\n");
             indent++;
             astUnparse(&casted->body);
@@ -307,7 +316,7 @@ void unparseNode(Node *node) {
 
             unparseToken(casted->name);
             printf("(");
-            unparseTokenArray(casted->params);
+            unparseParamArray(casted->params);
             printf(") {\n");
             indent++;
             astUnparse(&casted->body);
@@ -654,7 +663,7 @@ void printNode(Node *node) {
             indent++;
             printIndent();
             printf("params=");
-            printTokenArray(casted->params);
+            unparseParamArray(casted->params);
             printf(",\n");
             printIndent();
             printf("body=");
@@ -731,7 +740,7 @@ void printNode(Node *node) {
             indent++;
             printIndent();
             printf("params=");
-            printTokenArray(casted->params);
+            unparseParamArray(casted->params);
             printf(",\n");
             printIndent();
             printf("name=");

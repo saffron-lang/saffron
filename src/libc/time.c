@@ -22,3 +22,11 @@ ObjModule *createTimeModule() {
     pop();
     return module;
 }
+
+SimpleType *createTimeModuleType() {
+    SimpleType *timeModule = newSimpleType();
+    FunctorType *clockType = newFunctorType();
+    clockType->returnType = (Type *) numberType;
+    tableSet(&timeModule->fields, copyString("clock", 5), OBJ_VAL(clockType));
+    return timeModule;
+}

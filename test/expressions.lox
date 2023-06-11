@@ -1,6 +1,9 @@
-var b;
+5 |> println()
+
+var b: Number;
 b = 3;
 println(b);
+
 var a = fun () => {
     println("Wow!");
 };
@@ -8,4 +11,3 @@ var a = fun () => {
 println(a());
 println(:atom == "atom");
 println(:atom == :atom);
-

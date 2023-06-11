@@ -3,6 +3,9 @@
 #include "object.h"
 #include "vm.h"
 #include "libc/list.h"
+#include "files.h"
+#include "ast/astparse.h"
+#include "libc/time.h"
 
 
 Type *evaluateNode(Node *node);
@@ -80,35 +83,15 @@ static void error(const char *message) {
     errorAt(&token, message); // TODO: Don't do this
 }
 
-static TypeLocal *defineTypeDef(TypeEnvironment *typeEnvironment, const char *name, Type *type) {
-    TypeLocal typeLocal = {
-            syntheticToken(name),
-            0,
-            false,
-            (Type *) type,
-    };
-
-    typeEnvironment->typeDefs[currentEnv->typeDefCount] = typeLocal;
-    typeEnvironment->typeDefCount++;
-
-    return &typeEnvironment->typeDefs[typeEnvironment->typeDefCount - 1];
+static void defineTypeDef(TypeEnvironment *typeEnvironment, const char *name, Type *type) {
+    tableSet(&typeEnvironment->typeDefs, copyString(name, strlen(name)), OBJ_VAL(type));
 }
 
-static TypeLocal *defineLocal(TypeEnvironment *typeEnvironment, const char *name, Type *type) {
-    TypeLocal typeLocal = {
-            syntheticToken(name),
-            0,
-            false,
-            (Type *) type,
-    };
-
-    typeEnvironment->locals[currentEnv->localCount] = typeLocal;
-    typeEnvironment->localCount++;
-
-    return &typeEnvironment->locals[typeEnvironment->localCount - 1];
+static void *defineLocal(TypeEnvironment *typeEnvironment, const char *name, Type *type) {
+    tableSet(&typeEnvironment->locals, copyString(name, strlen(name)), OBJ_VAL(type));
 }
 
-static TypeLocal *defineLocalAndTypeDef(TypeEnvironment *typeEnvironment, const char *name, SimpleType *type) {
+static void *defineLocalAndTypeDef(TypeEnvironment *typeEnvironment, const char *name, SimpleType *type) {
     Value initTypeValue;
     tableGet(&type->methods, copyString("init", 4), &initTypeValue);
     Type *initType = (Type *) AS_OBJ(initTypeValue);
@@ -124,29 +107,39 @@ SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *anyType;
 SimpleType *listTypeDef;
+FunctorType *printlnType;
 
-void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
+Table modules;
+
+void makeTypes() {
     numberType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Number", (Type *) numberType);
     nilType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Nil", (Type *) nilType);
     boolType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Bool", (Type *) boolType);
     atomType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Atom", (Type *) atomType);
     stringType = newSimpleType();
-    defineTypeDef(typeEnvironment, "String", (Type *) stringType);
     neverType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Never", (Type *) neverType);
     anyType = newSimpleType();
-    defineTypeDef(typeEnvironment, "Never", (Type *) anyType);
     listTypeDef = createListTypeDef();
-    defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
 
-    FunctorType *printlnType = newFunctorType();
+    printlnType = newFunctorType();
     printlnType->returnType = (Type *) nilType;
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
+
+    initTable(&modules);
+    tableSet(&modules, copyString("time", 4), OBJ_VAL(createTimeModuleType()));
+}
+
+void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
+    defineTypeDef(typeEnvironment, "Number", (Type *) numberType);
+    defineTypeDef(typeEnvironment, "Nil", (Type *) nilType);
+    defineTypeDef(typeEnvironment, "Bool", (Type *) boolType);
+    defineTypeDef(typeEnvironment, "Atom", (Type *) atomType);
+    defineTypeDef(typeEnvironment, "String", (Type *) stringType);
+    defineTypeDef(typeEnvironment, "Never", (Type *) neverType);
+    defineTypeDef(typeEnvironment, "Any", (Type *) anyType);
+    defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
+
     defineLocal(typeEnvironment, "println", (Type *) printlnType);
     defineLocal(typeEnvironment, "print", (Type *) printlnType);
 }
@@ -154,21 +147,10 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
     typeEnvironment->enclosing = currentEnv;
     typeEnvironment->type = type;
-    typeEnvironment->localCount = 0;
-    typeEnvironment->typeDefCount = 0;
+    initTable(&typeEnvironment->locals);
+    initTable(&typeEnvironment->typeDefs);
     typeEnvironment->scopeDepth = 0;
     currentEnv = typeEnvironment;
-
-    TypeLocal *local = &currentEnv->locals[currentEnv->localCount++];
-    local->depth = 0;
-    local->isCaptured = false;
-    if (type != TYPE_FUNCTION) {
-        local->name.start = "this";
-        local->name.length = 4;
-    } else {
-        local->name.start = "";
-        local->name.length = 0;
-    }
 }
 
 struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType) {
@@ -189,15 +171,10 @@ static bool identifiersEqual(Token *a, Token *b) {
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static TypeLocal *resolveLocal(struct TypeEnvironment *typeEnvironment, Token *name) {
-    for (int i = typeEnvironment->localCount - 1; i >= 0; i--) {
-        TypeLocal *local = &typeEnvironment->locals[i];
-        if (identifiersEqual(name, &local->name)) {
-            if (local->depth == -1) {
-                error("Can't read local variable in its own initializer.");
-            }
-            return local;
-        }
+static Type *resolveLocal(struct TypeEnvironment *typeEnvironment, Token *name) {
+    Value valueType;
+    if (tableGet(&typeEnvironment->locals, copyString(name->start, name->length), &valueType)) {
+        return AS_OBJ(valueType);
     }
 
     if (typeEnvironment->enclosing != NULL) {
@@ -207,15 +184,10 @@ static TypeLocal *resolveLocal(struct TypeEnvironment *typeEnvironment, Token *n
     return NULL;
 }
 
-static TypeLocal *resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name) {
-    for (int i = typeEnvironment->typeDefCount - 1; i >= 0; i--) {
-        TypeLocal *local = &typeEnvironment->typeDefs[i];
-        if (identifiersEqual(name, &local->name)) {
-            if (local->depth == -1) {
-                error("Can't read local variable in its own initializer.");
-            }
-            return local;
-        }
+static Type *resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name) {
+    Value valueType;
+    if (tableGet(&typeEnvironment->typeDefs, copyString(name->start, name->length), &valueType)) {
+        return AS_OBJ(valueType);
     }
 
     if (typeEnvironment->enclosing != NULL) {
@@ -230,9 +202,9 @@ static TypeLocal *resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token 
 // Add attributes to types
 // Builtin types will also get added to vm.types
 static Type *getVariableType(Token name) {
-    TypeLocal *arg = resolveLocal(currentEnv, &name);
+    Type *arg = resolveLocal(currentEnv, &name);
     if (arg) {
-        return arg->type;
+        return arg;
     } else {
         errorAt(&name, "Undefined variable");
         return NULL;
@@ -241,9 +213,9 @@ static Type *getVariableType(Token name) {
 
 static Type *getTypeDef(Token name) {
     TypeEnvironment *tenv = currentEnv;
-    TypeLocal *arg = resolveTypeDef(currentEnv, &name);
+    Type *arg = resolveTypeDef(currentEnv, &name);
     if (arg) {
-        return arg->type;
+        return arg;
     } else {
         errorAt(&name, "Undefined type");
         return NULL;
@@ -391,6 +363,31 @@ Type *currentClassType = NULL;
 Type *currentAssignmentType = NULL;
 FunctorType *currentFuncType = NULL;
 
+Type *parseFile(const char *path, int length) {
+    Value cached;
+    if (tableGet(&modules, copyString(path, length), &cached)) {
+        return AS_OBJ(cached);
+    }
+
+    TypeEnvironment *oldEnv = currentEnv;
+    currentEnv = NULL;
+    TypeEnvironment typeEnvironment;
+    initTypeEnvironment(&typeEnvironment, TYPE_SCRIPT);
+    initGlobalEnvironment(&typeEnvironment);
+
+    char *source = readFile(path);
+    StmtArray *body = parseAST(source);
+    evaluateTypes(body);
+
+    SimpleType *type = newSimpleType();
+    copyTable(&typeEnvironment.locals, &type->fields);
+    // TODO: Importing types
+    tableSet(&modules, copyString(path, length), OBJ_VAL(type));
+
+    currentEnv = oldEnv;
+    return type;
+}
+
 Type *evaluateNode(Node *node) {
     if (node == NULL) {
         return NULL;
@@ -452,12 +449,13 @@ Type *evaluateNode(Node *node) {
 
             if (calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
                 errorAt(&casted->paren, "Type is not callable");
-                return(NULL);
+                return (NULL);
             }
 
             FunctorType *calleeFunctor = calleeType;
 
             if (casted->arguments.count > calleeFunctor->arguments.count) {
+                // TODO: Varargs
 //                errorAt(&casted->paren, "Too many arguments provided");
 //                return(NULL);
             }
@@ -537,8 +535,20 @@ Type *evaluateNode(Node *node) {
             return AS_TYPE(fieldType);
         }
         case NODE_SUPER: {
+            struct Super *casted = (struct Super *) node;
             SimpleType *currentClass = (SimpleType *) currentClassType;
-            return currentClass->superType;
+            SimpleType *superType = currentClass->superType;
+
+            Value fieldType;
+
+            if (!tableGet(&superType->methods, copyString(casted->method.start, casted->method.length), &fieldType)) {
+                if (!tableGet(&superType->fields, copyString(casted->method.start, casted->method.length),
+                              &fieldType)) {
+                    errorAt(&casted->method, "Invalid field");
+                }
+            }
+
+            return AS_TYPE(fieldType);
         }
         case NODE_THIS: {
             return currentClassType;
@@ -564,15 +574,12 @@ Type *evaluateNode(Node *node) {
                     Type *argType = evaluateNode((Node *) typeNode);
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
 
-                    TypeLocal typeLocal = {
-                            casted->params.tokens[i],
-                            0,
-                            false,
-                            (Type *) argType,
-                    };
-
-                    currentEnv->locals[currentEnv->localCount] = typeLocal;
-                    currentEnv->localCount++;
+                    tableSet(
+                            &currentEnv->locals, copyString(
+                                    casted->params.parameters[i]->name.start, casted->params.parameters[i]->name.length
+                            ),
+                            OBJ_VAL(argType)
+                    );
                 } else {
                     writeValueArray(&type->arguments, NIL_VAL);
                 }
@@ -624,7 +631,7 @@ Type *evaluateNode(Node *node) {
                 Type *tmp = currentAssignmentType;
                 currentAssignmentType = itemType;
                 for (int i = 0; i < casted->items.count; i++) {
-                    Type* evalType = evaluateNode(casted->items.exprs[i]);
+                    Type *evalType = evaluateNode(casted->items.exprs[i]);
                     if (!isSubType(evalType, itemType)) {
                         errorAt(&casted->bracket, "Type mismatch, incompatible types");
                     }
@@ -644,7 +651,7 @@ Type *evaluateNode(Node *node) {
             Type *varType = evaluateNode((Node *) casted->type);
 
             if (casted->initializer != NULL) {
-                Type* oldAssignmentType = currentAssignmentType;
+                Type *oldAssignmentType = currentAssignmentType;
                 currentAssignmentType = varType;
                 Type *valType = evaluateNode((Node *) casted->initializer);
                 if (varType) {
@@ -657,19 +664,12 @@ Type *evaluateNode(Node *node) {
                 currentAssignmentType = oldAssignmentType;
             }
 
-            TypeLocal typeLocal = {
-                    casted->name,
-                    0,
-                    false,
-                    varType,
-            };
-
-            if (currentEnv->localCount > UINT8_COUNT) {
-                errorAt(&casted->name, "Too many locals");
-            }
-
-            currentEnv->locals[currentEnv->localCount] = typeLocal;
-            currentEnv->localCount++;
+            tableSet(
+                    &currentEnv->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(varType)
+            );
             return NULL;
         }
         case NODE_BLOCK: {
@@ -683,11 +683,11 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);
 
-            Type* oldFuncType = currentFuncType;
+            Type *oldFuncType = currentFuncType;
             FunctorType *type = newFunctorType();
             currentFuncType = type;
             for (int i = 0; i < casted->params.count; i++) {
-                TypeNode *typeNode = casted->paramTypes.typeNodes[i];
+                TypeNode *typeNode = casted->params.parameters[i]->type;
                 Type *argType;
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
@@ -697,15 +697,12 @@ Type *evaluateNode(Node *node) {
 
                 writeValueArray(&type->arguments, OBJ_VAL(argType));
 
-                TypeLocal typeLocal = {
-                        casted->params.tokens[i],
-                        0,
-                        false,
-                        (Type *) argType,
-                };
-
-                currentEnv->locals[currentEnv->localCount] = typeLocal;
-                currentEnv->localCount++;
+                tableSet(
+                        &currentEnv->locals, copyString(
+                                casted->params.parameters[i]->name.start, casted->params.parameters[i]->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
 
             }
 
@@ -717,15 +714,12 @@ Type *evaluateNode(Node *node) {
 
             currentEnv = currentEnv->enclosing;
 
-            TypeLocal typeLocal = {
-                    casted->name,
-                    0,
-                    false,
-                    (Type *) type,
-            };
-
-            currentEnv->locals[currentEnv->localCount] = typeLocal;
-            currentEnv->localCount++;
+            tableSet(
+                    &currentEnv->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(type)
+            );
 
             currentFuncType = oldFuncType;
             return (Type *) type;
@@ -737,28 +731,34 @@ Type *evaluateNode(Node *node) {
             Type *oldClass = currentClassType;
             currentClassType = (Type *) classType;
             FunctorType *classFunctionType = newFunctorType();
-            for (int j = 0; j < casted->body.count; j++) {
 
+            classType->superType = NULL;
+
+            if (casted->superclass) {
+                SimpleType *superType = getTypeDef(casted->superclass->name);
+                copyTable(&superType->fields, &classType->fields);
+                copyTable(&superType->methods, &classType->methods);
+                classType->superType = (Type *) superType;
+            }
+
+            for (int j = 0; j < casted->body.count; j++) {
                 if (casted->body.stmts[j]->self.type == NODE_FUNCTION) {
                     struct Function *method = (struct Function *) casted->body.stmts[j];
                     TypeEnvironment typeEnv;
                     initTypeEnvironment(&typeEnv, method->functionType);
 
-                    TypeLocal typeLocal = {
-                            syntheticToken("this"),
-                            0,
-                            false,
-                            (Type *) classType,
-                    };
-
-                    typeEnv.locals[currentEnv->localCount] = typeLocal;
-                    typeEnv.localCount++;
+                    tableSet(
+                            &currentEnv->locals, copyString(
+                                    "this", 4
+                            ),
+                            OBJ_VAL(classType)
+                    );
 
                     FunctorType *type = newFunctorType();
                     FunctorType *oldFuncType = currentFuncType;
                     currentFuncType = type;
-                    for (int i = 0; i < method->paramTypes.count; i++) {
-                        TypeNode *typeNode = method->paramTypes.typeNodes[i];
+                    for (int i = 0; i < method->params.count; i++) {
+                        TypeNode *typeNode = method->params.parameters[i]->type;
                         Type *argType;
                         if (typeNode != NULL) {
                             argType = evaluateNode((Node *) typeNode);
@@ -768,15 +768,13 @@ Type *evaluateNode(Node *node) {
 
                         writeValueArray(&type->arguments, OBJ_VAL(argType));
 
-                        TypeLocal typeLocal = {
-                                method->params.tokens[i],
-                                0,
-                                false,
-                                (Type *) argType,
-                        };
-
-                        typeEnv.locals[currentEnv->localCount] = typeLocal;
-                        typeEnv.localCount++;
+                        tableSet(
+                                &currentEnv->locals, copyString(
+                                        method->params.parameters[i]->name.start,
+                                        method->params.parameters[i]->name.length
+                                ),
+                                OBJ_VAL(argType)
+                        );
 
                     }
 
@@ -816,34 +814,22 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            classType->superType = NULL;
-
-            if (casted->superclass) {
-                classType->superType = getTypeDef(casted->superclass->name);
-            }
-
             classFunctionType->returnType = (Type *) classType;
 
-            TypeLocal typeFuncLocal = {
-                    casted->name,
-                    0,
-                    false,
-                    (Type *) classFunctionType,
-            };
-
-            currentEnv->locals[currentEnv->localCount] = typeFuncLocal;
-            currentEnv->localCount++;
+            tableSet(
+                    &currentEnv->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(classFunctionType)
+            );
 
 
-            TypeLocal typeDefLocal = {
-                    casted->name,
-                    0,
-                    false,
-                    (Type *) classFunctionType,
-            };
-
-            currentEnv->typeDefs[currentEnv->typeDefCount] = typeDefLocal;
-            currentEnv->typeDefCount++;
+            tableSet(
+                    &currentEnv->typeDefs, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(classType)
+            );
 
             currentClassType = oldClass;
             return (Type *) classType;
@@ -874,7 +860,7 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
-            Type* value = evaluateNode((Node *) casted->value);
+            Type *value = evaluateNode((Node *) casted->value);
             if (currentFuncType->returnType) {
                 if (!isSubType(value, currentFuncType->returnType)) {
                     errorAt(&casted->keyword, "Return type mismatch");
@@ -882,52 +868,24 @@ Type *evaluateNode(Node *node) {
             } else {
                 currentFuncType->returnType = value;
             }
-            FunctorType* current = currentFuncType;
             return value;
         }
         case NODE_IMPORT: {
             struct Import *casted = (struct Import *) node;
+            struct Literal *expr = casted->expression;
+            ObjString *str = AS_STRING(expr->value);
+            Type *type = parseFile(str->chars, str->length);
+            tableSet(
+                    &currentEnv->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(type)
+            );
+            // TODO: Make this actually read the targeted file
+            // Don't just accept an expr, accept a string or cast to string literal
+            // Also support builtins
 
-//            TypeEnvironment typeEnv;
-//            initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
-//
-//            SimpleType *type = newSimpleType();
-//            for (int i = 0; i < casted->params.count; i++) {
-//                TypeNode *typeNode = casted->paramTypes.typeNodes[i];
-//                if (typeNode != NULL) {
-//                    Type *argType = evaluateNode((Node *) typeNode);
-//                    writeValueArray(&type->arguments, OBJ_VAL(argType));
-//
-//                    TypeLocal typeLocal = {
-//                            casted->params.tokens[i],
-//                            0,
-//                            false,
-//                            (Type *) argType,
-//                    };
-//
-//                    currentEnv->locals[currentEnv->localCount] = typeLocal;
-//                    currentEnv->localCount++;
-//                } else {
-//                    writeValueArray(&type->arguments, NIL_VAL);
-//                }
-//            }
-//
-//            type->returnType = evaluateNode((Node *) casted->returnType);
-//            evaluateTypes(&casted->body);
-//
-//            currentEnv = currentEnv->enclosing;
-//
-//            TypeLocal typeLocal = {
-//                    casted->name,
-//                    0,
-//                    false,
-//                    (Type *) type,
-//            };
-//
-//            currentEnv->locals[currentEnv->localCount] = typeLocal;
-//            currentEnv->localCount++;
-//
-//            return (Type *) type;
+
 
             return NULL;
         }
@@ -958,7 +916,8 @@ Type *evaluateNode(Node *node) {
                 genericType->target = type;
 
                 for (int i = 0; i < casted->generics.count; i++) {
-                    writeValueArray(&genericType->generics, OBJ_VAL(evaluateNode(casted->generics.typeNodes[i])));
+                    Type *arg = evaluateNode(casted->generics.typeNodes[i]);
+                    writeValueArray(&genericType->generics, OBJ_VAL(arg));
                 }
                 return genericType;
             }
@@ -1036,12 +995,8 @@ void markType(Type *type) {
 void markTypecheckerRoots() {
     TypeEnvironment *typeEnvironment = currentEnv;
     while (typeEnvironment != NULL) {
-        for (int i = 0; i < typeEnvironment->localCount; i++) {
-            markObject((Obj *) typeEnvironment->locals[i].type);
-        }
-        for (int i = 0; i < typeEnvironment->typeDefCount; i++) {
-            markObject((Obj *) typeEnvironment->typeDefs[i].type);
-        }
+        markTable(&typeEnvironment->locals);
+        markTable(&typeEnvironment->typeDefs);
         typeEnvironment = typeEnvironment->enclosing;
     }
 }

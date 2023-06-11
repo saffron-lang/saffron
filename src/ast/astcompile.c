@@ -550,8 +550,8 @@ void compileNode(Node *node) {
             beginScope();
 
             for (int i = 0; i < casted->params.count; i++) {
-                declareVariable(&casted->params.tokens[i]);
-                int constant = identifierConstant(&casted->params.tokens[i]);
+                declareVariable(&casted->params.parameters[i]->name);
+                int constant = identifierConstant(&casted->params.parameters[i]->name);
                 defineVariable(constant);
             }
 
@@ -610,8 +610,8 @@ void compileNode(Node *node) {
             beginScope();
 
             for (int i = 0; i < casted->params.count; i++) {
-                declareVariable(&casted->params.tokens[i]);
-                uint8_t constant = identifierConstant(&casted->params.tokens[i]);
+                declareVariable(&casted->params.parameters[i]->name);
+                uint8_t constant = identifierConstant(&casted->params.parameters[i]->name);
                 defineVariable(constant);
             }
 

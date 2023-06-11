@@ -471,8 +471,8 @@ static TypeNode *typeAnnotation();
 
 static Expr *anonFunction(bool canAssign) {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after fun keyword.");
-    TokenArray tokens;
-    initTokenArray(&tokens);
+    ParameterArray params;
+    initParameterArray(&params);
 
     TypeNodeArray types;
     initTypeNodeArray(&types);
@@ -485,10 +485,15 @@ static Expr *anonFunction(bool canAssign) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
             Token name = parseVariable("Expect parameter name.");
-            writeTokenArray(&tokens, name, name.line);
+            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+
+            param->self.name = name;
+            writeParameterArray(&params, param);
 
             if (match(TOKEN_COLON)) {
-                writeTypeNodeArray(&types, typeAnnotation());
+                TypeNode* typeNode = typeAnnotation();
+                writeTypeNodeArray(&types, typeNode);
+                param->self.type = typeNode;
             } else {
                 writeTypeNodeArray(&types, NULL);
             }
@@ -506,7 +511,7 @@ static Expr *anonFunction(bool canAssign) {
     struct Block *bl = (struct Block *) block();
     struct Lambda *result = ALLOCATE_NODE(struct Lambda, NODE_LAMBDA);
     result->body = bl->statements;
-    result->params = tokens;
+    result->params = params;
     result->self.type = (TypeNode *) initFunctor(types, returnType);
     return result;
 }
@@ -544,8 +549,8 @@ static Stmt *block() {
 static struct Function *function(FunctionType type) {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
 
-    TokenArray tokens;
-    initTokenArray(&tokens);
+    ParameterArray params;
+    initParameterArray(&params);
 
     TypeNodeArray types;
     initTypeNodeArray(&types);
@@ -558,10 +563,15 @@ static struct Function *function(FunctionType type) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
             Token name = parseVariable("Expect parameter name.");
-            writeTokenArray(&tokens, name, name.line);
+            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+
+            param->self.name = name;
+            writeParameterArray(&params, param);
 
             if (match(TOKEN_COLON)) {
-                writeTypeNodeArray(&types, typeAnnotation());
+                TypeNode* typeNode = typeAnnotation();
+                writeTypeNodeArray(&types, typeNode);
+                param->self.type = typeNode;
             } else {
                 writeTypeNodeArray(&types, NULL);
             }
@@ -579,8 +589,7 @@ static struct Function *function(FunctionType type) {
     struct Block *body = (struct Block *) block();
     struct Function *result = ALLOCATE_NODE(struct Function, NODE_FUNCTION);
     result->body = body->statements;
-    result->params = tokens;
-    result->paramTypes = types;
+    result->params = params;
     result->functionType = type;
     result->returnType = returnType;
     return result;
@@ -646,6 +655,7 @@ static TypeNode *typeAnnotation() {
             if (match(TOKEN_LESS)) {
                 struct Simple *target = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
                 target->name = name;
+                initTypeNodeArray(&target->generics);
 
                 do {
                     TypeNode *argument = typeAnnotation();
@@ -657,6 +667,7 @@ static TypeNode *typeAnnotation() {
             } else {
                 struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
                 result->name = name;
+                initTypeNodeArray(&result->generics);
                 leftType = (TypeNode *) result;
             }
         }
@@ -688,6 +699,7 @@ static Stmt *varDeclaration(AssignmentType assignmentType) {
 
     if (!type && !value) {
         errorAtCurrent("Var without initializer must provide a type!"); // TODO: Not require this
+        return NULL;
     }
 
     match(TOKEN_SEMICOLON);
@@ -735,9 +747,11 @@ static Stmt *forStatement() {
 static Stmt *importStatement() {
     consume(TOKEN_STRING, "Expect '\"' after import.");
     Expr *s = string(false);
-    match(TOKEN_SEMICOLON);
     struct Import *result = ALLOCATE_NODE(struct Import, NODE_IMPORT);
     result->expression = s;
+    consume(TOKEN_AS, "Expect 'as' after import path.");
+    result->name = parseVariable("Expect name after 'as' in import.");
+    match(TOKEN_SEMICOLON);
     return result;
 }
 
