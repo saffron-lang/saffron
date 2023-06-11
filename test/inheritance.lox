@@ -9,6 +9,10 @@ class Doughnut {
     println("Dunk in the fryer.");
     this.finish("sprinkles");
   }
+
+  errorable!() {
+    println("wowsers!");
+  }
 }
 
 var b = Doughnut();

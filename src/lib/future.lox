@@ -1,7 +1,7 @@
 class Future {
     var result: Any
 
-    init(a: String) {
+    init() {
         this.result = nil
     }
 
