@@ -107,6 +107,10 @@ static bool isDigit(char c) {
     return c >= '0' && c <= '9';
 }
 
+static bool isNameMod(char c) {
+    return c == '?' || c == '!';
+}
+
 static Token number() {
     while (isDigit(peek())) advance();
 
@@ -212,11 +216,15 @@ static TokenType identifierType() {
 
 static Token atom() {
     while (isAlpha(peek()) || isDigit(peek())) advance();
+    if (isNameMod(peek())) advance();
+
     return makeToken(TOKEN_ATOM);
 }
 
 static Token identifier() {
     while (isAlpha(peek()) || isDigit(peek())) advance();
+    if (isNameMod(peek())) advance();
+
     return makeToken(identifierType());
 }
 
