@@ -287,9 +287,10 @@ static ExprArray argumentList() {
 }
 
 static Expr *call(Expr *left, bool canAssign) {
+    Token paren = parser.previous;
     ExprArray arguments = argumentList();
     struct Call *result = ALLOCATE_NODE(struct Call, NODE_CALL);
-    result->paren = parser.previous;
+    result->paren = paren;
     result->arguments = arguments;
     result->callee = left;
     return (Expr *) result;
@@ -305,11 +306,19 @@ static Expr *getItem(Expr *left, bool canAssign) {
 }
 
 static Expr *pipeCall(Expr *left, bool canAssign) {
-    Expr *expr = parsePrecedence(PREC_ASSIGNMENT + 1);
-    struct Binary *result = ALLOCATE_NODE(struct Binary, NODE_BINARY);
-    result->operator = parser.previous;
-    result->right = expr;
-    result->left = left;
+    struct Call *result = (struct Call *) parsePrecedence(PREC_ASSIGNMENT);
+    if (result->self.self.type != NODE_CALL) {
+        errorAtCurrent("Expected functional call after pipe operator!");
+        return NULL;
+    }
+
+    writeExprArray(&result->arguments, NULL);
+
+    // Move arguments to the right one
+    for (int i = 0; i < result->arguments.count - 1; i++) {
+        result->arguments.exprs[i + 1] = result->arguments.exprs[i];
+    }
+    result->arguments.exprs[0] = left;
     return (Expr *) result;
 }
 
@@ -486,7 +495,7 @@ static Expr *anonFunction(bool canAssign) {
 
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
 
-    TypeNode* returnType = NULL;
+    TypeNode *returnType = NULL;
     if (match(TOKEN_COLON)) {
         returnType = typeAnnotation();
     }
@@ -675,6 +684,10 @@ static Stmt *varDeclaration(AssignmentType assignmentType) {
         value = expression();
     }
 
+    if (!type && !value) {
+        errorAtCurrent("Var without initializer must provide a type!"); // TODO: Not require this
+    }
+
     match(TOKEN_SEMICOLON);
 
     struct Var *var = ALLOCATE_NODE(struct Var, NODE_VAR);
@@ -744,7 +757,7 @@ static Stmt *returnStatement() {
 }
 
 static Stmt *statement() {
-    Stmt* result;
+    Stmt *result;
     if (match(TOKEN_IF)) {
         result = ifStatement();
     } else if (match(TOKEN_RETURN)) {
