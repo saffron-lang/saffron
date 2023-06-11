@@ -49,6 +49,9 @@ typedef enum {
     NODE_BREAK,
     NODE_RETURN,
     NODE_IMPORT,
+    NODE_POSITIONAL,
+    NODE_KEYWORD,
+    NODE_VARIADIC,
 } NodeType;
 
 typedef struct {
@@ -102,6 +105,20 @@ typedef struct {
 void initStmtArray(StmtArray* stmtArray);
 void writeStmtArray(StmtArray * stmtArray, Stmt* stmt);
 void freeStmtArray(StmtArray * stmtArray);
+
+typedef struct {
+    Node self;
+} Parameter;
+
+typedef struct {
+    int count;
+    int capacity;
+    Parameter** parameters;
+} ParameterArray;
+
+void initParameterArray(ParameterArray* parameterArray);
+void writeParameterArray(ParameterArray * parameterArray, Parameter* parameter);
+void freeParameterArray(ParameterArray * parameterArray);
 
 struct Simple {
     TypeNode self;
@@ -208,13 +225,14 @@ struct Yield {
 
 struct Lambda {
     Expr self;
-    TokenArray params;
+    ParameterArray params;
     StmtArray body;
 };
 
 struct List {
     Expr self;
     ExprArray items;
+    Token bracket;
 };
 
 struct Expression {
@@ -238,8 +256,7 @@ struct Block {
 struct Function {
     Stmt self;
     Token name;
-    TokenArray params;
-    TypeNodeArray paramTypes;
+    ParameterArray params;
     StmtArray body;
     FunctionType functionType;
     TypeNode *returnType;
@@ -287,6 +304,25 @@ struct Return {
 struct Import {
     Stmt self;
     Expr* expression;
+};
+
+struct Positional {
+    Parameter self;
+    Token name;
+    TypeNode* type;
+};
+
+struct Keyword {
+    Parameter self;
+    Token name;
+    TypeNode* type;
+    Expr* default_;
+};
+
+struct Variadic {
+    Parameter self;
+    Token name;
+    TypeNode* type;
 };
 
 #endif //CRAFTING_INTERPRETERS_AST_H

@@ -157,6 +157,7 @@ static Expr *list(bool canAssign) {
     uint8_t argCount = 0;
     ExprArray items;
     initExprArray(&items);
+    Token bracket = parser.previous;
     if (!check(TOKEN_RIGHT_BRACKET)) {
         do {
             if (parser.current.type == TOKEN_RIGHT_BRACKET) {
@@ -170,6 +171,7 @@ static Expr *list(bool canAssign) {
     consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list items.");
 
     struct List *result = ALLOCATE_NODE(struct List, NODE_LIST);
+    result->bracket = bracket;
     result->items = items;
     return result;
 }

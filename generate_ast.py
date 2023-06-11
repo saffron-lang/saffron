@@ -16,8 +16,8 @@ exprs = [
     "Super    : Token keyword, Token method",
     "This     : Token keyword",
     "Yield    : Expr* expression",
-    "Lambda   : TokenArray params, StmtArray body",
-    "List     : ExprArray items",
+    "Lambda   : ParameterArray params, StmtArray body",
+    "List     : ExprArray items, Token bracket",
     # "Arguments: Expr* items",
     # "Parameters: "
 ]
@@ -27,7 +27,7 @@ stmts = [
     "Expression : Expr* expression",
     "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
-    "Function   : Token name, TokenArray params, TypeNodeArray paramTypes," +
+    "Function   : Token name, ParameterArray params," +
     " StmtArray body, FunctionType functionType, TypeNode *returnType",
     "Class      : Token name, struct Variable* superclass," +
     " StmtArray body",
@@ -47,11 +47,18 @@ type_items = [
     "Union    : TypeNode* left, TypeNode* right"
 ]
 
+param_types = [
+    "Parameter  : Node self",
+    "Positional : Token name, TypeNode* type",
+    "Keyword    : Token name, TypeNode* type, Expr* default_",
+    "Variadic   : Token name, TypeNode* type",
+]
+
 # TODO: Argument list, etc
 
 capfirst = lambda x: x[0].upper() + x[1:]
 
-types = dict(typeNode=type_items, expr=exprs, stmt=stmts)
+types = dict(typeNode=type_items, expr=exprs, stmt=stmts, parameter=param_types)
 
 file = open("src/ast/ast.c", "w")
 with redirect_stdout(file):

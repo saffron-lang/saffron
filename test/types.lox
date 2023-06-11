@@ -2,3 +2,5 @@ var a: Number = 5
 var b: String | Number = "asd"
 var d: Atom = :asd
 var c: (Number) => Number = fun (x: Number): Number => { return x + 1; }
+var l: List<List<Number>> = [[1,2],[3,4]]
+println(l[1])
