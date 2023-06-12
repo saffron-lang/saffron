@@ -1,16 +1,8 @@
 var SLEEP = 1;
 
-fun join(future) {
-    while (!future.isReady()) {
-        yield;
-    }
-
-    return future.getResult();
-}
-
-fun function2(x) {
+fun function2(x: Number) {
     yield [SLEEP, x];
-    println("Slept ", x, " seconds");
+    println("Slept ", x);
     return true;
 }
 
@@ -19,16 +11,16 @@ fun finish() {
     var r = yield;
 
     println("resumed with ", r);
-    spawn(function2, 1);
-    spawn(function2, 2);
-    spawn(function2, 3);
-    var future = spawn(function2, 4);
+    spawn(fun () => function2(1))
+    spawn(fun () => function2(2))
+    spawn(fun () => function2(3))
+    var future = spawn(fun () => function2(4))
 
     println(future);
-    println("Future is done: ", future.isReady());
-    join(future);
-    println("Future is done: ", future.isReady());
-    println("Future result: ", future.getResult());
+    // println("Future is done: ", future.isReady());
+    // join(future);
+    // println("Future is done: ", future.isReady());
+    // println("Future result: ", future.getResult());
 
     return " ok!";
 }

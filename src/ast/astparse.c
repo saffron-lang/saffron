@@ -507,8 +507,22 @@ static Expr *anonFunction(bool canAssign) {
         returnType = typeAnnotation();
     }
     consume(TOKEN_ARROW, "Expect '=>' after parameters.");
-    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
-    struct Block *bl = (struct Block *) block();
+    struct Block *bl;
+    if (match(TOKEN_LEFT_BRACE)) {
+        bl = (struct Block *) block();
+    } else {
+        Expr *expr = expression();
+
+        struct Return *returnNode = ALLOCATE_NODE(struct Return, NODE_RETURN);
+        returnNode->value = expr;
+
+        StmtArray stmts;
+        initStmtArray(&stmts);
+        writeStmtArray(&stmts, (Stmt *) returnNode);
+
+        bl = ALLOCATE_NODE(struct Block, NODE_BLOCK);
+        bl->statements = stmts;
+    }
     struct Lambda *result = ALLOCATE_NODE(struct Lambda, NODE_LAMBDA);
     result->body = bl->statements;
     result->params = params;

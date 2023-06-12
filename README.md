@@ -13,6 +13,8 @@
 - Sensible syntax for piping with higher arity
   - Maybe something to do with currying?
 - Statements as expressions
+- Int and Float separation
+- Arbitrary size ints?
 
 ## Contributing Workflow
 
