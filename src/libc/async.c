@@ -7,6 +7,11 @@
 AsyncHandler asyncHandler;
 
 Value spawnNative(int argCount, Value *args) {
+    if (!IS_CLOSURE(args[0])) {
+        runtimeError("Invalid argument for parameter 0, expect a function");
+        return NIL_VAL;
+    }
+
     ObjClosure *closure = AS_CLOSURE(args[0]);
 
     ObjCallFrame *frame = ALLOCATE_OBJ(ObjCallFrame, OBJ_CALL_FRAME);
@@ -18,10 +23,7 @@ Value spawnNative(int argCount, Value *args) {
     frame->stored = NIL_VAL;
 
     initValueArray(&frame->stack);
-//    printf("EPIC ARGCOUNT, %d\n", argCount);
-    for (int i = 0; i < argCount; i++) {
-        writeValueArray(&frame->stack, args[i]);
-    }
+    writeValueArray(&frame->stack, args[0]);
 
     frame->result = NIL_VAL;
     frame->parent = NULL;

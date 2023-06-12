@@ -108,6 +108,7 @@ SimpleType *neverType;
 SimpleType *anyType;
 SimpleType *listTypeDef;
 FunctorType *printlnType;
+FunctorType *spawnType;
 
 Table modules;
 
@@ -126,6 +127,13 @@ void makeTypes() {
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
 
+    spawnType = newFunctorType();
+    spawnType->returnType = (Type *) nilType;
+    FunctorType *spawnArgType = newFunctorType();
+
+    spawnArgType->returnType = (Type *) anyType;
+    writeValueArray(&spawnType->arguments, OBJ_VAL(spawnArgType));
+
     initTable(&modules);
     tableSet(&modules, copyString("time", 4), OBJ_VAL(createTimeModuleType()));
 }
@@ -142,6 +150,7 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
 
     defineLocal(typeEnvironment, "println", (Type *) printlnType);
     defineLocal(typeEnvironment, "print", (Type *) printlnType);
+    defineLocal(typeEnvironment, "spawn", (Type *) spawnType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
@@ -206,6 +215,7 @@ static Type *getVariableType(Token name) {
     if (arg) {
         return arg;
     } else {
+        TypeEnvironment* tenv = currentEnv;
         errorAt(&name, "Undefined variable");
         return NULL;
     }
@@ -454,7 +464,7 @@ Type *evaluateNode(Node *node) {
 
             FunctorType *calleeFunctor = calleeType;
 
-            if (casted->arguments.count > calleeFunctor->arguments.count) {
+            if (casted->arguments.count != calleeFunctor->arguments.count) {
                 // TODO: Varargs
 //                errorAt(&casted->paren, "Too many arguments provided");
 //                return(NULL);
