@@ -109,6 +109,7 @@ SimpleType *anyType;
 SimpleType *listTypeDef;
 FunctorType *printlnType;
 FunctorType *spawnType;
+SimpleType *taskTypeDef;
 
 Table modules;
 
@@ -127,13 +128,26 @@ void makeTypes() {
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
     writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
 
+    // Tasks
+    taskTypeDef = (SimpleType *) newSimpleType();
+
+    FunctorType *isReady = newFunctorType();
+    FunctorType *getResult = newFunctorType();
+
+    isReady->returnType = (Type *) boolType;
+    getResult->returnType = (Type *) anyType;
+    tableSet(&taskTypeDef->methods, copyString("isReady", 7), OBJ_VAL(isReady));
+    tableSet(&taskTypeDef->methods, copyString("getResult", 9), OBJ_VAL(getResult));
+
+    // Spawn
     spawnType = newFunctorType();
-    spawnType->returnType = (Type *) nilType;
+    spawnType->returnType = (Type *) taskTypeDef;
     FunctorType *spawnArgType = newFunctorType();
 
     spawnArgType->returnType = (Type *) anyType;
     writeValueArray(&spawnType->arguments, OBJ_VAL(spawnArgType));
 
+    // Time
     initTable(&modules);
     tableSet(&modules, copyString("time", 4), OBJ_VAL(createTimeModuleType()));
 }
@@ -146,6 +160,7 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "String", (Type *) stringType);
     defineTypeDef(typeEnvironment, "Never", (Type *) neverType);
     defineTypeDef(typeEnvironment, "Any", (Type *) anyType);
+    defineTypeDef(typeEnvironment, "Task", (Type *) taskTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
 
     defineLocal(typeEnvironment, "println", (Type *) printlnType);

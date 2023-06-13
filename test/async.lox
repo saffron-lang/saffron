@@ -7,7 +7,7 @@ fun function2(x: Number) {
 }
 
 fun finish() {
-    var x = "First print";
+    var x = "First print"
     var r = yield;
 
     println("resumed with ", r);
@@ -15,15 +15,14 @@ fun finish() {
     spawn(fun () => function2(2))
     spawn(fun () => function2(3))
     var future = spawn(fun () => function2(4))
+    println(future, "wow!")
 
-    println(future);
-    // println("Future is done: ", future.isReady());
-    // join(future);
-    // println("Future is done: ", future.isReady());
-    // println("Future result: ", future.getResult());
+    println("Future is done: ", future.isReady())
+    println("Future is done: ", future.isReady())
+    println("Future result: ", future.getResult())
 
     return " ok!";
 }
 
-var gen = finish();
-println("Function returned", gen);
+var gen = finish()
+println("Function returned", gen)
