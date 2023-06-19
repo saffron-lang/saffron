@@ -34,6 +34,8 @@ typedef struct ClassCompiler {
 
 ClassCompiler *currentClass = NULL;
 Compiler *current = NULL;
+bool exprContext = false;
+bool lastInBody = false;
 
 static Chunk *currentChunk() {
     return &current->function->chunk;
@@ -343,6 +345,21 @@ void compileTree(StmtArray *statements) {
         compileNode((Node *) statements->stmts[i]);
     }
 }
+void compileBlock(StmtArray *statements) {
+    if (statements == NULL) {
+        return;
+    }
+
+    bool oldLast = lastInBody;
+    lastInBody = false;
+    for (int i = 0; i < statements->count; i++) {
+        if (i == statements->count) {
+            lastInBody = true;
+        }
+        compileNode((Node *) statements->stmts[i]);
+    }
+    lastInBody = oldLast;
+}
 
 
 ObjFunction *compile(StmtArray *body) {
@@ -555,7 +572,10 @@ void compileNode(Node *node) {
                 defineVariable(constant);
             }
 
+            bool oldContext = exprContext;
+            exprContext = false;
             compileTree(&casted->body);
+            exprContext = oldContext;
 
             ObjFunction *function = endCompiler();
             function->arity = casted->params.count;
@@ -575,8 +595,14 @@ void compileNode(Node *node) {
         }
         case NODE_EXPRESSION: {
             struct Expression *casted = (struct Expression *) node;
+            bool oldContext = exprContext;
+            exprContext = true;
             compileNode((Node *) casted->expression);
-            emitByte(OP_POP);
+            exprContext = oldContext;
+
+            if (!lastInBody) {
+                emitByte(OP_POP);
+            }
             break;
         }
         case NODE_VAR: {
@@ -687,14 +713,25 @@ void compileNode(Node *node) {
 
             int thenJump = emitJump(OP_JUMP_IF_FALSE);
             emitByte(OP_POP);
+
+            bool oldLast = lastInBody;
+            lastInBody = true;
             compileNode((Node *) casted->thenBranch);
+            lastInBody = oldLast;
 
             int elseJump = emitJump(OP_JUMP);
             patchJump(thenJump);
             emitByte(OP_POP);
 
             if (casted->elseBranch) {
-                compileNode((Node *) casted->thenBranch);
+                bool oldLast = lastInBody;
+                lastInBody = true;
+                compileNode((Node *) casted->elseBranch);
+                lastInBody = oldLast;
+            } else {
+                if (exprContext) {
+                    emitByte(OP_NIL);
+                }
             }
             patchJump(elseJump);
             break;

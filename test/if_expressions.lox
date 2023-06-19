@@ -1,15 +1,9 @@
-import "time"
-
-if (true) {
-    3
-    -4
-} else if (false) {
-    4
+var a = if (false) {
+    11
+} else if (true) {
+    13
 } else {
-    5
+    16
 }
 
-fun a() {
-    return
-    512
-}
+println(a)
