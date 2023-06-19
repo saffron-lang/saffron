@@ -27,7 +27,7 @@ static void runFile(const char *path) {
     StmtArray* body = parseAST(source);
     makeTypes();
     evaluateTree(body);
-//    printTree(body);
+    printTree(body);
 //    astUnparse(body);
     ObjModule* module = interpret(body, "<script>", path);
     free(source);

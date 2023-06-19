@@ -230,7 +230,7 @@ static Type *getVariableType(Token name) {
     if (arg) {
         return arg;
     } else {
-        TypeEnvironment* tenv = currentEnv;
+        TypeEnvironment *tenv = currentEnv;
         errorAt(&name, "Undefined variable");
         return NULL;
     }
@@ -366,6 +366,16 @@ Type *getTypeOf(Value value) {
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
         evaluateNode((Node *) statements->stmts[i]);
+    }
+}
+
+Type *evaluateBlock(StmtArray *statements) {
+    for (int i = 0; i < statements->count; i++) {
+        if (i == statements->count) {
+            return evaluateNode((Node *) statements->stmts[i]);
+        } else {
+            evaluateNode((Node *) statements->stmts[i]);
+        }
     }
 }
 
@@ -668,8 +678,7 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_EXPRESSION: {
             struct Expression *casted = (struct Expression *) node;
-            evaluateNode((Node *) casted->expression);
-            break;
+            return evaluateNode((Node *) casted->expression);
         }
         case NODE_VAR: {
             struct Var *casted = (struct Var *) node;
@@ -699,8 +708,7 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_BLOCK: {
             struct Block *casted = (struct Block *) node;
-            evaluateTypes(&casted->statements);
-            return NULL;
+            return evaluateBlock(&casted->statements);
         }
         case NODE_FUNCTION: {
             struct Function *casted = (struct Function *) node;
@@ -862,9 +870,9 @@ Type *evaluateNode(Node *node) {
         case NODE_IF: {
             struct If *casted = (struct If *) node;
             evaluateNode((Node *) casted->condition);
-            evaluateNode((Node *) casted->thenBranch);
+            Type *result = evaluateNode((Node *) casted->thenBranch);
             evaluateNode((Node *) casted->elseBranch);
-            return NULL;
+            return result;
         }
         case NODE_WHILE: {
             struct While *casted = (struct While *) node;

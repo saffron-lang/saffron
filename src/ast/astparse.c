@@ -19,11 +19,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+bool beginBody = false;
 
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT,  // =
-    PREC_YIELD,       // yield |>
+    PREC_YIELD,       // yield
     PREC_OR,          // or
     PREC_AND,         // and
     PREC_EQUALITY,    // == !=
@@ -123,6 +124,8 @@ static bool match(TokenType type) {
 
 static Stmt *statement();
 
+static Stmt *ifStatement();
+
 static Stmt *declaration();
 
 static Expr *expression();
@@ -211,11 +214,13 @@ static bool identifiersEqual(Token *a, Token *b) {
 
 static Expr *variable(bool canAssign) {
     Token name = parser.previous;
-    Token next = parser.current;
+
     if (canAssign && match(TOKEN_EQUAL)) {
         struct Assign *var = ALLOCATE_NODE(struct Assign, NODE_ASSIGN);
         var->name = name;
+
         var->value = expression();
+
         return (Expr *) var;
     } else {
         struct Variable *var = ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
@@ -409,7 +414,7 @@ ParseRule parseRules[] = {
         [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
         [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
-        [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
+        [TOKEN_IF]            = {ifStatement, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL, or_, PREC_OR},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
@@ -439,9 +444,6 @@ static Expr *parsePrecedence(Precedence precedence) {
 
     bool canAssign = precedence <= PREC_ASSIGNMENT;
     Expr *result = prefixRule(canAssign);
-
-    Token last = parser.previous;
-    Token current = parser.current;
 
     while (precedence <= getRule(parser.current.type)->precedence) {
         advance();
@@ -491,7 +493,7 @@ static Expr *anonFunction(bool canAssign) {
             writeParameterArray(&params, param);
 
             if (match(TOKEN_COLON)) {
-                TypeNode* typeNode = typeAnnotation();
+                TypeNode *typeNode = typeAnnotation();
                 writeTypeNodeArray(&types, typeNode);
                 param->self.type = typeNode;
             } else {
@@ -507,6 +509,7 @@ static Expr *anonFunction(bool canAssign) {
         returnType = typeAnnotation();
     }
     consume(TOKEN_ARROW, "Expect '=>' after parameters.");
+
     struct Block *bl;
     if (match(TOKEN_LEFT_BRACE)) {
         bl = (struct Block *) block();
@@ -531,10 +534,13 @@ static Expr *anonFunction(bool canAssign) {
 }
 
 static Expr *expression() {
+    Expr *result;
     if (match(TOKEN_FUN)) {
-        return anonFunction(false);
+        result = anonFunction(false);
+    } else {
+        result = parsePrecedence(PREC_ASSIGNMENT);
     }
-    return parsePrecedence(PREC_ASSIGNMENT);
+    return result;
 }
 
 static Stmt *expressionStatement() {
@@ -583,7 +589,7 @@ static struct Function *function(FunctionType type) {
             writeParameterArray(&params, param);
 
             if (match(TOKEN_COLON)) {
-                TypeNode* typeNode = typeAnnotation();
+                TypeNode *typeNode = typeAnnotation();
                 writeTypeNodeArray(&types, typeNode);
                 param->self.type = typeNode;
             } else {
@@ -788,9 +794,10 @@ static Stmt *returnStatement() {
 
 static Stmt *statement() {
     Stmt *result;
-    if (match(TOKEN_IF)) {
-        result = ifStatement();
-    } else if (match(TOKEN_RETURN)) {
+    // if (match(TOKEN_IF)) {
+    //        result = ifStatement();
+    //    } else
+    if (match(TOKEN_RETURN)) {
         result = returnStatement();
     } else if (match(TOKEN_WHILE)) {
         result = whileStatement();

@@ -1,3 +1,5 @@
+var a = if (true) 5 else 6
+
 fun add_one(x: Number) {
     return x + 1
 }
@@ -22,4 +24,3 @@ var a = fun () => {
 println(a());
 println(:atom == "atom");
 println(:atom == :atom);
-

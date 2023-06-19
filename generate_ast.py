@@ -24,7 +24,7 @@ exprs = [
 
 stmts = [
     "Stmt       : Node self",
-    "Expression : Expr* expression",
+    "Expression : Expr* expression, TypeNode* type",
     "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
     "Function   : Token name, ParameterArray params," +

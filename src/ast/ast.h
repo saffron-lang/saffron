@@ -240,6 +240,7 @@ struct List {
 struct Expression {
     Stmt self;
     Expr* expression;
+    TypeNode* type;
 };
 
 struct Var {
