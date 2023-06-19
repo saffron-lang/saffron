@@ -15,6 +15,7 @@
 - Statements as expressions
 - Int and Float separation
 - Arbitrary size ints?
+- Priority queue for async queuing
 
 ## Contributing Workflow
 

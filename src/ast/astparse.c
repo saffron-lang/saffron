@@ -308,7 +308,7 @@ static Expr *getItem(Expr *left, bool canAssign) {
 }
 
 static Expr *pipeCall(Expr *left, bool canAssign) {
-    struct Call *result = (struct Call *) parsePrecedence(PREC_ASSIGNMENT);
+    struct Call *result = (struct Call *) parsePrecedence(PREC_CALL);
     if (result->self.self.type != NODE_CALL) {
         errorAtCurrent("Expected functional call after pipe operator!");
         return NULL;

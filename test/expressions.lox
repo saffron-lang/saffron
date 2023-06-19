@@ -1,4 +1,15 @@
-5 |> println()
+fun add_one(x: Number) {
+    return x + 1
+}
+
+fun times_two(x: Number) {
+    return x * 2
+}
+
+5
+  |> add_one()
+  |> times_two()
+  |> println()
 
 var b: Number;
 b = 3;
@@ -11,3 +22,4 @@ var a = fun () => {
 println(a());
 println(:atom == "atom");
 println(:atom == :atom);
+
