@@ -1,5 +1,3 @@
-var a = if (true) 5 else 6
-
 fun add_one(x: Number) {
     return x + 1
 }

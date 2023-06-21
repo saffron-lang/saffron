@@ -10,12 +10,16 @@
 - Map and linked list types
 - Async networking
 - File I/O
-- Sensible syntax for piping with higher arity
-  - Maybe something to do with currying?
+- Maybe something to do with currying?
 - Statements as expressions
 - Int and Float separation
 - Arbitrary size ints?
 - Priority queue for async queuing
+- Exception handling
+  - Only during runtime we can determine where to jump in the event of an error
+  - Add try, catch but still encourage returning errors
+  - Different handlers for different errors
+  - Panic!
 
 ## Contributing Workflow
 
