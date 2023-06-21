@@ -7,3 +7,17 @@ var a = if (false) {
 }
 
 println(a)
+
+if (false) {
+    println("a")
+} else if (false) {
+    println("b")
+} else {
+    println("c")
+}
+
+{
+    5
+}
+
+println(6)

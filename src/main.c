@@ -24,26 +24,25 @@ static void repl() {
 
 static void runFile(const char *path) {
     char *source = readFile(path);
-    StmtArray* body = parseAST(source);
+    StmtArray *body = parseAST(source);
     makeTypes();
     evaluateTree(body);
-    printTree(body);
+//    printTree(body);
 //    astUnparse(body);
-    ObjModule* module = interpret(body, "<script>", path);
+    ObjModule *module = interpret(body, "<script>", path);
     free(source);
 
     if (module->result == INTERPRET_COMPILE_ERROR) exit(65);
     if (module->result == INTERPRET_RUNTIME_ERROR) exit(70);
 }
 
-
 static void parseFile(const char *path) {
     char *source = readFile(path);
-    StmtArray* body = parseAST(source);
+    StmtArray *body = parseAST(source);
     printTree(body);
     free(source);
 
-    if (body==NULL) exit(65);
+    if (body == NULL) exit(65);
 }
 
 

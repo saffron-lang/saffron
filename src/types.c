@@ -466,7 +466,13 @@ Type *evaluateNode(Node *node) {
             Type *valueType = evaluateNode((Node *) casted->value);
             Type *namedType = getVariableType(casted->name);
 
-            if (!isSubType(namedType, valueType)) {
+            // TODO: If named type is uninitialized and has no typedef, then
+            // infer it here.
+            // TODO: If multiple assigns for uninitialized, then make a union
+            // Maybe add a var that says whether the type was 'inferred', in which case
+            // We can extend the type
+
+            if (!isSubType(valueType, namedType)) {
                 errorAt(&casted->name, "Type mismatch");
             }
 
