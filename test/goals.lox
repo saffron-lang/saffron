@@ -121,7 +121,7 @@ dataclass User { // Dataclasses support structural matching? E.g. typescript
     var age: Number
 }
 
-Json.parse_into<User>('{"username": "henry", "age": 10}') // Some form of runtime type access
+var henry: User = Json.parse_into<User>('{"username": "henry", "age": 10}') // Some form of runtime type access
 // Or some other form of easy deserialization into a matching data type
 
 fun get_dogs() {

@@ -1,0 +1,54 @@
+interface Iterable {
+    fun iter() // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
+}
+
+interface Iterator {
+    fun next()
+    fun iter()
+}
+
+fun map<T extends Iterable, R>(iterable: List<T>, func: (T) => R): List<R> {
+    var result: List<R> = []
+
+    for (item in iterable) {
+        result.push(func(item))
+    }
+
+    return result
+}
+
+fun filter<T>(iterable: List<T>, func: (T) => Boolean): List<R> {
+    var result: List<R> = []
+
+    for (item in iterable) {
+        if (func(item)) {
+            result.push(item)
+        }
+    }
+
+    return result
+}
+
+interface Addend {
+    fun add()
+}
+
+fun sum<T extends Addend>(iterable: List<T>) {
+    var iterator = iterable.iter()
+
+    var result: T = iterator.next() // ReturnValue<T.add>?
+    for (item in iterator) {
+        result = result + item
+    }
+
+    return result
+}
+
+fun sum<T extends Addend>(iterable: List<T>, initial: T) {
+    var result: T = initial // ReturnValue<T.add>?
+    for (item in iterable) {
+        result = result + item
+    }
+
+    return result
+}
