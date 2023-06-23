@@ -148,14 +148,25 @@ static TokenType identifierType() {
                 switch (scanner.start[1]) {
                     case 'n':
                         return checkKeyword(2, 1, "d", TOKEN_AND);
-                    case 's': return TOKEN_AS;
+                    case 's':
+                        return TOKEN_AS;
                 }
             }
             break;
         case 'c':
             return checkKeyword(1, 4, "lass", TOKEN_CLASS);
         case 'e':
-            return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+            if (scanner.current - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'l':
+                        return checkKeyword(2, 2, "se", TOKEN_ELSE);
+                    case 'x':
+                        return checkKeyword(2, 5, "tends", TOKEN_EXTENDS);
+                    case 'n':
+                        return checkKeyword(2, 2, "um", TOKEN_EXTENDS);
+                }
+            }
+            break;
         case 'f':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
@@ -175,6 +186,12 @@ static TokenType identifierType() {
                         return TOKEN_IF;
                     case 'm':
                         return checkKeyword(2, 4, "port", TOKEN_IMPORT);
+                    case 'n':
+                        if (scanner.current - scanner.start > 2) {
+                            return checkKeyword(3, 6, "erface", TOKEN_IMPORT);
+                        } else {
+                            return TOKEN_IN;
+                        }
                 }
             }
             break;
@@ -298,21 +315,21 @@ Token scanToken() {
     return errorToken("Unexpected character.");
 }
 
-void initTokenArray(TokenArray* tokenArray) {
+void initTokenArray(TokenArray *tokenArray) {
     tokenArray->count = 0;
     tokenArray->capacity = 0;
     tokenArray->tokens = NULL;
     tokenArray->lines = NULL;
 }
 
-void writeTokenArray(TokenArray * tokenArray, Token token, int line) {
+void writeTokenArray(TokenArray *tokenArray, Token token, int line) {
     if (tokenArray->capacity < tokenArray->count + 1) {
         int oldCapacity = tokenArray->capacity;
         tokenArray->capacity = GROW_CAPACITY(oldCapacity);
         tokenArray->tokens = GROW_ARRAY(Token, tokenArray->tokens,
-                                 oldCapacity, tokenArray->capacity);
+                                        oldCapacity, tokenArray->capacity);
         tokenArray->lines = GROW_ARRAY(int, tokenArray->lines,
-                                  oldCapacity, tokenArray->capacity);
+                                       oldCapacity, tokenArray->capacity);
     }
 
     tokenArray->tokens[tokenArray->count] = token;
@@ -324,7 +341,7 @@ void writeTokenArray(TokenArray * tokenArray, Token token, int line) {
 // or something, not sure yet exactly whats happening but it seems like memory
 // boundaries are being violated.
 
-void freeTokenArray(TokenArray * tokenArray) {
+void freeTokenArray(TokenArray *tokenArray) {
     FREE_ARRAY(Token, tokenArray->tokens, tokenArray->capacity);
     FREE_ARRAY(int, tokenArray->lines, tokenArray->capacity);
     initTokenArray(tokenArray);
