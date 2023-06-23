@@ -46,6 +46,7 @@ typedef enum {
     OBJ_PARSE_INTERFACE_TYPE,
     OBJ_INSTANCE,
     OBJ_LIST,
+    OBJ_MAP,
     OBJ_BOUND_METHOD,
     OBJ_CALL_FRAME,
     OBJ_MODULE,

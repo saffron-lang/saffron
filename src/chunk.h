@@ -6,6 +6,7 @@
 
 typedef enum {
     OP_LIST,
+    OP_MAP,
     OP_CONSTANT,
     OP_CLOSURE,
     OP_NEGATE,

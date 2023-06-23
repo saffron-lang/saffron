@@ -13,6 +13,7 @@
 #include "libc/task.h"
 #include "files.h"
 #include "ast/astparse.h"
+#include "libc/map.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -85,6 +86,7 @@ void initVM() {
     vm.openUpvalues = NULL;
 
     defineBuiltin("List", OBJ_VAL(createListType()));
+    defineBuiltin("Map", OBJ_VAL(createMapType()));
 
     defineNative("println", printlnNative);
     defineNative("print", printNative);
@@ -624,6 +626,20 @@ static InterpretResult run(ObjModule *module) {
                     pop();
                 }
                 push(OBJ_VAL(list));
+                break;
+            }
+            case OP_MAP: {
+                int argCount = READ_BYTE();
+                ObjMap *map = newMap();
+                push(OBJ_VAL(map));
+                for (int i = argCount; i > 0; i--) {
+                    mapSet(map, peek(2*i), peek(2*i-1));
+                }
+                for (int i = 0; i < argCount + 1; i++) {
+                    pop();
+                    pop();
+                }
+                push(OBJ_VAL(map));
                 break;
             }
             case OP_CLOSURE: {

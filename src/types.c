@@ -6,6 +6,7 @@
 #include "files.h"
 #include "ast/astparse.h"
 #include "libc/time.h"
+#include "libc/map.h"
 
 
 Type *evaluateNode(Node *node);
@@ -107,6 +108,7 @@ SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *anyType;
 SimpleType *listTypeDef;
+SimpleType *mapTypeDef;
 FunctorType *printlnType;
 FunctorType *spawnType;
 SimpleType *taskTypeDef;
@@ -122,6 +124,7 @@ void makeTypes() {
     neverType = newSimpleType();
     anyType = newSimpleType();
     listTypeDef = createListTypeDef();
+    mapTypeDef = createMapTypeDef();
 
     printlnType = newFunctorType();
     printlnType->returnType = (Type *) nilType;
@@ -162,6 +165,7 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "Any", (Type *) anyType);
     defineTypeDef(typeEnvironment, "Task", (Type *) taskTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
+    defineLocalAndTypeDef(typeEnvironment, "Map", mapTypeDef);
 
     defineLocal(typeEnvironment, "println", (Type *) printlnType);
     defineLocal(typeEnvironment, "print", (Type *) printlnType);
@@ -514,21 +518,36 @@ Type *evaluateNode(Node *node) {
         case NODE_GETITEM: {
             struct GetItem *casted = (struct GetItem *) node;
             Type *type = evaluateNode((Node *) casted->object);
-            if (!isSubType(type, listTypeDef)) {
-                error("GetItem on something other than a list");
-                return (NULL);
-            }
-            GenericType *genericType = (GenericType *) type;
-            Type *indexType = evaluateNode(casted->index);
-            if (!isSubType(indexType, numberType)) {
-                error("Index must be a number");
-                return (NULL);
-            }
 
-            if (genericType->generics.count) {
-                return AS_OBJ(genericType->generics.values[0]);
+            if (isSubType(type, listTypeDef)) {
+                GenericType *genericType = (GenericType *) type;
+                Type *indexType = evaluateNode(casted->index);
+                if (!isSubType(indexType, numberType)) {
+                    error("Index must be a number");
+                    return (NULL);
+                }
+
+                if (genericType->generics.count) {
+                    return AS_OBJ(genericType->generics.values[0]);
+                } else {
+                    return neverType;
+                }
+            } else if (isSubType(type, mapTypeDef)) {
+                GenericType *genericType = (GenericType *) type;
+                Type *indexType = evaluateNode(casted->index);
+                if (!isSubType(indexType, AS_OBJ(genericType->generics.values[0]))) {
+                    error("Key type mismatch");
+                    return (NULL);
+                }
+
+                if (genericType->generics.count) {
+                    return AS_OBJ(genericType->generics.values[1]);
+                } else {
+                    return neverType;
+                }
             } else {
-                return neverType;
+                error("Cannot get item on something other than a list or map");
+                return (NULL);
             }
         }
         case NODE_GET: {
@@ -680,6 +699,62 @@ Type *evaluateNode(Node *node) {
                 currentAssignmentType = tmp;
             }
 
+            return (Type *) type;
+        }
+        case NODE_MAP: {
+            struct Map *casted = (struct Map *) node;
+
+            GenericType *type = currentAssignmentType;
+            type->target = mapTypeDef;
+
+            if (currentAssignmentType == NULL) {
+                type = newGenericType();
+                initValueArray(&type->generics);
+                Type *keyType = neverType;
+                Type *valueType = neverType;
+                if (casted->keys.count > 0) {
+                    if (casted->keys.count > 1) {
+                        evaluateExprTypes(&casted->keys);
+                        evaluateExprTypes(&casted->values);
+                    }
+
+                    keyType = evaluateNode((Node *) casted->keys.exprs[0]);
+                    valueType = evaluateNode((Node *) casted->values.exprs[0]);
+                }
+                writeValueArray(&type->generics, OBJ_VAL(keyType));
+                writeValueArray(&type->generics, OBJ_VAL(valueType));
+                type->target = mapTypeDef;
+
+            } else {
+                if (currentAssignmentType->obj.type != OBJ_PARSE_GENERIC_TYPE) {
+                    errorAt(&casted->brace, "Type mismatch");
+                    return type;
+                }
+                if (!isSubType(mapTypeDef, type->target)) {
+                    errorAt(&casted->brace, "Type mismatch, incompatible type");
+                    return type;
+                }
+                if (type->generics.count != 2) {
+                    errorAt(&casted->brace, "Type mismatch, missing type annotation");
+                    return type;
+                }
+                Type *keyType = AS_OBJ(type->generics.values[0]);
+                Type *valueType = AS_OBJ(type->generics.values[1]);
+                Type *tmp = currentAssignmentType;
+                for (int i = 0; i < casted->keys.count; i++) {
+                    currentAssignmentType = keyType;
+                    Type *evalType = evaluateNode((Node *) casted->keys.exprs[i]);
+                    if (!isSubType(evalType, keyType)) {
+                        errorAt(&casted->brace, "Map key type mismatch, incompatible types");
+                    }
+                    currentAssignmentType = valueType;
+                    evalType = evaluateNode((Node *) casted->values.exprs[i]);
+                    if (!isSubType(evalType, valueType)) {
+                        errorAt(&casted->brace, "Map value type mismatch, incompatible types");
+                    }
+                }
+                currentAssignmentType = tmp;
+            }
             return (Type *) type;
         }
         case NODE_EXPRESSION: {
