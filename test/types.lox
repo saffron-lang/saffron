@@ -4,3 +4,17 @@ var d: Atom = :asd
 var c: (Number) => Number = fun (x: Number): Number => { return x + 1; }
 var l: List<List<Number>> = [[1,2],[3,4]]
 println(l[1])
+
+interface MyInterface {
+    myfunc(a: Number, b: String)
+}
+
+class MyClass {
+    myfunc(a: Number, b: String) {
+        println(a)
+        println(b)
+    }
+}
+
+var my_var: MyInterface = MyClass()
+my_var.myfunc(5, "WOW!")

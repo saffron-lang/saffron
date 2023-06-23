@@ -22,6 +22,8 @@ typedef enum {
     NODE_SIMPLE,
     NODE_FUNCTOR,
     NODE_UNION,
+    NODE_INTERFACE,
+    NODE_TYPEDECLARATION,
     NODE_BINARY,
     NODE_GROUPING,
     NODE_LITERAL,
@@ -50,6 +52,9 @@ typedef enum {
     NODE_BREAK,
     NODE_RETURN,
     NODE_IMPORT,
+    NODE_ENUM,
+    NODE_ENUMITEM,
+    NODE_METHODSIG,
     NODE_POSITIONAL,
     NODE_KEYWORD,
     NODE_VARIADIC,
@@ -140,6 +145,19 @@ struct Union {
     TypeNode self;
     TypeNode* left;
     TypeNode* right;
+};
+
+struct Interface {
+    TypeNode self;
+    Token name;
+    struct Variable* superType;
+    StmtArray body;
+};
+
+struct TypeDeclaration {
+    TypeNode self;
+    Token name;
+    TypeNode* target;
 };
 
 struct Binary {
@@ -316,6 +334,26 @@ struct Import {
     Stmt self;
     Expr* expression;
     Token name;
+};
+
+struct Enum {
+    Stmt self;
+    Token name;
+    StmtArray body;
+};
+
+struct EnumItem {
+    Stmt self;
+    Token name;
+    ParameterArray params;
+};
+
+struct MethodSig {
+    Stmt self;
+    Token name;
+    ParameterArray params;
+    TypeNode *returnType;
+    FunctionType functionType;
 };
 
 struct Positional {

@@ -728,6 +728,22 @@ static TypeNode *typeAnnotation() {
     }
 }
 
+
+static Stmt *fieldDeclaration(AssignmentType assignmentType) {
+    Token name = parseVariable("Expect variable name.");
+    consume(TOKEN_COLON, "Expect type annotation");
+    TypeNode *type = typeAnnotation();
+
+    match(TOKEN_SEMICOLON);
+
+    struct Var *var = ALLOCATE_NODE(struct Var, NODE_VAR);
+    var->name = name;
+    var->initializer = NULL;
+    var->type = type;
+    var->assignmentType = assignmentType;
+    return var;
+}
+
 static Stmt *varDeclaration(AssignmentType assignmentType) {
     Token name = parseVariable("Expect variable name.");
     Expr *value = NULL;
@@ -754,6 +770,22 @@ static Stmt *varDeclaration(AssignmentType assignmentType) {
     var->type = type;
     var->assignmentType = assignmentType;
     return var;
+}
+
+static Stmt *typeDeclaration() {
+    Token name = parseVariable("Expect type name.");
+    TypeNode *value = NULL;
+
+    if (match(TOKEN_EQUAL)) {
+        value = typeAnnotation();
+    }
+
+    match(TOKEN_SEMICOLON);
+
+    struct TypeDeclaration *typeDecl = ALLOCATE_NODE(struct TypeDeclaration, NODE_TYPEDECLARATION);
+    typeDecl->name = name;
+    typeDecl->target = value;
+    return typeDecl;
 }
 
 static Stmt *forStatement() {
@@ -919,6 +951,98 @@ static Stmt *classDeclaration() {
     return (Stmt *) result;
 }
 
+static Stmt *methodSignature() {
+//    consume(TOKEN_FUN, "Expect 'fun' in interface body.")
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    Token name = parser.previous;
+    FunctionType type = TYPE_METHOD;
+    if (parser.previous.length == 4 &&
+        memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+
+    ParameterArray params;
+    initParameterArray(&params);
+
+    TypeNodeArray types;
+    initTypeNodeArray(&types);
+
+    int argCount = 0;
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            argCount++;
+            if (argCount > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+            Token name = parseVariable("Expect parameter name.");
+            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+
+            param->self.name = name;
+            writeParameterArray(&params, param);
+
+            if (match(TOKEN_COLON)) {
+                TypeNode *typeNode = typeAnnotation();
+                writeTypeNodeArray(&types, typeNode);
+                param->self.type = typeNode;
+            } else {
+                writeTypeNodeArray(&types, NULL);
+            }
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+    TypeNode *returnType = NULL;
+    if (match(TOKEN_COLON)) {
+        returnType = typeAnnotation();
+    }
+
+    struct MethodSig *result = ALLOCATE_NODE(struct MethodSig, NODE_METHODSIG);
+    result->params = params;
+    result->functionType = type;
+    result->returnType = returnType;
+    result->name = name;
+    return result;
+}
+
+static Stmt *interfaceDeclaration() {
+    consume(TOKEN_IDENTIFIER, "Expect an interface name.");
+    Token interfaceName = parser.previous;
+
+    struct Interface *result = ALLOCATE_NODE(struct Interface, NODE_INTERFACE);
+    result->name = interfaceName;
+    result->superType = NULL;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        struct Variable *var = fieldDeclaration(false);
+
+        if (identifiersEqual(&interfaceName, &parser.previous)) {
+            error("An interface can't extend from itself.");
+        }
+        result->superType = var;
+    }
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before interface body.");
+
+    StmtArray body;
+    initStmtArray(&body);
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        if (match(TOKEN_VAR)) {
+            writeStmtArray(&body, varDeclaration(TYPE_FIELD));
+        } else {
+            writeStmtArray(&body, methodSignature());
+        }
+    }
+
+    result->body = body;
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after interface body.");
+
+    return (Stmt *) result;
+}
+
 static Stmt *declaration() {
     if (match(TOKEN_CLASS)) {
         return classDeclaration();
@@ -926,6 +1050,10 @@ static Stmt *declaration() {
         return funDeclaration();
     } else if (match(TOKEN_VAR)) {
         return varDeclaration(TYPE_VARIABLE);
+    } else if (match(TOKEN_INTERFACE)) {
+        return interfaceDeclaration();
+    } else if (match(TOKEN_TYPE)) {
+        return typeDeclaration();
     } else {
         return statement();
     }

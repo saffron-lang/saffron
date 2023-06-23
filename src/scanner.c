@@ -188,7 +188,7 @@ static TokenType identifierType() {
                         return checkKeyword(2, 4, "port", TOKEN_IMPORT);
                     case 'n':
                         if (scanner.current - scanner.start > 2) {
-                            return checkKeyword(3, 6, "erface", TOKEN_IMPORT);
+                            return checkKeyword(3, 6, "erface", TOKEN_INTERFACE);
                         } else {
                             return TOKEN_IN;
                         }
