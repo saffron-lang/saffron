@@ -155,9 +155,7 @@ static Expr *unary(bool canAssign) {
     return result;
 }
 
-
 static Expr *list(bool canAssign) {
-    uint8_t argCount = 0;
     ExprArray items;
     initExprArray(&items);
     Token bracket = parser.previous;
@@ -168,7 +166,6 @@ static Expr *list(bool canAssign) {
             }
             Expr *item = expression();
             writeExprArray(&items, item);
-            argCount++;
         } while (match(TOKEN_COMMA));
     }
     consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list items.");
@@ -176,6 +173,33 @@ static Expr *list(bool canAssign) {
     struct List *result = ALLOCATE_NODE(struct List, NODE_LIST);
     result->bracket = bracket;
     result->items = items;
+    return result;
+}
+
+static Expr *map(bool casAssign) {
+    ExprArray keys;
+    initExprArray(&keys);
+    ExprArray values;
+    initExprArray(&values);
+    Token brace = parser.previous;
+    if (!check(TOKEN_RIGHT_BRACE)) {
+        do {
+            if (parser.current.type == TOKEN_RIGHT_BRACE) {
+                break;
+            }
+            Expr *key = expression();
+            writeExprArray(&keys, key);
+            consume(TOKEN_COLON, "Expect ':' after map key.");
+            Expr *value = expression();
+            writeExprArray(&values, value);
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after map items.");
+
+    struct Map *result = ALLOCATE_NODE(struct Map, NODE_MAP);
+    result->brace = brace;
+    result->keys = keys;
+    result->values = values;
     return result;
 }
 
@@ -384,7 +408,7 @@ static Expr *anonFunction(bool canAssign);
 ParseRule parseRules[] = {
         [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACE]    = {map, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACKET]  = {list, getItem, PREC_CALL},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},

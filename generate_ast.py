@@ -18,6 +18,7 @@ exprs = [
     "Yield    : Expr* expression",
     "Lambda   : ParameterArray params, StmtArray body",
     "List     : ExprArray items, Token bracket",
+    "Map      : ExprArray keys, ExprArray values, Token brace",
     # "Arguments: Expr* items",
     # "Parameters: "
 ]

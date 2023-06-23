@@ -38,6 +38,7 @@ typedef enum {
     NODE_YIELD,
     NODE_LAMBDA,
     NODE_LIST,
+    NODE_MAP,
     NODE_EXPRESSION,
     NODE_VAR,
     NODE_BLOCK,
@@ -235,6 +236,13 @@ struct List {
     Expr self;
     ExprArray items;
     Token bracket;
+};
+
+struct Map {
+    Expr self;
+    ExprArray keys;
+    ExprArray values;
+    Token brace;
 };
 
 struct Expression {

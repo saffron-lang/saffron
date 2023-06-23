@@ -1,0 +1,2 @@
+var aMap: Map<String, Number> = {"a": 123, "b": 321, "c": 456}
+println(aMap)

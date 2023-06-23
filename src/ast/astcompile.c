@@ -593,6 +593,15 @@ void compileNode(Node *node) {
             emitBytes(OP_LIST, casted->items.count);
             break;
         }
+        case NODE_MAP: {
+            struct Map *casted = (struct Map *) node;
+            for (int i = 0; i < casted->keys.count; i++) {
+                compileNode((Node *) casted->keys.exprs[i]);
+                compileNode((Node *) casted->values.exprs[i]);
+            }
+            emitBytes(OP_MAP, casted->keys.count);
+            break;
+        }
         case NODE_EXPRESSION: {
             struct Expression *casted = (struct Expression *) node;
             bool oldContext = exprContext;

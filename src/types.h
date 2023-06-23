@@ -78,6 +78,7 @@ SimpleType *atomType;
 SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *listTypeDef;
+SimpleType *mapTypeDef;
 
 void makeTypes();
 
