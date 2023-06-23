@@ -1,6 +1,6 @@
 interface Iterable {
     fun iter() // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
-}
+} // Or maybe just duck typing in general??
 
 interface Iterator {
     fun next()

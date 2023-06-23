@@ -42,6 +42,15 @@ UnionType *newUnionType() {
     return type;
 }
 
+InterfaceType *newInterfaceType() {
+    InterfaceType *type = ALLOCATE_OBJ(InterfaceType, OBJ_PARSE_INTERFACE_TYPE);
+    push(OBJ_VAL(type));
+    initTable(&type->fields);
+    initTable(&type->methods);
+    pop();
+    return type;
+}
+
 GenericType *newGenericType() {
     GenericType *type = ALLOCATE_OBJ(GenericType, OBJ_PARSE_GENERIC_TYPE);
     push(OBJ_VAL(type));
@@ -321,8 +330,40 @@ static bool isSubType(Type *subclass, Type *superclass) {
                    || isSubType(subclass, superclassType->right);
         }
         case (OBJ_PARSE_INTERFACE_TYPE): {
+            InterfaceType *superclassType = (InterfaceType *) superclass;
+            if (subclass->obj.type != OBJ_PARSE_INTERFACE_TYPE && subclass->obj.type != OBJ_PARSE_TYPE) {
+                return false;
+            }
+            InterfaceType *subclassType = (InterfaceType *) subclass;
+            for (int i = 0; i < superclassType->fields.count; i++) {
+                Entry *entry = &superclassType->fields.entries[i];
+                if (entry->key != NULL) {
+                    Type *fieldType = AS_OBJ(entry->value);
+                    Value targetFieldValue;
+                    if (!tableGet(&subclassType->fields, entry->key, &targetFieldValue)) {
+                        return false;
+                    }
 
-            break;
+                    if (!isSubType(AS_OBJ(targetFieldValue), fieldType)) {
+                        return false;
+                    }
+                }
+            }
+            for (int i = 0; i < superclassType->methods.count; i++) {
+                Entry *entry = &superclassType->methods.entries[i];
+                if (entry->key != NULL) {
+                    Type *methodType = AS_OBJ(entry->value);
+                    Value targetMethodValue;
+                    if (!tableGet(&subclassType->methods, entry->key, &targetMethodValue)) {
+                        return false;
+                    }
+
+                    if (!isSubType(AS_OBJ(targetMethodValue), methodType)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
     }
 
@@ -1044,6 +1085,94 @@ Type *evaluateNode(Node *node) {
             type->left = evaluateNode((Node *) casted->left);
             type->right = evaluateNode((Node *) casted->right);
             return type;
+        }
+        case NODE_INTERFACE: {
+            struct Interface *casted = (struct Interface *) node;
+            InterfaceType *interfaceType = newInterfaceType();
+            interfaceType->superType = NULL;
+
+            if (casted->superType) {
+                InterfaceType *superType = getTypeDef(casted->superType->name);
+
+                if (superType->self.obj.type != OBJ_PARSE_INTERFACE_TYPE) {
+                    errorAt(&casted->superType->name, "Parent type for interface may only be an interface.");
+                    return NULL;
+                }
+
+                copyTable(&superType->fields, &interfaceType->fields);
+                copyTable(&superType->methods, &interfaceType->methods);
+                interfaceType->superType = (Type *) superType;
+            }
+
+            for (int j = 0; j < casted->body.count; j++) {
+                if (casted->body.stmts[j]->self.type == NODE_METHODSIG) {
+                    struct MethodSig *method = (struct MethodSig *) casted->body.stmts[j];
+
+                    FunctorType *type = newFunctorType();
+                    for (int i = 0; i < method->params.count; i++) {
+                        TypeNode *typeNode = method->params.parameters[i]->type;
+                        Type *argType;
+                        if (typeNode != NULL) {
+                            argType = evaluateNode((Node *) typeNode);
+                        } else {
+                            argType = (Type *) anyType;
+                        }
+
+                        writeValueArray(&type->arguments, OBJ_VAL(argType));
+                    }
+
+                    tableSet(
+                            &interfaceType->methods,
+                            copyString(method->name.start, method->name.length),
+                            OBJ_VAL(type)
+                    );
+
+                    if (method->functionType != TYPE_INITIALIZER) {
+                        type->returnType = evaluateNode((Node *) method->returnType);
+                    } else {
+                        type->returnType = (Type *) interfaceType;
+                    }
+
+                    if (!type->returnType) {
+                        type->returnType = (Type *) nilType;
+                    }
+                } else {
+                    struct Var *var = (struct Var *) casted->body.stmts[j];
+                    Type *type = evaluateNode((Node *) var->type);
+                    tableSet(
+                            &interfaceType->fields,
+                            copyString(var->name.start, var->name.length),
+                            OBJ_VAL(type)
+                    );
+                }
+            }
+
+            tableSet(
+                    &currentEnv->typeDefs, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(interfaceType)
+            );
+
+            break;
+        }
+        case NODE_TYPEDECLARATION: {
+            struct TypeDeclaration *casted = (struct TypeDeclaration *) node;
+
+            tableSet(
+                    &currentEnv->typeDefs, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(evaluateNode(casted->target))
+            );
+
+            break;
+        }
+        case NODE_ENUM: {
+            break;
+        }
+        case NODE_ENUMITEM: {
+            break;
         }
     }
 

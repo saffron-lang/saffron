@@ -45,8 +45,10 @@ typedef struct UnionType {
 } UnionType;
 
 typedef struct InterfaceType {
+    Type self;
     Table fields;
     Table methods;
+    Type* superType;
     int genericCount;
 } InterfaceType;
 
@@ -68,6 +70,7 @@ typedef struct TypeEnvironment {
 SimpleType *newSimpleType();
 FunctorType *newFunctorType();
 UnionType *newUnionType();
+InterfaceType *newInterfaceType();
 
 GenericType *newGenericType();
 

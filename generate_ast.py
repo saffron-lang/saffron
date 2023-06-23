@@ -39,13 +39,18 @@ stmts = [
     "Break      : Token keyword",
     "Return     : Token keyword, Expr* value",
     "Import     : Expr* expression, Token name",
+    "Enum       : Token name, StmtArray body",
+    "EnumItem   : Token name, ParameterArray params",
+    "MethodSig  : Token name, ParameterArray params, TypeNode *returnType, FunctionType functionType",
 ]
 
 type_items = [
-    "TypeNode : Node self",
-    "Simple   : Token name, TypeNodeArray generics",
-    "Functor  : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
-    "Union    : TypeNode* left, TypeNode* right"
+    "TypeNode        : Node self",
+    "Simple          : Token name, TypeNodeArray generics",
+    "Functor         : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
+    "Union           : TypeNode* left, TypeNode* right",
+    "Interface       : Token name, struct Variable* superType, StmtArray body",
+    "TypeDeclaration : Token name, TypeNode* target",
 ]
 
 param_types = [
