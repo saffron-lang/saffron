@@ -25,6 +25,7 @@ static void unparseToken(Token token) {
         printf("%c", token.start[i]);
     }
 }
+
 static void printToken(Token token) {
     printf("Token(\"");
     for (int i = 0; i < token.length; i++) {
@@ -37,6 +38,17 @@ static void unparseExprArray(ExprArray exprArray) {
     for (int i = 0; i < exprArray.count; i++) {
         unparseNode((Node *) exprArray.exprs[i]);
         if (i != exprArray.count - 1) {
+            printf(", ");
+        }
+    }
+}
+
+static void unparseMapEntries(ExprArray keys, ExprArray values) {
+    for (int i = 0; i < keys.count; i++) {
+        unparseNode((Node *) keys.exprs[0]);
+        printf(": ");
+        unparseNode((Node *) values.exprs[0]);
+        if (i != keys.count - 1) {
             printf(", ");
         }
     }
@@ -70,6 +82,37 @@ static void printExprArray(ExprArray exprArray) {
     printf("\n");
     printIndent();
     printf("]");
+}
+
+static void printExprPairs(ExprArray keys, ExprArray values) {
+    if (keys.count == 0) {
+        printf("()");
+        return;
+    }
+    printf("(\n");
+    indent++;
+    for(int i = 0; i < keys.count; i++) {
+        printIndent();
+        printf("MapEntry(\n");
+        indent++;
+        printIndent();
+        printNode((Node *) keys.exprs[i]);
+        printf(",\n");
+        printIndent();
+        printNode((Node *) values.exprs[i]);
+        printf("\n");
+        indent--;
+        printIndent();
+        printf(")");
+        if (i != keys.count - 1) {
+            printf(",\n");
+        }
+
+    }
+    indent--;
+    printf("\n");
+    printIndent();
+    printf(")");
 }
 
 static void printTypeArray(TypeNodeArray typeArray) {
@@ -271,6 +314,13 @@ void unparseNode(Node *node) {
             printf("[");
             unparseExprArray(casted->items);
             printf("]");
+            break;
+        }
+        case NODE_MAP: {
+            struct Map *casted = (struct Map *) node;
+            printf("{");
+            unparseMapEntries(casted->keys, casted->values);
+            printf("}");
             break;
         }
         case NODE_EXPRESSION: {
@@ -681,6 +731,19 @@ void printNode(Node *node) {
             printIndent();
             printf("items=");
             printExprArray(casted->items);
+            indent--;
+            printf("\n");
+            printIndent();
+            printf(")");
+            break;
+        }
+        case NODE_MAP: {
+            struct Map *casted = (struct Map *) node;
+            printf("Map(\n");
+            indent++;
+            printIndent();
+            printf("entries=");
+            printExprPairs(casted->keys, casted->values);
             indent--;
             printf("\n");
             printIndent();
