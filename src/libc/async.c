@@ -50,7 +50,7 @@ void markAsyncRoots() {
 void handle_yield_value(Value value) {
     if (IS_LIST(value)) {
         ObjList *list = AS_LIST(value);
-        Value *arg = getItem(list, 0);
+        Value *arg = getListItem(list, 0);
         if (arg == NULL || !IS_NUMBER(*arg)) {
             runtimeError("Yielded invalid type");
         }
@@ -59,7 +59,7 @@ void handle_yield_value(Value value) {
 
         switch (op) {
             case SLEEP: {
-                Value *timeArg = getItem(list, 1);
+                Value *timeArg = getListItem(list, 1);
                 if (arg == NULL || !IS_NUMBER(*timeArg)) {
                     runtimeError("Yielded invalid type");
                 }

@@ -1,2 +1,5 @@
 var aMap: Map<String, Number> = {"a": 123, "b": 321, "c": 456}
-println(aMap)
+println(aMap["a"])
+println(aMap["b"])
+println(aMap["c"])
+println(aMap["d"])

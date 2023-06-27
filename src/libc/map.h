@@ -8,7 +8,7 @@
 #define IS_MAP(value) isObjType(value, OBJ_MAP)
 
 typedef struct {
-    int hash;
+    uint32_t hash;
     Value key;
     Value value;
 } MapEntry;
@@ -32,11 +32,17 @@ SimpleType* createMapTypeDef();
 
 Value mapCall(int argCount, Value *args);
 
-bool mapGet(ObjMap *map, Value *key, Value *value, int hash);
+bool mapGet(ObjMap *map, Value *key, Value *value, uint32_t hash);
 
 bool mapSet(ObjMap *map, Value key, Value item);
 
-bool mapDelete(ObjMap *map, int hash);
+bool mapDelete(ObjMap *map, uint32_t hash);
+
+Value *getMapItem(ObjMap *map, Value key);
+
+ValueArray mapKeysBuiltin(ObjMap *map, int argCount);
+
+ValueArray mapValuesBuiltin(ObjMap *map, int argCount);
 
 ObjBuiltinType *createMapType();
 
