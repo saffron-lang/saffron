@@ -1,5 +1,6 @@
 #include <printf.h>
 #include "map.h"
+#include "list.h"
 
 #define MAP_MAX_LOAD 0.75
 
@@ -108,6 +109,22 @@ SimpleType* createMapTypeDef() {
             OBJ_VAL(initType)
     );
 
+    FunctorType *keysType = newFunctorType();
+    keysType->returnType = listTypeDef;
+    tableSet(
+            &mapTypeDef->methods,
+            copyString("keys", 4),
+            OBJ_VAL(keysType)
+    );
+
+    FunctorType *valuesType = newFunctorType();
+    valuesType->returnType = listTypeDef;
+    tableSet(
+            &mapTypeDef->methods,
+            copyString("values", 6),
+            OBJ_VAL(valuesType)
+    );
+
     return (Type *) mapTypeDef;
 }
 
@@ -190,12 +207,38 @@ Value* getMapItem(ObjMap *map, Value key) {
     }
 }
 
+Value mapKeysBuiltin(ObjMap *map, int argCount) {
+    if (argCount > 0) return NIL_VAL;
+    ObjList *keys = newList();
+    for (int i = 0; i < map->capacity; i++) {
+        MapEntry *entry = &map->entries[i];
+        if (!valuesEqual(entry->key, NIL_VAL)) {
+            writeValueArray(&keys->items, entry->key);
+        }
+    }
+    return OBJ_VAL(keys);
+}
+
+Value mapValuesBuiltin(ObjMap *map, int argCount) {
+    if (argCount > 0) return NIL_VAL;
+    ObjList *values = newList();
+    for (int i = 0; i < map->capacity; i++) {
+        MapEntry *entry = &map->entries[i];
+        if (!valuesEqual(entry->key, NIL_VAL)) {
+            writeValueArray(&values->items, entry->value);
+        }
+    }
+    return OBJ_VAL(values);
+}
+
 void mapInit(ObjBuiltinType *type) {
     type->freeFn = (FreeFn) &freeMap;
     type->markFn = (MarkFn) &markMap;
     type->printFn = (PrintFn) &printMap;
     type->typeCallFn = NULL;
     type->typeDefFn = (GetTypeDefFn) &createMapTypeDef;
+    defineBuiltinMethod(type, "keys", (NativeMethodFn) mapKeysBuiltin);
+    defineBuiltinMethod(type, "values", (NativeMethodFn) mapValuesBuiltin);
 }
 
 ObjBuiltinType *createMapType() {

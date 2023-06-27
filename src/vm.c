@@ -342,7 +342,7 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name,
 static bool invoke(ObjString *name, int argCount) {
     Value receiver = peek(argCount);
 
-    if (!(IS_INSTANCE(receiver) || IS_LIST(receiver))) {
+    if (!(IS_INSTANCE(receiver) || IS_LIST(receiver) || IS_MAP(receiver))) {
         runtimeError("Only instances have methods.");
         return false;
     }

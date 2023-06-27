@@ -38,11 +38,11 @@ bool mapSet(ObjMap *map, Value key, Value item);
 
 bool mapDelete(ObjMap *map, uint32_t hash);
 
-Value *getMapItem(ObjMap *map, Value key);
+Value* getMapItem(ObjMap *map, Value key);
 
-ValueArray mapKeysBuiltin(ObjMap *map, int argCount);
+Value mapKeysBuiltin(ObjMap *map, int argCount);
 
-ValueArray mapValuesBuiltin(ObjMap *map, int argCount);
+Value mapValuesBuiltin(ObjMap *map, int argCount);
 
 ObjBuiltinType *createMapType();
 
