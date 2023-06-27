@@ -597,9 +597,14 @@ static InterpretResult run(ObjModule *module) {
                 break;
             }
             case OP_GETITEM: {
-                int index = trunc(AS_NUMBER(pop()));
-                ObjList *list = AS_OBJ(pop());
-                push(*getItem(list, index));
+                Value indexValue = pop();
+                Value value = pop();
+                if (isObjType(value, OBJ_LIST)) {
+                    int index = trunc(AS_NUMBER(indexValue));
+                    push(*getListItem((ObjList *) AS_OBJ(value), index));
+                } else if (isObjType(value, OBJ_MAP)) {
+                    push(*getMapItem((ObjMap *) AS_OBJ(value), indexValue));
+                }
                 break;
             }
             case OP_PIPE: {

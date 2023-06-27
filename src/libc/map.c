@@ -53,6 +53,7 @@ static void adjustCapacity(ObjMap *map, int capacity) {
         MapEntry *dest = findEntry(entries, capacity, entry->hash);
         dest->key = entry->key;
         dest->value = entry->value;
+        dest->hash = entry->hash;
         map->count++;
     }
 
@@ -61,7 +62,7 @@ static void adjustCapacity(ObjMap *map, int capacity) {
     map->capacity = capacity;
 }
 
-bool mapGet(ObjMap *map, Value *key, Value *value, int hash) {
+bool mapGet(ObjMap *map, Value *key, Value *value, uint32_t hash) {
     if (map->count == 0) return false;
 
     MapEntry *entry = findEntry(map->entries, map->capacity, hash);
@@ -76,7 +77,6 @@ void markMap(ObjMap *map) {
 }
 
 void printMap(ObjMap *map) {
-    // I don't think this will work right
     printf("{");
     bool skipped = false;
     for (int i = 0; i < map->capacity; i++) {
@@ -113,7 +113,7 @@ SimpleType* createMapTypeDef() {
 
 //Value mapCall(int argCount, Value *args);
 
-static int hash(Value key) {
+static uint32_t hash(Value key) {
     switch (key.type) {
         case VAL_BOOL: return AS_BOOL(key);
         case VAL_NIL: return 0;
@@ -153,10 +153,11 @@ bool mapSet(ObjMap *map, Value key, Value value) {
 
     entry->key = key;
     entry->value = value;
+    entry->hash = hash(key);
     return isNewKey;
 }
 
-bool mapDelete(ObjMap *map, int hash) {
+bool mapDelete(ObjMap *map, uint32_t hash) {
     if (map->count == 0) return false;
 
     MapEntry *entry = findEntry(map->entries, map->capacity, hash);
@@ -165,6 +166,28 @@ bool mapDelete(ObjMap *map, int hash) {
     entry->key = NIL_VAL;
     entry->value = BOOL_VAL(true);
     return true;
+}
+
+Value* getMapItem(ObjMap *map, Value key) {
+    if (map->count == 0) {
+        runtimeError("Accessing empty map. No value at the given key %s", AS_CSTRING(key));
+        return &NIL_VAL;
+    }
+
+    uint32_t keyHash = hash(key);
+    uint32_t index = keyHash & (map->capacity - 1);
+    for (;;) {
+        MapEntry* entry = &map->entries[index];
+        if (valuesEqual(entry->key, NIL_VAL)) {
+            if (IS_NIL(entry->value)) {
+                runtimeError("No value at the given key %s", AS_CSTRING(key));
+                return &NIL_VAL;
+            }
+        } else if (entry->hash == keyHash) {
+            return &entry->value;
+        }
+        index = (index + 1) & (map->capacity - 1);
+    }
 }
 
 void mapInit(ObjBuiltinType *type) {
