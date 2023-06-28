@@ -199,7 +199,7 @@ SimpleType* createListTypeDef() {
     );
 
     FunctorType *pushType = newFunctorType();
-    writeValueArray(&pushType->arguments, OBJ_VAL(numberType));
+    writeValueArray(&pushType->arguments, OBJ_VAL(anyType));
     pushType->returnType = (Type *) nilType;
     tableSet(
             &listTypeDef->methods,
