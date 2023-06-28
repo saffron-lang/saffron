@@ -18,7 +18,7 @@ SimpleType *newSimpleType() {
     push(OBJ_VAL(type));
     initTable(&type->methods);
     initTable(&type->fields);
-    type->genericCount = 0;
+    initValueArray(&type->genericArgs);
     pop();
     return type;
 }
@@ -27,7 +27,7 @@ FunctorType *newFunctorType() {
     FunctorType *type = ALLOCATE_OBJ(FunctorType, OBJ_PARSE_FUNCTOR_TYPE);
     push(OBJ_VAL(type));
     initValueArray(&type->arguments);
-    type->genericCount = 0;
+    initValueArray(&type->genericArgs);
     type->returnType = NULL;
     pop();
     return type;
@@ -57,6 +57,12 @@ GenericType *newGenericType() {
     type->target = NULL;
     initValueArray(&type->generics);
     pop();
+    return type;
+}
+
+GenericTypeDefinition *newGenericTypeDefinition() {
+    GenericTypeDefinition *type = ALLOCATE_OBJ(GenericTypeDefinition, OBJ_PARSE_GENERIC_DEFINITION_TYPE);
+    type->extends = NULL;
     return type;
 }
 
@@ -186,14 +192,16 @@ void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
     typeEnvironment->type = type;
     initTable(&typeEnvironment->locals);
     initTable(&typeEnvironment->typeDefs);
+    initValueTable(&typeEnvironment->genericResolutions);
     typeEnvironment->scopeDepth = 0;
     currentEnv = typeEnvironment;
 }
 
-struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType) {
+struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType, TypeNodeArray generics) {
     struct Functor *type = ALLOCATE_NODE(struct Functor, NODE_FUNCTOR);
     type->arguments = types;
     type->returnType = returnType;
+    type->generics = generics;
     return type;
 }
 
@@ -260,6 +268,22 @@ static Type *getTypeDef(Token name) {
     }
 }
 
+static bool isSubType(Type *subclass, Type *superclass);
+
+static bool resolveGenericArgument(TypeEnvironment *typeEnvironment, Type *subclass, Type *superclass) {
+    Value resultValue;
+    if (valueTableGet(&typeEnvironment->genericResolutions, OBJ_VAL(superclass), &resultValue)) {
+        if (IS_NIL(resultValue)) {
+            valueTableSet(&typeEnvironment->genericResolutions, OBJ_VAL(superclass), OBJ_VAL(subclass));
+            return true;
+        } else {
+            return isSubType(subclass, AS_OBJ(resultValue));
+        }
+    }
+
+    return resolveGenericArgument(typeEnvironment->enclosing, subclass, superclass);
+}
+
 static bool isSubType(Type *subclass, Type *superclass) {
     // TODO: Make this actually work
     // TODO: Maybe this should actually be "isSubClass", left to right
@@ -321,8 +345,31 @@ static bool isSubType(Type *subclass, Type *superclass) {
             return isSubType(subclassType->returnType, superclassType->returnType);
         }
         case (OBJ_PARSE_GENERIC_TYPE): {
+            GenericType *superclassType = (GenericType *) superclass;
+            if (subclass->obj.type != OBJ_PARSE_GENERIC_TYPE) {
+                return false;
+            }
 
-            break;
+            GenericType *subclassType = (GenericType *) subclass;
+            if (subclassType->generics.count != superclassType->generics.count) {
+                return false;
+            }
+
+            for (int i = 0; i < superclassType->generics.count; i++) {
+                if (!isSubType(AS_OBJ(subclassType->generics.values[i]), AS_OBJ(superclassType->generics.values[i]))) {
+                    return false;
+                }
+            }
+
+            return isSubType(subclassType->target, superclassType->target);
+        }
+        case (OBJ_PARSE_GENERIC_DEFINITION_TYPE): {
+            GenericTypeDefinition *superclassType = (GenericTypeDefinition *) superclass;
+            if (!superclassType->extends || isSubType(subclass, superclassType->extends)) {
+                return resolveGenericArgument(currentEnv, subclass, superclass);
+            }
+
+            return false;
         }
         case (OBJ_PARSE_UNION_TYPE): {
             UnionType *superclassType = (UnionType *) superclass;
@@ -546,15 +593,25 @@ Type *evaluateNode(Node *node) {
 //                return(NULL);
             }
 
+            TypeEnvironment argEnv;
+            initTypeEnvironment(&argEnv, TYPE_FUNCTION);
+
+            for (int i = 0; i < calleeFunctor->genericArgs.count; i++) {
+                valueTableSet(&argEnv.genericResolutions, calleeFunctor->genericArgs.values[i], NIL_VAL);
+            }
+
             for (int i = 0; i < casted->arguments.count; i++) {
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
                 if (!isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
                     errorAt(&casted->paren, "Type mismatch");
-                    return (NULL);
+                    return NULL;
                 }
             }
 
-            return calleeFunctor->returnType;
+            Type *returnType = calleeFunctor->returnType;
+
+            currentEnv = currentEnv->enclosing;
+            return returnType;
         }
         case NODE_GETITEM: {
             struct GetItem *casted = (struct GetItem *) node;
@@ -594,10 +651,29 @@ Type *evaluateNode(Node *node) {
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             Type *objectType = evaluateNode((Node *) casted->object);
-            SimpleType *rootType = (SimpleType *) objectType;
+            SimpleType *rootType;
 
-            if (objectType->obj.type == OBJ_PARSE_GENERIC_TYPE) {
-                rootType = (SimpleType *) ((GenericType *) objectType)->target;
+            switch (objectType->obj.type) {
+                case OBJ_PARSE_TYPE:
+                case OBJ_PARSE_INTERFACE_TYPE: {
+                    rootType = (SimpleType *) objectType;
+                    break;
+                }
+                case OBJ_PARSE_GENERIC_TYPE: {
+                    rootType = (SimpleType *) ((GenericType *) objectType)->target;
+                    break;
+                }
+                case OBJ_PARSE_GENERIC_DEFINITION_TYPE: {
+                    rootType = (SimpleType *) ((GenericTypeDefinition *) objectType)->extends;
+                    if (!rootType) {
+                        errorAt(&casted->name, "Attempting to get from invalid generic type.");
+                        return NULL;
+                    }
+                    break;
+                }
+                default: {
+                    errorAt(&casted->name, "Attempting to get from invalid type.");
+                }
             }
 
             Value fieldType;
@@ -838,8 +914,28 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);
 
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
             Type *oldFuncType = currentFuncType;
             FunctorType *type = newFunctorType();
+            type->genericArgs = genericArgs;
             currentFuncType = type;
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = casted->params.parameters[i]->type;
@@ -858,7 +954,6 @@ Type *evaluateNode(Node *node) {
                         ),
                         OBJ_VAL(argType)
                 );
-
             }
 
             type->returnType = evaluateNode((Node *) casted->returnType);
@@ -1040,13 +1135,26 @@ Type *evaluateNode(Node *node) {
             // Don't just accept an expr, accept a string or cast to string literal
             // Also support builtins
 
-
-
             return NULL;
         }
         case NODE_FUNCTOR: {
             struct Functor *casted = (struct Functor *) node;
             FunctorType *type = newFunctorType();
+
+            TypeEnvironment typeEnv;
+            initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *argType = newGenericTypeDefinition();
+                writeValueArray(&type->genericArgs, OBJ_VAL(argType));
+                tableSet(
+                        &currentEnv->typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
 
             for (int i = 0; i < casted->arguments.count; i++) {
                 TypeNode *typeNode = casted->arguments.typeNodes[i];
@@ -1058,7 +1166,10 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
+
             type->returnType = evaluateNode((Node *) casted->returnType);
+
+            currentEnv = currentEnv->enclosing;
 
             return (Type *) type;
         }

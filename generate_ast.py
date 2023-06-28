@@ -28,10 +28,10 @@ stmts = [
     "Expression : Expr* expression, TypeNode* type",
     "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
-    "Function   : Token name, ParameterArray params," +
+    "Function   : Token name, ParameterArray params, TypeNodeArray generics," +
     " StmtArray body, FunctionType functionType, TypeNode *returnType",
     "Class      : Token name, struct Variable* superclass," +
-    " StmtArray body",
+    " StmtArray body, TypeNodeArray generics",
     "If         : Expr* condition, Stmt* thenBranch," +
     " Stmt* elseBranch",
     "While      : Expr* condition, Stmt* body",
@@ -41,16 +41,17 @@ stmts = [
     "Import     : Expr* expression, Token name",
     "Enum       : Token name, StmtArray body",
     "EnumItem   : Token name, ParameterArray params",
-    "MethodSig  : Token name, ParameterArray params, TypeNode *returnType, FunctionType functionType",
+    "MethodSig  : Token name, ParameterArray params, TypeNode *returnType,"
+    " FunctionType functionType, TypeNodeArray generics",
 ]
 
 type_items = [
-    "TypeNode        : Node self",
-    "Simple          : Token name, TypeNodeArray generics",
-    "Functor         : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
-    "Union           : TypeNode* left, TypeNode* right",
-    "Interface       : Token name, struct Variable* superType, StmtArray body",
-    "TypeDeclaration : Token name, TypeNode* target",
+    "TypeNode         : Node self",
+    "Simple           : Token name, TypeNodeArray generics",
+    "Functor          : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
+    "Union            : TypeNode* left, TypeNode* right",
+    "Interface        : Token name, struct Variable* superType, StmtArray body",
+    "TypeDeclaration  : Token name, TypeNode* target, TypeNodeArray generics",
 ]
 
 param_types = [
