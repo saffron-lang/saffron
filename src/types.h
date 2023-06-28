@@ -97,6 +97,7 @@ InterfaceType *newInterfaceType();
 GenericType *newGenericType();
 
 SimpleType *numberType;
+SimpleType *anyType;
 SimpleType *boolType;
 SimpleType *nilType;
 SimpleType *atomType;

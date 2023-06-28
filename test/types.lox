@@ -30,3 +30,11 @@ fun myfunc<T extends MyInterface>(a: T, b: List<T>): T {
 }
 
 myfunc(my_var, [my_var])
+
+// This should fail
+var mylist: List<Number> = [1,2,3]
+var mylist2: List<Any> = mylist
+mylist2.push("String!")
+println(mylist2)
+// TODO: Methods dependent on their parent's type.
+// If called on a generic type, the generics should be available
