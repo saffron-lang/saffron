@@ -22,7 +22,7 @@ interface Container<T> {
 
     fun get_size()
 
-    fun is_full?() {
+    fun full?() {
         return this.get_size() >= capacity
     }
 }

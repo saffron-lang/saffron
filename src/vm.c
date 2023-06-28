@@ -17,8 +17,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include <libc.h>
+#include <stdlib.h>
 #include <libgen.h>
+#include <unistd.h>
 
 VM vm;
 
@@ -638,7 +639,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjMap *map = newMap();
                 push(OBJ_VAL(map));
                 for (int i = argCount; i > 0; i--) {
-                    mapSet(map, peek(2*i), peek(2*i-1));
+                    valueTableSet(map, peek(2 * i), peek(2 * i - 1));
                 }
                 for (int i = 0; i < argCount + 1; i++) {
                     pop();

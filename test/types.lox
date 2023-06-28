@@ -18,3 +18,15 @@ class MyClass {
 
 var my_var: MyInterface = MyClass()
 my_var.myfunc(5, "WOW!")
+
+fun myfunc<T>(a: T): T {
+    return a
+}
+
+fun myfunc<T extends MyInterface>(a: T, b: List<T>): T {
+    println(b)
+    a.myfunc(1, "ASD")
+    return a
+}
+
+myfunc(my_var, [my_var])

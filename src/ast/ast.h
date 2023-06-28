@@ -158,6 +158,7 @@ struct TypeDeclaration {
     TypeNode self;
     Token name;
     TypeNode* target;
+    TypeNodeArray generics;
 };
 
 struct Binary {
@@ -286,6 +287,7 @@ struct Function {
     Stmt self;
     Token name;
     ParameterArray params;
+    TypeNodeArray generics;
     StmtArray body;
     FunctionType functionType;
     TypeNode *returnType;
@@ -296,6 +298,7 @@ struct Class {
     Token name;
     struct Variable* superclass;
     StmtArray body;
+    TypeNodeArray generics;
 };
 
 struct If {
@@ -354,6 +357,7 @@ struct MethodSig {
     ParameterArray params;
     TypeNode *returnType;
     FunctionType functionType;
+    TypeNodeArray generics;
 };
 
 struct Positional {
