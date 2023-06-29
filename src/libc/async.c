@@ -50,21 +50,21 @@ void markAsyncRoots() {
 void handle_yield_value(Value value) {
     if (IS_LIST(value)) {
         ObjList *list = AS_LIST(value);
-        Value *arg = getListItem(list, 0);
-        if (arg == NULL || !IS_NUMBER(*arg)) {
+        Value arg = getListItem(list, 0);
+        if (valuesEqual(arg, NIL_VAL) || !IS_NUMBER(arg)) {
             runtimeError("Yielded invalid type");
         }
 
-        int op = trunc(AS_NUMBER(*arg));
+        int op = trunc(AS_NUMBER(arg));
 
         switch (op) {
             case SLEEP: {
-                Value *timeArg = getListItem(list, 1);
-                if (arg == NULL || !IS_NUMBER(*timeArg)) {
+                Value timeArg = getListItem(list, 1);
+                if (valuesEqual(arg, NIL_VAL) || !IS_NUMBER(timeArg)) {
                     runtimeError("Yielded invalid type");
                 }
 
-                double time = AS_NUMBER(*timeArg);
+                double time = AS_NUMBER(timeArg);
 
                 writeValueArray(&asyncHandler.sleepers, OBJ_VAL(currentFrame));
                 writeValueArray(&asyncHandler.sleeper_times, NUMBER_VAL(getTime() + time));

@@ -40,7 +40,7 @@ void listSortBuiltin(ObjList *list, int argCount, Value *args);
 
 Value getLength(ObjList *list, int argCount, Value *args);
 
-Value* getListItem(ObjList *list, int index);
+Value getListItem(ObjList *list, int index);
 
 ObjBuiltinType *createListType();
 
