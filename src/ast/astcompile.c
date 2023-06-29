@@ -2,7 +2,6 @@
 
 #include <printf.h>
 #include "astprint.h"
-#include "../object.h"
 #include "../debug.h"
 
 typedef struct {

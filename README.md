@@ -1,4 +1,4 @@
-# crafting-interpreters
+# Saffron
 ## Todo
 
 - Static types and typechecking
@@ -7,19 +7,23 @@
   - Import bytecode file
 - Discover files for import
 - List methods and accessing
-- Map and linked list types
+- ~~Map~~ and linked list types
 - Async networking
 - File I/O
 - Maybe something to do with currying?
 - Statements as expressions
+  - Allowing implicit return as the last stmt of a function
+  - Typechecking on if expressions?
 - Int and Float separation
-- Arbitrary size ints?
+  - Both as Long / Doubles?
+  - Arbitrary size ints?
 - Priority queue for async queuing
 - Exception handling
   - Only during runtime we can determine where to jump in the event of an error
   - Add try, catch but still encourage returning errors
   - Different handlers for different errors
   - Panic!
+- More complex typechecking that allows for referencing functions that are defined later
 
 ## Contributing Workflow
 
@@ -39,8 +43,8 @@
    - `libc/` for a builtin library
      - Types
        - `types.c` inside `initGlobalEnvironment()` define any new types or values
-       - `defineTypeDef` for a top level builtin type
-       - `defineLocal` for a top level bultin value/function
+       - `defineTypeDef()` for a top level builtin type
+       - `defineLocal()` for a top level bultin value/function
        - New classes will need to define both the Type and the Local if the type is to be used for both annotations and as a callable
      - Implementation
        - `vm.c` inside `initVM()` define any new builtin functions, values, or modules

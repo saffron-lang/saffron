@@ -604,7 +604,7 @@ static InterpretResult run(ObjModule *module) {
                     int index = trunc(AS_NUMBER(indexValue));
                     push(*getListItem((ObjList *) AS_OBJ(value), index));
                 } else if (isObjType(value, OBJ_MAP)) {
-                    push(*getMapItem((ObjMap *) AS_OBJ(value), indexValue));
+                    push(getMapItem((ObjMap *) AS_OBJ(value), indexValue));
                 }
                 break;
             }
@@ -639,7 +639,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjMap *map = newMap();
                 push(OBJ_VAL(map));
                 for (int i = argCount; i > 0; i--) {
-                    valueTableSet(map, peek(2 * i), peek(2 * i - 1));
+                    valueTableSet(&map->values, peek(2 * i), peek(2 * i - 1));
                 }
                 for (int i = 0; i < argCount + 1; i++) {
                     pop();
