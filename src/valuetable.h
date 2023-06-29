@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_VALUETABLE_H
-#define CRAFTING_INTERPRETERS_VALUETABLE_H
+#ifndef SAFFRON_VALUETABLE_H
+#define SAFFRON_VALUETABLE_H
 
 
 #include "object.h"
@@ -31,4 +31,4 @@ void freeValueTable(ValueTable *map);
 
 void markValueTable(ValueTable *map);
 
-#endif //CRAFTING_INTERPRETERS_VALUETABLE_H
+#endif //SAFFRON_VALUETABLE_H

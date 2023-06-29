@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_ASTPARSE_H
-#define CRAFTING_INTERPRETERS_ASTPARSE_H
+#ifndef SAFFRON_ASTPARSE_H
+#define SAFFRON_ASTPARSE_H
 
 #include "ast.h"
 
@@ -14,4 +14,4 @@ typedef struct {
 StmtArray *parseAST(const char *source);
 extern Parser parser;
 
-#endif //CRAFTING_INTERPRETERS_ASTPARSE_H
+#endif //SAFFRON_ASTPARSE_H

@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_LIST_H
-#define CRAFTING_INTERPRETERS_LIST_H
+#ifndef SAFFRON_LIST_H
+#define SAFFRON_LIST_H
 
 #include "../object.h"
 #include "type.h"
@@ -45,5 +45,5 @@ Value getListItem(ObjList *list, int index);
 ObjBuiltinType *createListType();
 
 
-#endif //CRAFTING_INTERPRETERS_LIST_H
+#endif //SAFFRON_LIST_H
 

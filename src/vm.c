@@ -14,6 +14,7 @@
 #include "files.h"
 #include "ast/astparse.h"
 #include "libc/map.h"
+#include "libc/builtins.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -86,20 +87,8 @@ void initVM() {
     vm.initString = copyString("init", 4);
     vm.openUpvalues = NULL;
 
-    defineBuiltin("List", OBJ_VAL(createListType()));
-    defineBuiltin("Map", OBJ_VAL(createMapType()));
-
-    defineNative("println", printlnNative);
-    defineNative("print", printNative);
-
-    defineNative("spawn", spawnNative);
-
-    defineType("Task", OBJ_VAL(createTaskType()));
-    defineType("Module", OBJ_VAL(createModuleType()));
-
-    defineModule("time", OBJ_VAL(createTimeModule()));
-//    defineNative("sleep", sleepNative);
-
+    makeTypes();
+    initLib();
     initAsyncHandler();
 }
 

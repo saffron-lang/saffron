@@ -9,16 +9,16 @@ fun times_two(x: Number) {
 5
   |> add_one()
   |> times_two()
-  |> println()
+  |> IO.println()
 
 var b: Number;
 b = 3;
-println(b);
+IO.println(b);
 
 var a = fun () => {
-    println("Wow!");
+    IO.println("Wow!");
 };
 
-println(a());
-println(:atom == "atom");
-println(:atom == :atom);
+IO.println(a());
+IO.println(:atom == "atom");
+IO.println(:atom == :atom);

@@ -86,6 +86,7 @@ static void freeObject(Obj *object) {
             FREE(ObjClass, object);
             break;
         }
+        case OBJ_MAP:
         case OBJ_LIST:
         case OBJ_INSTANCE: {
             ObjInstance *instance = (ObjInstance *) object;
@@ -234,6 +235,8 @@ static void blackenObject(Obj *object) {
             markTable(&klass->methods);
             break;
         }
+        case OBJ_MODULE:
+        case OBJ_MAP:
         case OBJ_LIST:
         case OBJ_INSTANCE: {
             ObjInstance *instance = (ObjInstance *) object;
@@ -259,6 +262,16 @@ static void blackenObject(Obj *object) {
             if (frame->parent) {
                 markObject((Obj *) frame->parent);
             }
+            break;
+        }
+        case OBJ_PARSE_TYPE:
+        case OBJ_PARSE_FUNCTOR_TYPE:
+        case OBJ_PARSE_GENERIC_TYPE:
+        case OBJ_PARSE_GENERIC_DEFINITION_TYPE:
+        case OBJ_PARSE_UNION_TYPE:
+        case OBJ_PARSE_INTERFACE_TYPE: {
+            markType((Type *) object);
+            break;
         }
     }
 }

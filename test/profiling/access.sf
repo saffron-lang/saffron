@@ -36,5 +36,5 @@ while (sum < 100000000) {
             + zoo.mouse();
 }
 
-print(Time.clock() - start);
-print(sum);
+IO.print(Time.clock() - start);
+IO.print(sum);

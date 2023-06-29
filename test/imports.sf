@@ -3,12 +3,12 @@ import "../test/inheritance.lox" as inheritance;
 
 var k = inheritance.Cruller();
 k.finish();
-println(k.finish);
-println("Successfully imported another module! ", inheritance);
+IO.println(k.finish);
+IO.println("Successfully imported another module! ", inheritance);
 
 
-println("New totally cool type, ", future.Future);
+IO.println("New totally cool type, ", future.Future);
 
 import "time" as time;
-println("New time module: ", time);
-println("The time is: ", time.clock());
+IO.println("New time module: ", time);
+IO.println("The time is: ", time.clock());

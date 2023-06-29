@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_MAP_H
-#define CRAFTING_INTERPRETERS_MAP_H
+#ifndef SAFFRON_MAP_H
+#define SAFFRON_MAP_H
 
 #include "type.h"
 #include "../valuetable.h"
@@ -31,4 +31,4 @@ Value mapValuesBuiltin(ObjMap *map, int argCount);
 
 ObjBuiltinType *createMapType();
 
-#endif //CRAFTING_INTERPRETERS_MAP_H
+#endif //SAFFRON_MAP_H

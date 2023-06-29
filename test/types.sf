@@ -3,7 +3,7 @@ var b: String | Number = "asd"
 var d: Atom = :asd
 var c: (Number) => Number = fun (x: Number): Number => { return x + 1; }
 var l: List<List<Number>> = [[1,2],[3,4]]
-println(l[1])
+IO.println(l[1])
 
 interface MyInterface {
     myfunc(a: Number, b: String)
@@ -11,8 +11,8 @@ interface MyInterface {
 
 class MyClass {
     myfunc(a: Number, b: String) {
-        println(a)
-        println(b)
+        IO.println(a)
+        IO.println(b)
     }
 }
 
@@ -24,7 +24,7 @@ fun myfunc<T>(a: T): T {
 }
 
 fun myfunc<T extends MyInterface>(a: T, b: List<T>): T {
-    println(b)
+    IO.println(b)
     a.myfunc(1, "ASD")
     return a
 }
@@ -35,6 +35,6 @@ myfunc(my_var, [my_var])
 var mylist: List<Number> = [1,2,3]
 var mylist2: List<Any> = mylist
 mylist2.push("String!")
-println(mylist2)
+IO.println(mylist2)
 // TODO: Methods dependent on their parent's type.
 // If called on a generic type, the generics should be available

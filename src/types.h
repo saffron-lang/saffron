@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_TYPES_H
-#define CRAFTING_INTERPRETERS_TYPES_H
+#ifndef SAFFRON_TYPES_H
+#define SAFFRON_TYPES_H
 
 #include "ast/ast.h"
 #include "table.h"
@@ -105,11 +105,15 @@ SimpleType *stringType;
 SimpleType *neverType;
 SimpleType *listTypeDef;
 SimpleType *mapTypeDef;
+SimpleType *taskTypeDef;
 
 void makeTypes();
 
+void defineBuiltinTypeDef(const char *path, const char *name, Type *type, bool builtin);
+
 void freeType(Type *type);
+void markType(Type *type);
 
 void markTypecheckerRoots();
 
-#endif //CRAFTING_INTERPRETERS_TYPES_H
+#endif //SAFFRON_TYPES_H
