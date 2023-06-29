@@ -23,7 +23,7 @@ SimpleType *createMapTypeDef();
 
 Value mapCall(int argCount, Value *args);
 
-Value *getMapItem(ObjMap *map, Value key);
+Value getMapItem(ObjMap *map, Value key);
 
 Value mapKeysBuiltin(ObjMap *map, int argCount);
 

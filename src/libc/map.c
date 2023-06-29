@@ -71,10 +71,10 @@ SimpleType *createMapTypeDef() {
 //Value mapCall(int argCount, Value *args);
 
 
-Value *getMapItem(ObjMap *map, Value key) {
+Value getMapItem(ObjMap *map, Value key) {
     if (map->values.count == 0) {
         runtimeError("Accessing empty map. No value at the given key %s", AS_CSTRING(key));
-        return &NIL_VAL;
+        return NIL_VAL;
     }
 
     uint32_t keyHash = hash(key);
@@ -84,10 +84,10 @@ Value *getMapItem(ObjMap *map, Value key) {
         if (valuesEqual(entry->key, NIL_VAL)) {
             if (IS_NIL(entry->value)) {
                 runtimeError("No value at the given key %s", AS_CSTRING(key));
-                return &NIL_VAL;
+                return NIL_VAL;
             }
         } else if (entry->hash == keyHash) {
-            return &entry->value;
+            return entry->value;
         }
         index = (index + 1) & (map->values.capacity - 1);
     }
