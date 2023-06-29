@@ -822,6 +822,8 @@ void compileNode(Node *node) {
             struct Import *casted = (struct Import *) node;
             compileNode((Node *) casted->expression);
             emitByte(OP_IMPORT);
+            uint8_t global = identifierConstant(&casted->name);
+            defineVariable(global);
             break;
         }
     }

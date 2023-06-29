@@ -1,4 +1,4 @@
-fun my_func(a): String {
+fun my_func(a): Number {
     println(a)
     return 5 + 2
 }
@@ -25,7 +25,7 @@ var brunch = Brunch();
 var eggs = brunch.eggs;
 
 class Scone {
-  topping(first, second) {
+  topping(first: String, second: String) {
     println("scone with " + first + " and " + second);
   }
 }

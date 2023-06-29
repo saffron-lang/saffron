@@ -800,8 +800,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_IMPORT: {
                 Value relPath = peek(0);
                 ObjModule *newModule = executeModule(AS_STRING(relPath));
-                tableSet(&module->obj.fields, newModule->name, OBJ_VAL(newModule));
-                pop();
+                push(OBJ_VAL(newModule));
                 break;
             }
             case OP_RETURN: {

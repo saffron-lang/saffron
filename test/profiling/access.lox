@@ -1,4 +1,13 @@
+import "time" as Time
+
 class Zoo {
+  var aardvark: Number;
+  var baboon: Number;
+  var cat: Number;
+  var donkey: Number;
+  var elephant: Number;
+  var fox: Number;
+
   init() {
     this.aardvark = 1;
     this.baboon   = 1;
@@ -17,7 +26,7 @@ class Zoo {
 
 var zoo = Zoo();
 var sum = 0;
-var start = clock();
+var start = Time.clock();
 while (sum < 100000000) {
   sum = sum + zoo.ant()
             + zoo.banana()
@@ -27,5 +36,5 @@ while (sum < 100000000) {
             + zoo.mouse();
 }
 
-print clock() - start;
-print sum;
+print(Time.clock() - start);
+print(sum);
