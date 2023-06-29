@@ -1,10 +1,19 @@
 # Saffron
+
+A small statically typed scripting language
+
 ## Todo
 
 - Static types and typechecking
 - Pattern matching
-- Write bytecode to file
-  - Import bytecode file
+- Imports
+  - Discover files from import paths
+  - Good semantics for relative imports
+    - May not go beyond root of package
+  - Packages
+  - Write bytecode to file
+    - Import bytecode file
+    - Write multiple bytecode files to a zipped package
 - Discover files for import
 - List methods and accessing
 - ~~Map~~ and linked list types

@@ -90,7 +90,7 @@ var container: Container = Backpack()
 try {
     container.add_item!(5)
     IO.println("Successfully added the item!")
-}  catch (error: RuntimeError) {
+} catch (error: RuntimeError) {
     IO.println("Failed to add the item!")
 }
 
