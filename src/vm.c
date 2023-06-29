@@ -602,7 +602,7 @@ static InterpretResult run(ObjModule *module) {
                 Value value = pop();
                 if (isObjType(value, OBJ_LIST)) {
                     int index = trunc(AS_NUMBER(indexValue));
-                    push(*getListItem((ObjList *) AS_OBJ(value), index));
+                    push(getListItem((ObjList *) AS_OBJ(value), index));
                 } else if (isObjType(value, OBJ_MAP)) {
                     push(getMapItem((ObjMap *) AS_OBJ(value), indexValue));
                 }
