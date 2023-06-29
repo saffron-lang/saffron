@@ -89,9 +89,9 @@ var container: Container = Backpack()
 
 try {
     container.add_item!(5)
-    println("Successfully added the item!")
+    IO.println("Successfully added the item!")
 }  catch (error: RuntimeError) {
-    println("Failed to add the item!")
+    IO.println("Failed to add the item!")
 }
 
 var success = match (container.add_item(5)) {
@@ -103,9 +103,9 @@ Ok(result) = success // throw an error if the match doesn't succeed
 
 // Deconstruction and matching
 [head, *middle, tail] = [1,2,3,4,5] // TODO: Refine this syntax
-println(head) // 1
-println(tail) // 5
-println(middle) // [2, 3, 4]
+IO.println(head) // 1
+IO.println(tail) // 5
+IO.println(middle) // [2, 3, 4]
 
 // Also
 [head, *tail] = [1,2,3,4,5]
@@ -130,7 +130,7 @@ fun get_dogs() {
         Task.sleep(0.1) // Awaiting is implicit, other tasks process
     }
 
-    println("We found the dogs")
+    IO.println("We found the dogs")
 }
 
 Task.spawn(get_dogs)

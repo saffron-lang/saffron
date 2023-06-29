@@ -1,8 +1,9 @@
 #include "../value.h"
 #include "type.h"
+#include "module.h"
 
-#ifndef CRAFTING_INTERPRETERS_ASYNC_H
-#define CRAFTING_INTERPRETERS_ASYNC_H
+#ifndef SAFFRON_ASYNC_H
+#define SAFFRON_ASYNC_H
 
 typedef enum {
     SLEEP = 1,
@@ -33,4 +34,6 @@ void markAsyncRoots();
 void handle_yield_value(Value value);
 int getTasks();
 
-#endif //CRAFTING_INTERPRETERS_ASYNC_H
+ModuleRegister taskModuleRegister;
+
+#endif //SAFFRON_ASYNC_H

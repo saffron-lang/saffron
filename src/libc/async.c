@@ -111,3 +111,27 @@ int getTasks() {
         return found;
     }
 }
+
+ObjModule *createTaskModule() {
+    ObjModule *module = newModule("Task", "task", false);
+    push(OBJ_VAL(module));
+    defineModuleFunction(module, "spawn", spawnNative);
+    pop();
+    return module;
+}
+
+SimpleType *createTaskModuleType() {
+    SimpleType *taskModule = newSimpleType();
+    FunctorType* callbackType = newFunctorType();
+    callbackType->returnType = anyType;
+    createBuiltinFunctorType(taskModule, "spawn", (Type *[]) {callbackType}, 1, NULL, 0, taskTypeDef);;
+    return taskModule;
+}
+
+ModuleRegister taskModuleRegister = {
+        createTaskModule,
+        createTaskModuleType,
+        "task",
+        "Task",
+        true
+};

@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_AST_H
-#define CRAFTING_INTERPRETERS_AST_H
+#ifndef SAFFRON_AST_H
+#define SAFFRON_AST_H
 #include "../scanner.h"
 #include "../value.h"
 #include "../memory.h"
@@ -375,4 +375,4 @@ struct Variadic {
     ;
 };
 
-#endif //CRAFTING_INTERPRETERS_AST_H
+#endif //SAFFRON_AST_H

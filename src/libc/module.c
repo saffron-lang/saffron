@@ -77,3 +77,31 @@ void defineModuleMember(ObjModule *module, const char *name, Value value) {
     pop();
     pop();
 }
+
+
+FunctorType *createBuiltinFunctorType(
+        SimpleType *moduleType,
+        const char *name,
+        Type **arguments,
+        int argumentCount,
+        struct TypeDeclaration **genericArgs,
+        int genericCount,
+        Type *returnType
+) {
+    FunctorType *type = ALLOCATE_OBJ(FunctorType, OBJ_PARSE_FUNCTOR_TYPE);
+    push(OBJ_VAL(type));
+    initValueArray(&type->arguments);
+    for (int i = 0; i < argumentCount; i++) {
+        writeValueArray(&type->arguments, OBJ_VAL(arguments[i]));
+    }
+
+    initValueArray(&type->genericArgs);
+    for (int i = 0; i < genericCount; i++) {
+        writeValueArray(&type->genericArgs, OBJ_VAL(genericArgs[i]));
+    }
+
+    type->returnType = returnType;
+    pop();
+    tableSet(&moduleType->fields, copyString(name, strlen(name)), OBJ_VAL(type));
+    return type;
+}

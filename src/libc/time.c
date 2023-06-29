@@ -16,7 +16,7 @@ Value clockNative(int argCount, Value *args) {
 }
 
 ObjModule *createTimeModule() {
-    ObjModule *module = newModule("time", "time", false);
+    ObjModule *module = newModule("Time", "time", false);
     push(OBJ_VAL(module));
     defineModuleFunction(module, "clock", clockNative);
     pop();
@@ -25,8 +25,14 @@ ObjModule *createTimeModule() {
 
 SimpleType *createTimeModuleType() {
     SimpleType *timeModule = newSimpleType();
-    FunctorType *clockType = newFunctorType();
-    clockType->returnType = (Type *) numberType;
-    tableSet(&timeModule->fields, copyString("clock", 5), OBJ_VAL(clockType));
+    createBuiltinFunctorType(timeModule, "clock", NULL, 0, NULL, 0, numberType);;
     return timeModule;
 }
+
+ModuleRegister timeModuleRegister = {
+        createTimeModule,
+        createTimeModuleType,
+        "time",
+        "Time",
+        false
+};

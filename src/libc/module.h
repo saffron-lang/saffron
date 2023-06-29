@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_MODULE_H
-#define CRAFTING_INTERPRETERS_MODULE_H
+#ifndef SAFFRON_MODULE_H
+#define SAFFRON_MODULE_H
 
 #include "../object.h"
 #include "type.h"
@@ -19,6 +19,29 @@ void printModule(ObjModule *module);
 ObjBuiltinType *createModuleType();
 
 void defineModuleFunction(ObjModule *module, const char *name, NativeFn function);
+
 void defineModuleMember(ObjModule *module, const char *name, Value value);
 
-#endif //CRAFTING_INTERPRETERS_MODULE_H
+typedef ObjModule *(*CreateModuleFn)();
+
+typedef SimpleType *(*CreateModuleTypeFn)();
+
+FunctorType *createBuiltinFunctorType(
+        SimpleType *moduleType,
+        const char *name,
+        Type **arguments,
+        int argumentCount,
+        struct TypeDeclaration **genericArgs,
+        int genericCount,
+        Type *returnType
+);
+
+typedef struct ModuleRegister {
+    CreateModuleFn createModuleFn;
+    CreateModuleTypeFn createModuleTypeFn;
+    const char* path;
+    const char* name;
+    bool builtin;
+} ModuleRegister;
+
+#endif //SAFFRON_MODULE_H

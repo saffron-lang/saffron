@@ -1,7 +1,6 @@
 
 #include <printf.h>
 #include "task.h"
-#include "../memory.h"
 
 ObjBuiltinType *taskType = NULL;
 
@@ -50,4 +49,28 @@ void taskInit(ObjBuiltinType *type) {
 ObjBuiltinType *createTaskType() {
     taskType = newBuiltinType("Task", taskInit);
     return taskType;
+}
+
+SimpleType *createTaskTypeDef() {
+    // Class
+    SimpleType *taskTypeDef = newSimpleType();
+
+    // Methods
+    FunctorType *getResultType = newFunctorType();
+    getResultType->returnType = (Type *) anyType;
+    tableSet(
+            &taskTypeDef->methods,
+            copyString("getResult", 9),
+            OBJ_VAL(getResultType)
+    );
+
+    FunctorType *isReadyType = newFunctorType();
+    isReadyType->returnType = (Type *) boolType;
+    tableSet(
+            &taskTypeDef->methods,
+            copyString("isReady", 7),
+            OBJ_VAL(isReadyType)
+    );
+
+    return (Type *) taskTypeDef;
 }

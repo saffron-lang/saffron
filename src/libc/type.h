@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_TYPE_H
-#define CRAFTING_INTERPRETERS_TYPE_H
+#ifndef SAFFRON_TYPE_H
+#define SAFFRON_TYPE_H
 
 #include "../object.h"
 #include "../vm.h"
@@ -48,4 +48,4 @@ ObjBuiltinType *newBuiltinType(const char *name, InitFn initFn);
 
 void defineBuiltinMethod(ObjBuiltinType *type, const char *name, NativeMethodFn function);
 
-#endif //CRAFTING_INTERPRETERS_TYPE_H
+#endif //SAFFRON_TYPE_H

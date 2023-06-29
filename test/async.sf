@@ -2,7 +2,7 @@ var SLEEP = 1;
 
 fun function2(x: Number) {
     yield [SLEEP, x];
-    println("Slept ", x);
+    IO.println("Slept ", x);
     return true;
 }
 
@@ -10,19 +10,19 @@ fun finish() {
     var x = "First print"
     var r = yield;
 
-    println("resumed with ", r);
-    spawn(fun () => function2(1))
-    spawn(fun () => function2(2))
-    spawn(fun () => function2(3))
-    var future = spawn(fun () => function2(4))
-    println(future, "wow!")
+    IO.println("resumed with ", r);
+    Task.spawn(fun () => function2(1))
+    Task.spawn(fun () => function2(2))
+    Task.spawn(fun () => function2(3))
+    var future = Task.spawn(fun () => function2(4))
+    IO.println(future, "wow!")
 
-    println("Future is done: ", future.isReady())
-    println("Future is done: ", future.isReady())
-    println("Future result: ", future.getResult())
+    IO.println("Future is done: ", future.isReady())
+    IO.println("Future is done: ", future.isReady())
+    IO.println("Future result: ", future.getResult())
 
     return " ok!";
 }
 
 var gen = finish()
-println("Function returned", gen)
+IO.println("Function returned", gen)

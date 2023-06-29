@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_TASK_H
-#define CRAFTING_INTERPRETERS_TASK_H
+#ifndef SAFFRON_TASK_H
+#define SAFFRON_TASK_H
 
 #include "../object.h"
 #include "../vm.h"
@@ -20,5 +20,6 @@ void printTask(ObjTask *list);
 
 ObjBuiltinType *createTaskType();
 
+SimpleType *createTaskTypeDef();
 
-#endif //CRAFTING_INTERPRETERS_TASK_H
+#endif //SAFFRON_TASK_H

@@ -5,8 +5,8 @@
 #include "libc/list.h"
 #include "files.h"
 #include "ast/astparse.h"
-#include "libc/time.h"
 #include "libc/map.h"
+#include "libc/task.h"
 
 
 Type *evaluateNode(Node *node);
@@ -19,6 +19,7 @@ SimpleType *newSimpleType() {
     initTable(&type->methods);
     initTable(&type->fields);
     initValueArray(&type->genericArgs);
+    type->superType = NULL;
     pop();
     return type;
 }
@@ -124,11 +125,10 @@ SimpleType *neverType;
 SimpleType *anyType;
 SimpleType *listTypeDef;
 SimpleType *mapTypeDef;
-FunctorType *printlnType;
-FunctorType *spawnType;
 SimpleType *taskTypeDef;
 
 Table modules;
+Table builtinModules;
 
 void makeTypes() {
     numberType = newSimpleType();
@@ -140,34 +140,20 @@ void makeTypes() {
     anyType = newSimpleType();
     listTypeDef = createListTypeDef();
     mapTypeDef = createMapTypeDef();
+    taskTypeDef = createTaskTypeDef();
 
-    printlnType = newFunctorType();
-    printlnType->returnType = (Type *) nilType;
-    writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
-    writeValueArray(&printlnType->arguments, OBJ_VAL(anyType));
-
-    // Tasks
-    taskTypeDef = (SimpleType *) newSimpleType();
-
-    FunctorType *isReady = newFunctorType();
-    FunctorType *getResult = newFunctorType();
-
-    isReady->returnType = (Type *) boolType;
-    getResult->returnType = (Type *) anyType;
-    tableSet(&taskTypeDef->methods, copyString("isReady", 7), OBJ_VAL(isReady));
-    tableSet(&taskTypeDef->methods, copyString("getResult", 9), OBJ_VAL(getResult));
-
-    // Spawn
-    spawnType = newFunctorType();
-    spawnType->returnType = (Type *) taskTypeDef;
-    FunctorType *spawnArgType = newFunctorType();
-
-    spawnArgType->returnType = (Type *) anyType;
-    writeValueArray(&spawnType->arguments, OBJ_VAL(spawnArgType));
-
-    // Time
     initTable(&modules);
-    tableSet(&modules, copyString("time", 4), OBJ_VAL(createTimeModuleType()));
+    initTable(&builtinModules);
+}
+
+void defineBuiltinTypeDef(const char *path, const char *name, Type *type, bool builtin) {
+    ObjString *pathString = copyString(path, strlen(path));
+    tableSet(&modules, pathString, OBJ_VAL(type));
+
+    if (builtin) {
+        ObjString *nameString = copyString(name, strlen(name));
+        tableSet(&builtinModules, nameString, OBJ_VAL(type));
+    }
 }
 
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
@@ -181,10 +167,6 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "Task", (Type *) taskTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "Map", mapTypeDef);
-
-    defineLocal(typeEnvironment, "println", (Type *) printlnType);
-    defineLocal(typeEnvironment, "print", (Type *) printlnType);
-    defineLocal(typeEnvironment, "spawn", (Type *) spawnType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
@@ -248,10 +230,12 @@ static Type *resolveTypeDef(struct TypeEnvironment *typeEnvironment, Token *name
 // Builtin types will also get added to vm.types
 static Type *getVariableType(Token name) {
     Type *arg = resolveLocal(currentEnv, &name);
+    Value argValue;
     if (arg) {
         return arg;
+    } else if (tableGet(&builtinModules, copyString(name.start, name.length), &argValue)) {
+        return AS_OBJ(argValue);
     } else {
-        TypeEnvironment *tenv = currentEnv;
         errorAt(&name, "Undefined variable");
         return NULL;
     }
@@ -677,9 +661,10 @@ Type *evaluateNode(Node *node) {
             }
 
             Value fieldType;
+            ObjString *nameString = copyString(casted->name.start, casted->name.length);
 
-            if (!tableGet(&rootType->methods, copyString(casted->name.start, casted->name.length), &fieldType)) {
-                if (!tableGet(&rootType->fields, copyString(casted->name.start, casted->name.length), &fieldType)) {
+            if (!tableGet(&rootType->methods, nameString, &fieldType)) {
+                if (!tableGet(&rootType->fields, nameString, &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
                 }
             }
@@ -1347,6 +1332,7 @@ void markType(Type *type) {
 }
 
 void markTypecheckerRoots() {
+    markTable(&modules);
     TypeEnvironment *typeEnvironment = currentEnv;
     while (typeEnvironment != NULL) {
         markTable(&typeEnvironment->locals);

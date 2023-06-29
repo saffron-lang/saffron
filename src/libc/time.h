@@ -1,5 +1,5 @@
-#ifndef CRAFTING_INTERPRETERS_TIME_H
-#define CRAFTING_INTERPRETERS_TIME_H
+#ifndef SAFFRON_TIME_H
+#define SAFFRON_TIME_H
 
 #include "../value.h"
 #include "module.h"
@@ -10,5 +10,6 @@ double getTime();
 Value clockNative(int argCount, Value* args);
 ObjModule* createTimeModule();
 SimpleType *createTimeModuleType();
+extern ModuleRegister timeModuleRegister;
 
-#endif //CRAFTING_INTERPRETERS_TIME_H
+#endif //SAFFRON_TIME_H
