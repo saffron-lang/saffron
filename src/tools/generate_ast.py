@@ -67,7 +67,7 @@ capfirst = lambda x: x[0].upper() + x[1:]
 
 types = dict(typeNode=type_items, expr=exprs, stmt=stmts, parameter=param_types)
 
-file = open("../src/ast/ast.c", "w")
+file = open("../ast/ast.c", "w")
 with redirect_stdout(file):
     print('#include "ast.h"')
     print()
@@ -98,7 +98,7 @@ void free{titleGroup}Array({titleGroup}Array * {group}Array) {{
     init{titleGroup}Array({group}Array);
 }}
 """)
-file = open("../src/ast/ast.h", "w")
+file = open("../ast/ast.h", "w")
 with redirect_stdout(file):
     all_types = []
 
