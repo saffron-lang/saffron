@@ -1,5 +1,5 @@
-import "lib/future.lox" as future; // Builtin module
-import "../test/inheritance.lox" as inheritance;
+import "lib/future.sf" as future; // Builtin module
+import "../test/inheritance.sf" as inheritance;
 
 var k = inheritance.Cruller();
 k.finish();
