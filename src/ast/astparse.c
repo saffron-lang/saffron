@@ -838,6 +838,8 @@ static Stmt *typeDeclaration() {
         typeDecl->generics = genericArgDefinitions();
     }
 
+    consume(TOKEN_EQUAL, "Expect '=' after type name.");
+
     typeDecl->target = typeAnnotation();
     match(TOKEN_SEMICOLON);
 
