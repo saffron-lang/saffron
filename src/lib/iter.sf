@@ -1,10 +1,10 @@
-interface Iterable {
-    fun iter() // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
+interface Iterable<T> {
+    fun iter<T>(): Iterator<T> // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
 } // Or maybe just duck typing in general??
 
-interface Iterator {
-    fun next()
-    fun iter()
+interface Iterator<T> {
+    fun next<T>()
+    fun iter<T>(): Iterator<T>
 }
 
 fun map<T extends Iterable, R>(iterable: List<T>, func: (T) => R): List<R> {

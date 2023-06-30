@@ -1,5 +1,5 @@
-#ifndef SAFFRON_AST_H
-#define SAFFRON_AST_H
+#ifndef saffron_AST_H
+#define saffron_AST_H
 #include "../scanner.h"
 #include "../value.h"
 #include "../memory.h"
@@ -152,6 +152,7 @@ struct Interface {
     Token name;
     struct Variable* superType;
     StmtArray body;
+    TypeNodeArray generics;
 };
 
 struct TypeDeclaration {
@@ -375,4 +376,4 @@ struct Variadic {
     ;
 };
 
-#endif //SAFFRON_AST_H
+#endif //saffron_AST_H

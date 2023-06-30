@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(crafting_interpreters C)
+project(saffron C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_OSX_ARCHITECTURES "arm64")
@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
 file(COPY src/lib DESTINATION .)
 
-add_executable(crafting_interpreters
+add_executable(saffron
         src/main.c
         src/common.h
         src/chunk.h

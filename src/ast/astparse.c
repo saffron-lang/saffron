@@ -419,6 +419,7 @@ ParseRule parseRules[] = {
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
+        [TOKEN_MODULO]        = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
         [TOKEN_SLASH]         = {NULL, binary, PREC_FACTOR},
         [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
@@ -957,6 +958,7 @@ static Stmt *funDeclaration() {
 }
 
 static Stmt *method() {
+    consume(TOKEN_FUN, "Expect 'var' or 'fun' keyword.");
     consume(TOKEN_IDENTIFIER, "Expect method name.");
     Token name = parser.previous;
     FunctionType type = TYPE_METHOD;
@@ -974,11 +976,17 @@ static Stmt *classDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expect class name.");
     Token className = parser.previous;
 
+    TypeNodeArray generics;
+    initTypeNodeArray(&generics);
+    if (match(TOKEN_LESS)) {
+        generics = genericArgDefinitions();
+    }
+
     struct Class *result = ALLOCATE_NODE(struct Class, NODE_CLASS);
     result->name = className;
     result->superclass = NULL;
 
-    if (match(TOKEN_LESS)) {
+    if (match(TOKEN_EXTENDS)) {
         consume(TOKEN_IDENTIFIER, "Expect superclass name.");
         struct Variable *var = variable(false);
 
@@ -1001,13 +1009,14 @@ static Stmt *classDeclaration() {
     }
 
     result->body = body;
+    result->generics = generics;
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 
     return (Stmt *) result;
 }
 
 static Stmt *methodSignature() {
-//    consume(TOKEN_FUN, "Expect 'fun' in interface body.")
+    consume(TOKEN_FUN, "Expect 'fun' in interface body.");
     consume(TOKEN_IDENTIFIER, "Expect method name.");
 
     TypeNodeArray generics;
@@ -1074,11 +1083,17 @@ static Stmt *interfaceDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expect an interface name.");
     Token interfaceName = parser.previous;
 
+    TypeNodeArray generics;
+    initTypeNodeArray(&generics);
+    if (match(TOKEN_LESS)) {
+        generics = genericArgDefinitions();
+    }
+
     struct Interface *result = ALLOCATE_NODE(struct Interface, NODE_INTERFACE);
     result->name = interfaceName;
     result->superType = NULL;
 
-    if (match(TOKEN_LESS)) {
+    if (match(TOKEN_EXTENDS)) {
         consume(TOKEN_IDENTIFIER, "Expect superclass name.");
         struct Variable *var = fieldDeclaration(false);
 
@@ -1101,6 +1116,7 @@ static Stmt *interfaceDeclaration() {
     }
 
     result->body = body;
+    result->generics = generics;
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after interface body.");
 
     return (Stmt *) result;
