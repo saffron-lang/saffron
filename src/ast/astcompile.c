@@ -402,6 +402,9 @@ void compileNode(Node *node) {
                 case TOKEN_MINUS:
                     emitByte(OP_SUBTRACT);
                     break;
+                case TOKEN_MODULO:
+                    emitByte(OP_MODULO);
+                    break;
                 case TOKEN_STAR:
                     emitByte(OP_MULTIPLY);
                     break;

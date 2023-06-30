@@ -6,7 +6,7 @@ var l: List<List<Number>> = [[1,2],[3,4]]
 IO.println(l[1])
 
 interface MyInterface {
-    myfunc(a: Number, b: String)
+    fun myfunc(a: Number, b: String)
 }
 
 class MyClass {

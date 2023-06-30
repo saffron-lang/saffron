@@ -50,7 +50,7 @@ type_items = [
     "Simple           : Token name, TypeNodeArray generics",
     "Functor          : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
     "Union            : TypeNode* left, TypeNode* right",
-    "Interface        : Token name, struct Variable* superType, StmtArray body",
+    "Interface        : Token name, struct Variable* superType, StmtArray body, TypeNodeArray generics",
     "TypeDeclaration  : Token name, TypeNode* target, TypeNodeArray generics",
 ]
 
@@ -102,8 +102,8 @@ file = open("../ast/ast.h", "w")
 with redirect_stdout(file):
     all_types = []
 
-    print("""#ifndef CRAFTING_INTERPRETERS_AST_H
-#define CRAFTING_INTERPRETERS_AST_H""")
+    print("""#ifndef saffron_AST_H
+#define saffron_AST_H""")
     print('#include "../scanner.h"')
     print('#include "../value.h"')
     print('#include "../memory.h"')
@@ -189,6 +189,6 @@ with redirect_stdout(file):
             print("};")
             print()
 
-    print("#endif //CRAFTING_INTERPRETERS_AST_H")
+    print("#endif //saffron_AST_H")
 
 # TODO: Write free function to recursively free tree
