@@ -1,5 +1,5 @@
-#ifndef clox_object_h
-#define clox_object_h
+#ifndef saffron_object_h
+#define saffron_object_h
 
 #include "common.h"
 #include "value.h"

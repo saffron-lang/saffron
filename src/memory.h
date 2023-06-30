@@ -1,5 +1,5 @@
-#ifndef clox_memory_h
-#define clox_memory_h
+#ifndef saffron_memory_h
+#define saffron_memory_h
 
 #include "common.h"
 #include "value.h"

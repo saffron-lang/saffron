@@ -12,7 +12,7 @@
     - `vm.c` handle the new ops
     - `debug.c` debug printing for the new op when printing bytecode
 4. Standard Library
-    - `lib/` an importable lib file written in lox, types are automatic
+    - `lib/` an importable lib file written in Saffron, no need to define types
     - `libc/` for a builtin library
         - Types
             - `types.c` inside `initGlobalEnvironment()` define any new types or values
@@ -24,5 +24,5 @@
             - `defineType()` for any top level types to keep them from being garbage collected that you don't want also to be defined as values
             - `defineModule()` to create a new module in C, see the time module created in `time.c`
             - `defineBuiltin()` to define a builtin function or value at the top level, e.g. `list` if you want a callable list type.
-            - `defineNative()` can define a function as a builtin and automatically wrap it in a Lox type
+            - `defineNative()` can define a function as a builtin and automatically wrap it in a Saffron type
             - Any definition will keep it from being garbage collected
