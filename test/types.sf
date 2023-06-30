@@ -5,12 +5,27 @@ var c: (Number) => Number = fun (x: Number): Number => { return x + 1; }
 var l: List<List<Number>> = [[1,2],[3,4]]
 IO.println(l[1])
 
+type A<T> = List<T>
+//var b: A<Number> = [1,2,3] // TODO: make this not error
+
+interface PogInterface<T> {
+    fun myfunc(a: T): T
+}
+
+class PogClass {
+    fun myfunc(a: Number): Number {
+        return a + 1
+    }
+}
+
+var cls: PogInterface<Number> = PogClass()
+
 interface MyInterface {
     fun myfunc(a: Number, b: String)
 }
 
 class MyClass {
-    myfunc(a: Number, b: String) {
+    fun myfunc(a: Number, b: String) {
         IO.println(a)
         IO.println(b)
     }

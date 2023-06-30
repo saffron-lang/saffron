@@ -330,6 +330,24 @@ static bool isSubType(Type *subclass, Type *superclass) {
         }
         case (OBJ_PARSE_GENERIC_TYPE): {
             GenericType *superclassType = (GenericType *) superclass;
+
+            if (superclassType->target->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
+                InterfaceType *target = (InterfaceType *) superclassType->target;
+                if (superclassType->generics.count != target->genericArgs.count) {
+                    error("Type argument count mismatch in generic");
+                    return false;
+                }
+
+                for (int i = 0; i < superclassType->generics.count; i++) {
+                    valueTableSet(&currentEnv->genericResolutions, target->genericArgs.values[i],
+                                  superclassType->generics.values[i]);
+                }
+
+                // TODO: This needs to actually check the consistency of the generic against the right side
+                // I think its done
+                return isSubType(subclass, superclassType->target);
+            }
+
             if (subclass->obj.type != OBJ_PARSE_GENERIC_TYPE) {
                 return false;
             }
@@ -726,6 +744,25 @@ Type *evaluateNode(Node *node) {
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, TYPE_FUNCTION);
 
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
             FunctorType *type = newFunctorType();
             FunctorType *oldFuncType = currentFuncType;
             currentFuncType = type;
@@ -873,6 +910,7 @@ Type *evaluateNode(Node *node) {
                 Type *valType = evaluateNode((Node *) casted->initializer);
                 if (varType) {
                     if (!isSubType(valType, varType)) {
+                        isSubType(valType, varType);
                         errorAt(&casted->name, "Type mismatch in var");
                     }
                 } else {
@@ -967,7 +1005,30 @@ Type *evaluateNode(Node *node) {
             currentClassType = (Type *) classType;
             FunctorType *classFunctionType = newFunctorType();
 
+            TypeEnvironment typeEnv;
+            initTypeEnvironment(&typeEnv, TYPE_INITIALIZER);
+
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
             classType->superType = NULL;
+            classType->genericArgs = genericArgs;
 
             if (casted->superclass) {
                 SimpleType *superType = getTypeDef(casted->superclass->name);
@@ -1050,6 +1111,8 @@ Type *evaluateNode(Node *node) {
             }
 
             classFunctionType->returnType = (Type *) classType;
+
+            currentEnv = currentEnv->enclosing;
 
             tableSet(
                     &currentEnv->locals, copyString(
@@ -1200,6 +1263,30 @@ Type *evaluateNode(Node *node) {
                 interfaceType->superType = (Type *) superType;
             }
 
+            TypeEnvironment typeEnv;
+            initTypeEnvironment(&typeEnv, TYPE_INITIALIZER);
+
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
+            interfaceType->genericArgs = genericArgs;
+
             for (int j = 0; j < casted->body.count; j++) {
                 if (casted->body.stmts[j]->self.type == NODE_METHODSIG) {
                     struct MethodSig *method = (struct MethodSig *) casted->body.stmts[j];
@@ -1243,6 +1330,8 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
+            currentEnv = currentEnv->enclosing;
+
             tableSet(
                     &currentEnv->typeDefs, copyString(
                             casted->name.start, casted->name.length
@@ -1255,11 +1344,36 @@ Type *evaluateNode(Node *node) {
         case NODE_TYPEDECLARATION: {
             struct TypeDeclaration *casted = (struct TypeDeclaration *) node;
 
+            TypeEnvironment typeEnv;
+            initTypeEnvironment(&typeEnv, TYPE_INITIALIZER);
+
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
+            Type *result = evaluateNode(casted->target);
+            currentEnv = currentEnv->enclosing;
+
             tableSet(
                     &currentEnv->typeDefs, copyString(
                             casted->name.start, casted->name.length
                     ),
-                    OBJ_VAL(evaluateNode(casted->target))
+                    OBJ_VAL(result)
             );
 
             break;

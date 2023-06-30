@@ -250,6 +250,7 @@ struct Lambda {
     Expr self;
     ParameterArray params;
     StmtArray body;
+    TypeNodeArray generics;
 };
 
 struct List {
