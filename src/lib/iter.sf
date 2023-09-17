@@ -1,26 +1,39 @@
-interface Iterable<T> {
-    fun iter<T>(): Iterator<T> // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
-} // Or maybe just duck typing in general??
-
 interface Iterator<T> {
-    fun next<T>()
-    fun iter<T>(): Iterator<T>
+    fun next(): T
+    fun next?(): Bool
+    fun iter(): Iterator<T>
 }
 
-fun map<T extends Iterable, R>(iterable: List<T>, func: (T) => R): List<R> {
+interface Iterable<T> {
+    fun iter(): Iterator<T> // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
+} // Or maybe just duck typing in general??
+
+fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     var result: List<R> = []
 
-    for (item in iterable) {
-        result.push(func(item))
+//    for (item in iterable) {
+//        result.push(func(item))
+//    }
+
+    var iter = iterable.iter()
+
+    var f: (T) => R = func
+    var res: R = func(iter.next())
+
+    for (var item = iter.next(); iter.next?(); item = iter.next()) {
+        result.push(
+            func(item)
+        )
     }
 
     return result
 }
 
-fun filter<T>(iterable: List<T>, func: (T) => Boolean): List<R> {
+fun filter<T>(iterable: Iterable<T>, func: (T) => Boolean): List<R> {
     var result: List<R> = []
 
-    for (item in iterable) {
+    var iter = iterable.iter()
+    for (var item = iter.next(); iter.next?(); item = iter.next()) {
         if (func(item)) {
             result.push(item)
         }
@@ -33,22 +46,50 @@ interface Addend {
     fun add()
 }
 
-fun sum<T extends Addend>(iterable: List<T>) {
+fun sum<T extends Addend>(iterable: Iterable<T>) {
     var iterator = iterable.iter()
 
     var result: T = iterator.next() // ReturnValue<T.add>?
-    for (item in iterator) {
+    for (var item = iterator.next(); iterator.next?(); item = iterator.next()) {
         result = result + item
     }
 
     return result
 }
 
-fun sum<T extends Addend>(iterable: List<T>, initial: T) {
+fun sum<T extends Addend>(iterable: Iterable<T>, initial: T) {
     var result: T = initial // ReturnValue<T.add>?
-    for (item in iterable) {
+    var iter = iterable.iter()
+    for (var item = iter.next(); iter.next?(); item = iter.next()) {
         result = result + item
     }
 
     return result
 }
+
+class ListIterator<Iterator> {
+    var index: number
+    var list: List
+
+    fun init(list: List) {
+        this.list = list
+        this.index = 0
+    }
+
+    fun iter() {
+        return this
+    }
+
+    fun next() {
+        var result = this.list[this.index]
+        this.index = this.index + 1
+        return result
+    }
+
+    fun next?() {
+        return this.index < this.list.length()
+    }
+}
+
+[1, 2, 3, 4, 5, 6] |> ListIterator() |> sum(0) |> IO.println()
+"Oh wow!" |> IO.println()

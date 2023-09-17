@@ -3,6 +3,8 @@
 #include "list.h"
 #include "time.h"
 #include "task.h"
+#include <sys/select.h>
+#include <limits.h>
 
 AsyncHandler asyncHandler;
 
@@ -77,6 +79,40 @@ void handle_yield_value(Value value) {
 
                 break;
             }
+            case WAIT_IO_READ: {
+                Value fdArg = getListItem(list, 1);
+                if (valuesEqual(arg, NIL_VAL) || !IS_NUMBER(fdArg)) {
+                    runtimeError("Yielded invalid type");
+                }
+
+                writeValueArray(&asyncHandler.readers, OBJ_VAL(currentFrame));
+                writeValueArray(&asyncHandler.reader_fds, fdArg);
+
+                popValueArray(&vm.tasks, vm.currentTask);
+                if (vm.currentTask >= vm.tasks.count) {
+                    getTasks();
+                }
+                vm.currentTask = vm.currentTask % vm.tasks.count;
+
+                break;
+            }
+            case WAIT_IO_WRITE: {
+                Value fdArg = getListItem(list, 1);
+                if (valuesEqual(arg, NIL_VAL) || !IS_NUMBER(fdArg)) {
+                    runtimeError("Yielded invalid type");
+                }
+
+                writeValueArray(&asyncHandler.writers, OBJ_VAL(currentFrame));
+                writeValueArray(&asyncHandler.writer_fds, fdArg);
+
+                popValueArray(&vm.tasks, vm.currentTask);
+                if (vm.currentTask >= vm.tasks.count) {
+                    getTasks();
+                }
+                vm.currentTask = vm.currentTask % vm.tasks.count;
+
+                break;
+            }
             default:
                 runtimeError("Invalid yield op %d", op);
                 return;
@@ -108,6 +144,60 @@ int getTasks() {
             }
         }
 
+        fd_set errfd;
+        FD_ZERO(&errfd);
+
+        int readStatus;
+        fd_set infd;
+        FD_ZERO(&infd);
+        for (int i = 0; i < asyncHandler.reader_fds.count; i++) {
+            FD_SET(trunc(AS_NUMBER(asyncHandler.reader_fds.values[i])), &infd);
+            FD_SET(trunc(AS_NUMBER(asyncHandler.reader_fds.values[i])), &errfd);
+        }
+
+        fd_set outfd;
+        FD_ZERO(&outfd);
+        for (int i = 0; i < asyncHandler.writer_fds.count; i++) {
+            FD_SET(trunc(AS_NUMBER(asyncHandler.writer_fds.values[i])), &outfd);
+            FD_SET(trunc(AS_NUMBER(asyncHandler.writer_fds.values[i])), &errfd);
+        }
+
+        // create a time struct that will tell select to wait for 200ms
+        struct timeval time;
+        time.tv_sec = 0;
+        time.tv_usec = 200000;
+
+        readStatus = select(INT_MAX, &infd, &outfd, NULL, &time);
+
+        if (!readStatus) {
+            return 0;
+        }
+
+        for (int i = 0; i < asyncHandler.readers.count; i++) {
+//            printf("Sleeper time: %f %f\n", AS_NUMBER(asyncHandler.sleeper_times.values[i]), getTime());
+            if (FD_ISSET(trunc(AS_NUMBER(asyncHandler.reader_fds.values[i])), &infd)) {
+                popValueArray(&asyncHandler.reader_fds, i);
+                Value reader = asyncHandler.readers.values[i];
+                AS_CALL_FRAME(reader)->stored = BOOL_VAL(true);
+                writeValueArray(&vm.tasks, reader);
+                popValueArray(&asyncHandler.readers, i);
+                found = 1;
+                i--;
+            }
+        }
+
+        for (int i = 0; i < asyncHandler.writers.count; i++) {
+            if (FD_ISSET(trunc(AS_NUMBER(asyncHandler.writer_fds.values[i])), &outfd)) {
+                popValueArray(&asyncHandler.writer_fds, i);
+                Value writer = asyncHandler.writers.values[i];
+                AS_CALL_FRAME(writer)->stored = BOOL_VAL(true);
+                writeValueArray(&vm.tasks, writer);
+                popValueArray(&asyncHandler.writers, i);
+                found = 1;
+                i--;
+            }
+        }
+
         return found;
     }
 }
@@ -122,7 +212,7 @@ ObjModule *createTaskModule() {
 
 SimpleType *createTaskModuleType() {
     SimpleType *taskModule = newSimpleType();
-    FunctorType* callbackType = newFunctorType();
+    FunctorType *callbackType = newFunctorType();
     callbackType->returnType = anyType;
     createBuiltinFunctorType(taskModule, "spawn", (Type *[]) {callbackType}, 1, NULL, 0, taskTypeDef);;
     return taskModule;
