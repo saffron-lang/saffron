@@ -440,7 +440,7 @@ static InterpretResult run(ObjModule *module) {
 #define BINARY_OP(valueType, op) \
     do { \
       if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-        runtimeError("Operands must be numbers."); \
+        runtimeError("Operands must be numbers for binary op."); \
         return INTERPRET_RUNTIME_ERROR; \
       } \
       double b = AS_NUMBER(pop()); \
@@ -495,7 +495,7 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_MODULO: {
                 if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError("Operands must be numbers for modulo.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 double b = AS_NUMBER(pop());
@@ -682,7 +682,7 @@ static InterpretResult run(ObjModule *module) {
                 push(OBJ_VAL(newClass(READ_STRING())));
                 break;
             case OP_GET_PROPERTY: {
-                if (!IS_INSTANCE(peek(0))) {
+                if (!IS_INSTANCE(peek(0)) && !IS_LIST(peek(0))) {
                     runtimeError("Only instances have properties.");
                     return INTERPRET_RUNTIME_ERROR;
                 }

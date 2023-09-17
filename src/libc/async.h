@@ -22,6 +22,10 @@ Value spawnNative(int argCount, Value* args);
 //Value sleepNative(int argCount, Value* args);
 
 typedef struct {
+    ValueArray readers;
+    ValueArray reader_fds;
+    ValueArray writers;
+    ValueArray writer_fds;
     ValueArray sleepers;
     ValueArray sleeper_times;
 } AsyncHandler;
