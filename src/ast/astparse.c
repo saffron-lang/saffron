@@ -1020,6 +1020,7 @@ static Stmt *classDeclaration() {
 static Stmt *methodSignature() {
     consume(TOKEN_FUN, "Expect 'fun' in interface body.");
     consume(TOKEN_IDENTIFIER, "Expect method name.");
+    Token name = parser.previous;
 
     TypeNodeArray generics;
     initTypeNodeArray(&generics);
@@ -1027,7 +1028,6 @@ static Stmt *methodSignature() {
         generics = genericArgDefinitions();
     }
 
-    Token name = parser.previous;
     FunctionType type = TYPE_METHOD;
     if (parser.previous.length == 4 &&
         memcmp(parser.previous.start, "init", 4) == 0) {

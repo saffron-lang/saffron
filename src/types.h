@@ -55,6 +55,7 @@ typedef struct UnionType {
 typedef struct GenericTypeDefinition {
     // T
     Type self;
+    Token name;
     Type *extends;
 } GenericTypeDefinition;
 
@@ -112,6 +113,7 @@ void makeTypes();
 void defineBuiltinTypeDef(const char *path, const char *name, Type *type, bool builtin);
 
 void freeType(Type *type);
+
 void markType(Type *type);
 
 void markTypecheckerRoots();

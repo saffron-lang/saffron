@@ -265,7 +265,23 @@ static bool resolveGenericArgument(TypeEnvironment *typeEnvironment, Type *subcl
         }
     }
 
+    if (!typeEnvironment->enclosing) {
+        return false;
+    }
+
     return resolveGenericArgument(typeEnvironment->enclosing, subclass, superclass);
+}
+static Type* findGenericResolution(TypeEnvironment *typeEnvironment, Type *subclass) {
+    Value resultValue;
+    if (valueTableGet(&typeEnvironment->genericResolutions, OBJ_VAL(subclass), &resultValue)) {
+        return AS_OBJ(resultValue);
+    }
+
+    if (!typeEnvironment->enclosing) {
+        return NULL;
+    }
+
+    return findGenericResolution(typeEnvironment->enclosing, subclass);
 }
 
 static bool isSubType(Type *subclass, Type *superclass) {
@@ -286,11 +302,23 @@ static bool isSubType(Type *subclass, Type *superclass) {
         return true;
     }
 
-    if (subclass->obj.type == OBJ_PARSE_GENERIC_TYPE) {
-        GenericType *subclassType = (GenericType *) subclass;
-        if (isSubType(subclassType->target, superclass)) {
-            return true;
+    switch (subclass->obj.type) {
+        case (OBJ_PARSE_GENERIC_TYPE): {
+            GenericType *subclassType = (GenericType *) subclass;
+            if (isSubType(subclassType->target, superclass)) {
+                return true;
+            }
+            break;
         }
+        case (OBJ_PARSE_GENERIC_DEFINITION_TYPE): {
+            GenericTypeDefinition *subclassType = (GenericTypeDefinition *) subclass;
+            Type* inner = findGenericResolution(currentEnv, subclass);
+            if (inner) {
+                return isSubType(inner, superclass);
+            }
+            break;
+        }
+        default: break;
     }
 
     switch (superclass->obj.type) {
@@ -605,6 +633,7 @@ Type *evaluateNode(Node *node) {
             for (int i = 0; i < casted->arguments.count; i++) {
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
                 if (!isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
+                    isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]));
                     errorAt(&casted->paren, "Type mismatch");
                     return NULL;
                 }
@@ -752,6 +781,7 @@ Type *evaluateNode(Node *node) {
                 Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
                 GenericTypeDefinition *argType = newGenericTypeDefinition();
                 argType->extends = extendType;
+                argType->name = typeNode->name;
 
                 writeValueArray(&genericArgs, OBJ_VAL(argType));
 
@@ -945,6 +975,7 @@ Type *evaluateNode(Node *node) {
                 Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
                 GenericTypeDefinition *argType = newGenericTypeDefinition();
                 argType->extends = extendType;
+                argType->name = typeNode->name;
 
                 writeValueArray(&genericArgs, OBJ_VAL(argType));
 
@@ -1016,6 +1047,7 @@ Type *evaluateNode(Node *node) {
                 Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
                 GenericTypeDefinition *argType = newGenericTypeDefinition();
                 argType->extends = extendType;
+                argType->name = typeNode->name;
 
                 writeValueArray(&genericArgs, OBJ_VAL(argType));
 
@@ -1194,7 +1226,8 @@ Type *evaluateNode(Node *node) {
 
             for (int i = 0; i < casted->generics.count; i++) {
                 struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
-                Type *argType = newGenericTypeDefinition();
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->name = typeNode->name;
                 writeValueArray(&type->genericArgs, OBJ_VAL(argType));
                 tableSet(
                         &currentEnv->typeDefs, copyString(
@@ -1250,6 +1283,13 @@ Type *evaluateNode(Node *node) {
             InterfaceType *interfaceType = newInterfaceType();
             interfaceType->superType = NULL;
 
+            tableSet(
+                    &currentEnv->typeDefs, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(interfaceType)
+            );
+
             if (casted->superType) {
                 InterfaceType *superType = getTypeDef(casted->superType->name);
 
@@ -1274,6 +1314,7 @@ Type *evaluateNode(Node *node) {
                 Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
                 GenericTypeDefinition *argType = newGenericTypeDefinition();
                 argType->extends = extendType;
+                argType->name = typeNode->name;
 
                 writeValueArray(&genericArgs, OBJ_VAL(argType));
 
@@ -1332,13 +1373,6 @@ Type *evaluateNode(Node *node) {
 
             currentEnv = currentEnv->enclosing;
 
-            tableSet(
-                    &currentEnv->typeDefs, copyString(
-                            casted->name.start, casted->name.length
-                    ),
-                    OBJ_VAL(interfaceType)
-            );
-
             break;
         }
         case NODE_TYPEDECLARATION: {
@@ -1355,6 +1389,7 @@ Type *evaluateNode(Node *node) {
                 Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
                 GenericTypeDefinition *argType = newGenericTypeDefinition();
                 argType->extends = extendType;
+                argType->name = typeNode->name;
 
                 writeValueArray(&genericArgs, OBJ_VAL(argType));
 
