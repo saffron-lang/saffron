@@ -5,6 +5,9 @@
 Value printNative(int argCount, Value *args) {
     for (int i = 0; i < argCount; i++) {
         printValue(args[i]);
+        if (i < argCount) {
+            printf(" ");
+        }
     }
     return NIL_VAL;
 }

@@ -897,7 +897,7 @@ ObjModule *executeModule(ObjString *relPath) {
     remove_n(chars, basename(relPath->chars), 4);
 
     StmtArray *body = parseAST(source);
-    evaluateTree(body);
+//    evaluateTree(body);
     ObjModule *module = interpret(body, chars, path);
     free(source);
     moduleContext = temp;
