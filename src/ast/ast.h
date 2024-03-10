@@ -29,6 +29,7 @@ typedef enum {
     NODE_LITERAL,
     NODE_UNARY,
     NODE_VARIABLE,
+    NODE_ALTASSIGN,
     NODE_ASSIGN,
     NODE_LOGICAL,
     NODE_CALL,
@@ -188,6 +189,13 @@ struct Unary {
 struct Variable {
     Expr self;
     Token name;
+};
+
+struct AltAssign {
+    Expr self;
+    Token name;
+    Token operator;
+    Expr* value;
 };
 
 struct Assign {

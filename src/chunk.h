@@ -24,6 +24,8 @@ typedef enum {
     OP_LESS,
     OP_POP,
     OP_CLOSE_UPVALUE,
+    OP_IN_PLACE_ADD,
+    OP_IN_PLACE_SUBTRACT,
     OP_DEFINE_GLOBAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,

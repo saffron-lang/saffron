@@ -7,6 +7,7 @@ exprs = [
     "Literal  : Value value",
     "Unary    : Token operator, Expr* right",
     "Variable : Token name",
+    "AltAssign: Token name, Token operator, Expr* value",
     "Assign   : Token name, Expr* value",
     "Logical  : Expr* left, Token operator, Expr* right",
     "Call     : Expr* callee, Token paren, ExprArray arguments",

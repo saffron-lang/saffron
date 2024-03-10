@@ -481,6 +481,27 @@ void compileNode(Node *node) {
             setVariable(casted->name, true);
             break;
         }
+        case NODE_ALTASSIGN: {
+            struct AltAssign *casted = (struct AltAssign *) node;
+            TokenType operatorType = casted->operator.type;
+            switch (operatorType) {
+                case TOKEN_PLUS_PLUS:
+                    getVariable(casted->name);
+                    compileNode((Node *) casted->value);
+                    emitByte(OP_ADD);
+                    setVariable(casted->name, true);
+                    break;
+                case TOKEN_MINUS_MINUS:
+                    getVariable(casted->name);
+                    compileNode((Node *) casted->value);
+                    emitByte(OP_SUBTRACT);
+                    setVariable(casted->name, true);
+                    break;
+                default:
+                    return; // Unreachable.
+            }
+            break;
+        }
         case NODE_CALL: {
             struct Call *casted = (struct Call *) node;
             if (casted->callee->self.type == NODE_GET) {
