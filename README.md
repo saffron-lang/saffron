@@ -3,11 +3,12 @@
 A small statically typed scripting language
 
 ## Todo
-
+- _Actual_ line numbers
 - Static types and typechecking
 - Pattern matching
 - Imports
-  - Discover files from import paths
+  - Discover files from import 
+  - paths
   - Good semantics for relative imports
     - May not go beyond root of package
   - Packages
@@ -33,3 +34,6 @@ A small statically typed scripting language
   - Different handlers for different errors
   - Panic!
 - More complex typechecking that allows for referencing functions that are defined later
+- In place arithmetic (`NODE_ALTASSIGN`)
+  - `OP_IN_PLACE_ADD`
+  - `OP_IN_PLACE_SUBTRACT`

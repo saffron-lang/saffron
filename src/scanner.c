@@ -278,9 +278,9 @@ Token scanToken() {
         case '.':
             return makeToken(TOKEN_DOT);
         case '-':
-            return makeToken(TOKEN_MINUS);
+            return makeToken(match('-') ? TOKEN_MINUS_MINUS : TOKEN_MINUS);
         case '+':
-            return makeToken(TOKEN_PLUS);
+            return makeToken(match('+') ? TOKEN_PLUS_PLUS : TOKEN_PLUS);
         case '%':
             return makeToken(TOKEN_MODULO);
         case '/':

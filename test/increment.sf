@@ -1,0 +1,6 @@
+var a: Number = 4;
+a = a++;
+IO.println(a);
+var b: Number = a--;
+IO.println(b);
+IO.println(a);

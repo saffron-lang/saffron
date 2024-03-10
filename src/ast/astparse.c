@@ -248,6 +248,14 @@ static Expr *variable(bool canAssign) {
         var->value = expression();
 
         return (Expr *) var;
+    } else if (canAssign && (match(TOKEN_PLUS_PLUS) || match(TOKEN_MINUS_MINUS))) {
+        struct AltAssign *var = ALLOCATE_NODE(struct AltAssign, NODE_ALTASSIGN);
+        struct Literal *amount = ALLOCATE_NODE(struct Literal, NODE_LITERAL);
+        amount->value = NUMBER_VAL(1);
+        var->name = name;
+        var->value = (Expr *) amount;
+        var->operator = parser.previous;
+        return (Expr *) var;
     } else {
         struct Variable *var = ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
         var->name = name;
@@ -425,6 +433,8 @@ ParseRule parseRules[] = {
         [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
         [TOKEN_BANG]          = {unary, NULL, PREC_NONE},
         [TOKEN_BANG_EQUAL]    = {NULL, binary, PREC_EQUALITY},
+        [TOKEN_PLUS_PLUS]     = {NULL, NULL, PREC_NONE},
+        [TOKEN_MINUS_MINUS]   = {NULL, NULL, PREC_NONE},
         [TOKEN_EQUAL]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EQUAL_EQUAL]   = {NULL, binary, PREC_EQUALITY},
         [TOKEN_GREATER]       = {NULL, binary, PREC_COMPARISON},
