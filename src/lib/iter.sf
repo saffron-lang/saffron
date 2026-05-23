@@ -1,4 +1,4 @@
-// Iterator interfaces
+// Iterator interfaces (standard protocols)
 interface Iterator<T> {
     fun next(): T
     fun next?(): Bool
@@ -8,8 +8,7 @@ interface Iterable<T> {
     fun iter(): Iterator<T>
 }
 
-// Iterator utilities — works with any type that has .iter(), .next(), .next?()
-// Lists and Maps both provide native .iter() methods.
+// Iterator utilities — works with any type implementing Iterable<T>
 
 fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     var result: List<R> = []
@@ -69,7 +68,7 @@ fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
 }
 
 fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
-    var n: Number = 0
+    var n = 0
     var iter = iterable.iter()
     while (iter.next?()) {
         if (func(iter.next())) { n = n + 1 }
@@ -112,7 +111,7 @@ fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
 fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
     var result: List<List<Any>> = []
     var iter = iterable.iter()
-    var i: Number = 0
+    var i = 0
     while (iter.next?()) {
         result.push([i, iter.next()])
         i = i + 1
@@ -123,7 +122,7 @@ fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
 fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
     var iter = iterable.iter()
-    var i: Number = 0
+    var i = 0
     while (i < n and iter.next?()) {
         result.push(iter.next())
         i = i + 1
@@ -134,7 +133,7 @@ fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
 fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
     var iter = iterable.iter()
-    var i: Number = 0
+    var i = 0
     while (iter.next?()) {
         var item = iter.next()
         if (i >= n) { result.push(item) }

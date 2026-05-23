@@ -35,5 +35,14 @@ interface Indexable<K, V> {
 }
 
 interface Stringable {
-    fun toString(): String
+    fun to_string(): String
+}
+
+interface Iterator<T> {
+    fun next(): T
+    fun next?(): Bool
+}
+
+interface Iterable<T> {
+    fun iter(): Iterator<T>
 }

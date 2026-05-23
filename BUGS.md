@@ -88,6 +88,38 @@ the top of the function.
 **Impact:** Spurious type errors on any function call that accepts `Any` and receives a
 list, map, or other compound type.
 
+### 10. Type checker `runtimeError()` interferes with exception handling in imported modules
+
+**Reproduction:**
+```saffron
+// src/lib/test.sf
+fun assert_eq(actual, expected, msg) {
+    if (actual == expected) { IO.println("ok") }
+}
+```
+```saffron
+import "@test" as T
+T.assert_eq(1, 1, "works")  // Runtime error at [line 0] in assert_eq()
+```
+
+**Expected:** `assert_eq` runs correctly (1 == 1 is true at runtime).
+**Actual:** Fatal `"Runtime error."` at `[line 0] in assert_eq()` before any user code executes.
+
+**Root cause:** The type checker calls `runtimeError()` when it can't resolve `==` on
+`Any`-typed operands. This happens during module compilation (type check phase of an
+`import`), but `vm.vmReady` is already true because the main script's VM has started.
+The `runtimeError` call resets the stack and aborts execution even though the runtime
+code would work fine.
+
+**Fix:** The type checker should use a separate error reporting path (e.g. `typeError()`)
+that never interacts with the VM's exception handler stack or `resetStack()`. Type errors
+during the type check pass should accumulate as diagnostics, not trigger `runtimeError()`.
+
+**Workaround:** Inline functions instead of importing, or add type annotations that avoid
+`Any == Any` comparisons in the type checker.
+
+**Impact:** Blocks any stdlib module that uses untyped parameters with equality checks.
+
 ## Minor
 
 ### 6. No `break`/`continue` keywords
