@@ -1756,24 +1756,32 @@ Type *evaluateNode(Node *node) {
 
             for (int i = 0; i < casted->body.count; i++) {
                 struct EnumItem *variant = (struct EnumItem *) casted->body.stmts[i];
-                FunctorType *variantType = newFunctorType();
-                variantType->genericArgs = genericArgs;
 
-                for (int j = 0; j < variant->params.count; j++) {
-                    TypeNode *typeNode = variant->params.parameters[j]->type;
-                    Type *argType;
-                    if (typeNode != NULL) {
-                        argType = evaluateNode((Node *) typeNode);
-                    } else {
-                        argType = (Type *) anyType;
+                if (variant->params.count == 0) {
+                    // Zero-arg variant: value IS the enum type directly
+                    tableSet(&enumType->methods,
+                             copyString(variant->name.start, variant->name.length),
+                             OBJ_VAL(enumType));
+                } else {
+                    FunctorType *variantType = newFunctorType();
+                    variantType->genericArgs = genericArgs;
+
+                    for (int j = 0; j < variant->params.count; j++) {
+                        TypeNode *typeNode = variant->params.parameters[j]->type;
+                        Type *argType;
+                        if (typeNode != NULL) {
+                            argType = evaluateNode((Node *) typeNode);
+                        } else {
+                            argType = (Type *) anyType;
+                        }
+                        writeValueArray(&variantType->arguments, OBJ_VAL(argType));
                     }
-                    writeValueArray(&variantType->arguments, OBJ_VAL(argType));
-                }
 
-                variantType->returnType = (Type *) enumType;
-                tableSet(&enumType->methods,
-                         copyString(variant->name.start, variant->name.length),
-                         OBJ_VAL(variantType));
+                    variantType->returnType = (Type *) enumType;
+                    tableSet(&enumType->methods,
+                             copyString(variant->name.start, variant->name.length),
+                             OBJ_VAL(variantType));
+                }
             }
 
             currentEnv = currentEnv->enclosing;
@@ -1814,13 +1822,16 @@ Type *evaluateNode(Node *node) {
                     if (tableGet(&enumST->methods,
                                  copyString(arm->variantName.start, arm->variantName.length),
                                  &variantVal)) {
-                        FunctorType *variantFn = (FunctorType *) AS_OBJ(variantVal);
-                        for (int j = 0; j < arm->bindings.count && j < variantFn->arguments.count; j++) {
-                            Type *bindingType = AS_OBJ(variantFn->arguments.values[j]);
-                            tableSet(&armEnv.locals,
-                                     copyString(arm->bindings.parameters[j]->name.start,
-                                                arm->bindings.parameters[j]->name.length),
-                                     OBJ_VAL(bindingType));
+                        Type *variantType = AS_OBJ(variantVal);
+                        if (variantType->obj.type == OBJ_PARSE_FUNCTOR_TYPE && arm->bindings.count > 0) {
+                            FunctorType *variantFn = (FunctorType *) variantType;
+                            for (int j = 0; j < arm->bindings.count && j < variantFn->arguments.count; j++) {
+                                Type *bindingType = AS_OBJ(variantFn->arguments.values[j]);
+                                tableSet(&armEnv.locals,
+                                         copyString(arm->bindings.parameters[j]->name.start,
+                                                    arm->bindings.parameters[j]->name.length),
+                                         OBJ_VAL(bindingType));
+                            }
                         }
                     } else {
                         errorAt(&arm->variantName, "Unknown variant in match");
