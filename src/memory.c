@@ -239,7 +239,9 @@ static void blackenObject(Obj *object) {
             ObjClass *klass = (ObjClass *) object;
             markObject((Obj *) klass->name);
             markTable(&klass->methods);
-            markObject((Obj *) klass->superclass);
+            for (int i = 0; i < klass->superclassCount; i++) {
+                markObject((Obj *) klass->superclasses[i]);
+            }
             break;
         }
         case OBJ_MODULE:

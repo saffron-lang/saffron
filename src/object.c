@@ -264,6 +264,7 @@ ObjClass *newClass(ObjString *name) {
     klass->name = name;
     initTable(&klass->methods);
     initTable(&klass->fields);
-    klass->superclass = NULL;
+    klass->superclassCount = 0;
+    for (int i = 0; i < 8; i++) klass->superclasses[i] = NULL;
     return klass;
 }
