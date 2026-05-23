@@ -1,0 +1,47 @@
+{
+  "name": "saffron-lang",
+  "displayName": "Saffron",
+  "description": "Language support for Saffron",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:saffron"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "saffron",
+        "aliases": ["Saffron", "saffron"],
+        "extensions": [".sf"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Saffron",
+      "properties": {
+        "saffron.compilerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the saffron binary. If empty, uses 'saffron' from PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.3.0"
+  }
+}

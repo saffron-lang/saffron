@@ -1853,7 +1853,16 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_ENUM: {
             struct Enum *casted = (struct Enum *) node;
-            SimpleType *enumType = newSimpleType();
+            // Reuse pre-registered placeholder if it exists
+            SimpleType *enumType = NULL;
+            Value existingType;
+            if (tableGet(&currentEnv->typeDefs, copyString(casted->name.start, casted->name.length), &existingType)) {
+                Type *existing = AS_OBJ(existingType);
+                if (existing->obj.type == OBJ_PARSE_TYPE) {
+                    enumType = (SimpleType *) existing;
+                }
+            }
+            if (enumType == NULL) enumType = newSimpleType();
 
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, TYPE_INITIALIZER);
@@ -1970,8 +1979,16 @@ Type *evaluateNode(Node *node) {
                                              OBJ_VAL(bindingType));
                                 }
                             }
-                        } else {
+                        } else if (subjectType != (Type *) anyType) {
                             errorAt(&arm->variantName, "Unknown variant in match");
+                        } else {
+                            // Subject type unknown — register bindings as Any
+                            for (int j = 0; j < arm->bindings.count; j++) {
+                                tableSet(&armEnv.locals,
+                                         copyString(arm->bindings.parameters[j]->name.start,
+                                                    arm->bindings.parameters[j]->name.length),
+                                         OBJ_VAL(anyType));
+                            }
                         }
                     }
                 }

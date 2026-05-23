@@ -1376,9 +1376,23 @@ void compileNode(Node *node) {
             compileNode((Node *) casted->expression);
             emitByte(OP_IMPORT);
 
-            // import "path" as Name
-            uint16_t global = identifierConstant(&casted->name);
-            defineVariable(global);
+            if (casted->names.count > 0) {
+                // import { a, b } from "path"
+                for (int i = 0; i < casted->names.count; i++) {
+                    Token nameToken = casted->names.tokens[i];
+                    emitByte(OP_DUP);
+                    uint16_t propConst = identifierConstant(&nameToken);
+                    emitByte(OP_GET_PROPERTY);
+                    emitConstantIndex(propConst);
+                    uint16_t global = identifierConstant(&nameToken);
+                    defineVariable(global);
+                }
+                emitByte(OP_POP);
+            } else {
+                // import "path" as Name
+                uint16_t global = identifierConstant(&casted->name);
+                defineVariable(global);
+            }
             break;
         }
     }

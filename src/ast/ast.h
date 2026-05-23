@@ -369,6 +369,7 @@ struct Import {
     Stmt self;
     Expr* expression;
     Token name;
+    TokenArray names;
 };
 
 struct Enum {
