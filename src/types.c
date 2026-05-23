@@ -1638,9 +1638,35 @@ Type *evaluateNode(Node *node) {
             struct Enum *casted = (struct Enum *) node;
             SimpleType *enumType = newSimpleType();
 
+            TypeEnvironment typeEnv;
+            initTypeEnvironment(&typeEnv, TYPE_INITIALIZER);
+
+            ValueArray genericArgs;
+            initValueArray(&genericArgs);
+
+            for (int i = 0; i < casted->generics.count; i++) {
+                struct TypeDeclaration *typeNode = casted->generics.typeNodes[i];
+                Type *extendType = typeNode->target != NULL ? evaluateNode((Node *) typeNode->target) : NULL;
+                GenericTypeDefinition *argType = newGenericTypeDefinition();
+                argType->extends = extendType;
+                argType->name = typeNode->name;
+
+                writeValueArray(&genericArgs, OBJ_VAL(argType));
+
+                tableSet(
+                        &typeEnv.typeDefs, copyString(
+                                typeNode->name.start, typeNode->name.length
+                        ),
+                        OBJ_VAL(argType)
+                );
+            }
+
+            enumType->genericArgs = genericArgs;
+
             for (int i = 0; i < casted->body.count; i++) {
                 struct EnumItem *variant = (struct EnumItem *) casted->body.stmts[i];
                 FunctorType *variantType = newFunctorType();
+                variantType->genericArgs = genericArgs;
 
                 for (int j = 0; j < variant->params.count; j++) {
                     TypeNode *typeNode = variant->params.parameters[j]->type;
@@ -1658,6 +1684,8 @@ Type *evaluateNode(Node *node) {
                          copyString(variant->name.start, variant->name.length),
                          OBJ_VAL(variantType));
             }
+
+            currentEnv = currentEnv->enclosing;
 
             tableSet(&currentEnv->locals,
                      copyString(casted->name.start, casted->name.length),

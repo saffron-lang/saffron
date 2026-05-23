@@ -594,6 +594,34 @@ static Stmt *expressionStatement() {
     struct Expression *result = ALLOCATE_NODE(struct Expression, NODE_EXPRESSION);
     result->self.self.lineno = parser.current.line;
     Expr *expr = expression();
+
+    // Check for enum destructure: Variant(bindings) = value
+    if (expr->self.type == NODE_CALL && match(TOKEN_EQUAL)) {
+        struct Call *call = (struct Call *) expr;
+        if (call->callee->self.type == NODE_VARIABLE) {
+            Token variantName = ((struct Variable *) call->callee)->name;
+            ParameterArray bindings;
+            initParameterArray(&bindings);
+            for (int i = 0; i < call->arguments.count; i++) {
+                Expr *arg = call->arguments.exprs[i];
+                if (arg->self.type == NODE_VARIABLE) {
+                    Token name = ((struct Variable *) arg)->name;
+                    struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                    param->self.name = name;
+                    param->self.type = NULL;
+                    writeParameterArray(&bindings, (Parameter *) param);
+                }
+            }
+            Expr *value = expression();
+            struct Destructure *destr = ALLOCATE_NODE(struct Destructure, NODE_DESTRUCTURE);
+            destr->bindings = bindings;
+            destr->value = value;
+            destr->variant = variantName;
+            destr->splatPosition = -1;
+            return (Stmt *) destr;
+        }
+    }
+
     match(TOKEN_SEMICOLON);
     result->expression = expr;
     return result;
@@ -920,6 +948,70 @@ static Stmt *returnStatement() {
     }
 }
 
+static Stmt *listDestructure() {
+    ParameterArray bindings;
+    initParameterArray(&bindings);
+    int splatPosition = -1;
+    int index = 0;
+
+    if (!check(TOKEN_RIGHT_BRACKET)) {
+        do {
+            bool isSplat = match(TOKEN_STAR);
+            consume(TOKEN_IDENTIFIER, "Expect binding name in destructure.");
+            Token name = parser.previous;
+            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+            param->self.name = name;
+            param->self.type = NULL;
+            writeParameterArray(&bindings, (Parameter *) param);
+            if (isSplat) {
+                splatPosition = index;
+            }
+            index++;
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after destructure pattern.");
+    consume(TOKEN_EQUAL, "Expect '=' after destructure pattern.");
+
+    Expr *value = expression();
+
+    Token emptyVariant = {.type = TOKEN_EOF, .start = "", .length = 0, .line = 0};
+    struct Destructure *result = ALLOCATE_NODE(struct Destructure, NODE_DESTRUCTURE);
+    result->bindings = bindings;
+    result->value = value;
+    result->variant = emptyVariant;
+    result->splatPosition = splatPosition;
+    return (Stmt *) result;
+}
+
+static Stmt *enumDestructure(Token variantName) {
+    ParameterArray bindings;
+    initParameterArray(&bindings);
+
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            consume(TOKEN_IDENTIFIER, "Expect binding name.");
+            Token name = parser.previous;
+            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+            param->self.name = name;
+            param->self.type = NULL;
+            writeParameterArray(&bindings, (Parameter *) param);
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after destructure bindings.");
+    consume(TOKEN_EQUAL, "Expect '=' after destructure pattern.");
+
+    Expr *value = expression();
+
+    struct Destructure *result = ALLOCATE_NODE(struct Destructure, NODE_DESTRUCTURE);
+    result->bindings = bindings;
+    result->value = value;
+    result->variant = variantName;
+    result->splatPosition = -1;
+    return (Stmt *) result;
+}
+
 static Stmt *statement() {
     Stmt *result;
     // if (match(TOKEN_IF)) {
@@ -935,6 +1027,8 @@ static Stmt *statement() {
         result = block();
     } else if (match(TOKEN_IMPORT)) {
         result = importStatement();
+    } else if (match(TOKEN_LEFT_BRACKET)) {
+        result = listDestructure();
     } else {
         result = expressionStatement();
     }
@@ -1156,6 +1250,12 @@ static Stmt *enumDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expect enum name.");
     Token enumName = parser.previous;
 
+    TypeNodeArray generics;
+    initTypeNodeArray(&generics);
+    if (match(TOKEN_LESS)) {
+        generics = genericArgDefinitions();
+    }
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before enum body.");
 
     StmtArray body;
@@ -1188,6 +1288,13 @@ static Stmt *enumDeclaration() {
         item->params = params;
         writeStmtArray(&body, (Stmt *) item);
 
+        if (parser.panicMode) {
+            parser.panicMode = false;
+            while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)
+                   && !check(TOKEN_IDENTIFIER)) {
+                advance();
+            }
+        }
         match(TOKEN_COMMA);
     }
 
@@ -1195,6 +1302,7 @@ static Stmt *enumDeclaration() {
 
     struct Enum *result = ALLOCATE_NODE(struct Enum, NODE_ENUM);
     result->name = enumName;
+    result->generics = generics;
     result->body = body;
     return (Stmt *) result;
 }
