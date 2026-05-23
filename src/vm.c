@@ -549,14 +549,19 @@ static InterpretResult run(ObjModule *module) {
                 Value instance = pop();
                 bool result = false;
                 if (IS_INSTANCE(instance) && IS_CLASS(typeVal)) {
-                    ObjClass *klass = AS_INSTANCE(instance)->klass;
                     ObjClass *target = AS_CLASS(typeVal);
-                    while (klass != NULL) {
-                        if (klass == target) {
+                    ObjClass *stack[64];
+                    int stackSize = 0;
+                    stack[stackSize++] = AS_INSTANCE(instance)->klass;
+                    while (stackSize > 0 && !result) {
+                        ObjClass *current = stack[--stackSize];
+                        if (current == target) {
                             result = true;
-                            break;
+                        } else {
+                            for (int i = 0; i < current->superclassCount && stackSize < 64; i++) {
+                                stack[stackSize++] = current->superclasses[i];
+                            }
                         }
-                        klass = klass->superclass;
                     }
                 }
                 push(BOOL_VAL(result));
@@ -788,8 +793,8 @@ static InterpretResult run(ObjModule *module) {
                 ObjClass *subclass = AS_CLASS(peek(0));
                 tableAddAll(&AS_CLASS(superclass)->methods,
                             &subclass->methods);
-                if (subclass->superclass == NULL) {
-                    subclass->superclass = AS_CLASS(superclass);
+                if (subclass->superclassCount < 8) {
+                    subclass->superclasses[subclass->superclassCount++] = AS_CLASS(superclass);
                 }
                 pop(); // Subclass.
                 break;

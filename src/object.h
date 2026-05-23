@@ -105,7 +105,8 @@ typedef struct ObjClass {
     ObjString *name;
     Table methods;
     Table fields;
-    struct ObjClass *superclass;
+    int superclassCount;
+    struct ObjClass *superclasses[8];
 } ObjClass;
 
 typedef struct {
