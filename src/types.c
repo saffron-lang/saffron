@@ -1067,7 +1067,7 @@ Type *evaluateNode(Node *node) {
                         }
                     }
                     if (argType == (Type *) anyType) {
-                        warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
+                        warnAt(&casted->params.parameters[i]->name, "Missing type annotation on lambda parameter");
                     }
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
 
@@ -1262,7 +1262,7 @@ Type *evaluateNode(Node *node) {
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
                 } else {
-                    warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
+                    errorAt(&casted->params.parameters[i]->name, "Function parameters require a type annotation");
                     argType = (Type *) anyType;
                 }
 
@@ -1374,7 +1374,7 @@ Type *evaluateNode(Node *node) {
                         if (typeNode != NULL) {
                             argType = evaluateNode((Node *) typeNode);
                         } else {
-                            warnAt(&method->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
+                            errorAt(&method->params.parameters[i]->name, "Method parameters require a type annotation");
                             argType = (Type *) anyType;
                         }
 
