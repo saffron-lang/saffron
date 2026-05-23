@@ -1,0 +1,11 @@
+// Minimal repro: @decorator on a function segfaults the type checker
+fun identity(fn: Number): Number {
+    return fn
+}
+
+@identity
+fun double(x: Number): Number {
+    return x * 2
+}
+
+IO.println(double(5))

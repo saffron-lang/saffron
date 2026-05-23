@@ -186,12 +186,12 @@ fun to_string(value: Any): String {
     return "null"
 }
 
-fun parse_into(klass, source: String) {
+fun parse_into(klass: Any, source: String) {
     var parsed = parse(source)
     return Reflect.construct(klass, parsed)
 }
 
-fun pretty(value): String {
+fun pretty(value: Any): String {
     fun pad(depth: Number): String {
         return "  ".repeat(depth)
     }

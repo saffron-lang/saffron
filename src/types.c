@@ -918,6 +918,22 @@ Type *evaluateNode(Node *node) {
                 } else {
                     return neverType;
                 }
+            } else if (type->obj.type == OBJ_PARSE_TYPE) {
+                // Allow indexing on class instances with a getItem method
+                SimpleType *st = (SimpleType *) type;
+                Value getItemMethod;
+                if (tableGet(&st->methods, copyString("getItem", 7), &getItemMethod)) {
+                    evaluateNode(casted->index);
+                    // Return type is the getItem method's return type
+                    FunctorType *ft = (FunctorType *) AS_OBJ(getItemMethod);
+                    if (((Type*)ft)->obj.type == OBJ_PARSE_FUNCTOR_TYPE && ft->returnType != NULL) {
+                        return ft->returnType;
+                    }
+                    return (Type *) anyType;
+                } else {
+                    errorAt(&casted->bracket, "Cannot get item on something other than a list or map");
+                    return (Type *) anyType;
+                }
             } else {
                 errorAt(&casted->bracket, "Cannot get item on something other than a list or map");
                 return (Type *) anyType;
@@ -1267,8 +1283,10 @@ Type *evaluateNode(Node *node) {
             struct Function *casted = (struct Function *) node;
 
             // Evaluate decorator expressions
-            for (int i = 0; i < casted->decorators.count; i++) {
-                evaluateNode((Node *) casted->decorators.exprs[i]);
+            if (casted->decorators.exprs != NULL) {
+                for (int i = 0; i < casted->decorators.count; i++) {
+                    evaluateNode((Node *) casted->decorators.exprs[i]);
+                }
             }
 
             TypeEnvironment typeEnv;

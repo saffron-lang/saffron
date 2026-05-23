@@ -143,17 +143,88 @@ static Value reflectTypeOf(int argCount, Value *args) {
     return OBJ_VAL(copyString("unknown", 7));
 }
 
-static Value reflectConstruct(int argCount, Value *args) {
-    if (argCount != 2 || !IS_CLASS(args[0])) {
-        runtimeError("Reflect.construct expects (class, fieldsMap)");
+static Value reflectFieldTypes(int argCount, Value *args) {
+    if (argCount != 1 || !IS_CLASS(args[0])) {
+        runtimeError("Reflect.field_types expects (class)");
         return NIL_VAL;
     }
     ObjClass *klass = AS_CLASS(args[0]);
+    ObjMap *result = newMap();
+    push(OBJ_VAL(result));
+
+    for (int i = 0; i < klass->fieldMetas.count; i++) {
+        FieldMeta *meta = &klass->fieldMetas.entries[i];
+        if (meta->typeName != NULL) {
+            valueTableSet(&result->values, OBJ_VAL(meta->name), OBJ_VAL(meta->typeName));
+        } else {
+            valueTableSet(&result->values, OBJ_VAL(meta->name), OBJ_VAL(copyString("Any", 3)));
+        }
+    }
+
+    return pop();
+}
+
+static Value deepConstruct(ObjClass *klass, ObjMap *data);
+
+static Value deepConstructField(ObjClass *klass, ObjString *fieldName, Value fieldValue) {
+    // Check if field has a class type that needs recursive construction
+    for (int i = 0; i < klass->fieldMetas.count; i++) {
+        FieldMeta *meta = &klass->fieldMetas.entries[i];
+        if (meta->name == fieldName && meta->typeTag == FIELD_TYPE_CLASS && meta->typeName != NULL) {
+            // Look up the class by name from current module or builtins
+            Value nestedClass = NIL_VAL;
+            ObjCallFrame *frame = CURRENT_TASK;
+            if (frame && frame->closure && frame->closure->function->module) {
+                ObjModule *mod = (ObjModule *) frame->closure->function->module;
+                tableGet(&mod->obj.fields, meta->typeName, &nestedClass);
+            }
+            if (IS_NIL(nestedClass)) {
+                tableGet(&vm.builtins, meta->typeName, &nestedClass);
+            }
+            if (!IS_NIL(nestedClass) && IS_CLASS(nestedClass)) {
+                if (IS_OBJ(fieldValue) && AS_OBJ(fieldValue)->type == OBJ_MAP) {
+                    return deepConstruct(AS_CLASS(nestedClass), (ObjMap *) AS_OBJ(fieldValue));
+                }
+            }
+            break;
+        }
+    }
+    return fieldValue;
+}
+
+static Value deepConstruct(ObjClass *klass, ObjMap *data) {
     ObjInstance *instance = newInstance(klass);
     push(OBJ_VAL(instance));
 
+    for (int i = 0; i < data->values.capacity; i++) {
+        MapEntry *entry = &data->values.entries[i];
+        if (IS_NIL(entry->key) && IS_NIL(entry->value)) continue;
+        if (IS_NIL(entry->key)) continue;
+        if (IS_STRING(entry->key)) {
+            Value processed = deepConstructField(klass, AS_STRING(entry->key), entry->value);
+            tableSet(&instance->fields, AS_STRING(entry->key), processed);
+        }
+    }
+
+    return pop();
+}
+
+static Value reflectConstruct(int argCount, Value *args) {
+    if (argCount < 2 || !IS_CLASS(args[0])) {
+        runtimeError("Reflect.construct expects (class, fieldsMap[, deep])");
+        return NIL_VAL;
+    }
+    ObjClass *klass = AS_CLASS(args[0]);
+    bool deep = (argCount >= 3 && IS_BOOL(args[2]) && AS_BOOL(args[2]));
+
     if (IS_OBJ(args[1]) && AS_OBJ(args[1])->type == OBJ_MAP) {
         ObjMap *map = (ObjMap *) AS_OBJ(args[1]);
+        if (deep) {
+            return deepConstruct(klass, map);
+        }
+
+        ObjInstance *instance = newInstance(klass);
+        push(OBJ_VAL(instance));
         for (int i = 0; i < map->values.capacity; i++) {
             MapEntry *entry = &map->values.entries[i];
             if (IS_NIL(entry->key) && IS_NIL(entry->value)) continue;
@@ -162,9 +233,11 @@ static Value reflectConstruct(int argCount, Value *args) {
                 tableSet(&instance->fields, AS_STRING(entry->key), entry->value);
             }
         }
+        return pop();
     }
 
-    return pop();
+    ObjInstance *instance = newInstance(klass);
+    return OBJ_VAL(instance);
 }
 
 // --- Module registration ---
@@ -191,6 +264,7 @@ ObjModule *createReflectModule() {
     defineModuleFunction(module, "type_of", reflectTypeOf);
     defineModuleFunction(module, "number_to_string", reflectNumberToString);
     defineModuleFunction(module, "construct", reflectConstruct);
+    defineModuleFunction(module, "field_types", reflectFieldTypes);
 
     pop();
     return module;
@@ -214,6 +288,7 @@ SimpleType *createReflectModuleType() {
     createBuiltinFunctorType(mod, "type_of", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(mod, "number_to_string", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(mod, "construct", (Type *[]) {(Type *) anyType, (Type *) anyType}, 2, NULL, 0, (Type *) anyType);
+    createBuiltinFunctorType(mod, "field_types", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) anyType);
     return mod;
 }
 

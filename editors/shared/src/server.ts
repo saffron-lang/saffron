@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import {
   createConnection,
   TextDocuments,
@@ -44,43 +45,35 @@ interface CheckOutput {
   diagnostics: SaffronDiagnostic[];
 }
 
-async function check(uri: string, text: string): Promise<Diagnostic[]> {
-  const filePath = uri.replace("file://", "");
+function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
+  return raw.map((d) => ({
+    range: {
+      start: { line: d.line - 1, character: d.column - 1 },
+      end: { line: d.line - 1, character: d.column - 1 + Math.max(d.length, 1) },
+    },
+    severity:
+      d.severity === "error"
+        ? DiagnosticSeverity.Error
+        : DiagnosticSeverity.Warning,
+    message: d.message,
+    source: "saffron",
+  }));
+}
+
+async function check(uri: string): Promise<Diagnostic[]> {
+  const filePath = decodeURIComponent(uri.replace("file://", ""));
 
   try {
     const { stdout } = await execFileAsync(compilerPath, ["--check", filePath], {
       timeout: 10000,
     });
-
     const result: CheckOutput = JSON.parse(stdout);
-    return result.diagnostics.map((d) => ({
-      range: {
-        start: { line: d.line - 1, character: d.column - 1 },
-        end: { line: d.line - 1, character: d.column - 1 + Math.max(d.length, 1) },
-      },
-      severity:
-        d.severity === "error"
-          ? DiagnosticSeverity.Error
-          : DiagnosticSeverity.Warning,
-      message: d.message,
-      source: "saffron",
-    }));
+    return mapDiagnostics(result.diagnostics);
   } catch (err: any) {
     if (err.stdout) {
       try {
         const result: CheckOutput = JSON.parse(err.stdout);
-        return result.diagnostics.map((d) => ({
-          range: {
-            start: { line: d.line - 1, character: d.column - 1 },
-            end: { line: d.line - 1, character: d.column - 1 + Math.max(d.length, 1) },
-          },
-          severity:
-            d.severity === "error"
-              ? DiagnosticSeverity.Error
-              : DiagnosticSeverity.Warning,
-          message: d.message,
-          source: "saffron",
-        }));
+        return mapDiagnostics(result.diagnostics);
       } catch {
         // JSON parse failed
       }
@@ -90,12 +83,12 @@ async function check(uri: string, text: string): Promise<Diagnostic[]> {
 }
 
 documents.onDidSave(async (event) => {
-  const diagnostics = await check(event.document.uri, event.document.getText());
+  const diagnostics = await check(event.document.uri);
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics });
 });
 
 documents.onDidOpen(async (event) => {
-  const diagnostics = await check(event.document.uri, event.document.getText());
+  const diagnostics = await check(event.document.uri);
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics });
 });
 
