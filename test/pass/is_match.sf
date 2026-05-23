@@ -1,0 +1,25 @@
+// Test: is-pattern matching on class types
+class Dog {
+    fun init() {}
+    fun bark(): String { return "Woof!" }
+}
+
+class Cat {
+    fun init() {}
+    fun meow(): String { return "Meow!" }
+}
+
+var animal = Dog()
+var sound = match (animal) {
+    is Dog(d) => d.bark(),
+    is Cat(c) => c.meow()
+}
+IO.println(sound)
+
+// Test: is-pattern with second branch matching
+var cat = Cat()
+var sound2 = match (cat) {
+    is Dog(d) => d.bark(),
+    is Cat(c) => c.meow()
+}
+IO.println(sound2)

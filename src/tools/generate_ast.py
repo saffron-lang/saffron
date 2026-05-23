@@ -37,6 +37,7 @@ stmts = [
     " Stmt* elseBranch",
     "While      : Expr* condition, Stmt* body",
     "For        : Stmt* initializer, Expr* condition, Expr* increment, Stmt* body",
+    "ForIn      : Token binding, Expr* iterable, Stmt* body",
     "Break      : Token keyword",
     "Return     : Token keyword, Expr* value",
     "Import     : Expr* expression, Token name",

@@ -864,6 +864,66 @@ static Stmt *typeDeclaration() {
 
 static Stmt *forStatement() {
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // Detect for-in: for (var? identifier in expr)
+    if (check(TOKEN_VAR) || check(TOKEN_IDENTIFIER)) {
+        Token saved = parser.current;
+        bool hadVar = match(TOKEN_VAR);
+        if (check(TOKEN_IDENTIFIER)) {
+            Token binding = parser.current;
+            advance();
+            if (match(TOKEN_IN)) {
+                Expr *iterable = expression();
+                consume(TOKEN_RIGHT_PAREN, "Expect ')' after for-in clause.");
+                Stmt *body = statement();
+                struct ForIn *result = ALLOCATE_NODE(struct ForIn, NODE_FORIN);
+                result->binding = binding;
+                result->iterable = iterable;
+                result->body = body;
+                return (Stmt *) result;
+            }
+            // Not for-in — fall through to C-style.
+            // We consumed var? + identifier but no 'in'. We're now past the identifier.
+            // For C-style "for (var i = 0; ...)", re-parse the initializer.
+            // The identifier is in parser.previous, check for = or ;
+            if (hadVar) {
+                Token name = binding;
+                struct Var *var = ALLOCATE_NODE(struct Var, NODE_VAR);
+                var->name = name;
+                var->type = NULL;
+                var->assignmentType = TYPE_VARIABLE;
+                if (match(TOKEN_COLON)) {
+                    var->type = typeAnnotation();
+                }
+                if (match(TOKEN_EQUAL)) {
+                    var->initializer = expression();
+                } else {
+                    var->initializer = NULL;
+                }
+                match(TOKEN_SEMICOLON);
+
+                Expr *condition = NULL;
+                if (!match(TOKEN_SEMICOLON)) {
+                    condition = expression();
+                    consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+                }
+                Expr *increment = NULL;
+                if (!match(TOKEN_RIGHT_PAREN)) {
+                    increment = expression();
+                    consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+                }
+                Stmt *body = statement();
+                struct For *result = ALLOCATE_NODE(struct For, NODE_FOR);
+                result->initializer = (Stmt *) var;
+                result->condition = condition;
+                result->increment = increment;
+                result->body = body;
+                return (Stmt *) result;
+            }
+        }
+    }
+
+    // C-style for loop (no var prefix case)
     Stmt *initializer = NULL;
     Expr *condition = NULL;
     Expr *increment = NULL;
@@ -891,7 +951,7 @@ static Stmt *forStatement() {
     result->condition = condition;
     result->increment = increment;
     result->body = body;
-    return result;
+    return (Stmt *) result;
 }
 
 static Stmt *importStatement() {
@@ -1376,7 +1436,9 @@ static Expr *matchExpression(bool canAssign) {
     initStmtArray(&arms);
 
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-        consume(TOKEN_IDENTIFIER, "Expect variant name in match arm.");
+        bool isTypePattern = match(TOKEN_IS);
+
+        consume(TOKEN_IDENTIFIER, "Expect variant or type name in match arm.");
         Token variantName = parser.previous;
 
         ParameterArray bindings;
@@ -1406,6 +1468,7 @@ static Expr *matchExpression(bool canAssign) {
         arm->variantName = variantName;
         arm->bindings = bindings;
         arm->body = armBody;
+        arm->isTypePattern = isTypePattern;
         writeStmtArray(&arms, (Stmt *) arm);
 
         match(TOKEN_COMMA);

@@ -128,12 +128,28 @@ static void concatenate() {
     push(OBJ_VAL(result));
 }
 
-void runtimeError(const char *format, ...) {
+bool runtimeError(const char *format, ...) {
+    char message[512];
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    vsnprintf(message, sizeof(message), format, args);
     va_end(args);
-    fputs("\n", stderr);
+
+    if (vm.handlerCount > 0) {
+        ObjString *errorStr = copyString(message, (int) strlen(message));
+        vm.currentException = OBJ_VAL(errorStr);
+        vm.isThrowing = true;
+
+        ExceptionHandler *handler = &vm.handlers[--vm.handlerCount];
+        vm.stackTop = handler->stackTop;
+        currentFrame = handler->frame;
+        currentFrame->ip = handler->catchIp;
+        push(OBJ_VAL(errorStr));
+        vm.isThrowing = false;
+        return true; // error was caught
+    }
+
+    fprintf(stderr, "%s\n", message);
 
     for (ObjCallFrame *frame = CURRENT_TASK; frame->parent != NULL; frame = frame->parent) {
         ObjFunction *function = frame->closure->function;
@@ -148,6 +164,7 @@ void runtimeError(const char *format, ...) {
     }
 
     resetStack();
+    return false; // fatal
 }
 
 ObjModule *executeModule(ObjString *name, const char *importingPath);
@@ -455,8 +472,9 @@ static InterpretResult run(ObjModule *module) {
 #define BINARY_OP(valueType, op) \
     do { \
       if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-        runtimeError("Operands must be numbers for binary op."); \
-        return INTERPRET_RUNTIME_ERROR; \
+        if (!runtimeError("Operands must be numbers for binary op.")) \
+            return INTERPRET_RUNTIME_ERROR; \
+        goto dispatch; \
       } \
       double b = AS_NUMBER(pop()); \
       double a = AS_NUMBER(pop()); \
@@ -478,6 +496,7 @@ static InterpretResult run(ObjModule *module) {
 #endif
 
         uint8_t instruction;
+        dispatch:
         switch (instruction = READ_BYTE()) {
             case OP_NOT:
                 push(BOOL_VAL(isFalsey(pop())));
@@ -489,8 +508,7 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_NEGATE:
                 if (!IS_NUMBER(peek(0))) {
-                    runtimeError("Operand must be a number.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
@@ -502,16 +520,15 @@ static InterpretResult run(ObjModule *module) {
                     double a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
                 } else {
-                    runtimeError(
-                            "Operands must be two numbers or two strings.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(
+                            "Operands must be two numbers or two strings.")) return INTERPRET_RUNTIME_ERROR;
+                    goto dispatch;
                 }
                 break;
             }
             case OP_MODULO: {
                 if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {
-                    runtimeError("Operands must be numbers for modulo.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 double b = AS_NUMBER(pop());
                 double a = AS_NUMBER(pop());
@@ -587,8 +604,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *name = READ_STRING();
                 Value value;
                 if (!tableGet(&module->obj.fields, name, &value)) {
-                    runtimeError("Undefined variable '%s'.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 push(value);
                 break;
@@ -597,8 +613,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *name = READ_STRING();
                 if (tableSet(&module->obj.fields, name, peek(0))) {
                     tableDelete(&module->obj.fields, name);
-                    runtimeError("Undefined variable '%s'.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 break;
             }
@@ -740,13 +755,11 @@ static InterpretResult run(ObjModule *module) {
                         push(value);
                         break;
                     }
-                    runtimeError("Undefined property '%s' on class.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 if (!IS_INSTANCE(peek(0)) && !IS_LIST(peek(0))) {
-                    runtimeError("Only instances have properties.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 ObjInstance *instance = AS_INSTANCE(peek(0));
@@ -790,8 +803,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_INHERIT: {
                 Value superclass = peek(1);
                 if (!IS_CLASS(superclass) && !IS_BUILTIN_TYPE(superclass)) {
-                    runtimeError("Superclass must be a class.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 ObjClass *subclass = AS_CLASS(peek(0));
@@ -882,8 +894,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_GET_TAG: {
                 Value value = peek(0);
                 if (!IS_ENUM_INSTANCE(value)) {
-                    runtimeError("Cannot get tag of non-enum value.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
                 pop();
@@ -895,8 +906,7 @@ static InterpretResult run(ObjModule *module) {
                 int start = (int) AS_NUMBER(pop());
                 Value listVal = pop();
                 if (!isObjType(listVal, OBJ_LIST)) {
-                    runtimeError("Can only slice lists.");
-                    return INTERPRET_RUNTIME_ERROR;
+                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 ObjList *source = (ObjList *) AS_OBJ(listVal);
                 int end = source->items.count - fromEnd;

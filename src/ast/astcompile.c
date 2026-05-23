@@ -832,6 +832,65 @@ void compileNode(Node *node) {
             endScope();
             break;
         }
+        case NODE_FORIN: {
+            struct ForIn *casted = (struct ForIn *) node;
+            beginScope();
+
+            // Compile iterable and store as hidden local
+            compileNode((Node *) casted->iterable);
+            Token listName = syntheticToken("$list");
+            addLocal(listName);
+            markInitialized();
+            int listSlot = current->localCount - 1;
+
+            // Index = 0
+            emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(0)));
+            Token idxName = syntheticToken("$idx");
+            addLocal(idxName);
+            markInitialized();
+            int idxSlot = current->localCount - 1;
+
+            // Loop start
+            int loopStart = currentChunk()->count;
+
+            // Condition: $idx < $list.length()
+            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
+            emitBytes(OP_GET_LOCAL, (uint8_t) listSlot);
+            uint8_t lengthConst = makeConstant(OBJ_VAL(copyString("length", 6)));
+            emitBytes(OP_INVOKE, lengthConst);
+            emitByte(0); // 0 args
+            emitByte(OP_LESS);
+
+            int exitJump = emitJump(OP_JUMP_IF_FALSE);
+            emitByte(OP_POP); // pop condition true
+
+            // Bind item: var item = $list[$idx]
+            beginScope();
+            emitBytes(OP_GET_LOCAL, (uint8_t) listSlot);
+            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
+            emitByte(OP_GETITEM);
+            declareVariable(&casted->binding);
+            defineVariable(identifierConstant(&casted->binding));
+
+            // Body
+            compileNode((Node *) casted->body);
+            endScope(); // pops item binding
+
+            // Increment: $idx = $idx + 1
+            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
+            emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(1)));
+            emitByte(OP_ADD);
+            emitBytes(OP_SET_LOCAL, (uint8_t) idxSlot);
+            emitByte(OP_POP);
+
+            emitLoop(loopStart);
+
+            patchJump(exitJump);
+            emitByte(OP_POP); // pop condition false
+
+            endScope(); // pops $list and $idx
+            break;
+        }
         case NODE_BREAK:
             // TODO
             break;
@@ -930,43 +989,74 @@ void compileNode(Node *node) {
             for (int i = 0; i < casted->arms.count; i++) {
                 struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
 
-                emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
-                emitByte(OP_GET_TAG);
-
-                uint8_t tagConst = makeConstant(OBJ_VAL(
-                    copyString(arm->variantName.start, arm->variantName.length)));
-                emitBytes(OP_CONSTANT, tagConst);
-                emitByte(OP_EQUAL);
-
-                int nextArm = emitJump(OP_JUMP_IF_FALSE);
-                emitByte(OP_POP); // pop true
-
-                // Bind variant fields in a sub-scope
-                beginScope();
-                for (int j = 0; j < arm->bindings.count; j++) {
+                if (arm->isTypePattern) {
+                    // is Type(binding) => ...
                     emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
-                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(j)));
-                    emitByte(OP_GETITEM);
-                    declareVariable(&arm->bindings.parameters[j]->name);
-                    uint8_t c = identifierConstant(&arm->bindings.parameters[j]->name);
-                    defineVariable(c);
+                    getVariable(arm->variantName); // push the class/type
+                    emitByte(OP_IS);
+
+                    int nextArm = emitJump(OP_JUMP_IF_FALSE);
+                    emitByte(OP_POP); // pop true
+
+                    beginScope();
+                    // Bind subject to the binding name
+                    if (arm->bindings.count > 0) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                        declareVariable(&arm->bindings.parameters[0]->name);
+                        uint8_t c = identifierConstant(&arm->bindings.parameters[0]->name);
+                        defineVariable(c);
+                    }
+
+                    bool oldLast = lastInBody;
+                    lastInBody = true;
+                    compileTree(&arm->body);
+                    lastInBody = oldLast;
+
+                    emitBytes(OP_SET_LOCAL, (uint8_t) subjectSlot);
+                    emitByte(OP_POP);
+                    endScope();
+
+                    armEndJumps[armCount++] = emitJump(OP_JUMP);
+
+                    patchJump(nextArm);
+                    emitByte(OP_POP); // pop false
+                } else {
+                    // Enum variant pattern
+                    emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                    emitByte(OP_GET_TAG);
+
+                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                        copyString(arm->variantName.start, arm->variantName.length)));
+                    emitBytes(OP_CONSTANT, tagConst);
+                    emitByte(OP_EQUAL);
+
+                    int nextArm = emitJump(OP_JUMP_IF_FALSE);
+                    emitByte(OP_POP); // pop true
+
+                    beginScope();
+                    for (int j = 0; j < arm->bindings.count; j++) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(j)));
+                        emitByte(OP_GETITEM);
+                        declareVariable(&arm->bindings.parameters[j]->name);
+                        uint8_t c = identifierConstant(&arm->bindings.parameters[j]->name);
+                        defineVariable(c);
+                    }
+
+                    bool oldLast = lastInBody;
+                    lastInBody = true;
+                    compileTree(&arm->body);
+                    lastInBody = oldLast;
+
+                    emitBytes(OP_SET_LOCAL, (uint8_t) subjectSlot);
+                    emitByte(OP_POP);
+                    endScope();
+
+                    armEndJumps[armCount++] = emitJump(OP_JUMP);
+
+                    patchJump(nextArm);
+                    emitByte(OP_POP); // pop false
                 }
-
-                // Compile arm body — result stays on stack
-                bool oldLast = lastInBody;
-                lastInBody = true;
-                compileTree(&arm->body);
-                lastInBody = oldLast;
-
-                // Store result into subject slot (reuse it for result)
-                emitBytes(OP_SET_LOCAL, (uint8_t) subjectSlot);
-                emitByte(OP_POP); // pop dup from SET_LOCAL
-                endScope(); // pops bindings
-
-                armEndJumps[armCount++] = emitJump(OP_JUMP);
-
-                patchJump(nextArm);
-                emitByte(OP_POP); // pop false
             }
 
             for (int i = 0; i < armCount; i++) {
