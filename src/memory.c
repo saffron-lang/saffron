@@ -120,6 +120,13 @@ static void freeObject(Obj *object) {
         case OBJ_MODULE:
             freeModule((ObjModule *) object);
             break;
+        case OBJ_OVERLOAD_SET: {
+            ObjOverloadSet *set = (ObjOverloadSet *) object;
+            FREE_ARRAY(ObjClosure*, set->closures, set->capacity);
+            FREE_ARRAY(int, set->arities, set->capacity);
+            FREE(ObjOverloadSet, object);
+            break;
+        }
         case OBJ_PARSE_FUNCTOR_TYPE:
         case OBJ_PARSE_UNION_TYPE:
         case OBJ_PARSE_INTERFACE_TYPE:
@@ -286,6 +293,13 @@ static void blackenObject(Obj *object) {
             markObject((Obj *) frame->closure);
             if (frame->parent) {
                 markObject((Obj *) frame->parent);
+            }
+            break;
+        }
+        case OBJ_OVERLOAD_SET: {
+            ObjOverloadSet *set = (ObjOverloadSet *) object;
+            for (int i = 0; i < set->count; i++) {
+                markObject((Obj *) set->closures[i]);
             }
             break;
         }

@@ -598,9 +598,11 @@ Type *getTypeOf(Value value) {
 
 
 
+static bool bailOnError = true;
+
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
-        if (hadError) return;
+        if (bailOnError && hadError) return;
         panicMode = false;
         evaluateNode((Node *) statements->stmts[i]);
     }
@@ -687,7 +689,11 @@ Type *parseFile(const char *path, int length) {
     panicMode = false;
 
     StmtArray *body = parseAST(source);
+    // Type-check imported files but don't crash on errors
+    bool oldBail = bailOnError;
+    bailOnError = true;
     evaluateTypes(body);
+    bailOnError = oldBail;
 
     hadError = oldHadError;
     panicMode = oldPanicMode;

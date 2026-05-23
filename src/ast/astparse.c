@@ -1587,6 +1587,69 @@ static Expr *matchExpression(bool canAssign) {
 }
 
 static Stmt *declaration() {
+    // Decorators: @expr applied to the next fun/class declaration
+    if (match(TOKEN_AT)) {
+        ExprArray decorators;
+        initExprArray(&decorators);
+
+        do {
+            Expr *decorator = parsePrecedence(PREC_CALL);
+            writeExprArray(&decorators, decorator);
+        } while (match(TOKEN_AT));
+
+        // Parse the decorated declaration (must be fun or class)
+        Stmt *decl;
+        Token name;
+        if (match(TOKEN_DATACLASS)) {
+            consume(TOKEN_CLASS, "Expect 'class' after 'data'.");
+            decl = classDeclaration();
+            ((struct Class *) decl)->isDataClass = true;
+            name = ((struct Class *) decl)->name;
+        } else if (match(TOKEN_CLASS)) {
+            decl = classDeclaration();
+            name = ((struct Class *) decl)->name;
+        } else if (match(TOKEN_FUN)) {
+            decl = funDeclaration();
+            name = ((struct Function *) decl)->name;
+        } else {
+            error("Decorators can only be applied to functions or classes.");
+            return statement();
+        }
+
+        // Build a block: [decl, name = d1(d2(...(name)))]
+        StmtArray stmts;
+        initStmtArray(&stmts);
+        writeStmtArray(&stmts, decl);
+
+        // Apply decorators bottom-up (last decorator listed = innermost)
+        // @a @b fun f() => f = a(b(f))
+        Expr *wrapped = (Expr *) ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
+        ((struct Variable *) wrapped)->name = name;
+
+        for (int i = decorators.count - 1; i >= 0; i--) {
+            struct Call *call = ALLOCATE_NODE(struct Call, NODE_CALL);
+            call->callee = decorators.exprs[i];
+            call->paren = name;
+            initExprArray(&call->arguments);
+            writeExprArray(&call->arguments, wrapped);
+            wrapped = (Expr *) call;
+        }
+
+        // name = wrapped
+        struct Assign *assign = ALLOCATE_NODE(struct Assign, NODE_ASSIGN);
+        assign->name = name;
+        assign->value = wrapped;
+
+        struct Expression *exprStmt = ALLOCATE_NODE(struct Expression, NODE_EXPRESSION);
+        exprStmt->expression = (Expr *) assign;
+        exprStmt->type = NULL;
+        writeStmtArray(&stmts, (Stmt *) exprStmt);
+
+        struct Block *block = ALLOCATE_NODE(struct Block, NODE_BLOCK);
+        block->statements = stmts;
+        return (Stmt *) block;
+    }
+
     if (match(TOKEN_DATACLASS)) {
         consume(TOKEN_CLASS, "Expect 'class' after 'data'.");
         Stmt *cls = classDeclaration();

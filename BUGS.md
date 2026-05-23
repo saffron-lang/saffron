@@ -24,6 +24,53 @@ test()
 
 The compiler has break/continue infrastructure (breakJumps, continueJumps arrays) but the type checker doesn't handle NODE_BREAK/NODE_CONTINUE. Runtime works; type checker just ignores them.
 
+### 12. Type checker segfaults on Any-typed closures in imported modules
+
+**Reproduction:**
+```saffron
+// src/lib/test.sf contains:
+fun mock(name: String) {
+    var ret = nil
+    var fn = fun (a: Any) => { return ret }
+    ...
+}
+```
+```saffron
+import "@test" as T
+T.mock("x")  // segfault
+```
+
+**Expected:** Module imports and runs.
+**Actual:** Type checker crashes (segfault) when evaluating closures that capture
+variables later assigned to different types (nil → Any), or when `Task.spawn(body)`
+is called with an `Any`-typed param inside an imported module.
+
+**Root cause:** The type checker dereferences NULL type pointers when resolving closure
+captured variables whose initial type is nil. The cascading "Undefined variable" errors
+from the type checker then trigger `runtimeError()` which corrupts VM state during import.
+
+**Impact:** Blocks `@test` import with mock/async features. Inline usage works.
+**Workaround:** Inline test functions or avoid nil-initialized captured variables.
+
+### 13. Bare `return` without semicolon consumes next `}`
+
+**Reproduction:**
+```saffron
+fun test() {
+    if (true) {
+        return
+    }
+    IO.println("after")
+}
+```
+
+**Expected:** `return` exits the function.
+**Actual:** Parser error `Expect expression` at `}` — the `return` statement tries to
+parse an expression (the `}`) because there's no semicolon or recognized terminator.
+
+**Fix:** `returnStatement()` should check for `}` and `EOF` the same way `yield` does.
+**Workaround:** Always use `return;` with a semicolon, or `return nil`.
+
 ### 11. Flow narrowing doesn't work for primitives in union types
 
 **Reproduction:**

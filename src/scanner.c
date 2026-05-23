@@ -368,6 +368,8 @@ Token scanToken() {
                     match('>') ? TOKEN_PIPE : TOKEN_BITWISE_OR);
         case ':':
             return makeToken(TOKEN_COLON);
+        case '@':
+            return makeToken(TOKEN_AT);
         case '"':
             return string();
 

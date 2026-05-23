@@ -140,7 +140,7 @@ fun escape_string(str: String): String {
     return result + "\""
 }
 
-fun to_string(value): String {
+fun to_string(value: Any): String {
     if (value == nil) { return "null" }
     if (value == true) { return "true" }
     if (value == false) { return "false" }
