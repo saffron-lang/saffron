@@ -9,17 +9,6 @@
     <depends>org.jetbrains.plugins.textmate</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileType
-            name="Saffron"
-            implementationClass="dev.saffron.intellij.SaffronFileType"
-            fieldName="INSTANCE"
-            language="Saffron"
-            extensions="sf"/>
-
-        <lang.parserDefinition
-            language="Saffron"
-            implementationClass="dev.saffron.intellij.SaffronParserDefinition"/>
-
         <platform.lsp.serverSupportProvider
             implementation="dev.saffron.intellij.SaffronLspServerSupportProvider"/>
     </extensions>

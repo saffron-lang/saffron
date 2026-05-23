@@ -4,6 +4,10 @@
 #include "memory.h"
 #include "value.h"
 #include "object.h"
+#include "libc/list.h"
+#include "libc/map.h"
+#include "valuetable.h"
+#include "object.h"
 #include <math.h>
 
 void initValueArray(ValueArray *array) {
@@ -78,7 +82,36 @@ bool valuesEqual(Value a, Value b) {
         case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NIL:    return true;
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-        case VAL_OBJ:    return AS_OBJ(a) == AS_OBJ(b);
+        case VAL_OBJ: {
+            if (AS_OBJ(a) == AS_OBJ(b)) return true;
+            if (AS_OBJ(a)->type != AS_OBJ(b)->type) return false;
+            if (AS_OBJ(a)->type == OBJ_STRING) {
+                ObjString *sa = AS_STRING(a), *sb = AS_STRING(b);
+                return sa->length == sb->length && memcmp(sa->chars, sb->chars, sa->length) == 0;
+            }
+            if (AS_OBJ(a)->type == OBJ_LIST) {
+                ObjList *la = (ObjList *) AS_OBJ(a), *lb = (ObjList *) AS_OBJ(b);
+                if (la->items.count != lb->items.count) return false;
+                for (int i = 0; i < la->items.count; i++) {
+                    if (!valuesEqual(la->items.values[i], lb->items.values[i])) return false;
+                }
+                return true;
+            }
+            if (AS_OBJ(a)->type == OBJ_MAP) {
+                ObjMap *ma = (ObjMap *) AS_OBJ(a), *mb = (ObjMap *) AS_OBJ(b);
+                if (ma->values.count != mb->values.count) return false;
+                for (int i = 0; i < ma->values.capacity; i++) {
+                    MapEntry *entry = &ma->values.entries[i];
+                    if (IS_NIL(entry->key) && IS_NIL(entry->value)) continue;
+                    if (IS_NIL(entry->key)) continue;
+                    Value bVal;
+                    if (!valueTableGet(&mb->values, entry->key, &bVal)) return false;
+                    if (!valuesEqual(entry->value, bVal)) return false;
+                }
+                return true;
+            }
+            return false;
+        }
         default:         return false; // Unreachable.
     }
 #endif
