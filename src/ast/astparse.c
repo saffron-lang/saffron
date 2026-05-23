@@ -1190,6 +1190,14 @@ static Stmt *statement() {
         result = block();
     } else if (match(TOKEN_IMPORT)) {
         result = importStatement();
+    } else if (match(TOKEN_BREAK)) {
+        struct Break *breakStmt = ALLOCATE_NODE(struct Break, NODE_BREAK);
+        breakStmt->keyword = parser.previous;
+        result = (Stmt *) breakStmt;
+    } else if (match(TOKEN_CONTINUE)) {
+        struct Continue *contStmt = ALLOCATE_NODE(struct Continue, NODE_CONTINUE);
+        contStmt->keyword = parser.previous;
+        result = (Stmt *) contStmt;
     } else if (match(TOKEN_THROW)) {
         struct Throw *throwStmt = ALLOCATE_NODE(struct Throw, NODE_THROW);
         throwStmt->value = expression();

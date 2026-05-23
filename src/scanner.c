@@ -167,6 +167,8 @@ static TokenType identifierType() {
                 }
             }
             break;
+        case 'b':
+            return checkKeyword(1, 4, "reak", TOKEN_BREAK);
         case 'c':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
@@ -174,6 +176,8 @@ static TokenType identifierType() {
                         return checkKeyword(2, 3, "ass", TOKEN_CLASS);
                     case 'a':
                         return checkKeyword(2, 3, "tch", TOKEN_CATCH);
+                    case 'o':
+                        return checkKeyword(2, 6, "ntinue", TOKEN_CONTINUE);
                 }
             }
             break;
