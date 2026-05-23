@@ -47,6 +47,7 @@ typedef enum {
     OP_SUPER_INVOKE,
     OP_METHOD,
     OP_FIELD,
+    OP_FIELD_META,
     OP_CLASS,
     OP_INHERIT,
     OP_YIELD,

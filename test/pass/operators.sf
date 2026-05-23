@@ -1,0 +1,42 @@
+// Test: Operator overloading via method dispatch
+class Vec2 {
+    var x: Number
+    var y: Number
+    fun init(x: Number, y: Number) {
+        this.x = x
+        this.y = y
+    }
+    fun add(other: Vec2): Vec2 {
+        return Vec2(this.x + other.x, this.y + other.y)
+    }
+    fun sub(other: Vec2): Vec2 {
+        return Vec2(this.x - other.x, this.y - other.y)
+    }
+    fun mul(other: Vec2): Vec2 {
+        return Vec2(this.x * other.x, this.y * other.y)
+    }
+}
+
+var a = Vec2(1, 2)
+var b = Vec2(3, 4)
+
+// + calls add()
+var c = a + b
+IO.println(c.x)
+IO.println(c.y)
+
+// - calls sub()
+var d = b - a
+IO.println(d.x)
+IO.println(d.y)
+
+// * calls mul()
+var e = a * b
+IO.println(e.x)
+IO.println(e.y)
+
+// Primitives still work
+IO.println(1 + 2)
+IO.println("hello" + " world")
+IO.println(10 - 3)
+IO.println(5 * 4)

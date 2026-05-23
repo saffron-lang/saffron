@@ -92,6 +92,11 @@ static void skipWhitespace() {
 
 static Token string() {
     while (peek() != '"' && !isAtEnd()) {
+        if (peek() == '\\') {
+            advance();
+            if (!isAtEnd()) advance();
+            continue;
+        }
         if (peek() == '\n') scanner.line++;
         advance();
     }
@@ -163,6 +168,8 @@ static TokenType identifierType() {
                 }
             }
             break;
+        case 'd':
+            return checkKeyword(1, 3, "ata", TOKEN_DATACLASS);
         case 'e':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {

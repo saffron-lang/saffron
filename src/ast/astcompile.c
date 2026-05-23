@@ -729,15 +729,73 @@ void compileNode(Node *node) {
             getVariable(className);
 
 
+            bool hasInit = false;
             for (int i = 0; i < casted->body.count; i++) {
                 if (casted->body.stmts[i]->self.type == NODE_FUNCTION) {
-                    uint8_t constant = identifierConstant(&((struct Function *) casted->body.stmts[i])->name);
+                    struct Function *fn = (struct Function *) casted->body.stmts[i];
+                    if (fn->functionType == TYPE_INITIALIZER) hasInit = true;
+                    uint8_t constant = identifierConstant(&fn->name);
                     compileNode((Node *) casted->body.stmts[i]);
                     emitBytes(OP_METHOD, constant);
                 } else {
                     uint8_t constant = identifierConstant(&((struct Var *) casted->body.stmts[i])->name);
                     compileNode((Node *) casted->body.stmts[i]);
                     emitBytes(OP_FIELD, constant);
+                }
+            }
+
+            if (casted->isDataClass) {
+                int fieldCount = 0;
+                for (int i = 0; i < casted->body.count; i++) {
+                    if (casted->body.stmts[i]->self.type == NODE_VAR) {
+                        struct Var *var = (struct Var *) casted->body.stmts[i];
+                        uint8_t fieldNameConst = identifierConstant(&var->name);
+                        Token typeName = {0};
+                        if (var->type != NULL && var->type->self.type == NODE_SIMPLE) {
+                            typeName = ((struct Simple *) var->type)->name;
+                        } else {
+                            typeName = syntheticToken("Any");
+                        }
+                        uint8_t typeNameConst = identifierConstant(&typeName);
+                        emitBytes(OP_FIELD_META, fieldNameConst);
+                        emitByte(typeNameConst);
+                        fieldCount++;
+                    }
+                }
+
+                if (!hasInit && fieldCount > 0) {
+                    Compiler compiler;
+                    Token initName = syntheticToken("init");
+                    initCompiler(&compiler, TYPE_INITIALIZER, &initName);
+                    beginScope();
+                    current->function->arity = fieldCount;
+
+                    for (int i = 0; i < casted->body.count; i++) {
+                        if (casted->body.stmts[i]->self.type != NODE_VAR) continue;
+                        struct Var *var = (struct Var *) casted->body.stmts[i];
+                        addLocal(var->name);
+                        markInitialized();
+                    }
+
+                    for (int i = 0; i < casted->body.count; i++) {
+                        if (casted->body.stmts[i]->self.type != NODE_VAR) continue;
+                        struct Var *var = (struct Var *) casted->body.stmts[i];
+                        int slot = resolveLocal(current, &var->name);
+                        emitBytes(OP_GET_LOCAL, 0);
+                        emitBytes(OP_GET_LOCAL, (uint8_t) slot);
+                        uint8_t nameConst = identifierConstant(&var->name);
+                        emitBytes(OP_SET_PROPERTY, nameConst);
+                        emitByte(OP_POP);
+                    }
+
+                    ObjFunction *function = endCompiler();
+                    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+                    for (int i = 0; i < function->upvalueCount; i++) {
+                        emitByte(0);
+                        emitByte(0);
+                    }
+                    uint8_t initConst = identifierConstant(&initName);
+                    emitBytes(OP_METHOD, initConst);
                 }
             }
 

@@ -76,6 +76,14 @@ typedef struct {
     Table strings;
     Table atoms;
     ObjString *initString;
+    ObjString *addString;
+    ObjString *subString;
+    ObjString *mulString;
+    ObjString *divString;
+    ObjString *modString;
+    ObjString *ltString;
+    ObjString *gtString;
+    ObjString *eqString;
     ObjUpvalue *openUpvalues;
 } VM;
 

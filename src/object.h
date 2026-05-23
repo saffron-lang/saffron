@@ -100,6 +100,28 @@ typedef struct {
     int upvalueCount;
 } ObjClosure;
 
+typedef enum {
+    FIELD_TYPE_STRING,
+    FIELD_TYPE_NUMBER,
+    FIELD_TYPE_BOOL,
+    FIELD_TYPE_NIL,
+    FIELD_TYPE_LIST,
+    FIELD_TYPE_MAP,
+    FIELD_TYPE_CLASS,
+} FieldTypeTag;
+
+typedef struct {
+    ObjString *name;
+    FieldTypeTag typeTag;
+    ObjString *typeName;
+} FieldMeta;
+
+typedef struct {
+    int count;
+    int capacity;
+    FieldMeta *entries;
+} FieldMetaArray;
+
 typedef struct ObjClass {
     Obj obj;
     ObjString *name;
@@ -107,6 +129,8 @@ typedef struct ObjClass {
     Table fields;
     int superclassCount;
     struct ObjClass *superclasses[8];
+    bool isDataClass;
+    FieldMetaArray fieldMetas;
 } ObjClass;
 
 typedef struct {
