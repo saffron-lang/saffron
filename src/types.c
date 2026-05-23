@@ -395,6 +395,11 @@ static bool isSubTypeInner(Type *subclass, Type *superclass) {
         return true;
     }
 
+    // Any as subclass is universally assignable (bivariant Any, like TypeScript)
+    if (subclass == (Type *) anyType) {
+        return true;
+    }
+
     switch (subclass->obj.type) {
         case (OBJ_PARSE_GENERIC_TYPE): {
             GenericType *subclassType = (GenericType *) subclass;
@@ -519,10 +524,15 @@ static bool isSubTypeInner(Type *subclass, Type *superclass) {
         }
         case (OBJ_PARSE_INTERFACE_TYPE): {
             InterfaceType *superclassType = (InterfaceType *) superclass;
-            if (subclass->obj.type != OBJ_PARSE_INTERFACE_TYPE && subclass->obj.type != OBJ_PARSE_TYPE) {
+            Type *subForInterface = subclass;
+            // Unwrap GenericType to its target for structural checking
+            if (subForInterface->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+                subForInterface = ((GenericType *) subForInterface)->target;
+            }
+            if (subForInterface->obj.type != OBJ_PARSE_INTERFACE_TYPE && subForInterface->obj.type != OBJ_PARSE_TYPE) {
                 return false;
             }
-            InterfaceType *subclassType = (InterfaceType *) subclass;
+            InterfaceType *subclassType = (InterfaceType *) subForInterface;
             for (int i = 0; i < superclassType->fields.count; i++) {
                 Entry *entry = &superclassType->fields.entries[i];
                 if (entry->key != NULL) {

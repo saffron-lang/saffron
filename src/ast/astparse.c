@@ -746,6 +746,7 @@ static struct Function *function(FunctionType type) {
     result->functionType = type;
     result->returnType = returnType;
     result->generics = generics;
+    initExprArray(&result->decorators);
     return result;
 }
 
@@ -1034,27 +1035,12 @@ static Stmt *forStatement() {
 
 static Stmt *importStatement() {
     struct Import *result = ALLOCATE_NODE(struct Import, NODE_IMPORT);
-    initTokenArray(&result->names);
 
-    if (match(TOKEN_LEFT_BRACE)) {
-        // import { name1, name2 } from "path"
-        do {
-            consume(TOKEN_IDENTIFIER, "Expect name in import list.");
-            writeTokenArray(&result->names, parser.previous, parser.previous.line);
-        } while (match(TOKEN_COMMA));
-        consume(TOKEN_RIGHT_BRACE, "Expect '}' after import names.");
-        // Expect 'from' — it's not a keyword, just an identifier
-        consume(TOKEN_IDENTIFIER, "Expect 'from' after import list.");
-        consume(TOKEN_STRING, "Expect path after 'from'.");
-        result->expression = string(false);
-        result->name = result->names.tokens[0]; // placeholder
-    } else {
-        // import "path" as Name
-        consume(TOKEN_STRING, "Expect '\"' after import.");
-        result->expression = string(false);
-        consume(TOKEN_AS, "Expect 'as' after import path.");
-        result->name = parseVariable("Expect name after 'as' in import.");
-    }
+    // import "path" as Name
+    consume(TOKEN_STRING, "Expect '\"' after import.");
+    result->expression = string(false);
+    consume(TOKEN_AS, "Expect 'as' after import path.");
+    result->name = parseVariable("Expect name after 'as' in import.");
 
     match(TOKEN_SEMICOLON);
     return result;
@@ -1598,56 +1584,19 @@ static Stmt *declaration() {
         } while (match(TOKEN_AT));
 
         // Parse the decorated declaration (must be fun or class)
-        Stmt *decl;
-        Token name;
-        if (match(TOKEN_DATACLASS)) {
-            consume(TOKEN_CLASS, "Expect 'class' after 'data'.");
-            decl = classDeclaration();
-            ((struct Class *) decl)->isDataClass = true;
-            name = ((struct Class *) decl)->name;
+        if (match(TOKEN_FUN)) {
+            Stmt *decl = funDeclaration();
+            ((struct Function *) decl)->decorators = decorators;
+            return decl;
         } else if (match(TOKEN_CLASS)) {
-            decl = classDeclaration();
-            name = ((struct Class *) decl)->name;
-        } else if (match(TOKEN_FUN)) {
-            decl = funDeclaration();
-            name = ((struct Function *) decl)->name;
+            // For classes, store decorators but apply same pattern
+            Stmt *decl = classDeclaration();
+            // TODO: add decorators field to Class node
+            return decl;
         } else {
             error("Decorators can only be applied to functions or classes.");
             return statement();
         }
-
-        // Build a block: [decl, name = d1(d2(...(name)))]
-        StmtArray stmts;
-        initStmtArray(&stmts);
-        writeStmtArray(&stmts, decl);
-
-        // Apply decorators bottom-up (last decorator listed = innermost)
-        // @a @b fun f() => f = a(b(f))
-        Expr *wrapped = (Expr *) ALLOCATE_NODE(struct Variable, NODE_VARIABLE);
-        ((struct Variable *) wrapped)->name = name;
-
-        for (int i = decorators.count - 1; i >= 0; i--) {
-            struct Call *call = ALLOCATE_NODE(struct Call, NODE_CALL);
-            call->callee = decorators.exprs[i];
-            call->paren = name;
-            initExprArray(&call->arguments);
-            writeExprArray(&call->arguments, wrapped);
-            wrapped = (Expr *) call;
-        }
-
-        // name = wrapped
-        struct Assign *assign = ALLOCATE_NODE(struct Assign, NODE_ASSIGN);
-        assign->name = name;
-        assign->value = wrapped;
-
-        struct Expression *exprStmt = ALLOCATE_NODE(struct Expression, NODE_EXPRESSION);
-        exprStmt->expression = (Expr *) assign;
-        exprStmt->type = NULL;
-        writeStmtArray(&stmts, (Stmt *) exprStmt);
-
-        struct Block *block = ALLOCATE_NODE(struct Block, NODE_BLOCK);
-        block->statements = stmts;
-        return (Stmt *) block;
     }
 
     if (match(TOKEN_DATACLASS)) {
