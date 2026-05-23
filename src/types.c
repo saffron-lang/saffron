@@ -1585,6 +1585,13 @@ Type *evaluateNode(Node *node) {
                     OBJ_VAL(type)
             );
 
+            // Bring imported type definitions into scope
+            if (type->obj.type == OBJ_PARSE_TYPE) {
+                SimpleType *moduleType = (SimpleType *) type;
+                tableAddAll(&moduleType->methods, &currentEnv->typeDefs);
+                tableAddAll(&moduleType->fields, &currentEnv->locals);
+            }
+
             return NULL;
         }
         case NODE_FUNCTOR: {
