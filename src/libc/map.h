@@ -31,4 +31,15 @@ Value mapValuesBuiltin(ObjMap *map, int argCount);
 
 ObjBuiltinType *createMapType();
 
+typedef struct {
+    ObjInstance obj;
+    ObjMap *map;
+    int index;
+} ObjMapIterator;
+
+ObjMapIterator *newMapIterator(ObjMap *map);
+ObjBuiltinType *createMapIteratorType();
+
+extern ObjBuiltinType *mapIteratorType;
+
 #endif //SAFFRON_MAP_H

@@ -15,6 +15,7 @@
 #include "ast/astparse.h"
 #include "libc/map.h"
 #include "libc/builtins.h"
+#include "libc/string.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -99,13 +100,25 @@ void initVM() {
     vm.isThrowing = false;
     vm.currentException = NIL_VAL;
 
+    vm.numberClass = newClass(copyString("Number", 6));
+    vm.stringClass = newClass(copyString("String", 6));
+    vm.boolClass = newClass(copyString("Bool", 4));
+    vm.nilClass = newClass(copyString("Nil", 3));
+
+    defineBuiltin("Number", OBJ_VAL(vm.numberClass));
+    defineBuiltin("String", OBJ_VAL(vm.stringClass));
+    defineBuiltin("Bool", OBJ_VAL(vm.boolClass));
+    defineBuiltin("Nil", OBJ_VAL(vm.nilClass));
+
     makeTypes();
     initLib();
+    initStringMethods();
     initAsyncHandler();
 }
 
 void freeVM() {
     freeAsyncHandler();
+    freeStringMethods();
 
     freeTable(&vm.types);
     freeTable(&vm.modules);
@@ -369,6 +382,53 @@ static bool invoke(ObjString *name, int argCount) {
             return callValue(value, argCount);
         }
         runtimeError("Undefined method '%s' on class.", name->chars);
+        return false;
+    }
+
+    if (IS_STRING(receiver)) {
+        Value method;
+        if (tableGet(&stringMethods, name, &method)) {
+            ObjNativeMethod *nativeMethod = (ObjNativeMethod *) AS_OBJ(method);
+            NativeMethodFn native = nativeMethod->function;
+            Value result = native(AS_OBJ(receiver), argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount + 1;
+            push(result);
+            return true;
+        }
+        runtimeError("Undefined method '%s' on String.", name->chars);
+        return false;
+    }
+
+    if (IS_NUMBER(receiver)) {
+        Value method;
+        if (tableGet(&vm.numberClass->methods, name, &method)) {
+            ObjNativeMethod *nativeMethod = (ObjNativeMethod *) AS_OBJ(method);
+            NativeMethodFn native = nativeMethod->function;
+            Value result = native(NULL, argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount + 1;
+            push(result);
+            return true;
+        }
+        runtimeError("Undefined method '%s' on Number.", name->chars);
+        return false;
+    }
+
+    if (IS_BOOL(receiver)) {
+        Value method;
+        if (tableGet(&vm.boolClass->methods, name, &method)) {
+            ObjNativeMethod *nativeMethod = (ObjNativeMethod *) AS_OBJ(method);
+            NativeMethodFn native = nativeMethod->function;
+            Value result = native(NULL, argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount + 1;
+            push(result);
+            return true;
+        }
+        runtimeError("Undefined method '%s' on Bool.", name->chars);
+        return false;
+    }
+
+    if (IS_NIL(receiver)) {
+        runtimeError("Cannot call method '%s' on nil.", name->chars);
         return false;
     }
 
@@ -643,18 +703,30 @@ static InterpretResult run(ObjModule *module) {
                 Value typeVal = pop();
                 Value instance = pop();
                 bool result = false;
-                if (IS_INSTANCE(instance) && IS_CLASS(typeVal)) {
+                if (IS_CLASS(typeVal)) {
                     ObjClass *target = AS_CLASS(typeVal);
-                    ObjClass *stack[64];
-                    int stackSize = 0;
-                    stack[stackSize++] = AS_INSTANCE(instance)->klass;
-                    while (stackSize > 0 && !result) {
-                        ObjClass *current = stack[--stackSize];
-                        if (current == target) {
-                            result = true;
-                        } else {
-                            for (int i = 0; i < current->superclassCount && stackSize < 64; i++) {
-                                stack[stackSize++] = current->superclasses[i];
+                    // Primitive type checks
+                    if (IS_NUMBER(instance) && target == vm.numberClass) {
+                        result = true;
+                    } else if (IS_STRING(instance) && target == vm.stringClass) {
+                        result = true;
+                    } else if (IS_BOOL(instance) && target == vm.boolClass) {
+                        result = true;
+                    } else if (IS_NIL(instance) && target == vm.nilClass) {
+                        result = true;
+                    } else if (IS_INSTANCE(instance)) {
+                        // Instance class hierarchy BFS
+                        ObjClass *stack[64];
+                        int stackSize = 0;
+                        stack[stackSize++] = AS_INSTANCE(instance)->klass;
+                        while (stackSize > 0 && !result) {
+                            ObjClass *current = stack[--stackSize];
+                            if (current == target) {
+                                result = true;
+                            } else {
+                                for (int i = 0; i < current->superclassCount && stackSize < 64; i++) {
+                                    stack[stackSize++] = current->superclasses[i];
+                                }
                             }
                         }
                     }

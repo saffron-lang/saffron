@@ -7,20 +7,23 @@
 #include "task.h"
 #include "time.h"
 #include "json.h"
+#include "reflect.h"
 
 void initLib() { // TODO: Don't evaluate registered modules until accessed?
     defineType("Module", OBJ_VAL(createModuleType()));
     createListIteratorType();
+    createMapIteratorType();
     defineBuiltin("List", OBJ_VAL(createListType()));
     defineBuiltin("Map", OBJ_VAL(createMapType()));
     defineType("Task", OBJ_VAL(createTaskType()));
 
-    #define MODULE_COUNT 4
+    #define MODULE_COUNT 5
     ModuleRegister registry[MODULE_COUNT] = {
             timeModuleRegister,
             ioModuleRegister,
             taskModuleRegister,
             jsonModuleRegister,
+            reflectModuleRegister,
     };
 
     for (int i = 0; i < MODULE_COUNT; i++) {

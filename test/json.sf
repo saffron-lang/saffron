@@ -1,0 +1,64 @@
+// Data class definitions
+data class Point {
+    var x: Number
+    var y: Number
+}
+
+data class User {
+    var name: String
+    var age: Number
+    var active: Bool
+}
+
+data class Config {
+    var host: String
+    var port: Number
+    var debug: Bool
+}
+
+// --- Test: data class construction ---
+var p = Point(3, 4)
+IO.print(p.x)
+IO.print(p.y)
+
+var u = User("alice", 30, true)
+IO.print(u.name)
+IO.print(u.age)
+IO.print(u.active)
+
+// --- Test: Json.to_string ---
+IO.print(Json.to_string(p))
+IO.print(Json.to_string(u))
+
+// --- Test: Json.parse (untyped) ---
+var nums = Json.parse("[1, 2, 3, 4, 5]")
+IO.print(nums)
+
+var flag = Json.parse("true")
+IO.print(flag)
+
+var nothing = Json.parse("null")
+IO.print(nothing)
+
+var num = Json.parse("42")
+IO.print(num)
+
+// --- Test: Json.parse_into (typed deserialization) ---
+var p2 = Json.parse_into(Point, "{\"x\":10,\"y\":20}")
+IO.print(p2.x)
+IO.print(p2.y)
+
+var u2 = Json.parse_into(User, "{\"name\":\"bob\",\"age\":25,\"active\":false}")
+IO.print(u2.name)
+IO.print(u2.age)
+IO.print(u2.active)
+
+// --- Test: roundtrip (stringify -> parse_into) ---
+var cfg = Config("localhost", 8080, true)
+var json = Json.to_string(cfg)
+IO.print(json)
+
+var cfg2 = Json.parse_into(Config, json)
+IO.print(cfg2.host)
+IO.print(cfg2.port)
+IO.print(cfg2.debug)

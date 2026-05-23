@@ -1,0 +1,258 @@
+// JSON parser and serializer implemented in Saffron
+
+fun parse(source: String) {
+    var pos = 0
+
+    fun peek(): String {
+        if (pos >= source.length()) return ""
+        return source.char_at(pos)
+    }
+
+    fun advance(): String {
+        var c = source.char_at(pos)
+        pos = pos + 1
+        return c
+    }
+
+    fun skip_ws() {
+        while (pos < source.length()) {
+            var c = peek()
+            if (c == " " or c == "\t" or c == "\n" or c == "\r") {
+                pos = pos + 1
+            } else {
+                return nil
+            }
+        }
+    }
+
+    fun consume(c: String): Bool {
+        if (peek() == c) {
+            pos = pos + 1
+            return true
+        }
+        return false
+    }
+
+    fun is_digit(c: String): Bool {
+        return c == "0" or c == "1" or c == "2" or c == "3" or c == "4" or
+               c == "5" or c == "6" or c == "7" or c == "8" or c == "9"
+    }
+
+    fun parse_string(): String {
+        var result = ""
+        while (pos < source.length()) {
+            var c = advance()
+            if (c == "\"") { return result }
+            if (c == "\\") {
+                var esc = advance()
+                if (esc == "n") { result = result + "\n" }
+                if (esc == "t") { result = result + "\t" }
+                if (esc == "r") { result = result + "\r" }
+                if (esc == "\\") { result = result + "\\" }
+                if (esc == "\"") { result = result + "\"" }
+                if (esc == "/") { result = result + "/" }
+                if (esc == "b") { result = result + "\b" }
+                if (esc == "f") { result = result + "\f" }
+            } else {
+                result = result + c
+            }
+        }
+        return result
+    }
+
+    fun parse_number(): Number {
+        var start = pos - 1
+        while (pos < source.length()) {
+            var c = peek()
+            if (is_digit(c) or c == "." or c == "e" or c == "E" or c == "+" or c == "-") {
+                pos = pos + 1
+            } else {
+                return source.slice(start, pos).to_number()
+            }
+        }
+        return source.slice(start, pos).to_number()
+    }
+
+    fun parse_value() {
+        skip_ws()
+        var c = advance()
+
+        if (c == "\"") { return parse_string() }
+        if (c == "t") { pos = pos + 3; return true }
+        if (c == "f") { pos = pos + 4; return false }
+        if (c == "n") { pos = pos + 3; return nil }
+        if (c == "-" or is_digit(c)) { return parse_number() }
+
+        if (c == "[") {
+            var arr = []
+            skip_ws()
+            if (consume("]")) { return arr }
+            var arr_done = false
+            while (!arr_done) {
+                skip_ws()
+                arr.push(parse_value())
+                skip_ws()
+                if (consume("]")) { arr_done = true }
+                else { consume(",") }
+            }
+            return arr
+        }
+
+        if (c == "{") {
+            var map = Map()
+            skip_ws()
+            if (consume("}")) { return map }
+            var map_done = false
+            while (!map_done) {
+                skip_ws()
+                consume("\"")
+                var key = parse_string()
+                skip_ws()
+                consume(":")
+                skip_ws()
+                var val = parse_value()
+                map.set(key, val)
+                skip_ws()
+                if (consume("}")) { map_done = true }
+                else { consume(",") }
+            }
+            return map
+        }
+
+        return nil
+    }
+
+    return parse_value()
+}
+
+fun to_string(value) {
+    if (value == nil) { return "null" }
+    if (value == true) { return "true" }
+    if (value == false) { return "false" }
+
+    if (Reflect.is_number(value)) {
+        return Reflect.number_to_string(value)
+    }
+
+    if (Reflect.is_string(value)) {
+        var str = Reflect.as_string(value)
+        var result = "\""
+        var i = 0
+        while (i < str.length()) {
+            var c = str.char_at(i)
+            if (c == "\"") { result = result + "\\\"" }
+            else if (c == "\\") { result = result + "\\\\" }
+            else if (c == "\n") { result = result + "\\n" }
+            else if (c == "\t") { result = result + "\\t" }
+            else if (c == "\r") { result = result + "\\r" }
+            else { result = result + c }
+            i = i + 1
+        }
+        return result + "\""
+    }
+
+    if (Reflect.is_list(value)) {
+        var list = Reflect.as_list(value)
+        var result = "["
+        var i = 0
+        while (i < list.length()) {
+            if (i > 0) { result = result + "," }
+            result = result + to_string(list[i])
+            i = i + 1
+        }
+        return result + "]"
+    }
+
+    if (Reflect.is_map(value)) {
+        var keys = value.keys()
+        var result = "{"
+        var i = 0
+        while (i < keys.length()) {
+            if (i > 0) { result = result + "," }
+            result = result + to_string(keys[i]) + ":" + to_string(value.get(keys[i]))
+            i = i + 1
+        }
+        return result + "}"
+    }
+
+    if (Reflect.is_instance(value)) {
+        var fields = Reflect.fields(value)
+        var names = fields.keys()
+        var result = "{"
+        var i = 0
+        while (i < names.length()) {
+            if (i > 0) { result = result + "," }
+            var name = names[i]
+            result = result + to_string(name) + ":" + to_string(fields.get(name))
+            i = i + 1
+        }
+        return result + "}"
+    }
+
+    return "null"
+}
+
+fun pretty(value, indent: Number) {
+    fun pad(depth: Number): String {
+        return "  ".repeat(depth)
+    }
+
+    fun fmt(val, depth: Number): String {
+        if (val == nil) { return "null" }
+        if (val == true) { return "true" }
+        if (val == false) { return "false" }
+
+        if (Reflect.is_number(val)) {
+            return Reflect.number_to_string(val)
+        }
+
+        if (Reflect.is_string(val)) {
+            return to_string(val)
+        }
+
+        if (Reflect.is_list(val)) {
+            var list = Reflect.as_list(val)
+            if (list.length() == 0) { return "[]" }
+            var result = "[\n"
+            var i = 0
+            while (i < list.length()) {
+                if (i > 0) { result = result + ",\n" }
+                result = result + pad(depth + 1) + fmt(list[i], depth + 1)
+                i = i + 1
+            }
+            return result + "\n" + pad(depth) + "]"
+        }
+
+        if (Reflect.is_map(val)) {
+            var keys = val.keys()
+            if (keys.length() == 0) { return "{}" }
+            var result = "{\n"
+            var i = 0
+            while (i < keys.length()) {
+                if (i > 0) { result = result + ",\n" }
+                result = result + pad(depth + 1) + to_string(keys[i]) + ": " + fmt(val.get(keys[i]), depth + 1)
+                i = i + 1
+            }
+            return result + "\n" + pad(depth) + "}"
+        }
+
+        if (Reflect.is_instance(val)) {
+            var fields = Reflect.fields(val)
+            var names = fields.keys()
+            if (names.length() == 0) { return "{}" }
+            var result = "{\n"
+            var i = 0
+            while (i < names.length()) {
+                if (i > 0) { result = result + ",\n" }
+                var name = names[i]
+                result = result + pad(depth + 1) + to_string(name) + ": " + fmt(fields.get(name), depth + 1)
+                i = i + 1
+            }
+            return result + "\n" + pad(depth) + "}"
+        }
+
+        return "null"
+    }
+
+    return fmt(value, 0)
+}

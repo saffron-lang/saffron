@@ -1,0 +1,13 @@
+// Reflect — runtime type introspection
+//
+// This module exposes type-checking and field access as a stable API.
+// Implementations (VM, compiled native, WASM) provide these as intrinsics.
+// User code and stdlib should use Reflect rather than coupling to internals.
+//
+// Usage:
+//   import "@reflect" as Reflect
+//   Reflect.is_string(value)
+//   Reflect.fields(instance)
+//
+// All functions here are stubs that will be backed by native intrinsics.
+// The native C module (src/libc/reflect.c) provides the actual implementation.

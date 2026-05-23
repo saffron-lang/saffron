@@ -355,7 +355,7 @@ static Value jsonParseIntoNative(int argCount, Value *args) {
     return pop();
 }
 
-static Value jsonStringifyNative(int argCount, Value *args) {
+static Value jsonToStringNative(int argCount, Value *args) {
     if (argCount != 1) {
         runtimeError("Json.stringify expects 1 argument");
         return NIL_VAL;
@@ -377,7 +377,7 @@ ObjModule *createJsonModule() {
     push(OBJ_VAL(module));
     defineModuleFunction(module, "parse", jsonParseNative);
     defineModuleFunction(module, "parse_into", jsonParseIntoNative);
-    defineModuleFunction(module, "stringify", jsonStringifyNative);
+    defineModuleFunction(module, "to_string", jsonToStringNative);
     pop();
     return module;
 }
@@ -386,7 +386,7 @@ SimpleType *createJsonModuleType() {
     SimpleType *jsonModule = newSimpleType();
     createBuiltinFunctorType(jsonModule, "parse", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) anyType);
     createBuiltinFunctorType(jsonModule, "parse_into", (Type *[]) {(Type *) anyType, (Type *) stringType}, 2, NULL, 0, (Type *) anyType);
-    createBuiltinFunctorType(jsonModule, "stringify", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
+    createBuiltinFunctorType(jsonModule, "to_string", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     return jsonModule;
 }
 

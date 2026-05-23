@@ -76,6 +76,10 @@ typedef struct {
     Table strings;
     Table atoms;
     ObjString *initString;
+    ObjClass *numberClass;
+    ObjClass *stringClass;
+    ObjClass *boolClass;
+    ObjClass *nilClass;
     ObjString *addString;
     ObjString *subString;
     ObjString *mulString;
