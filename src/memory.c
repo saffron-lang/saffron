@@ -124,6 +124,7 @@ static void freeObject(Obj *object) {
             ObjOverloadSet *set = (ObjOverloadSet *) object;
             FREE_ARRAY(ObjClosure*, set->closures, set->capacity);
             FREE_ARRAY(int, set->arities, set->capacity);
+            FREE_ARRAY(OverloadParamType, set->firstParamTypes, set->capacity);
             FREE(ObjOverloadSet, object);
             break;
         }

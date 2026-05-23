@@ -214,6 +214,7 @@ ObjFunction *newFunction() {
     function->upvalueCount = 0;
     function->name = NULL;
     function->module = NULL;
+    function->firstParamType = OVERLOAD_ANY;
     initChunk(&function->chunk);
     return function;
 }
@@ -269,18 +270,21 @@ ObjOverloadSet *newOverloadSet() {
     set->capacity = 0;
     set->closures = NULL;
     set->arities = NULL;
+    set->firstParamTypes = NULL;
     return set;
 }
 
-void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity) {
+void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity, OverloadParamType firstParamType) {
     if (set->count >= set->capacity) {
         int oldCapacity = set->capacity;
         set->capacity = oldCapacity < 4 ? 4 : oldCapacity * 2;
         set->closures = GROW_ARRAY(ObjClosure*, set->closures, oldCapacity, set->capacity);
         set->arities = GROW_ARRAY(int, set->arities, oldCapacity, set->capacity);
+        set->firstParamTypes = GROW_ARRAY(OverloadParamType, set->firstParamTypes, oldCapacity, set->capacity);
     }
     set->closures[set->count] = closure;
     set->arities[set->count] = arity;
+    set->firstParamTypes[set->count] = firstParamType;
     set->count++;
 }
 

@@ -4,3 +4,12 @@ fun add(a: Number, b: Number, c: Number): Number { return a + b + c }
 
 IO.println(add(1, 2))
 IO.println(add(1, 2, 3))
+
+// Type-based overloading (same arity, different first param type)
+fun format(n: Number): String { return "num: " + n.to_string() }
+fun format(s: String): String { return "str: " + s }
+fun format(items: List<Any>): String { return "list of " + items.length().to_string() }
+
+IO.println(format(42))
+IO.println(format("hello"))
+IO.println(format([1, 2, 3]))

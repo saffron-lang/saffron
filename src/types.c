@@ -128,8 +128,15 @@ static void *defineLocal(TypeEnvironment *typeEnvironment, const char *name, Typ
 
 static void *defineLocalAndTypeDef(TypeEnvironment *typeEnvironment, const char *name, SimpleType *type) {
     Value initTypeValue;
-    tableGet(&type->methods, copyString("init", 4), &initTypeValue);
-    Type *initType = (Type *) AS_OBJ(initTypeValue);
+    Type *initType;
+    if (tableGet(&type->methods, copyString("init", 4), &initTypeValue)) {
+        initType = (Type *) AS_OBJ(initTypeValue);
+    } else {
+        // Fallback: create a constructor type that returns this type
+        FunctorType *ft = newFunctorType();
+        ft->returnType = (Type *) type;
+        initType = (Type *) ft;
+    }
     defineTypeDef(typeEnvironment, name, (Type *) type);
     return defineLocal(typeEnvironment, name, initType);
 }
@@ -612,7 +619,7 @@ Type *getTypeOf(Value value) {
 
 #endif
 
-    return NULL;
+    return (Type *) anyType;
 }
 
 
@@ -640,9 +647,17 @@ static void preRegisterDeclarations(StmtArray *statements) {
         Node *node = (Node *) statements->stmts[i];
         if (node->type == NODE_FUNCTION) {
             struct Function *fn = (struct Function *) node;
-            FunctorType *placeholder = newFunctorType();
-            placeholder->returnType = (Type *) anyType;
-            tableSet(&currentEnv->locals, copyString(fn->name.start, fn->name.length), OBJ_VAL(placeholder));
+            ObjString *fnName = copyString(fn->name.start, fn->name.length);
+            Value existingVal;
+            if (tableGet(&currentEnv->locals, fnName, &existingVal) &&
+                IS_OBJ(existingVal) && AS_OBJ(existingVal)->type == OBJ_PARSE_FUNCTOR_TYPE) {
+                // Multiple functions with same name: mark as overloaded (Any)
+                tableSet(&currentEnv->locals, fnName, OBJ_VAL(anyType));
+            } else {
+                FunctorType *placeholder = newFunctorType();
+                placeholder->returnType = (Type *) anyType;
+                tableSet(&currentEnv->locals, fnName, OBJ_VAL(placeholder));
+            }
         } else if (node->type == NODE_CLASS) {
             struct Class *cls = (struct Class *) node;
             SimpleType *classPlaceholder = newSimpleType();
@@ -787,9 +802,9 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_GROUPING: {
             struct Grouping *casted = (struct Grouping *) node;
-            evaluateNode((Node *) casted->expression);
+            Type *result = evaluateNode((Node *) casted->expression);
             casted->self.type = casted->expression->type;
-            break;
+            return result;
         }
         case NODE_LITERAL: {
             struct Literal *casted = (struct Literal *) node;
@@ -942,8 +957,7 @@ Type *evaluateNode(Node *node) {
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             Type *objectType = evaluateNode((Node *) casted->object);
-            if (objectType == NULL) return NULL;
-            if (objectType == (Type *) anyType) return (Type *) anyType;
+            if (objectType == NULL || objectType == (Type *) anyType) return (Type *) anyType;
             SimpleType *rootType;
 
             switch (objectType->obj.type) {
@@ -992,13 +1006,18 @@ Type *evaluateNode(Node *node) {
                                               genType->generics.values[i]);
                             }
                         }
-                    } else {
+                    } else if (genDef->extends->obj.type == OBJ_PARSE_TYPE ||
+                               genDef->extends->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
                         rootType = (SimpleType *) genDef->extends;
+                    } else {
+                        errorAt(&casted->name, "Cannot access property on this generic type");
+                        return (Type *) anyType;
                     }
                     break;
                 }
                 default: {
                     errorAt(&casted->name, "Attempting to get from invalid type.");
+                    return (Type *) anyType;
                 }
             }
 
@@ -1021,10 +1040,15 @@ Type *evaluateNode(Node *node) {
             Type *valueType = evaluateNode((Node *) casted->value);
 
             Type *objectType = evaluateNode((Node *) casted->object);
+            if (objectType == NULL || objectType == (Type *) anyType) return (Type *) anyType;
+
             SimpleType *rootType = (SimpleType *) objectType;
 
             if (objectType->obj.type == OBJ_PARSE_GENERIC_TYPE) {
                 rootType = (SimpleType *) ((GenericType *) objectType)->target;
+            } else if (objectType->obj.type != OBJ_PARSE_TYPE && objectType->obj.type != OBJ_PARSE_INTERFACE_TYPE) {
+                errorAt(&casted->name, "Cannot set field on this type");
+                return (Type *) anyType;
             }
 
             if (rootType == anyType) return (Type *) anyType;
@@ -1034,6 +1058,7 @@ Type *evaluateNode(Node *node) {
             if (!tableGet(&rootType->methods, copyString(casted->name.start, casted->name.length), &fieldType)) {
                 if (!tableGet(&rootType->fields, copyString(casted->name.start, casted->name.length), &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
+                    return (Type *) anyType;
                 }
             }
 
@@ -1045,8 +1070,16 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_SUPER: {
             struct Super *casted = (struct Super *) node;
+            if (currentClassType == NULL) {
+                errorAt(&casted->method, "Cannot use 'super' outside a class");
+                return (Type *) anyType;
+            }
             SimpleType *currentClass = (SimpleType *) currentClassType;
             SimpleType *superType = currentClass->superType;
+            if (superType == NULL) {
+                errorAt(&casted->method, "Class has no superclass");
+                return (Type *) anyType;
+            }
 
             Value fieldType;
 
@@ -1054,6 +1087,7 @@ Type *evaluateNode(Node *node) {
                 if (!tableGet(&superType->fields, copyString(casted->method.start, casted->method.length),
                               &fieldType)) {
                     errorAt(&casted->method, "Invalid field");
+                    return (Type *) anyType;
                 }
             }
 
@@ -1339,12 +1373,19 @@ Type *evaluateNode(Node *node) {
             type->returnType = evaluateNode((Node *) casted->returnType);
 
             // Pre-register in enclosing scope for recursive calls
-            tableSet(
-                    &currentEnv->enclosing->locals, copyString(
-                            casted->name.start, casted->name.length
-                    ),
-                    OBJ_VAL(type)
-            );
+            // If an overload already exists, store Any to allow flexible dispatch
+            {
+                ObjString *funcName = copyString(casted->name.start, casted->name.length);
+                Value existingFunc;
+                if (tableGet(&currentEnv->enclosing->locals, funcName, &existingFunc) &&
+                    IS_OBJ(existingFunc) &&
+                    (AS_OBJ(existingFunc)->type == OBJ_PARSE_FUNCTOR_TYPE ||
+                     AS_OBJ(existingFunc) == (Obj *) anyType)) {
+                    tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(anyType));
+                } else {
+                    tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(type));
+                }
+            }
 
             evaluateTypes(&casted->body);
             if (!type->returnType) {
@@ -1660,6 +1701,7 @@ Type *evaluateNode(Node *node) {
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
             Type *value = evaluateNode((Node *) casted->value);
+            if (currentFuncType == NULL) return value;
             if (currentFuncType->returnType) {
                 if (!isSubType(value, currentFuncType->returnType)) {
                     if (!isSubType(currentFuncType->returnType, value)) {
@@ -1729,7 +1771,7 @@ Type *evaluateNode(Node *node) {
                     Type *argType = evaluateNode((Node *) typeNode);
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
                 } else {
-                    writeValueArray(&type->arguments, NIL_VAL);
+                    writeValueArray(&type->arguments, OBJ_VAL(anyType));
                 }
             }
 
@@ -1888,7 +1930,7 @@ Type *evaluateNode(Node *node) {
 
             currentEnv = currentEnv->enclosing;
 
-            break;
+            return (Type *) interfaceType;
         }
         case NODE_TYPEDECLARATION: {
             struct TypeDeclaration *casted = (struct TypeDeclaration *) node;
@@ -1926,7 +1968,7 @@ Type *evaluateNode(Node *node) {
                     OBJ_VAL(result)
             );
 
-            break;
+            return result;
         }
         case NODE_ENUM: {
             struct Enum *casted = (struct Enum *) node;
@@ -2121,11 +2163,11 @@ Type *evaluateNode(Node *node) {
             return resultType;
         }
         case NODE_MATCHARM: {
-            break;
+            return (Type *) anyType;
         }
     }
 
-    return NULL;
+    return (Type *) anyType;
 }
 
 void freeType(Type *type) {

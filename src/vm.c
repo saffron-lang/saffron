@@ -84,7 +84,13 @@ static Value numberCeil(Obj *self, int argCount, Value *args) {
 }
 
 static Value numberRound(Obj *self, int argCount, Value *args) {
-    return NUMBER_VAL(round(NUM_SELF(self)));
+    double n = NUM_SELF(self);
+    if (argCount >= 1 && IS_NUMBER(args[0])) {
+        int places = (int) AS_NUMBER(args[0]);
+        double factor = pow(10, places);
+        return NUMBER_VAL(round(n * factor) / factor);
+    }
+    return NUMBER_VAL(round(n));
 }
 
 static Value numberToString(Obj *self, int argCount, Value *args) {
@@ -331,17 +337,40 @@ static bool callValue(Value callee, int argCount) {
             case OBJ_OVERLOAD_SET: {
                 ObjOverloadSet *set = AS_OVERLOAD_SET(callee);
                 ObjClosure *match = NULL;
+                ObjClosure *anyMatch = NULL;
 
-                // Find first overload matching the argument count
                 for (int i = 0; i < set->count; i++) {
-                    if (set->arities[i] == argCount) {
+                    if (set->arities[i] != argCount) continue;
+
+                    OverloadParamType expected = set->firstParamTypes[i];
+                    if (expected == OVERLOAD_ANY) {
+                        if (anyMatch == NULL) anyMatch = set->closures[i];
+                        continue;
+                    }
+
+                    // Check if first arg matches expected type
+                    Value firstArg = peek(argCount - 1);
+                    bool matches = false;
+                    switch (expected) {
+                        case OVERLOAD_NUMBER: matches = IS_NUMBER(firstArg); break;
+                        case OVERLOAD_STRING: matches = IS_STRING(firstArg); break;
+                        case OVERLOAD_BOOL: matches = IS_BOOL(firstArg); break;
+                        case OVERLOAD_NIL: matches = IS_NIL(firstArg); break;
+                        case OVERLOAD_LIST: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_LIST; break;
+                        case OVERLOAD_MAP: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_MAP; break;
+                        case OVERLOAD_INSTANCE: matches = IS_INSTANCE(firstArg); break;
+                        default: break;
+                    }
+
+                    if (matches) {
                         match = set->closures[i];
                         break;
                     }
                 }
 
+                if (match == NULL) match = anyMatch;
                 if (match != NULL) return call(match, argCount);
-                runtimeError("No overload matches %d arguments.", argCount);
+                runtimeError("No overload matches the given arguments.");
                 return false;
             }
             case OBJ_BOUND_METHOD: {
@@ -840,12 +869,15 @@ static InterpretResult run(ObjModule *module) {
                 if (IS_CLOSURE(peek(0)) && tableGet(&targetModule->obj.fields, name, &existing)) {
                     if (IS_CLOSURE(existing)) {
                         ObjOverloadSet *set = newOverloadSet();
-                        addOverload(set, AS_CLOSURE(existing), AS_CLOSURE(existing)->function->arity);
-                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity);
+                        addOverload(set, AS_CLOSURE(existing), AS_CLOSURE(existing)->function->arity,
+                                    AS_CLOSURE(existing)->function->firstParamType);
+                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity,
+                                    AS_CLOSURE(peek(0))->function->firstParamType);
                         tableSet(&targetModule->obj.fields, name, OBJ_VAL(set));
                     } else if (IS_OVERLOAD_SET(existing)) {
                         ObjOverloadSet *set = AS_OVERLOAD_SET(existing);
-                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity);
+                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity,
+                                    AS_CLOSURE(peek(0))->function->firstParamType);
                     } else {
                         tableSet(&targetModule->obj.fields, name, peek(0));
                     }
@@ -977,10 +1009,12 @@ static InterpretResult run(ObjModule *module) {
                 for (int i = argCount; i > 0; i--) {
                     valueTableSet(&map->values, peek(2 * i), peek(2 * i - 1));
                 }
-                for (int i = 0; i < argCount + 1; i++) {
+                // Pop the 2*argCount key-value pairs plus the temp map reference
+                for (int i = 0; i < argCount; i++) {
                     pop();
                     pop();
                 }
+                pop(); // the temp map
                 push(OBJ_VAL(map));
                 break;
             }
