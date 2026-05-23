@@ -1,5 +1,3 @@
-import "@prelude" as Prelude
-
 // Iterator utilities — works with any type implementing Iterable<T>
 
 fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
