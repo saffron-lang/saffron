@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "memory.h"
 #include "value.h"
@@ -68,6 +69,30 @@ void printValue(Value value) {
         case VAL_OBJ: printObject(value); break;
     }
 #endif
+}
+
+int sprintValue(char *buf, int bufSize, Value value) {
+    // Capture printValue output into a buffer using open_memstream
+    char *membuf = NULL;
+    size_t memsize = 0;
+    FILE *stream = open_memstream(&membuf, &memsize);
+    if (stream == NULL) {
+        return snprintf(buf, bufSize, "<error>");
+    }
+
+    // Redirect printValue to our memory stream
+    FILE *oldStdout = stdout;
+    stdout = stream;
+    printValue(value);
+    stdout = oldStdout;
+    fclose(stream);
+
+    int len = (int) memsize;
+    if (len >= bufSize) len = bufSize - 1;
+    memcpy(buf, membuf, len);
+    buf[len] = '\0';
+    free(membuf);
+    return len;
 }
 
 bool valuesEqual(Value a, Value b) {

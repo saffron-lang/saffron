@@ -1026,8 +1026,8 @@ Type *evaluateNode(Node *node) {
 
             if (rootType == anyType) return (Type *) anyType;
 
-            if (!tableGet(&rootType->methods, nameString, &fieldType)) {
-                if (!tableGet(&rootType->fields, nameString, &fieldType)) {
+            if (!tableGet(&rootType->fields, nameString, &fieldType)) {
+                if (!tableGet(&rootType->methods, nameString, &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
                     return (Type *) anyType;
                 }
