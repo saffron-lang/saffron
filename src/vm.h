@@ -116,7 +116,7 @@ void defineType(const char *name, Value value);
 
 void defineBuiltin(const char *name, Value value);
 
-void runtimeError(const char *format, ...);
+bool runtimeError(const char *format, ...);
 
 void load_new_frame();
 

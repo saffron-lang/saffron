@@ -1809,34 +1809,46 @@ Type *evaluateNode(Node *node) {
 
             for (int i = 0; i < casted->arms.count; i++) {
                 struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
-                tableSet(&matchedVariants,
-                         copyString(arm->variantName.start, arm->variantName.length),
-                         BOOL_VAL(true));
 
                 // Type check the arm body with bindings in scope
                 TypeEnvironment armEnv;
                 initTypeEnvironment(&armEnv, currentEnv->type);
 
-                // Look up variant constructor to type the bindings
-                if (subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
-                    SimpleType *enumST = (SimpleType *) subjectType;
-                    Value variantVal;
-                    if (tableGet(&enumST->methods,
-                                 copyString(arm->variantName.start, arm->variantName.length),
-                                 &variantVal)) {
-                        Type *variantType = AS_OBJ(variantVal);
-                        if (variantType->obj.type == OBJ_PARSE_FUNCTOR_TYPE && arm->bindings.count > 0) {
-                            FunctorType *variantFn = (FunctorType *) variantType;
-                            for (int j = 0; j < arm->bindings.count && j < variantFn->arguments.count; j++) {
-                                Type *bindingType = AS_OBJ(variantFn->arguments.values[j]);
-                                tableSet(&armEnv.locals,
-                                         copyString(arm->bindings.parameters[j]->name.start,
-                                                    arm->bindings.parameters[j]->name.length),
-                                         OBJ_VAL(bindingType));
+                if (arm->isTypePattern) {
+                    // is Type(binding) => ...
+                    Type *narrowedType = getTypeDef(arm->variantName);
+                    if (narrowedType && arm->bindings.count > 0) {
+                        tableSet(&armEnv.locals,
+                                 copyString(arm->bindings.parameters[0]->name.start,
+                                            arm->bindings.parameters[0]->name.length),
+                                 OBJ_VAL(narrowedType));
+                    }
+                } else {
+                    tableSet(&matchedVariants,
+                             copyString(arm->variantName.start, arm->variantName.length),
+                             BOOL_VAL(true));
+
+                    // Look up variant constructor to type the bindings
+                    if (subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
+                        SimpleType *enumST = (SimpleType *) subjectType;
+                        Value variantVal;
+                        if (tableGet(&enumST->methods,
+                                     copyString(arm->variantName.start, arm->variantName.length),
+                                     &variantVal)) {
+                            Type *variantType = AS_OBJ(variantVal);
+                            if (variantType->obj.type == OBJ_PARSE_FUNCTOR_TYPE && arm->bindings.count > 0) {
+                                FunctorType *variantFn = (FunctorType *) variantType;
+                                for (int j = 0; j < arm->bindings.count && j < variantFn->arguments.count; j++) {
+                                    Type *bindingType = AS_OBJ(variantFn->arguments.values[j]);
+                                    tableSet(&armEnv.locals,
+                                             copyString(arm->bindings.parameters[j]->name.start,
+                                                        arm->bindings.parameters[j]->name.length),
+                                             OBJ_VAL(bindingType));
+                                }
                             }
+                        } else {
+                            errorAt(&arm->variantName, "Unknown variant in match");
                         }
-                    } else {
-                        errorAt(&arm->variantName, "Unknown variant in match");
                     }
                 }
 
@@ -1861,8 +1873,15 @@ Type *evaluateNode(Node *node) {
                 currentEnv = currentEnv->enclosing;
             }
 
-            // Exhaustiveness check: verify all variants are covered
-            if (subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
+            // Exhaustiveness check: only for enum variant patterns (not is-type patterns)
+            bool hasIsPattern = false;
+            for (int i = 0; i < casted->arms.count; i++) {
+                if (((struct MatchArm *)casted->arms.stmts[i])->isTypePattern) {
+                    hasIsPattern = true;
+                    break;
+                }
+            }
+            if (!hasIsPattern && subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
                 SimpleType *enumST = (SimpleType *) subjectType;
                 for (int i = 0; i < enumST->methods.capacity; i++) {
                     Entry *entry = &enumST->methods.entries[i];

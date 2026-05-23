@@ -50,6 +50,7 @@ typedef enum {
     NODE_IF,
     NODE_WHILE,
     NODE_FOR,
+    NODE_FORIN,
     NODE_BREAK,
     NODE_RETURN,
     NODE_IMPORT,
@@ -338,6 +339,13 @@ struct For {
     Stmt* body;
 };
 
+struct ForIn {
+    Stmt self;
+    Token binding;
+    Expr* iterable;
+    Stmt* body;
+};
+
 struct Break {
     Stmt self;
     Token keyword;
@@ -379,6 +387,7 @@ struct MatchArm {
     Token variantName;
     ParameterArray bindings;
     StmtArray body;
+    bool isTypePattern;
 };
 
 struct Destructure {
