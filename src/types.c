@@ -198,6 +198,11 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "Task", (Type *) taskTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "List", listTypeDef);
     defineLocalAndTypeDef(typeEnvironment, "Map", mapTypeDef);
+
+    defineLocal(typeEnvironment, "Number", (Type *) numberType);
+    defineLocal(typeEnvironment, "String", (Type *) stringType);
+    defineLocal(typeEnvironment, "Bool", (Type *) boolType);
+    defineLocal(typeEnvironment, "Nil", (Type *) nilType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {

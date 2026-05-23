@@ -1,0 +1,17 @@
+// Test: Primitive types are first-class
+// is-checks work on primitives
+IO.println(42 is Number)
+IO.println("hi" is String)
+IO.println(true is Bool)
+IO.println(nil is Nil)
+
+// Negative checks
+IO.println(42 is String)
+IO.println("hi" is Number)
+IO.println(true is Number)
+IO.println(nil is Bool)
+
+// nil is a singleton
+IO.println(nil is Nil)
+var x = nil
+IO.println(x is Nil)

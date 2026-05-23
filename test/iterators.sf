@@ -1,0 +1,34 @@
+// For-in with list (uses iterator protocol)
+IO.println("=== List ===")
+for (item in [10, 20, 30, 40]) {
+    IO.println(item)
+}
+
+// Map iteration via .iter() yielding [key, value] tuples
+IO.println("=== Map ===")
+var scores: Map<String, Number> = {"alice": 95, "bob": 87, "carol": 92}
+var iter = scores.iter()
+while (iter.next?()) {
+    IO.println(iter.next())
+}
+
+// Nested for-in
+IO.println("=== Nested ===")
+for (row in [[1, 2, 3], [4, 5, 6]]) {
+    for (item in row) {
+        IO.print(item)
+        IO.print(" ")
+    }
+    IO.println("")
+}
+
+// Closures correctly capture each iteration's value
+IO.println("=== Closures ===")
+var fns = []
+for (i in [10, 20, 30]) {
+    var captured = i
+    fns.push(fun () => captured)
+}
+for (f in fns) {
+    IO.println(f())
+}
