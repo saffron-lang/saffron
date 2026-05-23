@@ -1,0 +1,31 @@
+class Animal {
+    fun init() {}
+    fun speak(): String {
+        return "..."
+    }
+}
+
+class Dog extends Animal {
+    fun init() {
+        super.init()
+    }
+    fun speak(): String {
+        return "Woof"
+    }
+}
+
+class Cat extends Animal {
+    fun init() {
+        super.init()
+    }
+    fun speak(): String {
+        return "Meow"
+    }
+}
+
+var d = Dog()
+var c = Cat()
+
+IO.print(d is Dog)
+IO.print(d is Cat)
+IO.print(c is Cat)

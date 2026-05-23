@@ -126,6 +126,8 @@ static Stmt *statement();
 
 static Expr *ifStatement(bool canAssign);
 
+static Expr *matchExpression(bool canAssign);
+
 static TypeNodeArray genericArgDefinitions();
 
 static Stmt *declaration();
@@ -452,6 +454,7 @@ ParseRule parseRules[] = {
         [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
         [TOKEN_IF]            = {ifStatement, NULL, PREC_NONE},
+        [TOKEN_MATCH]         = {matchExpression, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL, or_, PREC_OR},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
@@ -462,6 +465,7 @@ ParseRule parseRules[] = {
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
         [TOKEN_YIELD]         = {yield, NULL, PREC_NONE},
         [TOKEN_AWAIT]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_IS]            = {NULL, binary, PREC_COMPARISON},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -970,7 +974,7 @@ static Stmt *funDeclaration() {
 }
 
 static Stmt *method() {
-    consume(TOKEN_FUN, "Expect 'var' or 'fun' keyword.");
+    consume(TOKEN_FUN, "Expect 'fun' keyword before method name.");
     consume(TOKEN_IDENTIFIER, "Expect method name.");
     Token name = parser.previous;
     FunctionType type = TYPE_METHOD;
@@ -1017,6 +1021,13 @@ static Stmt *classDeclaration() {
             writeStmtArray(&body, varDeclaration(TYPE_FIELD));
         } else {
             writeStmtArray(&body, method());
+        }
+        if (parser.panicMode) {
+            parser.panicMode = false;
+            while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)
+                   && !check(TOKEN_FUN) && !check(TOKEN_VAR)) {
+                advance();
+            }
         }
     }
 
@@ -1125,6 +1136,13 @@ static Stmt *interfaceDeclaration() {
         } else {
             writeStmtArray(&body, methodSignature());
         }
+        if (parser.panicMode) {
+            parser.panicMode = false;
+            while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)
+                   && !check(TOKEN_FUN) && !check(TOKEN_VAR)) {
+                advance();
+            }
+        }
     }
 
     result->body = body;
@@ -1132,6 +1150,106 @@ static Stmt *interfaceDeclaration() {
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after interface body.");
 
     return (Stmt *) result;
+}
+
+static Stmt *enumDeclaration() {
+    consume(TOKEN_IDENTIFIER, "Expect enum name.");
+    Token enumName = parser.previous;
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before enum body.");
+
+    StmtArray body;
+    initStmtArray(&body);
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        consume(TOKEN_IDENTIFIER, "Expect variant name.");
+        Token variantName = parser.previous;
+
+        ParameterArray params;
+        initParameterArray(&params);
+
+        if (match(TOKEN_LEFT_PAREN)) {
+            if (!check(TOKEN_RIGHT_PAREN)) {
+                do {
+                    Token fieldName = parseVariable("Expect field name.");
+                    struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                    param->self.name = fieldName;
+                    param->self.type = NULL;
+                    if (match(TOKEN_COLON)) {
+                        param->self.type = typeAnnotation();
+                    }
+                    writeParameterArray(&params, (Parameter *) param);
+                } while (match(TOKEN_COMMA));
+            }
+            consume(TOKEN_RIGHT_PAREN, "Expect ')' after variant fields.");
+        }
+
+        struct EnumItem *item = ALLOCATE_NODE(struct EnumItem, NODE_ENUMITEM);
+        item->name = variantName;
+        item->params = params;
+        writeStmtArray(&body, (Stmt *) item);
+
+        match(TOKEN_COMMA);
+    }
+
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after enum body.");
+
+    struct Enum *result = ALLOCATE_NODE(struct Enum, NODE_ENUM);
+    result->name = enumName;
+    result->body = body;
+    return (Stmt *) result;
+}
+
+static Expr *matchExpression(bool canAssign) {
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'match'.");
+    Expr *subject = expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after match subject.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before match arms.");
+
+    StmtArray arms;
+    initStmtArray(&arms);
+
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        consume(TOKEN_IDENTIFIER, "Expect variant name in match arm.");
+        Token variantName = parser.previous;
+
+        ParameterArray bindings;
+        initParameterArray(&bindings);
+
+        if (match(TOKEN_LEFT_PAREN)) {
+            if (!check(TOKEN_RIGHT_PAREN)) {
+                do {
+                    consume(TOKEN_IDENTIFIER, "Expect binding name.");
+                    Token bindingName = parser.previous;
+                    struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                    param->self.name = bindingName;
+                    param->self.type = NULL;
+                    writeParameterArray(&bindings, (Parameter *) param);
+                } while (match(TOKEN_COMMA));
+            }
+            consume(TOKEN_RIGHT_PAREN, "Expect ')' after match bindings.");
+        }
+
+        consume(TOKEN_ARROW, "Expect '=>' after match pattern.");
+
+        StmtArray armBody;
+        initStmtArray(&armBody);
+        writeStmtArray(&armBody, statement());
+
+        struct MatchArm *arm = ALLOCATE_NODE(struct MatchArm, NODE_MATCHARM);
+        arm->variantName = variantName;
+        arm->bindings = bindings;
+        arm->body = armBody;
+        writeStmtArray(&arms, (Stmt *) arm);
+
+        match(TOKEN_COMMA);
+    }
+
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after match arms.");
+
+    struct Match *result = ALLOCATE_NODE(struct Match, NODE_MATCH);
+    result->subject = subject;
+    result->arms = arms;
+    return (Expr *) result;
 }
 
 static Stmt *declaration() {
@@ -1143,6 +1261,8 @@ static Stmt *declaration() {
         return varDeclaration(TYPE_VARIABLE);
     } else if (match(TOKEN_INTERFACE)) {
         return interfaceDeclaration();
+    } else if (match(TOKEN_ENUM)) {
+        return enumDeclaration();
     } else if (match(TOKEN_TYPE)) {
         return typeDeclaration();
     } else {

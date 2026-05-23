@@ -167,8 +167,22 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             return byteInstruction("OP_LIST", chunk, offset);
         case OP_MAP:
             return byteInstruction("OP_MAP", chunk, offset);
+        case OP_DUP:
+            return simpleInstruction("OP_DUP", offset);
         case OP_IMPORT:
             return simpleInstruction("OP_IMPORT", offset);
+        case OP_ENUM:
+            return constantInstruction("OP_ENUM", chunk, offset);
+        case OP_VARIANT:
+            return constantInstruction("OP_VARIANT", chunk, offset);
+        case OP_CONSTRUCT_VARIANT:
+            return constantInstruction("OP_CONSTRUCT_VARIANT", chunk, offset);
+        case OP_GET_TAG:
+            return simpleInstruction("OP_GET_TAG", offset);
+        case OP_MATCH_TAG:
+            return constantInstruction("OP_MATCH_TAG", chunk, offset);
+        case OP_IS:
+            return simpleInstruction("OP_IS", offset);
         default:
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;

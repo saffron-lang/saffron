@@ -146,7 +146,7 @@ void runtimeError(const char *format, ...) {
     resetStack();
 }
 
-ObjModule *executeModule(ObjString *name);
+ObjModule *executeModule(ObjString *name, const char *importingPath);
 
 static bool call(ObjClosure *closure, int argCount) {
     switch (closure->obj.type) {
@@ -331,6 +331,17 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name,
 
 static bool invoke(ObjString *name, int argCount) {
     Value receiver = peek(argCount);
+
+    if (IS_CLASS(receiver)) {
+        ObjClass *klass = AS_CLASS(receiver);
+        Value value;
+        if (tableGet(&klass->methods, name, &value)) {
+            vm.stackTop[-argCount - 1] = value;
+            return callValue(value, argCount);
+        }
+        runtimeError("Undefined method '%s' on class.", name->chars);
+        return false;
+    }
 
     if (!(IS_INSTANCE(receiver) || IS_LIST(receiver) || IS_MAP(receiver))) {
         runtimeError("Only instances have methods.");
@@ -533,8 +544,23 @@ static InterpretResult run(ObjModule *module) {
                 push(BOOL_VAL(valuesEqual(a, b)));
                 break;
             }
+            case OP_IS: {
+                Value typeVal = pop();
+                Value instance = pop();
+                bool result = false;
+                if (IS_INSTANCE(instance) && IS_CLASS(typeVal)) {
+                    ObjClass *klass = AS_INSTANCE(instance)->klass;
+                    ObjClass *target = AS_CLASS(typeVal);
+                    result = (klass == target);
+                }
+                push(BOOL_VAL(result));
+                break;
+            }
             case OP_POP:
                 pop();
+                break;
+            case OP_DUP:
+                push(peek(0));
                 break;
             case OP_DEFINE_GLOBAL: {
                 ObjString *name = READ_STRING();
@@ -604,6 +630,14 @@ static InterpretResult run(ObjModule *module) {
                     push(getListItem((ObjList *) AS_OBJ(value), index));
                 } else if (isObjType(value, OBJ_MAP)) {
                     push(getMapItem((ObjMap *) AS_OBJ(value), indexValue));
+                } else if (IS_ENUM_INSTANCE(value)) {
+                    int index = (int) AS_NUMBER(indexValue);
+                    ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
+                    if (index >= 0 && index < instance->fields.count) {
+                        push(instance->fields.values[index]);
+                    } else {
+                        push(NIL_VAL);
+                    }
                 }
                 break;
             }
@@ -682,6 +716,19 @@ static InterpretResult run(ObjModule *module) {
                 push(OBJ_VAL(newClass(READ_STRING())));
                 break;
             case OP_GET_PROPERTY: {
+                if (IS_CLASS(peek(0))) {
+                    ObjClass *klass = AS_CLASS(peek(0));
+                    ObjString *name = READ_STRING();
+                    Value value;
+                    if (tableGet(&klass->methods, name, &value)) {
+                        pop();
+                        push(value);
+                        break;
+                    }
+                    runtimeError("Undefined property '%s' on class.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
                 if (!IS_INSTANCE(peek(0)) && !IS_LIST(peek(0))) {
                     runtimeError("Only instances have properties.");
                     return INTERPRET_RUNTIME_ERROR;
@@ -798,10 +845,37 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_IMPORT: {
                 Value relPath = peek(0);
-                ObjModule *newModule = executeModule(AS_STRING(relPath));
+                ObjModule *newModule = executeModule(AS_STRING(relPath), module->path->chars);
                 push(OBJ_VAL(newModule));
                 break;
             }
+            case OP_CONSTRUCT_VARIANT: {
+                ObjString *tag = READ_STRING();
+                ObjString *enumName = READ_STRING();
+                int arity = READ_BYTE();
+                ObjEnumInstance *instance = newEnumInstance(tag, enumName);
+                for (int i = arity; i > 0; i--) {
+                    writeValueArray(&instance->fields, peek(i - 1));
+                }
+                vm.stackTop -= arity;
+                push(OBJ_VAL(instance));
+                break;
+            }
+            case OP_GET_TAG: {
+                Value value = peek(0);
+                if (!IS_ENUM_INSTANCE(value)) {
+                    runtimeError("Cannot get tag of non-enum value.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
+                pop();
+                push(OBJ_VAL(instance->tag));
+                break;
+            }
+            case OP_ENUM:
+            case OP_VARIANT:
+            case OP_MATCH_TAG:
+                break;
             case OP_RETURN: {
                 Value result = pop();
                 currentFrame->state |= FINISHED;
@@ -883,10 +957,10 @@ char *remove_n(char *dst, const char *filename, int n) {
     return dst;
 }
 
-ObjModule *executeModule(ObjString *relPath) {
+ObjModule *executeModule(ObjString *relPath, const char *importingPath) {
     ModuleContext temp = moduleContext;
     moduleContext = IMPORT;
-    char *path = findModule(relPath->chars);
+    char *path = findModule(relPath->chars, importingPath);
 
     Value cachedModule;
     if (tableGet(&vm.modules, copyString(path, (int) strlen(path)), &cachedModule)) {
@@ -894,9 +968,21 @@ ObjModule *executeModule(ObjString *relPath) {
     }
     char *source = readFile(path);
     char chars[64];
-    remove_n(chars, basename(relPath->chars), 4);
+    const char *importName = relPath->chars;
+    if (importName[0] == '@') {
+        strncpy(chars, importName + 1, 63);
+        chars[63] = '\0';
+    } else {
+        remove_n(chars, basename(relPath->chars), 4);
+    }
 
     StmtArray *body = parseAST(source);
+    if (body == NULL) {
+        free(source);
+        moduleContext = temp;
+        runtimeError("Compile error in module '%s'.", relPath->chars);
+        return NULL;
+    }
 //    evaluateTree(body);
     ObjModule *module = interpret(body, chars, path);
     free(source);

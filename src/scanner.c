@@ -163,7 +163,7 @@ static TokenType identifierType() {
                     case 'x':
                         return checkKeyword(2, 5, "tends", TOKEN_EXTENDS);
                     case 'n':
-                        return checkKeyword(2, 2, "um", TOKEN_EXTENDS);
+                        return checkKeyword(2, 2, "um", TOKEN_ENUM);
                 }
             }
             break;
@@ -192,9 +192,13 @@ static TokenType identifierType() {
                         } else {
                             return TOKEN_IN;
                         }
+                    case 's':
+                        return TOKEN_IS;
                 }
             }
             break;
+        case 'm':
+            return checkKeyword(1, 4, "atch", TOKEN_MATCH);
         case 'n':
             return checkKeyword(1, 2, "il", TOKEN_NIL);
         case 'o':
