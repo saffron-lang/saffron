@@ -516,9 +516,20 @@ Type *getTypeOf(Value value) {
     return NULL;
 }
 
+static bool skipFunctionBodies = false;
+
+void evaluateTypesPermissive(StmtArray *statements) {
+    bool oldSkip = skipFunctionBodies;
+    skipFunctionBodies = true;
+    for (int i = 0; i < statements->count; i++) {
+        panicMode = false;
+        evaluateNode((Node *) statements->stmts[i]);
+    }
+    skipFunctionBodies = oldSkip;
+}
+
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
-        if (hadError) return;
         panicMode = false;
         evaluateNode((Node *) statements->stmts[i]);
     }
@@ -569,8 +580,16 @@ Type *parseFile(const char *path, int length) {
     initTypeEnvironment(&typeEnvironment, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnvironment);
 
+    bool oldHadError = hadError;
+    bool oldPanicMode = panicMode;
+    hadError = false;
+    panicMode = false;
+
     StmtArray *body = parseAST(source);
-    evaluateTypes(body);
+    evaluateTypesPermissive(body);
+
+    hadError = oldHadError;
+    panicMode = oldPanicMode;
 
     SimpleType *type = newSimpleType();
     copyTable(&typeEnvironment.locals, &type->fields);
@@ -893,7 +912,9 @@ Type *evaluateNode(Node *node) {
             }
 
             type->returnType = evaluateNode((Node *) functorNode->returnType);
-            evaluateTypes(&casted->body);
+            if (!skipFunctionBodies) {
+                evaluateTypes(&casted->body);
+            }
 
             if (!type->returnType) {
                 type->returnType = (Type *) nilType;
@@ -1099,7 +1120,9 @@ Type *evaluateNode(Node *node) {
                     OBJ_VAL(type)
             );
 
-            evaluateTypes(&casted->body);
+            if (!skipFunctionBodies) {
+                evaluateTypes(&casted->body);
+            }
             if (!type->returnType) {
                 type->returnType = (Type *) nilType;
             }

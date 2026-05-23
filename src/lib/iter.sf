@@ -11,13 +11,6 @@ interface Iterable<T> {
 fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     var result: List<R> = []
 
-//    for (item in iterable) {
-//        result.push(func(item))
-//    }
-
-    var f: (T) => R = func
-//    var res: R = func(iter.next())
-
     for (var iter = iterable.iter(); iter.next?();) {
         var item = iter.next()
         result.push(
@@ -28,8 +21,8 @@ fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     return result
 }
 
-fun filter<T>(iterable: Iterable<T>, func: (T) => Boolean): List<R> {
-    var result: List<R> = []
+fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
+    var result: List<T> = []
 
     for (var iter = iterable.iter(); iter.next?();) {
         var item = iter.next()
@@ -45,17 +38,8 @@ interface Addend {
     fun add()
 }
 
-fun sum<T extends Addend>(iterable: Iterable<T>) {
-    for (var iter = iterable.iter(); iter.next?();) {
-        var item = iter.next()
-        result = result + item
-    }
-
-    return result
-}
-
-fun sum<T extends Addend>(iterable: Iterable<T>, initial: T) {
-    var result: T = initial // ReturnValue<T.add>?
+fun sum<T extends Addend>(iterable: Iterable<T>, initial: T): T {
+    var result: T = initial
     for (var iter = iterable.iter(); iter.next?();) {
         var item = iter.next()
         result = result + item
@@ -65,7 +49,7 @@ fun sum<T extends Addend>(iterable: Iterable<T>, initial: T) {
 }
 
 class ListIterator<Iterator> {
-    var index: number
+    var index: Number
     var list: List
 
     fun init(list: List) {
