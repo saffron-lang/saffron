@@ -5,12 +5,14 @@
 #include "table.h"
 #include "object.h"
 #include "valuetable.h"
+#include "diagnostic.h"
 
 struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType, TypeNodeArray generics);
 
 struct Simple *initSimple(Token name);
 
-void evaluateTree(StmtArray *statements);
+bool evaluateTree(StmtArray *statements);
+void setTypeDiagnostics(DiagnosticArray *diagnostics);
 
 #define AS_TYPE(value)       (((Type *)AS_OBJ(value)))
 

@@ -70,6 +70,7 @@ GenericTypeDefinition *newGenericTypeDefinition() {
 
 static bool panicMode = false;
 static bool hadError = false;
+static DiagnosticArray *typeDiagnostics = NULL;
 
 static Token syntheticToken(const char *text) {
     Token token;
@@ -82,26 +83,34 @@ static Token syntheticToken(const char *text) {
 static void errorAt(Token *token, const char *message) {
     if (panicMode) return;
     panicMode = true;
-    fprintf(stderr, "[line %d] Error", token->line);
 
-    if (token->type == TOKEN_EOF) {
-        fprintf(stderr, " at end");
-    } else if (token->type == TOKEN_ERROR) {
-        // Nothing.
+    if (typeDiagnostics) {
+        writeDiagnostic(typeDiagnostics, token, message, DIAG_ERROR);
     } else {
-        fprintf(stderr, " at '%.*s'", token->length, token->start);
+        fprintf(stderr, "[line %d] Error", token->line);
+        if (token->type == TOKEN_EOF) {
+            fprintf(stderr, " at end");
+        } else if (token->type == TOKEN_ERROR) {
+            // Nothing.
+        } else {
+            fprintf(stderr, " at '%.*s'", token->length, token->start);
+        }
+        fprintf(stderr, ": %s\n", message);
     }
 
-    fprintf(stderr, ": %s\n", message);
     hadError = true;
 }
 
 static void warnAt(Token *token, const char *message) {
-    fprintf(stderr, "[line %d] Warning", token->line);
-    if (token->type != TOKEN_EOF && token->type != TOKEN_ERROR) {
-        fprintf(stderr, " at '%.*s'", token->length, token->start);
+    if (typeDiagnostics) {
+        writeDiagnostic(typeDiagnostics, token, message, DIAG_WARNING);
+    } else {
+        fprintf(stderr, "[line %d] Warning", token->line);
+        if (token->type != TOKEN_EOF && token->type != TOKEN_ERROR) {
+            fprintf(stderr, " at '%.*s'", token->length, token->start);
+        }
+        fprintf(stderr, ": %s\n", message);
     }
-    fprintf(stderr, ": %s\n", message);
 }
 
 static void error(const char *message) {
@@ -608,7 +617,7 @@ Type *getTypeOf(Value value) {
 
 
 
-static bool bailOnError = true;
+static bool bailOnError = false;
 
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
@@ -655,7 +664,12 @@ static void preRegisterDeclarations(StmtArray *statements) {
     }
 }
 
-void evaluateTree(StmtArray *statements) {
+void setTypeDiagnostics(DiagnosticArray *diagnostics) {
+    typeDiagnostics = diagnostics;
+}
+
+bool evaluateTree(StmtArray *statements) {
+    hadError = false;
     TypeEnvironment typeEnv;
     initTypeEnvironment(&typeEnv, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnv);
@@ -663,6 +677,7 @@ void evaluateTree(StmtArray *statements) {
     preRegisterDeclarations(statements);
     evaluateTypes(statements);
     currentEnv = typeEnv.enclosing;
+    return hadError;
 }
 
 void evaluateExprTypes(ExprArray *exprs) {

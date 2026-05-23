@@ -5,6 +5,7 @@
 #include "ast/astprint.h"
 #include "ast/astparse.h"
 #include "types.h"
+#include "diagnostic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,7 +70,11 @@ static void runFile(const char *path) {
         free(source);
         exit(65);
     }
-    evaluateTree(body);
+    bool typeErrors = evaluateTree(body);
+    if (typeErrors) {
+        free(source);
+        exit(65);
+    }
     ObjModule *module = interpret(body, "<script>", path);
     free(source);
 
@@ -86,16 +91,43 @@ static void parseFile(const char *path) {
     if (body == NULL) exit(65);
 }
 
+static void checkFile(const char *path) {
+    char *source = readFile(path);
+
+    DiagnosticArray diagnostics;
+    initDiagnosticArray(&diagnostics);
+
+    parser.diagnostics = &diagnostics;
+    StmtArray *body = parseAST(source);
+    parser.diagnostics = NULL;
+
+    if (body != NULL) {
+        setTypeDiagnostics(&diagnostics);
+        evaluateTree(body);
+        setTypeDiagnostics(NULL);
+    }
+
+    printDiagnosticsJson(&diagnostics, path);
+    freeDiagnosticArray(&diagnostics);
+    free(source);
+
+    exit(diagnostics.count > 0 ? 65 : 0);
+}
 
 int main(int argc, const char *argv[]) {
     initVM();
     if (argc == 1) {
         repl();
     } else if (argc == 2) {
+        if (strcmp(argv[1], "--help") == 0) {
+            printf("Usage: saffron [--check] [path]\n");
+            exit(0);
+        }
         runFile(argv[1]);
-//        parseFile(argv[1]);
+    } else if (argc == 3 && strcmp(argv[1], "--check") == 0) {
+        checkFile(argv[2]);
     } else {
-        fprintf(stderr, "Usage: saffron [path]\n");
+        fprintf(stderr, "Usage: saffron [--check] [path]\n");
         exit(64);
     }
 
