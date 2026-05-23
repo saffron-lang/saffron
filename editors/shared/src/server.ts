@@ -12,19 +12,43 @@ import {
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import * as path from "path";
+import * as fs from "fs";
 
 const execFileAsync = promisify(execFile);
+
+function findCompiler(): string {
+  const serverDir = __dirname;
+  const projectRoot = path.resolve(serverDir, "..", "..");
+  const localBinary = path.join(projectRoot, "cmake-build-debug", "saffron");
+  if (fs.existsSync(localBinary)) return localBinary;
+
+  const homeBinary = path.join(process.env.HOME || "", ".saffron", "bin", "saffron");
+  if (fs.existsSync(homeBinary)) return homeBinary;
+
+  return "saffron";
+}
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
-let compilerPath = "saffron";
+let compilerPath = findCompiler();
 
 connection.onInitialize((params: InitializeParams): InitializeResult => {
   const settings = params.initializationOptions;
   if (settings?.compilerPath) {
     compilerPath = settings.compilerPath;
   }
+
+  if (params.rootUri) {
+    const rootPath = decodeURIComponent(params.rootUri.replace("file://", ""));
+    const rootBinary = path.join(rootPath, "cmake-build-debug", "saffron");
+    if (!settings?.compilerPath && fs.existsSync(rootBinary)) {
+      compilerPath = rootBinary;
+    }
+  }
+
+  connection.console.log(`Saffron LSP using compiler: ${compilerPath}`);
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Full,

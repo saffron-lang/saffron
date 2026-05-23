@@ -1,15 +1,17 @@
 package dev.saffron.intellij
 
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.LspServerSupportProvider.LspServerStarter
 
-class SaffronLspServerSupportProvider : LspServerSupportProvider {
+internal class SaffronLspServerSupportProvider : LspServerSupportProvider {
     override fun fileOpened(
         project: Project,
         file: VirtualFile,
-        serverStarter: LspServerSupportProvider.LspServerStarter
+        serverStarter: LspServerStarter
     ) {
         if (file.extension == "sf") {
             serverStarter.ensureServerStarted(SaffronLspServerDescriptor(project))
@@ -17,12 +19,14 @@ class SaffronLspServerSupportProvider : LspServerSupportProvider {
     }
 }
 
-class SaffronLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Saffron") {
+private class SaffronLspServerDescriptor(project: Project) :
+    ProjectWideLspServerDescriptor(project, "Saffron") {
+
     override fun isSupportedFile(file: VirtualFile) = file.extension == "sf"
 
-    override fun createCommandLine(): com.intellij.execution.configurations.GeneralCommandLine {
+    override fun createCommandLine(): GeneralCommandLine {
         val serverPath = findServerPath()
-        return com.intellij.execution.configurations.GeneralCommandLine("node", serverPath, "--stdio")
+        return GeneralCommandLine("node", serverPath, "--stdio")
     }
 
     private fun findServerPath(): String {

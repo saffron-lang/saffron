@@ -17,7 +17,6 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.1")
-        bundledPlugin("com.intellij.platform.lsp")
     }
 }
 
