@@ -100,6 +100,8 @@ void popValueArray(ValueArray *array, int index);
 
 void printValue(Value value);
 
+int sprintValue(char *buf, int bufSize, Value value);
+
 bool valuesEqual(Value a, Value b);
 
 double valuesCmp(Value a, Value b);

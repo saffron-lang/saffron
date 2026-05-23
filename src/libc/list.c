@@ -337,6 +337,12 @@ SimpleType* createListTypeDef() {
     return (Type *) listTypeDef;
 }
 
+static Value listToStringBuiltin(ObjList *list, int argCount, Value *args) {
+    char buf[4096];
+    int written = sprintValue(buf, sizeof(buf), OBJ_VAL(list));
+    return OBJ_VAL(copyString(buf, written));
+}
+
 void listInit(ObjBuiltinType *type) {
     type->freeFn = (FreeFn) &freeList;
     type->markFn = (MarkFn) &markList;
@@ -354,6 +360,7 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "join", (NativeMethodFn) listJoinBuiltin);
     defineBuiltinMethod(type, "slice", (NativeMethodFn) listSliceBuiltin);
     defineBuiltinMethod(type, "iter", (NativeMethodFn) listIterBuiltin);
+    defineBuiltinMethod(type, "to_string", (NativeMethodFn) listToStringBuiltin);
 }
 
 ObjBuiltinType *createListType() {

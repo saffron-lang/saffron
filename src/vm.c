@@ -693,24 +693,16 @@ static InterpretResult run(ObjModule *module) {
                     if (!invoke(vm.addString, 1)) return INTERPRET_RUNTIME_ERROR;
                     currentFrame = CURRENT_TASK;
                 } else if (IS_STRING(peek(0)) || IS_STRING(peek(1))) {
-                    char buf[256];
                     Value b = pop();
                     Value a = pop();
-                    char aBuf[128], bBuf[128];
-                    int aLen, bLen;
-                    if (IS_STRING(a)) { aLen = AS_STRING(a)->length; memcpy(aBuf, AS_CSTRING(a), aLen); }
-                    else if (IS_NUMBER(a)) { aLen = snprintf(aBuf, 128, "%g", AS_NUMBER(a)); }
-                    else if (IS_BOOL(a)) { aLen = snprintf(aBuf, 128, "%s", AS_BOOL(a) ? "true" : "false"); }
-                    else if (IS_NIL(a)) { aLen = snprintf(aBuf, 128, "nil"); }
-                    else { aLen = snprintf(aBuf, 128, "<object>"); }
-                    if (IS_STRING(b)) { bLen = AS_STRING(b)->length; memcpy(bBuf, AS_CSTRING(b), bLen); }
-                    else if (IS_NUMBER(b)) { bLen = snprintf(bBuf, 128, "%g", AS_NUMBER(b)); }
-                    else if (IS_BOOL(b)) { bLen = snprintf(bBuf, 128, "%s", AS_BOOL(b) ? "true" : "false"); }
-                    else if (IS_NIL(b)) { bLen = snprintf(bBuf, 128, "nil"); }
-                    else { bLen = snprintf(bBuf, 128, "<object>"); }
+                    char aBuf[2048], bBuf[2048];
+                    int aLen = sprintValue(aBuf, sizeof(aBuf), a);
+                    int bLen = sprintValue(bBuf, sizeof(bBuf), b);
+                    char *buf = ALLOCATE(char, aLen + bLen + 1);
                     memcpy(buf, aBuf, aLen);
                     memcpy(buf + aLen, bBuf, bLen);
-                    push(OBJ_VAL(copyString(buf, aLen + bLen)));
+                    buf[aLen + bLen] = '\0';
+                    push(OBJ_VAL(takeString(buf, aLen + bLen)));
                 } else {
                     if (!runtimeError(
                             "Operands must be two numbers or two strings.")) return INTERPRET_RUNTIME_ERROR;

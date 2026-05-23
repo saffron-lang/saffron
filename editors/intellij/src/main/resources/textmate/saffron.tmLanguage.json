@@ -10,6 +10,7 @@
     { "include": "#keywords" },
     { "include": "#storage" },
     { "include": "#constants" },
+    { "include": "#modules" },
     { "include": "#types" },
     { "include": "#functions" },
     { "include": "#operators" },
@@ -101,11 +102,19 @@
         }
       ]
     },
+    "modules": {
+      "patterns": [
+        {
+          "name": "support.class.saffron",
+          "match": "\\b(IO|Math|Time|Json|Reflect|Task|Iter|Test|Async)\\b"
+        }
+      ]
+    },
     "types": {
       "patterns": [
         {
           "name": "support.type.saffron",
-          "match": "\\b(Number|String|Bool|Nil|Any|Never|List|Map|Task)\\b"
+          "match": "\\b(Number|String|Bool|Nil|Any|Never|List|Map)\\b"
         },
         {
           "name": "entity.name.type.saffron",

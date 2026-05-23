@@ -66,6 +66,26 @@ SimpleType *createMapTypeDef() {
             OBJ_VAL(valuesType)
     );
 
+    FunctorType *iterType = newFunctorType();
+    iterType->returnType = (Type *) anyType;
+    tableSet(&mapTypeDef->methods, copyString("iter", 4), OBJ_VAL(iterType));
+
+    FunctorType *getType = newFunctorType();
+    getType->returnType = (Type *) anyType;
+    tableSet(&mapTypeDef->methods, copyString("get", 3), OBJ_VAL(getType));
+
+    FunctorType *setType = newFunctorType();
+    setType->returnType = (Type *) nilType;
+    tableSet(&mapTypeDef->methods, copyString("set", 3), OBJ_VAL(setType));
+
+    FunctorType *hasType = newFunctorType();
+    hasType->returnType = (Type *) boolType;
+    tableSet(&mapTypeDef->methods, copyString("has", 3), OBJ_VAL(hasType));
+
+    FunctorType *lengthType = newFunctorType();
+    lengthType->returnType = (Type *) numberType;
+    tableSet(&mapTypeDef->methods, copyString("length", 6), OBJ_VAL(lengthType));
+
     return (Type *) mapTypeDef;
 }
 
