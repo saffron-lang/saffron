@@ -50,6 +50,15 @@ void freeChunk(Chunk* chunk) {
 }
 
 int addConstant(Chunk* chunk, Value value) {
+    // Deduplicate string constants (they're interned so pointer compare works)
+    if (IS_OBJ(value)) {
+        for (int i = 0; i < chunk->constants.count; i++) {
+            if (IS_OBJ(chunk->constants.values[i]) &&
+                AS_OBJ(chunk->constants.values[i]) == AS_OBJ(value)) {
+                return i;
+            }
+        }
+    }
     push(value);
     writeValueArray(&chunk->constants, value);
     pop();

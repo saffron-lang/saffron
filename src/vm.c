@@ -590,7 +590,7 @@ static InterpretResult run(ObjModule *module) {
     (uint16_t)((currentFrame->ip[-2] << 8) | currentFrame->ip[-1]))
 
 #define READ_CONSTANT() \
-    (currentFrame->closure->function->chunk.constants.values[READ_BYTE()])
+    (currentFrame->closure->function->chunk.constants.values[READ_SHORT()])
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op) \

@@ -1,0 +1,109 @@
+import "@test" as T
+
+T.section("Arithmetic")
+T.assert_eq(2 + 3, 5, "addition")
+T.assert_eq(10 - 4, 6, "subtraction")
+T.assert_eq(3 * 7, 21, "multiplication")
+T.assert_eq(15 / 3, 5, "division")
+T.assert_eq(10 % 3, 1, "modulo")
+
+T.section("Strings")
+T.assert_eq("hello" + " world", "hello world", "concat")
+T.assert_eq("hello".length(), 5, "length")
+
+T.section("Booleans")
+T.assert(true and true, "and")
+T.assert(true or false, "or")
+T.assert(!false, "not")
+
+T.section("Functions")
+fun add(a: Number, b: Number): Number { return a + b }
+fun fib(n: Number): Number {
+    if (n < 2) return n
+    return fib(n - 1) + fib(n - 2)
+}
+T.assert_eq(add(3, 4), 7, "function call")
+T.assert_eq(fib(10), 55, "recursion")
+
+T.section("Closures")
+fun makeAdder(base: Number): Number {
+    fun inner(x: Number): Number { return base + x }
+    return inner(10)
+}
+T.assert_eq(makeAdder(5), 15, "upvalue capture")
+
+T.section("Lists")
+var list = [10, 20, 30]
+T.assert_eq(list.length(), 3, "list length")
+T.assert_eq(list[0], 10, "list index")
+list.push(40)
+T.assert_eq(list.length(), 4, "list push")
+
+T.section("Classes")
+class Point {
+    var x: Number
+    var y: Number
+    fun init(x: Number, y: Number) { this.x = x; this.y = y }
+    fun sum(): Number { return this.x + this.y }
+}
+var p = Point(3, 4)
+T.assert_eq(p.x, 3, "field access")
+T.assert_eq(p.sum(), 7, "method call")
+
+T.section("Inheritance")
+class Animal {
+    fun init() {}
+    fun speak(): String { return "..." }
+}
+class Dog extends Animal {
+    fun init() {}
+    fun speak(): String { return "woof" }
+}
+T.assert_eq(Dog().speak(), "woof", "override")
+T.assert(Dog() is Animal, "is parent")
+
+T.section("Interfaces")
+interface Greetable {
+    fun greet(): String {
+        return "hello"
+    }
+}
+class Bot extends Greetable {
+    fun init() {}
+}
+T.assert_eq(Bot().greet(), "hello", "default method")
+T.assert(Bot() is Greetable, "is interface")
+
+T.section("Enums")
+enum Color { Red, Green, Blue }
+var c = Color.Red
+var name = match (c) {
+    Red => "red",
+    Green => "green",
+    Blue => "blue"
+}
+T.assert_eq(name, "red", "enum match")
+
+T.section("Operators")
+class Vec {
+    var x: Number
+    fun init(x: Number) { this.x = x }
+    fun add(other: Vec): Vec { return Vec(this.x + other.x) }
+}
+var v = Vec(3) + Vec(4)
+T.assert_eq(v.x, 7, "operator overload")
+
+T.section("is-checks")
+T.assert(42 is Number, "number is Number")
+T.assert("hi" is String, "string is String")
+T.assert(true is Bool, "bool is Bool")
+T.assert(nil is Nil, "nil is Nil")
+T.assert(!(42 is String), "number not String")
+
+T.section("Pipe + Imports")
+import { map } from "@iter"
+var doubled = [1, 2, 3] |> map(fun (x: Number): Number => x * 2)
+T.assert_eq(doubled[0], 2, "pipe map first")
+T.assert_eq(doubled[2], 6, "pipe map last")
+
+T.summary()

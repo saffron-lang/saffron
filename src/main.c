@@ -7,25 +7,54 @@
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void repl() {
-    char line[1024];
+    char buffer[8192];
+    int bufLen = 0;
     ObjModule *module = interpret(NULL, "<repl>", "<repl>");
 
     printf("saffron v0.1 REPL\n");
     for (;;) {
-        printf(">>> ");
+        printf(bufLen == 0 ? ">>> " : "... ");
 
+        char line[1024];
         if (!fgets(line, sizeof(line), stdin)) {
             printf("\n");
             break;
         }
 
-        if (line[0] == '\n') continue;
+        int lineLen = (int) strlen(line);
+        if (bufLen + lineLen >= (int) sizeof(buffer) - 1) {
+            fprintf(stderr, "Input too long.\n");
+            bufLen = 0;
+            continue;
+        }
+        memcpy(buffer + bufLen, line, lineLen);
+        bufLen += lineLen;
+        buffer[bufLen] = '\0';
 
-        StmtArray *body = parseAST(line);
-        if (body == NULL) continue;
+        if (bufLen == 1 && buffer[0] == '\n') {
+            bufLen = 0;
+            continue;
+        }
 
+        // Try parsing silently to detect incomplete input
+        parser.suppressErrors = true;
+        StmtArray *body = parseAST(buffer);
+        parser.suppressErrors = false;
+
+        if (body == NULL && parser.incomplete) {
+            continue;
+        }
+
+        if (body == NULL) {
+            parseAST(buffer); // re-parse to show error
+            bufLen = 0;
+            continue;
+        }
+
+        bufLen = 0;
         InterpretResult result = interpretInModule(body, module);
         if (result == INTERPRET_RUNTIME_ERROR) {
             fprintf(stderr, "Runtime error.\n");
