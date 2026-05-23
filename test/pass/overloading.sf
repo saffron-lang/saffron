@@ -1,0 +1,6 @@
+// Arity-based overloading
+fun add(a: Number, b: Number): Number { return a + b }
+fun add(a: Number, b: Number, c: Number): Number { return a + b + c }
+
+IO.println(add(1, 2))
+IO.println(add(1, 2, 3))

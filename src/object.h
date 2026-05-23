@@ -52,6 +52,7 @@ typedef enum {
     OBJ_BOUND_METHOD,
     OBJ_CALL_FRAME,
     OBJ_MODULE,
+    OBJ_OVERLOAD_SET,
 } ObjType;
 
 struct Obj {
@@ -152,6 +153,20 @@ typedef struct {
     Value receiver;
     ObjClosure *method;
 } ObjBoundMethod;
+
+typedef struct {
+    Obj obj;
+    int count;
+    int capacity;
+    ObjClosure **closures;
+    int *arities;
+} ObjOverloadSet;
+
+#define IS_OVERLOAD_SET(value) isObjType(value, OBJ_OVERLOAD_SET)
+#define AS_OVERLOAD_SET(value) ((ObjOverloadSet*)AS_OBJ(value))
+
+ObjOverloadSet *newOverloadSet();
+void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity);
 
 #define IS_ENUM_INSTANCE(value) isObjType(value, OBJ_ENUM_INSTANCE)
 #define AS_ENUM_INSTANCE(value) ((ObjEnumInstance*)AS_OBJ(value))

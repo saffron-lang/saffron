@@ -327,6 +327,19 @@ static bool callValue(Value callee, int argCount) {
 
                 return true;
             }
+            case OBJ_OVERLOAD_SET: {
+                ObjOverloadSet *set = AS_OVERLOAD_SET(callee);
+                ObjClosure *match = NULL;
+                for (int i = 0; i < set->count; i++) {
+                    if (set->arities[i] == argCount) {
+                        match = set->closures[i];
+                        break;
+                    }
+                }
+                if (match != NULL) return call(match, argCount);
+                runtimeError("No overload matches %d arguments.", argCount);
+                return false;
+            }
             case OBJ_BOUND_METHOD: {
                 ObjBoundMethod *bound = AS_BOUND_METHOD(callee);
 
@@ -819,7 +832,22 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *name = READ_STRING();
                 ObjModule *targetModule = currentFrame->closure->function->module
                     ? (ObjModule *)currentFrame->closure->function->module : module;
-                tableSet(&targetModule->obj.fields, name, peek(0));
+                Value existing;
+                if (IS_CLOSURE(peek(0)) && tableGet(&targetModule->obj.fields, name, &existing)) {
+                    if (IS_CLOSURE(existing)) {
+                        ObjOverloadSet *set = newOverloadSet();
+                        addOverload(set, AS_CLOSURE(existing), AS_CLOSURE(existing)->function->arity);
+                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity);
+                        tableSet(&targetModule->obj.fields, name, OBJ_VAL(set));
+                    } else if (IS_OVERLOAD_SET(existing)) {
+                        ObjOverloadSet *set = AS_OVERLOAD_SET(existing);
+                        addOverload(set, AS_CLOSURE(peek(0)), AS_CLOSURE(peek(0))->function->arity);
+                    } else {
+                        tableSet(&targetModule->obj.fields, name, peek(0));
+                    }
+                } else {
+                    tableSet(&targetModule->obj.fields, name, peek(0));
+                }
                 pop();
                 break;
             }

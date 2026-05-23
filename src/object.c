@@ -188,6 +188,9 @@ void printObject(Value value) {
             }
             break;
         }
+        case OBJ_OVERLOAD_SET:
+            printf("<overload set>");
+            break;
         default: {
             printf("<unknown %d>", OBJ_TYPE(value));
         }
@@ -258,6 +261,27 @@ ObjNative *newNative(NativeFn function) {
     ObjNative *native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
     native->function = function;
     return native;
+}
+
+ObjOverloadSet *newOverloadSet() {
+    ObjOverloadSet *set = ALLOCATE_OBJ(ObjOverloadSet, OBJ_OVERLOAD_SET);
+    set->count = 0;
+    set->capacity = 0;
+    set->closures = NULL;
+    set->arities = NULL;
+    return set;
+}
+
+void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity) {
+    if (set->count >= set->capacity) {
+        int oldCapacity = set->capacity;
+        set->capacity = oldCapacity < 4 ? 4 : oldCapacity * 2;
+        set->closures = GROW_ARRAY(ObjClosure*, set->closures, oldCapacity, set->capacity);
+        set->arities = GROW_ARRAY(int, set->arities, oldCapacity, set->capacity);
+    }
+    set->closures[set->count] = closure;
+    set->arities[set->count] = arity;
+    set->count++;
 }
 
 ObjClass *newClass(ObjString *name) {

@@ -1,0 +1,27 @@
+// Full test framework demo — should pass once import/type checker bugs are fixed.
+// Currently blocked by: type checker segfault on Any-typed closures in modules.
+
+import "@test" as T
+
+T.section("Assertions")
+T.assert(true, "true is true")
+T.assert_eq(1 + 2, 3, "addition")
+T.assert_eq("hello".length(), 5, "string length")
+T.assert_neq(1, 2, "not equal")
+T.assert_gt(5, 3, "greater than")
+T.assert_lt(2, 10, "less than")
+T.assert_throws(fun () => { throw "boom" }, "catches throw")
+T.assert_throws_with(fun () => { throw "oops" }, "oops", "throw message")
+T.assert_contains("hello world", "world", "string contains")
+
+T.section("Mocking")
+var m = T.mock("my_service")
+m["returns"](42)
+var fn = m["fn1"]
+fn("hello")
+fn("world")
+T.assert(m["called"](), "mock was called")
+T.assert_eq(m["call_count"](), 2, "called twice")
+T.assert_eq(m["last_args"](), ["world"], "last call args")
+
+T.summary()
