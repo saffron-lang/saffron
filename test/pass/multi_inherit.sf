@@ -1,0 +1,33 @@
+// Test: Multiple interface inheritance with is-checks
+interface Flyable {
+    fun fly() {
+        IO.println("flying")
+    }
+}
+
+interface Swimmable {
+    fun swim() {
+        IO.println("swimming")
+    }
+}
+
+interface Walkable {
+    fun walk() {
+        IO.println("walking")
+    }
+}
+
+class Duck extends Flyable, Swimmable, Walkable {
+    fun init() {}
+}
+
+var d = Duck()
+d.fly()
+d.swim()
+d.walk()
+
+// All is-checks should pass
+IO.println(d is Flyable)
+IO.println(d is Swimmable)
+IO.println(d is Walkable)
+IO.println(d is Duck)

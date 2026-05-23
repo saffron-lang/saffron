@@ -1,0 +1,47 @@
+// Test: Comparison operator overloading
+class Temperature {
+    var degrees: Number
+    fun init(d: Number) {
+        this.degrees = d
+    }
+    fun lt(other: Temperature): Bool {
+        return this.degrees < other.degrees
+    }
+    fun gt(other: Temperature): Bool {
+        return this.degrees > other.degrees
+    }
+    fun eq(other: Temperature): Bool {
+        return this.degrees == other.degrees
+    }
+}
+
+var cold = Temperature(0)
+var warm = Temperature(25)
+var hot = Temperature(40)
+
+IO.println(cold < warm)
+IO.println(hot > warm)
+IO.println(cold > hot)
+IO.println(Temperature(25) == warm)
+
+// Test: Division operator
+class Fraction {
+    var num: Number
+    var den: Number
+    fun init(n: Number, d: Number) {
+        this.num = n
+        this.den = d
+    }
+    fun div(other: Fraction): Fraction {
+        return Fraction(this.num * other.den, this.den * other.num)
+    }
+    fun mod(other: Fraction): Number {
+        return this.num % other.num
+    }
+}
+
+var a = Fraction(1, 2)
+var b = Fraction(3, 4)
+var c = a / b
+IO.println(c.num)
+IO.println(c.den)
