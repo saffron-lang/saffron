@@ -1,5 +1,5 @@
 // Saffron Test Framework
-// Decorator-based test discovery with assertions and reporting
+// Decorator-based test discovery with full error reporting
 //
 // Usage:
 //   import "@test" as T
@@ -8,12 +8,6 @@
 //   fun test_math() {
 //       T.assert_eq(1 + 1, 2, "addition")
 //   }
-//
-//   @T.skip("not ready")
-//   fun test_todo() { ... }
-//
-//   @T.only
-//   fun test_focused() { ... }
 //
 //   T.run_all()
 
@@ -24,44 +18,49 @@ var _passed = 0
 var _failed = 0
 var _skipped = 0
 var _total = 0
+var _current_test = ""
+var _test_errors = []
 
 // --- Test Discovery Decorators ---
 
 fun test(fn: Any): Any {
-    _tests.push({"name": fn, "fn": fn})
+    _tests.push(fn)
     return fn
 }
 
 fun skip(reason: String): Any {
     return fun (fn: Any) => {
         _skipped = _skipped + 1
+        IO.println("  SKIP: ${reason}")
         return fn;
     }
 }
 
 fun only(fn: Any): Any {
-    _only_tests.push({"name": fn, "fn": fn})
-    _tests.push({"name": fn, "fn": fn})
+    _only_tests.push(fn)
+    _tests.push(fn)
     return fn
 }
 
 // --- Assertions ---
 
+fun _record_failure(msg: String) {
+    _failed = _failed + 1
+    _test_errors.push("${_current_test}: ${msg}")
+    IO.println("    FAIL: ${msg}")
+}
+
 fun assert(condition: Bool, msg: String) {
     _total = _total + 1
     if (condition) { _passed = _passed + 1 }
-    else {
-        _failed = _failed + 1
-        IO.println("    FAIL: ${msg}")
-    }
+    else { _record_failure(msg) }
 }
 
 fun assert_eq(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual == expected) { _passed = _passed + 1 }
     else {
-        _failed = _failed + 1
-        IO.println("    FAIL: ${msg}")
+        _record_failure(msg)
         IO.println("      expected: ${expected}")
         IO.println("      actual:   ${actual}")
     }
@@ -70,22 +69,19 @@ fun assert_eq(actual: Any, expected: Any, msg: String) {
 fun assert_neq(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual != expected) { _passed = _passed + 1 }
-    else {
-        _failed = _failed + 1
-        IO.println("    FAIL: ${msg} (should not equal ${expected})")
-    }
+    else { _record_failure("${msg} (should not equal ${expected})") }
 }
 
 fun assert_gt(actual: Number, expected: Number, msg: String) {
     _total = _total + 1
     if (actual > expected) { _passed = _passed + 1 }
-    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (${actual} not > ${expected})") }
+    else { _record_failure("${msg} (${actual} not > ${expected})") }
 }
 
 fun assert_lt(actual: Number, expected: Number, msg: String) {
     _total = _total + 1
     if (actual < expected) { _passed = _passed + 1 }
-    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (${actual} not < ${expected})") }
+    else { _record_failure("${msg} (${actual} not < ${expected})") }
 }
 
 fun assert_throws(body: Any, msg: String) {
@@ -93,7 +89,7 @@ fun assert_throws(body: Any, msg: String) {
     var threw = false
     try { body() } catch (e) { threw = true }
     if (threw) { _passed = _passed + 1 }
-    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (expected throw)") }
+    else { _record_failure("${msg} (expected throw, none occurred)") }
 }
 
 fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
@@ -102,11 +98,10 @@ fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
     try { body() } catch (e) { caught_msg = e }
     if (caught_msg == expected_msg) { _passed = _passed + 1 }
     else {
-        _failed = _failed + 1
         if (caught_msg == nil) {
-            IO.println("    FAIL: ${msg} (no throw)")
+            _record_failure("${msg} (expected throw, none occurred)")
         } else {
-            IO.println("    FAIL: ${msg} (got '${caught_msg}', want '${expected_msg}')")
+            _record_failure("${msg} (got '${caught_msg}', want '${expected_msg}')")
         }
     }
 }
@@ -114,7 +109,7 @@ fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
 fun assert_contains(haystack: String, needle: String, msg: String) {
     _total = _total + 1
     if (haystack.contains(needle)) { _passed = _passed + 1 }
-    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} ('${haystack}' missing '${needle}')") }
+    else { _record_failure("${msg} ('${haystack}' missing '${needle}')") }
 }
 
 // --- Runner ---
@@ -129,29 +124,56 @@ fun run_all() {
         to_run = _tests
     }
 
-    IO.println("Running ${to_run.length()} tests (${_skipped} skipped)")
+    var test_count = to_run.length()
+    IO.println("Running ${test_count} tests (${_skipped} skipped)")
     IO.println("")
 
-    for (entry in to_run) {
-        var fn = entry["fn"]
+    var test_failures = []
+
+    for (fn in to_run) {
+        _current_test = "${fn}"
+        IO.print("  ${_current_test} ... ")
+
+        var before_failed = _failed
         try {
             fn()
         } catch (e) {
             _failed = _failed + 1
             _total = _total + 1
+            IO.println("")
             IO.println("    CRASH: ${e}")
+            test_failures.push("${_current_test}: crashed with '${e}'")
+        }
+
+        if (_failed == before_failed) {
+            IO.println("ok")
+        } else {
+            test_failures.push(_current_test)
         }
     }
 
     IO.println("")
-    if (_failed == 0) {
-        IO.println("  All ${_total} assertions passed")
-    } else {
-        IO.println("  ${_passed}/${_total} passed, ${_failed} failed")
+    IO.println("Results: ${_passed} passed, ${_failed} failed, ${_total} total")
+
+    if (test_failures.length() > 0) {
+        IO.println("")
+        IO.println("Failed tests:")
+        for (name in test_failures) {
+            IO.println("  - ${name}")
+        }
     }
 
+    if (_test_errors.length() > 0) {
+        IO.println("")
+        IO.println("Errors:")
+        for (err in _test_errors) {
+            IO.println("  ${err}")
+        }
+    }
+
+    IO.println("")
     if (_failed > 0) {
-        throw "Test suite failed"
+        throw "Test suite failed: ${_failed} failures"
     }
 }
 

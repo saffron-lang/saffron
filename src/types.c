@@ -732,6 +732,15 @@ Type *parseFile(const char *path, int length) {
     initTypeEnvironment(&typeEnvironment, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnvironment);
 
+    // Auto-import prelude interfaces (skip if we ARE the prelude to avoid recursion)
+    if (length != 8 || memcmp(path, "@prelude", 8) != 0) {
+        Type *preludeType = parseFile("@prelude", 8);
+        if (preludeType && preludeType->obj.type == OBJ_PARSE_TYPE) {
+            SimpleType *prelude = (SimpleType *) preludeType;
+            tableAddAll(&prelude->methods, &typeEnvironment.typeDefs);
+        }
+    }
+
     bool oldHadError = hadError;
     bool oldPanicMode = panicMode;
     hadError = false;
