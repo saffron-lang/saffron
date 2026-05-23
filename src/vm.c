@@ -87,6 +87,10 @@ void initVM() {
     vm.initString = copyString("init", 4);
     vm.openUpvalues = NULL;
 
+    vm.handlerCount = 0;
+    vm.isThrowing = false;
+    vm.currentException = NIL_VAL;
+
     makeTypes();
     initLib();
     initAsyncHandler();
@@ -907,6 +911,46 @@ static InterpretResult run(ObjModule *module) {
             case OP_VARIANT:
             case OP_MATCH_TAG:
                 break;
+            case OP_THROW: {
+                Value exception = pop();
+                vm.currentException = exception;
+                vm.isThrowing = true;
+
+                if (vm.handlerCount > 0) {
+                    ExceptionHandler *handler = &vm.handlers[--vm.handlerCount];
+                    vm.stackTop = handler->stackTop;
+                    currentFrame = handler->frame;
+                    currentFrame->ip = handler->catchIp;
+                    push(exception);
+                    vm.isThrowing = false;
+                } else {
+                    fprintf(stderr, "Unhandled exception: ");
+                    printValue(exception);
+                    fprintf(stderr, "\n");
+                    for (ObjCallFrame *frame = CURRENT_TASK; frame->parent != NULL; frame = frame->parent) {
+                        ObjFunction *function = frame->closure->function;
+                        size_t instruction = frame->ip - function->chunk.code - 1;
+                        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+                        if (function->name == NULL) fprintf(stderr, "script\n");
+                        else fprintf(stderr, "%s()\n", function->name->chars);
+                    }
+                    vm.isThrowing = false;
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
+            case OP_TRY_BEGIN: {
+                uint16_t offset = READ_SHORT();
+                ExceptionHandler *handler = &vm.handlers[vm.handlerCount++];
+                handler->catchIp = currentFrame->ip + offset;
+                handler->stackTop = vm.stackTop;
+                handler->frame = currentFrame;
+                break;
+            }
+            case OP_TRY_END: {
+                vm.handlerCount--;
+                break;
+            }
             case OP_RETURN: {
                 Value result = pop();
                 currentFrame->state |= FINISHED;

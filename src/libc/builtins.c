@@ -9,6 +9,7 @@
 
 void initLib() { // TODO: Don't evaluate registered modules until accessed?
     defineType("Module", OBJ_VAL(createModuleType()));
+    createListIteratorType();
     defineBuiltin("List", OBJ_VAL(createListType()));
     defineBuiltin("Map", OBJ_VAL(createMapType()));
     defineType("Task", OBJ_VAL(createTaskType()));

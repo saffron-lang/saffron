@@ -1,23 +1,23 @@
 class Future {
     var result: Any
 
-    init() {
+    fun init() {
         this.result = nil
     }
 
-    setResult(result: Any) {
+    fun setResult(result: Any) {
         this.result = result
     }
 
-    getResult() {
+    fun getResult() {
         return this.result
     }
 
-    isReady() {
+    fun isReady() {
         return this.result != nil
     }
 
-    join() {
+    fun join() {
         while (!this.isReady()) {
             yield;
         }
