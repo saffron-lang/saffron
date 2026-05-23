@@ -1,12 +1,4 @@
-// Iterator interfaces (standard protocols)
-interface Iterator<T> {
-    fun next(): T
-    fun next?(): Bool
-}
-
-interface Iterable<T> {
-    fun iter(): Iterator<T>
-}
+import "@prelude" as Prelude
 
 // Iterator utilities — works with any type implementing Iterable<T>
 
