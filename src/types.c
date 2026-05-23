@@ -282,7 +282,7 @@ static Type *getVariableType(Token name) {
         return AS_OBJ(argValue);
     } else {
         errorAt(&name, "Undefined variable");
-        return NULL;
+        return (Type *) anyType;
     }
 }
 
@@ -293,7 +293,7 @@ static Type *getTypeDef(Token name) {
         return arg;
     } else {
         errorAt(&name, "Undefined type");
-        return NULL;
+        return (Type *) anyType;
     }
 }
 
@@ -600,6 +600,7 @@ Type *getTypeOf(Value value) {
 
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
+        if (hadError) return;
         panicMode = false;
         evaluateNode((Node *) statements->stmts[i]);
     }
@@ -702,7 +703,7 @@ Type *parseFile(const char *path, int length) {
 
 Type *evaluateNode(Node *node) {
     if (node == NULL) {
-        return NULL;
+        return (Type *) anyType;
     }
     switch (node->type) {
         case NODE_BINARY: {
@@ -773,7 +774,7 @@ Type *evaluateNode(Node *node) {
                 case TOKEN_MINUS:
                     return right;
                 default:
-                    return NULL; // Unreachable.
+                    return (Type *) anyType; // Unreachable.
             }
         }
         case NODE_VARIABLE: {
@@ -815,7 +816,7 @@ Type *evaluateNode(Node *node) {
             }
             if (calleeType == NULL || calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
                 if (calleeType != NULL) errorAt(&casted->paren, "Type is not callable");
-                return (NULL);
+                return (Type *) anyType;
             }
 
             FunctorType *calleeFunctor = calleeType;
@@ -842,7 +843,7 @@ Type *evaluateNode(Node *node) {
                 currentAssignmentType = oldAssignmentType;
                 if (i < calleeFunctor->arguments.count && !isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
                     errorAt(&casted->paren, "Type mismatch");
-                    return NULL;
+                    return (Type *) anyType;
                 }
             }
 
@@ -860,7 +861,7 @@ Type *evaluateNode(Node *node) {
                 Type *indexType = evaluateNode(casted->index);
                 if (!isSubType(indexType, numberType)) {
                     errorAt(&casted->bracket, "Index must be a number");
-                    return (NULL);
+                    return (Type *) anyType;
                 }
 
                 if (genericType->generics.count) {
@@ -873,7 +874,7 @@ Type *evaluateNode(Node *node) {
                 Type *indexType = evaluateNode(casted->index);
                 if (!isSubType(indexType, AS_OBJ(genericType->generics.values[0]))) {
                     errorAt(&casted->bracket, "Key type mismatch");
-                    return (NULL);
+                    return (Type *) anyType;
                 }
 
                 if (genericType->generics.count) {
@@ -883,7 +884,7 @@ Type *evaluateNode(Node *node) {
                 }
             } else {
                 errorAt(&casted->bracket, "Cannot get item on something other than a list or map");
-                return (NULL);
+                return (Type *) anyType;
             }
         }
         case NODE_GET: {
@@ -921,7 +922,7 @@ Type *evaluateNode(Node *node) {
                     GenericTypeDefinition *genDef = (GenericTypeDefinition *) objectType;
                     if (!genDef->extends) {
                         errorAt(&casted->name, "Attempting to get from invalid generic type.");
-                        return NULL;
+                        return (Type *) anyType;
                     }
                     if (genDef->extends->obj.type == OBJ_PARSE_GENERIC_TYPE) {
                         GenericType *genType = (GenericType *) genDef->extends;
@@ -957,7 +958,7 @@ Type *evaluateNode(Node *node) {
             if (!tableGet(&rootType->methods, nameString, &fieldType)) {
                 if (!tableGet(&rootType->fields, nameString, &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
-                    return NULL;
+                    return (Type *) anyType;
                 }
             }
 
@@ -1220,7 +1221,7 @@ Type *evaluateNode(Node *node) {
                     ),
                     OBJ_VAL(varType)
             );
-            return NULL;
+            return (Type *) anyType;
         }
         case NODE_BLOCK: {
             struct Block *casted = (struct Block *) node;
@@ -1535,7 +1536,7 @@ Type *evaluateNode(Node *node) {
             struct While *casted = (struct While *) node;
             evaluateNode((Node *) casted->condition);
             evaluateNode((Node *) casted->body);
-            return NULL;
+            return (Type *) anyType;
         }
         case NODE_FOR: {
             struct For *casted = (struct For *) node;
@@ -1543,10 +1544,10 @@ Type *evaluateNode(Node *node) {
             evaluateNode((Node *) casted->condition);
             evaluateNode((Node *) casted->increment);
             evaluateNode((Node *) casted->body);
-            return NULL;
+            return (Type *) anyType;
         }
         case NODE_BREAK: {
-            return NULL;
+            return (Type *) anyType;
         }
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
@@ -1576,7 +1577,7 @@ Type *evaluateNode(Node *node) {
             Type *type = parseFile(str->chars, str->length);
             if (type == NULL) {
                 errorAt(&casted->name, "Could not resolve import");
-                return NULL;
+                return (Type *) anyType;
             }
             tableSet(
                     &currentEnv->locals, copyString(
@@ -1592,7 +1593,7 @@ Type *evaluateNode(Node *node) {
                 tableAddAll(&moduleType->fields, &currentEnv->locals);
             }
 
-            return NULL;
+            return (Type *) anyType;
         }
         case NODE_FUNCTOR: {
             struct Functor *casted = (struct Functor *) node;
@@ -1678,7 +1679,7 @@ Type *evaluateNode(Node *node) {
 
                 if (superType->self.obj.type != OBJ_PARSE_INTERFACE_TYPE) {
                     errorAt(&casted->superType->name, "Parent type for interface may only be an interface.");
-                    return NULL;
+                    return (Type *) anyType;
                 }
 
                 copyTable(&superType->fields, &interfaceType->fields);
