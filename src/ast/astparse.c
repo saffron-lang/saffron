@@ -1187,6 +1187,20 @@ static Stmt *methodSignature() {
         returnType = typeAnnotation();
     }
 
+    // If followed by '{', this is a default method implementation
+    if (check(TOKEN_LEFT_BRACE)) {
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before method body.");
+        struct Block *body = (struct Block *) block();
+        struct Function *func = ALLOCATE_NODE(struct Function, NODE_FUNCTION);
+        func->body = body->statements;
+        func->params = params;
+        func->functionType = type;
+        func->name = name;
+        func->returnType = returnType;
+        func->generics = generics;
+        return (Stmt *) func;
+    }
+
     struct MethodSig *result = ALLOCATE_NODE(struct MethodSig, NODE_METHODSIG);
     result->params = params;
     result->functionType = type;

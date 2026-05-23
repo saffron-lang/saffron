@@ -908,7 +908,7 @@ void compileNode(Node *node) {
         case NODE_MATCH: {
             struct Match *casted = (struct Match *) node;
 
-            // Put the subject in a local so we can reference it stably
+            // Allocate subject and result as locals in a scope
             beginScope();
             compileNode((Node *) casted->subject);
             Token matchSubject = syntheticToken("$match");
@@ -922,7 +922,6 @@ void compileNode(Node *node) {
             for (int i = 0; i < casted->arms.count; i++) {
                 struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
 
-                // Get subject's tag for comparison
                 emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
                 emitByte(OP_GET_TAG);
 
@@ -934,7 +933,7 @@ void compileNode(Node *node) {
                 int nextArm = emitJump(OP_JUMP_IF_FALSE);
                 emitByte(OP_POP); // pop true
 
-                // Bind variant fields to locals
+                // Bind variant fields in a sub-scope
                 beginScope();
                 for (int j = 0; j < arm->bindings.count; j++) {
                     emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
@@ -945,9 +944,16 @@ void compileNode(Node *node) {
                     defineVariable(c);
                 }
 
-                // Compile the arm body
+                // Compile arm body — result stays on stack
+                bool oldLast = lastInBody;
+                lastInBody = true;
                 compileTree(&arm->body);
-                endScope();
+                lastInBody = oldLast;
+
+                // Store result into subject slot (reuse it for result)
+                emitBytes(OP_SET_LOCAL, (uint8_t) subjectSlot);
+                emitByte(OP_POP); // pop dup from SET_LOCAL
+                endScope(); // pops bindings
 
                 armEndJumps[armCount++] = emitJump(OP_JUMP);
 
@@ -955,19 +961,118 @@ void compileNode(Node *node) {
                 emitByte(OP_POP); // pop false
             }
 
-            // No arm matched — nil result
-            if (exprContext) {
-                emitByte(OP_NIL);
-            }
-
             for (int i = 0; i < armCount; i++) {
                 patchJump(armEndJumps[i]);
             }
-            endScope(); // pop subject local
+
+            // Result is in the subject slot on the stack.
+            // "Exit" the scope without popping — the slot value IS the result.
+            current->localCount--;
+            current->scopeDepth--;
             break;
         }
         case NODE_MATCHARM:
             break;
+        case NODE_INTERFACE: {
+            struct Interface *casted = (struct Interface *) node;
+            uint8_t nameConstant = identifierConstant(&casted->name);
+            declareVariable(&casted->name);
+            emitBytes(OP_CLASS, nameConstant);
+            defineVariable(nameConstant);
+
+            getVariable(casted->name);
+
+            for (int i = 0; i < casted->body.count; i++) {
+                if (casted->body.stmts[i]->self.type == NODE_FUNCTION) {
+                    uint8_t constant = identifierConstant(&((struct Function *) casted->body.stmts[i])->name);
+                    compileNode((Node *) casted->body.stmts[i]);
+                    emitBytes(OP_METHOD, constant);
+                }
+            }
+
+            emitByte(OP_POP);
+            break;
+        }
+        case NODE_DESTRUCTURE: {
+            struct Destructure *casted = (struct Destructure *) node;
+            int bindingCount = casted->bindings.count;
+            bool isEnum = casted->variant.length > 0;
+
+            // Compile value — it stays on stack as a hidden temp
+            compileNode((Node *) casted->value);
+            // Use a hidden local to hold the value stably
+            Token tempName = syntheticToken("$destructure");
+            addLocal(tempName);
+            markInitialized();
+            int valueSlot = current->localCount - 1;
+
+            if (isEnum) {
+                emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                emitByte(OP_GET_TAG);
+                uint8_t tagConst = makeConstant(OBJ_VAL(
+                    copyString(casted->variant.start, casted->variant.length)));
+                emitBytes(OP_CONSTANT, tagConst);
+                emitByte(OP_EQUAL);
+                int failJump = emitJump(OP_JUMP_IF_FALSE);
+                emitByte(OP_POP);
+
+                for (int i = 0; i < bindingCount; i++) {
+                    emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                    emitByte(OP_GETITEM);
+                    declareVariable(&casted->bindings.parameters[i]->name);
+                    defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
+                }
+
+                int endJump = emitJump(OP_JUMP);
+                patchJump(failJump);
+                emitByte(OP_POP); // pop false
+                patchJump(endJump);
+            } else {
+                int splatPos = casted->splatPosition;
+
+                if (splatPos == -1) {
+                    for (int i = 0; i < bindingCount; i++) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                        emitByte(OP_GETITEM);
+                        declareVariable(&casted->bindings.parameters[i]->name);
+                        defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
+                    }
+                } else {
+                    int afterSplat = bindingCount - splatPos - 1;
+
+                    for (int i = 0; i < splatPos; i++) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                        emitByte(OP_GETITEM);
+                        declareVariable(&casted->bindings.parameters[i]->name);
+                        defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
+                    }
+
+                    // Splat: slice(list, start, fromEnd)
+                    emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(splatPos)));
+                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(afterSplat)));
+                    emitByte(OP_SLICE);
+                    declareVariable(&casted->bindings.parameters[splatPos]->name);
+                    defineVariable(identifierConstant(&casted->bindings.parameters[splatPos]->name));
+
+                    for (int i = 0; i < afterSplat; i++) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
+                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(-(afterSplat - i))));
+                        emitByte(OP_GETITEM);
+                        declareVariable(&casted->bindings.parameters[splatPos + 1 + i]->name);
+                        defineVariable(identifierConstant(&casted->bindings.parameters[splatPos + 1 + i]->name));
+                    }
+                }
+            }
+
+            // Pop the hidden temp value
+            emitByte(OP_POP);
+            current->localCount--;
+            break;
+        }
         case NODE_IMPORT: {
             struct Import *casted = (struct Import *) node;
             compileNode((Node *) casted->expression);
