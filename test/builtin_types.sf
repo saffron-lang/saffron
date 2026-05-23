@@ -10,7 +10,7 @@ for (var i = 0; i < 1000; i = i + 1) {
 
     list("asd");
 
-    class EpicList < list {}
+    class EpicList extends list {}
 
     var c = EpicList();
     c.length();

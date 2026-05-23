@@ -19,9 +19,10 @@ fun fib(n) {
 }
 
 // Native Functions
-var start = clock();
+import "time" as Time
+var start = Time.clock();
 IO.print(fib(10));
-IO.print(clock() - start);
+IO.print(Time.clock() - start);
 
 // Closures
 fun makeClosure() {

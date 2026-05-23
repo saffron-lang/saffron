@@ -1,25 +1,21 @@
 var b = 6;
 
 class Doughnut {
-  finish(ingredient: String) {
-    IO.IO.println("Finish with " + ingredient);
+  fun finish(ingredient: String) {
+    IO.println("Finish with " + ingredient);
   }
 
-  cook() {
+  fun cook() {
     IO.println("Dunk in the fryer.");
     this.finish("sprinkles");
-  }
-
-  errorable!() {
-    IO.println("wowsers!");
   }
 }
 
 var b = Doughnut();
 b.finish("cheese");
 
-class Cruller < Doughnut {
-  finish() {
+class Cruller extends Doughnut {
+  fun finish() {
     // No sprinkles, always icing.
     IO.println(super.finish);
     super.finish("icing");

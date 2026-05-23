@@ -1,0 +1,35 @@
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+var c = Color.Red
+IO.println(c)
+
+var g = Color.Green
+IO.println(g)
+
+enum Shape {
+    Circle(radius: Number),
+    Rect(width: Number, height: Number)
+}
+
+var s = Shape.Circle(5)
+IO.println(s)
+
+var r = Shape.Rect(3, 4)
+IO.println(r)
+
+// Pattern matching
+var area = match (s) {
+    Circle(radius) => radius * radius * 3
+    Rect(w, h) => w * h
+}
+IO.println(area)
+
+var area2 = match (r) {
+    Circle(radius) => radius * radius * 3
+    Rect(w, h) => w * h
+}
+IO.println(area2)

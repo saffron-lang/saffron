@@ -9,7 +9,7 @@ notMethod();
 
 // Don't OP_INVOKE on a non class memeber
 class Oops {
-  init() {
+  fun init() {
     fun f() {
       print "not a method";
     }

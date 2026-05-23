@@ -2,7 +2,7 @@ for (var i = 0; i < 10; i = i + 1) {
     IO.println(i)
 }
 
-import "lib/iter.sf" as iter; // Builtin module
+import "@iter" as iter
 
 fun predicate(item) {
     return (item % 2) == 0
