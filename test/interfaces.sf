@@ -1,0 +1,53 @@
+// Test: Default method bodies
+interface Greeter {
+    fun greet() {
+        IO.println("Hello!")
+    }
+}
+
+class Bot extends Greeter {
+    fun init() {}
+}
+
+Bot().greet()
+
+// Test: Multiple interface inheritance
+interface Printable {
+    fun print() {
+        IO.println("printed")
+    }
+}
+
+interface Serializable {
+    fun serialize() {
+        IO.println("serialized")
+    }
+}
+
+class Document extends Printable, Serializable {
+    fun init() {}
+}
+
+var doc = Document()
+doc.print()
+doc.serialize()
+
+// Test: is-check with multiple interfaces
+IO.println(doc is Printable)
+IO.println(doc is Serializable)
+
+// Test: Override default method
+interface Speaker {
+    fun speak() {
+        IO.println("...")
+    }
+}
+
+class Parrot extends Speaker {
+    fun init() {}
+    fun speak() {
+        IO.println("Polly wants a cracker")
+    }
+}
+
+Parrot().speak()

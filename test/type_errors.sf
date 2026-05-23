@@ -1,0 +1,28 @@
+// This file tests that the type checker catches errors.
+// Expected: type errors printed to stderr, program still runs.
+
+// Test: Missing interface implementation
+interface Drawable {
+    fun draw(): String
+}
+
+class Square extends Drawable {
+    fun init() {}
+    // Missing draw() — should error
+}
+
+// Test: Non-exhaustive match
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+var d = Direction.North
+var name = match (d) {
+    North => "north"
+    South => "south"
+    // Missing East and West — should error
+}
+IO.println(name)
