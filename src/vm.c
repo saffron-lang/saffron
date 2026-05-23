@@ -16,6 +16,7 @@
 #include "libc/map.h"
 #include "libc/builtins.h"
 #include "libc/string.h"
+#include "libc/type.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -66,6 +67,53 @@ void defineBuiltin(const char *name, Value value) {
     pop();
 }
 
+// Number native methods — receiver is Value* cast to Obj*
+#define NUM_SELF(obj) AS_NUMBER(*(Value*)(obj))
+
+static Value numberAbs(Obj *self, int argCount, Value *args) {
+    double n = NUM_SELF(self);
+    return NUMBER_VAL(n < 0 ? -n : n);
+}
+
+static Value numberFloor(Obj *self, int argCount, Value *args) {
+    return NUMBER_VAL(floor(NUM_SELF(self)));
+}
+
+static Value numberCeil(Obj *self, int argCount, Value *args) {
+    return NUMBER_VAL(ceil(NUM_SELF(self)));
+}
+
+static Value numberRound(Obj *self, int argCount, Value *args) {
+    return NUMBER_VAL(round(NUM_SELF(self)));
+}
+
+static Value numberToString(Obj *self, int argCount, Value *args) {
+    double n = NUM_SELF(self);
+    char buf[64];
+    if (n == (int)n) {
+        snprintf(buf, sizeof(buf), "%d", (int)n);
+    } else {
+        snprintf(buf, sizeof(buf), "%g", n);
+    }
+    return OBJ_VAL(copyString(buf, (int)strlen(buf)));
+}
+
+// Bool native methods
+#define BOOL_SELF(obj) AS_BOOL(*(Value*)(obj))
+
+static Value boolToString(Obj *self, int argCount, Value *args) {
+    bool b = BOOL_SELF(self);
+    return b ? OBJ_VAL(copyString("true", 4)) : OBJ_VAL(copyString("false", 5));
+}
+
+static void defineMethodOnClass(ObjClass *klass, const char *name, NativeMethodFn fn) {
+    push(OBJ_VAL(copyString(name, (int)strlen(name))));
+    push(OBJ_VAL(newNativeMethod(fn)));
+    tableSet(&klass->methods, AS_STRING(peek(1)), peek(0));
+    pop();
+    pop();
+}
+
 void initVM() {
     resetStack();
     vm.vmReady = false;
@@ -109,6 +157,13 @@ void initVM() {
     defineBuiltin("String", OBJ_VAL(vm.stringClass));
     defineBuiltin("Bool", OBJ_VAL(vm.boolClass));
     defineBuiltin("Nil", OBJ_VAL(vm.nilClass));
+
+    defineMethodOnClass(vm.numberClass, "abs", (NativeMethodFn) numberAbs);
+    defineMethodOnClass(vm.numberClass, "floor", (NativeMethodFn) numberFloor);
+    defineMethodOnClass(vm.numberClass, "ceil", (NativeMethodFn) numberCeil);
+    defineMethodOnClass(vm.numberClass, "round", (NativeMethodFn) numberRound);
+    defineMethodOnClass(vm.numberClass, "to_string", (NativeMethodFn) numberToString);
+    defineMethodOnClass(vm.boolClass, "to_string", (NativeMethodFn) boolToString);
 
     makeTypes();
     initLib();
@@ -156,7 +211,7 @@ bool runtimeError(const char *format, ...) {
     vsnprintf(message, sizeof(message), format, args);
     va_end(args);
 
-    if (vm.handlerCount > 0) {
+    if (vm.handlerCount > 0 && vm.vmReady) {
         ObjString *errorStr = copyString(message, (int) strlen(message));
         vm.currentException = OBJ_VAL(errorStr);
         vm.isThrowing = true;
@@ -404,7 +459,8 @@ static bool invoke(ObjString *name, int argCount) {
         if (tableGet(&vm.numberClass->methods, name, &method)) {
             ObjNativeMethod *nativeMethod = (ObjNativeMethod *) AS_OBJ(method);
             NativeMethodFn native = nativeMethod->function;
-            Value result = native(NULL, argCount, vm.stackTop - argCount);
+            // Pass pointer to receiver slot as "self" — native casts back to Value*
+            Value result = native((Obj *)(vm.stackTop - argCount - 1), argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
             push(result);
             return true;
@@ -418,7 +474,7 @@ static bool invoke(ObjString *name, int argCount) {
         if (tableGet(&vm.boolClass->methods, name, &method)) {
             ObjNativeMethod *nativeMethod = (ObjNativeMethod *) AS_OBJ(method);
             NativeMethodFn native = nativeMethod->function;
-            Value result = native(NULL, argCount, vm.stackTop - argCount);
+            Value result = native((Obj *)(vm.stackTop - argCount - 1), argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
             push(result);
             return true;
@@ -590,6 +646,25 @@ static InterpretResult run(ObjModule *module) {
                 } else if (IS_INSTANCE(peek(1))) {
                     if (!invoke(vm.addString, 1)) return INTERPRET_RUNTIME_ERROR;
                     currentFrame = CURRENT_TASK;
+                } else if (IS_STRING(peek(0)) || IS_STRING(peek(1))) {
+                    char buf[256];
+                    Value b = pop();
+                    Value a = pop();
+                    char aBuf[128], bBuf[128];
+                    int aLen, bLen;
+                    if (IS_STRING(a)) { aLen = AS_STRING(a)->length; memcpy(aBuf, AS_CSTRING(a), aLen); }
+                    else if (IS_NUMBER(a)) { aLen = snprintf(aBuf, 128, "%g", AS_NUMBER(a)); }
+                    else if (IS_BOOL(a)) { aLen = snprintf(aBuf, 128, "%s", AS_BOOL(a) ? "true" : "false"); }
+                    else if (IS_NIL(a)) { aLen = snprintf(aBuf, 128, "nil"); }
+                    else { aLen = snprintf(aBuf, 128, "<object>"); }
+                    if (IS_STRING(b)) { bLen = AS_STRING(b)->length; memcpy(bBuf, AS_CSTRING(b), bLen); }
+                    else if (IS_NUMBER(b)) { bLen = snprintf(bBuf, 128, "%g", AS_NUMBER(b)); }
+                    else if (IS_BOOL(b)) { bLen = snprintf(bBuf, 128, "%s", AS_BOOL(b) ? "true" : "false"); }
+                    else if (IS_NIL(b)) { bLen = snprintf(bBuf, 128, "nil"); }
+                    else { bLen = snprintf(bBuf, 128, "<object>"); }
+                    memcpy(buf, aBuf, aLen);
+                    memcpy(buf + aLen, bBuf, bLen);
+                    push(OBJ_VAL(copyString(buf, aLen + bLen)));
                 } else {
                     if (!runtimeError(
                             "Operands must be two numbers or two strings.")) return INTERPRET_RUNTIME_ERROR;

@@ -1,0 +1,64 @@
+import "@test" as T
+
+IO.println("Arithmetic")
+T.assert_eq(1 + 2, 3, "addition")
+T.assert_eq(10 - 3, 7, "subtraction")
+T.assert_eq(4 * 5, 20, "multiplication")
+T.assert_eq(10 / 2, 5, "division")
+T.assert_eq(7 % 3, 1, "modulo")
+
+IO.println("Strings")
+T.assert_eq("hello" + " world", "hello world", "concatenation")
+var name = "saffron"
+T.assert_eq("hello ${name}", "hello saffron", "interpolation")
+T.assert_eq("${1 + 1}", "2", "interp expression")
+
+IO.println("Lists")
+var list = [1, 2, 3]
+T.assert_eq(list[0], 1, "index 0")
+T.assert_eq(list[2], 3, "index 2")
+T.assert_eq(list.length(), 3, "length")
+list.push(4);
+T.assert_eq(list.length(), 4, "push increases length")
+T.assert_eq(list[3], 4, "pushed value")
+
+IO.println("For-in")
+var sum = 0
+for (x in [1, 2, 3, 4, 5]) {
+    sum = sum + x
+}
+T.assert_eq(sum, 15, "sum via for-in")
+
+IO.println("Enums")
+enum Option { Some(value: Number), None }
+var x = Option.Some(42)
+var result = match (x) {
+    Some(v) => v
+    None => 0
+}
+T.assert_eq(result, 42, "match extracts value")
+
+IO.println("Exceptions")
+var caught = false
+try {
+    throw "oops"
+} catch (e) {
+    caught = true
+    T.assert_eq(e, "oops", "caught value")
+}
+T.assert(caught, "catch block ran")
+
+IO.println("Closures")
+fun counter() {
+    var n = 0
+    return fun () => {
+        n = n + 1
+        return n
+    }
+}
+var c = counter()
+T.assert_eq(c(), 1, "first call")
+T.assert_eq(c(), 2, "second call")
+T.assert_eq(c(), 3, "third call")
+
+T.summary()

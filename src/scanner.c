@@ -10,6 +10,7 @@ typedef struct {
     const char *start;
     const char *current;
     int line;
+    int interpDepth;
 } Scanner;
 
 Scanner scanner;
@@ -18,6 +19,7 @@ void initScanner(const char *source) {
     scanner.start = source;
     scanner.current = source;
     scanner.line = 1;
+    scanner.interpDepth = 0;
 }
 
 static bool isAtEnd() {
@@ -97,6 +99,13 @@ static Token string() {
             if (!isAtEnd()) advance();
             continue;
         }
+        if (peek() == '$' && peekNext() == '{') {
+            // String interpolation: emit this segment and enter interp mode
+            scanner.interpDepth++;
+            advance(); // skip $
+            advance(); // skip {
+            return makeToken(TOKEN_STRING_INTERP);
+        }
         if (peek() == '\n') scanner.line++;
         advance();
     }
@@ -154,7 +163,7 @@ static TokenType identifierType() {
                     case 'n':
                         return checkKeyword(2, 1, "d", TOKEN_AND);
                     case 's':
-                        return TOKEN_AS;
+                        return checkKeyword(2, 0, "", TOKEN_AS);
                 }
             }
             break;
@@ -305,6 +314,11 @@ Token scanToken() {
         case '{':
             return makeToken(TOKEN_LEFT_BRACE);
         case '}':
+            if (scanner.interpDepth > 0) {
+                scanner.interpDepth--;
+                scanner.start = scanner.current;
+                return string();
+            }
             return makeToken(TOKEN_RIGHT_BRACE);
         case '[':
             return makeToken(TOKEN_LEFT_BRACKET);

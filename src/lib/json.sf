@@ -1,4 +1,5 @@
-// JSON parser and serializer implemented in Saffron
+// JSON parser and serializer — pure Saffron implementation
+// Depends on: Reflect (builtin), String methods (char_at, slice, to_number, length)
 
 fun parse(source: String) {
     var pos = 0
@@ -51,8 +52,6 @@ fun parse(source: String) {
                 if (esc == "\\") { result = result + "\\" }
                 if (esc == "\"") { result = result + "\"" }
                 if (esc == "/") { result = result + "/" }
-                if (esc == "b") { result = result + "\b" }
-                if (esc == "f") { result = result + "\f" }
             } else {
                 result = result + c
             }
@@ -125,39 +124,35 @@ fun parse(source: String) {
     return parse_value()
 }
 
-fun to_string(value) {
+fun escape_string(str: String): String {
+    var result = "\""
+    var i = 0
+    while (i < str.length()) {
+        var c = str.char_at(i)
+        if (c == "\"") { result = result + "\\\"" }
+        else if (c == "\\") { result = result + "\\\\" }
+        else if (c == "\n") { result = result + "\\n" }
+        else if (c == "\t") { result = result + "\\t" }
+        else if (c == "\r") { result = result + "\\r" }
+        else { result = result + c }
+        i = i + 1
+    }
+    return result + "\""
+}
+
+fun to_string(value): String {
     if (value == nil) { return "null" }
     if (value == true) { return "true" }
     if (value == false) { return "false" }
-
-    if (Reflect.is_number(value)) {
-        return Reflect.number_to_string(value)
-    }
-
-    if (Reflect.is_string(value)) {
-        var str = Reflect.as_string(value)
-        var result = "\""
-        var i = 0
-        while (i < str.length()) {
-            var c = str.char_at(i)
-            if (c == "\"") { result = result + "\\\"" }
-            else if (c == "\\") { result = result + "\\\\" }
-            else if (c == "\n") { result = result + "\\n" }
-            else if (c == "\t") { result = result + "\\t" }
-            else if (c == "\r") { result = result + "\\r" }
-            else { result = result + c }
-            i = i + 1
-        }
-        return result + "\""
-    }
+    if (Reflect.is_number(value)) { return Reflect.number_to_string(value) }
+    if (Reflect.is_string(value)) { return escape_string(value) }
 
     if (Reflect.is_list(value)) {
-        var list = Reflect.as_list(value)
         var result = "["
         var i = 0
-        while (i < list.length()) {
+        while (i < value.length()) {
             if (i > 0) { result = result + "," }
-            result = result + to_string(list[i])
+            result = result + to_string(value[i])
             i = i + 1
         }
         return result + "]"
@@ -177,13 +172,12 @@ fun to_string(value) {
 
     if (Reflect.is_instance(value)) {
         var fields = Reflect.fields(value)
-        var names = fields.keys()
+        var keys = fields.keys()
         var result = "{"
         var i = 0
-        while (i < names.length()) {
+        while (i < keys.length()) {
             if (i > 0) { result = result + "," }
-            var name = names[i]
-            result = result + to_string(name) + ":" + to_string(fields.get(name))
+            result = result + to_string(keys[i]) + ":" + to_string(fields.get(keys[i]))
             i = i + 1
         }
         return result + "}"
@@ -192,7 +186,12 @@ fun to_string(value) {
     return "null"
 }
 
-fun pretty(value, indent: Number) {
+fun parse_into(klass, source: String) {
+    var parsed = parse(source)
+    return Reflect.construct(klass, parsed)
+}
+
+fun pretty(value): String {
     fun pad(depth: Number): String {
         return "  ".repeat(depth)
     }
@@ -201,23 +200,16 @@ fun pretty(value, indent: Number) {
         if (val == nil) { return "null" }
         if (val == true) { return "true" }
         if (val == false) { return "false" }
-
-        if (Reflect.is_number(val)) {
-            return Reflect.number_to_string(val)
-        }
-
-        if (Reflect.is_string(val)) {
-            return to_string(val)
-        }
+        if (Reflect.is_number(val)) { return Reflect.number_to_string(val) }
+        if (Reflect.is_string(val)) { return escape_string(val) }
 
         if (Reflect.is_list(val)) {
-            var list = Reflect.as_list(val)
-            if (list.length() == 0) { return "[]" }
+            if (val.length() == 0) { return "[]" }
             var result = "[\n"
             var i = 0
-            while (i < list.length()) {
+            while (i < val.length()) {
                 if (i > 0) { result = result + ",\n" }
-                result = result + pad(depth + 1) + fmt(list[i], depth + 1)
+                result = result + pad(depth + 1) + fmt(val[i], depth + 1)
                 i = i + 1
             }
             return result + "\n" + pad(depth) + "]"
@@ -230,7 +222,7 @@ fun pretty(value, indent: Number) {
             var i = 0
             while (i < keys.length()) {
                 if (i > 0) { result = result + ",\n" }
-                result = result + pad(depth + 1) + to_string(keys[i]) + ": " + fmt(val.get(keys[i]), depth + 1)
+                result = result + pad(depth + 1) + escape_string(keys[i]) + ": " + fmt(val.get(keys[i]), depth + 1)
                 i = i + 1
             }
             return result + "\n" + pad(depth) + "}"
@@ -238,14 +230,13 @@ fun pretty(value, indent: Number) {
 
         if (Reflect.is_instance(val)) {
             var fields = Reflect.fields(val)
-            var names = fields.keys()
-            if (names.length() == 0) { return "{}" }
+            var keys = fields.keys()
+            if (keys.length() == 0) { return "{}" }
             var result = "{\n"
             var i = 0
-            while (i < names.length()) {
+            while (i < keys.length()) {
                 if (i > 0) { result = result + ",\n" }
-                var name = names[i]
-                result = result + pad(depth + 1) + to_string(name) + ": " + fmt(fields.get(name), depth + 1)
+                result = result + pad(depth + 1) + escape_string(keys[i]) + ": " + fmt(fields.get(keys[i]), depth + 1)
                 i = i + 1
             }
             return result + "\n" + pad(depth) + "}"

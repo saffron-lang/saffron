@@ -143,6 +143,30 @@ static Value reflectTypeOf(int argCount, Value *args) {
     return OBJ_VAL(copyString("unknown", 7));
 }
 
+static Value reflectConstruct(int argCount, Value *args) {
+    if (argCount != 2 || !IS_CLASS(args[0])) {
+        runtimeError("Reflect.construct expects (class, fieldsMap)");
+        return NIL_VAL;
+    }
+    ObjClass *klass = AS_CLASS(args[0]);
+    ObjInstance *instance = newInstance(klass);
+    push(OBJ_VAL(instance));
+
+    if (IS_OBJ(args[1]) && AS_OBJ(args[1])->type == OBJ_MAP) {
+        ObjMap *map = (ObjMap *) AS_OBJ(args[1]);
+        for (int i = 0; i < map->values.capacity; i++) {
+            MapEntry *entry = &map->values.entries[i];
+            if (IS_NIL(entry->key) && IS_NIL(entry->value)) continue;
+            if (IS_NIL(entry->key)) continue;
+            if (IS_STRING(entry->key)) {
+                tableSet(&instance->fields, AS_STRING(entry->key), entry->value);
+            }
+        }
+    }
+
+    return pop();
+}
+
 // --- Module registration ---
 
 ObjModule *createReflectModule() {
@@ -166,6 +190,7 @@ ObjModule *createReflectModule() {
     defineModuleFunction(module, "class_name", reflectClassName);
     defineModuleFunction(module, "type_of", reflectTypeOf);
     defineModuleFunction(module, "number_to_string", reflectNumberToString);
+    defineModuleFunction(module, "construct", reflectConstruct);
 
     pop();
     return module;
@@ -188,6 +213,7 @@ SimpleType *createReflectModuleType() {
     createBuiltinFunctorType(mod, "class_name", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(mod, "type_of", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(mod, "number_to_string", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
+    createBuiltinFunctorType(mod, "construct", (Type *[]) {(Type *) anyType, (Type *) anyType}, 2, NULL, 0, (Type *) anyType);
     return mod;
 }
 
