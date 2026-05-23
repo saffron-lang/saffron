@@ -44,6 +44,17 @@ Value getListItem(ObjList *list, int index);
 
 ObjBuiltinType *createListType();
 
+// ListIterator
+typedef struct {
+    ObjInstance obj;
+    ObjList *list;
+    int index;
+} ObjListIterator;
+
+ObjListIterator *newListIterator(ObjList *list);
+ObjBuiltinType *createListIteratorType();
+
+extern ObjBuiltinType *listIteratorType;
 
 #endif //SAFFRON_LIST_H
 

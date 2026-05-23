@@ -457,7 +457,6 @@ ParseRule parseRules[] = {
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
         [TOKEN_IF]            = {ifStatement, NULL, PREC_NONE},
         [TOKEN_MATCH]         = {matchExpression, NULL, PREC_NONE},
-        [TOKEN_TRY]           = {tryExpression, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL, or_, PREC_OR},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
@@ -1063,6 +1062,8 @@ static Stmt *statement() {
         struct Throw *throwStmt = ALLOCATE_NODE(struct Throw, NODE_THROW);
         throwStmt->value = expression();
         result = (Stmt *) throwStmt;
+    } else if (match(TOKEN_TRY)) {
+        result = (Stmt *) tryExpression(false);
     } else if (match(TOKEN_LET)) {
         if (match(TOKEN_LEFT_BRACKET)) {
             result = listDestructure();

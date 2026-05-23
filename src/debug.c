@@ -175,14 +175,31 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             return constantInstruction("OP_ENUM", chunk, offset);
         case OP_VARIANT:
             return constantInstruction("OP_VARIANT", chunk, offset);
-        case OP_CONSTRUCT_VARIANT:
-            return constantInstruction("OP_CONSTRUCT_VARIANT", chunk, offset);
+        case OP_CONSTRUCT_VARIANT: {
+            uint8_t tagConst = chunk->code[offset + 1];
+            uint8_t enumConst = chunk->code[offset + 2];
+            uint8_t arity = chunk->code[offset + 3];
+            printf("%-16s %4d '", "OP_CONSTRUCT_VARIANT", tagConst);
+            printValue(chunk->constants.values[tagConst]);
+            printf("' enum='");
+            printValue(chunk->constants.values[enumConst]);
+            printf("' arity=%d\n", arity);
+            return offset + 4;
+        }
         case OP_GET_TAG:
             return simpleInstruction("OP_GET_TAG", offset);
         case OP_MATCH_TAG:
             return constantInstruction("OP_MATCH_TAG", chunk, offset);
         case OP_IS:
             return simpleInstruction("OP_IS", offset);
+        case OP_SLICE:
+            return simpleInstruction("OP_SLICE", offset);
+        case OP_THROW:
+            return simpleInstruction("OP_THROW", offset);
+        case OP_TRY_BEGIN:
+            return jumpInstruction("OP_TRY_BEGIN", 1, chunk, offset);
+        case OP_TRY_END:
+            return simpleInstruction("OP_TRY_END", offset);
         default:
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;

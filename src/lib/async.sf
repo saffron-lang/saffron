@@ -1,0 +1,10 @@
+fun sleep(duration: Number) {
+    yield [1, duration]
+}
+
+fun await(task: Task) {
+    while (!task.isReady()) {
+        yield
+    }
+    return task.getResult()
+}

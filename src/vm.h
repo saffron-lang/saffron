@@ -41,6 +41,14 @@ ObjCallFrame *currentFrame;
 #define CURRENT_TASK \
     AS_CALL_FRAME(vm.tasks.values[vm.currentTask])
 
+#define HANDLER_MAX 64
+
+typedef struct {
+    uint8_t *catchIp;
+    Value *stackTop;
+    ObjCallFrame *frame;
+} ExceptionHandler;
+
 typedef struct {
     ValueArray tasks;
     int currentTask;
@@ -48,6 +56,11 @@ typedef struct {
     Value stack[STACK_MAX];
     Value *stackTop;
     Obj *objects;
+
+    ExceptionHandler handlers[HANDLER_MAX];
+    int handlerCount;
+    Value currentException;
+    bool isThrowing;
 
     int grayCount;
     int grayCapacity;

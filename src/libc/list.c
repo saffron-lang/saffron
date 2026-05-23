@@ -4,6 +4,7 @@
 
 
 ObjBuiltinType *listType = NULL;
+ObjBuiltinType *listIteratorType = NULL;
 
 ObjList *newList() {
     ObjList *instance = ALLOCATE_OBJ(ObjList, OBJ_LIST);
@@ -42,6 +43,7 @@ Value getLength(ObjList *list, int argCount, Value *args) {
 }
 
 Value getListItem(ObjList *list, int index) {
+    if (index < 0) index += list->items.count;
     if (index > list->items.count-1 || index < 0) {
         runtimeError("Index out of bounds");
         return NIL_VAL;
@@ -185,6 +187,13 @@ void listSortBuiltin(ObjList *list, int argCount, Value *args) {
     timSort(list, list->items.count);
 }
 
+Value listIterBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount > 0) {
+        return NIL_VAL;
+    }
+    return OBJ_VAL(newListIterator(list));
+}
+
 SimpleType* createListTypeDef() {
     // Class
     SimpleType *listTypeDef = newSimpleType();
@@ -239,6 +248,14 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(sortType)
     );
 
+    FunctorType *iterType = newFunctorType();
+    iterType->returnType = (Type *) newSimpleType();
+    tableSet(
+            &listTypeDef->methods,
+            copyString("iter", 4),
+            OBJ_VAL(iterType)
+    );
+
     FunctorType *initType = newFunctorType();
     sortType->returnType = (Type *) listTypeDef;
     tableSet(
@@ -262,9 +279,64 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "reverse", (NativeMethodFn) listReverseBuiltin);
     defineBuiltinMethod(type, "copy", (NativeMethodFn) listCopyBuiltin);
     defineBuiltinMethod(type, "sort", (NativeMethodFn) listSortBuiltin);
+    defineBuiltinMethod(type, "iter", (NativeMethodFn) listIterBuiltin);
 }
 
 ObjBuiltinType *createListType() {
     listType = newBuiltinType("List", listInit);
     return listType;
+}
+
+// --- ListIterator ---
+
+ObjListIterator *newListIterator(ObjList *list) {
+    ObjListIterator *iter = ALLOCATE_OBJ(ObjListIterator, OBJ_INSTANCE);
+    iter->obj.klass = (ObjClass *) listIteratorType;
+    initTable(&iter->obj.fields);
+    iter->list = list;
+    iter->index = 0;
+    return iter;
+}
+
+static void freeListIterator(ObjListIterator *iter) {
+    FREE(ObjListIterator, iter);
+}
+
+static void markListIterator(ObjListIterator *iter) {
+    markObject((Obj *) iter->list);
+}
+
+static void printListIterator(ObjListIterator *iter) {
+    printf("<ListIterator>");
+}
+
+static Value listIteratorNext(ObjListIterator *iter, int argCount, Value *args) {
+    if (iter->index >= iter->list->items.count) {
+        return NIL_VAL;
+    }
+    return iter->list->items.values[iter->index++];
+}
+
+static Value listIteratorHasNext(ObjListIterator *iter, int argCount, Value *args) {
+    return BOOL_VAL(iter->index < iter->list->items.count);
+}
+
+static Value listIteratorIter(ObjListIterator *iter, int argCount, Value *args) {
+    return OBJ_VAL(iter);
+}
+
+static void listIteratorInit(ObjBuiltinType *type) {
+    type->freeFn = (FreeFn) &freeListIterator;
+    type->markFn = (MarkFn) &markListIterator;
+    type->printFn = (PrintFn) &printListIterator;
+    type->typeCallFn = NULL;
+    type->typeDefFn = NULL;
+    defineBuiltinMethod(type, "next", (NativeMethodFn) listIteratorNext);
+    defineBuiltinMethod(type, "next?", (NativeMethodFn) listIteratorHasNext);
+    defineBuiltinMethod(type, "iter", (NativeMethodFn) listIteratorIter);
+}
+
+ObjBuiltinType *createListIteratorType() {
+    listIteratorType = newBuiltinType("ListIterator", listIteratorInit);
+    return listIteratorType;
 }

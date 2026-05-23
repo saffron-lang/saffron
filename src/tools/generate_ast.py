@@ -42,6 +42,12 @@ stmts = [
     "Import     : Expr* expression, Token name",
     "Enum       : Token name, StmtArray body",
     "EnumItem   : Token name, ParameterArray params",
+    "Match      : Expr* subject, StmtArray arms",
+    "MatchArm   : Token variantName, ParameterArray bindings, StmtArray body",
+    "Destructure: ParameterArray bindings, Expr* value, Token variant, int splatPosition",
+    "Throw      : Expr* value",
+    "TryCatch   : StmtArray tryBody, StmtArray catchClauses, StmtArray finallyBody",
+    "CatchClause: Token binding, TypeNode* type, StmtArray body",
     "MethodSig  : Token name, ParameterArray params, TypeNode *returnType,"
     " FunctionType functionType, TypeNodeArray generics",
 ]

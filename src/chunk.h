@@ -59,6 +59,10 @@ typedef enum {
     OP_GET_TAG,
     OP_MATCH_TAG,
     OP_IS,
+    OP_SLICE,
+    OP_THROW,
+    OP_TRY_BEGIN,
+    OP_TRY_END,
 } OpCode;
 
 typedef struct {
