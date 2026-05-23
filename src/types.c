@@ -587,9 +587,11 @@ static void preRegisterDeclarations(StmtArray *statements) {
             tableSet(&currentEnv->locals, copyString(fn->name.start, fn->name.length), OBJ_VAL(placeholder));
         } else if (node->type == NODE_CLASS) {
             struct Class *cls = (struct Class *) node;
-            SimpleType *placeholder = newSimpleType();
-            tableSet(&currentEnv->locals, copyString(cls->name.start, cls->name.length), OBJ_VAL(placeholder));
-            tableSet(&currentEnv->typeDefs, copyString(cls->name.start, cls->name.length), OBJ_VAL(placeholder));
+            SimpleType *classPlaceholder = newSimpleType();
+            FunctorType *ctorPlaceholder = newFunctorType();
+            ctorPlaceholder->returnType = (Type *) classPlaceholder;
+            tableSet(&currentEnv->locals, copyString(cls->name.start, cls->name.length), OBJ_VAL(ctorPlaceholder));
+            tableSet(&currentEnv->typeDefs, copyString(cls->name.start, cls->name.length), OBJ_VAL(classPlaceholder));
         } else if (node->type == NODE_ENUM) {
             struct Enum *en = (struct Enum *) node;
             SimpleType *placeholder = newSimpleType();

@@ -1,0 +1,27 @@
+// Test: Forward references to functions
+fun isEven(n: Number): Bool {
+    if (n == 0) return true
+    return isOdd(n - 1)
+}
+
+fun isOdd(n: Number): Bool {
+    if (n == 0) return false
+    return isEven(n - 1)
+}
+
+IO.println(isEven(4))
+IO.println(isOdd(3))
+
+// Test: Forward references to classes
+class Animal {
+    fun init() {}
+    fun speak(): String {
+        return "hello"
+    }
+}
+
+fun makeAnimal(): Animal {
+    return Animal()
+}
+
+IO.println(makeAnimal().speak())

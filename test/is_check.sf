@@ -1,0 +1,44 @@
+// Test: is with direct class
+class Dog {
+    fun init() {}
+}
+
+class Cat {
+    fun init() {}
+}
+
+var d = Dog()
+IO.println(d is Dog)
+IO.println(d is Cat)
+
+// Test: is with inheritance
+class Animal {
+    fun init() {}
+}
+
+class Parrot extends Animal {
+    fun init() {}
+}
+
+var p = Parrot()
+IO.println(p is Animal)
+IO.println(p is Parrot)
+
+// Test: is with interfaces
+interface Flyable {
+    fun fly() {
+        IO.println("flying")
+    }
+}
+
+class Bird extends Animal, Flyable {
+    fun init() {}
+}
+
+var b = Bird()
+IO.println(b is Animal)
+IO.println(b is Flyable)
+IO.println(b is Bird)
+
+// Test: negative
+IO.println(d is Animal)

@@ -1,0 +1,34 @@
+// Test: Generic enums
+enum Option<T> {
+    Some(value: T),
+    None
+}
+
+var x = Option.Some(42)
+IO.println(x)
+
+var y = Option.None
+IO.println(y)
+
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+
+var r = Result.Ok(100)
+IO.println(r)
+
+// Test: Pattern matching on generic enums
+var doubled = match (r) {
+    Ok(v) => v * 2
+    Err(e) => 0
+}
+IO.println(doubled)
+
+// Test: Generic functions with typed params
+fun identity<T>(x: T): T {
+    return x
+}
+
+IO.println(identity(99))
+IO.println(identity("hello"))
