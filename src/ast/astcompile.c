@@ -1324,8 +1324,24 @@ void compileNode(Node *node) {
             struct Import *casted = (struct Import *) node;
             compileNode((Node *) casted->expression);
             emitByte(OP_IMPORT);
-            uint8_t global = identifierConstant(&casted->name);
-            defineVariable(global);
+
+            if (casted->names.count > 0) {
+                // import { a, b } from "path"
+                // Module is on stack. For each name, dup + get property + define
+                for (int i = 0; i < casted->names.count; i++) {
+                    Token nameToken = casted->names.tokens[i];
+                    emitByte(OP_DUP);
+                    uint8_t propConst = identifierConstant(&nameToken);
+                    emitBytes(OP_GET_PROPERTY, propConst);
+                    uint8_t global = identifierConstant(&nameToken);
+                    defineVariable(global);
+                }
+                emitByte(OP_POP); // pop the module itself
+            } else {
+                // import "path" as Name
+                uint8_t global = identifierConstant(&casted->name);
+                defineVariable(global);
+            }
             break;
         }
     }

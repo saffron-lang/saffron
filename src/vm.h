@@ -111,6 +111,7 @@ void initVM();
 void freeVM();
 
 ObjModule *interpret(StmtArray *body, const char *name, const char *path);
+InterpretResult interpretInModule(StmtArray *body, ObjModule *module);
 
 void push(Value value);
 
