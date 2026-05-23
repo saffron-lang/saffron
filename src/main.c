@@ -11,14 +11,22 @@
 static void repl() {
     char line[1024];
     for (;;) {
-        printf("> ");
+        printf(">>> ");
 
         if (!fgets(line, sizeof(line), stdin)) {
             printf("\n");
             break;
         }
 
-//        interpret(line, "<repl>", "<repl>");
+        if (line[0] == '\n') continue;
+
+        StmtArray *body = parseAST(line);
+        if (body == NULL) continue;
+
+        ObjModule *module = interpret(body, "<repl>", "<repl>");
+        if (module->result == INTERPRET_RUNTIME_ERROR) {
+            fprintf(stderr, "Runtime error.\n");
+        }
     }
 }
 

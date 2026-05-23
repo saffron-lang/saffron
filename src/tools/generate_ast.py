@@ -31,20 +31,21 @@ stmts = [
     "Block      : StmtArray statements",
     "Function   : Token name, ParameterArray params, TypeNodeArray generics," +
     " StmtArray body, FunctionType functionType, TypeNode *returnType",
-    "Class      : Token name, struct Variable* superclass," +
-    " StmtArray body, TypeNodeArray generics",
+    "Class      : Token name, ExprArray superclasses," +
+    " StmtArray body, TypeNodeArray generics, bool isDataClass",
     "If         : Expr* condition, Stmt* thenBranch," +
     " Stmt* elseBranch",
     "While      : Expr* condition, Stmt* body",
     "For        : Stmt* initializer, Expr* condition, Expr* increment, Stmt* body",
     "ForIn      : Token binding, Expr* iterable, Stmt* body",
     "Break      : Token keyword",
+    "Continue   : Token keyword",
     "Return     : Token keyword, Expr* value",
     "Import     : Expr* expression, Token name",
-    "Enum       : Token name, StmtArray body",
+    "Enum       : Token name, StmtArray body, TypeNodeArray generics",
     "EnumItem   : Token name, ParameterArray params",
     "Match      : Expr* subject, StmtArray arms",
-    "MatchArm   : Token variantName, ParameterArray bindings, StmtArray body",
+    "MatchArm   : Token variantName, ParameterArray bindings, StmtArray body, bool isTypePattern",
     "Destructure: ParameterArray bindings, Expr* value, Token variant, int splatPosition",
     "Throw      : Expr* value",
     "TryCatch   : StmtArray tryBody, StmtArray catchClauses, StmtArray finallyBody",

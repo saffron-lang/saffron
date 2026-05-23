@@ -39,7 +39,11 @@ bool lastInBody = false;
 #define MAX_BREAKS 32
 int breakJumps[MAX_BREAKS];
 int breakCount = 0;
+int continueJumps[MAX_BREAKS];
+int continueCount = 0;
 int loopDepth = 0;
+int loopScopeDepth = 0; // scope depth at loop entry
+int loopLocalCount = 0; // local count at loop entry
 
 static Chunk *currentChunk() {
     return &current->function->chunk;
@@ -909,13 +913,18 @@ void compileNode(Node *node) {
             Token iterName = syntheticToken("$iter");
             addLocal(iterName);
             markInitialized();
-            int iterSlot = current->localCount - 1;
 
+            // Save loop state
             int savedBreakCount = breakCount;
+            int savedContinueCount = continueCount;
+            int savedLoopLocalCount = loopLocalCount;
+            int savedLoopScopeDepth = loopScopeDepth;
+            loopLocalCount = current->localCount;
+            loopScopeDepth = current->scopeDepth;
             loopDepth++;
 
             int loopStart = currentChunk()->count;
-            emitBytes(OP_GET_LOCAL, (uint8_t) iterSlot);
+            emitBytes(OP_GET_LOCAL, (uint8_t) (current->localCount - 1));
             uint8_t hasNextConst = makeConstant(OBJ_VAL(copyString("next?", 5)));
             emitBytes(OP_INVOKE, hasNextConst);
             emitByte(0);
@@ -924,7 +933,7 @@ void compileNode(Node *node) {
             emitByte(OP_POP);
 
             beginScope();
-            emitBytes(OP_GET_LOCAL, (uint8_t) iterSlot);
+            emitBytes(OP_GET_LOCAL, (uint8_t) (loopLocalCount - 1));
             uint8_t nextConst = makeConstant(OBJ_VAL(copyString("next", 4)));
             emitBytes(OP_INVOKE, nextConst);
             emitByte(0);
@@ -934,27 +943,55 @@ void compileNode(Node *node) {
             compileNode((Node *) casted->body);
             endScope();
 
+            // Continue jumps land here (back to loop start)
+            for (int i = savedContinueCount; i < continueCount; i++) {
+                patchJump(continueJumps[i]);
+            }
+
             emitLoop(loopStart);
 
             patchJump(exitJump);
             emitByte(OP_POP);
 
-            // Patch break jumps
+            // Break jumps land here (after the loop)
             for (int i = savedBreakCount; i < breakCount; i++) {
                 patchJump(breakJumps[i]);
             }
+
+            // Restore loop state
             breakCount = savedBreakCount;
+            continueCount = savedContinueCount;
+            loopLocalCount = savedLoopLocalCount;
+            loopScopeDepth = savedLoopScopeDepth;
             loopDepth--;
 
             endScope();
             break;
         }
-        case NODE_BREAK:
+        case NODE_BREAK: {
             if (loopDepth == 0) {
                 error("Cannot use 'break' outside of a loop.");
+                break;
+            }
+            // Pop locals between current scope and loop scope
+            for (int i = current->localCount - 1; i >= loopLocalCount; i--) {
+                emitByte(OP_POP);
             }
             breakJumps[breakCount++] = emitJump(OP_JUMP);
             break;
+        }
+        case NODE_CONTINUE: {
+            if (loopDepth == 0) {
+                error("Cannot use 'continue' outside of a loop.");
+                break;
+            }
+            // Pop locals between current scope and loop scope
+            for (int i = current->localCount - 1; i >= loopLocalCount; i--) {
+                emitByte(OP_POP);
+            }
+            continueJumps[continueCount++] = emitJump(OP_JUMP);
+            break;
+        }
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
             if (current->type == TYPE_SCRIPT) {

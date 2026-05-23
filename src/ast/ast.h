@@ -52,6 +52,7 @@ typedef enum {
     NODE_FOR,
     NODE_FORIN,
     NODE_BREAK,
+    NODE_CONTINUE,
     NODE_RETURN,
     NODE_IMPORT,
     NODE_ENUM,
@@ -352,6 +353,11 @@ struct Break {
     Token keyword;
 };
 
+struct Continue {
+    Stmt self;
+    Token keyword;
+};
+
 struct Return {
     Stmt self;
     Token keyword;
@@ -367,8 +373,8 @@ struct Import {
 struct Enum {
     Stmt self;
     Token name;
-    TypeNodeArray generics;
     StmtArray body;
+    TypeNodeArray generics;
 };
 
 struct EnumItem {

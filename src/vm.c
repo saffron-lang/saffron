@@ -817,24 +817,33 @@ static InterpretResult run(ObjModule *module) {
                 break;
             case OP_DEFINE_GLOBAL: {
                 ObjString *name = READ_STRING();
-                tableSet(&module->obj.fields, name, peek(0));
+                ObjModule *targetModule = currentFrame->closure->function->module
+                    ? (ObjModule *)currentFrame->closure->function->module : module;
+                tableSet(&targetModule->obj.fields, name, peek(0));
                 pop();
                 break;
             }
             case OP_GET_GLOBAL: {
                 ObjString *name = READ_STRING();
+                ObjModule *targetModule = currentFrame->closure->function->module
+                    ? (ObjModule *)currentFrame->closure->function->module : module;
                 Value value;
-                if (!tableGet(&module->obj.fields, name, &value)) {
-                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                if (!tableGet(&targetModule->obj.fields, name, &value)) {
+                    // Fall back to builtins
+                    if (!tableGet(&vm.builtins, name, &value)) {
+                        if (!runtimeError("Undefined variable '%s'.", name->chars)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    }
                 }
                 push(value);
                 break;
             }
             case OP_SET_GLOBAL: {
                 ObjString *name = READ_STRING();
-                if (tableSet(&module->obj.fields, name, peek(0))) {
-                    tableDelete(&module->obj.fields, name);
-                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                ObjModule *targetModule = currentFrame->closure->function->module
+                    ? (ObjModule *)currentFrame->closure->function->module : module;
+                if (tableSet(&targetModule->obj.fields, name, peek(0))) {
+                    tableDelete(&targetModule->obj.fields, name);
+                    if (!runtimeError("Undefined variable '%s'.", name->chars)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 break;
             }
@@ -934,6 +943,10 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_CLOSURE: {
                 ObjFunction *function = AS_FUNCTION(READ_CONSTANT());
+                // Inherit module from enclosing function
+                if (function->module == NULL) {
+                    function->module = currentFrame->closure->function->module;
+                }
                 ObjClosure *closure = newClosure(function);
                 push(OBJ_VAL(closure));
 
@@ -1266,6 +1279,7 @@ ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
         return module;
     }
 
+    function->module = module;
     push(OBJ_VAL(function));
     ObjClosure *closure = newClosure(function);
     pop();
