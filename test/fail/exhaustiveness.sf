@@ -1,0 +1,17 @@
+// Expected error: Non-exhaustive match: missing variant
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+var d = Direction.North
+
+// Missing East and West
+var name = match (d) {
+    North => "north",
+    South => "south"
+}
+IO.println(name)

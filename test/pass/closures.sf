@@ -1,0 +1,37 @@
+// Test: Nested function calling
+fun outer(): String {
+    fun inner(): String {
+        return "from inner"
+    }
+    return inner()
+}
+IO.println(outer())
+
+// Test: Closure capturing upvalue
+fun makeGreeter(name: String): String {
+    fun greet(): String {
+        return "Hello, " + name
+    }
+    return greet()
+}
+IO.println(makeGreeter("world"))
+
+// Test: Closure returned and called later
+fun counter(): Number {
+    var count = 0
+    fun increment(): Number {
+        count = count + 1
+        return count
+    }
+    increment()
+    increment()
+    return increment()
+}
+IO.println(counter())
+
+// Test: Lambda capturing
+fun apply(x: Number): Number {
+    var double = fun (n: Number): Number => n * 2
+    return double(x)
+}
+IO.println(apply(21))

@@ -1,0 +1,18 @@
+// Expected errors:
+// - Missing implementation for 'area' from interface
+// - Missing implementation for 'perimeter' from interface
+
+interface Shape {
+    fun area(): Number
+    fun perimeter(): Number
+}
+
+class Circle extends Shape {
+    var radius: Number
+    fun init(r: Number) {
+        this.radius = r
+    }
+    // Missing area() and perimeter() implementations
+}
+
+IO.println("should error above")
