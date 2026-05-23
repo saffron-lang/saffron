@@ -2,6 +2,7 @@
 #define SAFFRON_ASTPARSE_H
 
 #include "ast.h"
+#include "../diagnostic.h"
 
 typedef struct {
     Token current;
@@ -11,6 +12,7 @@ typedef struct {
     bool incomplete;
     bool suppressErrors;
     Node *nodes;
+    DiagnosticArray *diagnostics;
 } Parser;
 
 StmtArray *parseAST(const char *source);

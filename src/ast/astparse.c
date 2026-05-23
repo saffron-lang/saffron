@@ -76,15 +76,19 @@ static void errorAt(Token *token, const char *message) {
     }
 
     if (!parser.suppressErrors) {
-        fprintf(stderr, "[line %d] Error", token->line);
-        if (token->type == TOKEN_EOF) {
-            fprintf(stderr, " at end");
-        } else if (token->type == TOKEN_ERROR) {
-            // Nothing.
+        if (parser.diagnostics) {
+            writeDiagnostic(parser.diagnostics, token, message, DIAG_ERROR);
         } else {
-            fprintf(stderr, " at '%.*s'", token->length, token->start);
+            fprintf(stderr, "[line %d] Error", token->line);
+            if (token->type == TOKEN_EOF) {
+                fprintf(stderr, " at end");
+            } else if (token->type == TOKEN_ERROR) {
+                // Nothing.
+            } else {
+                fprintf(stderr, " at '%.*s'", token->length, token->start);
+            }
+            fprintf(stderr, ": %s\n", message);
         }
-        fprintf(stderr, ": %s\n", message);
     }
 
     parser.hadError = true;
