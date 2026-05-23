@@ -30,7 +30,7 @@ stmts = [
     "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
     "Block      : StmtArray statements",
     "Function   : Token name, ParameterArray params, TypeNodeArray generics," +
-    " StmtArray body, FunctionType functionType, TypeNode *returnType",
+    " StmtArray body, FunctionType functionType, TypeNode *returnType, ExprArray decorators",
     "Class      : Token name, ExprArray superclasses," +
     " StmtArray body, TypeNodeArray generics, bool isDataClass",
     "If         : Expr* condition, Stmt* thenBranch," +

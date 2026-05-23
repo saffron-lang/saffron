@@ -319,7 +319,7 @@ SimpleType* createListTypeDef() {
     );
 
     FunctorType *iterType = newFunctorType();
-    iterType->returnType = (Type *) newSimpleType();
+    iterType->returnType = (Type *) anyType;
     tableSet(
             &listTypeDef->methods,
             copyString("iter", 4),

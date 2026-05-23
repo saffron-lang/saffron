@@ -718,6 +718,27 @@ void compileNode(Node *node) {
                 emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
                 emitByte(compiler.upvalues[i].index);
             }
+
+            // Apply decorators: name = d1(d2(...(name)))
+            if (casted->decorators.count > 0) {
+                for (int i = casted->decorators.count - 1; i >= 0; i--) {
+                    compileNode((Node *) casted->decorators.exprs[i]);
+                    getVariable(casted->name);
+                    emitByte(OP_CALL);
+                    emitByte(1);
+                    // Store result back
+                    uint16_t nameConst = identifierConstant(&casted->name);
+                    if (current->scopeDepth > 0) {
+                        int slot = resolveLocal(current, &casted->name);
+                        if (slot != -1) {
+                            emitBytes(OP_SET_LOCAL, (uint8_t) slot);
+                        }
+                    } else {
+                        emitBytes(OP_SET_GLOBAL, nameConst);
+                    }
+                    emitByte(OP_POP);
+                }
+            }
             break;
         }
         case NODE_CLASS: {
@@ -1355,24 +1376,9 @@ void compileNode(Node *node) {
             compileNode((Node *) casted->expression);
             emitByte(OP_IMPORT);
 
-            if (casted->names.count > 0) {
-                // import { a, b } from "path"
-                // Module is on stack. For each name, dup + get property + define
-                for (int i = 0; i < casted->names.count; i++) {
-                    Token nameToken = casted->names.tokens[i];
-                    emitByte(OP_DUP);
-                    uint16_t propConst = identifierConstant(&nameToken);
-                    emitByte(OP_GET_PROPERTY);
-                    emitConstantIndex(propConst);
-                    uint16_t global = identifierConstant(&nameToken);
-                    defineVariable(global);
-                }
-                emitByte(OP_POP); // pop the module itself
-            } else {
-                // import "path" as Name
-                uint16_t global = identifierConstant(&casted->name);
-                defineVariable(global);
-            }
+            // import "path" as Name
+            uint16_t global = identifierConstant(&casted->name);
+            defineVariable(global);
             break;
         }
     }

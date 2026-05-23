@@ -309,6 +309,7 @@ struct Function {
     StmtArray body;
     FunctionType functionType;
     TypeNode *returnType;
+    ExprArray decorators;
 };
 
 struct Class {
@@ -368,7 +369,6 @@ struct Import {
     Stmt self;
     Expr* expression;
     Token name;
-    TokenArray names;
 };
 
 struct Enum {
