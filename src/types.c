@@ -292,16 +292,59 @@ static Type* findGenericResolution(TypeEnvironment *typeEnvironment, Type *subcl
     return findGenericResolution(typeEnvironment->enclosing, subclass);
 }
 
-static int isSubTypeDepth = 0;
+static Type *resolveType(Type *type) {
+    if (type == NULL) return NULL;
+
+    if (type->obj.type == OBJ_PARSE_GENERIC_DEFINITION_TYPE) {
+        Type *resolved = findGenericResolution(currentEnv, type);
+        if (resolved != NULL) return resolved;
+    }
+
+    if (type->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+        GenericType *genType = (GenericType *) type;
+        bool anyResolved = false;
+        for (int i = 0; i < genType->generics.count; i++) {
+            Type *arg = AS_OBJ(genType->generics.values[i]);
+            Type *resolved = resolveType(arg);
+            if (resolved != arg) anyResolved = true;
+        }
+        if (anyResolved) {
+            GenericType *newType = newGenericType();
+            newType->target = genType->target;
+            for (int i = 0; i < genType->generics.count; i++) {
+                Type *resolved = resolveType(AS_OBJ(genType->generics.values[i]));
+                writeValueArray(&newType->generics, OBJ_VAL(resolved));
+            }
+            return (Type *) newType;
+        }
+    }
+
+    return type;
+}
+
+#define MAX_SUBTYPE_STACK 64
+typedef struct { Type *sub; Type *super; } SubTypePair;
+static SubTypePair subTypeStack[MAX_SUBTYPE_STACK];
+static int subTypeStackCount = 0;
+
 static bool isSubTypeInner(Type *subclass, Type *superclass);
 
 static bool isSubType(Type *subclass, Type *superclass) {
     if (subclass == NULL || superclass == NULL) return true;
     if (subclass == superclass) return true;
-    if (isSubTypeDepth > 64) return true;
-    isSubTypeDepth++;
+    if (subTypeStackCount >= MAX_SUBTYPE_STACK) return true;
+
+    for (int i = 0; i < subTypeStackCount; i++) {
+        if (subTypeStack[i].sub == subclass && subTypeStack[i].super == superclass) {
+            return true;
+        }
+    }
+
+    subTypeStack[subTypeStackCount].sub = subclass;
+    subTypeStack[subTypeStackCount].super = superclass;
+    subTypeStackCount++;
     bool result = isSubTypeInner(subclass, superclass);
-    isSubTypeDepth--;
+    subTypeStackCount--;
     return result;
 }
 
@@ -516,17 +559,7 @@ Type *getTypeOf(Value value) {
     return NULL;
 }
 
-static bool skipFunctionBodies = false;
 
-void evaluateTypesPermissive(StmtArray *statements) {
-    bool oldSkip = skipFunctionBodies;
-    skipFunctionBodies = true;
-    for (int i = 0; i < statements->count; i++) {
-        panicMode = false;
-        evaluateNode((Node *) statements->stmts[i]);
-    }
-    skipFunctionBodies = oldSkip;
-}
 
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
@@ -586,7 +619,7 @@ Type *parseFile(const char *path, int length) {
     panicMode = false;
 
     StmtArray *body = parseAST(source);
-    evaluateTypesPermissive(body);
+    evaluateTypes(body);
 
     hadError = oldHadError;
     panicMode = oldPanicMode;
@@ -600,16 +633,10 @@ Type *parseFile(const char *path, int length) {
     return type;
 }
 
-static int evaluateNodeDepth = 0;
-
 Type *evaluateNode(Node *node) {
     if (node == NULL) {
         return NULL;
     }
-    if (evaluateNodeDepth > 256) {
-        return (Type *) anyType;
-    }
-    evaluateNodeDepth++;
     switch (node->type) {
         case NODE_BINARY: {
             struct Binary *casted = (struct Binary *) node;
@@ -716,7 +743,7 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            Type *returnType = calleeFunctor->returnType;
+            Type *returnType = resolveType(calleeFunctor->returnType);
 
             currentEnv = currentEnv->enclosing;
             return returnType;
@@ -769,14 +796,47 @@ Type *evaluateNode(Node *node) {
                     break;
                 }
                 case OBJ_PARSE_GENERIC_TYPE: {
-                    rootType = (SimpleType *) ((GenericType *) objectType)->target;
+                    GenericType *genType = (GenericType *) objectType;
+                    rootType = (SimpleType *) genType->target;
+                    ValueArray *targetGenericArgs = NULL;
+                    if (genType->target->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
+                        targetGenericArgs = &((InterfaceType *) genType->target)->genericArgs;
+                    } else if (genType->target->obj.type == OBJ_PARSE_TYPE) {
+                        targetGenericArgs = &((SimpleType *) genType->target)->genericArgs;
+                    }
+                    if (targetGenericArgs != NULL) {
+                        for (int i = 0; i < targetGenericArgs->count && i < genType->generics.count; i++) {
+                            valueTableSet(&currentEnv->genericResolutions,
+                                          targetGenericArgs->values[i],
+                                          genType->generics.values[i]);
+                        }
+                    }
                     break;
                 }
                 case OBJ_PARSE_GENERIC_DEFINITION_TYPE: {
-                    rootType = (SimpleType *) ((GenericTypeDefinition *) objectType)->extends;
-                    if (!rootType) {
+                    GenericTypeDefinition *genDef = (GenericTypeDefinition *) objectType;
+                    if (!genDef->extends) {
                         errorAt(&casted->name, "Attempting to get from invalid generic type.");
                         return NULL;
+                    }
+                    if (genDef->extends->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+                        GenericType *genType = (GenericType *) genDef->extends;
+                        rootType = (SimpleType *) genType->target;
+                        ValueArray *targetGenericArgs = NULL;
+                        if (genType->target->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
+                            targetGenericArgs = &((InterfaceType *) genType->target)->genericArgs;
+                        } else if (genType->target->obj.type == OBJ_PARSE_TYPE) {
+                            targetGenericArgs = &((SimpleType *) genType->target)->genericArgs;
+                        }
+                        if (targetGenericArgs != NULL) {
+                            for (int i = 0; i < targetGenericArgs->count && i < genType->generics.count; i++) {
+                                valueTableSet(&currentEnv->genericResolutions,
+                                              targetGenericArgs->values[i],
+                                              genType->generics.values[i]);
+                            }
+                        }
+                    } else {
+                        rootType = (SimpleType *) genDef->extends;
                     }
                     break;
                 }
@@ -791,10 +851,11 @@ Type *evaluateNode(Node *node) {
             if (!tableGet(&rootType->methods, nameString, &fieldType)) {
                 if (!tableGet(&rootType->fields, nameString, &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
+                    return NULL;
                 }
             }
 
-            return AS_TYPE(fieldType);
+            return resolveType(AS_TYPE(fieldType));
         }
         case NODE_SET: {
             struct Set *casted = (struct Set *) node;
@@ -912,9 +973,7 @@ Type *evaluateNode(Node *node) {
             }
 
             type->returnType = evaluateNode((Node *) functorNode->returnType);
-            if (!skipFunctionBodies) {
-                evaluateTypes(&casted->body);
-            }
+            evaluateTypes(&casted->body);
 
             if (!type->returnType) {
                 type->returnType = (Type *) nilType;
@@ -1120,9 +1179,7 @@ Type *evaluateNode(Node *node) {
                     OBJ_VAL(type)
             );
 
-            if (!skipFunctionBodies) {
-                evaluateTypes(&casted->body);
-            }
+            evaluateTypes(&casted->body);
             if (!type->returnType) {
                 type->returnType = (Type *) nilType;
             }
@@ -1699,7 +1756,6 @@ Type *evaluateNode(Node *node) {
         }
     }
 
-    evaluateNodeDepth--;
     return NULL;
 }
 
