@@ -10,7 +10,9 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-  const serverModule = context.asAbsolutePath(path.join("out", "server.js"));
+  const serverModule = context.asAbsolutePath(
+    path.join("..", "shared", "out", "server.js")
+  );
 
   const config = workspace.getConfiguration("saffron");
   const compilerPath = config.get<string>("compilerPath") || "saffron";

@@ -142,6 +142,7 @@ void initVM() {
     vm.ltString = copyString("lt", 2);
     vm.gtString = copyString("gt", 2);
     vm.eqString = copyString("eq", 2);
+    vm.getItemString = copyString("getItem", 7);
     vm.openUpvalues = NULL;
 
     vm.handlerCount = 0;
@@ -926,6 +927,17 @@ static InterpretResult run(ObjModule *module) {
                     } else {
                         push(NIL_VAL);
                     }
+                } else if (IS_INSTANCE(value)) {
+                    // Operator overload: obj[key] dispatches to obj.getItem(key)
+                    push(value);
+                    push(indexValue);
+                    if (!invoke(vm.getItemString, 1)) {
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    runtimeError("Type does not support indexing.");
+                    return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
             }

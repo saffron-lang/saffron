@@ -206,6 +206,7 @@ static void markRoots() {
     markTypecheckerRoots();
     markAsyncRoots();
     markObject((Obj *) vm.initString);
+    markObject((Obj *) vm.getItemString);
 }
 
 void markArray(ValueArray *array) {
