@@ -95,6 +95,14 @@ static void errorAt(Token *token, const char *message) {
     hadError = true;
 }
 
+static void warnAt(Token *token, const char *message) {
+    fprintf(stderr, "[line %d] Warning", token->line);
+    if (token->type != TOKEN_EOF && token->type != TOKEN_ERROR) {
+        fprintf(stderr, " at '%.*s'", token->length, token->start);
+    }
+    fprintf(stderr, ": %s\n", message);
+}
+
 static void error(const char *message) {
     Token token = syntheticToken("Fake error location");
     errorAt(&token, message); // TODO: Don't do this
@@ -349,7 +357,8 @@ static bool isSubType(Type *subclass, Type *superclass) {
             for (int i = 0; i < superclassType->arguments.count; i++) {
                 Type *superArgType = AS_OBJ(superclassType->arguments.values[i]);
                 Type *subArgType = AS_OBJ(subclassType->arguments.values[i]);
-                if (!isSubType(subArgType, superArgType)) {
+                // Contravariant: superclass arg must be subtype of subclass arg
+                if (!isSubType(superArgType, subArgType)) {
                     return false;
                 }
             }
@@ -403,8 +412,17 @@ static bool isSubType(Type *subclass, Type *superclass) {
         }
         case (OBJ_PARSE_UNION_TYPE): {
             UnionType *superclassType = (UnionType *) superclass;
-            return isSubType(subclass, superclassType->left)
-                   || isSubType(subclass, superclassType->right);
+            // Snapshot generic resolutions before speculative left-branch check
+            ValueTable snapshot;
+            copyValueTable(&currentEnv->genericResolutions, &snapshot);
+            if (isSubType(subclass, superclassType->left)) {
+                freeValueTable(&snapshot);
+                return true;
+            }
+            // Left failed — restore resolutions before trying right branch
+            freeValueTable(&currentEnv->genericResolutions);
+            currentEnv->genericResolutions = snapshot;
+            return isSubType(subclass, superclassType->right);
         }
         case (OBJ_PARSE_INTERFACE_TYPE): {
             InterfaceType *superclassType = (InterfaceType *) superclass;
@@ -492,13 +510,11 @@ void evaluateTypes(StmtArray *statements) {
 }
 
 Type *evaluateBlock(StmtArray *statements) {
+    Type *last = NULL;
     for (int i = 0; i < statements->count; i++) {
-        if (i == statements->count) {
-            return evaluateNode((Node *) statements->stmts[i]);
-        } else {
-            evaluateNode((Node *) statements->stmts[i]);
-        }
+        last = evaluateNode((Node *) statements->stmts[i]);
     }
+    return last;
 }
 
 void evaluateTree(StmtArray *statements) {
@@ -652,7 +668,7 @@ Type *evaluateNode(Node *node) {
                 GenericType *genericType = (GenericType *) type;
                 Type *indexType = evaluateNode(casted->index);
                 if (!isSubType(indexType, numberType)) {
-                    error("Index must be a number");
+                    errorAt(&casted->bracket, "Index must be a number");
                     return (NULL);
                 }
 
@@ -665,7 +681,7 @@ Type *evaluateNode(Node *node) {
                 GenericType *genericType = (GenericType *) type;
                 Type *indexType = evaluateNode(casted->index);
                 if (!isSubType(indexType, AS_OBJ(genericType->generics.values[0]))) {
-                    error("Key type mismatch");
+                    errorAt(&casted->bracket, "Key type mismatch");
                     return (NULL);
                 }
 
@@ -675,7 +691,7 @@ Type *evaluateNode(Node *node) {
                     return neverType;
                 }
             } else {
-                error("Cannot get item on something other than a list or map");
+                errorAt(&casted->bracket, "Cannot get item on something other than a list or map");
                 return (NULL);
             }
         }
@@ -738,7 +754,7 @@ Type *evaluateNode(Node *node) {
             }
 
             if (!isSubType(valueType, AS_TYPE(fieldType))) {
-                error("Type mismatch in setter");
+                errorAt(&casted->name, "Type mismatch in setter");
             }
 
             return AS_TYPE(fieldType);
@@ -810,7 +826,16 @@ Type *evaluateNode(Node *node) {
                             OBJ_VAL(argType)
                     );
                 } else {
-                    writeValueArray(&type->arguments, NIL_VAL);
+                    warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
+                    Type *argType = (Type *) anyType;
+                    writeValueArray(&type->arguments, OBJ_VAL(argType));
+
+                    tableSet(
+                            &currentEnv->locals, copyString(
+                                    casted->params.parameters[i]->name.start, casted->params.parameters[i]->name.length
+                            ),
+                            OBJ_VAL(argType)
+                    );
                 }
             }
 
@@ -997,6 +1022,7 @@ Type *evaluateNode(Node *node) {
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
                 } else {
+                    warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
                     argType = (Type *) anyType;
                 }
 
@@ -1091,6 +1117,7 @@ Type *evaluateNode(Node *node) {
                         if (typeNode != NULL) {
                             argType = evaluateNode((Node *) typeNode);
                         } else {
+                            warnAt(&method->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
                             argType = (Type *) anyType;
                         }
 
@@ -1193,7 +1220,16 @@ Type *evaluateNode(Node *node) {
             Type *value = evaluateNode((Node *) casted->value);
             if (currentFuncType->returnType) {
                 if (!isSubType(value, currentFuncType->returnType)) {
-                    errorAt(&casted->keyword, "Return type mismatch");
+                    if (!isSubType(currentFuncType->returnType, value)) {
+                        // Neither direction works — widen to a union
+                        UnionType *union_ = newUnionType();
+                        union_->left = currentFuncType->returnType;
+                        union_->right = value;
+                        currentFuncType->returnType = (Type *) union_;
+                    } else {
+                        // value is a supertype of current — widen
+                        currentFuncType->returnType = value;
+                    }
                 }
             } else {
                 currentFuncType->returnType = value;
