@@ -36,6 +36,11 @@ Compiler *current = NULL;
 bool exprContext = false;
 bool lastInBody = false;
 
+#define MAX_BREAKS 32
+int breakJumps[MAX_BREAKS];
+int breakCount = 0;
+int loopDepth = 0;
+
 static Chunk *currentChunk() {
     return &current->function->chunk;
 }
@@ -666,6 +671,9 @@ void compileNode(Node *node) {
         }
         case NODE_FUNCTION: {
             struct Function *casted = (struct Function *) node;
+            if (current->scopeDepth > 0 && casted->functionType == TYPE_FUNCTION) {
+                declareVariable(&casted->name);
+            }
             Compiler compiler;
             initCompiler(&compiler, casted->functionType, &casted->name);
             beginScope();
@@ -894,63 +902,58 @@ void compileNode(Node *node) {
             struct ForIn *casted = (struct ForIn *) node;
             beginScope();
 
-            // Compile iterable and store as hidden local
             compileNode((Node *) casted->iterable);
-            Token listName = syntheticToken("$list");
-            addLocal(listName);
+            uint8_t iterConst = makeConstant(OBJ_VAL(copyString("iter", 4)));
+            emitBytes(OP_INVOKE, iterConst);
+            emitByte(0);
+            Token iterName = syntheticToken("$iter");
+            addLocal(iterName);
             markInitialized();
-            int listSlot = current->localCount - 1;
+            int iterSlot = current->localCount - 1;
 
-            // Index = 0
-            emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(0)));
-            Token idxName = syntheticToken("$idx");
-            addLocal(idxName);
-            markInitialized();
-            int idxSlot = current->localCount - 1;
+            int savedBreakCount = breakCount;
+            loopDepth++;
 
-            // Loop start
             int loopStart = currentChunk()->count;
-
-            // Condition: $idx < $list.length()
-            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
-            emitBytes(OP_GET_LOCAL, (uint8_t) listSlot);
-            uint8_t lengthConst = makeConstant(OBJ_VAL(copyString("length", 6)));
-            emitBytes(OP_INVOKE, lengthConst);
-            emitByte(0); // 0 args
-            emitByte(OP_LESS);
+            emitBytes(OP_GET_LOCAL, (uint8_t) iterSlot);
+            uint8_t hasNextConst = makeConstant(OBJ_VAL(copyString("next?", 5)));
+            emitBytes(OP_INVOKE, hasNextConst);
+            emitByte(0);
 
             int exitJump = emitJump(OP_JUMP_IF_FALSE);
-            emitByte(OP_POP); // pop condition true
+            emitByte(OP_POP);
 
-            // Bind item: var item = $list[$idx]
             beginScope();
-            emitBytes(OP_GET_LOCAL, (uint8_t) listSlot);
-            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
-            emitByte(OP_GETITEM);
+            emitBytes(OP_GET_LOCAL, (uint8_t) iterSlot);
+            uint8_t nextConst = makeConstant(OBJ_VAL(copyString("next", 4)));
+            emitBytes(OP_INVOKE, nextConst);
+            emitByte(0);
             declareVariable(&casted->binding);
             defineVariable(identifierConstant(&casted->binding));
 
-            // Body
             compileNode((Node *) casted->body);
-            endScope(); // pops item binding
-
-            // Increment: $idx = $idx + 1
-            emitBytes(OP_GET_LOCAL, (uint8_t) idxSlot);
-            emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(1)));
-            emitByte(OP_ADD);
-            emitBytes(OP_SET_LOCAL, (uint8_t) idxSlot);
-            emitByte(OP_POP);
+            endScope();
 
             emitLoop(loopStart);
 
             patchJump(exitJump);
-            emitByte(OP_POP); // pop condition false
+            emitByte(OP_POP);
 
-            endScope(); // pops $list and $idx
+            // Patch break jumps
+            for (int i = savedBreakCount; i < breakCount; i++) {
+                patchJump(breakJumps[i]);
+            }
+            breakCount = savedBreakCount;
+            loopDepth--;
+
+            endScope();
             break;
         }
         case NODE_BREAK:
-            // TODO
+            if (loopDepth == 0) {
+                error("Cannot use 'break' outside of a loop.");
+            }
+            breakJumps[breakCount++] = emitJump(OP_JUMP);
             break;
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
