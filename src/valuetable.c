@@ -127,6 +127,17 @@ bool valueTableSet(ValueTable *map, Value key, Value item) {
     return isNewKey;
 }
 
+void copyValueTable(ValueTable *src, ValueTable *dst) {
+    initValueTable(dst);
+    if (src->count == 0) return;
+    for (int i = 0; i < src->capacity; i++) {
+        MapEntry *entry = &src->entries[i];
+        if (!valuesEqual(entry->key, NIL_VAL)) {
+            valueTableSet(dst, entry->key, entry->value);
+        }
+    }
+}
+
 bool valueTableDelete(ValueTable *map, uint32_t hash) {
     if (map->count == 0) return false;
 

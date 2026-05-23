@@ -31,4 +31,6 @@ void freeValueTable(ValueTable *map);
 
 void markValueTable(ValueTable *map);
 
+void copyValueTable(ValueTable *src, ValueTable *dst);
+
 #endif //SAFFRON_VALUETABLE_H
