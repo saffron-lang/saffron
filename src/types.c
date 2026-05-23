@@ -550,19 +550,23 @@ Type *parseFile(const char *path, int length) {
         return AS_OBJ(cached);
     }
 
+    char *source = readFile(path);
+    if (source == NULL) {
+        return (Type *) anyType;
+    }
+
     TypeEnvironment *oldEnv = currentEnv;
     currentEnv = NULL;
     TypeEnvironment typeEnvironment;
     initTypeEnvironment(&typeEnvironment, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnvironment);
 
-    char *source = readFile(path);
     StmtArray *body = parseAST(source);
     evaluateTypes(body);
 
     SimpleType *type = newSimpleType();
     copyTable(&typeEnvironment.locals, &type->fields);
-    // TODO: Importing types
+    copyTable(&typeEnvironment.typeDefs, &type->methods);
     tableSet(&modules, copyString(path, length), OBJ_VAL(type));
 
     currentEnv = oldEnv;
@@ -1534,9 +1538,123 @@ Type *evaluateNode(Node *node) {
             break;
         }
         case NODE_ENUM: {
-            break;
+            struct Enum *casted = (struct Enum *) node;
+            SimpleType *enumType = newSimpleType();
+
+            for (int i = 0; i < casted->body.count; i++) {
+                struct EnumItem *variant = (struct EnumItem *) casted->body.stmts[i];
+                FunctorType *variantType = newFunctorType();
+
+                for (int j = 0; j < variant->params.count; j++) {
+                    TypeNode *typeNode = variant->params.parameters[j]->type;
+                    Type *argType;
+                    if (typeNode != NULL) {
+                        argType = evaluateNode((Node *) typeNode);
+                    } else {
+                        argType = (Type *) anyType;
+                    }
+                    writeValueArray(&variantType->arguments, OBJ_VAL(argType));
+                }
+
+                variantType->returnType = (Type *) enumType;
+                tableSet(&enumType->methods,
+                         copyString(variant->name.start, variant->name.length),
+                         OBJ_VAL(variantType));
+            }
+
+            tableSet(&currentEnv->locals,
+                     copyString(casted->name.start, casted->name.length),
+                     OBJ_VAL(enumType));
+            tableSet(&currentEnv->typeDefs,
+                     copyString(casted->name.start, casted->name.length),
+                     OBJ_VAL(enumType));
+            return (Type *) enumType;
         }
         case NODE_ENUMITEM: {
+            break;
+        }
+        case NODE_MATCH: {
+            struct Match *casted = (struct Match *) node;
+            Type *subjectType = evaluateNode((Node *) casted->subject);
+            // Collect matched variant names for exhaustiveness check
+            Table matchedVariants;
+            initTable(&matchedVariants);
+            Type *resultType = NULL;
+
+            for (int i = 0; i < casted->arms.count; i++) {
+                struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
+                tableSet(&matchedVariants,
+                         copyString(arm->variantName.start, arm->variantName.length),
+                         BOOL_VAL(true));
+
+                // Type check the arm body with bindings in scope
+                TypeEnvironment armEnv;
+                initTypeEnvironment(&armEnv, currentEnv->type);
+
+                // Look up variant constructor to type the bindings
+                if (subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
+                    SimpleType *enumST = (SimpleType *) subjectType;
+                    Value variantVal;
+                    if (tableGet(&enumST->methods,
+                                 copyString(arm->variantName.start, arm->variantName.length),
+                                 &variantVal)) {
+                        FunctorType *variantFn = (FunctorType *) AS_OBJ(variantVal);
+                        for (int j = 0; j < arm->bindings.count && j < variantFn->arguments.count; j++) {
+                            Type *bindingType = AS_OBJ(variantFn->arguments.values[j]);
+                            tableSet(&armEnv.locals,
+                                     copyString(arm->bindings.parameters[j]->name.start,
+                                                arm->bindings.parameters[j]->name.length),
+                                     OBJ_VAL(bindingType));
+                        }
+                    } else {
+                        errorAt(&arm->variantName, "Unknown variant in match");
+                    }
+                }
+
+                Type *armResult = NULL;
+                for (int j = 0; j < arm->body.count; j++) {
+                    armResult = evaluateNode((Node *) arm->body.stmts[j]);
+                }
+
+                if (resultType == NULL) {
+                    resultType = armResult;
+                } else if (armResult && !isSubType(armResult, resultType)) {
+                    if (!isSubType(resultType, armResult)) {
+                        UnionType *u = newUnionType();
+                        u->left = resultType;
+                        u->right = armResult;
+                        resultType = (Type *) u;
+                    } else {
+                        resultType = armResult;
+                    }
+                }
+
+                currentEnv = currentEnv->enclosing;
+            }
+
+            // Exhaustiveness check: verify all variants are covered
+            if (subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
+                SimpleType *enumST = (SimpleType *) subjectType;
+                for (int i = 0; i < enumST->methods.capacity; i++) {
+                    Entry *entry = &enumST->methods.entries[i];
+                    if (entry->key != NULL) {
+                        Value dummy;
+                        if (!tableGet(&matchedVariants, entry->key, &dummy)) {
+                            Token varToken = syntheticToken(entry->key->chars);
+                            struct Match *m = casted;
+                            errorAt(&m->arms.count > 0
+                                ? &((struct MatchArm *)m->arms.stmts[0])->variantName
+                                : &varToken,
+                                "Non-exhaustive match: missing variant");
+                        }
+                    }
+                }
+            }
+
+            freeTable(&matchedVariants);
+            return resultType;
+        }
+        case NODE_MATCHARM: {
             break;
         }
     }

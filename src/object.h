@@ -46,6 +46,7 @@ typedef enum {
     OBJ_PARSE_UNION_TYPE,
     OBJ_PARSE_INTERFACE_TYPE,
     OBJ_INSTANCE,
+    OBJ_ENUM_INSTANCE,
     OBJ_LIST,
     OBJ_MAP,
     OBJ_BOUND_METHOD,
@@ -99,11 +100,12 @@ typedef struct {
     int upvalueCount;
 } ObjClosure;
 
-typedef struct {
+typedef struct ObjClass {
     Obj obj;
     ObjString *name;
     Table methods;
     Table fields;
+    struct ObjClass *superclass;
 } ObjClass;
 
 typedef struct {
@@ -114,9 +116,21 @@ typedef struct {
 
 typedef struct {
     Obj obj;
+    ObjString *tag;
+    ObjString *enumName;
+    ValueArray fields;
+} ObjEnumInstance;
+
+typedef struct {
+    Obj obj;
     Value receiver;
     ObjClosure *method;
 } ObjBoundMethod;
+
+#define IS_ENUM_INSTANCE(value) isObjType(value, OBJ_ENUM_INSTANCE)
+#define AS_ENUM_INSTANCE(value) ((ObjEnumInstance*)AS_OBJ(value))
+
+ObjEnumInstance *newEnumInstance(ObjString *tag, ObjString *enumName);
 
 ObjFunction *newFunction();
 

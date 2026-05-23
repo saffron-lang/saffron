@@ -102,6 +102,12 @@ static void freeObject(Obj *object) {
 
             break;
         }
+        case OBJ_ENUM_INSTANCE: {
+            ObjEnumInstance *instance = (ObjEnumInstance *) object;
+            freeValueArray(&instance->fields);
+            FREE(ObjEnumInstance, object);
+            break;
+        }
         case OBJ_BOUND_METHOD:
             FREE(ObjBoundMethod, object);
             break;
@@ -233,6 +239,7 @@ static void blackenObject(Obj *object) {
             ObjClass *klass = (ObjClass *) object;
             markObject((Obj *) klass->name);
             markTable(&klass->methods);
+            markObject((Obj *) klass->superclass);
             break;
         }
         case OBJ_MODULE:
@@ -248,6 +255,13 @@ static void blackenObject(Obj *object) {
                 ObjBuiltinType *type = (ObjBuiltinType *) instance->klass;
                 type->markFn((Obj *) instance);
             }
+            break;
+        }
+        case OBJ_ENUM_INSTANCE: {
+            ObjEnumInstance *instance = (ObjEnumInstance *) object;
+            markObject((Obj *) instance->tag);
+            markObject((Obj *) instance->enumName);
+            markArray(&instance->fields);
             break;
         }
         case OBJ_BOUND_METHOD: {

@@ -175,6 +175,19 @@ void printObject(Value value) {
             }
             break;
         }
+        case OBJ_ENUM_INSTANCE: {
+            ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
+            printf("%s.%s", instance->enumName->chars, instance->tag->chars);
+            if (instance->fields.count > 0) {
+                printf("(");
+                for (int i = 0; i < instance->fields.count; i++) {
+                    printValue(instance->fields.values[i]);
+                    if (i < instance->fields.count - 1) printf(", ");
+                }
+                printf(")");
+            }
+            break;
+        }
         default: {
             printf("<unknown %d>", OBJ_TYPE(value));
         }
@@ -206,6 +219,14 @@ ObjInstance *newInstance(ObjClass *klass) {
     instance->klass = klass;
     copyTable(&klass->fields, &instance->fields);
 
+    return instance;
+}
+
+ObjEnumInstance *newEnumInstance(ObjString *tag, ObjString *enumName) {
+    ObjEnumInstance *instance = ALLOCATE_OBJ(ObjEnumInstance, OBJ_ENUM_INSTANCE);
+    instance->tag = tag;
+    instance->enumName = enumName;
+    initValueArray(&instance->fields);
     return instance;
 }
 
@@ -243,5 +264,6 @@ ObjClass *newClass(ObjString *name) {
     klass->name = name;
     initTable(&klass->methods);
     initTable(&klass->fields);
+    klass->superclass = NULL;
     return klass;
 }

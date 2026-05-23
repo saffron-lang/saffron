@@ -551,7 +551,13 @@ static InterpretResult run(ObjModule *module) {
                 if (IS_INSTANCE(instance) && IS_CLASS(typeVal)) {
                     ObjClass *klass = AS_INSTANCE(instance)->klass;
                     ObjClass *target = AS_CLASS(typeVal);
-                    result = (klass == target);
+                    while (klass != NULL) {
+                        if (klass == target) {
+                            result = true;
+                            break;
+                        }
+                        klass = klass->superclass;
+                    }
                 }
                 push(BOOL_VAL(result));
                 break;
@@ -782,6 +788,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjClass *subclass = AS_CLASS(peek(0));
                 tableAddAll(&AS_CLASS(superclass)->methods,
                             &subclass->methods);
+                subclass->superclass = AS_CLASS(superclass);
                 pop(); // Subclass.
                 break;
             }
