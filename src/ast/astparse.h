@@ -8,6 +8,8 @@ typedef struct {
     Token previous;
     bool hadError;
     bool panicMode;
+    bool incomplete;
+    bool suppressErrors;
     Node *nodes;
 } Parser;
 

@@ -70,17 +70,23 @@ Node *allocateNode(size_t size, NodeType type) {
 static void errorAt(Token *token, const char *message) {
     if (parser.panicMode) return;
     parser.panicMode = true;
-    fprintf(stderr, "[line %d] Error", token->line);
 
     if (token->type == TOKEN_EOF) {
-        fprintf(stderr, " at end");
-    } else if (token->type == TOKEN_ERROR) {
-        // Nothing.
-    } else {
-        fprintf(stderr, " at '%.*s'", token->length, token->start);
+        parser.incomplete = true;
     }
 
-    fprintf(stderr, ": %s\n", message);
+    if (!parser.suppressErrors) {
+        fprintf(stderr, "[line %d] Error", token->line);
+        if (token->type == TOKEN_EOF) {
+            fprintf(stderr, " at end");
+        } else if (token->type == TOKEN_ERROR) {
+            // Nothing.
+        } else {
+            fprintf(stderr, " at '%.*s'", token->length, token->start);
+        }
+        fprintf(stderr, ": %s\n", message);
+    }
+
     parser.hadError = true;
 }
 
@@ -1610,6 +1616,8 @@ StmtArray *parseAST(const char *source) {
 
     parser.hadError = false;
     parser.panicMode = false;
+    parser.incomplete = false;
+    parser.suppressErrors = false;
 
     advance();
 

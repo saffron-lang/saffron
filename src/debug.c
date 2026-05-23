@@ -18,11 +18,11 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
 static int constantInstruction(const char *name, Chunk *chunk,
                                int offset) {
-    uint8_t constant = chunk->code[offset + 1];
+    uint16_t constant = (uint16_t)(chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
     printf("%-16s %4d '", name, constant);
     printValue(chunk->constants.values[constant]);
     printf("'\n");
-    return offset + 2;
+    return offset + 3;
 }
 
 static int byteInstruction(const char *name, Chunk *chunk,
@@ -43,12 +43,12 @@ static int jumpInstruction(const char *name, int sign,
 
 static int invokeInstruction(const char* name, Chunk* chunk,
                              int offset) {
-    uint8_t constant = chunk->code[offset + 1];
-    uint8_t argCount = chunk->code[offset + 2];
+    uint16_t constant = (uint16_t)(chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
+    uint8_t argCount = chunk->code[offset + 3];
     printf("%-16s (%d args) %4d '", name, argCount, constant);
     printValue(chunk->constants.values[constant]);
     printf("'\n");
-    return offset + 3;
+    return offset + 4;
 }
 
 int disassembleInstruction(Chunk *chunk, int offset) {
@@ -125,7 +125,8 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             return simpleInstruction("OP_CLOSE_UPVALUE", offset);
         case OP_CLOSURE: {
             offset++;
-            uint8_t constant = chunk->code[offset++];
+            uint16_t constant = (uint16_t)(chunk->code[offset] << 8) | chunk->code[offset + 1];
+            offset += 2;
             printf("%-16s %4d ", "OP_CLOSURE", constant);
             printValue(chunk->constants.values[constant]);
             printf("\n");
@@ -158,14 +159,14 @@ int disassembleInstruction(Chunk *chunk, int offset) {
         case OP_FIELD:
             return constantInstruction("OP_FIELD", chunk, offset);
         case OP_FIELD_META: {
-            uint8_t nameConst = chunk->code[offset + 1];
-            uint8_t typeConst = chunk->code[offset + 2];
+            uint16_t nameConst = (uint16_t)(chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
+            uint16_t typeConst = (uint16_t)(chunk->code[offset + 3] << 8) | chunk->code[offset + 4];
             printf("%-16s %4d '", "OP_FIELD_META", nameConst);
             printValue(chunk->constants.values[nameConst]);
             printf("' type='");
             printValue(chunk->constants.values[typeConst]);
             printf("'\n");
-            return offset + 3;
+            return offset + 5;
         }
         case OP_INHERIT:
             return simpleInstruction("OP_INHERIT", offset);
@@ -186,15 +187,15 @@ int disassembleInstruction(Chunk *chunk, int offset) {
         case OP_VARIANT:
             return constantInstruction("OP_VARIANT", chunk, offset);
         case OP_CONSTRUCT_VARIANT: {
-            uint8_t tagConst = chunk->code[offset + 1];
-            uint8_t enumConst = chunk->code[offset + 2];
-            uint8_t arity = chunk->code[offset + 3];
+            uint16_t tagConst = (uint16_t)(chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
+            uint16_t enumConst = (uint16_t)(chunk->code[offset + 3] << 8) | chunk->code[offset + 4];
+            uint8_t arity = chunk->code[offset + 5];
             printf("%-16s %4d '", "OP_CONSTRUCT_VARIANT", tagConst);
             printValue(chunk->constants.values[tagConst]);
             printf("' enum='");
             printValue(chunk->constants.values[enumConst]);
             printf("' arity=%d\n", arity);
-            return offset + 4;
+            return offset + 6;
         }
         case OP_GET_TAG:
             return simpleInstruction("OP_GET_TAG", offset);

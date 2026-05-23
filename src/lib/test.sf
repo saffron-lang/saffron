@@ -1,6 +1,15 @@
+// Saffron Test Framework
+// Usage: import "@test" as T
+
 var passed = 0
 var failed = 0
 var total = 0
+var current_section = ""
+
+fun section(name: String) {
+    current_section = name
+    IO.println("  ${name}")
+}
 
 fun assert(condition: Bool, msg: String) {
     total = total + 1
@@ -8,7 +17,7 @@ fun assert(condition: Bool, msg: String) {
         passed = passed + 1
     } else {
         failed = failed + 1
-        IO.println("  FAIL: " + msg)
+        IO.println("    FAIL: ${msg}")
     }
 }
 
@@ -18,17 +27,122 @@ fun assert_eq(actual: Any, expected: Any, msg: String) {
         passed = passed + 1
     } else {
         failed = failed + 1
-        IO.println("  FAIL: " + msg)
-        IO.println("    expected: " + expected)
-        IO.println("    actual:   " + actual)
+        IO.println("    FAIL: ${msg}")
+        IO.println("      expected: ${expected}")
+        IO.println("      actual:   ${actual}")
     }
 }
 
-fun section(name: String) {
-    IO.println(name)
+fun assert_neq(actual: Any, expected: Any, msg: String) {
+    total = total + 1
+    if (actual != expected) {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+        IO.println("    FAIL: ${msg}")
+        IO.println("      should not equal: ${expected}")
+    }
+}
+
+fun assert_throws(body: Any, msg: String) {
+    total = total + 1
+    var threw = false
+    try {
+        body()
+    } catch (e) {
+        threw = true
+    }
+    if (threw) {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+        IO.println("    FAIL: ${msg} (expected throw, none occurred)")
+    }
+}
+
+fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
+    total = total + 1
+    var caught_msg = nil
+    try {
+        body()
+    } catch (e) {
+        caught_msg = e
+    }
+    if (caught_msg == expected_msg) {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+        if (caught_msg == nil) {
+            IO.println("    FAIL: ${msg} (expected throw, none occurred)")
+        } else {
+            IO.println("    FAIL: ${msg}")
+            IO.println("      expected message: ${expected_msg}")
+            IO.println("      actual message:   ${caught_msg}")
+        }
+    }
+}
+
+// Async test support
+// Runs body as a spawned task with a timeout, catches failures
+fun async_test(name: String, body: Any, timeout_duration: Number) {
+    total = total + 1
+    var task = Task.spawn(body)
+
+    // Poll until done or timeout
+    var elapsed = 0
+    var poll_interval = 0.01
+    while (!task.isReady()) {
+        yield [1, poll_interval]
+        elapsed = elapsed + poll_interval
+        if (elapsed >= timeout_duration) {
+            failed = failed + 1
+            IO.println("    FAIL: ${name} (timed out after ${timeout_duration}s)")
+            return
+        }
+    }
+
+    var result = task.getResult()
+    if (result == false) {
+        failed = failed + 1
+        IO.println("    FAIL: ${name}")
+    } else {
+        passed = passed + 1
+    }
+}
+
+// Async assert — runs within an async_test body, returns false on failure
+fun async_assert(condition: Bool, msg: String) {
+    if (!condition) {
+        IO.println("    FAIL: ${msg}")
+        return false
+    }
+    return true
+}
+
+fun async_assert_eq(actual: Any, expected: Any, msg: String) {
+    if (actual != expected) {
+        IO.println("    FAIL: ${msg}")
+        IO.println("      expected: ${expected}")
+        IO.println("      actual:   ${actual}")
+        return false
+    }
+    return true
 }
 
 fun summary() {
     IO.println("")
-    IO.println(passed + "/" + total + " passed, " + failed + " failed")
+    if (failed == 0) {
+        IO.println("  All ${total} tests passed")
+    } else {
+        IO.println("  ${passed}/${total} passed, ${failed} failed")
+    }
+}
+
+fun run(name: String, body: Any) {
+    IO.println(name)
+    body()
+    summary()
+    if (failed > 0) {
+        throw "Test suite failed"
+    }
 }

@@ -6,14 +6,14 @@ fun areWeHavingItYet() {
 IO.print(areWeHavingItYet);
 
 // Arguments
-fun sum(a, b, c) {
+fun sum(a: Number, b: Number, c: Number) {
   return a + b + c;
 }
 
 IO.print(4 + sum(5, 6, 7));
 
 // Recursion
-fun fib(n) {
+fun fib(n: Number) {
   if (n < 2) return n;
   return fib(n - 2) + fib(n - 1);
 }

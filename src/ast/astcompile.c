@@ -127,18 +127,23 @@ static ObjFunction *endCompiler() {
 }
 
 
-static uint8_t makeConstant(Value value) {
+static uint16_t makeConstant(Value value) {
     int constant = addConstant(currentChunk(), value);
-    if (constant > UINT8_MAX) {
+    if (constant > UINT16_MAX) {
         error("Too many constants in one chunk.");
         return 0;
     }
+    return (uint16_t) constant;
+}
 
-    return (uint8_t) constant;
+static void emitConstantIndex(uint16_t index) {
+    emitByte((index >> 8) & 0xff);
+    emitByte(index & 0xff);
 }
 
 static void emitConstant(Value value) {
-    emitBytes(OP_CONSTANT, makeConstant(value));
+    emitByte(OP_CONSTANT);
+    emitConstantIndex(makeConstant(value));
 }
 
 static int emitJump(uint8_t instruction) {
@@ -279,16 +284,17 @@ static void markInitialized() {
             current->scopeDepth;
 }
 
-static void defineVariable(uint8_t global) {
+static void defineVariable(uint16_t global) {
     if (current->scopeDepth > 0) {
         markInitialized();
         return;
     }
 
-    emitBytes(OP_DEFINE_GLOBAL, global);
+    emitByte(OP_DEFINE_GLOBAL);
+    emitConstantIndex(global);
 }
 
-uint8_t identifierConstant(Token *name) {
+uint16_t identifierConstant(Token *name) {
     return makeConstant(OBJ_VAL(copyString(name->start,
                                            name->length)));
 }
@@ -298,14 +304,15 @@ static void getVariable(Token name) {
     int arg = resolveLocal(current, &name);
     if (arg != -1) {
         getOp = OP_GET_LOCAL;
+        emitBytes(getOp, (uint8_t) arg);
     } else if ((arg = resolveUpvalue(current, &name)) != -1) {
         getOp = OP_GET_UPVALUE;
+        emitBytes(getOp, (uint8_t) arg);
     } else {
-        arg = identifierConstant(&name);
-        getOp = OP_GET_GLOBAL;
+        uint16_t constant = identifierConstant(&name);
+        emitByte(OP_GET_GLOBAL);
+        emitConstantIndex(constant);
     }
-
-    emitBytes(getOp, (uint8_t) arg);
 }
 
 static void setVariable(Token name, bool canAssign) {
@@ -313,14 +320,15 @@ static void setVariable(Token name, bool canAssign) {
     int arg = resolveLocal(current, &name);
     if (arg != -1) {
         setOp = OP_SET_LOCAL;
+        emitBytes(setOp, (uint8_t) arg);
     } else if ((arg = resolveUpvalue(current, &name)) != -1) {
         setOp = OP_SET_UPVALUE;
+        emitBytes(setOp, (uint8_t) arg);
     } else {
-        arg = identifierConstant(&name);
-        setOp = OP_SET_GLOBAL;
+        uint16_t constant = identifierConstant(&name);
+        emitByte(OP_SET_GLOBAL);
+        emitConstantIndex(constant);
     }
-
-    emitBytes(setOp, (uint8_t) arg);
 }
 
 static void beginScope() {
@@ -519,17 +527,19 @@ void compileNode(Node *node) {
             if (casted->callee->self.type == NODE_GET) {
                 struct Get *callee = (struct Get *) casted->callee;
                 compileNode((Node *) callee->object);
-                uint8_t name = identifierConstant(&callee->name);
+                uint16_t name = identifierConstant(&callee->name);
                 compileExprArray(casted->arguments);
-                emitBytes(OP_INVOKE, name);
+                emitByte(OP_INVOKE);
+                emitConstantIndex(name);
                 emitByte(casted->arguments.count);
             } else if (casted->callee->self.type == NODE_SUPER) {
                 struct Super *callee = (struct Super *) casted->callee;
                 getVariable(syntheticToken("this"));
-                uint8_t name = identifierConstant(&callee->method);
+                uint16_t name = identifierConstant(&callee->method);
                 compileExprArray(casted->arguments);
                 getVariable(syntheticToken("super"));
-                emitBytes(OP_SUPER_INVOKE, name);
+                emitByte(OP_SUPER_INVOKE);
+                emitConstantIndex(name);
                 emitByte(casted->arguments.count);
             } else {
                 compileNode((Node *) casted->callee);
@@ -548,16 +558,18 @@ void compileNode(Node *node) {
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             compileNode((Node *) casted->object);
-            uint8_t name = identifierConstant(&casted->name);
-            emitBytes(OP_GET_PROPERTY, name);
+            uint16_t name = identifierConstant(&casted->name);
+            emitByte(OP_GET_PROPERTY);
+            emitConstantIndex(name);
             break;
         }
         case NODE_SET: {
             struct Set *casted = (struct Set *) node;
             compileNode((Node *) casted->object);
             compileNode((Node *) casted->value);
-            uint8_t name = identifierConstant(&casted->name);
-            emitBytes(OP_SET_PROPERTY, name);
+            uint16_t name = identifierConstant(&casted->name);
+            emitByte(OP_SET_PROPERTY);
+            emitConstantIndex(name);
             break;
         }
         case NODE_SUPER: {
@@ -568,10 +580,11 @@ void compileNode(Node *node) {
                 errorAt(&casted->keyword, "Can't use 'super' in a class with no superclass.");
             }
 
-            uint8_t name = identifierConstant(&casted->method);
+            uint16_t name = identifierConstant(&casted->method);
             getVariable(syntheticToken("this"));
             getVariable(syntheticToken("super"));
-            emitBytes(OP_GET_SUPER, name);
+            emitByte(OP_GET_SUPER);
+            emitConstantIndex(name);
             break;
         }
         case NODE_THIS: {
@@ -603,7 +616,7 @@ void compileNode(Node *node) {
 
             for (int i = 0; i < casted->params.count; i++) {
                 declareVariable(&casted->params.parameters[i]->name);
-                int constant = identifierConstant(&casted->params.parameters[i]->name);
+                uint16_t constant = identifierConstant(&casted->params.parameters[i]->name);
                 defineVariable(constant);
             }
 
@@ -614,7 +627,8 @@ void compileNode(Node *node) {
 
             ObjFunction *function = endCompiler();
             function->arity = casted->params.count;
-            emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+            emitByte(OP_CLOSURE);
+            emitConstantIndex(makeConstant(OBJ_VAL(function)));
 
             for (int i = 0; i < function->upvalueCount; i++) {
                 emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
@@ -653,7 +667,7 @@ void compileNode(Node *node) {
             struct Var *casted = (struct Var *) node;
 
             declareVariable(&casted->name);
-            uint8_t nameConstant = identifierConstant(&casted->name);
+            uint16_t nameConstant = identifierConstant(&casted->name);
 
             if (casted->initializer) {
                 compileNode((Node *) casted->initializer);
@@ -684,7 +698,7 @@ void compileNode(Node *node) {
 
             for (int i = 0; i < casted->params.count; i++) {
                 declareVariable(&casted->params.parameters[i]->name);
-                uint8_t constant = identifierConstant(&casted->params.parameters[i]->name);
+                uint16_t constant = identifierConstant(&casted->params.parameters[i]->name);
                 defineVariable(constant);
             }
 
@@ -693,9 +707,10 @@ void compileNode(Node *node) {
             ObjFunction *function = endCompiler();
             function->arity = casted->params.count;
 
-            emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+            emitByte(OP_CLOSURE);
+            emitConstantIndex(makeConstant(OBJ_VAL(function)));
             if (casted->functionType == TYPE_FUNCTION) {
-                uint8_t global = identifierConstant(&casted->name);
+                uint16_t global = identifierConstant(&casted->name);
                 defineVariable(global);
             }
 
@@ -708,9 +723,10 @@ void compileNode(Node *node) {
         case NODE_CLASS: {
             struct Class *casted = (struct Class *) node;
             Token className = casted->name;
-            uint8_t nameConstant = identifierConstant(&casted->name);
+            uint16_t nameConstant = identifierConstant(&casted->name);
             declareVariable(&casted->name);
-            emitBytes(OP_CLASS, nameConstant);
+            emitByte(OP_CLASS);
+            emitConstantIndex(nameConstant);
             defineVariable(nameConstant);
 
             ClassCompiler classCompiler;
@@ -746,13 +762,15 @@ void compileNode(Node *node) {
                 if (casted->body.stmts[i]->self.type == NODE_FUNCTION) {
                     struct Function *fn = (struct Function *) casted->body.stmts[i];
                     if (fn->functionType == TYPE_INITIALIZER) hasInit = true;
-                    uint8_t constant = identifierConstant(&fn->name);
+                    uint16_t constant = identifierConstant(&fn->name);
                     compileNode((Node *) casted->body.stmts[i]);
-                    emitBytes(OP_METHOD, constant);
+                    emitByte(OP_METHOD);
+                    emitConstantIndex(constant);
                 } else {
-                    uint8_t constant = identifierConstant(&((struct Var *) casted->body.stmts[i])->name);
+                    uint16_t constant = identifierConstant(&((struct Var *) casted->body.stmts[i])->name);
                     compileNode((Node *) casted->body.stmts[i]);
-                    emitBytes(OP_FIELD, constant);
+                    emitByte(OP_FIELD);
+                    emitConstantIndex(constant);
                 }
             }
 
@@ -761,16 +779,17 @@ void compileNode(Node *node) {
                 for (int i = 0; i < casted->body.count; i++) {
                     if (casted->body.stmts[i]->self.type == NODE_VAR) {
                         struct Var *var = (struct Var *) casted->body.stmts[i];
-                        uint8_t fieldNameConst = identifierConstant(&var->name);
+                        uint16_t fieldNameConst = identifierConstant(&var->name);
                         Token typeName = {0};
                         if (var->type != NULL && var->type->self.type == NODE_SIMPLE) {
                             typeName = ((struct Simple *) var->type)->name;
                         } else {
                             typeName = syntheticToken("Any");
                         }
-                        uint8_t typeNameConst = identifierConstant(&typeName);
-                        emitBytes(OP_FIELD_META, fieldNameConst);
-                        emitByte(typeNameConst);
+                        uint16_t typeNameConst = identifierConstant(&typeName);
+                        emitByte(OP_FIELD_META);
+                        emitConstantIndex(fieldNameConst);
+                        emitConstantIndex(typeNameConst);
                         fieldCount++;
                     }
                 }
@@ -795,19 +814,22 @@ void compileNode(Node *node) {
                         int slot = resolveLocal(current, &var->name);
                         emitBytes(OP_GET_LOCAL, 0);
                         emitBytes(OP_GET_LOCAL, (uint8_t) slot);
-                        uint8_t nameConst = identifierConstant(&var->name);
-                        emitBytes(OP_SET_PROPERTY, nameConst);
+                        uint16_t nameConst = identifierConstant(&var->name);
+                        emitByte(OP_SET_PROPERTY);
+                        emitConstantIndex(nameConst);
                         emitByte(OP_POP);
                     }
 
                     ObjFunction *function = endCompiler();
-                    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+                    emitByte(OP_CLOSURE);
+                    emitConstantIndex(makeConstant(OBJ_VAL(function)));
                     for (int i = 0; i < function->upvalueCount; i++) {
                         emitByte(0);
                         emitByte(0);
                     }
-                    uint8_t initConst = identifierConstant(&initName);
-                    emitBytes(OP_METHOD, initConst);
+                    uint16_t initConst = identifierConstant(&initName);
+                    emitByte(OP_METHOD);
+                    emitConstantIndex(initConst);
                 }
             }
 
@@ -907,8 +929,9 @@ void compileNode(Node *node) {
             beginScope();
 
             compileNode((Node *) casted->iterable);
-            uint8_t iterConst = makeConstant(OBJ_VAL(copyString("iter", 4)));
-            emitBytes(OP_INVOKE, iterConst);
+            uint16_t iterConst = makeConstant(OBJ_VAL(copyString("iter", 4)));
+            emitByte(OP_INVOKE);
+            emitConstantIndex(iterConst);
             emitByte(0);
             Token iterName = syntheticToken("$iter");
             addLocal(iterName);
@@ -925,8 +948,9 @@ void compileNode(Node *node) {
 
             int loopStart = currentChunk()->count;
             emitBytes(OP_GET_LOCAL, (uint8_t) (current->localCount - 1));
-            uint8_t hasNextConst = makeConstant(OBJ_VAL(copyString("next?", 5)));
-            emitBytes(OP_INVOKE, hasNextConst);
+            uint16_t hasNextConst = makeConstant(OBJ_VAL(copyString("next?", 5)));
+            emitByte(OP_INVOKE);
+            emitConstantIndex(hasNextConst);
             emitByte(0);
 
             int exitJump = emitJump(OP_JUMP_IF_FALSE);
@@ -934,8 +958,9 @@ void compileNode(Node *node) {
 
             beginScope();
             emitBytes(OP_GET_LOCAL, (uint8_t) (loopLocalCount - 1));
-            uint8_t nextConst = makeConstant(OBJ_VAL(copyString("next", 4)));
-            emitBytes(OP_INVOKE, nextConst);
+            uint16_t nextConst = makeConstant(OBJ_VAL(copyString("next", 4)));
+            emitByte(OP_INVOKE);
+            emitConstantIndex(nextConst);
             emitByte(0);
             declareVariable(&casted->binding);
             defineVariable(identifierConstant(&casted->binding));
@@ -1012,9 +1037,10 @@ void compileNode(Node *node) {
         }
         case NODE_ENUM: {
             struct Enum *casted = (struct Enum *) node;
-            uint8_t nameConstant = identifierConstant(&casted->name);
+            uint16_t nameConstant = identifierConstant(&casted->name);
             declareVariable(&casted->name);
-            emitBytes(OP_CLASS, nameConstant);
+            emitByte(OP_CLASS);
+            emitConstantIndex(nameConstant);
             defineVariable(nameConstant);
 
             getVariable(casted->name);
@@ -1026,11 +1052,12 @@ void compileNode(Node *node) {
                 int arity = variant->params.count;
 
                 if (arity == 0) {
-                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                    uint16_t tagConst = makeConstant(OBJ_VAL(
                         copyString(variant->name.start, variant->name.length)));
-                    uint8_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
-                    emitBytes(OP_CONSTRUCT_VARIANT, tagConst);
-                    emitByte(enumConst);
+                    uint16_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
+                    emitByte(OP_CONSTRUCT_VARIANT);
+                    emitConstantIndex(tagConst);
+                    emitConstantIndex(enumConst);
                     emitByte(0);
                 } else {
                     Compiler compiler;
@@ -1039,15 +1066,16 @@ void compileNode(Node *node) {
 
                     for (int j = 0; j < arity; j++) {
                         declareVariable(&variant->params.parameters[j]->name);
-                        uint8_t c = identifierConstant(&variant->params.parameters[j]->name);
+                        uint16_t c = identifierConstant(&variant->params.parameters[j]->name);
                         defineVariable(c);
                     }
 
-                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                    uint16_t tagConst = makeConstant(OBJ_VAL(
                         copyString(variant->name.start, variant->name.length)));
-                    uint8_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
-                    emitBytes(OP_CONSTRUCT_VARIANT, tagConst);
-                    emitByte(enumConst);
+                    uint16_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
+                    emitByte(OP_CONSTRUCT_VARIANT);
+                    emitConstantIndex(tagConst);
+                    emitConstantIndex(enumConst);
                     emitByte((uint8_t) arity);
                     for (int j = 0; j < arity; j++) {
                         emitBytes(OP_GET_LOCAL, j + 1);
@@ -1056,15 +1084,17 @@ void compileNode(Node *node) {
 
                     ObjFunction *function = endCompiler();
                     function->arity = arity;
-                    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+                    emitByte(OP_CLOSURE);
+                    emitConstantIndex(makeConstant(OBJ_VAL(function)));
                     for (int j = 0; j < function->upvalueCount; j++) {
                         emitByte(compiler.upvalues[j].isLocal ? 1 : 0);
                         emitByte(compiler.upvalues[j].index);
                     }
                 }
 
-                uint8_t methodConst = identifierConstant(&variant->name);
-                emitBytes(OP_METHOD, methodConst);
+                uint16_t methodConst = identifierConstant(&variant->name);
+                emitByte(OP_METHOD);
+                emitConstantIndex(methodConst);
             }
 
             emitByte(OP_POP);
@@ -1101,7 +1131,7 @@ void compileNode(Node *node) {
                     if (arm->bindings.count > 0) {
                         emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
                         declareVariable(&arm->bindings.parameters[0]->name);
-                        uint8_t c = identifierConstant(&arm->bindings.parameters[0]->name);
+                        uint16_t c = identifierConstant(&arm->bindings.parameters[0]->name);
                         defineVariable(c);
                     }
 
@@ -1123,9 +1153,8 @@ void compileNode(Node *node) {
                     emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
                     emitByte(OP_GET_TAG);
 
-                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                    emitConstant(OBJ_VAL(
                         copyString(arm->variantName.start, arm->variantName.length)));
-                    emitBytes(OP_CONSTANT, tagConst);
                     emitByte(OP_EQUAL);
 
                     int nextArm = emitJump(OP_JUMP_IF_FALSE);
@@ -1134,10 +1163,10 @@ void compileNode(Node *node) {
                     beginScope();
                     for (int j = 0; j < arm->bindings.count; j++) {
                         emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
-                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(j)));
+                        emitConstant(NUMBER_VAL(j));
                         emitByte(OP_GETITEM);
                         declareVariable(&arm->bindings.parameters[j]->name);
-                        uint8_t c = identifierConstant(&arm->bindings.parameters[j]->name);
+                        uint16_t c = identifierConstant(&arm->bindings.parameters[j]->name);
                         defineVariable(c);
                     }
 
@@ -1171,18 +1200,20 @@ void compileNode(Node *node) {
             break;
         case NODE_INTERFACE: {
             struct Interface *casted = (struct Interface *) node;
-            uint8_t nameConstant = identifierConstant(&casted->name);
+            uint16_t nameConstant = identifierConstant(&casted->name);
             declareVariable(&casted->name);
-            emitBytes(OP_CLASS, nameConstant);
+            emitByte(OP_CLASS);
+            emitConstantIndex(nameConstant);
             defineVariable(nameConstant);
 
             getVariable(casted->name);
 
             for (int i = 0; i < casted->body.count; i++) {
                 if (casted->body.stmts[i]->self.type == NODE_FUNCTION) {
-                    uint8_t constant = identifierConstant(&((struct Function *) casted->body.stmts[i])->name);
+                    uint16_t constant = identifierConstant(&((struct Function *) casted->body.stmts[i])->name);
                     compileNode((Node *) casted->body.stmts[i]);
-                    emitBytes(OP_METHOD, constant);
+                    emitByte(OP_METHOD);
+                    emitConstantIndex(constant);
                 }
             }
 
@@ -1205,16 +1236,15 @@ void compileNode(Node *node) {
             if (isEnum) {
                 emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
                 emitByte(OP_GET_TAG);
-                uint8_t tagConst = makeConstant(OBJ_VAL(
+                emitConstant(OBJ_VAL(
                     copyString(casted->variant.start, casted->variant.length)));
-                emitBytes(OP_CONSTANT, tagConst);
                 emitByte(OP_EQUAL);
                 int failJump = emitJump(OP_JUMP_IF_FALSE);
                 emitByte(OP_POP);
 
                 for (int i = 0; i < bindingCount; i++) {
                     emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
-                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                    emitConstant(NUMBER_VAL(i));
                     emitByte(OP_GETITEM);
                     declareVariable(&casted->bindings.parameters[i]->name);
                     defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
@@ -1230,7 +1260,7 @@ void compileNode(Node *node) {
                 if (splatPos == -1) {
                     for (int i = 0; i < bindingCount; i++) {
                         emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
-                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                        emitConstant(NUMBER_VAL(i));
                         emitByte(OP_GETITEM);
                         declareVariable(&casted->bindings.parameters[i]->name);
                         defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
@@ -1240,7 +1270,7 @@ void compileNode(Node *node) {
 
                     for (int i = 0; i < splatPos; i++) {
                         emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
-                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(i)));
+                        emitConstant(NUMBER_VAL(i));
                         emitByte(OP_GETITEM);
                         declareVariable(&casted->bindings.parameters[i]->name);
                         defineVariable(identifierConstant(&casted->bindings.parameters[i]->name));
@@ -1248,15 +1278,15 @@ void compileNode(Node *node) {
 
                     // Splat: slice(list, start, fromEnd)
                     emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
-                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(splatPos)));
-                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(afterSplat)));
+                    emitConstant(NUMBER_VAL(splatPos));
+                    emitConstant(NUMBER_VAL(afterSplat));
                     emitByte(OP_SLICE);
                     declareVariable(&casted->bindings.parameters[splatPos]->name);
                     defineVariable(identifierConstant(&casted->bindings.parameters[splatPos]->name));
 
                     for (int i = 0; i < afterSplat; i++) {
                         emitBytes(OP_GET_LOCAL, (uint8_t) valueSlot);
-                        emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(-(afterSplat - i))));
+                        emitConstant(NUMBER_VAL(-(afterSplat - i)));
                         emitByte(OP_GETITEM);
                         declareVariable(&casted->bindings.parameters[splatPos + 1 + i]->name);
                         defineVariable(identifierConstant(&casted->bindings.parameters[splatPos + 1 + i]->name));
@@ -1331,15 +1361,16 @@ void compileNode(Node *node) {
                 for (int i = 0; i < casted->names.count; i++) {
                     Token nameToken = casted->names.tokens[i];
                     emitByte(OP_DUP);
-                    uint8_t propConst = identifierConstant(&nameToken);
-                    emitBytes(OP_GET_PROPERTY, propConst);
-                    uint8_t global = identifierConstant(&nameToken);
+                    uint16_t propConst = identifierConstant(&nameToken);
+                    emitByte(OP_GET_PROPERTY);
+                    emitConstantIndex(propConst);
+                    uint16_t global = identifierConstant(&nameToken);
                     defineVariable(global);
                 }
                 emitByte(OP_POP); // pop the module itself
             } else {
                 // import "path" as Name
-                uint8_t global = identifierConstant(&casted->name);
+                uint16_t global = identifierConstant(&casted->name);
                 defineVariable(global);
             }
             break;
