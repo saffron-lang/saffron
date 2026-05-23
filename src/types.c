@@ -576,9 +576,21 @@ Type *evaluateNode(Node *node) {
     switch (node->type) {
         case NODE_BINARY: {
             struct Binary *casted = (struct Binary *) node;
+            Type *leftType = evaluateNode((Node *) casted->left);
             evaluateNode((Node *) casted->right);
 
-            return evaluateNode((Node *) casted->left);
+            switch (casted->operator.type) {
+                case TOKEN_IS:
+                case TOKEN_EQUAL_EQUAL:
+                case TOKEN_BANG_EQUAL:
+                case TOKEN_GREATER:
+                case TOKEN_GREATER_EQUAL:
+                case TOKEN_LESS:
+                case TOKEN_LESS_EQUAL:
+                    return (Type *) boolType;
+                default:
+                    return leftType;
+            }
         }
         case NODE_GROUPING: {
             struct Grouping *casted = (struct Grouping *) node;
@@ -1216,8 +1228,58 @@ Type *evaluateNode(Node *node) {
         case NODE_IF: {
             struct If *casted = (struct If *) node;
             evaluateNode((Node *) casted->condition);
-            Type *result = evaluateNode((Node *) casted->thenBranch);
-            evaluateNode((Node *) casted->elseBranch);
+
+            // Flow narrowing: if condition is `x is Type`, narrow x in branches
+            Expr *cond = casted->condition;
+            Token *narrowVar = NULL;
+            Type *narrowType = NULL;
+            Type *originalType = NULL;
+
+            if (cond->type == NODE_BINARY) {
+                struct Binary *binCond = (struct Binary *) cond;
+                if (binCond->operator.type == TOKEN_IS &&
+                    binCond->left->type == NODE_VARIABLE &&
+                    binCond->right->type == NODE_VARIABLE) {
+                    struct Variable *lhs = (struct Variable *) binCond->left;
+                    struct Variable *rhs = (struct Variable *) binCond->right;
+                    narrowVar = &lhs->name;
+                    narrowType = getTypeDef(rhs->name);
+                    originalType = getVariableType(lhs->name);
+                }
+            }
+
+            Type *result;
+            if (narrowVar && narrowType) {
+                // Then-branch: variable has the narrowed type
+                TypeEnvironment thenEnv;
+                initTypeEnvironment(&thenEnv, currentEnv->type);
+                tableSet(&thenEnv.locals, copyString(narrowVar->start, narrowVar->length), OBJ_VAL(narrowType));
+                result = evaluateNode((Node *) casted->thenBranch);
+                currentEnv = currentEnv->enclosing;
+
+                // Else-branch: subtract narrowed type from union if applicable
+                if (casted->elseBranch) {
+                    Type *elseType = originalType;
+                    if (originalType && originalType->obj.type == OBJ_PARSE_UNION_TYPE) {
+                        UnionType *u = (UnionType *) originalType;
+                        if (isSubType(u->left, narrowType) && isSubType(narrowType, u->left)) {
+                            elseType = u->right;
+                        } else if (isSubType(u->right, narrowType) && isSubType(narrowType, u->right)) {
+                            elseType = u->left;
+                        }
+                    }
+                    TypeEnvironment elseEnv;
+                    initTypeEnvironment(&elseEnv, currentEnv->type);
+                    if (elseType != originalType) {
+                        tableSet(&elseEnv.locals, copyString(narrowVar->start, narrowVar->length), OBJ_VAL(elseType));
+                    }
+                    evaluateNode((Node *) casted->elseBranch);
+                    currentEnv = currentEnv->enclosing;
+                }
+            } else {
+                result = evaluateNode((Node *) casted->thenBranch);
+                evaluateNode((Node *) casted->elseBranch);
+            }
             return result;
         }
         case NODE_WHILE: {

@@ -23,6 +23,7 @@ typedef enum {
     OP_GREATER,
     OP_LESS,
     OP_POP,
+    OP_DUP,
     OP_CLOSE_UPVALUE,
     OP_IN_PLACE_ADD,
     OP_IN_PLACE_SUBTRACT,
@@ -52,6 +53,12 @@ typedef enum {
     OP_RESUME,
     OP_RETURN,
     OP_IMPORT,
+    OP_ENUM,
+    OP_VARIANT,
+    OP_CONSTRUCT_VARIANT,
+    OP_GET_TAG,
+    OP_MATCH_TAG,
+    OP_IS,
 } OpCode;
 
 typedef struct {

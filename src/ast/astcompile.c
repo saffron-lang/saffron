@@ -429,6 +429,9 @@ void compileNode(Node *node) {
                 case TOKEN_LESS_EQUAL:
                     emitBytes(OP_GREATER, OP_NOT);
                     break;
+                case TOKEN_IS:
+                    emitByte(OP_IS);
+                    break;
             }
             break;
         }
@@ -842,6 +845,129 @@ void compileNode(Node *node) {
             }
             break;
         }
+        case NODE_ENUM: {
+            struct Enum *casted = (struct Enum *) node;
+            uint8_t nameConstant = identifierConstant(&casted->name);
+            declareVariable(&casted->name);
+            emitBytes(OP_CLASS, nameConstant);
+            defineVariable(nameConstant);
+
+            getVariable(casted->name);
+
+            ObjString *enumNameStr = copyString(casted->name.start, casted->name.length);
+
+            for (int i = 0; i < casted->body.count; i++) {
+                struct EnumItem *variant = (struct EnumItem *) casted->body.stmts[i];
+                int arity = variant->params.count;
+
+                if (arity == 0) {
+                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                        copyString(variant->name.start, variant->name.length)));
+                    uint8_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
+                    emitBytes(OP_CONSTRUCT_VARIANT, tagConst);
+                    emitByte(enumConst);
+                    emitByte(0);
+                } else {
+                    Compiler compiler;
+                    initCompiler(&compiler, TYPE_FUNCTION, &variant->name);
+                    beginScope();
+
+                    for (int j = 0; j < arity; j++) {
+                        declareVariable(&variant->params.parameters[j]->name);
+                        uint8_t c = identifierConstant(&variant->params.parameters[j]->name);
+                        defineVariable(c);
+                    }
+
+                    uint8_t tagConst = makeConstant(OBJ_VAL(
+                        copyString(variant->name.start, variant->name.length)));
+                    uint8_t enumConst = makeConstant(OBJ_VAL(enumNameStr));
+                    emitBytes(OP_CONSTRUCT_VARIANT, tagConst);
+                    emitByte(enumConst);
+                    emitByte((uint8_t) arity);
+                    for (int j = 0; j < arity; j++) {
+                        emitBytes(OP_GET_LOCAL, j + 1);
+                    }
+                    emitByte(OP_RETURN);
+
+                    ObjFunction *function = endCompiler();
+                    function->arity = arity;
+                    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+                    for (int j = 0; j < function->upvalueCount; j++) {
+                        emitByte(compiler.upvalues[j].isLocal ? 1 : 0);
+                        emitByte(compiler.upvalues[j].index);
+                    }
+                }
+
+                uint8_t methodConst = identifierConstant(&variant->name);
+                emitBytes(OP_METHOD, methodConst);
+            }
+
+            emitByte(OP_POP);
+            break;
+        }
+        case NODE_MATCH: {
+            struct Match *casted = (struct Match *) node;
+
+            // Put the subject in a local so we can reference it stably
+            beginScope();
+            compileNode((Node *) casted->subject);
+            Token matchSubject = syntheticToken("$match");
+            addLocal(matchSubject);
+            markInitialized();
+            int subjectSlot = current->localCount - 1;
+
+            int armEndJumps[256];
+            int armCount = 0;
+
+            for (int i = 0; i < casted->arms.count; i++) {
+                struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
+
+                // Get subject's tag for comparison
+                emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                emitByte(OP_GET_TAG);
+
+                uint8_t tagConst = makeConstant(OBJ_VAL(
+                    copyString(arm->variantName.start, arm->variantName.length)));
+                emitBytes(OP_CONSTANT, tagConst);
+                emitByte(OP_EQUAL);
+
+                int nextArm = emitJump(OP_JUMP_IF_FALSE);
+                emitByte(OP_POP); // pop true
+
+                // Bind variant fields to locals
+                beginScope();
+                for (int j = 0; j < arm->bindings.count; j++) {
+                    emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                    emitBytes(OP_CONSTANT, makeConstant(NUMBER_VAL(j)));
+                    emitByte(OP_GETITEM);
+                    declareVariable(&arm->bindings.parameters[j]->name);
+                    uint8_t c = identifierConstant(&arm->bindings.parameters[j]->name);
+                    defineVariable(c);
+                }
+
+                // Compile the arm body
+                compileTree(&arm->body);
+                endScope();
+
+                armEndJumps[armCount++] = emitJump(OP_JUMP);
+
+                patchJump(nextArm);
+                emitByte(OP_POP); // pop false
+            }
+
+            // No arm matched — nil result
+            if (exprContext) {
+                emitByte(OP_NIL);
+            }
+
+            for (int i = 0; i < armCount; i++) {
+                patchJump(armEndJumps[i]);
+            }
+            endScope(); // pop subject local
+            break;
+        }
+        case NODE_MATCHARM:
+            break;
         case NODE_IMPORT: {
             struct Import *casted = (struct Import *) node;
             compileNode((Node *) casted->expression);
