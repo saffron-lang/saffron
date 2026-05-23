@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/crafting-interpreters.iml" filepath="$PROJECT_DIR$/.idea/crafting-interpreters.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/saffron.iml" filepath="$PROJECT_DIR$/.idea/saffron.iml" />
     </modules>
   </component>
 </project>
