@@ -552,7 +552,7 @@ Type *parseFile(const char *path, int length) {
 
     char *source = readFile(path);
     if (source == NULL) {
-        return (Type *) anyType;
+        return NULL;
     }
 
     TypeEnvironment *oldEnv = currentEnv;
@@ -1075,20 +1075,21 @@ Type *evaluateNode(Node *node) {
             }
 
             type->returnType = evaluateNode((Node *) casted->returnType);
+
+            // Pre-register in enclosing scope for recursive calls
+            tableSet(
+                    &currentEnv->enclosing->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(type)
+            );
+
             evaluateTypes(&casted->body);
             if (!type->returnType) {
                 type->returnType = (Type *) nilType;
             }
 
             currentEnv = currentEnv->enclosing;
-
-            tableSet(
-                    &currentEnv->locals, copyString(
-                            casted->name.start, casted->name.length
-                    ),
-                    OBJ_VAL(type)
-            );
-
             currentFuncType = oldFuncType;
             return (Type *) type;
         }
@@ -1329,15 +1330,16 @@ Type *evaluateNode(Node *node) {
             struct Literal *expr = casted->expression;
             ObjString *str = AS_STRING(expr->value);
             Type *type = parseFile(str->chars, str->length);
+            if (type == NULL) {
+                errorAt(&casted->name, "Could not resolve import");
+                return NULL;
+            }
             tableSet(
                     &currentEnv->locals, copyString(
                             casted->name.start, casted->name.length
                     ),
                     OBJ_VAL(type)
             );
-            // TODO: Make this actually read the targeted file
-            // Don't just accept an expr, accept a string or cast to string literal
-            // Also support builtins
 
             return NULL;
         }
