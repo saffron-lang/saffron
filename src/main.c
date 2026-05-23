@@ -108,10 +108,11 @@ static void checkFile(const char *path) {
     }
 
     printDiagnosticsJson(&diagnostics, path);
+    int exitCode = diagnostics.count > 0 ? 65 : 0;
     freeDiagnosticArray(&diagnostics);
     free(source);
 
-    exit(diagnostics.count > 0 ? 65 : 0);
+    exit(exitCode);
 }
 
 int main(int argc, const char *argv[]) {
