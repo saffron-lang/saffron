@@ -1295,6 +1295,28 @@ ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
     return module;
 }
 
+InterpretResult interpretInModule(StmtArray *body, ObjModule *module) {
+    push(OBJ_VAL(module));
+    ObjFunction *function = compile(body);
+    if (function == NULL) {
+        pop();
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    function->module = module;
+    push(OBJ_VAL(function));
+    ObjClosure *closure = newClosure(function);
+    pop();
+    push(OBJ_VAL(closure));
+    call(closure, 0);
+    vm.vmReady = true;
+
+    InterpretResult result = run(module);
+
+    pop();
+    return result;
+}
+
 char *remove_n(char *dst, const char *filename, int n) {
     size_t len = strlen(filename);
     memcpy(dst, filename, len - n);

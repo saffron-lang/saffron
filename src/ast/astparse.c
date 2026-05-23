@@ -1027,12 +1027,29 @@ static Stmt *forStatement() {
 }
 
 static Stmt *importStatement() {
-    consume(TOKEN_STRING, "Expect '\"' after import.");
-    Expr *s = string(false);
     struct Import *result = ALLOCATE_NODE(struct Import, NODE_IMPORT);
-    result->expression = s;
-    consume(TOKEN_AS, "Expect 'as' after import path.");
-    result->name = parseVariable("Expect name after 'as' in import.");
+    initTokenArray(&result->names);
+
+    if (match(TOKEN_LEFT_BRACE)) {
+        // import { name1, name2 } from "path"
+        do {
+            consume(TOKEN_IDENTIFIER, "Expect name in import list.");
+            writeTokenArray(&result->names, parser.previous, parser.previous.line);
+        } while (match(TOKEN_COMMA));
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after import names.");
+        // Expect 'from' — it's not a keyword, just an identifier
+        consume(TOKEN_IDENTIFIER, "Expect 'from' after import list.");
+        consume(TOKEN_STRING, "Expect path after 'from'.");
+        result->expression = string(false);
+        result->name = result->names.tokens[0]; // placeholder
+    } else {
+        // import "path" as Name
+        consume(TOKEN_STRING, "Expect '\"' after import.");
+        result->expression = string(false);
+        consume(TOKEN_AS, "Expect 'as' after import path.");
+        result->name = parseVariable("Expect name after 'as' in import.");
+    }
+
     match(TOKEN_SEMICOLON);
     return result;
 }
