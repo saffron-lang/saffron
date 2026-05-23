@@ -292,15 +292,20 @@ static Type* findGenericResolution(TypeEnvironment *typeEnvironment, Type *subcl
     return findGenericResolution(typeEnvironment->enclosing, subclass);
 }
 
-static bool isSubType(Type *subclass, Type *superclass) {
-    // TODO: Make this actually work
-    // TODO: Maybe this should actually be "isSubClass", left to right
-    // If left is a subclass of right, then we can assign right to left
-    // Subclasses include generics
+static int isSubTypeDepth = 0;
+static bool isSubTypeInner(Type *subclass, Type *superclass);
 
-    if (subclass == superclass) {
-        return true;
-    }
+static bool isSubType(Type *subclass, Type *superclass) {
+    if (subclass == NULL || superclass == NULL) return true;
+    if (subclass == superclass) return true;
+    if (isSubTypeDepth > 64) return true;
+    isSubTypeDepth++;
+    bool result = isSubTypeInner(subclass, superclass);
+    isSubTypeDepth--;
+    return result;
+}
+
+static bool isSubTypeInner(Type *subclass, Type *superclass) {
 
     if (superclass == neverType) {
         return false;
@@ -513,6 +518,8 @@ Type *getTypeOf(Value value) {
 
 void evaluateTypes(StmtArray *statements) {
     for (int i = 0; i < statements->count; i++) {
+        if (hadError) return;
+        panicMode = false;
         evaluateNode((Node *) statements->stmts[i]);
     }
 }
@@ -550,7 +557,8 @@ Type *parseFile(const char *path, int length) {
         return AS_OBJ(cached);
     }
 
-    char *source = readFile(path);
+    char *resolved = findModule(path, NULL);
+    char *source = readFile(resolved);
     if (source == NULL) {
         return NULL;
     }
@@ -573,10 +581,16 @@ Type *parseFile(const char *path, int length) {
     return type;
 }
 
+static int evaluateNodeDepth = 0;
+
 Type *evaluateNode(Node *node) {
     if (node == NULL) {
         return NULL;
     }
+    if (evaluateNodeDepth > 256) {
+        return (Type *) anyType;
+    }
+    evaluateNodeDepth++;
     switch (node->type) {
         case NODE_BINARY: {
             struct Binary *casted = (struct Binary *) node;
@@ -650,8 +664,8 @@ Type *evaluateNode(Node *node) {
             struct Call *casted = (struct Call *) node;
             Type *calleeType = evaluateNode((Node *) casted->callee);
 
-            if (calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
-                errorAt(&casted->paren, "Type is not callable");
+            if (calleeType == NULL || calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
+                if (calleeType != NULL) errorAt(&casted->paren, "Type is not callable");
                 return (NULL);
             }
 
@@ -726,6 +740,7 @@ Type *evaluateNode(Node *node) {
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             Type *objectType = evaluateNode((Node *) casted->object);
+            if (objectType == NULL) return NULL;
             SimpleType *rootType;
 
             switch (objectType->obj.type) {
@@ -1661,6 +1676,7 @@ Type *evaluateNode(Node *node) {
         }
     }
 
+    evaluateNodeDepth--;
     return NULL;
 }
 
