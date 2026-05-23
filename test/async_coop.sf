@@ -1,0 +1,22 @@
+import "@async" as Async
+
+fun worker(name: String, duration: Number) {
+    IO.println(name + " starting")
+    Async.sleep(duration)
+    IO.println(name + " done")
+    return name + " result"
+}
+
+// Spawn multiple tasks
+var t1 = Task.spawn(fun () => worker("A", 0.1))
+var t2 = Task.spawn(fun () => worker("B", 0.05))
+var t3 = Task.spawn(fun () => worker("C", 0.02))
+
+// Await them all
+var r1 = Async.await(t1)
+var r2 = Async.await(t2)
+var r3 = Async.await(t3)
+
+IO.println(r1)
+IO.println(r2)
+IO.println(r3)

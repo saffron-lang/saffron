@@ -1,0 +1,31 @@
+// Simple list destructuring
+let [a, b, c] = [1, 2, 3]
+IO.println(a);
+IO.println(b);
+IO.println(c);
+
+// Splat in the middle
+let [head, *middle, tail] = [1, 2, 3, 4, 5]
+IO.println(head);
+IO.println(middle);
+IO.println(tail);
+
+// Splat at the start
+let [*rest, last] = [10, 20, 30, 40]
+IO.println(rest);
+IO.println(last);
+
+// Splat at the end
+let [first, *others] = [100, 200, 300]
+IO.println(first);
+IO.println(others);
+
+// Enum destructuring
+enum Option {
+    Some(value: Number),
+    None
+}
+
+var x = Option.Some(42)
+let Some(result) = x;
+IO.println(result);

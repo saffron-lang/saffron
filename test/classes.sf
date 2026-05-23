@@ -14,7 +14,7 @@ pair.second = 2;
 IO.println(pair.first + pair.second); // 3.
 
 class Brunch {
-  eggs() {
+  fun eggs() {
     IO.println("10")
   }
 
@@ -25,7 +25,7 @@ var brunch = Brunch();
 var eggs = brunch.eggs;
 
 class Scone {
-  topping(first: String, second: String) {
+  fun topping(first: String, second: String) {
     IO.println("scone with " + first + " and " + second);
   }
 }
@@ -37,12 +37,12 @@ class CoffeeMaker {
   var coffee: String
   var tube: (Number) => String
 
-  init(coffee) {
+  fun init(coffee) {
     this.tube = fun (a: Number) => { return "beans" }
     this.coffee = coffee;
   }
 
-  brew() {
+  fun brew() {
     IO.println("Enjoy your cup of " + this.coffee);
 
     // No reusing the grounds!

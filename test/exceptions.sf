@@ -1,0 +1,53 @@
+// Basic throw/catch
+try {
+    IO.println("before throw")
+    throw "something went wrong"
+    IO.println("after throw")
+} catch (e) {
+    IO.println("caught: " + e)
+}
+
+// Nested try/catch
+try {
+    try {
+        throw "inner error"
+    } catch (e) {
+        IO.println("inner caught: " + e)
+        throw "rethrown"
+    }
+} catch (e) {
+    IO.println("outer caught: " + e)
+}
+
+// No throw — normal flow
+try {
+    IO.println("no error here")
+} catch (e) {
+    IO.println("should not print")
+}
+
+// Finally block
+try {
+    IO.println("try body")
+    throw "oops"
+} catch (e) {
+    IO.println("caught: " + e)
+} finally {
+    IO.println("finally runs")
+}
+
+// Function that throws
+fun risky(x: Number) {
+    if (x > 5) {
+        throw "too big!"
+    }
+    return x * 2
+}
+
+IO.println(risky(3))
+
+try {
+    IO.println(risky(10))
+} catch (e) {
+    IO.println("caught from function: " + e)
+}

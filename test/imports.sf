@@ -1,4 +1,4 @@
-import "lib/future.sf" as future; // Builtin module
+import "@future" as future
 import "../test/inheritance.sf" as inheritance;
 
 var k = inheritance.Cruller();
