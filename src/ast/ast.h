@@ -309,7 +309,7 @@ struct Function {
 struct Class {
     Stmt self;
     Token name;
-    struct Variable* superclass;
+    ExprArray superclasses;
     StmtArray body;
     TypeNodeArray generics;
 };

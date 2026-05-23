@@ -1222,11 +1222,18 @@ Type *evaluateNode(Node *node) {
             classType->superType = NULL;
             classType->genericArgs = genericArgs;
 
-            if (casted->superclass) {
-                SimpleType *superType = getTypeDef(casted->superclass->name);
-                copyTable(&superType->fields, &classType->fields);
-                copyTable(&superType->methods, &classType->methods);
-                classType->superType = (Type *) superType;
+            for (int i = 0; i < casted->superclasses.count; i++) {
+                struct Variable *superVar = (struct Variable *) casted->superclasses.exprs[i];
+                Type *superType = getTypeDef(superVar->name);
+                if (superType && (superType->obj.type == OBJ_PARSE_TYPE ||
+                                  superType->obj.type == OBJ_PARSE_INTERFACE_TYPE)) {
+                    SimpleType *st = (SimpleType *) superType;
+                    tableAddAll(&st->fields, &classType->fields);
+                    tableAddAll(&st->methods, &classType->methods);
+                    if (i == 0) {
+                        classType->superType = superType;
+                    }
+                }
             }
 
             for (int j = 0; j < casted->body.count; j++) {
@@ -1587,6 +1594,31 @@ Type *evaluateNode(Node *node) {
                     if (!type->returnType) {
                         type->returnType = (Type *) nilType;
                     }
+                } else if (casted->body.stmts[j]->self.type == NODE_FUNCTION) {
+                    struct Function *method = (struct Function *) casted->body.stmts[j];
+
+                    FunctorType *type = newFunctorType();
+                    for (int i = 0; i < method->params.count; i++) {
+                        TypeNode *typeNode = method->params.parameters[i]->type;
+                        Type *argType;
+                        if (typeNode != NULL) {
+                            argType = evaluateNode((Node *) typeNode);
+                        } else {
+                            argType = (Type *) anyType;
+                        }
+                        writeValueArray(&type->arguments, OBJ_VAL(argType));
+                    }
+
+                    type->returnType = evaluateNode((Node *) method->returnType);
+                    if (!type->returnType) {
+                        type->returnType = (Type *) nilType;
+                    }
+
+                    tableSet(
+                            &interfaceType->methods,
+                            copyString(method->name.start, method->name.length),
+                            OBJ_VAL(type)
+                    );
                 } else {
                     struct Var *var = (struct Var *) casted->body.stmts[j];
                     Type *type = evaluateNode((Node *) var->type);
