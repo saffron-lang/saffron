@@ -128,6 +128,8 @@ static Expr *ifStatement(bool canAssign);
 
 static Expr *matchExpression(bool canAssign);
 
+static Expr *tryExpression(bool canAssign);
+
 static TypeNodeArray genericArgDefinitions();
 
 static Stmt *declaration();
@@ -409,7 +411,7 @@ static Expr *super_(bool canAssign) {
 
 static Expr *yield(bool canAssign) {
     struct Yield *result = ALLOCATE_NODE(struct Yield, NODE_YIELD);
-    if (!check(TOKEN_SEMICOLON)) {
+    if (!check(TOKEN_SEMICOLON) && !check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         result->expression = parsePrecedence(PREC_YIELD);
     }
     return result;
@@ -455,6 +457,7 @@ ParseRule parseRules[] = {
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
         [TOKEN_IF]            = {ifStatement, NULL, PREC_NONE},
         [TOKEN_MATCH]         = {matchExpression, NULL, PREC_NONE},
+        [TOKEN_TRY]           = {tryExpression, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL, or_, PREC_OR},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
@@ -984,6 +987,63 @@ static Stmt *enumDestructure(Token variantName) {
     return (Stmt *) result;
 }
 
+static TypeNode *typeAnnotation();
+
+static Expr *tryExpression(bool canAssign) {
+    consume(TOKEN_LEFT_BRACE, "Expect '{' after 'try'.");
+
+    StmtArray tryBody;
+    initStmtArray(&tryBody);
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        writeStmtArray(&tryBody, declaration());
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after try body.");
+
+    StmtArray catchClauses;
+    initStmtArray(&catchClauses);
+    while (match(TOKEN_CATCH)) {
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after 'catch'.");
+        consume(TOKEN_IDENTIFIER, "Expect error binding name.");
+        Token binding = parser.previous;
+
+        TypeNode *type = NULL;
+        if (match(TOKEN_COLON)) {
+            type = typeAnnotation();
+        }
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after catch binding.");
+
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before catch body.");
+        StmtArray body;
+        initStmtArray(&body);
+        while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+            writeStmtArray(&body, declaration());
+        }
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after catch body.");
+
+        struct CatchClause *clause = ALLOCATE_NODE(struct CatchClause, NODE_CATCHCLAUSE);
+        clause->binding = binding;
+        clause->type = type;
+        clause->body = body;
+        writeStmtArray(&catchClauses, (Stmt *) clause);
+    }
+
+    StmtArray finallyBody;
+    initStmtArray(&finallyBody);
+    if (match(TOKEN_FINALLY)) {
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before finally body.");
+        while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+            writeStmtArray(&finallyBody, declaration());
+        }
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after finally body.");
+    }
+
+    struct TryCatch *result = ALLOCATE_NODE(struct TryCatch, NODE_TRYCATCH);
+    result->tryBody = tryBody;
+    result->catchClauses = catchClauses;
+    result->finallyBody = finallyBody;
+    return (Expr *) result;
+}
+
 static Stmt *statement() {
     Stmt *result;
     // if (match(TOKEN_IF)) {
@@ -999,6 +1059,10 @@ static Stmt *statement() {
         result = block();
     } else if (match(TOKEN_IMPORT)) {
         result = importStatement();
+    } else if (match(TOKEN_THROW)) {
+        struct Throw *throwStmt = ALLOCATE_NODE(struct Throw, NODE_THROW);
+        throwStmt->value = expression();
+        result = (Stmt *) throwStmt;
     } else if (match(TOKEN_LET)) {
         if (match(TOKEN_LEFT_BRACKET)) {
             result = listDestructure();

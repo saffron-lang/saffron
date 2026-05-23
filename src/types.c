@@ -48,6 +48,7 @@ InterfaceType *newInterfaceType() {
     push(OBJ_VAL(type));
     initTable(&type->fields);
     initTable(&type->methods);
+    initTable(&type->abstractMethods);
     pop();
     return type;
 }
@@ -576,11 +577,39 @@ Type *evaluateBlock(StmtArray *statements) {
     return last;
 }
 
+static void preRegisterDeclarations(StmtArray *statements) {
+    for (int i = 0; i < statements->count; i++) {
+        Node *node = (Node *) statements->stmts[i];
+        if (node->type == NODE_FUNCTION) {
+            struct Function *fn = (struct Function *) node;
+            FunctorType *placeholder = newFunctorType();
+            placeholder->returnType = (Type *) anyType;
+            tableSet(&currentEnv->locals, copyString(fn->name.start, fn->name.length), OBJ_VAL(placeholder));
+        } else if (node->type == NODE_CLASS) {
+            struct Class *cls = (struct Class *) node;
+            SimpleType *placeholder = newSimpleType();
+            tableSet(&currentEnv->locals, copyString(cls->name.start, cls->name.length), OBJ_VAL(placeholder));
+            tableSet(&currentEnv->typeDefs, copyString(cls->name.start, cls->name.length), OBJ_VAL(placeholder));
+        } else if (node->type == NODE_ENUM) {
+            struct Enum *en = (struct Enum *) node;
+            SimpleType *placeholder = newSimpleType();
+            tableSet(&currentEnv->locals, copyString(en->name.start, en->name.length), OBJ_VAL(placeholder));
+            tableSet(&currentEnv->typeDefs, copyString(en->name.start, en->name.length), OBJ_VAL(placeholder));
+        } else if (node->type == NODE_INTERFACE) {
+            struct Interface *iface = (struct Interface *) node;
+            InterfaceType *placeholder = newInterfaceType();
+            tableSet(&currentEnv->locals, copyString(iface->name.start, iface->name.length), OBJ_VAL(placeholder));
+            tableSet(&currentEnv->typeDefs, copyString(iface->name.start, iface->name.length), OBJ_VAL(placeholder));
+        }
+    }
+}
+
 void evaluateTree(StmtArray *statements) {
     TypeEnvironment typeEnv;
     initTypeEnvironment(&typeEnv, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnv);
     currentEnv = &typeEnv;
+    preRegisterDeclarations(statements);
     evaluateTypes(statements);
     currentEnv = typeEnv.enclosing;
 }
@@ -1222,11 +1251,11 @@ Type *evaluateNode(Node *node) {
             classType->superType = NULL;
             classType->genericArgs = genericArgs;
 
+            // First pass: copy from class parents only (not interfaces)
             for (int i = 0; i < casted->superclasses.count; i++) {
                 struct Variable *superVar = (struct Variable *) casted->superclasses.exprs[i];
                 Type *superType = getTypeDef(superVar->name);
-                if (superType && (superType->obj.type == OBJ_PARSE_TYPE ||
-                                  superType->obj.type == OBJ_PARSE_INTERFACE_TYPE)) {
+                if (superType && superType->obj.type == OBJ_PARSE_TYPE) {
                     SimpleType *st = (SimpleType *) superType;
                     tableAddAll(&st->fields, &classType->fields);
                     tableAddAll(&st->methods, &classType->methods);
@@ -1328,6 +1357,32 @@ Type *evaluateNode(Node *node) {
                     ),
                     OBJ_VAL(classType)
             );
+
+            // Interface conformance: check abstract methods, then copy defaults
+            for (int i = 0; i < casted->superclasses.count; i++) {
+                struct Variable *superVar = (struct Variable *) casted->superclasses.exprs[i];
+                Type *superType = getTypeDef(superVar->name);
+                if (superType && superType->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
+                    InterfaceType *iface = (InterfaceType *) superType;
+                    for (int j = 0; j < iface->abstractMethods.capacity; j++) {
+                        Entry *entry = &iface->abstractMethods.entries[j];
+                        if (entry->key != NULL) {
+                            Value impl;
+                            if (!tableGet(&classType->methods, entry->key, &impl)) {
+                                fprintf(stderr, "[line %d] Error at '%.*s': Missing implementation for '%s' from interface\n",
+                                        casted->name.line, casted->name.length, casted->name.start, entry->key->chars);
+                                hadError = true;
+                            }
+                        }
+                    }
+                    // Copy interface methods (defaults) that class doesn't override
+                    tableAddAll(&iface->fields, &classType->fields);
+                    tableAddAll(&iface->methods, &classType->methods);
+                    if (classType->superType == NULL) {
+                        classType->superType = superType;
+                    }
+                }
+            }
 
             currentClassType = oldClass;
             return (Type *) classType;
@@ -1579,11 +1634,9 @@ Type *evaluateNode(Node *node) {
                         writeValueArray(&type->arguments, OBJ_VAL(argType));
                     }
 
-                    tableSet(
-                            &interfaceType->methods,
-                            copyString(method->name.start, method->name.length),
-                            OBJ_VAL(type)
-                    );
+                    ObjString *methodName = copyString(method->name.start, method->name.length);
+                    tableSet(&interfaceType->methods, methodName, OBJ_VAL(type));
+                    tableSet(&interfaceType->abstractMethods, methodName, BOOL_VAL(true));
 
                     if (method->functionType != TYPE_INITIALIZER) {
                         type->returnType = evaluateNode((Node *) method->returnType);

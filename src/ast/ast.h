@@ -58,6 +58,9 @@ typedef enum {
     NODE_MATCH,
     NODE_MATCHARM,
     NODE_DESTRUCTURE,
+    NODE_THROW,
+    NODE_TRYCATCH,
+    NODE_CATCHCLAUSE,
     NODE_METHODSIG,
     NODE_POSITIONAL,
     NODE_KEYWORD,
@@ -384,6 +387,25 @@ struct Destructure {
     Expr* value;
     Token variant;
     int splatPosition;
+};
+
+struct Throw {
+    Stmt self;
+    Expr* value;
+};
+
+struct TryCatch {
+    Stmt self;
+    StmtArray tryBody;
+    StmtArray catchClauses;
+    StmtArray finallyBody;
+};
+
+struct CatchClause {
+    Stmt self;
+    Token binding;
+    TypeNode* type;
+    StmtArray body;
 };
 
 struct MethodSig {
