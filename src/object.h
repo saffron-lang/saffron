@@ -61,6 +61,17 @@ struct Obj {
     struct Obj *next;
 };
 
+typedef enum {
+    OVERLOAD_ANY,
+    OVERLOAD_NUMBER,
+    OVERLOAD_STRING,
+    OVERLOAD_BOOL,
+    OVERLOAD_LIST,
+    OVERLOAD_MAP,
+    OVERLOAD_INSTANCE,
+    OVERLOAD_NIL,
+} OverloadParamType;
+
 typedef struct {
     Obj obj;
     int arity;
@@ -68,6 +79,7 @@ typedef struct {
     Chunk chunk;
     ObjString *name;
     void *module;
+    OverloadParamType firstParamType;
 } ObjFunction;
 
 typedef Value (*NativeFn)(int argCount, Value *args);
@@ -160,13 +172,14 @@ typedef struct {
     int capacity;
     ObjClosure **closures;
     int *arities;
+    OverloadParamType *firstParamTypes;
 } ObjOverloadSet;
 
 #define IS_OVERLOAD_SET(value) isObjType(value, OBJ_OVERLOAD_SET)
 #define AS_OVERLOAD_SET(value) ((ObjOverloadSet*)AS_OBJ(value))
 
 ObjOverloadSet *newOverloadSet();
-void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity);
+void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity, OverloadParamType firstParamType);
 
 #define IS_ENUM_INSTANCE(value) isObjType(value, OBJ_ENUM_INSTANCE)
 #define AS_ENUM_INSTANCE(value) ((ObjEnumInstance*)AS_OBJ(value))

@@ -707,6 +707,30 @@ void compileNode(Node *node) {
             ObjFunction *function = endCompiler();
             function->arity = casted->params.count;
 
+            // Determine first parameter type for overload dispatch
+            if (casted->params.count > 0) {
+                TypeNode *firstType = casted->params.parameters[0]->type;
+                if (firstType != NULL && firstType->self.type == NODE_SIMPLE) {
+                    struct Simple *simple = (struct Simple *) firstType;
+                    if (simple->name.length == 6 && memcmp(simple->name.start, "Number", 6) == 0)
+                        function->firstParamType = OVERLOAD_NUMBER;
+                    else if (simple->name.length == 6 && memcmp(simple->name.start, "String", 6) == 0)
+                        function->firstParamType = OVERLOAD_STRING;
+                    else if (simple->name.length == 4 && memcmp(simple->name.start, "Bool", 4) == 0)
+                        function->firstParamType = OVERLOAD_BOOL;
+                    else if (simple->name.length == 3 && memcmp(simple->name.start, "Nil", 3) == 0)
+                        function->firstParamType = OVERLOAD_NIL;
+                    else if (simple->name.length == 4 && memcmp(simple->name.start, "List", 4) == 0)
+                        function->firstParamType = OVERLOAD_LIST;
+                    else if (simple->name.length == 3 && memcmp(simple->name.start, "Map", 3) == 0)
+                        function->firstParamType = OVERLOAD_MAP;
+                    else if (simple->name.length == 3 && memcmp(simple->name.start, "Any", 3) == 0)
+                        function->firstParamType = OVERLOAD_ANY;
+                    else
+                        function->firstParamType = OVERLOAD_INSTANCE;
+                }
+            }
+
             emitByte(OP_CLOSURE);
             emitConstantIndex(makeConstant(OBJ_VAL(function)));
             if (casted->functionType == TYPE_FUNCTION) {
