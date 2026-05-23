@@ -196,7 +196,7 @@ fun pretty(value: Any): String {
         return "  ".repeat(depth)
     }
 
-    fun fmt(val, depth: Number): String {
+    fun fmt(val: Any, depth: Number): String {
         if (val == nil) { return "null" }
         if (val == true) { return "true" }
         if (val == false) { return "false" }

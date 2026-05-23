@@ -1,23 +1,66 @@
 // Saffron Test Framework
-// Full-featured: assertions, async tests, mocking
+// Decorator-based test discovery with assertions and reporting
+//
+// Usage:
+//   import "@test" as T
+//
+//   @T.test
+//   fun test_math() {
+//       T.assert_eq(1 + 1, 2, "addition")
+//   }
+//
+//   @T.skip("not ready")
+//   fun test_todo() { ... }
+//
+//   @T.only
+//   fun test_focused() { ... }
+//
+//   T.run_all()
 
-var passed = 0
-var failed = 0
-var total = 0
+// --- Internal State ---
+var _tests = []
+var _only_tests = []
+var _passed = 0
+var _failed = 0
+var _skipped = 0
+var _total = 0
+
+// --- Test Discovery Decorators ---
+
+fun test(fn: Any): Any {
+    _tests.push({"name": fn, "fn": fn})
+    return fn
+}
+
+fun skip(reason: String): Any {
+    return fun (fn: Any) => {
+        _skipped = _skipped + 1
+        return fn;
+    }
+}
+
+fun only(fn: Any): Any {
+    _only_tests.push({"name": fn, "fn": fn})
+    _tests.push({"name": fn, "fn": fn})
+    return fn
+}
 
 // --- Assertions ---
 
 fun assert(condition: Bool, msg: String) {
-    total = total + 1
-    if (condition) { passed = passed + 1 }
-    else { failed = failed + 1; IO.println("    FAIL: ${msg}") }
+    _total = _total + 1
+    if (condition) { _passed = _passed + 1 }
+    else {
+        _failed = _failed + 1
+        IO.println("    FAIL: ${msg}")
+    }
 }
 
 fun assert_eq(actual: Any, expected: Any, msg: String) {
-    total = total + 1
-    if (actual == expected) { passed = passed + 1 }
+    _total = _total + 1
+    if (actual == expected) { _passed = _passed + 1 }
     else {
-        failed = failed + 1
+        _failed = _failed + 1
         IO.println("    FAIL: ${msg}")
         IO.println("      expected: ${expected}")
         IO.println("      actual:   ${actual}")
@@ -25,41 +68,41 @@ fun assert_eq(actual: Any, expected: Any, msg: String) {
 }
 
 fun assert_neq(actual: Any, expected: Any, msg: String) {
-    total = total + 1
-    if (actual != expected) { passed = passed + 1 }
+    _total = _total + 1
+    if (actual != expected) { _passed = _passed + 1 }
     else {
-        failed = failed + 1
+        _failed = _failed + 1
         IO.println("    FAIL: ${msg} (should not equal ${expected})")
     }
 }
 
 fun assert_gt(actual: Number, expected: Number, msg: String) {
-    total = total + 1
-    if (actual > expected) { passed = passed + 1 }
-    else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not > ${expected})") }
+    _total = _total + 1
+    if (actual > expected) { _passed = _passed + 1 }
+    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (${actual} not > ${expected})") }
 }
 
 fun assert_lt(actual: Number, expected: Number, msg: String) {
-    total = total + 1
-    if (actual < expected) { passed = passed + 1 }
-    else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not < ${expected})") }
+    _total = _total + 1
+    if (actual < expected) { _passed = _passed + 1 }
+    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (${actual} not < ${expected})") }
 }
 
 fun assert_throws(body: Any, msg: String) {
-    total = total + 1
+    _total = _total + 1
     var threw = false
     try { body() } catch (e) { threw = true }
-    if (threw) { passed = passed + 1 }
-    else { failed = failed + 1; IO.println("    FAIL: ${msg} (expected throw)") }
+    if (threw) { _passed = _passed + 1 }
+    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} (expected throw)") }
 }
 
 fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
-    total = total + 1
+    _total = _total + 1
     var caught_msg = nil
     try { body() } catch (e) { caught_msg = e }
-    if (caught_msg == expected_msg) { passed = passed + 1 }
+    if (caught_msg == expected_msg) { _passed = _passed + 1 }
     else {
-        failed = failed + 1
+        _failed = _failed + 1
         if (caught_msg == nil) {
             IO.println("    FAIL: ${msg} (no throw)")
         } else {
@@ -69,122 +112,54 @@ fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
 }
 
 fun assert_contains(haystack: String, needle: String, msg: String) {
-    total = total + 1
-    if (haystack.contains(needle)) { passed = passed + 1 }
-    else { failed = failed + 1; IO.println("    FAIL: ${msg} ('${haystack}' missing '${needle}')") }
+    _total = _total + 1
+    if (haystack.contains(needle)) { _passed = _passed + 1 }
+    else { _failed = _failed + 1; IO.println("    FAIL: ${msg} ('${haystack}' missing '${needle}')") }
 }
 
-// --- Mocking ---
-
-fun mock(name: String) {
-    var calls = []
-    var return_value = nil
-
-    fun get_fn() {
-        return fun () => {
-            calls.push([])
-            return return_value;
-        }
-    }
-
-    fun get_fn1() {
-        return fun (a: Any) => {
-            calls.push([a])
-            return return_value;
-        }
-    }
-
-    fun get_fn2() {
-        return fun (a: Any, b: Any) => {
-            calls.push([a, b])
-            return return_value;
-        }
-    }
-
-    fun call_count(): Number {
-        return calls.length()
-    }
-
-    fun called(): Bool {
-        return calls.length() > 0
-    }
-
-    fun last_args() {
-        if (calls.length() == 0) { return nil; }
-        return calls[calls.length() - 1]
-    }
-
-    fun returns(value: Any) {
-        return_value = value
-    }
-
-    fun reset() {
-        calls = []
-        return_value = nil
-    }
-
-    // Return a map-like object with mock utilities
-    var m: Map<String, Any> = {
-        "fn": get_fn(),
-        "fn1": get_fn1(),
-        "fn2": get_fn2(),
-        "call_count": call_count,
-        "called": called,
-        "last_args": last_args,
-        "returns": returns,
-        "reset": reset,
-        "calls": calls
-    }
-    return m
-}
-
-// --- Async Testing ---
-
-fun async_test(name: String, body: Any, timeout_secs: Number) {
-    total = total + 1
-    var task = Task.spawn(body)
-
-    var elapsed = 0
-    var interval = 0.01
-    while (!task.isReady()) {
-        yield [1, interval]
-        elapsed = elapsed + interval
-        if (elapsed >= timeout_secs) {
-            failed = failed + 1
-            IO.println("    FAIL: ${name} (timeout after ${timeout_secs}s)")
-            return;
-        }
-    }
-
-    var result = task.getResult()
-    if (result == false) {
-        failed = failed + 1
-        IO.println("    FAIL: ${name}")
-    } else {
-        passed = passed + 1
-    }
-}
-
-// --- Reporting ---
+// --- Runner ---
 
 fun section(name: String) {
     IO.println("  ${name}")
 }
 
-fun summary() {
+fun run_all() {
+    var to_run = _only_tests
+    if (_only_tests.length() == 0) {
+        to_run = _tests
+    }
+
+    IO.println("Running ${to_run.length()} tests (${_skipped} skipped)")
     IO.println("")
-    if (failed == 0) {
-        IO.println("  All ${total} tests passed")
+
+    for (entry in to_run) {
+        var fn = entry["fn"]
+        try {
+            fn()
+        } catch (e) {
+            _failed = _failed + 1
+            _total = _total + 1
+            IO.println("    CRASH: ${e}")
+        }
+    }
+
+    IO.println("")
+    if (_failed == 0) {
+        IO.println("  All ${_total} assertions passed")
     } else {
-        IO.println("  ${passed}/${total} passed, ${failed} failed")
+        IO.println("  ${_passed}/${_total} passed, ${_failed} failed")
+    }
+
+    if (_failed > 0) {
+        throw "Test suite failed"
     }
 }
 
-fun run(name: String, body: Any) {
-    IO.println(name)
-    body()
-    summary()
-    if (failed > 0) {
-        throw "Test suite failed"
+fun summary() {
+    IO.println("")
+    if (_failed == 0) {
+        IO.println("  All ${_total} assertions passed")
+    } else {
+        IO.println("  ${_passed}/${_total} passed, ${_failed} failed")
     }
 }
