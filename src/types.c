@@ -139,6 +139,12 @@ SimpleType *taskTypeDef;
 Table modules;
 Table builtinModules;
 
+static void defineMethodType(SimpleType *onType, const char *name, Type *returnType) {
+    FunctorType *ft = newFunctorType();
+    ft->returnType = returnType;
+    tableSet(&onType->methods, copyString(name, (int)strlen(name)), OBJ_VAL(ft));
+}
+
 void makeTypes() {
     numberType = newSimpleType();
     nilType = newSimpleType();
@@ -147,6 +153,20 @@ void makeTypes() {
     stringType = newSimpleType();
     neverType = newSimpleType();
     anyType = newSimpleType();
+
+    defineMethodType(stringType, "length", (Type *) numberType);
+    defineMethodType(stringType, "split", (Type *) anyType);
+    defineMethodType(stringType, "trim", (Type *) stringType);
+    defineMethodType(stringType, "contains", (Type *) boolType);
+    defineMethodType(stringType, "starts_with", (Type *) boolType);
+    defineMethodType(stringType, "ends_with", (Type *) boolType);
+    defineMethodType(stringType, "replace", (Type *) stringType);
+    defineMethodType(stringType, "to_upper", (Type *) stringType);
+    defineMethodType(stringType, "to_lower", (Type *) stringType);
+    defineMethodType(stringType, "slice", (Type *) stringType);
+    defineMethodType(stringType, "index_of", (Type *) numberType);
+    defineMethodType(stringType, "repeat", (Type *) stringType);
+
     listTypeDef = createListTypeDef();
     mapTypeDef = createMapTypeDef();
     taskTypeDef = createTaskTypeDef();
@@ -674,18 +694,48 @@ Type *evaluateNode(Node *node) {
             Type *leftType = evaluateNode((Node *) casted->left);
             evaluateNode((Node *) casted->right);
 
+            const char *opMethod = NULL;
+            bool isBoolOp = false;
+
             switch (casted->operator.type) {
                 case TOKEN_IS:
-                case TOKEN_EQUAL_EQUAL:
-                case TOKEN_BANG_EQUAL:
-                case TOKEN_GREATER:
-                case TOKEN_GREATER_EQUAL:
-                case TOKEN_LESS:
-                case TOKEN_LESS_EQUAL:
                     return (Type *) boolType;
-                default:
-                    return leftType;
+                case TOKEN_PLUS: opMethod = "add"; break;
+                case TOKEN_MINUS: opMethod = "sub"; break;
+                case TOKEN_STAR: opMethod = "mul"; break;
+                case TOKEN_SLASH: opMethod = "div"; break;
+                case TOKEN_MODULO: opMethod = "mod"; break;
+                case TOKEN_LESS: opMethod = "lt"; isBoolOp = true; break;
+                case TOKEN_GREATER: opMethod = "gt"; isBoolOp = true; break;
+                case TOKEN_LESS_EQUAL: opMethod = "lt"; isBoolOp = true; break;
+                case TOKEN_GREATER_EQUAL: opMethod = "gt"; isBoolOp = true; break;
+                case TOKEN_EQUAL_EQUAL: opMethod = "eq"; isBoolOp = true; break;
+                case TOKEN_BANG_EQUAL: opMethod = "eq"; isBoolOp = true; break;
+                default: return leftType;
             }
+
+            if (isBoolOp && (leftType == (Type *) numberType || leftType == (Type *) stringType)) {
+                return (Type *) boolType;
+            }
+            if (!isBoolOp && (leftType == (Type *) numberType || leftType == (Type *) stringType)) {
+                return leftType;
+            }
+
+            if (leftType != NULL && opMethod != NULL &&
+                (leftType->obj.type == OBJ_PARSE_TYPE || leftType->obj.type == OBJ_PARSE_INTERFACE_TYPE)) {
+                SimpleType *st = (SimpleType *) leftType;
+                Value methodVal;
+                ObjString *methodName = copyString(opMethod, strlen(opMethod));
+                if (tableGet(&st->methods, methodName, &methodVal)) {
+                    Type *methodType = AS_OBJ(methodVal);
+                    if (methodType->obj.type == OBJ_PARSE_FUNCTOR_TYPE) {
+                        Type *ret = resolveType(((FunctorType *) methodType)->returnType);
+                        return isBoolOp ? (Type *) boolType : ret;
+                    }
+                }
+            }
+
+            return isBoolOp ? (Type *) boolType : leftType;
         }
         case NODE_GROUPING: {
             struct Grouping *casted = (struct Grouping *) node;
@@ -1226,7 +1276,16 @@ Type *evaluateNode(Node *node) {
         case NODE_CLASS: {
             struct Class *casted = (struct Class *) node;
 
-            SimpleType *classType = newSimpleType();
+            // Reuse pre-registered placeholder if it exists
+            SimpleType *classType = NULL;
+            Value existingType;
+            if (tableGet(&currentEnv->typeDefs, copyString(casted->name.start, casted->name.length), &existingType)) {
+                Type *existing = AS_OBJ(existingType);
+                if (existing->obj.type == OBJ_PARSE_TYPE) {
+                    classType = (SimpleType *) existing;
+                }
+            }
+            if (classType == NULL) classType = newSimpleType();
             Type *oldClass = currentClassType;
             currentClassType = (Type *) classType;
             FunctorType *classFunctionType = newFunctorType();
