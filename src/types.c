@@ -375,14 +375,22 @@ static bool isSubType(Type *subclass, Type *superclass) {
                     return false;
                 }
 
+                ValueTable snapshot;
+                copyValueTable(&currentEnv->genericResolutions, &snapshot);
+
                 for (int i = 0; i < superclassType->generics.count; i++) {
                     valueTableSet(&currentEnv->genericResolutions, target->genericArgs.values[i],
                                   superclassType->generics.values[i]);
                 }
 
-                // TODO: This needs to actually check the consistency of the generic against the right side
-                // I think its done
-                return isSubType(subclass, superclassType->target);
+                bool result = isSubType(subclass, superclassType->target);
+                if (!result) {
+                    freeValueTable(&currentEnv->genericResolutions);
+                    currentEnv->genericResolutions = snapshot;
+                } else {
+                    freeValueTable(&snapshot);
+                }
+                return result;
             }
 
             if (subclass->obj.type != OBJ_PARSE_GENERIC_TYPE) {
@@ -647,9 +655,13 @@ Type *evaluateNode(Node *node) {
             }
 
             for (int i = 0; i < casted->arguments.count; i++) {
+                Type *oldAssignmentType = currentAssignmentType;
+                if (i < calleeFunctor->arguments.count) {
+                    currentAssignmentType = AS_OBJ(calleeFunctor->arguments.values[i]);
+                }
                 Type *argType = evaluateNode((Node *) casted->arguments.exprs[i]);
-                if (!isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
-                    isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]));
+                currentAssignmentType = oldAssignmentType;
+                if (i < calleeFunctor->arguments.count && !isSubType(argType, AS_OBJ(calleeFunctor->arguments.values[i]))) {
                     errorAt(&casted->paren, "Type mismatch");
                     return NULL;
                 }
@@ -826,8 +838,18 @@ Type *evaluateNode(Node *node) {
                             OBJ_VAL(argType)
                     );
                 } else {
-                    warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
                     Type *argType = (Type *) anyType;
+                    // Infer from call-site context if available
+                    if (currentAssignmentType != NULL &&
+                        currentAssignmentType->obj.type == OBJ_PARSE_FUNCTOR_TYPE) {
+                        FunctorType *expectedFunctor = (FunctorType *) currentAssignmentType;
+                        if (i < expectedFunctor->arguments.count) {
+                            argType = AS_OBJ(expectedFunctor->arguments.values[i]);
+                        }
+                    }
+                    if (argType == (Type *) anyType) {
+                        warnAt(&casted->params.parameters[i]->name, "Missing type annotation, defaulting to Any");
+                    }
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
 
                     tableSet(
