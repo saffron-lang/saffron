@@ -691,6 +691,7 @@ void compileNode(Node *node) {
             struct Function *casted = (struct Function *) node;
             if (current->scopeDepth > 0 && casted->functionType == TYPE_FUNCTION) {
                 declareVariable(&casted->name);
+                markInitialized();
             }
             Compiler compiler;
             initCompiler(&compiler, casted->functionType, &casted->name);
@@ -758,7 +759,8 @@ void compileNode(Node *node) {
                             emitBytes(OP_SET_LOCAL, (uint8_t) slot);
                         }
                     } else {
-                        emitBytes(OP_SET_GLOBAL, nameConst);
+                        emitByte(OP_SET_GLOBAL);
+                        emitConstantIndex(nameConst);
                     }
                     emitByte(OP_POP);
                 }

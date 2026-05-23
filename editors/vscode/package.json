@@ -18,6 +18,13 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "saffron",
+        "scopeName": "source.saffron",
+        "path": "./syntaxes/saffron.tmLanguage.json"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "Saffron",

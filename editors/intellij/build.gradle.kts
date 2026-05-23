@@ -17,6 +17,7 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.1")
+        bundledPlugin("org.jetbrains.plugins.textmate")
     }
 }
 
@@ -27,5 +28,13 @@ kotlin {
 intellijPlatform {
     pluginConfiguration {
         name = "Saffron"
+    }
+}
+
+tasks {
+    prepareSandbox {
+        from("src/main/resources/textmate") {
+            into("saffron-intellij/textmate")
+        }
     }
 }
