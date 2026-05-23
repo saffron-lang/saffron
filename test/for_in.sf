@@ -1,0 +1,19 @@
+// Basic for-in loop
+var items = [10, 20, 30, 40, 50]
+for (item in items) {
+    IO.println(item)
+}
+
+// For-in with inline list
+for (var x in [1, 2, 3]) {
+    IO.println(x * x)
+}
+
+// Nested for-in
+for (row in [[1,2], [3,4], [5,6]]) {
+    for (item in row) {
+        IO.print(item)
+        IO.print(" ")
+    }
+    IO.println("")
+}

@@ -83,6 +83,9 @@ static void freeObject(Obj *object) {
         case OBJ_CLASS: {
             ObjClass *klass = (ObjClass *) object;
             freeTable(&klass->methods);
+            if (klass->fieldMetas.entries != NULL) {
+                FREE_ARRAY(FieldMeta, klass->fieldMetas.entries, klass->fieldMetas.capacity);
+            }
             FREE(ObjClass, object);
             break;
         }
@@ -241,6 +244,12 @@ static void blackenObject(Obj *object) {
             markTable(&klass->methods);
             for (int i = 0; i < klass->superclassCount; i++) {
                 markObject((Obj *) klass->superclasses[i]);
+            }
+            for (int i = 0; i < klass->fieldMetas.count; i++) {
+                markObject((Obj *) klass->fieldMetas.entries[i].name);
+                if (klass->fieldMetas.entries[i].typeName != NULL) {
+                    markObject((Obj *) klass->fieldMetas.entries[i].typeName);
+                }
             }
             break;
         }

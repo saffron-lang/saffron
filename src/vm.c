@@ -85,6 +85,14 @@ void initVM() {
 
     vm.initString = NULL;
     vm.initString = copyString("init", 4);
+    vm.addString = copyString("add", 3);
+    vm.subString = copyString("sub", 3);
+    vm.mulString = copyString("mul", 3);
+    vm.divString = copyString("div", 3);
+    vm.modString = copyString("mod", 3);
+    vm.ltString = copyString("lt", 2);
+    vm.gtString = copyString("gt", 2);
+    vm.eqString = copyString("eq", 2);
     vm.openUpvalues = NULL;
 
     vm.handlerCount = 0;
@@ -508,7 +516,7 @@ static InterpretResult run(ObjModule *module) {
             }
             case OP_NEGATE:
                 if (!IS_NUMBER(peek(0))) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
@@ -519,6 +527,9 @@ static InterpretResult run(ObjModule *module) {
                     double b = AS_NUMBER(pop());
                     double a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.addString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
                 } else {
                     if (!runtimeError(
                             "Operands must be two numbers or two strings.")) return INTERPRET_RUNTIME_ERROR;
@@ -527,23 +538,57 @@ static InterpretResult run(ObjModule *module) {
                 break;
             }
             case OP_MODULO: {
-                if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(NUMBER_VAL(fmod(a, b)));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.modString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    if (!runtimeError("Operands not supported for '%%'.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
-                double b = AS_NUMBER(pop());
-                double a = AS_NUMBER(pop());
-                push(NUMBER_VAL(fmod(a, b)));
                 break;
             }
-            case OP_SUBTRACT:
-                BINARY_OP(NUMBER_VAL, -);
+            case OP_SUBTRACT: {
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(NUMBER_VAL(a - b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.subString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    BINARY_OP(NUMBER_VAL, -);
+                }
                 break;
-            case OP_MULTIPLY:
-                BINARY_OP(NUMBER_VAL, *);
+            }
+            case OP_MULTIPLY: {
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(NUMBER_VAL(a * b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.mulString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    BINARY_OP(NUMBER_VAL, *);
+                }
                 break;
-            case OP_DIVIDE:
-                BINARY_OP(NUMBER_VAL, /);
+            }
+            case OP_DIVIDE: {
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(NUMBER_VAL(a / b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.divString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    BINARY_OP(NUMBER_VAL, /);
+                }
                 break;
+            }
             case OP_NIL:
                 push(NIL_VAL);
                 break;
@@ -553,13 +598,42 @@ static InterpretResult run(ObjModule *module) {
             case OP_FALSE:
                 push(BOOL_VAL(false));
                 break;
-            case OP_GREATER:
-                BINARY_OP(BOOL_VAL, >);
+            case OP_GREATER: {
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(BOOL_VAL(a > b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.gtString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    BINARY_OP(BOOL_VAL, >);
+                }
                 break;
-            case OP_LESS:
-                BINARY_OP(BOOL_VAL, <);
+            }
+            case OP_LESS: {
+                if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(BOOL_VAL(a < b));
+                } else if (IS_INSTANCE(peek(1))) {
+                    if (!invoke(vm.ltString, 1)) return INTERPRET_RUNTIME_ERROR;
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    BINARY_OP(BOOL_VAL, <);
+                }
                 break;
+            }
             case OP_EQUAL: {
+                if (IS_INSTANCE(peek(1))) {
+                    Value method;
+                    ObjInstance *inst = AS_INSTANCE(peek(1));
+                    if (tableGet(&inst->klass->methods, vm.eqString, &method)) {
+                        if (!invoke(vm.eqString, 1)) return INTERPRET_RUNTIME_ERROR;
+                        currentFrame = CURRENT_TASK;
+                        break;
+                    }
+                }
                 Value b = pop();
                 Value a = pop();
                 push(BOOL_VAL(valuesEqual(a, b)));
@@ -604,7 +678,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *name = READ_STRING();
                 Value value;
                 if (!tableGet(&module->obj.fields, name, &value)) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 push(value);
                 break;
@@ -613,7 +687,7 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *name = READ_STRING();
                 if (tableSet(&module->obj.fields, name, peek(0))) {
                     tableDelete(&module->obj.fields, name);
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 break;
             }
@@ -755,11 +829,11 @@ static InterpretResult run(ObjModule *module) {
                         push(value);
                         break;
                     }
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 if (!IS_INSTANCE(peek(0)) && !IS_LIST(peek(0))) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 ObjInstance *instance = AS_INSTANCE(peek(0));
@@ -791,6 +865,31 @@ static InterpretResult run(ObjModule *module) {
             case OP_FIELD:
                 defineField(READ_STRING());
                 break;
+            case OP_FIELD_META: {
+                ObjString *fieldName = READ_STRING();
+                ObjString *typeName = READ_STRING();
+                ObjClass *klass = AS_CLASS(peek(0));
+                klass->isDataClass = true;
+
+                FieldMeta meta;
+                meta.name = fieldName;
+                meta.typeName = typeName;
+                if (memcmp(typeName->chars, "String", 6) == 0) meta.typeTag = FIELD_TYPE_STRING;
+                else if (memcmp(typeName->chars, "Number", 6) == 0) meta.typeTag = FIELD_TYPE_NUMBER;
+                else if (memcmp(typeName->chars, "Bool", 4) == 0) meta.typeTag = FIELD_TYPE_BOOL;
+                else if (memcmp(typeName->chars, "Nil", 3) == 0) meta.typeTag = FIELD_TYPE_NIL;
+                else if (memcmp(typeName->chars, "List", 4) == 0) meta.typeTag = FIELD_TYPE_LIST;
+                else if (memcmp(typeName->chars, "Map", 3) == 0) meta.typeTag = FIELD_TYPE_MAP;
+                else meta.typeTag = FIELD_TYPE_CLASS;
+
+                if (klass->fieldMetas.count >= klass->fieldMetas.capacity) {
+                    int oldCap = klass->fieldMetas.capacity;
+                    klass->fieldMetas.capacity = oldCap < 8 ? 8 : oldCap * 2;
+                    klass->fieldMetas.entries = GROW_ARRAY(FieldMeta, klass->fieldMetas.entries, oldCap, klass->fieldMetas.capacity);
+                }
+                klass->fieldMetas.entries[klass->fieldMetas.count++] = meta;
+                break;
+            }
             case OP_INVOKE: {
                 ObjString *method = READ_STRING();
                 int argCount = READ_BYTE();
@@ -803,7 +902,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_INHERIT: {
                 Value superclass = peek(1);
                 if (!IS_CLASS(superclass) && !IS_BUILTIN_TYPE(superclass)) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
 
                 ObjClass *subclass = AS_CLASS(peek(0));
@@ -894,7 +993,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_GET_TAG: {
                 Value value = peek(0);
                 if (!IS_ENUM_INSTANCE(value)) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
                 pop();
@@ -906,7 +1005,7 @@ static InterpretResult run(ObjModule *module) {
                 int start = (int) AS_NUMBER(pop());
                 Value listVal = pop();
                 if (!isObjType(listVal, OBJ_LIST)) {
-                    if (!runtimeError(\1)) return INTERPRET_RUNTIME_ERROR; goto dispatch;
+                    if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 ObjList *source = (ObjList *) AS_OBJ(listVal);
                 int end = source->items.count - fromEnd;

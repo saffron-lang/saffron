@@ -266,5 +266,9 @@ ObjClass *newClass(ObjString *name) {
     initTable(&klass->fields);
     klass->superclassCount = 0;
     for (int i = 0; i < 8; i++) klass->superclasses[i] = NULL;
+    klass->isDataClass = false;
+    klass->fieldMetas.count = 0;
+    klass->fieldMetas.capacity = 0;
+    klass->fieldMetas.entries = NULL;
     return klass;
 }

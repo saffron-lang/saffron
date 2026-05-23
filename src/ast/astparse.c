@@ -229,8 +229,27 @@ static Expr *grouping(bool canAssign) {
 }
 
 static Expr *string(bool canAssign) {
-    Value value = (OBJ_VAL(copyString(parser.previous.start + 1,
-                                      parser.previous.length - 2)));
+    const char *src = parser.previous.start + 1;
+    int srcLen = parser.previous.length - 2;
+    char buf[4096];
+    int len = 0;
+    for (int i = 0; i < srcLen && len < 4095; i++) {
+        if (src[i] == '\\' && i + 1 < srcLen) {
+            i++;
+            switch (src[i]) {
+                case 'n': buf[len++] = '\n'; break;
+                case 't': buf[len++] = '\t'; break;
+                case 'r': buf[len++] = '\r'; break;
+                case '\\': buf[len++] = '\\'; break;
+                case '"': buf[len++] = '"'; break;
+                case '0': buf[len++] = '\0'; break;
+                default: buf[len++] = src[i]; break;
+            }
+        } else {
+            buf[len++] = src[i];
+        }
+    }
+    Value value = OBJ_VAL(copyString(buf, len));
 
     struct Literal *result = ALLOCATE_NODE(struct Literal, NODE_LITERAL);
     result->value = value;
@@ -1198,6 +1217,7 @@ static Stmt *classDeclaration() {
 
     struct Class *result = ALLOCATE_NODE(struct Class, NODE_CLASS);
     result->name = className;
+    result->isDataClass = false;
     initExprArray(&result->superclasses);
 
     if (match(TOKEN_EXTENDS)) {
@@ -1483,7 +1503,12 @@ static Expr *matchExpression(bool canAssign) {
 }
 
 static Stmt *declaration() {
-    if (match(TOKEN_CLASS)) {
+    if (match(TOKEN_DATACLASS)) {
+        consume(TOKEN_CLASS, "Expect 'class' after 'data'.");
+        Stmt *cls = classDeclaration();
+        ((struct Class *) cls)->isDataClass = true;
+        return cls;
+    } else if (match(TOKEN_CLASS)) {
         return classDeclaration();
     } else if (match(TOKEN_FUN)) {
         return funDeclaration();

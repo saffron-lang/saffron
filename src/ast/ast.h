@@ -316,6 +316,7 @@ struct Class {
     ExprArray superclasses;
     StmtArray body;
     TypeNodeArray generics;
+    bool isDataClass;
 };
 
 struct If {

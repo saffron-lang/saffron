@@ -879,6 +879,8 @@ Type *evaluateNode(Node *node) {
             Value fieldType;
             ObjString *nameString = copyString(casted->name.start, casted->name.length);
 
+            if (rootType == anyType) return (Type *) anyType;
+
             if (!tableGet(&rootType->methods, nameString, &fieldType)) {
                 if (!tableGet(&rootType->fields, nameString, &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
@@ -898,6 +900,8 @@ Type *evaluateNode(Node *node) {
             if (objectType->obj.type == OBJ_PARSE_GENERIC_TYPE) {
                 rootType = (SimpleType *) ((GenericType *) objectType)->target;
             }
+
+            if (rootType == anyType) return (Type *) anyType;
 
             Value fieldType;
 

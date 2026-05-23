@@ -157,6 +157,16 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             return constantInstruction("OP_METHOD", chunk, offset);
         case OP_FIELD:
             return constantInstruction("OP_FIELD", chunk, offset);
+        case OP_FIELD_META: {
+            uint8_t nameConst = chunk->code[offset + 1];
+            uint8_t typeConst = chunk->code[offset + 2];
+            printf("%-16s %4d '", "OP_FIELD_META", nameConst);
+            printValue(chunk->constants.values[nameConst]);
+            printf("' type='");
+            printValue(chunk->constants.values[typeConst]);
+            printf("'\n");
+            return offset + 3;
+        }
         case OP_INHERIT:
             return simpleInstruction("OP_INHERIT", offset);
         case OP_GET_SUPER:
