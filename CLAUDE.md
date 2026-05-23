@@ -19,6 +19,12 @@ The binary is at `cmake-build-debug/saffron`. Run a file with:
 ./cmake-build-debug/saffron test/functions.sf
 ```
 
+Launch the REPL (no arguments):
+
+```bash
+./cmake-build-debug/saffron
+```
+
 ## Architecture
 
 The pipeline is: **Scanner → AST Parser → Type Checker → Bytecode Compiler → VM**
@@ -31,7 +37,7 @@ The pipeline is: **Scanner → AST Parser → Type Checker → Bytecode Compiler
 - **Compiler** (`src/ast/astcompile.c`) — walks the AST and emits bytecode (`OpCode`s in `chunk.h`)
 - **VM** (`src/vm.c`) — stack-based bytecode interpreter with call frames, closures, upvalues, and cooperative multitasking via a task queue
 - **GC** (`src/memory.c`) — mark-sweep garbage collector; both runtime `Obj` values and AST `Node`s are GC-managed
-- **Standard library** — C builtins in `src/libc/` (list, map, IO, time, async, modules), Saffron stdlib in `src/lib/`
+- **Standard library** — C builtins in `src/libc/` (list, map, IO, time, async, string, json), Saffron stdlib in `src/lib/`
 
 ### Adding a language feature (the full workflow)
 
@@ -44,7 +50,7 @@ Defined in `.github/contributing.md`:
 
 ### Object system
 
-All heap objects inherit from `Obj` (in `object.h`). Classes have methods and fields tables. Instances carry a pointer to their class. Bound methods wrap a receiver + closure. The type system has a parallel hierarchy (`Type`, `SimpleType`, `FunctorType`, `UnionType`, `GenericType`, `InterfaceType` in `types.h`).
+All heap objects inherit from `Obj` (in `object.h`). Classes have methods and fields tables. Instances carry a pointer to their class. Bound methods wrap a receiver + closure. Enum instances (`ObjEnumInstance`) carry a tag, enum name, and positional fields. The type system has a parallel hierarchy (`Type`, `SimpleType`, `FunctorType`, `UnionType`, `GenericType`, `InterfaceType` in `types.h`).
 
 ### Debug flags (in `common.h`)
 
@@ -52,17 +58,217 @@ All heap objects inherit from `Obj` (in `object.h`). Classes have methods and fi
 - `DEBUG_TRACE_EXECUTION` — trace each VM instruction
 - `DEBUG_STRESS_GC` / `DEBUG_LOG_GC` — GC diagnostics
 
-## Language syntax highlights
+## Language Features
 
-- Semicolons optional, C-style blocks with `{}`
-- `var`/`let` declarations with optional type annotations: `var x: Number = 5`
-- Functions: `fun name(param: Type): ReturnType { ... }`
-- Lambdas: `fun (x: Number) => x + 1`
-- Classes with inheritance, interfaces with generics
-- Pipe operator: `[1,2,3] |> map(fn) |> filter(fn)`
-- Atoms: `:symbol`
-- Async: `yield` / `resume`
-- Imports: `import "path.sf" as Name`
+### Variables and Types
+
+```saffron
+var x: Number = 5
+var name = "saffron"       // type inferred
+let [a, b, c] = [1, 2, 3] // destructuring
+```
+
+### Functions and Lambdas
+
+```saffron
+fun add(a: Number, b: Number): Number {
+    return a + b
+}
+
+var double = fun (x: Number) => x * 2
+```
+
+### String Interpolation
+
+```saffron
+var name = "world"
+IO.println("hello ${name}!")
+IO.println("${1 + 2} is three")
+```
+
+### String Methods
+
+```saffron
+"hello".length()          // 5
+"hello world".split(" ")  // ["hello", "world"]
+"  hi  ".trim()           // "hi"
+"hello".contains("ell")   // true
+"hello".starts_with("he") // true
+"hello".replace("l", "L") // "heLLo"
+"abc".to_upper()          // "ABC"
+"hello".slice(1, 3)       // "el"
+"hello".index_of("lo")    // 3
+"ha".repeat(3)            // "hahaha"
+"123".to_number()         // 123
+```
+
+### Enums and Pattern Matching
+
+```saffron
+enum Option {
+    Some(value: Number),
+    None
+}
+
+var x = Option.Some(42)
+var result = match (x) {
+    Some(v) => v * 2
+    None => 0
+}
+```
+
+### Destructuring
+
+```saffron
+let [head, *middle, tail] = [1, 2, 3, 4, 5]
+// head = 1, middle = [2, 3, 4], tail = 5
+
+let Some(value) = Option.Some(42)
+// value = 42
+```
+
+### Control Flow
+
+```saffron
+// For-in (uses iterator protocol: .iter(), .next?(), .next())
+for (item in [1, 2, 3]) {
+    if (item == 2) continue
+    IO.println(item)
+}
+
+// Break
+for (x in items) {
+    if (x > 10) break
+}
+
+// While, for (C-style), if/else — standard
+```
+
+### Exception Handling
+
+```saffron
+try {
+    throw "something went wrong"
+} catch (e) {
+    IO.println("caught: ${e}")
+} finally {
+    IO.println("cleanup")
+}
+
+// Runtime errors (index out of bounds, etc.) are catchable
+try {
+    var list = [1, 2, 3]
+    list[99]
+} catch (e) {
+    IO.println("caught: ${e}")
+}
+```
+
+### Classes and Inheritance
+
+```saffron
+class Animal {
+    var name: String
+    fun init(name: String) {
+        this.name = name
+    }
+    fun speak() {
+        IO.println("...")
+    }
+}
+
+class Dog extends Animal {
+    fun speak() {
+        IO.println("Woof!")
+    }
+}
+```
+
+### Interfaces
+
+```saffron
+interface Printable {
+    fun to_string(): String
+}
+```
+
+### Cooperative Async
+
+```saffron
+import "@async" as Async
+
+fun worker(name: String, duration: Number) {
+    Async.sleep(duration)
+    return "${name} done"
+}
+
+var task = Task.spawn(fun () => worker("A", 0.1))
+var result = Async.await(task)
+```
+
+### Modules and Imports
+
+```saffron
+import "time" as Time           // builtin C module
+import "@iter" as Iter          // stdlib .sf file (src/lib/iter.sf)
+import "../other/file.sf" as M  // relative path
+```
+
+The `@` prefix resolves to `src/lib/<name>.sf` relative to the executable.
+
+### Pipe Operator
+
+```saffron
+[1, 2, 3] |> IO.println()
+```
+
+### Maps
+
+```saffron
+var m: Map<String, Number> = {"a": 1, "b": 2}
+m.set("c", 3)
+m.get("a")       // 1
+m.has("b")       // true
+m.keys()         // ["a", "b", "c"]
+m.values()       // [1, 2, 3]
+
+// Iteration via .iter() returns [key, value] tuples
+var iter = m.iter()
+while (iter.next?()) {
+    IO.println(iter.next())  // [key, value]
+}
+```
+
+### Lists
+
+```saffron
+var list = [1, 2, 3]
+list.push(4)
+list.pop()
+list.length()    // 3
+list.reverse()
+list.sort()
+list.copy()
+list[0]          // 1 (negative indexing: list[-1] = last)
+
+// Iteration
+for (item in list) { ... }
+```
+
+## REPL
+
+The REPL supports multi-line input (detects unclosed braces/parens/brackets and prompts with `...`). Variables, functions, and classes persist across lines.
+
+```
+$ ./cmake-build-debug/saffron
+saffron v0.1 REPL
+>>> var x = 42
+>>> fun double(n: Number) {
+...   return n * 2
+... }
+>>> IO.println(double(x))
+84
+```
 
 ## Tests
 
@@ -72,4 +278,96 @@ Test files are in `test/*.sf`. Run them manually:
 ./cmake-build-debug/saffron test/<name>.sf
 ```
 
-There is no automated test runner — verify by checking stdout output and exit codes.
+Run all tests:
+
+```bash
+for f in test/*.sf; do printf "%-40s " "$f:"; timeout 5 ./cmake-build-debug/saffron "$f" > /dev/null 2>&1 && echo "PASS" || echo "FAIL"; done
+```
+
+### Test stdlib (`@test`)
+
+```saffron
+import "@test" as T
+T.assert_eq(1 + 1, 2, "basic math")
+T.assert(true, "truth")
+T.summary()
+```
+
+### Named Imports
+
+```saffron
+import { map, filter, reduce } from "@iter"
+
+var doubled = [1, 2, 3] |> map(fun (x: Number): Number => x * 2)
+```
+
+### Operator Overloading
+
+Classes can define `add`, `sub`, `mul`, `div`, `mod`, `lt`, `gt`, `eq` methods to overload operators:
+
+```saffron
+class Vec2 {
+    var x: Number
+    var y: Number
+    fun init(x: Number, y: Number) { this.x = x; this.y = y }
+    fun add(other: Vec2): Vec2 { return Vec2(this.x + other.x, this.y + other.y) }
+}
+
+var c = Vec2(1, 2) + Vec2(3, 4)  // Vec2(4, 6)
+```
+
+### First-Class Types
+
+All types are first-class at runtime. `is` checks work on primitives:
+
+```saffron
+42 is Number      // true
+"hi" is String    // true
+nil is Nil        // true
+```
+
+Number and Bool have methods: `(-5).abs()`, `(3.7).floor()`, `true.to_string()`
+
+### Generic Enums
+
+```saffron
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+```
+
+### Interface Conformance
+
+Interfaces with abstract methods enforce implementation. Default methods are inherited:
+
+```saffron
+interface Drawable {
+    fun draw(): String              // abstract — must implement
+    fun description(): String {     // default — inherited
+        return "a drawable"
+    }
+}
+
+class Circle extends Drawable {
+    fun init() {}
+    fun draw(): String { return "O" }  // required
+}
+```
+
+Multiple inheritance: `class Duck extends Flyable, Swimmable, Walkable { ... }`
+
+### is-Pattern Matching
+
+```saffron
+var sound = match (animal) {
+    is Dog(d) => d.bark(),
+    is Cat(c) => c.meow()
+}
+```
+
+## Known Issues
+
+See `BUGS.md` for the full list. Remaining critical bugs:
+- **#2**: Forward references in nested closures (design limitation)
+- **#6**: No `break`/`continue` (infrastructure exists but not yet connected to type checker)
