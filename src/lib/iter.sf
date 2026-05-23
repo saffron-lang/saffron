@@ -1,7 +1,7 @@
 // Iterator utilities — works with any type that has .iter(), .next(), .next?()
 // Lists and Maps both provide native .iter() methods.
 
-fun map(iterable, func) {
+fun map(iterable: Any, func: Any) {
     var result = []
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -10,7 +10,7 @@ fun map(iterable, func) {
     return result
 }
 
-fun filter(iterable, func) {
+fun filter(iterable: Any, func: Any) {
     var result = []
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -22,7 +22,7 @@ fun filter(iterable, func) {
     return result
 }
 
-fun reduce(iterable, func, initial) {
+fun reduce(iterable: Any, func: Any, initial: Any) {
     var acc = initial
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -31,11 +31,11 @@ fun reduce(iterable, func, initial) {
     return acc
 }
 
-fun sum(iterable) {
+fun sum(iterable: Any) {
     return reduce(iterable, fun (a, b) => a + b, 0)
 }
 
-fun any(iterable, func) {
+fun any(iterable: Any, func: Any) {
     var iter = iterable.iter()
     while (iter.next?()) {
         if (func(iter.next())) { return true }
@@ -43,7 +43,7 @@ fun any(iterable, func) {
     return false
 }
 
-fun all(iterable, func) {
+fun all(iterable: Any, func: Any) {
     var iter = iterable.iter()
     while (iter.next?()) {
         if (!func(iter.next())) { return false }
@@ -51,14 +51,14 @@ fun all(iterable, func) {
     return true
 }
 
-fun each(iterable, func) {
+fun each(iterable: Any, func: Any) {
     var iter = iterable.iter()
     while (iter.next?()) {
         func(iter.next())
     }
 }
 
-fun count(iterable, func) {
+fun count(iterable: Any, func: Any) {
     var n = 0
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -67,7 +67,7 @@ fun count(iterable, func) {
     return n
 }
 
-fun find(iterable, func) {
+fun find(iterable: Any, func: Any) {
     var iter = iterable.iter()
     while (iter.next?()) {
         var item = iter.next()
@@ -76,7 +76,7 @@ fun find(iterable, func) {
     return nil
 }
 
-fun flat_map(iterable, func) {
+fun flat_map(iterable: Any, func: Any) {
     var result = []
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -89,7 +89,7 @@ fun flat_map(iterable, func) {
     return result
 }
 
-fun zip(a, b) {
+fun zip(a: Any, b: Any) {
     var result = []
     var iter_a = a.iter()
     var iter_b = b.iter()
@@ -99,7 +99,7 @@ fun zip(a, b) {
     return result
 }
 
-fun enumerate(iterable) {
+fun enumerate(iterable: Any) {
     var result = []
     var iter = iterable.iter()
     var i = 0
@@ -110,7 +110,7 @@ fun enumerate(iterable) {
     return result
 }
 
-fun take(iterable, n: Number) {
+fun take(iterable: Any, n: Number) {
     var result = []
     var iter = iterable.iter()
     var i = 0
@@ -121,7 +121,7 @@ fun take(iterable, n: Number) {
     return result
 }
 
-fun skip(iterable, n: Number) {
+fun skip(iterable: Any, n: Number) {
     var result = []
     var iter = iterable.iter()
     var i = 0
