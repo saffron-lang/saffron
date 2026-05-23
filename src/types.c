@@ -878,7 +878,7 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            Type *returnType = resolveType(calleeFunctor->returnType);
+            Type *returnType = calleeFunctor->returnType ? resolveType(calleeFunctor->returnType) : (Type *) anyType;
 
             currentEnv = currentEnv->enclosing;
             return returnType;
@@ -886,6 +886,11 @@ Type *evaluateNode(Node *node) {
         case NODE_GETITEM: {
             struct GetItem *casted = (struct GetItem *) node;
             Type *type = evaluateNode((Node *) casted->object);
+
+            if (type == (Type *) anyType) {
+                evaluateNode(casted->index);
+                return (Type *) anyType;
+            }
 
             if (isSubType(type, listTypeDef)) {
                 GenericType *genericType = (GenericType *) type;
@@ -1261,6 +1266,11 @@ Type *evaluateNode(Node *node) {
         case NODE_FUNCTION: {
             struct Function *casted = (struct Function *) node;
 
+            // Evaluate decorator expressions
+            for (int i = 0; i < casted->decorators.count; i++) {
+                evaluateNode((Node *) casted->decorators.exprs[i]);
+            }
+
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);
 
@@ -1577,7 +1587,56 @@ Type *evaluateNode(Node *node) {
             evaluateNode((Node *) casted->body);
             return (Type *) anyType;
         }
-        case NODE_BREAK: {
+        case NODE_BREAK:
+        case NODE_CONTINUE: {
+            return (Type *) anyType;
+        }
+        case NODE_FORIN: {
+            struct ForIn *casted = (struct ForIn *) node;
+            evaluateNode((Node *) casted->iterable);
+            // Register loop binding variable
+            TypeEnvironment forEnv;
+            initTypeEnvironment(&forEnv, currentEnv->type);
+            tableSet(&forEnv.locals,
+                     copyString(casted->binding.start, casted->binding.length),
+                     OBJ_VAL(anyType));
+            evaluateNode((Node *) casted->body);
+            currentEnv = currentEnv->enclosing;
+            return (Type *) anyType;
+        }
+        case NODE_THROW: {
+            struct Throw *casted = (struct Throw *) node;
+            evaluateNode((Node *) casted->value);
+            return (Type *) anyType;
+        }
+        case NODE_TRYCATCH: {
+            struct TryCatch *casted = (struct TryCatch *) node;
+            evaluateTypes(&casted->tryBody);
+            for (int i = 0; i < casted->catchClauses.count; i++) {
+                struct CatchClause *clause = (struct CatchClause *) casted->catchClauses.stmts[i];
+                TypeEnvironment catchEnv;
+                initTypeEnvironment(&catchEnv, currentEnv->type);
+                if (clause->binding.length > 0) {
+                    tableSet(&catchEnv.locals,
+                             copyString(clause->binding.start, clause->binding.length),
+                             OBJ_VAL(anyType));
+                }
+                evaluateTypes(&clause->body);
+                currentEnv = currentEnv->enclosing;
+            }
+            evaluateTypes(&casted->finallyBody);
+            return (Type *) anyType;
+        }
+        case NODE_DESTRUCTURE: {
+            struct Destructure *casted = (struct Destructure *) node;
+            evaluateNode((Node *) casted->value);
+            // Register all destructured bindings as Any
+            for (int i = 0; i < casted->bindings.count; i++) {
+                tableSet(&currentEnv->locals,
+                         copyString(casted->bindings.parameters[i]->name.start,
+                                    casted->bindings.parameters[i]->name.length),
+                         OBJ_VAL(anyType));
+            }
             return (Type *) anyType;
         }
         case NODE_RETURN: {
