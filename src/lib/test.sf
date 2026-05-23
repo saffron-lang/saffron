@@ -1,0 +1,34 @@
+var passed = 0
+var failed = 0
+var total = 0
+
+fun assert(condition, msg) {
+    total = total + 1
+    if (condition) {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+        IO.println("  FAIL: " + msg)
+    }
+}
+
+fun assert_eq(actual, expected, msg) {
+    total = total + 1
+    if (actual == expected) {
+        passed = passed + 1
+    } else {
+        failed = failed + 1
+        IO.println("  FAIL: " + msg)
+        IO.println("    expected: " + expected)
+        IO.println("    actual:   " + actual)
+    }
+}
+
+fun section(name) {
+    IO.println(name)
+}
+
+fun summary() {
+    IO.println("")
+    IO.println(passed + "/" + total + " passed, " + failed + " failed")
+}

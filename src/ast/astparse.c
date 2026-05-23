@@ -228,9 +228,7 @@ static Expr *grouping(bool canAssign) {
     return expr;
 }
 
-static Expr *string(bool canAssign) {
-    const char *src = parser.previous.start + 1;
-    int srcLen = parser.previous.length - 2;
+static Expr *makeStringLiteral(const char *src, int srcLen) {
     char buf[4096];
     int len = 0;
     for (int i = 0; i < srcLen && len < 4095; i++) {
@@ -250,9 +248,63 @@ static Expr *string(bool canAssign) {
         }
     }
     Value value = OBJ_VAL(copyString(buf, len));
-
     struct Literal *result = ALLOCATE_NODE(struct Literal, NODE_LITERAL);
     result->value = value;
+    return (Expr *) result;
+}
+
+static Expr *makeBinaryAdd(Expr *left, Expr *right) {
+    struct Binary *bin = ALLOCATE_NODE(struct Binary, NODE_BINARY);
+    Token op = {.type = TOKEN_PLUS, .start = "+", .length = 1, .line = 0};
+    bin->operator = op;
+    bin->left = left;
+    bin->right = right;
+    return (Expr *) bin;
+}
+
+static Expr *string(bool canAssign) {
+    const char *src = parser.previous.start + 1;
+    int srcLen = parser.previous.length - 2;
+    return makeStringLiteral(src, srcLen);
+}
+
+static Expr *interpString(bool canAssign) {
+    // TOKEN_STRING_INTERP: content is from opening " (or previous }) up to ${
+    // Token includes the leading " but not the trailing ${
+    const char *src = parser.previous.start + 1;
+    int srcLen = parser.previous.length - 3; // skip opening " and trailing ${
+
+    Expr *result = makeStringLiteral(src, srcLen);
+
+    for (;;) {
+        // Parse the interpolated expression
+        Expr *expr = expression();
+        result = makeBinaryAdd(result, expr);
+
+        // After expression, scanner resumed string scanning from }
+        // Next token is either TOKEN_STRING (final segment) or TOKEN_STRING_INTERP (another ${)
+        if (match(TOKEN_STRING)) {
+            const char *seg = parser.previous.start;
+            int segLen = parser.previous.length - 1; // no leading ", has trailing "
+            if (segLen > 0) {
+                Expr *suffix = makeStringLiteral(seg, segLen);
+                result = makeBinaryAdd(result, suffix);
+            }
+            break;
+        } else if (match(TOKEN_STRING_INTERP)) {
+            const char *seg = parser.previous.start;
+            int segLen = parser.previous.length - 2; // no leading ", no trailing ${
+            if (segLen > 0) {
+                Expr *mid = makeStringLiteral(seg, segLen);
+                result = makeBinaryAdd(result, mid);
+            }
+            // continue loop for next interpolation
+        } else {
+            error("Unterminated string interpolation.");
+            break;
+        }
+    }
+
     return result;
 }
 
@@ -467,6 +519,7 @@ ParseRule parseRules[] = {
         [TOKEN_IDENTIFIER]    = {variable, NULL, PREC_NONE},
         [TOKEN_ATOM]          = {atom, NULL, PREC_NONE},
         [TOKEN_STRING]        = {string, NULL, PREC_NONE},
+        [TOKEN_STRING_INTERP] = {interpString, NULL, PREC_NONE},
         [TOKEN_NUMBER]        = {number, NULL, PREC_NONE},
         [TOKEN_AND]           = {NULL, and_, PREC_AND},
         [TOKEN_CLASS]         = {NULL, NULL, PREC_NONE},

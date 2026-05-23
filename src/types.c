@@ -168,6 +168,15 @@ void makeTypes() {
     defineMethodType(stringType, "repeat", (Type *) stringType);
     defineMethodType(stringType, "char_at", (Type *) stringType);
     defineMethodType(stringType, "to_number", (Type *) numberType);
+    defineMethodType(stringType, "to_string", (Type *) stringType);
+
+    defineMethodType(numberType, "abs", (Type *) numberType);
+    defineMethodType(numberType, "floor", (Type *) numberType);
+    defineMethodType(numberType, "ceil", (Type *) numberType);
+    defineMethodType(numberType, "round", (Type *) numberType);
+    defineMethodType(numberType, "to_string", (Type *) stringType);
+
+    defineMethodType(boolType, "to_string", (Type *) stringType);
 
     listTypeDef = createListTypeDef();
     mapTypeDef = createMapTypeDef();
@@ -798,6 +807,12 @@ Type *evaluateNode(Node *node) {
             struct Call *casted = (struct Call *) node;
             Type *calleeType = evaluateNode((Node *) casted->callee);
 
+            if (calleeType == (Type *) anyType) {
+                for (int i = 0; i < casted->arguments.count; i++) {
+                    evaluateNode((Node *) casted->arguments.exprs[i]);
+                }
+                return (Type *) anyType;
+            }
             if (calleeType == NULL || calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
                 if (calleeType != NULL) errorAt(&casted->paren, "Type is not callable");
                 return (NULL);
@@ -875,6 +890,7 @@ Type *evaluateNode(Node *node) {
             struct Get *casted = (struct Get *) node;
             Type *objectType = evaluateNode((Node *) casted->object);
             if (objectType == NULL) return NULL;
+            if (objectType == (Type *) anyType) return (Type *) anyType;
             SimpleType *rootType;
 
             switch (objectType->obj.type) {

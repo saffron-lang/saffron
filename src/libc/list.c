@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "list.h"
 #include "../memory.h"
 
@@ -187,6 +188,75 @@ void listSortBuiltin(ObjList *list, int argCount, Value *args) {
     timSort(list, list->items.count);
 }
 
+Value listContainsBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount != 1) return BOOL_VAL(false);
+    for (int i = 0; i < list->items.count; i++) {
+        if (valuesEqual(list->items.values[i], args[0])) return BOOL_VAL(true);
+    }
+    return BOOL_VAL(false);
+}
+
+Value listIndexOfBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount != 1) return NUMBER_VAL(-1);
+    for (int i = 0; i < list->items.count; i++) {
+        if (valuesEqual(list->items.values[i], args[0])) return NUMBER_VAL(i);
+    }
+    return NUMBER_VAL(-1);
+}
+
+Value listJoinBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("join() expects 1 string argument");
+        return NIL_VAL;
+    }
+    ObjString *sep = AS_STRING(args[0]);
+
+    // Calculate total length
+    int totalLen = 0;
+    for (int i = 0; i < list->items.count; i++) {
+        if (IS_STRING(list->items.values[i])) {
+            totalLen += AS_STRING(list->items.values[i])->length;
+        }
+        if (i < list->items.count - 1) totalLen += sep->length;
+    }
+
+    char *buf = ALLOCATE(char, totalLen + 1);
+    int pos = 0;
+    for (int i = 0; i < list->items.count; i++) {
+        if (IS_STRING(list->items.values[i])) {
+            ObjString *s = AS_STRING(list->items.values[i]);
+            memcpy(buf + pos, s->chars, s->length);
+            pos += s->length;
+        }
+        if (i < list->items.count - 1) {
+            memcpy(buf + pos, sep->chars, sep->length);
+            pos += sep->length;
+        }
+    }
+    buf[pos] = '\0';
+    return OBJ_VAL(takeString(buf, pos));
+}
+
+Value listSliceBuiltin(ObjList *list, int argCount, Value *args) {
+    if (argCount < 1 || argCount > 2) {
+        runtimeError("slice() expects 1 or 2 arguments");
+        return NIL_VAL;
+    }
+    int start = (int) AS_NUMBER(args[0]);
+    int end = (argCount == 2) ? (int) AS_NUMBER(args[1]) : list->items.count;
+    if (start < 0) start += list->items.count;
+    if (end < 0) end += list->items.count;
+    if (start < 0) start = 0;
+    if (end > list->items.count) end = list->items.count;
+
+    ObjList *result = newList();
+    push(OBJ_VAL(result));
+    for (int i = start; i < end; i++) {
+        writeValueArray(&result->items, list->items.values[i]);
+    }
+    return pop();
+}
+
 Value listIterBuiltin(ObjList *list, int argCount, Value *args) {
     if (argCount > 0) {
         return NIL_VAL;
@@ -279,6 +349,10 @@ void listInit(ObjBuiltinType *type) {
     defineBuiltinMethod(type, "reverse", (NativeMethodFn) listReverseBuiltin);
     defineBuiltinMethod(type, "copy", (NativeMethodFn) listCopyBuiltin);
     defineBuiltinMethod(type, "sort", (NativeMethodFn) listSortBuiltin);
+    defineBuiltinMethod(type, "contains", (NativeMethodFn) listContainsBuiltin);
+    defineBuiltinMethod(type, "index_of", (NativeMethodFn) listIndexOfBuiltin);
+    defineBuiltinMethod(type, "join", (NativeMethodFn) listJoinBuiltin);
+    defineBuiltinMethod(type, "slice", (NativeMethodFn) listSliceBuiltin);
     defineBuiltinMethod(type, "iter", (NativeMethodFn) listIterBuiltin);
 }
 

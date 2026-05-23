@@ -2,11 +2,11 @@ for (var i = 0; i < 10; i = i + 1) {
     IO.println(i)
 }
 
-import "@iter" as iter
+import "@iter" as Iter
 
-fun predicate(item) {
+fun predicate(item: Number): Bool {
     return (item % 2) == 0
 }
 
-[1, 2, 3, 4, 5, 6] |> iter.ListIterator() |> iter.filter(predicate) |>  iter.ListIterator() |> iter.sum(0) |> IO.println()
+IO.println(Iter.sum(Iter.filter([1, 2, 3, 4, 5, 6], predicate)))
 "Oh wow!" |> IO.println()

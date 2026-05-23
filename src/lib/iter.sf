@@ -1,73 +1,134 @@
-interface Iterator<T> {
-    fun next(): T
-    fun next?(): Bool
-    fun iter(): Iterator<T>
-}
+// Iterator utilities — works with any type that has .iter(), .next(), .next?()
+// Lists and Maps both provide native .iter() methods.
 
-interface Iterable<T> {
-    fun iter(): Iterator<T> // TODO: Make these kinds of interfaces 'special' and predefined at time of typechecking
-} // Or maybe just duck typing in general??
-
-fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
-    var result: List<R> = []
-
-    for (var iter = iterable.iter(); iter.next?();) {
-        var item = iter.next()
-        result.push(
-            func(item)
-        )
+fun map(iterable, func) {
+    var result = []
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        result.push(func(iter.next()))
     }
-
     return result
 }
 
-fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
-    var result: List<T> = []
-
-    for (var iter = iterable.iter(); iter.next?();) {
+fun filter(iterable, func) {
+    var result = []
+    var iter = iterable.iter()
+    while (iter.next?()) {
         var item = iter.next()
         if (func(item)) {
             result.push(item)
         }
     }
-
     return result
 }
 
-interface Addend {
-    fun add()
+fun reduce(iterable, func, initial) {
+    var acc = initial
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        acc = func(acc, iter.next())
+    }
+    return acc
 }
 
-fun sum<T extends Addend>(iterable: Iterable<T>, initial: T): T {
-    var result: T = initial
-    for (var iter = iterable.iter(); iter.next?();) {
+fun sum(iterable) {
+    return reduce(iterable, fun (a, b) => a + b, 0)
+}
+
+fun any(iterable, func) {
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        if (func(iter.next())) { return true }
+    }
+    return false
+}
+
+fun all(iterable, func) {
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        if (!func(iter.next())) { return false }
+    }
+    return true
+}
+
+fun each(iterable, func) {
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        func(iter.next())
+    }
+}
+
+fun count(iterable, func) {
+    var n = 0
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        if (func(iter.next())) { n = n + 1 }
+    }
+    return n
+}
+
+fun find(iterable, func) {
+    var iter = iterable.iter()
+    while (iter.next?()) {
         var item = iter.next()
-        result = result + item
+        if (func(item)) { return item }
     }
+    return nil
+}
 
+fun flat_map(iterable, func) {
+    var result = []
+    var iter = iterable.iter()
+    while (iter.next?()) {
+        var items = func(iter.next())
+        var inner = items.iter()
+        while (inner.next?()) {
+            result.push(inner.next())
+        }
+    }
     return result
 }
 
-class ListIterator<Iterator> {
-    var index: Number
-    var list: List
-
-    fun init(list: List) {
-        this.list = list
-        this.index = 0
+fun zip(a, b) {
+    var result = []
+    var iter_a = a.iter()
+    var iter_b = b.iter()
+    while (iter_a.next?() and iter_b.next?()) {
+        result.push([iter_a.next(), iter_b.next()])
     }
+    return result
+}
 
-    fun iter() {
-        return this
+fun enumerate(iterable) {
+    var result = []
+    var iter = iterable.iter()
+    var i = 0
+    while (iter.next?()) {
+        result.push([i, iter.next()])
+        i = i + 1
     }
+    return result
+}
 
-    fun next() {
-        var result = this.list[this.index]
-        this.index = this.index + 1
-        return result
+fun take(iterable, n: Number) {
+    var result = []
+    var iter = iterable.iter()
+    var i = 0
+    while (i < n and iter.next?()) {
+        result.push(iter.next())
+        i = i + 1
     }
+    return result
+}
 
-    fun next?() {
-        return this.index < this.list.length()
+fun skip(iterable, n: Number) {
+    var result = []
+    var iter = iterable.iter()
+    var i = 0
+    while (iter.next?()) {
+        var item = iter.next()
+        if (i >= n) { result.push(item) }
+        i = i + 1
     }
+    return result
 }

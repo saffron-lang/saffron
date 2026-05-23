@@ -2,30 +2,34 @@
 
 ## Critical
 
-### 1. Nested closures crash in imported modules
+### 1. Functions in imported modules can't call other functions from the same module
 
 **Reproduction:**
 ```saffron
 // lib.sf
-fun outer(x: String) {
-    fun inner(): String {
-        return x  // captures upvalue from outer
-    }
-    return inner()
-}
+fun double(n) { return n * 2 }
+fun quad(n) { return double(double(n)) }
 ```
 ```saffron
 // main.sf
 import "lib.sf" as Lib
-IO.print(Lib.outer("hello"))  // Runtime error at line 0
+IO.print(Lib.quad(5))  // Runtime error at line 0 in quad()
 ```
 
-**Expected:** Works like it does in the main script.
-**Actual:** `Runtime error. [line 0] in outer()`
+**Expected:** `quad` can call `double` since both are module-level functions.
+**Actual:** `Runtime error. [line 0] in quad()` — `double` is not found.
 
-**Impact:** Blocks writing any non-trivial stdlib in Saffron (e.g., the JSON parser).
-**Location:** Likely in `executeModule` / `interpret` in `src/vm.c` — the module's call frame
-or upvalue handling differs from the main script path.
+**Note:** Nested closures (upvalues within a single function) DO work in imports.
+The issue is specifically module-level globals referencing each other.
+
+**Root cause:** Module functions are compiled as closures with `OP_GET_GLOBAL` for
+inter-function calls. `OP_GET_GLOBAL` looks up `module->obj.fields`. But at the time
+`quad` runs, `double` may not yet be in the module's fields table — OR the function's
+global scope doesn't point back to the same module fields table.
+
+**Impact:** Blocks any stdlib module where functions call each other (iter, json, etc.).
+**Location:** `OP_GET_GLOBAL` handler in `src/vm.c` and how `interpret()` sets up
+the module context for imported files.
 
 ### 2. Forward references in nested closures
 
