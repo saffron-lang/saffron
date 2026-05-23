@@ -5,7 +5,7 @@
     <vendor>saffron-lang</vendor>
     <description>Language support for Saffron (.sf files)</description>
 
-    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType

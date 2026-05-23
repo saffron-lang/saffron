@@ -171,19 +171,24 @@ static Value deepConstructField(ObjClass *klass, ObjString *fieldName, Value fie
     for (int i = 0; i < klass->fieldMetas.count; i++) {
         FieldMeta *meta = &klass->fieldMetas.entries[i];
         if (meta->name == fieldName && meta->typeTag == FIELD_TYPE_CLASS && meta->typeName != NULL) {
-            // Look up the class by name from caller's module or builtins
+            // Look up the class by name from builtins or caller's module
             Value nestedClass = NIL_VAL;
-            ObjCallFrame *frame = CURRENT_TASK;
-            // Walk up frames to find the user's module (skip native/reflect frames)
-            while (frame && frame->parent) {
-                if (frame->closure->function->module) {
-                    ObjModule *mod = (ObjModule *) frame->closure->function->module;
-                    if (tableGet(&mod->obj.fields, meta->typeName, &nestedClass)) break;
+            // Try builtins first
+            if (tableGet(&vm.builtins, meta->typeName, &nestedClass) && IS_CLASS(nestedClass)) {
+                // found
+            } else {
+                // Walk ALL modules in the frame chain
+                nestedClass = NIL_VAL;
+                ObjCallFrame *frame = CURRENT_TASK;
+                while (frame != NULL) {
+                    if (frame->closure && frame->closure->function && frame->closure->function->module) {
+                        ObjModule *mod = (ObjModule *) frame->closure->function->module;
+                        if (tableGet(&mod->obj.fields, meta->typeName, &nestedClass) && IS_CLASS(nestedClass)) {
+                            break;
+                        }
+                    }
+                    frame = frame->parent;
                 }
-                frame = frame->parent;
-            }
-            if (IS_NIL(nestedClass)) {
-                tableGet(&vm.builtins, meta->typeName, &nestedClass);
             }
             if (!IS_NIL(nestedClass) && IS_CLASS(nestedClass)) {
                 if (IS_OBJ(fieldValue) && AS_OBJ(fieldValue)->type == OBJ_MAP) {

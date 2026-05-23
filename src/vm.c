@@ -331,12 +331,15 @@ static bool callValue(Value callee, int argCount) {
             case OBJ_OVERLOAD_SET: {
                 ObjOverloadSet *set = AS_OVERLOAD_SET(callee);
                 ObjClosure *match = NULL;
+
+                // Find first overload matching the argument count
                 for (int i = 0; i < set->count; i++) {
                     if (set->arities[i] == argCount) {
                         match = set->closures[i];
                         break;
                     }
                 }
+
                 if (match != NULL) return call(match, argCount);
                 runtimeError("No overload matches %d arguments.", argCount);
                 return false;
