@@ -1,0 +1,194 @@
+// SEGFAULT REPRO: This file reproduces the type checker crash on Any-typed
+// closures and yield in imported modules. Import this as @test to trigger.
+// Once the type checker handles NODE_FUNCTION decorators field and NULL
+// returnType on closures, this should pass.
+//
+// Original: src/lib/test.sf (legacy version before decorator-based rewrite)
+
+var passed = 0
+var failed = 0
+var total = 0
+
+// --- Assertions ---
+
+fun assert(condition: Bool, msg: String) {
+    total = total + 1
+    if (condition) { passed = passed + 1 }
+    else { failed = failed + 1; IO.println("    FAIL: ${msg}") }
+}
+
+fun assert_eq(actual: Any, expected: Any, msg: String) {
+    total = total + 1
+    if (actual == expected) { passed = passed + 1 }
+    else {
+        failed = failed + 1
+        IO.println("    FAIL: ${msg}")
+        IO.println("      expected: ${expected}")
+        IO.println("      actual:   ${actual}")
+    }
+}
+
+fun assert_neq(actual: Any, expected: Any, msg: String) {
+    total = total + 1
+    if (actual != expected) { passed = passed + 1 }
+    else {
+        failed = failed + 1
+        IO.println("    FAIL: ${msg} (should not equal ${expected})")
+    }
+}
+
+fun assert_gt(actual: Number, expected: Number, msg: String) {
+    total = total + 1
+    if (actual > expected) { passed = passed + 1 }
+    else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not > ${expected})") }
+}
+
+fun assert_lt(actual: Number, expected: Number, msg: String) {
+    total = total + 1
+    if (actual < expected) { passed = passed + 1 }
+    else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not < ${expected})") }
+}
+
+fun assert_throws(body: Any, msg: String) {
+    total = total + 1
+    var threw = false
+    try { body() } catch (e) { threw = true }
+    if (threw) { passed = passed + 1 }
+    else { failed = failed + 1; IO.println("    FAIL: ${msg} (expected throw)") }
+}
+
+fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
+    total = total + 1
+    var caught_msg = nil
+    try { body() } catch (e) { caught_msg = e }
+    if (caught_msg == expected_msg) { passed = passed + 1 }
+    else {
+        failed = failed + 1
+        if (caught_msg == nil) {
+            IO.println("    FAIL: ${msg} (no throw)")
+        } else {
+            IO.println("    FAIL: ${msg} (got '${caught_msg}', want '${expected_msg}')")
+        }
+    }
+}
+
+fun assert_contains(haystack: String, needle: String, msg: String) {
+    total = total + 1
+    if (haystack.contains(needle)) { passed = passed + 1 }
+    else { failed = failed + 1; IO.println("    FAIL: ${msg} ('${haystack}' missing '${needle}')") }
+}
+
+// --- Mocking ---
+
+fun mock(name: String) {
+    var calls = []
+    var return_value = nil
+
+    fun get_fn() {
+        return fun () => {
+            calls.push([])
+            return return_value;
+        }
+    }
+
+    fun get_fn1() {
+        return fun (a: Any) => {
+            calls.push([a])
+            return return_value;
+        }
+    }
+
+    fun get_fn2() {
+        return fun (a: Any, b: Any) => {
+            calls.push([a, b])
+            return return_value;
+        }
+    }
+
+    fun call_count(): Number {
+        return calls.length()
+    }
+
+    fun called(): Bool {
+        return calls.length() > 0
+    }
+
+    fun last_args() {
+        if (calls.length() == 0) { return nil; }
+        return calls[calls.length() - 1]
+    }
+
+    fun returns(value: Any) {
+        return_value = value
+    }
+
+    fun reset() {
+        calls = []
+        return_value = nil
+    }
+
+    // Return a map-like object with mock utilities
+    var m: Map<String, Any> = {
+        "fn": get_fn(),
+        "fn1": get_fn1(),
+        "fn2": get_fn2(),
+        "call_count": call_count,
+        "called": called,
+        "last_args": last_args,
+        "returns": returns,
+        "reset": reset,
+        "calls": calls
+    }
+    return m
+}
+
+// --- Async Testing ---
+
+fun async_test(name: String, body: Any, timeout_secs: Number) {
+    total = total + 1
+    var task = Task.spawn(body)
+
+    var elapsed = 0
+    var interval = 0.01
+    while (!task.isReady()) {
+        yield [1, interval]
+        elapsed = elapsed + interval
+        if (elapsed >= timeout_secs) {
+            failed = failed + 1
+            IO.println("    FAIL: ${name} (timeout after ${timeout_secs}s)")
+            return;
+        }
+    }
+
+    var result = task.getResult()
+    if (result == false) {
+        failed = failed + 1
+        IO.println("    FAIL: ${name}")
+    } else {
+        passed = passed + 1
+    }
+}
+
+// --- Reporting ---
+
+fun section(name: String) {
+    IO.println("  ${name}")
+}
+
+fun summary() {
+    IO.println("")
+    if (failed == 0) {
+        IO.println("  All ${total} tests passed")
+    } else {
+        IO.println("  ${passed}/${total} passed, ${failed} failed")
+    }
+}
+
+fun run(name: String, body: Any) {
+    IO.println(name)
+    body()
+    summary()
+    if (failed > 0) {
+        throw "Test suite failed"
+    }
+}

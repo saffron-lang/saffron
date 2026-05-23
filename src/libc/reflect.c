@@ -171,12 +171,16 @@ static Value deepConstructField(ObjClass *klass, ObjString *fieldName, Value fie
     for (int i = 0; i < klass->fieldMetas.count; i++) {
         FieldMeta *meta = &klass->fieldMetas.entries[i];
         if (meta->name == fieldName && meta->typeTag == FIELD_TYPE_CLASS && meta->typeName != NULL) {
-            // Look up the class by name from current module or builtins
+            // Look up the class by name from caller's module or builtins
             Value nestedClass = NIL_VAL;
             ObjCallFrame *frame = CURRENT_TASK;
-            if (frame && frame->closure && frame->closure->function->module) {
-                ObjModule *mod = (ObjModule *) frame->closure->function->module;
-                tableGet(&mod->obj.fields, meta->typeName, &nestedClass);
+            // Walk up frames to find the user's module (skip native/reflect frames)
+            while (frame && frame->parent) {
+                if (frame->closure->function->module) {
+                    ObjModule *mod = (ObjModule *) frame->closure->function->module;
+                    if (tableGet(&mod->obj.fields, meta->typeName, &nestedClass)) break;
+                }
+                frame = frame->parent;
             }
             if (IS_NIL(nestedClass)) {
                 tableGet(&vm.builtins, meta->typeName, &nestedClass);
