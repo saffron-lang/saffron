@@ -1,0 +1,65 @@
+import "reflect" as Reflect
+
+// Nested data classes
+data class Coord {
+    var lat: Number
+    var lng: Number
+}
+
+data class Address {
+    var street: String
+    var city: String
+    var zip: Number
+    var coord: Coord
+}
+
+data class Company {
+    var name: String
+    var address: Address
+}
+
+data class Person {
+    var name: String
+    var age: Number
+    var company: Company
+}
+
+// 4-level deep deserialization
+var info = {
+    "name": "Alice",
+    "age": 30,
+    "company": {
+        "name": "Acme",
+        "address": {
+            "street": "123 Main St",
+            "city": "NYC",
+            "zip": 10001,
+            "coord": {
+                "lat": 40.7128,
+                "lng": -74.006
+            }
+        }
+    }
+}
+
+var person = Reflect.construct(Person, info, true)
+
+// Verify top level
+IO.println(person.name)
+IO.println(person.age)
+
+// Verify nested company
+IO.println(person.company.name)
+
+// Verify doubly nested address
+IO.println(person.company.address.street)
+IO.println(person.company.address.city)
+IO.println(person.company.address.zip)
+
+// Verify 4-level deep coord
+IO.println(person.company.address.coord.lat)
+IO.println(person.company.address.coord.lng)
+
+// Verify field_types introspection
+IO.println(Reflect.field_types(Person))
+IO.println(Reflect.field_types(Address))
