@@ -166,6 +166,8 @@ void makeTypes() {
     defineMethodType(stringType, "slice", (Type *) stringType);
     defineMethodType(stringType, "index_of", (Type *) numberType);
     defineMethodType(stringType, "repeat", (Type *) stringType);
+    defineMethodType(stringType, "char_at", (Type *) stringType);
+    defineMethodType(stringType, "to_number", (Type *) numberType);
 
     listTypeDef = createListTypeDef();
     mapTypeDef = createMapTypeDef();
@@ -1073,7 +1075,7 @@ Type *evaluateNode(Node *node) {
             struct List *casted = (struct List *) node;
 
             GenericType *type = currentAssignmentType;
-            if (currentAssignmentType == NULL) {
+            if (currentAssignmentType == NULL || currentAssignmentType == (Type *) anyType) {
                 type = newGenericType();
                 initValueArray(&type->generics);
                 Type *itemType = neverType;
@@ -1117,9 +1119,8 @@ Type *evaluateNode(Node *node) {
             struct Map *casted = (struct Map *) node;
 
             GenericType *type = currentAssignmentType;
-            type->target = mapTypeDef;
 
-            if (currentAssignmentType == NULL) {
+            if (currentAssignmentType == NULL || currentAssignmentType == (Type *) anyType) {
                 type = newGenericType();
                 initValueArray(&type->generics);
                 Type *keyType = neverType;
