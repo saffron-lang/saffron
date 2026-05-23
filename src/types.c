@@ -1317,11 +1317,11 @@ Type *evaluateNode(Node *node) {
             struct Function *casted = (struct Function *) node;
 
             // Evaluate decorator expressions
-            if (casted->decorators.exprs != NULL) {
-                for (int i = 0; i < casted->decorators.count; i++) {
-                    evaluateNode((Node *) casted->decorators.exprs[i]);
-                }
-            }
+            // Decorators transform function values at runtime, skip in type checker
+
+
+
+
 
             TypeEnvironment typeEnv;
             initTypeEnvironment(&typeEnv, casted->functionType);

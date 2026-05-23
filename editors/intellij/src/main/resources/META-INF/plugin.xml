@@ -6,6 +6,7 @@
     <description>Language support for Saffron (.sf files)</description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
@@ -21,5 +22,9 @@
 
         <platform.lsp.serverSupportProvider
             implementation="dev.saffron.intellij.SaffronLspServerSupportProvider"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij.textmate">
+        <bundleProvider implementation="dev.saffron.intellij.SaffronTextMateBundleProvider"/>
     </extensions>
 </idea-plugin>
