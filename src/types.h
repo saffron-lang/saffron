@@ -60,13 +60,10 @@ typedef struct GenericTypeDefinition {
 } GenericTypeDefinition;
 
 typedef struct InterfaceType {
-    // {
-    //    var a: Number
-    //    add(other: Number)
-    // }
     Type self;
     Table fields;
     Table methods;
+    Table abstractMethods;
     ValueArray genericArgs;
     Type *superType;
 } InterfaceType;

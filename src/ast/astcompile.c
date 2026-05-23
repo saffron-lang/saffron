@@ -1081,6 +1081,66 @@ void compileNode(Node *node) {
             current->localCount--;
             break;
         }
+        case NODE_THROW: {
+            struct Throw *casted = (struct Throw *) node;
+            compileNode((Node *) casted->value);
+            emitByte(OP_THROW);
+            break;
+        }
+        case NODE_TRYCATCH: {
+            struct TryCatch *casted = (struct TryCatch *) node;
+
+            // OP_TRY_BEGIN with offset to catch section
+            int tryBegin = emitJump(OP_TRY_BEGIN);
+
+            // Compile try body
+            compileTree(&casted->tryBody);
+
+            // Normal exit: pop handler and jump past catches
+            emitByte(OP_TRY_END);
+            int tryEndJump = emitJump(OP_JUMP);
+
+            // Catch target
+            patchJump(tryBegin);
+
+            // For each catch clause: check type, bind, execute body
+            int catchEndJumps[16];
+            int catchCount = 0;
+
+            for (int i = 0; i < casted->catchClauses.count; i++) {
+                struct CatchClause *clause = (struct CatchClause *) casted->catchClauses.stmts[i];
+
+                // The exception is on the stack (pushed by OP_THROW unwinding)
+                // Bind it to the local
+                beginScope();
+                declareVariable(&clause->binding);
+                defineVariable(identifierConstant(&clause->binding));
+
+                compileTree(&clause->body);
+                endScope();
+
+                catchEndJumps[catchCount++] = emitJump(OP_JUMP);
+            }
+
+            // If no catch matched (for now we only have one catch that always matches)
+            // re-throw — but we'll handle type matching later
+            // For now: the single catch always catches
+
+            // Patch all catch exits
+            patchJump(tryEndJump);
+            for (int i = 0; i < catchCount; i++) {
+                patchJump(catchEndJumps[i]);
+            }
+
+            // Finally block
+            if (casted->finallyBody.count > 0) {
+                compileTree(&casted->finallyBody);
+            }
+
+            break;
+        }
+        case NODE_CATCHCLAUSE:
+            break;
         case NODE_IMPORT: {
             struct Import *casted = (struct Import *) node;
             compileNode((Node *) casted->expression);
