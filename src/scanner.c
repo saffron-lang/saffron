@@ -193,7 +193,7 @@ static TokenType identifierType() {
                             return TOKEN_IN;
                         }
                     case 's':
-                        return TOKEN_IS;
+                        return checkKeyword(2, 0, "", TOKEN_IS);
                 }
             }
             break;

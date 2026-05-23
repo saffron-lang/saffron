@@ -26,6 +26,11 @@ class Cat extends Animal {
 var d = Dog()
 var c = Cat()
 
+// Direct class checks
 IO.print(d is Dog)
 IO.print(d is Cat)
 IO.print(c is Cat)
+
+// Inheritance-aware checks
+IO.print(d is Animal)
+IO.print(c is Animal)
