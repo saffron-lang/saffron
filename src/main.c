@@ -10,6 +10,9 @@
 
 static void repl() {
     char line[1024];
+    ObjModule *module = interpret(NULL, "<repl>", "<repl>");
+
+    printf("saffron v0.1 REPL\n");
     for (;;) {
         printf(">>> ");
 
@@ -23,8 +26,8 @@ static void repl() {
         StmtArray *body = parseAST(line);
         if (body == NULL) continue;
 
-        ObjModule *module = interpret(body, "<repl>", "<repl>");
-        if (module->result == INTERPRET_RUNTIME_ERROR) {
+        InterpretResult result = interpretInModule(body, module);
+        if (result == INTERPRET_RUNTIME_ERROR) {
             fprintf(stderr, "Runtime error.\n");
         }
     }

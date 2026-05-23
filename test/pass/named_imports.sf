@@ -1,0 +1,11 @@
+// Test: Named imports with destructuring syntax
+import { map, filter, reduce } from "@iter"
+
+var doubled = [1, 2, 3] |> map(fun (x: Number): Number => x * 2)
+IO.println(doubled)
+
+var evens = [1, 2, 3, 4] |> filter(fun (x: Number): Bool => x % 2 == 0)
+IO.println(evens)
+
+var total = reduce([1, 2, 3, 4], fun (acc: Number, x: Number): Number => acc + x, 0)
+IO.println(total)

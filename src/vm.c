@@ -1272,6 +1272,10 @@ static InterpretResult run(ObjModule *module) {
 
 ObjModule *interpret(StmtArray *body, const char *name, const char *path) {
     ObjModule *module = newModule(name, path, true);
+    if (body == NULL) {
+        module->result = INTERPRET_OK;
+        return module;
+    }
     push(OBJ_VAL(module));
     ObjFunction *function = compile(body);
     if (function == NULL) {
