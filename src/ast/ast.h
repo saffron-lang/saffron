@@ -55,6 +55,9 @@ typedef enum {
     NODE_IMPORT,
     NODE_ENUM,
     NODE_ENUMITEM,
+    NODE_MATCH,
+    NODE_MATCHARM,
+    NODE_DESTRUCTURE,
     NODE_METHODSIG,
     NODE_POSITIONAL,
     NODE_KEYWORD,
@@ -352,6 +355,7 @@ struct Import {
 struct Enum {
     Stmt self;
     Token name;
+    TypeNodeArray generics;
     StmtArray body;
 };
 
@@ -359,6 +363,27 @@ struct EnumItem {
     Stmt self;
     Token name;
     ParameterArray params;
+};
+
+struct Match {
+    Stmt self;
+    Expr* subject;
+    StmtArray arms;
+};
+
+struct MatchArm {
+    Stmt self;
+    Token variantName;
+    ParameterArray bindings;
+    StmtArray body;
+};
+
+struct Destructure {
+    Stmt self;
+    ParameterArray bindings;
+    Expr* value;
+    Token variant;
+    int splatPosition;
 };
 
 struct MethodSig {
