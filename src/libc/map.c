@@ -43,6 +43,7 @@ SimpleType *createMapTypeDef() {
 
     // Methods
     FunctorType *initType = newFunctorType();
+    initType->returnType = (Type *) mapTypeDef;
     tableSet(
             &mapTypeDef->methods,
             copyString("init", 4),
@@ -125,17 +126,131 @@ void freeMap(ValueTable *table) {
     freeValueTable(table);
 }
 
+Value mapCall(int argCount, Value *args) {
+    return OBJ_VAL(newMap());
+}
+
+Value mapSetBuiltin(ObjMap *map, int argCount, Value *args) {
+    if (argCount != 2) {
+        runtimeError("set() expects 2 arguments (key, value)");
+        return NIL_VAL;
+    }
+    valueTableSet(&map->values, args[0], args[1]);
+    return args[1];
+}
+
+Value mapGetBuiltin(ObjMap *map, int argCount, Value *args) {
+    if (argCount != 1) {
+        runtimeError("get() expects 1 argument (key)");
+        return NIL_VAL;
+    }
+    Value result;
+    if (valueTableGet(&map->values, args[0], &result)) {
+        return result;
+    }
+    return NIL_VAL;
+}
+
+Value mapHasBuiltin(ObjMap *map, int argCount, Value *args) {
+    if (argCount != 1) {
+        runtimeError("has() expects 1 argument (key)");
+        return BOOL_VAL(false);
+    }
+    Value result;
+    return BOOL_VAL(valueTableGet(&map->values, args[0], &result));
+}
+
+static Value mapIterBuiltin(ObjMap *map, int argCount, Value *args) {
+    return OBJ_VAL(newMapIterator(map));
+}
+
+static Value mapLengthBuiltin(ObjMap *map, int argCount, Value *args) {
+    return NUMBER_VAL(map->values.count);
+}
+
 void mapInit(ObjBuiltinType *type) {
     type->freeFn = (FreeFn) &freeMap;
     type->markFn = (MarkFn) &markMap;
     type->printFn = (PrintFn) &printMap;
-    type->typeCallFn = NULL;
+    type->typeCallFn = (TypeCallFn) &mapCall;
     type->typeDefFn = (GetTypeDefFn) &createMapTypeDef;
     defineBuiltinMethod(type, "keys", (NativeMethodFn) mapKeysBuiltin);
     defineBuiltinMethod(type, "values", (NativeMethodFn) mapValuesBuiltin);
+    defineBuiltinMethod(type, "set", (NativeMethodFn) mapSetBuiltin);
+    defineBuiltinMethod(type, "get", (NativeMethodFn) mapGetBuiltin);
+    defineBuiltinMethod(type, "has", (NativeMethodFn) mapHasBuiltin);
+    defineBuiltinMethod(type, "iter", (NativeMethodFn) mapIterBuiltin);
+    defineBuiltinMethod(type, "length", (NativeMethodFn) mapLengthBuiltin);
 }
 
 ObjBuiltinType *createMapType() {
     mapType = newBuiltinType("Map", mapInit);
     return mapType;
+}
+
+// --- MapIterator ---
+
+ObjBuiltinType *mapIteratorType = NULL;
+
+ObjMapIterator *newMapIterator(ObjMap *map) {
+    ObjMapIterator *iter = ALLOCATE_OBJ(ObjMapIterator, OBJ_INSTANCE);
+    iter->obj.klass = (ObjClass *) mapIteratorType;
+    initTable(&iter->obj.fields);
+    iter->map = map;
+    iter->index = 0;
+    return iter;
+}
+
+static void freeMapIterator(ObjMapIterator *iter) {
+    FREE(ObjMapIterator, iter);
+}
+
+static void markMapIterator(ObjMapIterator *iter) {
+    markObject((Obj *) iter->map);
+}
+
+static void printMapIterator(ObjMapIterator *iter) {
+    printf("<MapIterator>");
+}
+
+static Value mapIteratorNext(ObjMapIterator *iter, int argCount, Value *args) {
+    while (iter->index < iter->map->values.capacity) {
+        MapEntry *entry = &iter->map->values.entries[iter->index++];
+        if (!valuesEqual(entry->key, NIL_VAL)) {
+            ObjList *pair = newList();
+            writeValueArray(&pair->items, entry->key);
+            writeValueArray(&pair->items, entry->value);
+            return OBJ_VAL(pair);
+        }
+    }
+    return NIL_VAL;
+}
+
+static Value mapIteratorHasNext(ObjMapIterator *iter, int argCount, Value *args) {
+    for (int i = iter->index; i < iter->map->values.capacity; i++) {
+        if (!valuesEqual(iter->map->values.entries[i].key, NIL_VAL)) {
+            return BOOL_VAL(true);
+        }
+    }
+    return BOOL_VAL(false);
+}
+
+static Value mapIteratorIter(ObjMapIterator *iter, int argCount, Value *args) {
+    return OBJ_VAL(iter);
+}
+
+static void mapIteratorInit(ObjBuiltinType *type) {
+    type->freeFn = (FreeFn) &freeMapIterator;
+    type->markFn = (MarkFn) &markMapIterator;
+    type->printFn = (PrintFn) &printMapIterator;
+    type->typeCallFn = NULL;
+    type->typeDefFn = NULL;
+    defineBuiltinMethod(type, "next", (NativeMethodFn) mapIteratorNext);
+    defineBuiltinMethod(type, "next?", (NativeMethodFn) mapIteratorHasNext);
+    defineBuiltinMethod(type, "iter", (NativeMethodFn) mapIteratorIter);
+}
+
+ObjBuiltinType *createMapIteratorType() {
+    mapIteratorType = newBuiltinType("MapIterator", mapIteratorInit);
+    return mapIteratorType;
 }
