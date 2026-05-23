@@ -1510,6 +1510,12 @@ Type *evaluateNode(Node *node) {
                     ),
                     OBJ_VAL(interfaceType)
             );
+            tableSet(
+                    &currentEnv->locals, copyString(
+                            casted->name.start, casted->name.length
+                    ),
+                    OBJ_VAL(interfaceType)
+            );
 
             if (casted->superType) {
                 InterfaceType *superType = getTypeDef(casted->superType->name);
