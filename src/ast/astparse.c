@@ -594,34 +594,6 @@ static Stmt *expressionStatement() {
     struct Expression *result = ALLOCATE_NODE(struct Expression, NODE_EXPRESSION);
     result->self.self.lineno = parser.current.line;
     Expr *expr = expression();
-
-    // Check for enum destructure: Variant(bindings) = value
-    if (expr->self.type == NODE_CALL && match(TOKEN_EQUAL)) {
-        struct Call *call = (struct Call *) expr;
-        if (call->callee->self.type == NODE_VARIABLE) {
-            Token variantName = ((struct Variable *) call->callee)->name;
-            ParameterArray bindings;
-            initParameterArray(&bindings);
-            for (int i = 0; i < call->arguments.count; i++) {
-                Expr *arg = call->arguments.exprs[i];
-                if (arg->self.type == NODE_VARIABLE) {
-                    Token name = ((struct Variable *) arg)->name;
-                    struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
-                    param->self.name = name;
-                    param->self.type = NULL;
-                    writeParameterArray(&bindings, (Parameter *) param);
-                }
-            }
-            Expr *value = expression();
-            struct Destructure *destr = ALLOCATE_NODE(struct Destructure, NODE_DESTRUCTURE);
-            destr->bindings = bindings;
-            destr->value = value;
-            destr->variant = variantName;
-            destr->splatPosition = -1;
-            return (Stmt *) destr;
-        }
-    }
-
     match(TOKEN_SEMICOLON);
     result->expression = expr;
     return result;
@@ -1027,8 +999,15 @@ static Stmt *statement() {
         result = block();
     } else if (match(TOKEN_IMPORT)) {
         result = importStatement();
-    } else if (match(TOKEN_LEFT_BRACKET)) {
-        result = listDestructure();
+    } else if (match(TOKEN_LET)) {
+        if (match(TOKEN_LEFT_BRACKET)) {
+            result = listDestructure();
+        } else {
+            consume(TOKEN_IDENTIFIER, "Expect variant name after 'let'.");
+            Token name = parser.previous;
+            consume(TOKEN_LEFT_PAREN, "Expect '(' after variant name in let destructure.");
+            result = enumDestructure(name);
+        }
     } else {
         result = expressionStatement();
     }
@@ -1094,16 +1073,17 @@ static Stmt *classDeclaration() {
 
     struct Class *result = ALLOCATE_NODE(struct Class, NODE_CLASS);
     result->name = className;
-    result->superclass = NULL;
+    initExprArray(&result->superclasses);
 
     if (match(TOKEN_EXTENDS)) {
-        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
-        struct Variable *var = variable(false);
-
-        if (identifiersEqual(&className, &parser.previous)) {
-            error("A class can't inherit from itself.");
-        }
-        result->superclass = var;
+        do {
+            consume(TOKEN_IDENTIFIER, "Expect superclass/interface name.");
+            Expr *var = variable(false);
+            if (identifiersEqual(&className, &parser.previous)) {
+                error("A class can't inherit from itself.");
+            }
+            writeExprArray(&result->superclasses, var);
+        } while (match(TOKEN_COMMA));
     }
 
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");

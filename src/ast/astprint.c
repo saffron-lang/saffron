@@ -380,9 +380,12 @@ void unparseNode(Node *node) {
             printIndent();
             printf("class ");
             unparseToken(casted->name);
-            if (casted->superclass) {
-                printf("< ");
-                unparseNode((Node *) casted->superclass);
+            if (casted->superclasses.count > 0) {
+                printf("extends ");
+                for (int i = 0; i < casted->superclasses.count; i++) {
+                    if (i > 0) printf(", ");
+                    unparseNode((Node *) casted->superclasses.exprs[i]);
+                }
             }
 
             printf(" {\n");
@@ -831,8 +834,12 @@ void printNode(Node *node) {
             printToken(casted->name);
             printf(",\n");
             printIndent();
-            printf("superclass=");
-            printNode((Node *) casted->superclass);
+            printf("superclasses=[");
+            for (int i = 0; i < casted->superclasses.count; i++) {
+                if (i > 0) printf(", ");
+                printNode((Node *) casted->superclasses.exprs[i]);
+            }
+            printf("]");
             printf(",\n");
             printIndent();
             printf("body=");

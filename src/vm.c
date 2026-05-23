@@ -788,7 +788,9 @@ static InterpretResult run(ObjModule *module) {
                 ObjClass *subclass = AS_CLASS(peek(0));
                 tableAddAll(&AS_CLASS(superclass)->methods,
                             &subclass->methods);
-                subclass->superclass = AS_CLASS(superclass);
+                if (subclass->superclass == NULL) {
+                    subclass->superclass = AS_CLASS(superclass);
+                }
                 pop(); // Subclass.
                 break;
             }
@@ -877,6 +879,23 @@ static InterpretResult run(ObjModule *module) {
                 ObjEnumInstance *instance = AS_ENUM_INSTANCE(value);
                 pop();
                 push(OBJ_VAL(instance->tag));
+                break;
+            }
+            case OP_SLICE: {
+                int fromEnd = (int) AS_NUMBER(pop());
+                int start = (int) AS_NUMBER(pop());
+                Value listVal = pop();
+                if (!isObjType(listVal, OBJ_LIST)) {
+                    runtimeError("Can only slice lists.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjList *source = (ObjList *) AS_OBJ(listVal);
+                int end = source->items.count - fromEnd;
+                ObjList *slice = newList();
+                push(OBJ_VAL(slice));
+                for (int i = start; i < end; i++) {
+                    listPush(slice, source->items.values[i]);
+                }
                 break;
             }
             case OP_ENUM:

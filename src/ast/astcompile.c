@@ -706,8 +706,9 @@ void compileNode(Node *node) {
             classCompiler.hasSuperclass = false;
             currentClass = &classCompiler;
 
-            if (casted->superclass != NULL) {
-                compileNode((Node *) casted->superclass);
+            if (casted->superclasses.count > 0) {
+                // First superclass gets the "super" binding
+                compileNode((Node *) casted->superclasses.exprs[0]);
 
                 beginScope();
                 addLocal(syntheticToken("super"));
@@ -716,6 +717,13 @@ void compileNode(Node *node) {
                 getVariable(className);
                 emitByte(OP_INHERIT);
                 classCompiler.hasSuperclass = true;
+
+                // Additional superclasses (interfaces/mixins) also inherit methods
+                for (int i = 1; i < casted->superclasses.count; i++) {
+                    compileNode((Node *) casted->superclasses.exprs[i]);
+                    getVariable(className);
+                    emitByte(OP_INHERIT);
+                }
             }
 
             getVariable(className);
