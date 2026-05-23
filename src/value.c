@@ -135,6 +135,20 @@ bool valuesEqual(Value a, Value b) {
                 }
                 return true;
             }
+            if (AS_OBJ(a)->type == OBJ_INSTANCE) {
+                ObjInstance *ia = AS_INSTANCE(a), *ib = AS_INSTANCE(b);
+                if (ia->klass != ib->klass) return false;
+                if (!ia->klass->isDataClass) return false;
+                // Compare all fields structurally
+                for (int i = 0; i < ia->fields.capacity; i++) {
+                    Entry *entry = &ia->fields.entries[i];
+                    if (entry->key == NULL) continue;
+                    Value bVal;
+                    if (!tableGet(&ib->fields, entry->key, &bVal)) return false;
+                    if (!valuesEqual(entry->value, bVal)) return false;
+                }
+                return true;
+            }
             return false;
         }
         default:         return false; // Unreachable.

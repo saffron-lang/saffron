@@ -10,6 +10,7 @@
 
 
 Type *evaluateNode(Node *node);
+Type *parseFile(const char *path, int length);
 
 TypeEnvironment *currentEnv = NULL;
 
@@ -689,6 +690,14 @@ bool evaluateTree(StmtArray *statements) {
     initTypeEnvironment(&typeEnv, TYPE_SCRIPT);
     initGlobalEnvironment(&typeEnv);
     currentEnv = &typeEnv;
+
+    // Auto-import prelude interfaces into global scope
+    Type *preludeType = parseFile("@prelude", 8);
+    if (preludeType && preludeType->obj.type == OBJ_PARSE_TYPE) {
+        SimpleType *prelude = (SimpleType *) preludeType;
+        tableAddAll(&prelude->methods, &typeEnv.typeDefs);
+    }
+
     preRegisterDeclarations(statements);
     evaluateTypes(statements);
     currentEnv = typeEnv.enclosing;
