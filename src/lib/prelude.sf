@@ -1,0 +1,39 @@
+// System interfaces for operator overloading and duck typing
+// These define the protocols that classes can implement to support operators.
+
+interface Addable<T> {
+    fun add(other: T): T
+}
+
+interface Subtractable<T> {
+    fun sub(other: T): T
+}
+
+interface Multipliable<T> {
+    fun mul(other: T): T
+}
+
+interface Dividable<T> {
+    fun div(other: T): T
+}
+
+interface Modable<T> {
+    fun mod(other: T): T
+}
+
+interface Comparable<T> {
+    fun lt(other: T): Bool
+    fun gt(other: T): Bool
+}
+
+interface Equatable<T> {
+    fun eq(other: T): Bool
+}
+
+interface Indexable<K, V> {
+    fun getItem(key: K): V
+}
+
+interface Stringable {
+    fun toString(): String
+}
