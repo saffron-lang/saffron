@@ -2,7 +2,7 @@ var passed = 0
 var failed = 0
 var total = 0
 
-fun assert(condition, msg) {
+fun assert(condition: Bool, msg: String) {
     total = total + 1
     if (condition) {
         passed = passed + 1
@@ -12,7 +12,7 @@ fun assert(condition, msg) {
     }
 }
 
-fun assert_eq(actual, expected, msg) {
+fun assert_eq(actual: Any, expected: Any, msg: String) {
     total = total + 1
     if (actual == expected) {
         passed = passed + 1
@@ -24,7 +24,7 @@ fun assert_eq(actual, expected, msg) {
     }
 }
 
-fun section(name) {
+fun section(name: String) {
     IO.println(name)
 }
 
