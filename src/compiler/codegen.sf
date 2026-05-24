@@ -13,6 +13,7 @@ class Codegen {
     var enum_variant_tags: Map<String, Float>
     var enum_variant_fields: Map<String, String>
     var type_defs: StringBuilder
+    var known_functions: List<String>
 
     fun init() {
         this.sb = StringBuilder()
@@ -25,6 +26,7 @@ class Codegen {
         this.enum_variant_tags = {}
         this.enum_variant_fields = {}
         this.type_defs = StringBuilder()
+        this.known_functions = []
     }
 
     fun fresh_label(prefix: String): String {
@@ -182,6 +184,9 @@ class Codegen {
             Match(subject, arms) => {
                 this.gen_match(subject, arms)
             }
+            Lambda(params, ret_type, body) => {
+                this.gen_lambda(params, ret_type, body)
+            }
         }
     }
 
@@ -262,16 +267,43 @@ class Codegen {
             return local
         }
 
-        // General function call
+        // Check if it's a known direct function or an indirect call through a variable
+        if (this.known_functions.contains(callee_name)) {
+            // Direct call to known function
+            var arg_strs: List<String> = []
+            var i = 0
+            while (i < args.length()) {
+                var val = this.gen_expr(args[i])
+                arg_strs.push("i64 " + val)
+                i = i + 1
+            }
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+            return local
+        }
+
+        // Indirect call: callee is a variable holding a function pointer
+        var ptr_val = this.fresh_local()
+        this.emit_indent(ptr_val + " = load i64, i64* %" + callee_name)
+        return this.gen_indirect_call(ptr_val, args)
+    }
+
+    fun gen_indirect_call(ptr_val: String, args: List<AST.Expr>): String {
         var arg_strs: List<String> = []
+        var arg_types: List<String> = []
         var i = 0
         while (i < args.length()) {
             var val = this.gen_expr(args[i])
             arg_strs.push("i64 " + val)
+            arg_types.push("i64")
             i = i + 1
         }
+        // Cast i64 back to function pointer and call
+        var fn_type = "i64 (" + arg_types.join(", ") + ")*"
+        var fn_ptr = this.fresh_local()
+        this.emit_indent(fn_ptr + " = inttoptr i64 " + ptr_val + " to " + fn_type)
         var local = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+        this.emit_indent(local + " = call i64 " + fn_ptr + "(" + arg_strs.join(", ") + ")")
         return local
     }
 
@@ -289,6 +321,9 @@ class Codegen {
             Logical(l, o, r) => "logical"
             MemberAccess(o, f) => "member"
             NilLit => "nil"
+            Match(s, a) => "match"
+            EnumConstruct(e, v, a) => "enum"
+            Lambda(p, r, b) => "lambda"
         }
         return kind == "string"
     }
@@ -488,6 +523,34 @@ class Codegen {
             i = i + 1
         }
         return max_f
+    }
+
+    fun gen_lambda(params: String, ret_type: String, body: List<AST.Stmt>): String {
+        // Generate a unique name for this lambda
+        this.label_counter = this.label_counter + 1
+        var lambda_name = "__lambda_" + this.label_counter.floor().to_string()
+
+        // Save current state
+        var saved_sb = this.sb
+        var saved_terminated = this.block_terminated
+        var saved_counter = this.local_counter
+
+        // Generate the lambda function into a new buffer
+        this.sb = StringBuilder()
+        this.gen_function(lambda_name, params, ret_type, body)
+        var lambda_ir = this.sb.to_string()
+
+        // Restore state and append lambda to the main buffer
+        this.sb = saved_sb
+        this.block_terminated = saved_terminated
+        this.local_counter = saved_counter
+        // Store lambda IR to emit later
+        this.globals.push(lambda_ir)
+
+        // Return function pointer as i64
+        var local = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint i64 (i64)* @" + lambda_name + " to i64")
+        return local
     }
 
     fun find_enum_for_variant(variant: String): String {
@@ -714,6 +777,7 @@ class Codegen {
     }
 
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
+        this.known_functions.push(name)
         this.reset_locals()
         var ret_llvm = this.llvm_type(ret_type)
 
@@ -821,6 +885,13 @@ class Codegen {
         // External declarations
         out.append("declare i32 @puts(i8*)\n")
         out.append("declare i32 @printf(i8*, ...)\n")
+
+        // Lambda functions
+        var k = 0
+        while (k < this.globals.length()) {
+            out.append(this.globals[k])
+            k = k + 1
+        }
 
         // Function bodies
         out.append(this.sb.to_string())

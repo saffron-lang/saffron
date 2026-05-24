@@ -234,6 +234,9 @@ class Parser {
         if (this.match_kind_check("match")) {
             return this.parse_match_expr()
         }
+        if (this.match_kind_check("fun")) {
+            return this.parse_lambda()
+        }
 
         var kind = this.current_kind()
         this.advance()
@@ -291,6 +294,44 @@ class Parser {
     }
 
     // --- Helpers for operator precedence ---
+
+    fun parse_lambda(): AST.Expr {
+        this.advance() // consume fun
+        this.consume("(")
+        var params_sb = StringBuilder()
+        if (!this.match_kind_check(")")) {
+            var pname = this.expect_ident()
+            this.consume(":")
+            var ptype = this.parse_type()
+            params_sb.append(pname)
+            params_sb.append(":")
+            params_sb.append(ptype)
+            while (this.match_kind(",")) {
+                pname = this.expect_ident()
+                this.consume(":")
+                ptype = this.parse_type()
+                params_sb.append(",")
+                params_sb.append(pname)
+                params_sb.append(":")
+                params_sb.append(ptype)
+            }
+        }
+        this.consume(")")
+        var ret_type = "Int"
+        if (this.match_kind(":")) {
+            ret_type = this.parse_type()
+        }
+        if (this.match_kind("=>")) {
+            // Short form: fun (x: Int) => expr
+            var expr = this.parse_expr()
+            var params = params_sb.to_string()
+            return AST.Expr.Lambda(params, ret_type, [AST.Stmt.Return(expr)])
+        }
+        // Block form: fun (x: Int) { ... }
+        var params = params_sb.to_string()
+        var body = this.parse_block_stmts()
+        return AST.Expr.Lambda(params, ret_type, body)
+    }
 
     fun match_kind_check(expected: String): Bool {
         var kind = this.current_kind()
