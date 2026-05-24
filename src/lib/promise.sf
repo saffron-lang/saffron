@@ -1,0 +1,34 @@
+import "@async" as Async
+
+fun all(tasks: List): List {
+    var results = []
+    var i = 0
+    while (i < tasks.length()) {
+        results.push(Async.await(tasks[i]))
+        i = i + 1
+    }
+    return results
+}
+
+fun race(tasks: List): Any {
+    var i = 0
+    while (i < tasks.length()) {
+        if (tasks[i].isReady()) {
+            return tasks[i].getResult()
+        }
+        i = i + 1
+    }
+    if (tasks.length() > 0) {
+        return Async.await(tasks[0])
+    }
+    return nil
+}
+
+fun any(tasks: List): Any {
+    return race(tasks)
+}
+
+fun delay(ms: Number): Task {
+    var secs = ms / 1000
+    return Task.spawn(fun () => Async.sleep(secs))
+}

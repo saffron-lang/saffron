@@ -241,6 +241,8 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineLocal(typeEnvironment, "Nil", (Type *) nilType);
     defineLocal(typeEnvironment, "StringBuilder", (Type *) anyType);
     defineTypeDef(typeEnvironment, "StringBuilder", (Type *) anyType);
+    defineLocal(typeEnvironment, "Channel", (Type *) anyType);
+    defineTypeDef(typeEnvironment, "Channel", (Type *) anyType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
