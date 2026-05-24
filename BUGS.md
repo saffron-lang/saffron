@@ -87,6 +87,24 @@ fun test(x: Number | String) {
 
 **Workaround:** Narrowing works for class types, just not primitives.
 
+### 21. `type` is a reserved keyword — can't use as parameter/variable name
+
+`type` is tokenized as `TOKEN_TYPE` for type alias declarations. Code that uses `type` as a parameter name (e.g. `fun define(name: String, type: String)`) gets a parse error. Consider making it a contextual keyword (only reserved at statement start).
+
+### 20. `List.pop()` removes first element instead of last
+
+**Reproduction:**
+```saffron
+var x = [1, 2, 3]
+x.pop()
+IO.println(x)  // [2, 3] — should be [1, 2]
+```
+
+**Expected:** `pop()` removes and returns the last element.
+**Actual:** Removes the first element (behaves like `shift()`).
+
+**Impact:** Any stack/LIFO usage of lists is broken. Workaround: use `x.slice(0, x.length() - 1)` to simulate pop.
+
 ## Fixed
 
 - ~~#1: Functions in imported modules can't call each other~~ — Fixed: ObjFunction now stores owning module, OP_GET_GLOBAL uses correct module context.
@@ -98,3 +116,9 @@ fun test(x: Number | String) {
 - ~~#9: anyType not universal supertype~~ — Fixed: NODE_LIST/NODE_MAP/NODE_GET/NODE_CALL all handle anyType.
 - ~~#10: Imported module functions crash~~ — Fixed: same as #1.
 - ~~Nested closures crash~~ — Fixed: declareVariable for nested fun declarations.
+- ~~#14: break/continue rejected in while/for loops~~ — Fixed: added loop depth tracking for NODE_WHILE and NODE_FOR.
+- ~~#15: Qualified type references (`Module.Type`)~~ — Fixed: parser handles dotted names in type annotations, type checker resolves from module.
+- ~~#16: Empty list not assignable to typed `List<T>` fields~~ — Fixed: NODE_SET propagates field type as currentAssignmentType; raw `List` accepted for list literals.
+- ~~#17: Type checker NULL file path for relative imports~~ — Fixed: `setTypecheckFile(path)` called before `evaluateTree` in checkFile mode.
+- ~~#18: Cross-module enum pattern matching~~ — Fixed: OP_IMPORT now pops the path string (was leaking on stack); match arms support dotted qualified names.
+- ~~#19: GC not marking suspended call frame locals~~ — Fixed: OBJ_CALL_FRAME marking now traces `frame->stack`, `frame->stored`, `frame->result`.

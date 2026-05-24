@@ -1,0 +1,10 @@
+fun add(a: Int, b: Int): Int {
+    return a + b
+}
+
+fun main(): Int {
+    var x: Int = 10
+    var y: Int = 32
+    var result: Int = add(x, y)
+    return result
+}

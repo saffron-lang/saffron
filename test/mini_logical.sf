@@ -1,0 +1,12 @@
+fun main(): Int {
+    var x: Int = 5
+    if (x > 3 and x < 10) {
+        IO.println("in range")
+    }
+    if (x > 10 or x < 0) {
+        IO.println("out of range")
+    } else {
+        IO.println("safe")
+    }
+    return 0
+}

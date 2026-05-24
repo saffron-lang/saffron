@@ -1,0 +1,44 @@
+// Comprehensive Saffron-mini compiler test
+// Tests: arithmetic, if/else, while, function calls, IO.println for ints and strings
+
+fun main(): Int {
+    // Arithmetic
+    var x: Int = 10 + 5 * 2
+    IO.println(x)
+
+    // Comparison + if/else
+    if (x > 15) {
+        IO.println("big")
+    } else {
+        IO.println("small")
+    }
+
+    // While loop — fibonacci
+    var a: Int = 0
+    var b: Int = 1
+    var i: Int = 0
+    while (i < 10) {
+        var temp: Int = b
+        b = a + b
+        a = temp
+        i = i + 1
+    }
+    IO.println(a)
+
+    // Modulo + nested if
+    var n: Int = 1
+    while (n <= 5) {
+        if (n % 2 == 0) {
+            IO.println("even")
+        } else {
+            IO.println("odd")
+        }
+        n = n + 1
+    }
+
+    // Bitwise
+    var flags: Int = 255 & 15
+    IO.println(flags)
+
+    return 0
+}

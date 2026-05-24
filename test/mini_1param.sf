@@ -1,0 +1,7 @@
+fun double(x: Int): Int {
+    return x + x
+}
+
+fun main(): Int {
+    return double(21)
+}
