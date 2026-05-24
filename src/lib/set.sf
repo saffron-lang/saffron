@@ -1,0 +1,105 @@
+class Set {
+    var _map: Map
+
+    fun init() {
+        this._map = Map()
+    }
+
+    fun add(value: Any): Set {
+        this._map.set(value, true)
+        return this
+    }
+
+    fun has(value: Any): Bool {
+        return this._map.has(value)
+    }
+
+    fun remove(value: Any): Set {
+        this._map.set(value, nil)
+        return this
+    }
+
+    fun size(): Number {
+        return this._map.keys().length()
+    }
+
+    fun values(): List {
+        return this._map.keys()
+    }
+
+    fun to_string(): String {
+        var sb = StringBuilder()
+        sb.append("Set{")
+        var keys = this._map.keys()
+        var i = 0
+        while (i < keys.length()) {
+            if (i > 0) { sb.append(", ") }
+            var k = keys[i]
+            if (k is String) {
+                sb.append("\"")
+                sb.append(k)
+                sb.append("\"")
+            } else if (k is Number) {
+                sb.append(k.to_string())
+            } else {
+                sb.append("<value>")
+            }
+            i = i + 1
+        }
+        sb.append("}")
+        return sb.to_string()
+    }
+}
+
+fun from(items: List): Set {
+    var s = Set()
+    var i = 0
+    while (i < items.length()) {
+        s.add(items[i])
+        i = i + 1
+    }
+    return s
+}
+
+fun union(a: Set, b: Set): Set {
+    var result = Set()
+    var av = a.values()
+    var i = 0
+    while (i < av.length()) {
+        result.add(av[i])
+        i = i + 1
+    }
+    var bv = b.values()
+    i = 0
+    while (i < bv.length()) {
+        result.add(bv[i])
+        i = i + 1
+    }
+    return result
+}
+
+fun intersect(a: Set, b: Set): Set {
+    var result = Set()
+    var av = a.values()
+    var i = 0
+    while (i < av.length()) {
+        if (b.has(av[i])) {
+            result.add(av[i])
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun diff(a: Set, b: Set): Set {
+    var result = Set()
+    var av = a.values()
+    var i = 0
+    while (i < av.length()) {
+        if (b.has(av[i]) == false) {
+            result.add(av[i])
+        }
+        i = i + 1
+    }
+    return result
+}

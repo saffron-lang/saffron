@@ -1,0 +1,4 @@
+import "./enum_module_helper.sf" as Nav
+
+var d = Nav.heading()
+IO.println(d)

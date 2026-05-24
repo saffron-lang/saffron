@@ -1759,10 +1759,10 @@ Type *evaluateNode(Node *node) {
             Type *narrowType = NULL;
             Type *originalType = NULL;
 
-            fprintf(stderr, "[NARROW-CHECK] cond->type=%d\n", cond->type);
-            if (cond->type == NODE_BINARY) {
+            fprintf(stderr, "[NARROW-CHECK] cond node type=%d\n", cond->self.type);
+            if (cond->self.type == NODE_BINARY) {
                 struct Binary *binCond = (struct Binary *) cond;
-                fprintf(stderr, "[NARROW-CHECK] op=%d left=%d right=%d\n", binCond->operator.type, binCond->left->type, binCond->right->type);
+                fprintf(stderr, "[NARROW-CHECK] op=%d left=%d right=%d\n", binCond->operator.type, binCond->left->self.type, binCond->right->self.type);
                 if (binCond->operator.type == TOKEN_IS &&
                     binCond->left->type == NODE_VARIABLE &&
                     binCond->right->type == NODE_VARIABLE) {

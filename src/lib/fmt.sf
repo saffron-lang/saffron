@@ -1,0 +1,81 @@
+fun format(template: String, values: List): String {
+    var sb = StringBuilder()
+    var i = 0
+    while (i < template.length()) {
+        var c = template.char_at(i)
+        if (c == "{") {
+            var end = i + 1
+            while (end < template.length()) {
+                if (template.char_at(end) == "}") {
+                    break
+                }
+                end = end + 1
+            }
+            var idx_str = template.slice(i + 1, end)
+            var idx = idx_str.to_number()
+            if (idx < values.length()) {
+                var val = values[idx]
+                if (val == nil) {
+                    sb.append("nil")
+                } else if (val == true) {
+                    sb.append("true")
+                } else if (val == false) {
+                    sb.append("false")
+                } else if (val is Number) {
+                    sb.append(val.to_string())
+                } else if (val is String) {
+                    sb.append(val)
+                } else {
+                    sb.append("<value>")
+                }
+            }
+            i = end + 1
+        } else {
+            sb.append(c)
+            i = i + 1
+        }
+    }
+    return sb.to_string()
+}
+
+fun pad_left(text: String, width: Number, fill: String): String {
+    var sb = StringBuilder()
+    var needed = width - text.length()
+    var i = 0
+    while (i < needed) {
+        sb.append(fill)
+        i = i + 1
+    }
+    sb.append(text)
+    return sb.to_string()
+}
+
+fun pad_right(text: String, width: Number, fill: String): String {
+    var sb = StringBuilder()
+    sb.append(text)
+    var needed = width - text.length()
+    var i = 0
+    while (i < needed) {
+        sb.append(fill)
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun center(text: String, width: Number, fill: String): String {
+    var total = width - text.length()
+    if (total <= 0) { return text }
+    var left = total / 2
+    var right = total - left
+    var sb = StringBuilder()
+    var i = 0
+    while (i < left) { sb.append(fill); i = i + 1 }
+    sb.append(text)
+    i = 0
+    while (i < right) { sb.append(fill); i = i + 1 }
+    return sb.to_string()
+}
+
+fun repeat(text: String, n: Number): String {
+    return text.repeat(n)
+}

@@ -1,0 +1,131 @@
+fun parse(source: String): List {
+    var rows = []
+    var pos = 0
+
+    fun peek(): String {
+        if (pos >= source.length()) { return "" }
+        return source.char_at(pos)
+    }
+
+    fun advance(): String {
+        var c = source.char_at(pos)
+        pos = pos + 1
+        return c
+    }
+
+    fun parse_quoted_field(): String {
+        var sb = StringBuilder()
+        while (pos < source.length()) {
+            var c = advance()
+            if (c == "\"") {
+                if (peek() == "\"") {
+                    advance()
+                    sb.append("\"")
+                } else {
+                    return sb.to_string()
+                }
+            } else {
+                sb.append(c)
+            }
+        }
+        return sb.to_string()
+    }
+
+    fun parse_field(): String {
+        if (peek() == "\"") {
+            advance()
+            return parse_quoted_field()
+        }
+        var sb = StringBuilder()
+        while (pos < source.length()) {
+            var c = peek()
+            if (c == "," or c == "\n" or c == "\r") {
+                return sb.to_string()
+            }
+            sb.append(advance())
+        }
+        return sb.to_string()
+    }
+
+    fun parse_row(): List {
+        var fields = []
+        fields.push(parse_field())
+        while (pos < source.length()) {
+            var c = peek()
+            if (c == ",") {
+                advance()
+                fields.push(parse_field())
+            } else if (c == "\n") {
+                advance()
+                return fields
+            } else if (c == "\r") {
+                advance()
+                if (peek() == "\n") { advance() }
+                return fields
+            } else {
+                return fields
+            }
+        }
+        return fields
+    }
+
+    while (pos < source.length()) {
+        var row = parse_row()
+        rows.push(row)
+    }
+
+    return rows
+}
+
+fun to_string(rows: List): String {
+    var sb = StringBuilder()
+    var i = 0
+    while (i < rows.length()) {
+        var row = rows[i]
+        var j = 0
+        while (j < row.length()) {
+            if (j > 0) { sb.append(",") }
+            var field: String = row[j]
+            if (field.contains(",") or field.contains("\"") or field.contains("\n")) {
+                sb.append("\"")
+                sb.append(field.replace("\"", "\"\""))
+                sb.append("\"")
+            } else {
+                sb.append(field)
+            }
+            j = j + 1
+        }
+        sb.append("\n")
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun headers(rows: List): List {
+    if (rows.length() == 0) { return [] }
+    return rows[0]
+}
+
+fun as_maps(rows: List): List {
+    if (rows.length() < 2) { return [] }
+    var hdrs = rows[0]
+    var result = []
+    var i = 1
+    while (i < rows.length()) {
+        var row = rows[i]
+        var m = Map()
+        var j = 0
+        while (j < hdrs.length()) {
+            var key: String = hdrs[j]
+            if (j < row.length()) {
+                m.set(key, row[j])
+            } else {
+                m.set(key, "")
+            }
+            j = j + 1
+        }
+        result.push(m)
+        i = i + 1
+    }
+    return result
+}

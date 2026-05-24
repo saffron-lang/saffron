@@ -1,0 +1,5 @@
+fun greet(name: String): String {
+    return "hello " + name
+}
+
+var VERSION: Number = 1

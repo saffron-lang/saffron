@@ -1,0 +1,21 @@
+import "./qualified_type_helper.sf" as Lexer
+
+// Test: qualified type in variable declaration
+var tok: Lexer.Token = Lexer.make_token("ID", "hello")
+IO.println(tok.to_string())
+
+// Test: qualified type in function parameter and return
+fun wrap(t: Lexer.Token): Lexer.Token {
+    return t
+}
+
+var tok2: Lexer.Token = wrap(tok)
+IO.println(tok2.to_string())
+
+// Test: qualified type as generic argument
+var tokens: List<Lexer.Token> = []
+tokens.push(tok)
+tokens.push(Lexer.make_token("NUM", "42"))
+IO.println(tokens.length())
+
+IO.println("qualified type test passed")
