@@ -1,0 +1,167 @@
+import "@os" as OS
+
+var _sep = OS.path_sep()
+
+fun sep(): String {
+    return _sep
+}
+
+fun is_absolute(p: String): Bool {
+    if (p.length() == 0) { return false }
+    if (p.char_at(0) == "/") { return true }
+    if (_sep == "\\" and p.length() >= 3) {
+        if (p.char_at(1) == ":" and p.char_at(2) == "\\") { return true }
+    }
+    return false
+}
+
+fun dirname(p: String): String {
+    if (p.length() == 0) { return "." }
+    var last = -1
+    var i = 0
+    while (i < p.length()) {
+        var c = p.char_at(i)
+        if (c == "/" or c == "\\") { last = i }
+        i = i + 1
+    }
+    if (last == -1) { return "." }
+    if (last == 0) { return "/" }
+    return p.slice(0, last)
+}
+
+fun basename(p: String): String {
+    if (p.length() == 0) { return "" }
+    var last = -1
+    var i = 0
+    while (i < p.length()) {
+        var c = p.char_at(i)
+        if (c == "/" or c == "\\") { last = i }
+        i = i + 1
+    }
+    if (last == -1) { return p }
+    return p.slice(last + 1, p.length())
+}
+
+fun ext(p: String): String {
+    var base = basename(p)
+    var dot = -1
+    var i = base.length() - 1
+    while (i >= 0) {
+        if (base.char_at(i) == ".") {
+            dot = i
+            break
+        }
+        i = i - 1
+    }
+    if (dot <= 0) { return "" }
+    return base.slice(dot, base.length())
+}
+
+fun stem(p: String): String {
+    var base = basename(p)
+    var dot = -1
+    var i = base.length() - 1
+    while (i >= 0) {
+        if (base.char_at(i) == ".") {
+            dot = i
+            break
+        }
+        i = i - 1
+    }
+    if (dot <= 0) { return base }
+    return base.slice(0, dot)
+}
+
+fun join(parts: List): String {
+    if (parts.length() == 0) { return "" }
+    var result = parts[0]
+    var i = 1
+    while (i < parts.length()) {
+        var part = parts[i]
+        if (is_absolute(part)) {
+            result = part
+        } else {
+            if (result.length() > 0) {
+                var last_char = result.char_at(result.length() - 1)
+                if (last_char != "/" and last_char != "\\") {
+                    result = result + _sep
+                }
+            }
+            result = result + part
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun normalize(p: String): String {
+    if (p.length() == 0) { return "." }
+    var abs = is_absolute(p)
+    var parts = p.split("/")
+    var result = []
+    var i = 0
+    while (i < parts.length()) {
+        var part: String = parts[i]
+        var handled = false
+        if (part == "..") {
+            handled = true
+            if (result.length() > 0) {
+                result = result.slice(0, result.length() - 1)
+            }
+        }
+        if (handled == false) {
+            if (part != "." and part != "") {
+                result.push(part)
+            }
+        }
+        i = i + 1
+    }
+    var joined = result.join("/")
+    if (abs) { return "/" + joined }
+    if (joined == "") { return "." }
+    return joined
+}
+
+fun resolve(parts: List): String {
+    var base = OS.cwd()
+    var i = 0
+    while (i < parts.length()) {
+        var part = parts[i]
+        if (is_absolute(part)) {
+            base = part
+        } else {
+            base = base + "/" + part
+        }
+        i = i + 1
+    }
+    return normalize(base)
+}
+
+fun relative(from: String, to: String): String {
+    var from_parts = normalize(from).split("/")
+    var to_parts = normalize(to).split("/")
+
+    var common = 0
+    while (common < from_parts.length() and common < to_parts.length()) {
+        if (from_parts[common] == to_parts[common]) {
+            common = common + 1
+        } else {
+            break
+        }
+    }
+
+    var result = []
+    var i = common
+    while (i < from_parts.length()) {
+        result.push("..")
+        i = i + 1
+    }
+    i = common
+    while (i < to_parts.length()) {
+        result.push(to_parts[i])
+        i = i + 1
+    }
+
+    if (result.length() == 0) { return "." }
+    return result.join("/")
+}

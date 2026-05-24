@@ -1,0 +1,78 @@
+import "@os" as OS
+
+class ParsedArgs {
+    var flags: Map
+    var options: Map
+    var positional: List
+
+    fun init() {
+        this.flags = Map()
+        this.options = Map()
+        this.positional = []
+    }
+
+    fun has(name: String): Bool {
+        return this.flags.has(name) or this.options.has(name)
+    }
+
+    fun get(name: String): String {
+        if (this.options.has(name)) {
+            return this.options.get(name)
+        }
+        return ""
+    }
+
+    fun flag(name: String): Bool {
+        if (this.flags.has(name)) { return true }
+        return false
+    }
+}
+
+fun parse(): ParsedArgs {
+    var raw = OS.args()
+    return parse_list(raw)
+}
+
+fun is_long_flag(arg: String): Bool {
+    if (arg.length() < 2) { return false }
+    if (arg.char_at(0) == "-") {
+        if (arg.char_at(1) == "-") { return true }
+    }
+    return false
+}
+
+fun is_short_flag(arg: String): Bool {
+    if (arg.length() < 1) { return false }
+    if (arg.char_at(0) == "-") { return true }
+    return false
+}
+
+fun parse_list(raw: List): ParsedArgs {
+    var result = ParsedArgs()
+    var i = 0
+    while (i < raw.length()) {
+        var arg: String = raw[i]
+        if (is_long_flag(arg)) {
+            var rest = arg.slice(2, arg.length())
+            var eq_pos = rest.index_of("=")
+            if (eq_pos >= 0) {
+                var key = rest.slice(0, eq_pos)
+                var val = rest.slice(eq_pos + 1, rest.length())
+                result.options.set(key, val)
+            } else {
+                result.flags.set(rest, true)
+            }
+        } else if (is_short_flag(arg)) {
+            var rest = arg.slice(1, arg.length())
+            var ci = 0
+            while (ci < rest.length()) {
+                result.flags.set(rest.char_at(ci), true)
+                ci = ci + 1
+            }
+        } else {
+            result.positional.push(arg)
+        }
+        i = i + 1
+    }
+    return result
+}

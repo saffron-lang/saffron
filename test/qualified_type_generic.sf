@@ -1,0 +1,16 @@
+import "./qualified_type_helper.sf" as Lexer
+
+// This is the exact pattern from bug #15:
+// "Qualified type references (Module.Type) not supported in type annotations"
+// "Parser error 'Expect > after generic type argument' — the . inside <...> is not handled"
+var tokens: List<Lexer.Token> = []
+tokens.push(Lexer.make_token("ID", "x"))
+tokens.push(Lexer.make_token("PLUS", "+"))
+tokens.push(Lexer.make_token("NUM", "1"))
+
+IO.println(tokens.length())
+IO.println(tokens[0].to_string())
+IO.println(tokens[1].to_string())
+IO.println(tokens[2].to_string())
+
+IO.println("bug #15 fixed")

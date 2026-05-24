@@ -1,0 +1,108 @@
+import "@path" as Path
+import "@os" as OS
+
+class FileFinder {
+    var entries: List
+    var base_dir: String
+
+    fun init(dir: String) {
+        this.base_dir = dir
+        this.entries = IO.walk_dir(dir)
+    }
+}
+
+fun from(dir: String): FileFinder {
+    return FileFinder(dir)
+}
+
+fun files(finder: FileFinder): List {
+    var result = []
+    var i = 0
+    while (i < finder.entries.length()) {
+        var entry = finder.entries[i]
+        var root: String = entry[0]
+        var file_list = entry[2]
+        var j = 0
+        while (j < file_list.length()) {
+            var name: String = file_list[j]
+            result.push(Path.join([root, name]))
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun dirs(finder: FileFinder): List {
+    var result = []
+    var i = 0
+    while (i < finder.entries.length()) {
+        var entry = finder.entries[i]
+        var root: String = entry[0]
+        var dir_list = entry[1]
+        var j = 0
+        while (j < dir_list.length()) {
+            var name: String = dir_list[j]
+            result.push(Path.join([root, name]))
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun by_ext(finder: FileFinder, extension: String): List {
+    var all = files(finder)
+    var result = []
+    var i = 0
+    while (i < all.length()) {
+        var file: String = all[i]
+        if (Path.ext(file) == extension) {
+            result.push(file)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun by_name(finder: FileFinder, name: String): List {
+    var all = files(finder)
+    var result = []
+    var i = 0
+    while (i < all.length()) {
+        var file: String = all[i]
+        if (Path.basename(file) == name) {
+            result.push(file)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun containing(finder: FileFinder, text: String): List {
+    var all = files(finder)
+    var result = []
+    var i = 0
+    while (i < all.length()) {
+        var file: String = all[i]
+        var content: String = IO.read_file(file)
+        if (content.contains(text)) {
+            result.push(file)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun first(finder: FileFinder): String {
+    var all = files(finder)
+    if (all.length() > 0) {
+        return all[0]
+    }
+    return ""
+}
+
+fun count(finder: FileFinder): Number {
+    var all = files(finder)
+    return all.length()
+}

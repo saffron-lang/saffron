@@ -1,0 +1,4 @@
+import "./relative_import_helper.sf" as Helper
+
+var msg: String = Helper.greet("world")
+IO.println(msg)

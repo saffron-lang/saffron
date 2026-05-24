@@ -1,0 +1,22 @@
+var _esc = "\x1b["
+var _reset = "\x1b[0m"
+
+fun red(text: String): String { return _esc + "31m" + text + _reset }
+fun green(text: String): String { return _esc + "32m" + text + _reset }
+fun yellow(text: String): String { return _esc + "33m" + text + _reset }
+fun blue(text: String): String { return _esc + "34m" + text + _reset }
+fun magenta(text: String): String { return _esc + "35m" + text + _reset }
+fun cyan(text: String): String { return _esc + "36m" + text + _reset }
+fun white(text: String): String { return _esc + "37m" + text + _reset }
+fun gray(text: String): String { return _esc + "90m" + text + _reset }
+
+fun bold(text: String): String { return _esc + "1m" + text + _reset }
+fun dim(text: String): String { return _esc + "2m" + text + _reset }
+fun italic(text: String): String { return _esc + "3m" + text + _reset }
+fun underline(text: String): String { return _esc + "4m" + text + _reset }
+fun strikethrough(text: String): String { return _esc + "9m" + text + _reset }
+
+fun bg_red(text: String): String { return _esc + "41m" + text + _reset }
+fun bg_green(text: String): String { return _esc + "42m" + text + _reset }
+fun bg_yellow(text: String): String { return _esc + "43m" + text + _reset }
+fun bg_blue(text: String): String { return _esc + "44m" + text + _reset }
