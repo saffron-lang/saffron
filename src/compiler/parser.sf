@@ -205,10 +205,16 @@ class Parser {
                     } else {
                         this.advance()
                     }
-                    expr = AST.Expr.Call(AST.Expr.MemberAccess(expr, field), args)
+                    expr = AST.Expr.MethodCall(expr, field, args)
                 } else {
                     expr = AST.Expr.MemberAccess(expr, field)
                 }
+            } else if (this.match_kind_check("[")) {
+                // Index access: obj[expr]
+                this.advance()
+                var idx = this.parse_expr()
+                this.consume("]")
+                expr = AST.Expr.IndexGet(expr, idx)
             } else if (this.match_kind_check("(")) {
                 this.advance()
                 var args: List<AST.Expr> = []
@@ -241,6 +247,9 @@ class Parser {
             this.advance()
             return AST.Expr.This
         }
+        if (this.match_kind_check("[")) {
+            return this.parse_list_lit()
+        }
 
         var kind = this.current_kind()
         this.advance()
@@ -259,6 +268,19 @@ class Parser {
                 expr
             }
         }
+    }
+
+    fun parse_list_lit(): AST.Expr {
+        this.advance() // consume [
+        var elements: List<AST.Expr> = []
+        if (!this.match_kind_check("]")) {
+            elements.push(this.parse_expr())
+            while (this.match_kind(",")) {
+                elements.push(this.parse_expr())
+            }
+        }
+        this.consume("]")
+        return AST.Expr.ListLit(elements)
     }
 
     fun parse_match_expr(): AST.Expr {

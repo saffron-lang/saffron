@@ -221,6 +221,7 @@ class Codegen {
                 this.gen_lambda(params, ret_type, body)
             }
             This => {
+                this.last_type = this.current_class
                 var local = this.fresh_local()
                 this.emit_indent(local + " = load i64, i64* %self")
                 local
@@ -230,6 +231,18 @@ class Codegen {
             }
             SetField(object, field, value) => {
                 this.gen_set_field(object, field, value)
+            }
+            ListLit(elements) => {
+                this.gen_list_lit(elements)
+            }
+            IndexGet(object, index) => {
+                this.gen_index_get(object, index)
+            }
+            IndexSet(object, index, value) => {
+                this.gen_index_set(object, index, value)
+            }
+            MethodCall(object, method, args) => {
+                this.gen_method_call(object, method, args)
             }
         }
     }
@@ -318,7 +331,25 @@ class Codegen {
     }
 
     fun gen_arg_value(expr: AST.Expr): String {
-        // Handle string literals directly to avoid non-exhaustive match issue
+        // Handle specific expression types that don't match reliably in gen_expr
+        var expr_kind = this.classify_expr(expr)
+        if (expr_kind == "method_call") {
+            var mc_obj = match (expr) { MethodCall(o, m, a) => o }
+            var mc_method = match (expr) { MethodCall(o, m, a) => m }
+            var mc_args = match (expr) { MethodCall(o, m, a) => a }
+            return this.gen_method_call(mc_obj, mc_method, mc_args)
+        }
+        if (expr_kind == "list_lit") {
+            var elems = match (expr) { ListLit(e) => e }
+            return this.gen_list_lit(elems)
+        }
+        if (expr_kind == "index_get") {
+            var ig_obj = match (expr) { IndexGet(o, i) => o }
+            var ig_idx = match (expr) { IndexGet(o, i) => i }
+            return this.gen_index_get(ig_obj, ig_idx)
+        }
+
+        // Handle string literals directly
         if (this.is_string_expr(expr)) {
             this.last_type = "String"
             var str_val = this.flatten_string_expr(expr)
@@ -628,6 +659,10 @@ class Codegen {
             GetField(o, f) => "field"
             SetField(o, f, v) => "field"
             This => "this"
+            ListLit(e) => "list"
+            IndexGet(o, i) => "index"
+            IndexSet(o, i, v) => "index"
+            MethodCall(o, m, a) => "method"
         }
         return kind == "string"
     }
@@ -850,6 +885,196 @@ class Codegen {
         if (method == "init") return "void"
         if (method == "increment") return "void"
         return "i64"
+    }
+
+    fun classify_expr(expr: AST.Expr): String {
+        return match (expr) {
+            MethodCall(o, m, a) => "method_call"
+            ListLit(e) => "list_lit"
+            IndexGet(o, i) => "index_get"
+            IndexSet(o, i, v) => "index_set"
+            StringLit(s) => "string"
+            IntLit(v) => "int"
+            FloatLit(v) => "float"
+            BoolLit(v) => "bool"
+            Variable(n) => "variable"
+            Binary(l, o, r) => "binary"
+            Unary(o, r) => "unary"
+            Call(c, a) => "call"
+            Assign(n, v) => "assign"
+            Logical(l, o, r) => "logical"
+            MemberAccess(o, f) => "member"
+            NilLit => "nil"
+            Match(s, a) => "match_expr"
+            EnumConstruct(e, v, a) => "enum"
+            Lambda(p, r, b) => "lambda"
+            GetField(o, f) => "get_field"
+            SetField(o, f, v) => "set_field"
+            This => "this"
+        }
+    }
+
+    fun get_variable_name(expr: AST.Expr): String {
+        var name = match (expr) {
+            Variable(n) => n
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Binary(l, o, r) => ""
+            Unary(o, r) => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => ""
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+            ListLit(e) => ""
+            IndexGet(o, i) => ""
+            IndexSet(o, i, v) => ""
+            MethodCall(o, m, a) => ""
+        }
+        return name
+    }
+
+    fun gen_list_lit(elements: List<AST.Expr>): String {
+        this.last_type = "List"
+        var list_val = this.fresh_local()
+        this.emit_indent(list_val + " = call i64 @__list_new()")
+        var i = 0
+        while (i < elements.length()) {
+            var elem = this.gen_arg_value(elements[i])
+            this.emit_indent("call void @__list_push(i64 " + list_val + ", i64 " + elem + ")")
+            i = i + 1
+        }
+        return list_val
+    }
+
+    fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
+        var obj = this.gen_expr(object)
+        var idx = this.gen_expr(index)
+        var local = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + idx + ")")
+        this.last_type = "Int"
+        return local
+    }
+
+    fun gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
+        var obj = this.gen_expr(object)
+        var idx = this.gen_expr(index)
+        var val = this.gen_arg_value(value)
+        this.emit_indent("call void @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+        return val
+    }
+
+    fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
+        // Check for IO module calls first
+        var obj_name = this.get_variable_name(object)
+        if (obj_name == "IO") {
+            if (method == "println") {
+                var arg = this.gen_arg_value(args[0])
+                var arg_type = this.last_type
+                var local = this.fresh_local()
+                if (arg_type == "String") {
+                    var str_ptr = this.fresh_local()
+                    this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
+                    this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
+                } else {
+                    var fmt = this.get_format_ptr("%ld\n")
+                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
+                }
+                this.last_type = "Nil"
+                return local
+            }
+            if (method == "print") {
+                var arg = this.gen_arg_value(args[0])
+                var arg_type = this.last_type
+                var local = this.fresh_local()
+                if (arg_type == "String") {
+                    var str_ptr = this.fresh_local()
+                    this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
+                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + str_ptr + ")")
+                } else {
+                    var fmt = this.get_format_ptr("%ld")
+                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
+                }
+                this.last_type = "Nil"
+                return local
+            }
+        }
+
+        // Check for enum constructor: EnumName.Variant(args)
+        if (obj_name.length() > 0) {
+            var key = obj_name + "." + method
+            if (this.enum_variant_tags.has(key)) {
+                return this.gen_enum_construct(obj_name, method, args)
+            }
+        }
+
+        var obj = this.gen_expr(object)
+        var obj_type = this.last_type
+
+        // List methods
+        if (obj_type == "List") {
+            if (method == "push") {
+                var val = this.gen_arg_value(args[0])
+                this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
+                this.last_type = "Nil"
+                return "0"
+            }
+            if (method == "pop") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__list_pop(i64 " + obj + ")")
+                this.last_type = "Int"
+                return local
+            }
+            if (method == "length") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__list_length(i64 " + obj + ")")
+                this.last_type = "Int"
+                return local
+            }
+        }
+
+        // String methods
+        if (obj_type == "String") {
+            if (method == "length") {
+                var str_ptr = this.fresh_local()
+                this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
+                this.last_type = "Int"
+                return local
+            }
+        }
+
+        // Fall back to class method call
+        if (this.current_class.length() > 0) {
+            var class_name = this.find_class_for_method(method)
+            if (class_name.length() > 0) {
+                var arg_strs: List<String> = []
+                arg_strs.push("i64 " + obj)
+                var i = 0
+                while (i < args.length()) {
+                    var val = this.gen_arg_value(args[i])
+                    arg_strs.push("i64 " + val)
+                    i = i + 1
+                }
+                var full_method = class_name + "__" + method
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+                this.last_type = "Int"
+                return local
+            }
+        }
+
+        this.last_type = "Int"
+        return "0"
     }
 
     fun is_this_expr(expr: AST.Expr): Bool {
@@ -1209,6 +1434,105 @@ class Codegen {
         }
     }
 
+    fun list_runtime(): String {
+        var rt = StringBuilder()
+        // __list_new() -> %List* (as i64)
+        rt.append("define i64 @__list_new() {\n")
+        rt.append("entry:\n")
+        rt.append("  %raw = call i8* @malloc(i64 24)\n")
+        rt.append("  %ptr = bitcast i8* %raw to %List*\n")
+        rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  store i64 0, i64* %count_ptr\n")
+        rt.append("  %cap_ptr = getelementptr %List, %List* %ptr, i32 0, i32 1\n")
+        rt.append("  store i64 8, i64* %cap_ptr\n")
+        rt.append("  %data_raw = call i8* @malloc(i64 64)\n")
+        rt.append("  %data = bitcast i8* %data_raw to i64*\n")
+        rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  store i64* %data, i64** %data_ptr\n")
+        rt.append("  %result = ptrtoint %List* %ptr to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("}\n\n")
+
+        // __list_push(list: i64, value: i64)
+        rt.append("define void @__list_push(i64 %list, i64 %value) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %count_ptr\n")
+        rt.append("  %cap_ptr = getelementptr %List, %List* %ptr, i32 0, i32 1\n")
+        rt.append("  %cap = load i64, i64* %cap_ptr\n")
+        rt.append("  %need_grow = icmp sge i64 %count, %cap\n")
+        rt.append("  br i1 %need_grow, label %grow, label %store\n")
+        rt.append("grow:\n")
+        rt.append("  %new_cap = mul i64 %cap, 2\n")
+        rt.append("  store i64 %new_cap, i64* %cap_ptr\n")
+        rt.append("  %new_bytes = mul i64 %new_cap, 8\n")
+        rt.append("  %data_ptr_g = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %old_data = load i64*, i64** %data_ptr_g\n")
+        rt.append("  %old_raw = bitcast i64* %old_data to i8*\n")
+        rt.append("  %new_raw = call i8* @realloc(i8* %old_raw, i64 %new_bytes)\n")
+        rt.append("  %new_data = bitcast i8* %new_raw to i64*\n")
+        rt.append("  store i64* %new_data, i64** %data_ptr_g\n")
+        rt.append("  br label %store\n")
+        rt.append("store:\n")
+        rt.append("  %data_ptr_s = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %data_ptr_s\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %count\n")
+        rt.append("  store i64 %value, i64* %slot\n")
+        rt.append("  %new_count = add i64 %count, 1\n")
+        rt.append("  store i64 %new_count, i64* %count_ptr\n")
+        rt.append("  ret void\n")
+        rt.append("}\n\n")
+
+        // __list_get(list: i64, index: i64) -> i64
+        rt.append("define i64 @__list_get(i64 %list, i64 %index) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %data_ptr\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %index\n")
+        rt.append("  %val = load i64, i64* %slot\n")
+        rt.append("  ret i64 %val\n")
+        rt.append("}\n\n")
+
+        // __list_set(list: i64, index: i64, value: i64)
+        rt.append("define void @__list_set(i64 %list, i64 %index, i64 %value) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %data_ptr\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %index\n")
+        rt.append("  store i64 %value, i64* %slot\n")
+        rt.append("  ret void\n")
+        rt.append("}\n\n")
+
+        // __list_length(list: i64) -> i64
+        rt.append("define i64 @__list_length(i64 %list) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %count_ptr\n")
+        rt.append("  ret i64 %count\n")
+        rt.append("}\n\n")
+
+        // __list_pop(list: i64) -> i64
+        rt.append("define i64 @__list_pop(i64 %list) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %count_ptr\n")
+        rt.append("  %new_count = sub i64 %count, 1\n")
+        rt.append("  store i64 %new_count, i64* %count_ptr\n")
+        rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %data_ptr\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %new_count\n")
+        rt.append("  %val = load i64, i64* %slot\n")
+        rt.append("  ret i64 %val\n")
+        rt.append("}\n\n")
+
+        return rt.to_string()
+    }
+
     fun find_enum_for_variant(variant: String): String {
         var keys = this.enum_variant_tags.keys()
         var i = 0
@@ -1341,7 +1665,7 @@ class Codegen {
 
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
-            ExprStmt(expr) => { this.gen_expr(expr) }
+            ExprStmt(expr) => { this.gen_arg_value(expr) }
             VarDecl(name, type_ann, init) => {
                 var val = this.gen_arg_value(init)
                 // Infer type: use annotation if present, else use last_type from init
@@ -1651,10 +1975,17 @@ class Codegen {
         out.append("declare i32 @puts(i8*)\n")
         out.append("declare i32 @printf(i8*, ...)\n")
         out.append("declare i8* @malloc(i64)\n")
+        out.append("declare i8* @realloc(i8*, i64)\n")
         out.append("declare void @free(i8*)\n")
         out.append("declare i64 @strlen(i8*)\n")
         out.append("declare i8* @strcpy(i8*, i8*)\n")
         out.append("declare i8* @strcat(i8*, i8*)\n")
+        out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n\n")
+
+        // List runtime
+        out.append("; List = { count, capacity, data* }\n")
+        out.append("%List = type { i64, i64, i64* }\n\n")
+        out.append(this.list_runtime())
 
         // Lambda functions
         var k = 0
