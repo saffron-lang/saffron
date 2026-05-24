@@ -1,0 +1,492 @@
+// Recursive descent parser for Saffron-mini
+
+import "./ast.sf" as AST
+import "./lexer.sf" as Lexer
+
+class Parser {
+    var tokens: List<Lexer.Token>
+    var pos: Float
+
+    fun init(tokens: List<Lexer.Token>) {
+        this.tokens = tokens
+        this.pos = 0
+    }
+
+    fun current(): Lexer.Token {
+        return this.tokens[this.pos]
+    }
+
+    fun current_kind(): Lexer.TokenKind {
+        var tok = this.current()
+        return match (tok) { Token(kind, line, col) => kind }
+    }
+
+    fun advance(): Lexer.Token {
+        var tok = this.current()
+        this.pos = this.pos + 1
+        return tok
+    }
+
+    fun expect_ident(): String {
+        var kind = this.current_kind()
+        this.advance()
+        return match (kind) {
+            TkIdent(name) => name
+        }
+    }
+
+    fun match_kind(expected: String): Bool {
+        if (this.match_kind_check(expected)) {
+            this.advance()
+            return true
+        }
+        return false
+    }
+
+    fun consume(expected: String) {
+        if (!this.match_kind(expected)) {
+            IO.println("Parse error: expected " + expected)
+        }
+    }
+
+    // --- Type annotations ---
+
+    fun parse_type(): String {
+        return this.expect_ident()
+    }
+
+    // --- Expressions (Pratt parser) ---
+
+    fun parse_expr(): AST.Expr {
+        return this.parse_or()
+    }
+
+    fun parse_or(): AST.Expr {
+        var left = this.parse_and()
+        while (this.match_kind_check("or")) {
+            this.advance()
+            var right = this.parse_and()
+            left = AST.Expr.Logical(left, "or", right)
+        }
+        return left
+    }
+
+    fun parse_and(): AST.Expr {
+        var left = this.parse_equality()
+        while (this.match_kind_check("and")) {
+            this.advance()
+            var right = this.parse_equality()
+            left = AST.Expr.Logical(left, "and", right)
+        }
+        return left
+    }
+
+    fun parse_equality(): AST.Expr {
+        var left = this.parse_comparison()
+        while (this.is_equality_op()) {
+            var op = this.get_op_string()
+            this.advance()
+            var right = this.parse_comparison()
+            left = AST.Expr.Binary(left, op, right)
+        }
+        return left
+    }
+
+    fun parse_comparison(): AST.Expr {
+        var left = this.parse_bitwise_or()
+        while (this.is_comparison_op()) {
+            var op = this.get_op_string()
+            this.advance()
+            var right = this.parse_bitwise_or()
+            left = AST.Expr.Binary(left, op, right)
+        }
+        return left
+    }
+
+    fun parse_bitwise_or(): AST.Expr {
+        var left = this.parse_bitwise_xor()
+        while (this.match_kind_check("|")) {
+            this.advance()
+            var right = this.parse_bitwise_xor()
+            left = AST.Expr.Binary(left, "|", right)
+        }
+        return left
+    }
+
+    fun parse_bitwise_xor(): AST.Expr {
+        var left = this.parse_bitwise_and()
+        while (this.match_kind_check("^")) {
+            this.advance()
+            var right = this.parse_bitwise_and()
+            left = AST.Expr.Binary(left, "^", right)
+        }
+        return left
+    }
+
+    fun parse_bitwise_and(): AST.Expr {
+        var left = this.parse_shift()
+        while (this.match_kind_check("&")) {
+            this.advance()
+            var right = this.parse_shift()
+            left = AST.Expr.Binary(left, "&", right)
+        }
+        return left
+    }
+
+    fun parse_shift(): AST.Expr {
+        var left = this.parse_term()
+        while (this.is_shift_op()) {
+            var op = this.get_op_string()
+            this.advance()
+            var right = this.parse_term()
+            left = AST.Expr.Binary(left, op, right)
+        }
+        return left
+    }
+
+    fun parse_term(): AST.Expr {
+        var left = this.parse_factor()
+        while (this.is_term_op()) {
+            var op = this.get_op_string()
+            this.advance()
+            var right = this.parse_factor()
+            left = AST.Expr.Binary(left, op, right)
+        }
+        return left
+    }
+
+    fun parse_factor(): AST.Expr {
+        var left = this.parse_unary()
+        while (this.is_factor_op()) {
+            var op = this.get_op_string()
+            this.advance()
+            var right = this.parse_unary()
+            left = AST.Expr.Binary(left, op, right)
+        }
+        return left
+    }
+
+    fun parse_unary(): AST.Expr {
+        if (this.match_kind_check("-")) {
+            this.advance()
+            var right = this.parse_unary()
+            return AST.Expr.Unary("-", right)
+        }
+        if (this.match_kind_check("!")) {
+            this.advance()
+            var right = this.parse_unary()
+            return AST.Expr.Unary("!", right)
+        }
+        if (this.match_kind_check("~")) {
+            this.advance()
+            var right = this.parse_unary()
+            return AST.Expr.Unary("~", right)
+        }
+        return this.parse_call()
+    }
+
+    fun parse_call(): AST.Expr {
+        var expr = this.parse_primary()
+
+        while (true) {
+            if (this.match_kind_check(".")) {
+                this.advance()
+                var field = this.expect_ident()
+                if (this.match_kind_check("(")) {
+                    // Method call: obj.method(args)
+                    this.advance()
+                    var args: List<AST.Expr> = []
+                    if (!this.match_kind_check(")")) {
+                        args.push(this.parse_expr())
+                        while (this.match_kind(",")) {
+                            args.push(this.parse_expr())
+                        }
+                        this.consume(")")
+                    } else {
+                        this.advance()
+                    }
+                    expr = AST.Expr.Call(AST.Expr.MemberAccess(expr, field), args)
+                } else {
+                    expr = AST.Expr.MemberAccess(expr, field)
+                }
+            } else if (this.match_kind_check("(")) {
+                this.advance()
+                var args: List<AST.Expr> = []
+                if (!this.match_kind_check(")")) {
+                    args.push(this.parse_expr())
+                    while (this.match_kind(",")) {
+                        args.push(this.parse_expr())
+                    }
+                    this.consume(")")
+                } else {
+                    this.advance()
+                }
+                expr = AST.Expr.Call(expr, args)
+            } else {
+                break
+            }
+        }
+
+        return expr
+    }
+
+    fun parse_primary(): AST.Expr {
+        var kind = this.current_kind()
+        this.advance()
+
+        return match (kind) {
+            TkInt(v) => AST.Expr.IntLit(v)
+            TkFloat(v) => AST.Expr.FloatLit(v)
+            TkTrue => AST.Expr.BoolLit(true)
+            TkFalse => AST.Expr.BoolLit(false)
+            TkNil => AST.Expr.NilLit
+            TkString(s) => AST.Expr.StringLit(s)
+            TkIdent(name) => AST.Expr.Variable(name)
+            TkLParen => {
+                var expr = this.parse_expr()
+                this.consume(")")
+                expr
+            }
+        }
+    }
+
+    // --- Helpers for operator precedence ---
+
+    fun match_kind_check(expected: String): Bool {
+        var kind = this.current_kind()
+        var name = this.kind_name(kind)
+        return name == expected
+    }
+
+    fun kind_name(kind: Lexer.TokenKind): String {
+        return match (kind) {
+            TkPlus => "+"
+            TkMinus => "-"
+            TkStar => "*"
+            TkSlash => "/"
+            TkPercent => "%"
+            TkAmpersand => "&"
+            TkPipe => "|"
+            TkCaret => "^"
+            TkTilde => "~"
+            TkShiftLeft => "<<"
+            TkShiftRight => ">>"
+            TkBang => "!"
+            TkBangEq => "!="
+            TkEqEq => "=="
+            TkLt => "<"
+            TkLtEq => "<="
+            TkGt => ">"
+            TkGtEq => ">="
+            TkLParen => "("
+            TkRParen => ")"
+            TkLBrace => "{"
+            TkRBrace => "}"
+            TkLBracket => "["
+            TkRBracket => "]"
+            TkDot => "."
+            TkComma => ","
+            TkColon => ":"
+            TkEq => "="
+            TkArrow => "->"
+            TkFatArrow => "=>"
+            TkVar => "var"
+            TkLet => "let"
+            TkFun => "fun"
+            TkReturn => "return"
+            TkIf => "if"
+            TkElse => "else"
+            TkWhile => "while"
+            TkOr => "or"
+            TkAnd => "and"
+            TkTrue => "true"
+            TkFalse => "false"
+            TkNil => "nil"
+            TkImport => "import"
+            TkAs => "as"
+            TkEof => "eof"
+            TkInt(v) => "int"
+            TkFloat(v) => "float"
+            TkString(v) => "string"
+            TkIdent(v) => "ident"
+            TkNewline => "newline"
+        }
+    }
+
+    fun is_equality_op(): Bool {
+        return this.match_kind_check("==") or this.match_kind_check("!=")
+    }
+
+    fun is_comparison_op(): Bool {
+        return this.match_kind_check("<") or this.match_kind_check("<=") or
+               this.match_kind_check(">") or this.match_kind_check(">=")
+    }
+
+    fun is_shift_op(): Bool {
+        return this.match_kind_check("<<") or this.match_kind_check(">>")
+    }
+
+    fun is_term_op(): Bool {
+        return this.match_kind_check("+") or this.match_kind_check("-")
+    }
+
+    fun is_factor_op(): Bool {
+        return this.match_kind_check("*") or this.match_kind_check("/") or this.match_kind_check("%")
+    }
+
+    fun get_op_string(): String {
+        var kind = this.current_kind()
+        return match (kind) {
+            TkPlus => "+"
+            TkMinus => "-"
+            TkStar => "*"
+            TkSlash => "/"
+            TkPercent => "%"
+            TkAmpersand => "&"
+            TkPipe => "|"
+            TkCaret => "^"
+            TkShiftLeft => "<<"
+            TkShiftRight => ">>"
+            TkBangEq => "!="
+            TkEqEq => "=="
+            TkLt => "<"
+            TkLtEq => "<="
+            TkGt => ">"
+            TkGtEq => ">="
+        }
+    }
+
+    // --- Statements ---
+
+    fun parse_program(): List<AST.Stmt> {
+        var stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("eof")) {
+            stmts.push(this.parse_stmt())
+        }
+        return stmts
+    }
+
+    fun parse_stmt(): AST.Stmt {
+        if (this.match_kind_check("var")) return this.parse_var_decl()
+        if (this.match_kind_check("let")) return this.parse_var_decl()
+        if (this.match_kind_check("fun")) return this.parse_fun_decl()
+        if (this.match_kind_check("return")) return this.parse_return()
+        if (this.match_kind_check("if")) return this.parse_if()
+        if (this.match_kind_check("while")) return this.parse_while()
+        if (this.match_kind_check("{")) return this.parse_block()
+        // Check for assignment: ident = expr
+        if (this.match_kind_check("ident") and this.peek_is("=")) {
+            return this.parse_assign()
+        }
+        // Default: expression statement
+        var expr = this.parse_expr()
+        return AST.Stmt.ExprStmt(expr)
+    }
+
+    fun peek_is(expected: String): Bool {
+        if (this.pos + 1 >= this.tokens.length()) return false
+        var next_tok = this.tokens[this.pos + 1]
+        var next_kind = match (next_tok) { Token(k, l, c) => k }
+        return this.kind_name(next_kind) == expected
+    }
+
+    fun parse_assign(): AST.Stmt {
+        var name = this.expect_ident()
+        this.consume("=")
+        var value = this.parse_expr()
+        return AST.Stmt.ExprStmt(AST.Expr.Assign(name, value))
+    }
+
+    fun parse_var_decl(): AST.Stmt {
+        this.advance() // consume var/let
+        var name = this.expect_ident()
+        var type_ann = "Any"
+        if (this.match_kind(":")) {
+            type_ann = this.parse_type()
+        }
+        this.consume("=")
+        var init = this.parse_expr()
+        return AST.Stmt.VarDecl(name, type_ann, init)
+    }
+
+    fun parse_fun_decl(): AST.Stmt {
+        this.advance() // consume fun
+        var name = this.expect_ident()
+        this.consume("(")
+        var params_sb = StringBuilder()
+        var first_param = true
+        if (!this.match_kind_check(")")) {
+            var pname = this.expect_ident()
+            this.consume(":")
+            var ptype = this.parse_type()
+            params_sb.append(pname)
+            params_sb.append(":")
+            params_sb.append(ptype)
+            first_param = false
+            while (this.match_kind(",")) {
+                pname = this.expect_ident()
+                this.consume(":")
+                ptype = this.parse_type()
+                params_sb.append(",")
+                params_sb.append(pname)
+                params_sb.append(":")
+                params_sb.append(ptype)
+            }
+        }
+        this.consume(")")
+        var ret_type = "Nil"
+        if (this.match_kind(":")) {
+            ret_type = this.parse_type()
+        }
+        var params = params_sb.to_string()
+        var body = this.parse_block_stmts()
+        return AST.Stmt.FunDecl(name, params, ret_type, body)
+    }
+
+    fun parse_return(): AST.Stmt {
+        this.advance() // consume return
+        var value = this.parse_expr()
+        return AST.Stmt.Return(value)
+    }
+
+    fun parse_if(): AST.Stmt {
+        this.advance() // consume if
+        this.consume("(")
+        var cond = this.parse_expr()
+        this.consume(")")
+        var then_branch = this.parse_block_stmts()
+        var else_branch: List<AST.Stmt> = []
+        if (this.match_kind("else")) {
+            else_branch = this.parse_block_stmts()
+        }
+        return AST.Stmt.If(cond, then_branch, else_branch)
+    }
+
+    fun parse_while(): AST.Stmt {
+        this.advance() // consume while
+        this.consume("(")
+        var cond = this.parse_expr()
+        this.consume(")")
+        var body = this.parse_block_stmts()
+        return AST.Stmt.While(cond, body)
+    }
+
+    fun parse_block(): AST.Stmt {
+        return AST.Stmt.Block(this.parse_block_stmts())
+    }
+
+    fun parse_block_stmts(): List<AST.Stmt> {
+        this.consume("{")
+        var stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        return stmts
+    }
+}
+
+fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
+    var p = Parser(tokens)
+    return p.parse_program()
+}

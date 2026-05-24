@@ -1,0 +1,470 @@
+// LLVM IR code generator for Saffron-mini
+
+import "./ast.sf" as AST
+
+class Codegen {
+    var sb: StringBuilder
+    var label_counter: Float
+    var local_counter: Float
+    var globals: List<String>
+    var string_constants: List<String>
+    var block_terminated: Bool
+
+    fun init() {
+        this.sb = StringBuilder()
+        this.label_counter = 0
+        this.local_counter = 0
+        this.globals = []
+        this.string_constants = []
+        this.block_terminated = false
+    }
+
+    fun fresh_label(prefix: String): String {
+        this.label_counter = this.label_counter + 1
+        return prefix + this.label_counter.floor().to_string()
+    }
+
+    fun fresh_local(): String {
+        this.local_counter = this.local_counter + 1
+        return "%t" + this.local_counter.floor().to_string()
+    }
+
+    fun reset_locals() {
+        this.local_counter = 0
+    }
+
+    fun emit(line: String) {
+        this.sb.append(line)
+        this.sb.append("\n")
+    }
+
+    fun emit_indent(line: String) {
+        if (this.block_terminated) return nil
+        this.sb.append("  ")
+        this.sb.append(line)
+        this.sb.append("\n")
+    }
+
+    fun emit_terminator(line: String) {
+        if (this.block_terminated) return nil
+        this.sb.append("  ")
+        this.sb.append(line)
+        this.sb.append("\n")
+        this.block_terminated = true
+    }
+
+    fun start_block(label: String) {
+        this.emit(label + ":")
+        this.block_terminated = false
+    }
+
+    // --- Type mapping ---
+
+    fun llvm_type(t: String): String {
+        if (t == "Int") return "i64"
+        if (t == "Float") return "double"
+        if (t == "Bool") return "i1"
+        if (t == "String") return "i8*"
+        if (t == "Nil") return "void"
+        if (t == "Any") return "i64"
+        return "i64"
+    }
+
+    // --- String constants ---
+
+    fun add_string_constant(s: String): String {
+        var idx = this.string_constants.length()
+        var name = "@.str." + idx.floor().to_string()
+        this.string_constants.push(s)
+        return name
+    }
+
+    fun emit_string_constants() {
+        var i = 0
+        while (i < this.string_constants.length()) {
+            var s = this.string_constants[i]
+            var name = "@.str." + i.floor().to_string()
+            var len = s.length() + 1
+            this.emit(name + " = private unnamed_addr constant [" + len.to_string() + " x i8] c\"" + this.escape_llvm_string(s) + "\\00\"")
+            i = i + 1
+        }
+    }
+
+    fun escape_llvm_string(s: String): String {
+        var result = StringBuilder()
+        var i = 0
+        while (i < s.length()) {
+            var ch = s.char_at(i)
+            if (ch == "\n") { result.append("\\0A") }
+            else if (ch == "\t") { result.append("\\09") }
+            else if (ch == "\\") { result.append("\\5C") }
+            else if (ch == "\"") { result.append("\\22") }
+            else { result.append(ch) }
+            i = i + 1
+        }
+        return result.to_string()
+    }
+
+    // --- Expression codegen ---
+    // Returns the LLVM local name holding the result
+
+    fun gen_expr(expr: AST.Expr): String {
+        return match (expr) {
+            IntLit(v) => {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                local
+            }
+            FloatLit(v) => {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = fadd double 0.0, " + v.to_string())
+                local
+            }
+            BoolLit(v) => {
+                var local = this.fresh_local()
+                var val_str = "0"
+                if (v) { val_str = "1" }
+                this.emit_indent(local + " = add i1 0, " + val_str)
+                local
+            }
+            StringLit(s) => {
+                var const_name = this.add_string_constant(s)
+                var local = this.fresh_local()
+                var len = s.length() + 1
+                this.emit_indent(local + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                local
+            }
+            NilLit => "null"
+            Variable(name) => {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = load i64, i64* %" + name)
+                local
+            }
+            Binary(left, op, right) => {
+                this.gen_binary(left, op, right)
+            }
+            Unary(op, right) => {
+                this.gen_unary(op, right)
+            }
+            Call(callee, args) => {
+                this.gen_call(callee, args)
+            }
+            Assign(name, value) => {
+                var val = this.gen_expr(value)
+                this.emit_indent("store i64 " + val + ", i64* %" + name)
+                val
+            }
+            Logical(left, op, right) => {
+                this.gen_logical(left, op, right)
+            }
+            MemberAccess(object, field) => {
+                "null"
+            }
+        }
+    }
+
+    fun gen_binary(left: AST.Expr, op: String, right: AST.Expr): String {
+        var lhs = this.gen_expr(left)
+        var rhs = this.gen_expr(right)
+        var local = this.fresh_local()
+
+        if (op == "+") { this.emit_indent(local + " = add i64 " + lhs + ", " + rhs) }
+        else if (op == "-") { this.emit_indent(local + " = sub i64 " + lhs + ", " + rhs) }
+        else if (op == "*") { this.emit_indent(local + " = mul i64 " + lhs + ", " + rhs) }
+        else if (op == "/") { this.emit_indent(local + " = sdiv i64 " + lhs + ", " + rhs) }
+        else if (op == "%") { this.emit_indent(local + " = srem i64 " + lhs + ", " + rhs) }
+        else if (op == "&") { this.emit_indent(local + " = and i64 " + lhs + ", " + rhs) }
+        else if (op == "|") { this.emit_indent(local + " = or i64 " + lhs + ", " + rhs) }
+        else if (op == "^") { this.emit_indent(local + " = xor i64 " + lhs + ", " + rhs) }
+        else if (op == "<<") { this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs) }
+        else if (op == ">>") { this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs) }
+        else if (op == "==") { this.emit_indent(local + " = icmp eq i64 " + lhs + ", " + rhs) }
+        else if (op == "!=") { this.emit_indent(local + " = icmp ne i64 " + lhs + ", " + rhs) }
+        else if (op == "<") { this.emit_indent(local + " = icmp slt i64 " + lhs + ", " + rhs) }
+        else if (op == "<=") { this.emit_indent(local + " = icmp sle i64 " + lhs + ", " + rhs) }
+        else if (op == ">") { this.emit_indent(local + " = icmp sgt i64 " + lhs + ", " + rhs) }
+        else if (op == ">=") { this.emit_indent(local + " = icmp sge i64 " + lhs + ", " + rhs) }
+
+        return local
+    }
+
+    fun gen_unary(op: String, right: AST.Expr): String {
+        var rhs = this.gen_expr(right)
+        var local = this.fresh_local()
+
+        if (op == "-") { this.emit_indent(local + " = sub i64 0, " + rhs) }
+        else if (op == "!") { this.emit_indent(local + " = xor i1 " + rhs + ", true") }
+        else if (op == "~") { this.emit_indent(local + " = xor i64 " + rhs + ", -1") }
+
+        return local
+    }
+
+    fun gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
+        // Check if this is IO.println
+        var callee_name = this.resolve_callee(callee)
+
+        if (callee_name == "IO.println") {
+            var arg_expr = args[0]
+            var is_string = this.is_string_expr(arg_expr)
+            var arg = this.gen_expr(arg_expr)
+            var local = this.fresh_local()
+            if (is_string) {
+                this.emit_indent(local + " = call i32 @puts(i8* " + arg + ")")
+            } else {
+                var fmt = this.get_format_ptr("%ld\n")
+                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
+            }
+            return local
+        }
+        if (callee_name == "IO.print") {
+            var arg_expr = args[0]
+            var is_string = this.is_string_expr(arg_expr)
+            var arg = this.gen_expr(arg_expr)
+            var local = this.fresh_local()
+            if (is_string) {
+                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + arg + ")")
+            } else {
+                var fmt = this.get_format_ptr("%ld")
+                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
+            }
+            return local
+        }
+
+        // General function call
+        var arg_strs: List<String> = []
+        var i = 0
+        while (i < args.length()) {
+            var val = this.gen_expr(args[i])
+            arg_strs.push("i64 " + val)
+            i = i + 1
+        }
+        var local = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+        return local
+    }
+
+    fun is_string_expr(expr: AST.Expr): Bool {
+        var kind = match (expr) {
+            StringLit(s) => "string"
+            IntLit(v) => "int"
+            FloatLit(v) => "float"
+            BoolLit(v) => "bool"
+            Variable(n) => "var"
+            Binary(l, o, r) => "binary"
+            Unary(o, r) => "unary"
+            Call(c, a) => "call"
+            Assign(n, v) => "assign"
+            Logical(l, o, r) => "logical"
+            MemberAccess(o, f) => "member"
+            NilLit => "nil"
+        }
+        return kind == "string"
+    }
+
+    fun get_format_ptr(fmt: String): String {
+        var name = this.add_string_constant(fmt)
+        var len = fmt.length() + 1
+        var local = this.fresh_local()
+        this.emit_indent(local + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + name + ", i64 0, i64 0")
+        return local
+    }
+
+    fun resolve_callee(expr: AST.Expr): String {
+        return match (expr) {
+            Variable(n) => n
+            MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
+        }
+    }
+
+    fun gen_logical(left: AST.Expr, op: String, right: AST.Expr): String {
+        var lhs = this.gen_expr(left)
+        var rhs_label = this.fresh_label("rhs")
+        var end_label = this.fresh_label("end")
+        var result = this.fresh_local()
+
+        if (op == "or") {
+            this.emit_indent("br i1 " + lhs + ", label %" + end_label + ", label %" + rhs_label)
+        } else {
+            this.emit_indent("br i1 " + lhs + ", label %" + rhs_label + ", label %" + end_label)
+        }
+
+        this.emit(rhs_label + ":")
+        var rhs = this.gen_expr(right)
+        this.emit_indent("br label %" + end_label)
+
+        this.emit(end_label + ":")
+        this.emit_indent(result + " = phi i1 [" + lhs + ", %entry], [" + rhs + ", %" + rhs_label + "]")
+        return result
+    }
+
+    // --- Statement codegen ---
+
+    fun gen_stmt(stmt: AST.Stmt) {
+        match (stmt) {
+            ExprStmt(expr) => { this.gen_expr(expr) }
+            VarDecl(name, type_ann, init) => {
+                var llvm_t = this.llvm_type(type_ann)
+                this.emit_indent("%" + name + " = alloca " + llvm_t)
+                var val = this.gen_expr(init)
+                this.emit_indent("store " + llvm_t + " " + val + ", " + llvm_t + "* %" + name)
+            }
+            Return(value) => {
+                var val = this.gen_expr(value)
+                this.emit_terminator("ret i64 " + val)
+            }
+            If(cond, then_branch, else_branch) => {
+                this.gen_if(cond, then_branch, else_branch)
+            }
+            While(cond, body) => {
+                this.gen_while(cond, body)
+            }
+            Block(stmts) => {
+                this.gen_stmts(stmts)
+            }
+            FunDecl(name, params, ret_type, body) => {
+                this.gen_function(name, params, ret_type, body)
+            }
+        }
+    }
+
+    fun gen_stmts(stmts: List<AST.Stmt>) {
+        var i = 0
+        while (i < stmts.length()) {
+            this.gen_stmt(stmts[i])
+            i = i + 1
+        }
+    }
+
+    fun gen_if(cond: AST.Expr, then_branch: List<AST.Stmt>, else_branch: List<AST.Stmt>) {
+        var cond_val = this.gen_expr(cond)
+        var then_label = this.fresh_label("then")
+        var else_label = this.fresh_label("else")
+        var end_label = this.fresh_label("endif")
+
+        this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+
+        this.start_block(then_label)
+        this.gen_stmts(then_branch)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(else_label)
+        if (else_branch.length() > 0) {
+            this.gen_stmts(else_branch)
+        }
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+    }
+
+    fun gen_while(cond: AST.Expr, body: List<AST.Stmt>) {
+        var cond_label = this.fresh_label("while.cond")
+        var body_label = this.fresh_label("while.body")
+        var end_label = this.fresh_label("while.end")
+
+        this.emit_terminator("br label %" + cond_label)
+
+        this.start_block(cond_label)
+        var cond_val = this.gen_expr(cond)
+        this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
+
+        this.start_block(body_label)
+        this.gen_stmts(body)
+        this.emit_terminator("br label %" + cond_label)
+
+        this.start_block(end_label)
+    }
+
+    fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
+        this.reset_locals()
+        var ret_llvm = this.llvm_type(ret_type)
+
+        // Parse params string "name:type,name:type"
+        var param_list: List<String> = []
+        if (params.length() > 0) {
+            param_list = params.split(",")
+        }
+
+        var param_strs: List<String> = []
+        var i = 0
+        while (i < param_list.length()) {
+            var parts = param_list[i].split(":")
+            var pname = parts[0]
+            var ptype = parts[1]
+            param_strs.push(this.llvm_type(ptype) + " %" + pname + ".arg")
+            i = i + 1
+        }
+
+        this.emit("")
+        this.emit("define " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
+        this.emit("entry:")
+        this.block_terminated = false
+
+        // Allocate space for params
+        i = 0
+        while (i < param_list.length()) {
+            var parts = param_list[i].split(":")
+            var pname = parts[0]
+            var ptype = parts[1]
+            this.emit_indent("%" + pname + " = alloca " + this.llvm_type(ptype))
+            this.emit_indent("store " + this.llvm_type(ptype) + " %" + pname + ".arg, " + this.llvm_type(ptype) + "* %" + pname)
+            i = i + 1
+        }
+
+        this.gen_stmts(body)
+
+        // Ensure block has a terminator
+        if (!this.block_terminated) {
+            if (ret_llvm == "void") {
+                this.emit_terminator("ret void")
+            } else {
+                this.emit_terminator("unreachable")
+            }
+        }
+
+        this.emit("}")
+        this.block_terminated = false
+    }
+
+    // --- Top-level ---
+
+    fun generate(program: List<AST.Stmt>): String {
+        // Generate all top-level declarations into sb
+        var i = 0
+        while (i < program.length()) {
+            this.gen_stmt(program[i])
+            i = i + 1
+        }
+
+        // Build final output with proper ordering
+        var out = StringBuilder()
+        out.append("; Generated by Saffron LLVM compiler\n")
+        out.append("target triple = \"arm64-apple-macosx14.0.0\"\n\n")
+
+        // String constants
+        var j = 0
+        while (j < this.string_constants.length()) {
+            var s = this.string_constants[j]
+            var name = "@.str." + j.floor().to_string()
+            var len = s.length() + 1
+            out.append(name + " = private unnamed_addr constant [" + len.to_string() + " x i8] c\"" + this.escape_llvm_string(s) + "\\00\"\n")
+            j = j + 1
+        }
+        if (this.string_constants.length() > 0) {
+            out.append("\n")
+        }
+
+        // External declarations
+        out.append("declare i32 @puts(i8*)\n")
+        out.append("declare i32 @printf(i8*, ...)\n")
+
+        // Function bodies
+        out.append(this.sb.to_string())
+
+        return out.to_string()
+    }
+}
+
+fun generate(program: List<AST.Stmt>): String {
+    var gen = Codegen()
+    return gen.generate(program)
+}
