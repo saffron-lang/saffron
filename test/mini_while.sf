@@ -1,0 +1,16 @@
+fun fib(n: Int): Int {
+    var a: Int = 0
+    var b: Int = 1
+    var i: Int = 0
+    while (i < n) {
+        var temp: Int = b
+        b = a + b
+        a = temp
+        i = i + 1
+    }
+    return a
+}
+
+fun main(): Int {
+    return fib(10)
+}

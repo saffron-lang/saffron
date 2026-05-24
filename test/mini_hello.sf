@@ -1,0 +1,4 @@
+fun main(): Int {
+    IO.println("Hello from Saffron!")
+    return 0
+}
