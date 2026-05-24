@@ -56,6 +56,11 @@ enum Variant {
     Variant(name: String, fields: String)
 }
 
+// Typed value — tracks both the LLVM register name and its Saffron type
+enum TypedVal {
+    TV(val: String, typ: String)
+}
+
 fun type_to_string(t: Type): String {
     return match (t) {
         IntType => "Int"
