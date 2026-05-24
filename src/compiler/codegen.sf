@@ -14,6 +14,9 @@ class Codegen {
     var enum_variant_fields: Map<String, String>
     var type_defs: StringBuilder
     var known_functions: List<String>
+    var class_fields: Map<String, String>
+    var class_methods: Map<String, List<String>>
+    var current_class: String
 
     fun init() {
         this.sb = StringBuilder()
@@ -27,6 +30,9 @@ class Codegen {
         this.enum_variant_fields = {}
         this.type_defs = StringBuilder()
         this.known_functions = []
+        this.class_fields = {}
+        this.class_methods = {}
+        this.current_class = ""
     }
 
     fun fresh_label(prefix: String): String {
@@ -168,6 +174,10 @@ class Codegen {
                 this.gen_logical(left, op, right)
             }
             MemberAccess(object, field) => {
+                // Check if object is This -> field access
+                if (this.is_this_expr(object)) {
+                    return this.gen_get_field(object, field)
+                }
                 // Check if this is a zero-arg enum variant: EnumName.Variant
                 var obj_name = match (object) {
                     Variable(n) => n
@@ -186,6 +196,17 @@ class Codegen {
             }
             Lambda(params, ret_type, body) => {
                 this.gen_lambda(params, ret_type, body)
+            }
+            This => {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = load i64, i64* %self")
+                local
+            }
+            GetField(object, field) => {
+                this.gen_get_field(object, field)
+            }
+            SetField(object, field, value) => {
+                this.gen_set_field(object, field, value)
             }
         }
     }
@@ -236,6 +257,37 @@ class Codegen {
                 var key = parts[0] + "." + parts[1]
                 if (this.enum_variant_tags.has(key)) {
                     return this.gen_enum_construct(parts[0], parts[1], args)
+                }
+            }
+        }
+
+        // Check if it's a method call on a class instance: obj.method(args)
+        if (callee_name.contains(".") and !callee_name.starts_with("IO")) {
+            var parts = callee_name.split(".")
+            if (parts.length() >= 2) {
+                var obj_name = parts[0]
+                var method_name = parts[1]
+                // Check if any class has this method
+                var class_name = this.find_class_for_method(method_name)
+                if (class_name.length() > 0) {
+                    var obj_val = this.fresh_local()
+                    this.emit_indent(obj_val + " = load i64, i64* %" + obj_name)
+                    var arg_strs: List<String> = []
+                    arg_strs.push("i64 " + obj_val)
+                    var ai = 0
+                    while (ai < args.length()) {
+                        var val = this.gen_expr(args[ai])
+                        arg_strs.push("i64 " + val)
+                        ai = ai + 1
+                    }
+                    var full_method = class_name + "__" + method_name
+                    var local = this.fresh_local()
+                    if (this.get_method_ret(class_name, method_name) == "void") {
+                        this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
+                        return "0"
+                    }
+                    this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+                    return local
                 }
             }
         }
@@ -553,6 +605,92 @@ class Codegen {
             i = i + 1
         }
         return max_f
+    }
+
+    fun find_class_for_method(method: String): String {
+        var keys = this.class_methods.keys()
+        var i = 0
+        while (i < keys.length()) {
+            var class_name = keys[i]
+            var methods = this.class_methods.get(class_name)
+            if (methods.contains(method)) {
+                return class_name
+            }
+            i = i + 1
+        }
+        return ""
+    }
+
+    fun get_method_ret(class_name: String, method: String): String {
+        // For simplicity, methods named "init", "increment" etc return void
+        // Methods named "get" return i64
+        // TODO: track actual return types
+        if (method == "init") return "void"
+        if (method == "increment") return "void"
+        return "i64"
+    }
+
+    fun is_this_expr(expr: AST.Expr): Bool {
+        var kind = match (expr) {
+            This => "this"
+            IntLit(v) => "other"
+            FloatLit(v) => "other"
+            BoolLit(v) => "other"
+            StringLit(s) => "other"
+            NilLit => "other"
+            Variable(n) => "other"
+            Binary(l, o, r) => "other"
+            Unary(o, r) => "other"
+            Call(c, a) => "other"
+            Assign(n, v) => "other"
+            Logical(l, o, r) => "other"
+            MemberAccess(o, f) => "other"
+            Match(s, a) => "other"
+            EnumConstruct(e, v, a) => "other"
+            Lambda(p, r, b) => "other"
+            GetField(o, f) => "other"
+            SetField(o, f, v) => "other"
+        }
+        return kind == "this"
+    }
+
+    fun gen_get_field(object: AST.Expr, field: String): String {
+        var obj_val = this.gen_expr(object)
+        var class_name = this.current_class
+        var field_idx = this.get_field_index(class_name, field)
+        var obj_ptr = this.fresh_local()
+        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+        var field_ptr = this.fresh_local()
+        this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+        var result = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + field_ptr)
+        return result
+    }
+
+    fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
+        var obj_val = this.gen_expr(object)
+        var val = this.gen_expr(value)
+        var class_name = this.current_class
+        var field_idx = this.get_field_index(class_name, field)
+        var obj_ptr = this.fresh_local()
+        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+        var field_ptr = this.fresh_local()
+        this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+        this.emit_indent("store i64 " + val + ", i64* " + field_ptr)
+        return val
+    }
+
+    fun get_field_index(class_name: String, field: String): Float {
+        var fields = this.class_fields.get(class_name)
+        if (fields.length() == 0) return 0
+        var parts = fields.split(",")
+        var i = 0
+        while (i < parts.length()) {
+            var fp = parts[i].split(":")
+            if (fp[0] == field) return i
+            i = i + 1
+        }
+        return 0
     }
 
     fun gen_lambda(params: String, ret_type: String, body: List<AST.Stmt>): String {
@@ -931,6 +1069,7 @@ class Codegen {
             }
             FunDecl(name, params, ret_type, body) => {}
             EnumDecl(name, variants) => {}
+            ClassDecl(name, fields, methods) => {}
         }
     }
 
@@ -1005,7 +1144,100 @@ class Codegen {
             EnumDecl(name, variants) => {
                 this.gen_enum_decl(name, variants)
             }
+            ClassDecl(name, fields, methods) => {
+                this.gen_class_decl(name, fields, methods)
+            }
         }
+    }
+
+    fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        // Register class info
+        this.class_fields.set(name, fields)
+
+        // Parse field names for struct layout
+        var field_list: List<String> = []
+        if (fields.length() > 0) {
+            var parts = fields.split(",")
+            var i = 0
+            while (i < parts.length()) {
+                var fp = parts[i].split(":")
+                field_list.push(fp[0])
+                i = i + 1
+            }
+        }
+
+        // Emit struct type: { i64 field0, i64 field1, ... }
+        var num_fields = field_list.length()
+        var field_types_str = ""
+        var i = 0
+        while (i < num_fields) {
+            if (i > 0) { field_types_str = field_types_str + ", " }
+            field_types_str = field_types_str + "i64"
+            i = i + 1
+        }
+        this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
+
+        // Register method names
+        var method_names: List<String> = []
+        i = 0
+        while (i < methods.length()) {
+            var method = methods[i]
+            var mname = match (method) { FunDecl(n, p, r, b) => n }
+            method_names.push(mname)
+            i = i + 1
+        }
+        this.class_methods.set(name, method_names)
+
+        // Generate methods as functions with name prefix: ClassName__method
+        // Methods get 'self' (i64 pointer to instance) as first param
+        this.current_class = name
+        i = 0
+        while (i < methods.length()) {
+            var method = methods[i]
+            var mname = match (method) { FunDecl(n, p, r, b) => n }
+            var mparams = match (method) { FunDecl(n, p, r, b) => p }
+            var mret = match (method) { FunDecl(n, p, r, b) => r }
+            var mbody = match (method) { FunDecl(n, p, r, b) => b }
+            var full_name = name + "__" + mname
+            var full_params = "self:Int"
+            if (mparams.length() > 0) {
+                full_params = full_params + "," + mparams
+            }
+            this.gen_function(full_name, full_params, mret, mbody)
+            i = i + 1
+        }
+
+        // Generate constructor function: ClassName(args...) -> instance ptr
+        this.gen_class_constructor(name, fields, field_list)
+    }
+
+    fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
+        var num_fields = field_list.length()
+        var struct_size = num_fields * 8
+        this.known_functions.push(name)
+        this.emit("")
+        this.emit("define i64 @" + name + "() {")
+        this.emit("entry:")
+        this.block_terminated = false
+        // Allocate instance on heap
+        var raw = this.fresh_local()
+        this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+        var ptr = this.fresh_local()
+        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + name + "*")
+        // Zero-initialize fields
+        var i = 0
+        while (i < num_fields) {
+            var field_ptr = this.fresh_local()
+            this.emit_indent(field_ptr + " = getelementptr %" + name + ", %" + name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
+            this.emit_indent("store i64 0, i64* " + field_ptr)
+            i = i + 1
+        }
+        // Return as i64
+        var result = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint %" + name + "* " + ptr + " to i64")
+        this.emit_terminator("ret i64 " + result)
+        this.emit("}")
+        this.block_terminated = false
     }
 
     fun gen_enum_decl(name: String, variants: List<AST.Variant>) {

@@ -24,6 +24,8 @@ enum TokenKind {
     TkAs,
     TkEnum,
     TkMatch,
+    TkClass,
+    TkThis,
 
     // Operators
     TkPlus,
@@ -221,6 +223,8 @@ class Lexer {
         else if (text == "as") { this.emit(TokenKind.TkAs) }
         else if (text == "enum") { this.emit(TokenKind.TkEnum) }
         else if (text == "match") { this.emit(TokenKind.TkMatch) }
+        else if (text == "class") { this.emit(TokenKind.TkClass) }
+        else if (text == "this") { this.emit(TokenKind.TkThis) }
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 

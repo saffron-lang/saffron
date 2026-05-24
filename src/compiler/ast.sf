@@ -24,7 +24,10 @@ enum Expr {
     MemberAccess(object: Expr, field: String),
     Match(subject: Expr, arms: List<MatchArm>),
     EnumConstruct(enum_name: String, variant: String, args: List<Expr>),
-    Lambda(params: String, ret_type: String, body: List<Stmt>)
+    Lambda(params: String, ret_type: String, body: List<Stmt>),
+    GetField(object: Expr, field: String),
+    SetField(object: Expr, field: String, value: Expr),
+    This
 }
 
 enum MatchArm {
@@ -42,6 +45,7 @@ enum Stmt {
     VarDecl(name: String, type_ann: String, initializer: Expr),
     FunDecl(name: String, params: String, ret_type: String, body: List<Stmt>),
     EnumDecl(name: String, variants: List<Variant>),
+    ClassDecl(name: String, fields: String, methods: List<Stmt>),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
