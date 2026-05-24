@@ -1,0 +1,21 @@
+import "random" as Random
+import "@test" as T
+
+// Seed for reproducibility
+Random.seed(42)
+
+// float returns [0, 1)
+var f = Random.float()
+T.assert(f >= 0, "float >= 0")
+T.assert(f < 1, "float < 1")
+
+// int returns within range
+var i = Random.int(1, 10)
+T.assert(i >= 1, "int >= min")
+T.assert(i <= 10, "int <= max")
+
+// Multiple calls give valid results
+var j = Random.int(0, 0)
+T.assert_eq(j, 0, "int with min == max")
+
+T.summary()

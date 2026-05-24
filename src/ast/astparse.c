@@ -510,6 +510,7 @@ ParseRule parseRules[] = {
         [TOKEN_PIPE]          = {NULL, pipeCall, PREC_YIELD},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
+        [TOKEN_DOT_DOT]       = {NULL, binary, PREC_TERM},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
         [TOKEN_MODULO]        = {NULL, binary, PREC_TERM},
@@ -611,24 +612,40 @@ static Expr *anonFunction(bool canAssign) {
     initTypeNodeArray(&types);
 
     int argCount = 0;
+    bool hasRest = false;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             argCount++;
             if (argCount > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
-            Token name = parseVariable("Expect parameter name.");
-            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
 
-            param->self.name = name;
-            writeParameterArray(&params, param);
-
-            if (match(TOKEN_COLON)) {
-                TypeNode *typeNode = typeAnnotation();
-                writeTypeNodeArray(&types, typeNode);
-                param->self.type = typeNode;
+            if (match(TOKEN_STAR)) {
+                if (hasRest) errorAtCurrent("Can't have more than one rest parameter.");
+                hasRest = true;
+                Token name = parseVariable("Expect rest parameter name.");
+                struct Variadic *param = ALLOCATE_NODE(struct Variadic, NODE_VARIADIC);
+                param->self.name = name;
+                param->self.type = NULL;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             } else {
-                writeTypeNodeArray(&types, NULL);
+                if (hasRest) errorAtCurrent("Rest parameter must be last.");
+                Token name = parseVariable("Expect parameter name.");
+                struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                param->self.name = name;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             }
         } while (match(TOKEN_COMMA));
     }
@@ -713,24 +730,40 @@ static struct Function *function(FunctionType type) {
     initTypeNodeArray(&types);
 
     int argCount = 0;
+    bool hasRest = false;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             argCount++;
             if (argCount > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
-            Token name = parseVariable("Expect parameter name.");
-            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
 
-            param->self.name = name;
-            writeParameterArray(&params, param);
-
-            if (match(TOKEN_COLON)) {
-                TypeNode *typeNode = typeAnnotation();
-                writeTypeNodeArray(&types, typeNode);
-                param->self.type = typeNode;
+            if (match(TOKEN_STAR)) {
+                if (hasRest) errorAtCurrent("Can't have more than one rest parameter.");
+                hasRest = true;
+                Token name = parseVariable("Expect rest parameter name.");
+                struct Variadic *param = ALLOCATE_NODE(struct Variadic, NODE_VARIADIC);
+                param->self.name = name;
+                param->self.type = NULL;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             } else {
-                writeTypeNodeArray(&types, NULL);
+                if (hasRest) errorAtCurrent("Rest parameter must be last.");
+                Token name = parseVariable("Expect parameter name.");
+                struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                param->self.name = name;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             }
         } while (match(TOKEN_COMMA));
     }
@@ -1371,24 +1404,40 @@ static Stmt *methodSignature() {
     initTypeNodeArray(&types);
 
     int argCount = 0;
+    bool hasRest = false;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             argCount++;
             if (argCount > 255) {
                 errorAtCurrent("Can't have more than 255 parameters.");
             }
-            Token name = parseVariable("Expect parameter name.");
-            struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
 
-            param->self.name = name;
-            writeParameterArray(&params, param);
-
-            if (match(TOKEN_COLON)) {
-                TypeNode *typeNode = typeAnnotation();
-                writeTypeNodeArray(&types, typeNode);
-                param->self.type = typeNode;
+            if (match(TOKEN_STAR)) {
+                if (hasRest) errorAtCurrent("Can't have more than one rest parameter.");
+                hasRest = true;
+                Token name = parseVariable("Expect rest parameter name.");
+                struct Variadic *param = ALLOCATE_NODE(struct Variadic, NODE_VARIADIC);
+                param->self.name = name;
+                param->self.type = NULL;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             } else {
-                writeTypeNodeArray(&types, NULL);
+                if (hasRest) errorAtCurrent("Rest parameter must be last.");
+                Token name = parseVariable("Expect parameter name.");
+                struct Positional *param = ALLOCATE_NODE(struct Positional, NODE_POSITIONAL);
+                param->self.name = name;
+                writeParameterArray(&params, (Parameter *) param);
+                if (match(TOKEN_COLON)) {
+                    param->self.type = typeAnnotation();
+                    writeTypeNodeArray(&types, param->self.type);
+                } else {
+                    writeTypeNodeArray(&types, NULL);
+                }
             }
         } while (match(TOKEN_COMMA));
     }

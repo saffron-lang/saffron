@@ -1,0 +1,29 @@
+import "os" as OS
+import "@test" as T
+
+// platform
+var p = OS.platform()
+T.assert(p == "darwin" or p == "linux" or p == "windows", "platform is valid")
+
+// cwd returns a string
+var cwd = OS.cwd()
+T.assert(cwd.length() > 0, "cwd is non-empty")
+
+// env
+OS.set_env("SAFFRON_TEST_VAR", "hello")
+T.assert_eq(OS.env("SAFFRON_TEST_VAR"), "hello", "set_env + env")
+
+// env returns nil for missing var
+var missing = OS.env("SAFFRON_DOES_NOT_EXIST_12345")
+T.assert_eq(missing, nil, "env returns nil for missing")
+
+// exec
+var result = OS.exec("echo hi")
+T.assert_eq(result, "hi\n", "exec echo")
+
+// args returns a list
+var a = OS.args()
+T.assert(a is List, "args returns list")
+T.assert(a.length() > 0, "args has entries")
+
+T.summary()

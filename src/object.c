@@ -212,6 +212,7 @@ ObjFunction *newFunction() {
     ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
     function->arity = 0;
     function->upvalueCount = 0;
+    function->hasRest = false;
     function->name = NULL;
     function->module = NULL;
     function->firstParamType = OVERLOAD_ANY;

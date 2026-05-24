@@ -73,7 +73,7 @@ interface SaffronDiagnostic {
 
 interface SaffronSymbol {
   name: string;
-  kind: "variable" | "function" | "class" | "parameter";
+  kind: "variable" | "function" | "class" | "parameter" | "module" | "enum" | "variant" | "interface" | "method";
   line: number;
   column: number;
   length: number;
@@ -126,7 +126,12 @@ async function runCheck(uri: string): Promise<CheckOutput | null> {
   }
 }
 
-function getWordAtPosition(doc: TextDocument, line: number, character: number): string | null {
+interface WordContext {
+  word: string;
+  qualifier: string | null;
+}
+
+function getWordAtPosition(doc: TextDocument, line: number, character: number): WordContext | null {
   const text = doc.getText();
   const lines = text.split("\n");
   if (line >= lines.length) return null;
@@ -138,35 +143,64 @@ function getWordAtPosition(doc: TextDocument, line: number, character: number): 
   while (end < lineText.length && /[a-zA-Z0-9_?!]/.test(lineText[end])) end++;
 
   if (start === end) return null;
-  return lineText.slice(start, end);
+  const word = lineText.slice(start, end);
+
+  let qualifier: string | null = null;
+  if (start > 0 && lineText[start - 1] === ".") {
+    let qStart = start - 2;
+    while (qStart > 0 && /[a-zA-Z0-9_]/.test(lineText[qStart - 1])) qStart--;
+    if (qStart < start - 1) {
+      qualifier = lineText.slice(qStart, start - 1);
+    }
+  }
+
+  return { word, qualifier };
 }
 
-function findSymbol(symbols: SaffronSymbol[], name: string): SaffronSymbol | null {
+function findSymbol(symbols: SaffronSymbol[], name: string, qualifier: string | null): SaffronSymbol | null {
+  if (qualifier) {
+    for (let i = symbols.length - 1; i >= 0; i--) {
+      if (symbols[i].name === name) return symbols[i];
+    }
+  }
   for (let i = symbols.length - 1; i >= 0; i--) {
     if (symbols[i].name === name) return symbols[i];
   }
   return null;
 }
 
+const kindLabels: Record<string, string> = {
+  variable: "var",
+  function: "fun",
+  class: "class",
+  parameter: "param",
+  module: "module",
+  enum: "enum",
+  variant: "variant",
+  interface: "interface",
+  method: "fun",
+};
+
 connection.onHover(async (params: HoverParams): Promise<Hover | null> => {
   const doc = documents.get(params.textDocument.uri);
   if (!doc) return null;
 
-  const word = getWordAtPosition(doc, params.position.line, params.position.character);
-  if (!word) return null;
+  const ctx = getWordAtPosition(doc, params.position.line, params.position.character);
+  if (!ctx) return null;
 
   let cached = fileCache.get(params.textDocument.uri);
   if (!cached) cached = await runCheck(params.textDocument.uri) ?? undefined;
   if (!cached) return null;
 
-  const sym = findSymbol(cached.symbols, word);
+  const sym = findSymbol(cached.symbols, ctx.word, ctx.qualifier);
   if (!sym) return null;
 
-  const kindLabel = sym.kind === "function" ? "fun" : sym.kind === "class" ? "class" : "var";
+  const label = kindLabels[sym.kind] || sym.kind;
+  const prefix = ctx.qualifier ? `${ctx.qualifier}.` : "";
   return {
     contents: {
       kind: MarkupKind.Markdown,
-      value: `\`\`\`saffron\n(${kindLabel}) ${sym.name}\n\`\`\``,
+      value: `\`\`\`saffron\n(${label}) ${prefix}${sym.name}\n\`\`\``,
     },
   };
 });
@@ -175,14 +209,14 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
   const doc = documents.get(params.textDocument.uri);
   if (!doc) return null;
 
-  const word = getWordAtPosition(doc, params.position.line, params.position.character);
-  if (!word) return null;
+  const ctx = getWordAtPosition(doc, params.position.line, params.position.character);
+  if (!ctx) return null;
 
   let cached = fileCache.get(params.textDocument.uri);
   if (!cached) cached = await runCheck(params.textDocument.uri) ?? undefined;
   if (!cached) return null;
 
-  const sym = findSymbol(cached.symbols, word);
+  const sym = findSymbol(cached.symbols, ctx.qualifier || ctx.word, null);
   if (!sym) return null;
 
   return {

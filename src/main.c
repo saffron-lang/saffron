@@ -10,6 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+int saffronArgc = 0;
+const char **saffronArgv = NULL;
+
 static void repl() {
     char buffer[8192];
     int bufLen = 0;
@@ -120,6 +123,8 @@ static void checkFile(const char *path) {
 }
 
 int main(int argc, const char *argv[]) {
+    saffronArgc = argc;
+    saffronArgv = argv;
     initVM();
     if (argc == 1) {
         repl();

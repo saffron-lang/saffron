@@ -64,6 +64,9 @@ typedef enum {
     OP_THROW,
     OP_TRY_BEGIN,
     OP_TRY_END,
+    OP_PACK_REST,
+    OP_CALL_SPREAD,
+    OP_RANGE,
 } OpCode;
 
 typedef struct {

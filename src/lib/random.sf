@@ -1,0 +1,31 @@
+import "random" as _Random
+
+fun float(): Number {
+    return _Random.float()
+}
+
+fun int(min: Number, max: Number): Number {
+    return _Random.int(min, max)
+}
+
+fun seed(n: Number) {
+    _Random.seed(n)
+}
+
+fun choice(list: List<Any>): Any {
+    var idx = _Random.int(0, list.length() - 1)
+    return list[idx]
+}
+
+fun shuffle(list: List<Any>): List<Any> {
+    var result = list.copy()
+    var i = result.length() - 1
+    while (i > 0) {
+        var j = _Random.int(0, i)
+        var temp = result[i]
+        result[i] = result[j]
+        result[j] = temp
+        i = i - 1
+    }
+    return result
+}
