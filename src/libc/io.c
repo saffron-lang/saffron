@@ -1,6 +1,11 @@
-#include <printf.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
 #include "io.h"
+#include "list.h"
 #include "module.h"
 #include "../memory.h"
 
@@ -111,6 +116,75 @@ Value readlineNative(int argCount, Value *args) {
     return OBJ_VAL(copyString(buffer, len));
 }
 
+static Value listDirNative(int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("IO.list_dir expects 1 string argument (path)");
+        return NIL_VAL;
+    }
+    ObjString *path = AS_STRING(args[0]);
+    DIR *dir = opendir(path->chars);
+    if (dir == NULL) {
+        runtimeError("Could not open directory \"%s\"", path->chars);
+        return NIL_VAL;
+    }
+
+    ObjList *list = newList();
+    push(OBJ_VAL(list));
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        Value name = OBJ_VAL(copyString(entry->d_name, (int)strlen(entry->d_name)));
+        writeValueArray(&list->items, name);
+    }
+    closedir(dir);
+    pop();
+    return OBJ_VAL(list);
+}
+
+static Value mkdirNative(int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("IO.mkdir expects 1 string argument (path)");
+        return BOOL_VAL(false);
+    }
+    ObjString *path = AS_STRING(args[0]);
+    return BOOL_VAL(mkdir(path->chars, 0755) == 0);
+}
+
+static Value renameNative(int argCount, Value *args) {
+    if (argCount != 2 || !IS_STRING(args[0]) || !IS_STRING(args[1])) {
+        runtimeError("IO.rename expects 2 string arguments (old_path, new_path)");
+        return BOOL_VAL(false);
+    }
+    ObjString *oldPath = AS_STRING(args[0]);
+    ObjString *newPath = AS_STRING(args[1]);
+    return BOOL_VAL(rename(oldPath->chars, newPath->chars) == 0);
+}
+
+static Value fileSizeNative(int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("IO.file_size expects 1 string argument (path)");
+        return NUMBER_VAL(-1);
+    }
+    ObjString *path = AS_STRING(args[0]);
+    struct stat st;
+    if (stat(path->chars, &st) != 0) {
+        return NUMBER_VAL(-1);
+    }
+    return NUMBER_VAL((double)st.st_size);
+}
+
+static Value isDirNative(int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("IO.is_dir expects 1 string argument (path)");
+        return BOOL_VAL(false);
+    }
+    ObjString *path = AS_STRING(args[0]);
+    struct stat st;
+    if (stat(path->chars, &st) != 0) return BOOL_VAL(false);
+    return BOOL_VAL(S_ISDIR(st.st_mode));
+}
+
 ObjModule *createIOModule() {
     ObjModule *module = newModule("IO", "io", false);
     push(OBJ_VAL(module));
@@ -122,20 +196,30 @@ ObjModule *createIOModule() {
     defineModuleFunction(module, "file_exists", fileExistsNative);
     defineModuleFunction(module, "delete_file", deleteFileNative);
     defineModuleFunction(module, "readline", readlineNative);
+    defineModuleFunction(module, "list_dir", listDirNative);
+    defineModuleFunction(module, "mkdir", mkdirNative);
+    defineModuleFunction(module, "rename", renameNative);
+    defineModuleFunction(module, "file_size", fileSizeNative);
+    defineModuleFunction(module, "is_dir", isDirNative);
     pop();
     return module;
 }
 
 SimpleType *createIOModuleType() {
     SimpleType *ioModule = newSimpleType();
-    createBuiltinFunctorType(ioModule, "print", (Type *[]) {anyType, anyType}, 2, NULL, 0, nilType);
-    createBuiltinFunctorType(ioModule, "println", (Type *[]) {anyType, anyType}, 2, NULL, 0, nilType);
-    createBuiltinFunctorType(ioModule, "read_file", (Type *[]) {stringType}, 1, NULL, 0, stringType);
-    createBuiltinFunctorType(ioModule, "write_file", (Type *[]) {stringType, stringType}, 2, NULL, 0, nilType);
-    createBuiltinFunctorType(ioModule, "append_file", (Type *[]) {stringType, stringType}, 2, NULL, 0, nilType);
-    createBuiltinFunctorType(ioModule, "file_exists", (Type *[]) {stringType}, 1, NULL, 0, boolType);
-    createBuiltinFunctorType(ioModule, "delete_file", (Type *[]) {stringType}, 1, NULL, 0, boolType);
-    createBuiltinFunctorType(ioModule, "readline", (Type *[]) {}, 0, NULL, 0, stringType);
+    createBuiltinFunctorType(ioModule, "print", (Type *[]) {(Type *) anyType, (Type *) anyType}, 2, NULL, 0, (Type *) nilType);
+    createBuiltinFunctorType(ioModule, "println", (Type *[]) {(Type *) anyType, (Type *) anyType}, 2, NULL, 0, (Type *) nilType);
+    createBuiltinFunctorType(ioModule, "read_file", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) stringType);
+    createBuiltinFunctorType(ioModule, "write_file", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) nilType);
+    createBuiltinFunctorType(ioModule, "append_file", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) nilType);
+    createBuiltinFunctorType(ioModule, "file_exists", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
+    createBuiltinFunctorType(ioModule, "delete_file", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
+    createBuiltinFunctorType(ioModule, "readline", (Type *[]) {}, 0, NULL, 0, (Type *) stringType);
+    createBuiltinFunctorType(ioModule, "list_dir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) listTypeDef);
+    createBuiltinFunctorType(ioModule, "mkdir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
+    createBuiltinFunctorType(ioModule, "rename", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) boolType);
+    createBuiltinFunctorType(ioModule, "file_size", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) numberType);
+    createBuiltinFunctorType(ioModule, "is_dir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
     return ioModule;
 }
 

@@ -471,6 +471,9 @@ void compileNode(Node *node) {
                 case TOKEN_IS:
                     emitByte(OP_IS);
                     break;
+                case TOKEN_DOT_DOT:
+                    emitByte(OP_RANGE);
+                    break;
             }
             break;
         }
@@ -719,16 +722,27 @@ void compileNode(Node *node) {
             initCompiler(&compiler, casted->functionType, &casted->name);
             beginScope();
 
+            bool hasRestParam = false;
+            int restIndex = -1;
             for (int i = 0; i < casted->params.count; i++) {
+                if (casted->params.parameters[i]->self.type == NODE_VARIADIC) {
+                    hasRestParam = true;
+                    restIndex = i;
+                }
                 declareVariable(&casted->params.parameters[i]->name);
                 uint16_t constant = identifierConstant(&casted->params.parameters[i]->name);
                 defineVariable(constant);
+            }
+
+            if (hasRestParam) {
+                emitBytes(OP_PACK_REST, (uint8_t) restIndex);
             }
 
             compileTree(&casted->body);
 
             ObjFunction *function = endCompiler();
             function->arity = casted->params.count;
+            function->hasRest = hasRestParam;
 
             // Determine first parameter type for overload dispatch
             if (casted->params.count > 0) {

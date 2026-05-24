@@ -29,6 +29,11 @@ typedef enum {
     SYM_FUNCTION,
     SYM_CLASS,
     SYM_PARAMETER,
+    SYM_MODULE,
+    SYM_ENUM,
+    SYM_ENUM_ITEM,
+    SYM_INTERFACE,
+    SYM_METHOD,
 } SymbolKind;
 
 typedef struct {

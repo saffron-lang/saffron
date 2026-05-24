@@ -256,7 +256,14 @@ ObjModule *executeModule(ObjString *name, const char *importingPath);
 static bool call(ObjClosure *closure, int argCount) {
     switch (closure->obj.type) {
         case OBJ_CLOSURE: {
-            if (argCount != closure->function->arity) {
+            if (closure->function->hasRest) {
+                int minArgs = closure->function->arity - 1;
+                if (argCount < minArgs) {
+                    runtimeError("Expected at least %d arguments but got %d.",
+                                 minArgs, argCount);
+                    return false;
+                }
+            } else if (argCount != closure->function->arity) {
                 runtimeError("Expected %d arguments but got %d.",
                              closure->function->arity, argCount);
                 return false;
@@ -1256,6 +1263,29 @@ static InterpretResult run(ObjModule *module) {
                 }
                 break;
             }
+            case OP_RANGE: {
+                if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {
+                    if (!runtimeError("Range operands must be numbers.")) return INTERPRET_RUNTIME_ERROR;
+                    goto dispatch;
+                }
+                double rangeEnd = AS_NUMBER(pop());
+                double rangeStart = AS_NUMBER(pop());
+
+                ObjList *rangeList = newList();
+                push(OBJ_VAL(rangeList));
+
+                if (rangeStart <= rangeEnd) {
+                    for (int i = (int)rangeStart; i < (int)rangeEnd; i++) {
+                        listPush(rangeList, NUMBER_VAL(i));
+                    }
+                } else {
+                    for (int i = (int)rangeStart; i > (int)rangeEnd; i--) {
+                        listPush(rangeList, NUMBER_VAL(i));
+                    }
+                }
+
+                break;
+            }
             case OP_ENUM:
             case OP_VARIANT:
             case OP_MATCH_TAG:
@@ -1301,6 +1331,33 @@ static InterpretResult run(ObjModule *module) {
                 vm.handlerCount--;
                 break;
             }
+            case OP_PACK_REST: {
+                int restIndex = READ_BYTE();
+                // slots points to the start of this call frame's locals
+                // slot[0] = function itself, slot[1..] = args
+                // restIndex is the parameter index (0-based) where rest starts
+                // The actual arg slot is restIndex + 1 (slot 0 is the fn)
+                Value *restSlot = currentFrame->slots + restIndex + 1;
+                int totalArgs = (int)(vm.stackTop - currentFrame->slots) - 1;
+                int restCount = totalArgs - restIndex;
+
+                ObjList *list = newList();
+                push(OBJ_VAL(list)); // protect from GC
+
+                if (restCount > 0) {
+                    for (int i = 0; i < restCount; i++) {
+                        writeValueArray(&list->items, restSlot[i]);
+                    }
+                }
+
+                pop(); // unprotect
+                // Collapse: put list at restSlot, move stack top back
+                *restSlot = OBJ_VAL(list);
+                vm.stackTop = restSlot + 1;
+                break;
+            }
+            case OP_CALL_SPREAD:
+                break;
             case OP_RETURN: {
                 Value result = pop();
                 currentFrame->state |= FINISHED;

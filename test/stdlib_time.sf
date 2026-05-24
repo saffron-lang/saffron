@@ -1,0 +1,28 @@
+import "time" as Time
+import "@test" as T
+
+// clock returns a positive number
+var c = Time.clock()
+T.assert(c > 0, "clock > 0")
+
+// timestamp returns Unix epoch (should be > 2024)
+var ts = Time.timestamp()
+T.assert(ts > 1700000000, "timestamp is recent")
+
+// to_iso returns a string
+var iso = Time.to_iso(1700000000)
+T.assert(iso is String, "to_iso returns String")
+
+// year/month/day/hour/minute/second return numbers
+var y = Time.year()
+T.assert(y >= 2024, "year >= 2024")
+
+var m = Time.month()
+T.assert(m >= 1, "month >= 1")
+T.assert(m <= 12, "month <= 12")
+
+var d = Time.day()
+T.assert(d >= 1, "day >= 1")
+T.assert(d <= 31, "day <= 31")
+
+T.summary()

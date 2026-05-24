@@ -1,0 +1,26 @@
+import "@random" as Random
+import "@test" as T
+
+Random.seed(123)
+
+// float
+var f = Random.float()
+T.assert(f >= 0, "float >= 0")
+T.assert(f < 1, "float < 1")
+
+// int
+var i = Random.int(5, 10)
+T.assert(i >= 5, "int >= 5")
+T.assert(i <= 10, "int <= 10")
+
+// choice
+var items = ["a", "b", "c"]
+var c = Random.choice(items)
+T.assert(c == "a" or c == "b" or c == "c", "choice picks from list")
+
+// shuffle - requires indexed assignment (list[i] = x)
+// var nums = [1, 2, 3, 4, 5]
+// var shuffled = Random.shuffle(nums)
+// T.assert_eq(shuffled.length(), 5, "shuffle preserves length")
+
+T.summary()

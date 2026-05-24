@@ -99,22 +99,20 @@ fun parse(source: String) {
 
         if (c == "{") {
             var map = Map()
-            skip_ws()
-            if (consume("}")) { return map }
-            var map_done = false
-            while (!map_done) {
-                skip_ws()
-                consume("\"")
-                var key = parse_string()
-                skip_ws()
-                consume(":")
-                skip_ws()
-                var val = parse_value()
-                map.set(key, val)
-                skip_ws()
-                if (consume("}")) { map_done = true }
-                else { consume(",") }
+            IO.println("testing consume directly:")
+            var p = peek()
+            IO.println(p)
+            var eq = (p == "}")
+            IO.println(eq)
+            IO.println("calling consume:")
+            var r = consume("}")
+            IO.println(r)
+            IO.println("testing return false directly:")
+            fun test_ret(): Bool {
+                if (false) { return true }
+                return false
             }
+            IO.println(test_ret())
             return map
         }
 

@@ -1,0 +1,40 @@
+import "@test" as T
+
+// Test filesystem operations
+var testDir = "/tmp/saffron_test_io"
+IO.mkdir(testDir)
+T.assert(IO.is_dir(testDir), "mkdir creates directory")
+
+// Write and read
+var path = testDir + "/hello.txt"
+IO.write_file(path, "hello world")
+T.assert(IO.file_exists(path), "file_exists after write")
+T.assert_eq(IO.read_file(path), "hello world", "read_file content")
+
+// file_size
+var size = IO.file_size(path)
+T.assert_eq(size, 11, "file_size")
+
+// append
+IO.append_file(path, "!")
+T.assert_eq(IO.read_file(path), "hello world!", "append_file")
+
+// rename
+var newPath = testDir + "/renamed.txt"
+IO.rename(path, newPath)
+T.assert(IO.file_exists(newPath), "rename: new exists")
+T.assert(!IO.file_exists(path), "rename: old gone")
+
+// list_dir
+var files = IO.list_dir(testDir)
+T.assert_eq(files.length(), 1, "list_dir count")
+T.assert_eq(files[0], "renamed.txt", "list_dir entry")
+
+// is_dir
+T.assert(!IO.is_dir(newPath), "file is not dir")
+
+// cleanup
+IO.delete_file(newPath)
+T.assert(!IO.file_exists(newPath), "delete_file")
+
+T.summary()

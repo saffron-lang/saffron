@@ -9,8 +9,10 @@
 #include "json.h"
 #include "reflect.h"
 #include "math_mod.h"
+#include "random.h"
+#include "os.h"
 
-void initLib() { // TODO: Don't evaluate registered modules until accessed?
+void initLib() {
     defineType("Module", OBJ_VAL(createModuleType()));
     createListIteratorType();
     createMapIteratorType();
@@ -18,7 +20,7 @@ void initLib() { // TODO: Don't evaluate registered modules until accessed?
     defineBuiltin("Map", OBJ_VAL(createMapType()));
     defineType("Task", OBJ_VAL(createTaskType()));
 
-    #define MODULE_COUNT 6
+    #define MODULE_COUNT 8
     ModuleRegister registry[MODULE_COUNT] = {
             timeModuleRegister,
             ioModuleRegister,
@@ -26,6 +28,8 @@ void initLib() { // TODO: Don't evaluate registered modules until accessed?
             jsonModuleRegister,
             reflectModuleRegister,
             mathModuleRegister,
+            randomModuleRegister,
+            osModuleRegister,
     };
 
     for (int i = 0; i < MODULE_COUNT; i++) {
@@ -38,7 +42,4 @@ void initLib() { // TODO: Don't evaluate registered modules until accessed?
 
         defineBuiltinTypeDef(reg.path, reg.name,reg.createModuleTypeFn(), reg.builtin);
     }
-
-
-//    defineNative("sleep", sleepNative);
 }

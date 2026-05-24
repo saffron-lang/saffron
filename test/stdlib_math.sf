@@ -1,0 +1,33 @@
+import "math" as Math
+import "@test" as T
+
+T.assert_eq(Math.abs(-5), 5, "abs")
+T.assert_eq(Math.floor(3.7), 3, "floor")
+T.assert_eq(Math.ceil(3.2), 4, "ceil")
+T.assert_eq(Math.round(3.5), 4, "round")
+T.assert_eq(Math.min(2, 5), 2, "min")
+T.assert_eq(Math.max(2, 5), 5, "max")
+T.assert_eq(Math.sqrt(9), 3, "sqrt")
+T.assert_eq(Math.pow(2, 10), 1024, "pow")
+T.assert_eq(Math.sign(-42), -1, "sign negative")
+T.assert_eq(Math.sign(0), 0, "sign zero")
+T.assert_eq(Math.sign(7), 1, "sign positive")
+T.assert_eq(Math.clamp(15, 0, 10), 10, "clamp high")
+T.assert_eq(Math.clamp(-5, 0, 10), 0, "clamp low")
+T.assert_eq(Math.clamp(5, 0, 10), 5, "clamp in range")
+
+// Trig at known values
+T.assert_eq(Math.sin(0), 0, "sin(0)")
+T.assert_eq(Math.cos(0), 1, "cos(0)")
+T.assert_eq(Math.tan(0), 0, "tan(0)")
+
+// Log
+T.assert_eq(Math.log(1), 0, "log(1)")
+T.assert_eq(Math.log2(8), 3, "log2(8)")
+T.assert_eq(Math.log10(100), 2, "log10(100)")
+
+// Constants
+T.assert(Math.pi > 3.14, "pi > 3.14")
+T.assert(Math.e > 2.71, "e > 2.71")
+
+T.summary()

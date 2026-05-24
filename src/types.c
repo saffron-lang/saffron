@@ -792,6 +792,7 @@ Type *evaluateNode(Node *node) {
                 case TOKEN_GREATER_EQUAL: opMethod = "gt"; isBoolOp = true; break;
                 case TOKEN_EQUAL_EQUAL: opMethod = "eq"; isBoolOp = true; break;
                 case TOKEN_BANG_EQUAL: opMethod = "eq"; isBoolOp = true; break;
+                case TOKEN_DOT_DOT: return (Type *) listTypeDef;
                 default: return leftType;
             }
 

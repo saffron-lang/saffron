@@ -76,6 +76,7 @@ typedef struct {
     Obj obj;
     int arity;
     int upvalueCount;
+    bool hasRest;
     Chunk chunk;
     ObjString *name;
     void *module;

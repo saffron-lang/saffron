@@ -79,6 +79,26 @@ void collectSymbols(void *stmts, SymbolArray *array) {
         } else if (node->type == NODE_BLOCK) {
             struct Block *block = (struct Block *)node;
             collectSymbols(&block->statements, array);
+        } else if (node->type == NODE_IMPORT) {
+            struct Import *imp = (struct Import *)node;
+            writeSymbol(array, &imp->name, SYM_MODULE, NULL);
+        } else if (node->type == NODE_ENUM) {
+            struct Enum *en = (struct Enum *)node;
+            writeSymbol(array, &en->name, SYM_ENUM, NULL);
+            collectSymbols(&en->body, array);
+        } else if (node->type == NODE_ENUMITEM) {
+            struct EnumItem *item = (struct EnumItem *)node;
+            writeSymbol(array, &item->name, SYM_ENUM_ITEM, NULL);
+        } else if (node->type == NODE_INTERFACE) {
+            struct Interface *iface = (struct Interface *)node;
+            writeSymbol(array, &iface->name, SYM_INTERFACE, NULL);
+            collectSymbols(&iface->body, array);
+        } else if (node->type == NODE_METHODSIG) {
+            struct MethodSig *sig = (struct MethodSig *)node;
+            writeSymbol(array, &sig->name, SYM_METHOD, NULL);
+        } else if (node->type == NODE_FORIN) {
+            struct ForIn *forin = (struct ForIn *)node;
+            writeSymbol(array, &forin->binding, SYM_VARIABLE, NULL);
         }
     }
 }
@@ -122,6 +142,11 @@ static const char *kindToString(SymbolKind kind) {
         case SYM_FUNCTION: return "function";
         case SYM_CLASS: return "class";
         case SYM_PARAMETER: return "parameter";
+        case SYM_MODULE: return "module";
+        case SYM_ENUM: return "enum";
+        case SYM_ENUM_ITEM: return "variant";
+        case SYM_INTERFACE: return "interface";
+        case SYM_METHOD: return "method";
     }
     return "variable";
 }
