@@ -1440,7 +1440,7 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_VAR: {
             struct Var *casted = (struct Var *) node;
-            Type *varType = evaluateNode((Node *) casted->type);
+            Type *varType = casted->type ? evaluateNode((Node *) casted->type) : NULL;
 
             if (casted->initializer != NULL) {
                 Type *oldAssignmentType = currentAssignmentType;
@@ -1448,7 +1448,6 @@ Type *evaluateNode(Node *node) {
                 Type *valType = evaluateNode((Node *) casted->initializer);
                 if (varType) {
                     if (!isSubType(valType, varType)) {
-                        isSubType(valType, varType);
                         errorAt(&casted->name, "Type mismatch in var");
                     }
                 } else {
@@ -1456,6 +1455,7 @@ Type *evaluateNode(Node *node) {
                 }
                 currentAssignmentType = oldAssignmentType;
             }
+            if (varType == NULL) varType = (Type *) anyType;
 
             tableSet(
                     &currentEnv->locals, copyString(

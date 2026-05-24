@@ -1405,9 +1405,12 @@ static InterpretResult run(ObjModule *module) {
                 ObjString *enumName = READ_STRING();
                 int arity = READ_BYTE();
                 ObjEnumInstance *instance = newEnumInstance(tag, enumName);
+                push(OBJ_VAL(instance)); // protect from GC
                 for (int i = arity; i > 0; i--) {
-                    writeValueArray(&instance->fields, peek(i - 1));
+                    writeValueArray(&instance->fields, peek(i));
                 }
+                // pop instance + arity values, then push instance back
+                pop(); // pop the temporary instance
                 vm.stackTop -= arity;
                 push(OBJ_VAL(instance));
                 break;

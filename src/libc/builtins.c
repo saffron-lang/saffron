@@ -12,6 +12,7 @@
 #include "random.h"
 #include "os.h"
 #include "stringbuilder.h"
+#include "regex.h"
 
 void initLib() {
     defineType("Module", OBJ_VAL(createModuleType()));
@@ -22,7 +23,7 @@ void initLib() {
     defineBuiltin("StringBuilder", OBJ_VAL(createStringBuilderType()));
     defineType("Task", OBJ_VAL(createTaskType()));
 
-    #define MODULE_COUNT 8
+    #define MODULE_COUNT 9
     ModuleRegister registry[MODULE_COUNT] = {
             timeModuleRegister,
             ioModuleRegister,
@@ -32,6 +33,7 @@ void initLib() {
             mathModuleRegister,
             randomModuleRegister,
             osModuleRegister,
+            regexModuleRegister,
     };
 
     for (int i = 0; i < MODULE_COUNT; i++) {
