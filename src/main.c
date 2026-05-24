@@ -96,20 +96,24 @@ static void checkFile(const char *path) {
 
     DiagnosticArray diagnostics;
     initDiagnosticArray(&diagnostics);
+    SymbolArray symbols;
+    initSymbolArray(&symbols);
 
     parser.diagnostics = &diagnostics;
     StmtArray *body = parseAST(source);
     parser.diagnostics = NULL;
 
     if (body != NULL) {
+        collectSymbols(body, &symbols);
         setTypeDiagnostics(&diagnostics);
         evaluateTree(body);
         setTypeDiagnostics(NULL);
     }
 
-    printDiagnosticsJson(&diagnostics, path);
+    printCheckJson(&diagnostics, &symbols, path);
     int exitCode = diagnostics.count > 0 ? 65 : 0;
     freeDiagnosticArray(&diagnostics);
+    freeSymbolArray(&symbols);
     free(source);
 
     exit(exitCode);

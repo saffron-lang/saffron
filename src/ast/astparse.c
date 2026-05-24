@@ -375,19 +375,19 @@ static Expr *literal(bool canAssign) {
 }
 
 static Expr *and_(Expr *left, bool canAssign) {
-    struct Binary *result = ALLOCATE_NODE(struct Binary, NODE_BINARY);
+    struct Logical *result = ALLOCATE_NODE(struct Logical, NODE_LOGICAL);
     result->operator = parser.previous;
     result->right = parsePrecedence(PREC_AND);
-    result->left = left;// TODO
-    return result;
+    result->left = left;
+    return (Expr *) result;
 }
 
 static Expr *or_(Expr *left, bool canAssign) {
-    struct Binary *result = ALLOCATE_NODE(struct Binary, NODE_BINARY);
+    struct Logical *result = ALLOCATE_NODE(struct Logical, NODE_LOGICAL);
     result->operator = parser.previous;
     result->right = parsePrecedence(PREC_OR);
     result->left = left;
-    return result;
+    return (Expr *) result;
 }
 
 static ExprArray argumentList() {
