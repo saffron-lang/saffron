@@ -66,6 +66,20 @@ static void repl() {
     }
 }
 
+static void runFileNoCheck(const char *path) {
+    char *source = readFile(path);
+    StmtArray *body = parseAST(source);
+    if (body == NULL) {
+        free(source);
+        exit(65);
+    }
+    ObjModule *module = interpret(body, "<script>", path);
+    free(source);
+
+    if (module->result == INTERPRET_COMPILE_ERROR) exit(65);
+    if (module->result == INTERPRET_RUNTIME_ERROR) exit(70);
+}
+
 static void runFile(const char *path) {
     char *source = readFile(path);
     StmtArray *body = parseAST(source);
@@ -73,7 +87,9 @@ static void runFile(const char *path) {
         free(source);
         exit(65);
     }
+    setTypecheckFile(path);
     bool typeErrors = evaluateTree(body);
+    setTypecheckFile(NULL);
     if (typeErrors) {
         free(source);
         exit(65);
@@ -109,7 +125,9 @@ static void checkFile(const char *path) {
     if (body != NULL) {
         collectSymbols(body, &symbols);
         setTypeDiagnostics(&diagnostics);
+        setTypecheckFile(path);
         evaluateTree(body);
+        setTypecheckFile(NULL);
         setTypeDiagnostics(NULL);
     }
 
@@ -128,17 +146,17 @@ int main(int argc, const char *argv[]) {
     initVM();
     if (argc == 1) {
         repl();
-    } else if (argc == 2) {
-        if (strcmp(argv[1], "--help") == 0) {
-            printf("Usage: saffron [--check] [path]\n");
-            exit(0);
-        }
-        runFile(argv[1]);
-    } else if (argc == 3 && strcmp(argv[1], "--check") == 0) {
+    } else if (argc >= 2 && strcmp(argv[1], "--help") == 0) {
+        printf("Usage: saffron [--check|--no-check] [path] [args...]\n");
+        exit(0);
+    } else if (argc >= 3 && strcmp(argv[1], "--check") == 0) {
         checkFile(argv[2]);
-    } else {
-        fprintf(stderr, "Usage: saffron [--check] [path]\n");
-        exit(64);
+    } else if (argc >= 3 && strcmp(argv[1], "--no-check") == 0) {
+        saffronArgc = argc - 1;
+        saffronArgv = argv + 1;
+        runFileNoCheck(argv[2]);
+    } else if (argc >= 2) {
+        runFile(argv[1]);
     }
 
     freeVM();

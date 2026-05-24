@@ -141,6 +141,7 @@ void freeParameterArray(ParameterArray * parameterArray);
 struct Simple {
     TypeNode self;
     Token name;
+    Token qualifier;
     TypeNodeArray generics;
 };
 
@@ -406,6 +407,7 @@ struct MatchArm {
     ParameterArray bindings;
     StmtArray body;
     bool isTypePattern;
+    bool isBinding;
 };
 
 struct Destructure {

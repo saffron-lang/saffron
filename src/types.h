@@ -12,6 +12,7 @@ struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType, TypeNodeA
 struct Simple *initSimple(Token name);
 
 bool evaluateTree(StmtArray *statements);
+void setTypecheckFile(const char *path);
 void setTypeDiagnostics(DiagnosticArray *diagnostics);
 
 #define AS_TYPE(value)       (((Type *)AS_OBJ(value)))
@@ -70,6 +71,11 @@ typedef struct InterfaceType {
     Type *superType;
 } InterfaceType;
 
+typedef struct OverloadType {
+    Type self;
+    ValueArray variants; // Array of FunctorType*
+} OverloadType;
+
 // Todo: Maybe some sort of type for intrinsic simple types
 // Or maybe just recursive compare all children and provide more complex
 // types for builtins / primitives.
@@ -95,6 +101,8 @@ UnionType *newUnionType();
 InterfaceType *newInterfaceType();
 
 GenericType *newGenericType();
+
+OverloadType *newOverloadType();
 
 SimpleType *numberType;
 SimpleType *anyType;
