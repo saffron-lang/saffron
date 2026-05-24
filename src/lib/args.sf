@@ -1,9 +1,9 @@
 import "@os" as OS
 
 class ParsedArgs {
-    var flags: Map
-    var options: Map
-    var positional: List
+    var flags: Map<String, Bool>
+    var options: Map<String, String>
+    var positional: List<String>
 
     fun init() {
         this.flags = Map()
@@ -82,7 +82,7 @@ fun process_arg(result: ParsedArgs, arg: String) {
     result.positional.push(arg)
 }
 
-fun parse_list(raw: List): ParsedArgs {
+fun parse_list(raw: List<String>): ParsedArgs {
     var result = ParsedArgs()
     var i = 0
     while (i < raw.length()) {

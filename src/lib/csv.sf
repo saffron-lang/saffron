@@ -1,4 +1,4 @@
-fun parse(source: String): List {
+fun parse(source: String): List<List<String>> {
     var rows = []
     var pos = 0
 
@@ -47,7 +47,7 @@ fun parse(source: String): List {
         return sb.to_string()
     }
 
-    fun parse_row(): List {
+    fun parse_row(): List<String> {
         var fields = []
         fields.push(parse_field())
         while (pos < source.length()) {

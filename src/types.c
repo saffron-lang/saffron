@@ -977,7 +977,7 @@ Type *evaluateNode(Node *node) {
                     return (Type *) anyType;
                 }
 
-                return bestMatch->returnType ? resolveType(bestMatch->returnType) : (Type *) anyType;
+                return bestMatch->returnType ? resolveType(bestMatch->returnType) : (Type *) nilType;
             }
 
             if (calleeType == NULL || calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
@@ -1011,7 +1011,7 @@ Type *evaluateNode(Node *node) {
                 }
             }
 
-            Type *returnType = calleeFunctor->returnType ? resolveType(calleeFunctor->returnType) : (Type *) anyType;
+            Type *returnType = calleeFunctor->returnType ? resolveType(calleeFunctor->returnType) : (Type *) nilType;
 
             currentEnv = currentEnv->enclosing;
             return returnType;
@@ -1238,8 +1238,10 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_YIELD: {
             struct Yield *casted = (struct Yield *) node;
-            evaluateNode((Node *) casted->expression);
-            return anyType;
+            if (casted->expression) {
+                return evaluateNode((Node *) casted->expression);
+            }
+            return (Type *) nilType;
         }
         case NODE_LAMBDA: {
             struct Lambda *casted = (struct Lambda *) node;
@@ -1835,25 +1837,33 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_BREAK:
         case NODE_CONTINUE: {
-            return (Type *) anyType;
+            return (Type *) neverType;
         }
         case NODE_FORIN: {
             struct ForIn *casted = (struct ForIn *) node;
-            evaluateNode((Node *) casted->iterable);
-            // Register loop binding variable
+            Type *iterableType = evaluateNode((Node *) casted->iterable);
+            Type *elementType = (Type *) anyType;
+            if (iterableType != NULL && iterableType->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+                GenericType *genType = (GenericType *) iterableType;
+                if (genType->generics.count > 0) {
+                    elementType = (Type *) AS_OBJ(genType->generics.values[0]);
+                }
+            } else if (iterableType == (Type *) stringType) {
+                elementType = (Type *) stringType;
+            }
             TypeEnvironment forEnv;
             initTypeEnvironment(&forEnv, currentEnv->type);
             tableSet(&forEnv.locals,
                      copyString(casted->binding.start, casted->binding.length),
-                     OBJ_VAL(anyType));
+                     OBJ_VAL(elementType));
             evaluateNode((Node *) casted->body);
             currentEnv = currentEnv->enclosing;
-            return (Type *) anyType;
+            return (Type *) nilType;
         }
         case NODE_THROW: {
             struct Throw *casted = (struct Throw *) node;
             evaluateNode((Node *) casted->value);
-            return (Type *) anyType;
+            return (Type *) neverType;
         }
         case NODE_TRYCATCH: {
             struct TryCatch *casted = (struct TryCatch *) node;
@@ -1865,25 +1875,31 @@ Type *evaluateNode(Node *node) {
                 if (clause->binding.length > 0) {
                     tableSet(&catchEnv.locals,
                              copyString(clause->binding.start, clause->binding.length),
-                             OBJ_VAL(anyType));
+                             OBJ_VAL(stringType));
                 }
                 evaluateTypes(&clause->body);
                 currentEnv = currentEnv->enclosing;
             }
             evaluateTypes(&casted->finallyBody);
-            return (Type *) anyType;
+            return (Type *) nilType;
         }
         case NODE_DESTRUCTURE: {
             struct Destructure *casted = (struct Destructure *) node;
-            evaluateNode((Node *) casted->value);
-            // Register all destructured bindings as Any
+            Type *valueType = evaluateNode((Node *) casted->value);
+            Type *elementType = (Type *) anyType;
+            if (valueType != NULL && valueType->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+                GenericType *genType = (GenericType *) valueType;
+                if (genType->generics.count > 0) {
+                    elementType = (Type *) AS_OBJ(genType->generics.values[0]);
+                }
+            }
             for (int i = 0; i < casted->bindings.count; i++) {
                 tableSet(&currentEnv->locals,
                          copyString(casted->bindings.parameters[i]->name.start,
                                     casted->bindings.parameters[i]->name.length),
-                         OBJ_VAL(anyType));
+                         OBJ_VAL(elementType));
             }
-            return (Type *) anyType;
+            return (Type *) nilType;
         }
         case NODE_RETURN: {
             struct Return *casted = (struct Return *) node;
