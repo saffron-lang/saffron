@@ -145,9 +145,11 @@ class Codegen {
             }
             StringLit(s) => {
                 var const_name = this.add_string_constant(s)
-                var local = this.fresh_local()
+                var gep = this.fresh_local()
                 var len = s.length() + 1
-                this.emit_indent(local + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
                 local
             }
             NilLit => "null"
@@ -212,6 +214,11 @@ class Codegen {
     }
 
     fun gen_binary(left: AST.Expr, op: String, right: AST.Expr): String {
+        // String concatenation: if both sides are string literals, use strcat
+        if (op == "+" and this.is_string_expr(left) and this.is_string_expr(right)) {
+            return this.gen_string_concat(left, right)
+        }
+
         var lhs = this.gen_expr(left)
         var rhs = this.gen_expr(right)
         var local = this.fresh_local()
@@ -234,6 +241,26 @@ class Codegen {
         else if (op == ">=") { this.emit_indent(local + " = icmp sge i64 " + lhs + ", " + rhs) }
 
         return local
+    }
+
+    fun gen_string_concat(left: AST.Expr, right: AST.Expr): String {
+        // Flatten string concat at compile time
+        var combined = this.flatten_string_expr(left) + this.flatten_string_expr(right)
+        var const_name = this.add_string_constant(combined)
+        var gep = this.fresh_local()
+        var len = combined.length() + 1
+        this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+        var local = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+        return local
+    }
+
+    fun flatten_string_expr(expr: AST.Expr): String {
+        var kind = match (expr) {
+            StringLit(s) => s
+            Binary(l, o, r) => this.flatten_string_expr(l) + this.flatten_string_expr(r)
+        }
+        return kind
     }
 
     fun gen_unary(op: String, right: AST.Expr): String {
@@ -295,11 +322,17 @@ class Codegen {
         if (callee_name == "IO.println") {
             var arg_expr = args[0]
             var is_string = this.is_string_expr(arg_expr)
-            var arg = this.gen_expr(arg_expr)
             var local = this.fresh_local()
             if (is_string) {
-                this.emit_indent(local + " = call i32 @puts(i8* " + arg + ")")
+                // Flatten to compile-time constant
+                var str_val = this.flatten_string_expr(arg_expr)
+                var const_name = this.add_string_constant(str_val)
+                var str_ptr = this.fresh_local()
+                var slen = str_val.length() + 1
+                this.emit_indent(str_ptr + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
             } else {
+                var arg = this.gen_expr(arg_expr)
                 var fmt = this.get_format_ptr("%ld\n")
                 this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
             }
@@ -308,11 +341,16 @@ class Codegen {
         if (callee_name == "IO.print") {
             var arg_expr = args[0]
             var is_string = this.is_string_expr(arg_expr)
-            var arg = this.gen_expr(arg_expr)
             var local = this.fresh_local()
             if (is_string) {
-                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + arg + ")")
+                var str_val = this.flatten_string_expr(arg_expr)
+                var const_name = this.add_string_constant(str_val)
+                var str_ptr = this.fresh_local()
+                var slen = str_val.length() + 1
+                this.emit_indent(str_ptr + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + str_ptr + ")")
             } else {
+                var arg = this.gen_expr(arg_expr)
                 var fmt = this.get_format_ptr("%ld")
                 this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
             }
@@ -389,14 +427,22 @@ class Codegen {
         return local
     }
 
+    fun get_string_lit_value(expr: AST.Expr): String {
+        return match (expr) { StringLit(s) => s }
+    }
+
     fun is_string_expr(expr: AST.Expr): Bool {
         var kind = match (expr) {
             StringLit(s) => "string"
+            Binary(l, o, r) => {
+                if (o == "+") {
+                    if (this.is_string_expr(l)) { "string" } else { "binary" }
+                } else { "binary" }
+            }
             IntLit(v) => "int"
             FloatLit(v) => "float"
             BoolLit(v) => "bool"
             Variable(n) => "var"
-            Binary(l, o, r) => "binary"
             Unary(o, r) => "unary"
             Call(c, a) => "call"
             Assign(n, v) => "assign"
@@ -406,6 +452,9 @@ class Codegen {
             Match(s, a) => "match"
             EnumConstruct(e, v, a) => "enum"
             Lambda(p, r, b) => "lambda"
+            GetField(o, f) => "field"
+            SetField(o, f, v) => "field"
+            This => "this"
         }
         return kind == "string"
     }
@@ -1415,6 +1464,9 @@ class Codegen {
         out.append("declare i32 @printf(i8*, ...)\n")
         out.append("declare i8* @malloc(i64)\n")
         out.append("declare void @free(i8*)\n")
+        out.append("declare i64 @strlen(i8*)\n")
+        out.append("declare i8* @strcpy(i8*, i8*)\n")
+        out.append("declare i8* @strcat(i8*, i8*)\n")
 
         // Lambda functions
         var k = 0
