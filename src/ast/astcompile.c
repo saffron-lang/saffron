@@ -474,6 +474,21 @@ void compileNode(Node *node) {
                 case TOKEN_DOT_DOT:
                     emitByte(OP_RANGE);
                     break;
+                case TOKEN_BITWISE_AND:
+                    emitByte(OP_BITWISE_AND);
+                    break;
+                case TOKEN_BITWISE_OR:
+                    emitByte(OP_BITWISE_OR);
+                    break;
+                case TOKEN_BITWISE_XOR:
+                    emitByte(OP_BITWISE_XOR);
+                    break;
+                case TOKEN_SHIFT_LEFT:
+                    emitByte(OP_SHIFT_LEFT);
+                    break;
+                case TOKEN_SHIFT_RIGHT:
+                    emitByte(OP_SHIFT_RIGHT);
+                    break;
             }
             break;
         }
@@ -509,6 +524,9 @@ void compileNode(Node *node) {
                     break;
                 case TOKEN_MINUS:
                     emitByte(OP_NEGATE);
+                    break;
+                case TOKEN_BITWISE_NOT:
+                    emitByte(OP_BITWISE_NOT);
                     break;
                 default:
                     return; // Unreachable.
@@ -964,16 +982,44 @@ void compileNode(Node *node) {
         }
         case NODE_WHILE: {
             struct While *casted = (struct While *) node;
+
+            // Save loop state
+            int savedBreakCount = breakCount;
+            int savedContinueCount = continueCount;
+            int savedLoopLocalCount = loopLocalCount;
+            int savedLoopScopeDepth = loopScopeDepth;
+            loopLocalCount = current->localCount;
+            loopScopeDepth = current->scopeDepth;
+            loopDepth++;
+
             int loopStart = currentChunk()->count;
             compileNode((Node *) casted->condition);
 
             int exitJump = emitJump(OP_JUMP_IF_FALSE);
             emitByte(OP_POP);
             compileNode((Node *) casted->body);
+
+            // Continue jumps land here (back to loop start)
+            for (int i = savedContinueCount; i < continueCount; i++) {
+                patchJump(continueJumps[i]);
+            }
+
             emitLoop(loopStart);
 
             patchJump(exitJump);
             emitByte(OP_POP);
+
+            // Break jumps land here (after the loop)
+            for (int i = savedBreakCount; i < breakCount; i++) {
+                patchJump(breakJumps[i]);
+            }
+
+            // Restore loop state
+            breakCount = savedBreakCount;
+            continueCount = savedContinueCount;
+            loopLocalCount = savedLoopLocalCount;
+            loopScopeDepth = savedLoopScopeDepth;
+            loopDepth--;
             break;
         }
         case NODE_FOR: {
@@ -982,6 +1028,15 @@ void compileNode(Node *node) {
             if (casted->initializer) {
                 compileNode((Node *) casted->initializer);
             }
+
+            // Save loop state
+            int savedBreakCount = breakCount;
+            int savedContinueCount = continueCount;
+            int savedLoopLocalCount = loopLocalCount;
+            int savedLoopScopeDepth = loopScopeDepth;
+            loopLocalCount = current->localCount;
+            loopScopeDepth = current->scopeDepth;
+            loopDepth++;
 
             int loopStart = currentChunk()->count;
             int exitJump = -1;
@@ -993,6 +1048,7 @@ void compileNode(Node *node) {
                 emitByte(OP_POP); // Condition.
             }
 
+            int continueTarget = loopStart;
             if (casted->increment) {
                 int bodyJump = emitJump(OP_JUMP);
                 int incrementStart = currentChunk()->count;
@@ -1001,16 +1057,35 @@ void compileNode(Node *node) {
 
                 emitLoop(loopStart);
                 loopStart = incrementStart;
+                continueTarget = incrementStart;
                 patchJump(bodyJump);
             }
 
             compileNode((Node *) casted->body);
+
+            // Continue jumps land here (at the increment, or loop start if no increment)
+            for (int i = savedContinueCount; i < continueCount; i++) {
+                patchJump(continueJumps[i]);
+            }
+
             emitLoop(loopStart);
 
             if (exitJump != -1) {
                 patchJump(exitJump);
                 emitByte(OP_POP); // Condition.
             }
+
+            // Break jumps land here (after the loop)
+            for (int i = savedBreakCount; i < breakCount; i++) {
+                patchJump(breakJumps[i]);
+            }
+
+            // Restore loop state
+            breakCount = savedBreakCount;
+            continueCount = savedContinueCount;
+            loopLocalCount = savedLoopLocalCount;
+            loopScopeDepth = savedLoopScopeDepth;
+            loopDepth--;
 
             endScope();
             break;
@@ -1208,7 +1283,28 @@ void compileNode(Node *node) {
             for (int i = 0; i < casted->arms.count; i++) {
                 struct MatchArm *arm = (struct MatchArm *) casted->arms.stmts[i];
 
-                if (arm->isTypePattern) {
+                if (arm->isBinding) {
+                    // Variable binding catch-all: `x => ...` or `_ => ...`
+                    beginScope();
+                    // Bind subject to the variable name (unless it's `_`)
+                    if (!(arm->variantName.length == 1 && arm->variantName.start[0] == '_')) {
+                        emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
+                        declareVariable(&arm->variantName);
+                        uint16_t c = identifierConstant(&arm->variantName);
+                        defineVariable(c);
+                    }
+
+                    bool oldLast = lastInBody;
+                    lastInBody = true;
+                    compileTree(&arm->body);
+                    lastInBody = oldLast;
+
+                    emitBytes(OP_SET_LOCAL, (uint8_t) subjectSlot);
+                    emitByte(OP_POP);
+                    endScope();
+
+                    armEndJumps[armCount++] = emitJump(OP_JUMP);
+                } else if (arm->isTypePattern) {
                     // is Type(binding) => ...
                     emitBytes(OP_GET_LOCAL, (uint8_t) subjectSlot);
                     getVariable(arm->variantName); // push the class/type

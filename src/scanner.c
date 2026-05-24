@@ -133,7 +133,19 @@ static bool isNameMod(char c) {
     return c == '?' || c == '!';
 }
 
+static bool isHexDigit(char c) {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+}
+
 static Token number() {
+    if (scanner.current[-1] == '0' && (peek() == 'x' || peek() == 'X')) {
+        advance(); // consume 'x'
+        while (isHexDigit(peek())) advance();
+        return makeToken(TOKEN_NUMBER);
+    }
+
     while (isDigit(peek())) advance();
 
     // Look for a fractional part.
@@ -368,13 +380,21 @@ Token scanToken() {
             );
         case '<':
             return makeToken(
-                    match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+                    match('<') ? TOKEN_SHIFT_LEFT :
+                    (match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS));
         case '>':
             return makeToken(
-                    match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+                    match('>') ? TOKEN_SHIFT_RIGHT :
+                    (match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER));
         case '|':
             return makeToken(
                     match('>') ? TOKEN_PIPE : TOKEN_BITWISE_OR);
+        case '&':
+            return makeToken(TOKEN_BITWISE_AND);
+        case '^':
+            return makeToken(TOKEN_BITWISE_XOR);
+        case '~':
+            return makeToken(TOKEN_BITWISE_NOT);
         case ':':
             return makeToken(TOKEN_COLON);
         case '@':

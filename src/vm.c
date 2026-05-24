@@ -131,7 +131,7 @@ void initVM() {
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
     vm.bytesAllocated = 0;
-    vm.nextGC = 1024 * 1024;
+    vm.nextGC = 1024 * 1024 * 16;
 
     initTable(&vm.types);
     initTable(&vm.modules);
@@ -396,6 +396,46 @@ static bool callValue(Value callee, int argCount) {
                         vm.stackTop -= argCount + 1;
                         push(result);
                         return true;
+                    case OBJ_OVERLOAD_SET: {
+                        vm.stackTop[-argCount - 1] = bound->receiver;
+                        ObjOverloadSet *set = (ObjOverloadSet *) bound->method;
+                        ObjClosure *match = NULL;
+                        ObjClosure *anyMatch = NULL;
+
+                        for (int i = 0; i < set->count; i++) {
+                            if (set->arities[i] != argCount) continue;
+
+                            OverloadParamType expected = set->firstParamTypes[i];
+                            if (expected == OVERLOAD_ANY) {
+                                if (anyMatch == NULL) anyMatch = set->closures[i];
+                                continue;
+                            }
+
+                            Value firstArg = peek(argCount - 1);
+                            bool matches = false;
+                            switch (expected) {
+                                case OVERLOAD_NUMBER: matches = IS_NUMBER(firstArg); break;
+                                case OVERLOAD_STRING: matches = IS_STRING(firstArg); break;
+                                case OVERLOAD_BOOL: matches = IS_BOOL(firstArg); break;
+                                case OVERLOAD_NIL: matches = IS_NIL(firstArg); break;
+                                case OVERLOAD_LIST: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_LIST; break;
+                                case OVERLOAD_MAP: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_MAP; break;
+                                case OVERLOAD_INSTANCE: matches = IS_INSTANCE(firstArg); break;
+                                default: break;
+                            }
+
+                            if (matches) {
+                                match = set->closures[i];
+                                break;
+                            }
+                        }
+
+                        if (match == NULL) match = anyMatch;
+                        if (match != NULL) return call(match, argCount);
+                        runtimeError("No overload matches the given arguments.");
+                        return false;
+                    }
+                    default: break;
                 }
                 break;
             }
@@ -444,7 +484,26 @@ static void closeUpvalues(Value *last) {
 static void defineMethod(ObjString *name) {
     Value method = peek(0);
     ObjClass *klass = AS_CLASS(peek(1));
-    tableSet(&klass->methods, name, method);
+
+    Value existing;
+    if (tableGet(&klass->methods, name, &existing)) {
+        ObjOverloadSet *set;
+        if (IS_OBJ(existing) && AS_OBJ(existing)->type == OBJ_OVERLOAD_SET) {
+            set = AS_OVERLOAD_SET(existing);
+        } else {
+            set = newOverloadSet();
+            push(OBJ_VAL(set));
+            ObjClosure *existingClosure = AS_CLOSURE(existing);
+            addOverload(set, existingClosure, existingClosure->function->arity,
+                        existingClosure->function->firstParamType);
+            pop();
+        }
+        ObjClosure *closure = AS_CLOSURE(method);
+        addOverload(set, closure, closure->function->arity, closure->function->firstParamType);
+        tableSet(&klass->methods, name, OBJ_VAL(set));
+    } else {
+        tableSet(&klass->methods, name, method);
+    }
     pop();
 }
 
@@ -463,6 +522,13 @@ static bool bindMethod(ObjClass *klass, ObjString *name) {
         return false;
     }
 
+    if (IS_OBJ(method) && AS_OBJ(method)->type == OBJ_OVERLOAD_SET) {
+        ObjBoundMethod *bound = newBoundMethod(peek(0), (ObjClosure *) AS_OBJ(method));
+        pop();
+        push(OBJ_VAL(bound));
+        return true;
+    }
+
     ObjBoundMethod *bound = newBoundMethod(peek(0),
                                            AS_CLOSURE(method));
     pop();
@@ -475,6 +541,45 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name,
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
         runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    if (IS_OBJ(method) && AS_OBJ(method)->type == OBJ_OVERLOAD_SET) {
+        ObjOverloadSet *set = AS_OVERLOAD_SET(method);
+        ObjClosure *match = NULL;
+        ObjClosure *anyMatch = NULL;
+
+        for (int i = 0; i < set->count; i++) {
+            if (set->arities[i] != argCount) continue;
+
+            OverloadParamType expected = set->firstParamTypes[i];
+            if (expected == OVERLOAD_ANY) {
+                if (anyMatch == NULL) anyMatch = set->closures[i];
+                continue;
+            }
+
+            Value firstArg = peek(argCount - 1);
+            bool matches = false;
+            switch (expected) {
+                case OVERLOAD_NUMBER: matches = IS_NUMBER(firstArg); break;
+                case OVERLOAD_STRING: matches = IS_STRING(firstArg); break;
+                case OVERLOAD_BOOL: matches = IS_BOOL(firstArg); break;
+                case OVERLOAD_NIL: matches = IS_NIL(firstArg); break;
+                case OVERLOAD_LIST: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_LIST; break;
+                case OVERLOAD_MAP: matches = IS_OBJ(firstArg) && AS_OBJ(firstArg)->type == OBJ_MAP; break;
+                case OVERLOAD_INSTANCE: matches = IS_INSTANCE(firstArg); break;
+                default: break;
+            }
+
+            if (matches) {
+                match = set->closures[i];
+                break;
+            }
+        }
+
+        if (match == NULL) match = anyMatch;
+        if (match != NULL) return call(match, argCount);
+        runtimeError("No overload matches the given arguments.");
         return false;
     }
 
@@ -769,6 +874,41 @@ static InterpretResult run(ObjModule *module) {
                 } else {
                     BINARY_OP(NUMBER_VAL, /);
                 }
+                break;
+            }
+            case OP_BITWISE_AND: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)((long long)a & (long long)b)));
+                break;
+            }
+            case OP_BITWISE_OR: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)((long long)a | (long long)b)));
+                break;
+            }
+            case OP_BITWISE_XOR: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)((long long)a ^ (long long)b)));
+                break;
+            }
+            case OP_BITWISE_NOT: {
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)(~(long long)a)));
+                break;
+            }
+            case OP_SHIFT_LEFT: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)((long long)a << (long long)b)));
+                break;
+            }
+            case OP_SHIFT_RIGHT: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(NUMBER_VAL((double)((long long)a >> (long long)b)));
                 break;
             }
             case OP_NIL:
@@ -1256,6 +1396,7 @@ static InterpretResult run(ObjModule *module) {
             case OP_IMPORT: {
                 Value relPath = peek(0);
                 ObjModule *newModule = executeModule(AS_STRING(relPath), module->path->chars);
+                pop(); // pop the path string
                 push(OBJ_VAL(newModule));
                 break;
             }
