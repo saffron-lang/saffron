@@ -1,0 +1,19 @@
+// Print primes up to 50 using trial division
+fun main(): Int {
+    var n: Int = 2
+    while (n <= 50) {
+        var is_prime: Int = 1
+        var d: Int = 2
+        while (d * d <= n) {
+            if (n % d == 0) {
+                is_prime = 0
+            }
+            d = d + 1
+        }
+        if (is_prime == 1) {
+            IO.println(n)
+        }
+        n = n + 1
+    }
+    return 0
+}
