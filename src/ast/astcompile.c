@@ -666,7 +666,6 @@ void compileNode(Node *node) {
         case NODE_VAR: {
             struct Var *casted = (struct Var *) node;
 
-            declareVariable(&casted->name);
             uint16_t nameConstant = identifierConstant(&casted->name);
 
             if (casted->initializer) {
@@ -675,6 +674,7 @@ void compileNode(Node *node) {
                 emitByte(OP_NIL);
             }
 
+            declareVariable(&casted->name);
             if (casted->assignmentType != TYPE_FIELD) {
                 defineVariable(nameConstant);
             }
