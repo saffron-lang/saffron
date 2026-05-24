@@ -372,6 +372,7 @@ class Parser {
             TkDot => "."
             TkComma => ","
             TkColon => ":"
+            TkSemicolon => ";"
             TkEq => "="
             TkArrow => "->"
             TkFatArrow => "=>"
@@ -393,6 +394,7 @@ class Parser {
             TkMatch => "match"
             TkClass => "class"
             TkThis => "this"
+            TkFor => "for"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -464,6 +466,7 @@ class Parser {
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
+        if (this.match_kind_check("for")) return this.parse_for()
         if (this.match_kind_check("{")) return this.parse_block()
         // Check for assignment: ident = expr
         if (this.match_kind_check("ident") and this.peek_is("=")) {
@@ -640,6 +643,30 @@ class Parser {
         this.consume(")")
         var body = this.parse_block_stmts()
         return AST.Stmt.While(cond, body)
+    }
+
+    fun parse_for(): AST.Stmt {
+        this.advance() // consume for
+        this.consume("(")
+        // Init: var i = 0
+        var init = this.parse_var_decl()
+        this.consume(";")
+        // Condition: i < 10
+        var cond = this.parse_expr()
+        this.consume(";")
+        // Update: i = i + 1
+        var update_name = this.expect_ident()
+        this.consume("=")
+        var update_expr = this.parse_expr()
+        this.consume(")")
+        // Body
+        var body = this.parse_block_stmts()
+        // Desugar: { init; while (cond) { body; update } }
+        body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
+        var stmts: List<AST.Stmt> = []
+        stmts.push(init)
+        stmts.push(AST.Stmt.While(cond, body))
+        return AST.Stmt.Block(stmts)
     }
 
     fun parse_block(): AST.Stmt {
