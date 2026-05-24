@@ -21,17 +21,34 @@ enum Expr {
     Call(callee: Expr, args: List<Expr>),
     Assign(name: String, value: Expr),
     Logical(left: Expr, op: String, right: Expr),
-    MemberAccess(object: Expr, field: String)
+    MemberAccess(object: Expr, field: String),
+    Match(subject: Expr, arms: List<MatchArm>),
+    EnumConstruct(enum_name: String, variant: String, args: List<Expr>)
+}
+
+enum MatchArm {
+    Arm(pattern: Pattern, body: Expr)
+}
+
+enum Pattern {
+    VariantPattern(variant: String, bindings: List<String>),
+    WildcardPattern,
+    LiteralPattern(value: Expr)
 }
 
 enum Stmt {
     ExprStmt(expr: Expr),
     VarDecl(name: String, type_ann: String, initializer: Expr),
     FunDecl(name: String, params: String, ret_type: String, body: List<Stmt>),
+    EnumDecl(name: String, variants: List<Variant>),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
     Block(stmts: List<Stmt>)
+}
+
+enum Variant {
+    Variant(name: String, fields: String)
 }
 
 fun type_to_string(t: Type): String {
