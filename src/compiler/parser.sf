@@ -237,6 +237,10 @@ class Parser {
         if (this.match_kind_check("fun")) {
             return this.parse_lambda()
         }
+        if (this.match_kind_check("this")) {
+            this.advance()
+            return AST.Expr.This
+        }
 
         var kind = this.current_kind()
         this.advance()
@@ -387,6 +391,8 @@ class Parser {
             TkAs => "as"
             TkEnum => "enum"
             TkMatch => "match"
+            TkClass => "class"
+            TkThis => "this"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -454,6 +460,7 @@ class Parser {
         if (this.match_kind_check("let")) return this.parse_var_decl()
         if (this.match_kind_check("fun")) return this.parse_fun_decl()
         if (this.match_kind_check("enum")) return this.parse_enum_decl()
+        if (this.match_kind_check("class")) return this.parse_class_decl()
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
@@ -461,6 +468,10 @@ class Parser {
         // Check for assignment: ident = expr
         if (this.match_kind_check("ident") and this.peek_is("=")) {
             return this.parse_assign()
+        }
+        // Check for this.field = value
+        if (this.match_kind_check("this")) {
+            return this.parse_this_stmt()
         }
         // Default: expression statement
         var expr = this.parse_expr()
@@ -559,6 +570,48 @@ class Parser {
         }
         this.consume("}")
         return AST.Stmt.EnumDecl(name, variants)
+    }
+
+    fun parse_this_stmt(): AST.Stmt {
+        this.advance() // consume this
+        this.consume(".")
+        var field = this.expect_ident()
+        if (this.match_kind("=")) {
+            // this.field = value
+            var value = this.parse_expr()
+            return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
+        }
+        // this.field (expression) or this.method(...)
+        var expr = AST.Expr.GetField(AST.Expr.This, field)
+        return AST.Stmt.ExprStmt(expr)
+    }
+
+    fun parse_class_decl(): AST.Stmt {
+        this.advance() // consume class
+        var name = this.expect_ident()
+        this.consume("{")
+        var fields_sb = StringBuilder()
+        var methods: List<AST.Stmt> = []
+        var first_field = true
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            if (this.match_kind_check("var")) {
+                // Field declaration: var name: Type
+                this.advance()
+                var fname = this.expect_ident()
+                this.consume(":")
+                var ftype = this.parse_type()
+                if (!first_field) { fields_sb.append(",") }
+                fields_sb.append(fname)
+                fields_sb.append(":")
+                fields_sb.append(ftype)
+                first_field = false
+            } else if (this.match_kind_check("fun")) {
+                // Method declaration
+                methods.push(this.parse_fun_decl())
+            }
+        }
+        this.consume("}")
+        return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods)
     }
 
     fun parse_return(): AST.Stmt {
