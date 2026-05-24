@@ -405,7 +405,29 @@ static void compileExprArray(ExprArray exprArray) {
 
 void compileNode(Node *node) {
     switch (node->type) {
-        case NODE_LOGICAL:
+        case NODE_LOGICAL: {
+            struct Logical *logical = (struct Logical *) node;
+            compileNode((Node *) logical->left);
+
+            if (logical->operator.type == TOKEN_OR) {
+                // Short-circuit OR: if left is truthy, keep it; otherwise evaluate right
+                int elseJump = emitJump(OP_JUMP_IF_FALSE);
+                int endJump = emitJump(OP_JUMP);
+
+                patchJump(elseJump);
+                emitByte(OP_POP);
+                compileNode((Node *) logical->right);
+
+                patchJump(endJump);
+            } else {
+                // Short-circuit AND: if left is falsy, keep it; otherwise evaluate right
+                int endJump = emitJump(OP_JUMP_IF_FALSE);
+                emitByte(OP_POP);
+                compileNode((Node *) logical->right);
+                patchJump(endJump);
+            }
+            break;
+        }
         case NODE_BINARY: {
             struct Binary *casted = (struct Binary *) node;
             TokenType operatorType = casted->operator.type;
@@ -1341,9 +1363,9 @@ void compileNode(Node *node) {
                 }
             }
 
-            // Pop the hidden temp value
-            emitByte(OP_POP);
-            current->localCount--;
+            // The $destructure temp remains as a dead local on the stack.
+            // It will be cleaned up when the enclosing scope ends.
+            // We can't POP it because bindings are stacked above it.
             break;
         }
         case NODE_THROW: {

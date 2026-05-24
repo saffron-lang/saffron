@@ -1,136 +1,153 @@
+// Saffron Language Goals
+// This file demonstrates the target syntax for the language.
+// Some features are implemented, some are aspirational.
+// The file should parse cleanly even if runtime behavior is incomplete.
+
 import "time" as Time
 import "@iter" as Iter
 import "task" as Task
 
+// --- Pipe operator with iterators ---
 var epic_sum = [1,3,5,7,9]
     |> Iter.map(fun (x: Number) => x + 1)
     |> Iter.filter(fun (x: Number) => x % 2 == 0)
     |> Iter.sum()
 
+// --- Enums with generics ---
 enum Result<T, E> {
     Ok(value: T),
     Err(error: E)
 }
 
-type Result<T, E> = [:ok, T] | [:error, E] // or maybe {:error, E} tuple with {}
-
+// --- Interfaces with default methods ---
 interface Container<T> {
     var capacity: Number
 
-    fun add_item!(item: T): Boolean
-    fun add_item(item: T): Result<Boolean, RuntimeError>
+    fun add_item(item: T): Bool
 
-    fun get_size()
+    fun get_size(): Number
 
-    fun full?() {
+    fun full?(): Bool {
         return this.get_size() >= capacity
     }
 }
 
-class Backpack(Container<Number>) {
+// --- Class implementing interface (extends keyword, comma-separated) ---
+class Backpack extends Container {
     var capacity: Number
     var items: List<Number>
 
     fun init() {
-        size = 0
-        capacity = 16
+        this.capacity = 16
+        this.items = List()
     }
 
-    fun length() {
-        // Implicitly implements Length interface, used for getting length
-    }
-
-    fun string() {
-        // Implicitly implements Stringable interface, used for printing
-    }
-
-    fun repr() {
-        // Implicitly implements Representable interface, used for printing representations
-    }
-
-    fun hash() {
-        // Implicitly implements Hashable interface, used for hashing
+    fun to_string(): String {
+        return "Backpack(${this.items})"
     }
 
     fun iter() {
-        // Implicitly implements Iterable interface, used for iterating, returns an iterator
+        return this.items.iter()
     }
 
-    fun next() {
-        // Implicitly implements Iterator interface, used for iterating, returns next item in the iteration
-    }
-
-    fun add_item!(item: Number): Boolean {
-        if (list.length >= capacity) {
-            throw RuntimeError("Attempted to add to a full container!")
-            // Or maybe
-            panic!("Attempted to add to a full container!")
+    fun add_item(item: Number): Bool {
+        if (this.items.length() >= this.capacity) {
+            throw "Attempted to add to a full container!"
         }
-        list.push(item)
-
+        this.items.push(item)
         return true
     }
 
-    fun add_item(item: Number): Result<Boolean, RuntimeError> {
-        return if (list.length >= capacity) {
-            return Err(RuntimeError("Attempted to add to a full container!"))
-        } else {
-            list.push(item)
-            return Ok(true)
-        }
-    }
-
-    fun get_size() {
-        return list.length
+    fun get_size(): Number {
+        return this.items.length()
     }
 }
 
-var container: Container = Backpack()
+var container = Backpack()
 
+// --- Exception handling ---
 try {
-    container.add_item!(5)
+    container.add_item(5)
     IO.println("Successfully added the item!")
-} catch (error: RuntimeError) {
-    IO.println("Failed to add the item!")
+} catch (error) {
+    IO.println("Failed to add the item: ${error}")
 }
 
-var success = match (container.add_item(5)) {
-    Ok(_result) => result // Todo: guards, e.g. Ok(result) where result == True => true
-    Err(_error) => false
+// --- Pattern matching on enums ---
+var success = match (Result.Ok(42)) {
+    Ok(value) => value
+    Err(error) => -1
 }
 
-Ok(result) = success // throw an error if the match doesn't succeed
+// --- Destructuring ---
+let [head, *middle, tail] = [1, 2, 3, 4, 5]
+IO.println(head)    // 1
+IO.println(tail)    // 5
+IO.println(middle)  // [2, 3, 4]
 
-// Deconstruction and matching
-[head, *middle, tail] = [1,2,3,4,5] // TODO: Refine this syntax
-IO.println(head) // 1
-IO.println(tail) // 5
-IO.println(middle) // [2, 3, 4]
+let [first, *rest] = [1, 2, 3, 4, 5]
+let [*init, last] = [1, 2, 3, 4, 5]
 
-// Also
-[head, *tail] = [1,2,3,4,5]
-[*head, tail] = [1,2,3,4,5]
-
-interface User { // maybe dataclass?
+// --- Dataclasses (structural types) ---
+data class User {
     var username: String
     var age: Number
 }
 
-dataclass User { // Dataclasses support structural matching? E.g. typescript
-    var username: String
-    var age: Number
-}
+var henry = User("henry", 10)
 
-var henry: User = Json.parse_into<User>('{"username": "henry", "age": 10}') // Some form of runtime type access
-// Or some other form of easy deserialization into a matching data type
-
-fun get_dogs() {
-    var dogs: List<Dog>
-    while !(dogs = find_dogs()) {
-        Task.sleep(0.1) // Awaiting is implicit, other tasks process
-    }
-
-    IO.println("We found the dogs")
+// --- Cooperative async ---
+fun get_dogs(): List<String> {
+    var dogs: List<String> = []
+    // Simulated async work
+    yield [1, 0.1]
+    dogs.push("Rex")
+    IO.println("We found the dogs: ${dogs}")
+    return dogs
 }
 
 Task.spawn(get_dogs)
+
+// --- Decorators ---
+fun logged(fn: Any): Any {
+    return fun (x: Any) => {
+        IO.println("calling...")
+        return fn(x)
+    }
+}
+
+@logged
+fun double(x: Number): Number {
+    return x * 2
+}
+
+IO.println(double(5))
+
+// --- String interpolation and methods ---
+var greeting = "Hello, ${henry.username}!"
+IO.println(greeting.to_upper())
+IO.println(greeting.contains("Hello"))
+
+// --- For-in iteration ---
+for (item in [10, 20, 30]) {
+    IO.println("item: ${item}")
+}
+
+// --- Map iteration ---
+var scores: Map<String, Number> = {"alice": 95, "bob": 87}
+var iter = scores.iter()
+while (iter.next?()) {
+    IO.println(iter.next())
+}
+
+// --- Match with type patterns ---
+// var x: Number | String = 42
+// var label = match (x) {
+//     Number(n) => "number: ${n}"
+//     String(s) => "string: ${s}"
+// }
+
+// --- Range syntax (aspirational) ---
+// for (i in 0..10) {
+//     IO.println(i)
+// }

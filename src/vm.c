@@ -226,6 +226,7 @@ bool runtimeError(const char *format, ...) {
         ExceptionHandler *handler = &vm.handlers[--vm.handlerCount];
         vm.stackTop = handler->stackTop;
         currentFrame = handler->frame;
+        vm.tasks.values[vm.currentTask] = OBJ_VAL(currentFrame);
         currentFrame->ip = handler->catchIp;
         push(OBJ_VAL(errorStr));
         vm.isThrowing = false;
@@ -1268,6 +1269,7 @@ static InterpretResult run(ObjModule *module) {
                     ExceptionHandler *handler = &vm.handlers[--vm.handlerCount];
                     vm.stackTop = handler->stackTop;
                     currentFrame = handler->frame;
+                    vm.tasks.values[vm.currentTask] = OBJ_VAL(currentFrame);
                     currentFrame->ip = handler->catchIp;
                     push(exception);
                     vm.isThrowing = false;
