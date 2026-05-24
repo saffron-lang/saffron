@@ -13,6 +13,7 @@
 #include "os.h"
 #include "stringbuilder.h"
 #include "regex.h"
+#include "channel.h"
 
 void initLib() {
     defineType("Module", OBJ_VAL(createModuleType()));
@@ -21,6 +22,7 @@ void initLib() {
     defineBuiltin("List", OBJ_VAL(createListType()));
     defineBuiltin("Map", OBJ_VAL(createMapType()));
     defineBuiltin("StringBuilder", OBJ_VAL(createStringBuilderType()));
+    defineBuiltin("Channel", OBJ_VAL(createChannelType()));
     defineType("Task", OBJ_VAL(createTaskType()));
 
     #define MODULE_COUNT 9

@@ -190,7 +190,7 @@ static Value regexSplit(int argCount, Value *args) {
 ObjModule *createRegexModule() {
     ObjModule *module = newModule("Regex", "regex", false);
     push(OBJ_VAL(module));
-    defineModuleFunction(module, "match", regexMatch);
+    defineModuleFunction(module, "test", regexMatch);
     defineModuleFunction(module, "find", regexFind);
     defineModuleFunction(module, "find_all", regexFindAll);
     defineModuleFunction(module, "replace", regexReplace);
@@ -201,7 +201,7 @@ ObjModule *createRegexModule() {
 
 SimpleType *createRegexModuleType() {
     SimpleType *mod = newSimpleType();
-    createBuiltinFunctorType(mod, "match", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) boolType);
+    createBuiltinFunctorType(mod, "test", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) boolType);
     createBuiltinFunctorType(mod, "find", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) anyType);
     createBuiltinFunctorType(mod, "find_all", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) anyType);
     createBuiltinFunctorType(mod, "replace", (Type *[]) {(Type *) stringType, (Type *) stringType, (Type *) stringType}, 3, NULL, 0, (Type *) stringType);

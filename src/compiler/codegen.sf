@@ -297,6 +297,38 @@ class Codegen {
         return result
     }
 
+    // --- Variable collection (for hoisting allocas to entry block) ---
+
+    fun collect_vars(stmts: List<AST.Stmt>, names: List<String>, types: List<String>) {
+        var i = 0
+        while (i < stmts.length()) {
+            this.collect_vars_stmt(stmts[i], names, types)
+            i = i + 1
+        }
+    }
+
+    fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        match (stmt) {
+            VarDecl(name, type_ann, init) => {
+                names.push(name)
+                types.push(type_ann)
+            }
+            If(cond, then_branch, else_branch) => {
+                this.collect_vars(then_branch, names, types)
+                this.collect_vars(else_branch, names, types)
+            }
+            While(cond, body) => {
+                this.collect_vars(body, names, types)
+            }
+            Block(stmts) => {
+                this.collect_vars(stmts, names, types)
+            }
+            ExprStmt(expr) => {}
+            Return(value) => {}
+            FunDecl(name, params, ret_type, body) => {}
+        }
+    }
+
     // --- Statement codegen ---
 
     fun gen_stmt(stmt: AST.Stmt) {
@@ -304,7 +336,6 @@ class Codegen {
             ExprStmt(expr) => { this.gen_expr(expr) }
             VarDecl(name, type_ann, init) => {
                 var llvm_t = this.llvm_type(type_ann)
-                this.emit_indent("%" + name + " = alloca " + llvm_t)
                 var val = this.gen_expr(init)
                 this.emit_indent("store " + llvm_t + " " + val + ", " + llvm_t + "* %" + name)
             }
@@ -399,13 +430,32 @@ class Codegen {
         this.emit("entry:")
         this.block_terminated = false
 
-        // Allocate space for params
+        // Collect all local variable declarations from body
+        var var_names: List<String> = []
+        var var_types: List<String> = []
+        this.collect_vars(body, var_names, var_types)
+
+        // Emit all allocas in entry block (params + locals)
         i = 0
         while (i < param_list.length()) {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
             this.emit_indent("%" + pname + " = alloca " + this.llvm_type(ptype))
+            i = i + 1
+        }
+        i = 0
+        while (i < var_names.length()) {
+            this.emit_indent("%" + var_names[i] + " = alloca " + this.llvm_type(var_types[i]))
+            i = i + 1
+        }
+
+        // Store params into their allocas
+        i = 0
+        while (i < param_list.length()) {
+            var parts = param_list[i].split(":")
+            var pname = parts[0]
+            var ptype = parts[1]
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + pname + ".arg, " + this.llvm_type(ptype) + "* %" + pname)
             i = i + 1
         }
