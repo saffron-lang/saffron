@@ -17,6 +17,7 @@ class Codegen {
     var class_fields: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
+    var string_vars: List<String>
 
     fun init() {
         this.sb = StringBuilder()
@@ -33,6 +34,7 @@ class Codegen {
         this.class_fields = {}
         this.class_methods = {}
         this.current_class = ""
+        this.string_vars = []
     }
 
     fun fresh_label(prefix: String): String {
@@ -80,7 +82,7 @@ class Codegen {
         if (t == "Int") return "i64"
         if (t == "Float") return "double"
         if (t == "Bool") return "i1"
-        if (t == "String") return "i8*"
+        if (t == "String") return "i64"
         if (t == "Nil") return "void"
         if (t == "Any") return "i64"
         return "i64"
@@ -214,9 +216,13 @@ class Codegen {
     }
 
     fun gen_binary(left: AST.Expr, op: String, right: AST.Expr): String {
-        // String concatenation: if both sides are string literals, use strcat
+        // String concatenation: if all parts are literals, fold at compile time
         if (op == "+" and this.is_string_expr(left) and this.is_string_expr(right)) {
             return this.gen_string_concat(left, right)
+        }
+        // Runtime string concat: if either side contains a string literal
+        if (op == "+" and this.has_string_literal(left, right)) {
+            return this.gen_runtime_string_concat(left, right)
         }
 
         var lhs = this.gen_expr(left)
@@ -261,6 +267,63 @@ class Codegen {
             Binary(l, o, r) => this.flatten_string_expr(l) + this.flatten_string_expr(r)
         }
         return kind
+    }
+
+    fun gen_arg_value(expr: AST.Expr): String {
+        // Handle string literals directly to avoid non-exhaustive match issue
+        if (this.is_string_expr(expr)) {
+            var str_val = this.flatten_string_expr(expr)
+            var const_name = this.add_string_constant(str_val)
+            var gep = this.fresh_local()
+            var slen = str_val.length() + 1
+            this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+            var local = this.fresh_local()
+            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+            return local
+        }
+        return this.gen_expr(expr)
+    }
+
+    fun gen_string_ptr(expr: AST.Expr): String {
+        if (this.is_string_expr(expr)) {
+            // String literal: get pointer directly
+            var str_val = this.flatten_string_expr(expr)
+            var const_name = this.add_string_constant(str_val)
+            var ptr = this.fresh_local()
+            var slen = str_val.length() + 1
+            this.emit_indent(ptr + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+            return ptr
+        }
+        // Variable or expression: gen_expr gives i64, convert to i8*
+        var val = this.gen_expr(expr)
+        var ptr = this.fresh_local()
+        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+        return ptr
+    }
+
+    fun gen_runtime_string_concat(left: AST.Expr, right: AST.Expr): String {
+        var lptr = this.gen_string_ptr(left)
+        var rptr = this.gen_string_ptr(right)
+        // Get lengths
+        var llen = this.fresh_local()
+        this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
+        var rlen = this.fresh_local()
+        this.emit_indent(rlen + " = call i64 @strlen(i8* " + rptr + ")")
+        // Total = llen + rlen + 1
+        var total = this.fresh_local()
+        this.emit_indent(total + " = add i64 " + llen + ", " + rlen)
+        var total1 = this.fresh_local()
+        this.emit_indent(total1 + " = add i64 " + total + ", 1")
+        // Malloc
+        var buf = this.fresh_local()
+        this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
+        // strcpy + strcat
+        this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
+        this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
+        // Return as i64
+        var result = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        return result
     }
 
     fun gen_unary(op: String, right: AST.Expr): String {
@@ -322,6 +385,7 @@ class Codegen {
         if (callee_name == "IO.println") {
             var arg_expr = args[0]
             var is_string = this.is_string_expr(arg_expr)
+            var is_str_var = this.is_string_variable(arg_expr)
             var local = this.fresh_local()
             if (is_string) {
                 // Flatten to compile-time constant
@@ -330,6 +394,12 @@ class Codegen {
                 var str_ptr = this.fresh_local()
                 var slen = str_val.length() + 1
                 this.emit_indent(str_ptr + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
+            } else if (is_str_var) {
+                // Variable known to hold a string
+                var arg = this.gen_expr(arg_expr)
+                var str_ptr = this.fresh_local()
+                this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
                 this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
             } else {
                 var arg = this.gen_expr(arg_expr)
@@ -363,7 +433,7 @@ class Codegen {
             var arg_strs: List<String> = []
             var i = 0
             while (i < args.length()) {
-                var val = this.gen_expr(args[i])
+                var val = this.gen_arg_value(args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }
@@ -427,6 +497,63 @@ class Codegen {
         return local
     }
 
+    fun has_string_literal(left: AST.Expr, right: AST.Expr): Bool {
+        return this.is_string_expr(left) or this.is_string_expr(right) or this.contains_string_lit(left) or this.contains_string_lit(right)
+    }
+
+    fun contains_string_lit(expr: AST.Expr): Bool {
+        var kind = match (expr) {
+            StringLit(s) => "yes"
+            Binary(l, o, r) => {
+                if (this.contains_string_lit(l) or this.contains_string_lit(r)) { "yes" } else { "no" }
+            }
+            IntLit(v) => "no"
+            FloatLit(v) => "no"
+            BoolLit(v) => "no"
+            Variable(n) => "no"
+            Unary(o, r) => "no"
+            Call(c, a) => "no"
+            Assign(n, v) => "no"
+            Logical(l, o, r) => "no"
+            MemberAccess(o, f) => "no"
+            NilLit => "no"
+            Match(s, a) => "no"
+            EnumConstruct(e, v, a) => "no"
+            Lambda(p, r, b) => "no"
+            GetField(o, f) => "no"
+            SetField(o, f, v) => "no"
+            This => "no"
+        }
+        return kind == "yes"
+    }
+
+    fun is_string_variable(expr: AST.Expr): Bool {
+        var name = match (expr) {
+            Variable(n) => n
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Binary(l, o, r) => ""
+            Unary(o, r) => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => ""
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+        }
+        if (name.length() > 0) {
+            return this.string_vars.contains(name)
+        }
+        return false
+    }
+
     fun get_string_lit_value(expr: AST.Expr): String {
         return match (expr) { StringLit(s) => s }
     }
@@ -436,7 +563,7 @@ class Codegen {
             StringLit(s) => "string"
             Binary(l, o, r) => {
                 if (o == "+") {
-                    if (this.is_string_expr(l)) { "string" } else { "binary" }
+                    if (this.is_string_expr(l) and this.is_string_expr(r)) { "string" } else { "binary" }
                 } else { "binary" }
             }
             IntLit(v) => "int"
@@ -1170,8 +1297,11 @@ class Codegen {
         match (stmt) {
             ExprStmt(expr) => { this.gen_expr(expr) }
             VarDecl(name, type_ann, init) => {
+                if (type_ann == "String") {
+                    this.string_vars.push(name)
+                }
                 var llvm_t = this.llvm_type(type_ann)
-                var val = this.gen_expr(init)
+                var val = this.gen_arg_value(init)
                 this.emit_indent("store " + llvm_t + " " + val + ", " + llvm_t + "* %" + name)
             }
             Return(value) => {
@@ -1356,6 +1486,7 @@ class Codegen {
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
         this.known_functions.push(name)
         this.reset_locals()
+        this.string_vars = []
         var ret_llvm = this.llvm_type(ret_type)
 
         // Parse params string "name:type,name:type"
@@ -1399,12 +1530,15 @@ class Codegen {
             i = i + 1
         }
 
-        // Store params into their allocas
+        // Store params into their allocas and track string params
         i = 0
         while (i < param_list.length()) {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
+            if (ptype == "String") {
+                this.string_vars.push(pname)
+            }
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + pname + ".arg, " + this.llvm_type(ptype) + "* %" + pname)
             i = i + 1
         }
