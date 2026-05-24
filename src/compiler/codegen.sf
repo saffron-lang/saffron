@@ -166,6 +166,14 @@ class Codegen {
                 this.gen_logical(left, op, right)
             }
             MemberAccess(object, field) => {
+                // Check if this is a zero-arg enum variant: EnumName.Variant
+                var obj_name = match (object) {
+                    Variable(n) => n
+                }
+                var key = obj_name + "." + field
+                if (this.enum_variant_tags.has(key)) {
+                    return this.gen_enum_construct(obj_name, field, [])
+                }
                 "null"
             }
             EnumConstruct(enum_name, variant, args) => {
@@ -286,31 +294,45 @@ class Codegen {
     fun gen_enum_construct(enum_name: String, variant: String, args: List<AST.Expr>): String {
         var key = enum_name + "." + variant
         var tag = this.enum_variant_tags.get(key)
+
+        if (args.length() == 0) {
+            // No-payload variant: just the tag as i64
+            var local = this.fresh_local()
+            this.emit_indent(local + " = add i64 0, " + tag.floor().to_string())
+            return local
+        }
+
+        // Variant with payload: pack tag + fields into a single i64
+        // For simplicity: encode as (tag << 56) | field_value (single field)
+        // For multi-field: use struct pointer approach
+        if (args.length() == 1) {
+            var val = this.gen_expr(args[0])
+            var tag_shifted = this.fresh_local()
+            this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
+            var combined = this.fresh_local()
+            this.emit_indent(combined + " = or i64 " + tag_shifted + ", " + val)
+            return combined
+        }
+
+        // Multi-field: allocate struct on stack
         var ptr = this.fresh_local()
         this.emit_indent(ptr + " = alloca %" + enum_name)
-
-        // Store tag
         var tag_ptr = this.fresh_local()
         this.emit_indent(tag_ptr + " = getelementptr %" + enum_name + ", %" + enum_name + "* " + ptr + ", i32 0, i32 0")
         this.emit_indent("store i8 " + tag.floor().to_string() + ", i8* " + tag_ptr)
-
-        // Store fields into payload
-        if (args.length() > 0) {
-            var payload_ptr = this.fresh_local()
-            this.emit_indent(payload_ptr + " = getelementptr %" + enum_name + ", %" + enum_name + "* " + ptr + ", i32 0, i32 1")
-            var i = 0
-            while (i < args.length()) {
-                var val = this.gen_expr(args[i])
-                var field_ptr = this.fresh_local()
-                var offset = i * 8
-                this.emit_indent(field_ptr + " = getelementptr [16 x i8], [16 x i8]* " + payload_ptr + ", i32 0, i32 " + offset.to_string())
-                var cast_ptr = this.fresh_local()
-                this.emit_indent(cast_ptr + " = bitcast i8* " + field_ptr + " to i64*")
-                this.emit_indent("store i64 " + val + ", i64* " + cast_ptr)
-                i = i + 1
-            }
+        var payload_ptr = this.fresh_local()
+        this.emit_indent(payload_ptr + " = getelementptr %" + enum_name + ", %" + enum_name + "* " + ptr + ", i32 0, i32 1")
+        var i = 0
+        while (i < args.length()) {
+            var val = this.gen_expr(args[i])
+            var field_ptr = this.fresh_local()
+            var offset = i * 8
+            this.emit_indent(field_ptr + " = getelementptr [16 x i8], [16 x i8]* " + payload_ptr + ", i32 0, i32 " + offset.to_string())
+            var cast_ptr = this.fresh_local()
+            this.emit_indent(cast_ptr + " = bitcast i8* " + field_ptr + " to i64*")
+            this.emit_indent("store i64 " + val + ", i64* " + cast_ptr)
+            i = i + 1
         }
-
         return ptr
     }
 
@@ -319,11 +341,16 @@ class Codegen {
         var result_ptr = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
-        // Load tag from subject
-        var tag_ptr = this.fresh_local()
-        this.emit_indent(tag_ptr + " = getelementptr %" + "Enum" + ", %" + "Enum" + "* " + subj + ", i32 0, i32 0")
+        // Determine which enum from first arm's pattern
+        var first_arm = arms[0]
+        var first_pattern = match (first_arm) { Arm(p, b) => p }
+        var first_variant = match (first_pattern) { VariantPattern(v, b) => v }
+        var enum_name = this.find_enum_for_variant(first_variant)
+
+        // For no-payload enums, subj is the tag directly (i64)
+        // Truncate to i8 for switch
         var tag_val = this.fresh_local()
-        this.emit_indent(tag_val + " = load i8, i8* " + tag_ptr)
+        this.emit_indent(tag_val + " = trunc i64 " + subj + " to i8")
 
         // Build switch
         var end_label = this.fresh_label("match.end")
@@ -337,7 +364,11 @@ class Codegen {
         var switch_str = "switch i8 " + tag_val + ", label %" + end_label + " ["
         i = 0
         while (i < arms.length()) {
-            switch_str = switch_str + " i8 " + i.to_string() + ", label %" + arm_labels[i]
+            var arm = arms[i]
+            var pattern = match (arm) { Arm(p, b) => p }
+            var variant_name = match (pattern) { VariantPattern(v, b) => v }
+            var tag_idx = this.enum_variant_tags.get(enum_name + "." + variant_name)
+            switch_str = switch_str + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
             i = i + 1
         }
         switch_str = switch_str + " ]"
@@ -359,6 +390,19 @@ class Codegen {
         var result = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
         return result
+    }
+
+    fun find_enum_for_variant(variant: String): String {
+        var keys = this.enum_variant_tags.keys()
+        var i = 0
+        while (i < keys.length()) {
+            var key = keys[i]
+            if (key.ends_with("." + variant)) {
+                return key.split(".")[0]
+            }
+            i = i + 1
+        }
+        return "Unknown"
     }
 
     fun resolve_callee(expr: AST.Expr): String {

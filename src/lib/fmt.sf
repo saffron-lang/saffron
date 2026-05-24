@@ -1,4 +1,4 @@
-fun format(template: String, values: List): String {
+fun format(template: String, values: List<Any>): String {
     var sb = StringBuilder()
     var i = 0
     while (i < template.length()) {

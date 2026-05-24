@@ -1,6 +1,6 @@
 import "@async" as Async
 
-fun all(tasks: List): List {
+fun all(tasks: List<Task>): List<Any> {
     var results = []
     var i = 0
     while (i < tasks.length()) {

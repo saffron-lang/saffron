@@ -2,7 +2,7 @@ import "@path" as Path
 import "@os" as OS
 
 class FileFinder {
-    var entries: List
+    var entries: List<List<Any>>
     var base_dir: String
 
     fun init(dir: String) {
@@ -15,7 +15,7 @@ fun from(dir: String): FileFinder {
     return FileFinder(dir)
 }
 
-fun files(finder: FileFinder): List {
+fun files(finder: FileFinder): List<String> {
     var result = []
     var i = 0
     while (i < finder.entries.length()) {
@@ -33,7 +33,7 @@ fun files(finder: FileFinder): List {
     return result
 }
 
-fun dirs(finder: FileFinder): List {
+fun dirs(finder: FileFinder): List<String> {
     var result = []
     var i = 0
     while (i < finder.entries.length()) {
@@ -51,7 +51,7 @@ fun dirs(finder: FileFinder): List {
     return result
 }
 
-fun by_ext(finder: FileFinder, extension: String): List {
+fun by_ext(finder: FileFinder, extension: String): List<String> {
     var all = files(finder)
     var result = []
     var i = 0
@@ -65,7 +65,7 @@ fun by_ext(finder: FileFinder, extension: String): List {
     return result
 }
 
-fun by_name(finder: FileFinder, name: String): List {
+fun by_name(finder: FileFinder, name: String): List<String> {
     var all = files(finder)
     var result = []
     var i = 0
@@ -79,7 +79,7 @@ fun by_name(finder: FileFinder, name: String): List {
     return result
 }
 
-fun containing(finder: FileFinder, text: String): List {
+fun containing(finder: FileFinder, text: String): List<String> {
     var all = files(finder)
     var result = []
     var i = 0
