@@ -27,7 +27,11 @@ enum Expr {
     Lambda(params: String, ret_type: String, body: List<Stmt>),
     GetField(object: Expr, field: String),
     SetField(object: Expr, field: String, value: Expr),
-    This
+    This,
+    ListLit(elements: List<Expr>),
+    IndexGet(object: Expr, index: Expr),
+    IndexSet(object: Expr, index: Expr, value: Expr),
+    MethodCall(object: Expr, method: String, args: List<Expr>)
 }
 
 enum MatchArm {
