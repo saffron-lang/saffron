@@ -1,0 +1,33 @@
+// Variadic arguments test
+
+// Basic varargs
+fun sum(*nums: Number): Number {
+    var total = 0
+    for (n in nums) { total = total + n }
+    return total
+}
+IO.println(sum(1, 2, 3))
+IO.println(sum(10, 20))
+IO.println(sum())
+
+// Varargs with leading params
+fun greet(greeting: String, *names: String): String {
+    var result = greeting
+    for (name in names) { result = result + " " + name }
+    return result
+}
+IO.println(greet("Hello", "Alice", "Bob"))
+
+// Varargs length
+fun count(*items: Any): Number {
+    return items.length()
+}
+IO.println(count("a", "b", "c", "d"))
+
+// Varargs with transformation
+fun double_all(*nums: Number): List {
+    var result = []
+    for (n in nums) { result.push(n * 2) }
+    return result
+}
+IO.println(double_all(1, 2, 3))

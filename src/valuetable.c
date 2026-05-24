@@ -22,19 +22,8 @@ uint32_t hash(Value key) {
                     return AS_STRING(key)->hash;
                 case OBJ_ATOM:
                     return AS_STRING(key)->hash;
-                case OBJ_FUNCTION:
-                case OBJ_NATIVE:
-                case OBJ_NATIVE_METHOD:
-                case OBJ_CLOSURE:
-                case OBJ_CLASS:
-                case OBJ_BUILTIN_TYPE:
-                case OBJ_INSTANCE:
-                case OBJ_LIST:
-                case OBJ_MAP:
-                case OBJ_BOUND_METHOD:
-                case OBJ_CALL_FRAME:
-                case OBJ_MODULE:
-                    return (int) obj;
+                default:
+                    return (uint32_t)(uintptr_t) obj;
             }
         }
     }
