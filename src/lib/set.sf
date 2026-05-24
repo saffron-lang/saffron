@@ -1,5 +1,5 @@
 class Set {
-    var _map: Map
+    var _map: Map<Any, Bool>
 
     fun init() {
         this._map = Map()
@@ -23,7 +23,7 @@ class Set {
         return this._map.keys().length()
     }
 
-    fun values(): List {
+    fun values(): List<Any> {
         return this._map.keys()
     }
 
@@ -51,7 +51,7 @@ class Set {
     }
 }
 
-fun from(items: List): Set {
+fun from(items: List<Any>): Set {
     var s = Set()
     var i = 0
     while (i < items.length()) {

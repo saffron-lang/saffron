@@ -10,7 +10,7 @@ fun all(tasks: List<Task>): List<Any> {
     return results
 }
 
-fun race(tasks: List): Any {
+fun race(tasks: List<Task>): Any {
     var i = 0
     while (i < tasks.length()) {
         if (tasks[i].isReady()) {
@@ -24,7 +24,7 @@ fun race(tasks: List): Any {
     return nil
 }
 
-fun any(tasks: List): Any {
+fun any(tasks: List<Task>): Any {
     return race(tasks)
 }
 

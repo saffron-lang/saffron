@@ -77,7 +77,7 @@ fun parse(source: String): List<List<String>> {
     return rows
 }
 
-fun to_string(rows: List): String {
+fun to_string(rows: List<List<String>>): String {
     var sb = StringBuilder()
     var i = 0
     while (i < rows.length()) {
@@ -101,12 +101,12 @@ fun to_string(rows: List): String {
     return sb.to_string()
 }
 
-fun headers(rows: List): List {
+fun headers(rows: List<List<String>>): List<String> {
     if (rows.length() == 0) { return [] }
     return rows[0]
 }
 
-fun as_maps(rows: List): List {
+fun as_maps(rows: List<List<String>>): List<Map<String, String>> {
     if (rows.length() < 2) { return [] }
     var hdrs = rows[0]
     var result = []

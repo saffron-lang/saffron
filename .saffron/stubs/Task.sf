@@ -1,3 +1,0 @@
-// Task (native module)
-
-fun spawn(callback: () => Any): Task { /* native */ }

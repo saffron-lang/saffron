@@ -72,7 +72,7 @@ fun stem(p: String): String {
     return base.slice(0, dot)
 }
 
-fun join(parts: List): String {
+fun join(parts: List<String>): String {
     if (parts.length() == 0) { return "" }
     var result = parts[0]
     var i = 1
@@ -117,7 +117,7 @@ fun normalize(p: String): String {
     return joined
 }
 
-fun resolve(parts: List): String {
+fun resolve(parts: List<String>): String {
     var base = OS.cwd()
     var i = 0
     while (i < parts.length()) {

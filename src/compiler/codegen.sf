@@ -222,8 +222,18 @@ class Codegen {
     }
 
     fun gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
-        // Check if this is IO.println
         var callee_name = this.resolve_callee(callee)
+
+        // Check if this is an enum constructor
+        if (callee_name.contains(".")) {
+            var parts = callee_name.split(".")
+            if (parts.length() >= 2) {
+                var key = parts[0] + "." + parts[1]
+                if (this.enum_variant_tags.has(key)) {
+                    return this.gen_enum_construct(parts[0], parts[1], args)
+                }
+            }
+        }
 
         if (callee_name == "IO.println") {
             var arg_expr = args[0]
@@ -296,9 +306,9 @@ class Codegen {
         var tag = this.enum_variant_tags.get(key)
 
         if (args.length() == 0) {
-            // No-payload variant: just the tag as i64
+            // No-payload variant: tag << 56
             var local = this.fresh_local()
-            this.emit_indent(local + " = add i64 0, " + tag.floor().to_string())
+            this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
             return local
         }
 
@@ -347,10 +357,13 @@ class Codegen {
         var first_variant = match (first_pattern) { VariantPattern(v, b) => v }
         var enum_name = this.find_enum_for_variant(first_variant)
 
-        // For no-payload enums, subj is the tag directly (i64)
-        // Truncate to i8 for switch
+        // Extract tag: for no-payload enums, the value IS the tag
+        // For payload enums, tag is in upper byte: (tag << 56) | value
+        // Use right-shift to get the tag byte
+        var tag_shifted = this.fresh_local()
+        this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
         var tag_val = this.fresh_local()
-        this.emit_indent(tag_val + " = trunc i64 " + subj + " to i8")
+        this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
 
         // Build switch
         var end_label = this.fresh_label("match.end")
@@ -379,7 +392,30 @@ class Codegen {
         while (i < arms.length()) {
             this.start_block(arm_labels[i])
             var arm = arms[i]
-            var body_expr = match (arm) { Arm(pattern, body) => body }
+            var pattern = match (arm) { Arm(p, b) => p }
+            var body_expr = match (arm) { Arm(p, b) => b }
+
+            // Extract bindings from payload
+            var bindings = match (pattern) { VariantPattern(v, b) => b }
+            if (bindings.length() == 1) {
+                // Single-field: extract value with AND mask
+                var bname = bindings[0]
+                var extracted = this.fresh_local()
+                this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+                this.emit_indent("store i64 " + extracted + ", i64* %" + bname)
+            } else if (bindings.length() > 1) {
+                // Multi-field: extract from struct payload
+                var j = 0
+                while (j < bindings.length()) {
+                    var bname = bindings[j]
+                    var offset = j * 8
+                    var extracted = this.fresh_local()
+                    this.emit_indent(extracted + " = lshr i64 " + subj + ", " + (offset * 8).to_string())
+                    this.emit_indent("store i64 " + extracted + ", i64* %" + bname)
+                    j = j + 1
+                }
+            }
+
             var val = this.gen_expr(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             this.emit_terminator("br label %" + end_label)
@@ -443,11 +479,18 @@ class Codegen {
         }
     }
 
+    fun add_var_unique(names: List<String>, types: List<String>, name: String, typ: String) {
+        if (!names.contains(name)) {
+            names.push(name)
+            types.push(typ)
+        }
+    }
+
     fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
         match (stmt) {
             VarDecl(name, type_ann, init) => {
-                names.push(name)
-                types.push(type_ann)
+                this.add_var_unique(names, types, name, type_ann)
+                this.collect_vars_expr(init, names, types)
             }
             If(cond, then_branch, else_branch) => {
                 this.collect_vars(then_branch, names, types)
@@ -459,11 +502,57 @@ class Codegen {
             Block(stmts) => {
                 this.collect_vars(stmts, names, types)
             }
-            ExprStmt(expr) => {}
-            Return(value) => {}
+            ExprStmt(expr) => {
+                this.collect_vars_expr(expr, names, types)
+            }
+            Return(value) => {
+                this.collect_vars_expr(value, names, types)
+            }
             FunDecl(name, params, ret_type, body) => {}
             EnumDecl(name, variants) => {}
         }
+    }
+
+    fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
+        if (!this.is_match_expr(expr)) return nil
+        // It's a match expression — collect bindings from patterns
+        var arms = this.get_match_arms(expr)
+        var i = 0
+        while (i < arms.length()) {
+            var arm = arms[i]
+            var pattern = match (arm) { Arm(p, b) => p }
+            var bindings = match (pattern) { VariantPattern(v, b) => b }
+            var j = 0
+            while (j < bindings.length()) {
+                this.add_var_unique(names, types, bindings[j], "Int")
+                j = j + 1
+            }
+            i = i + 1
+        }
+    }
+
+    fun is_match_expr(expr: AST.Expr): Bool {
+        var kind = match (expr) {
+            Match(s, a) => "match"
+            IntLit(v) => "other"
+            FloatLit(v) => "other"
+            BoolLit(v) => "other"
+            StringLit(s) => "other"
+            NilLit => "other"
+            Variable(n) => "other"
+            Binary(l, o, r) => "other"
+            Unary(o, r) => "other"
+            Call(c, a) => "other"
+            Assign(n, v) => "other"
+            Logical(l, o, r) => "other"
+            MemberAccess(o, f) => "other"
+            EnumConstruct(e, v, a) => "other"
+        }
+        return kind == "match"
+    }
+
+    fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
+        return match (expr) { Match(s, a) => a }
     }
 
     // --- Statement codegen ---

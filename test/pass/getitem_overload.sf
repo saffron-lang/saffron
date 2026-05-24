@@ -1,6 +1,6 @@
 // Test: getItem method overloading for obj[key] syntax
 class Dict {
-    var items: List
+    var items: List<String>
 
     fun init() {
         this.items = ["first", "second", "third"]

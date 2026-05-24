@@ -25,7 +25,7 @@ fun count(*items: Any): Number {
 IO.println(count("a", "b", "c", "d"))
 
 // Varargs with transformation
-fun double_all(*nums: Number): List {
+fun double_all(*nums: Number): List<Number> {
     var result = []
     for (n in nums) { result.push(n * 2) }
     return result
