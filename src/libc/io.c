@@ -142,6 +142,67 @@ static Value listDirNative(int argCount, Value *args) {
     return OBJ_VAL(list);
 }
 
+static void walkDirRecursive(const char *dirPath, ObjList *results) {
+    DIR *dir = opendir(dirPath);
+    if (dir == NULL) return;
+
+    ObjList *dirs = newList();
+    push(OBJ_VAL(dirs));
+    ObjList *files = newList();
+    push(OBJ_VAL(files));
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+        int pathLen = (int)strlen(dirPath);
+        int nameLen = (int)strlen(entry->d_name);
+        char fullPath[4096];
+        snprintf(fullPath, sizeof(fullPath), "%s/%s", dirPath, entry->d_name);
+
+        struct stat st;
+        if (stat(fullPath, &st) == 0 && S_ISDIR(st.st_mode)) {
+            Value name = OBJ_VAL(copyString(entry->d_name, nameLen));
+            writeValueArray(&dirs->items, name);
+        } else {
+            Value name = OBJ_VAL(copyString(entry->d_name, nameLen));
+            writeValueArray(&files->items, name);
+        }
+    }
+    closedir(dir);
+
+    ObjList *triple = newList();
+    push(OBJ_VAL(triple));
+    Value rootVal = OBJ_VAL(copyString(dirPath, (int)strlen(dirPath)));
+    writeValueArray(&triple->items, rootVal);
+    writeValueArray(&triple->items, OBJ_VAL(dirs));
+    writeValueArray(&triple->items, OBJ_VAL(files));
+    writeValueArray(&results->items, OBJ_VAL(triple));
+    pop(); // triple
+    pop(); // files
+    pop(); // dirs
+
+    for (int i = 0; i < dirs->items.count; i++) {
+        ObjString *subName = AS_STRING(dirs->items.values[i]);
+        char subPath[4096];
+        snprintf(subPath, sizeof(subPath), "%s/%s", dirPath, subName->chars);
+        walkDirRecursive(subPath, results);
+    }
+}
+
+static Value walkDirNative(int argCount, Value *args) {
+    if (argCount != 1 || !IS_STRING(args[0])) {
+        runtimeError("IO.walk_dir expects 1 string argument (path)");
+        return NIL_VAL;
+    }
+    ObjString *path = AS_STRING(args[0]);
+    ObjList *results = newList();
+    push(OBJ_VAL(results));
+    walkDirRecursive(path->chars, results);
+    pop();
+    return OBJ_VAL(results);
+}
+
 static Value mkdirNative(int argCount, Value *args) {
     if (argCount != 1 || !IS_STRING(args[0])) {
         runtimeError("IO.mkdir expects 1 string argument (path)");
@@ -197,6 +258,7 @@ ObjModule *createIOModule() {
     defineModuleFunction(module, "delete_file", deleteFileNative);
     defineModuleFunction(module, "readline", readlineNative);
     defineModuleFunction(module, "list_dir", listDirNative);
+    defineModuleFunction(module, "walk_dir", walkDirNative);
     defineModuleFunction(module, "mkdir", mkdirNative);
     defineModuleFunction(module, "rename", renameNative);
     defineModuleFunction(module, "file_size", fileSizeNative);
@@ -216,6 +278,7 @@ SimpleType *createIOModuleType() {
     createBuiltinFunctorType(ioModule, "delete_file", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
     createBuiltinFunctorType(ioModule, "readline", (Type *[]) {}, 0, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(ioModule, "list_dir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) listTypeDef);
+    createBuiltinFunctorType(ioModule, "walk_dir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) listTypeDef);
     createBuiltinFunctorType(ioModule, "mkdir", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) boolType);
     createBuiltinFunctorType(ioModule, "rename", (Type *[]) {(Type *) stringType, (Type *) stringType}, 2, NULL, 0, (Type *) boolType);
     createBuiltinFunctorType(ioModule, "file_size", (Type *[]) {(Type *) stringType}, 1, NULL, 0, (Type *) numberType);

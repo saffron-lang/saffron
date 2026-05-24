@@ -91,8 +91,9 @@ Value listPopBuiltin(ObjList *list, int argCount) {
     if (argCount > 0 || list->items.count == 0) {
         return NIL_VAL;
     }
-    Value poppedValue = list->items.values[0];
-    popValueArray(&list->items, 0);
+    int lastIndex = list->items.count - 1;
+    Value poppedValue = list->items.values[lastIndex];
+    popValueArray(&list->items, lastIndex);
     return poppedValue;
 }
 
