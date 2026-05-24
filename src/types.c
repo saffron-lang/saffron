@@ -431,6 +431,16 @@ static bool isSubTypeInner(Type *subclass, Type *superclass) {
             if (inner) {
                 return isSubType(inner, superclass);
             }
+            // Unresolved generic in subclass position: try resolving it
+            // This handles contravariant positions (e.g., function param types)
+            // Only attempt if the generic is registered (NIL) in resolutions
+            Value checkVal;
+            if (valueTableGet(&currentEnv->genericResolutions, OBJ_VAL(subclass), &checkVal)) {
+                if (!subclassType->extends || isSubType(superclass, subclassType->extends)) {
+                    return resolveGenericArgument(currentEnv, superclass, subclass);
+                }
+                return false;
+            }
             break;
         }
         default: break;
@@ -496,6 +506,19 @@ static bool isSubTypeInner(Type *subclass, Type *superclass) {
                     currentEnv->genericResolutions = snapshot;
                 } else {
                     freeValueTable(&snapshot);
+                    // Also resolve generic type parameters pairwise when the
+                    // subclass is a GenericType with matching arity
+                    if (subclass->obj.type == OBJ_PARSE_GENERIC_TYPE) {
+                        GenericType *subclassType = (GenericType *) subclass;
+                        if (subclassType->generics.count == superclassType->generics.count) {
+                            for (int i = 0; i < superclassType->generics.count; i++) {
+                                if (!isSubType(AS_OBJ(subclassType->generics.values[i]),
+                                               AS_OBJ(superclassType->generics.values[i]))) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
                 }
                 return result;
             }
@@ -889,9 +912,7 @@ Type *evaluateNode(Node *node) {
             FunctorType *calleeFunctor = calleeType;
 
             if (casted->arguments.count != calleeFunctor->arguments.count) {
-                // TODO: Varargs
-//                errorAt(&casted->paren, "Too many arguments provided");
-//                return(NULL);
+                // TODO: Varargs — for now skip detailed checking on arity mismatch
             }
 
             TypeEnvironment argEnv;
@@ -1386,10 +1407,19 @@ Type *evaluateNode(Node *node) {
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
                 } else if (isVariadic) {
-                    argType = (Type *) listTypeDef;
+                    argType = (Type *) anyType;
                 } else {
                     errorAt(&casted->params.parameters[i]->name, "Function parameters require a type annotation");
                     argType = (Type *) anyType;
+                }
+
+                // Variadic params are Lists at runtime
+                Type *localType = argType;
+                if (isVariadic) {
+                    GenericType *listOfType = newGenericType();
+                    listOfType->target = (Type *) listTypeDef;
+                    writeValueArray(&listOfType->generics, OBJ_VAL(argType));
+                    localType = (Type *) listOfType;
                 }
 
                 writeValueArray(&type->arguments, OBJ_VAL(argType));
@@ -1398,7 +1428,7 @@ Type *evaluateNode(Node *node) {
                         &currentEnv->locals, copyString(
                                 casted->params.parameters[i]->name.start, casted->params.parameters[i]->name.length
                         ),
-                        OBJ_VAL(argType)
+                        OBJ_VAL(localType)
                 );
             }
 

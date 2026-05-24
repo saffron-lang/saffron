@@ -19,6 +19,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
+import { getBuiltinStub, getBuiltinFunctionLine, isBuiltinModule } from "./builtins";
 
 const execFileAsync = promisify(execFile);
 
@@ -120,6 +121,22 @@ function resolveImports(doc: TextDocument): Map<string, string> {
   return imports;
 }
 
+function getStubPath(moduleName: string): string {
+  const stubDir = path.join(projectRoot, ".saffron", "stubs");
+  return path.join(stubDir, moduleName + ".sf");
+}
+
+function ensureStub(moduleName: string): string | null {
+  const stub = getBuiltinStub(moduleName);
+  if (!stub) return null;
+
+  const stubPath = getStubPath(moduleName);
+  const stubDir = path.dirname(stubPath);
+  if (!fs.existsSync(stubDir)) fs.mkdirSync(stubDir, { recursive: true });
+  fs.writeFileSync(stubPath, stub);
+  return stubPath;
+}
+
 function resolveImportPath(importPath: string, fromDir: string): string | null {
   if (importPath.startsWith("@")) {
     const name = importPath.slice(1);
@@ -137,7 +154,7 @@ function resolveImportPath(importPath: string, fromDir: string): string | null {
     return null;
   }
 
-  // Builtin C module (time, json, etc.) — no source file
+  // Builtin C module — no .sf source, but we can generate a stub
   return null;
 }
 
@@ -295,6 +312,27 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
 
   // Member access: Iter.map → look up "map" in Iter's source file
   if (ctx.qualifier) {
+    // Check if qualifier is a builtin module (IO, Task, etc.)
+    if (isBuiltinModule(ctx.qualifier)) {
+      const stubPath = ensureStub(ctx.qualifier);
+      if (stubPath) {
+        const line = getBuiltinFunctionLine(ctx.qualifier, ctx.word);
+        if (line !== null) {
+          return {
+            uri: "file://" + stubPath,
+            range: {
+              start: { line, character: 4 },
+              end: { line, character: 4 + ctx.word.length },
+            },
+          };
+        }
+        return {
+          uri: "file://" + stubPath,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+        };
+      }
+    }
+
     const imports = resolveImports(doc);
     const targetFile = imports.get(ctx.qualifier);
     if (targetFile) {
@@ -335,7 +373,7 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
   }
 
   // No qualifier: look up in current file
-  // If word is a module alias, navigate to source file
+  // If word is a module alias, navigate to source or stub
   const imports = resolveImports(doc);
   const targetFile = imports.get(ctx.word);
   if (targetFile) {
@@ -343,6 +381,17 @@ connection.onDefinition(async (params: DefinitionParams): Promise<Location | nul
       uri: "file://" + targetFile,
       range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
     };
+  }
+
+  // Check if it's a builtin module name used directly
+  if (isBuiltinModule(ctx.word)) {
+    const stubPath = ensureStub(ctx.word);
+    if (stubPath) {
+      return {
+        uri: "file://" + stubPath,
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      };
+    }
   }
 
   const sym = findSymbol(cached.symbols, ctx.word, null);

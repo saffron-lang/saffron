@@ -369,8 +369,8 @@ void compileBlock(StmtArray *statements) {
     bool oldLast = lastInBody;
     lastInBody = false;
     for (int i = 0; i < statements->count; i++) {
-        if (i == statements->count) {
-            lastInBody = true;
+        if (i == statements->count - 1) {
+            lastInBody = oldLast;
         }
         compileNode((Node *) statements->stmts[i]);
     }
@@ -716,7 +716,7 @@ void compileNode(Node *node) {
         case NODE_BLOCK: {
             struct Block *casted = (struct Block *) node;
             beginScope();
-            compileTree(&casted->statements);
+            compileBlock(&casted->statements);
             endScope();
             break;
         }

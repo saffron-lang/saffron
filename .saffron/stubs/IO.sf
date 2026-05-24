@@ -1,0 +1,15 @@
+// IO (native module)
+
+fun print(value: Any): Nil { /* native */ }
+fun println(value: Any): Nil { /* native */ }
+fun read_file(path: String): String { /* native */ }
+fun write_file(path: String, content: String): Nil { /* native */ }
+fun append_file(path: String, content: String): Nil { /* native */ }
+fun file_exists(path: String): Bool { /* native */ }
+fun delete_file(path: String): Bool { /* native */ }
+fun readline(): String { /* native */ }
+fun list_dir(path: String): List { /* native */ }
+fun mkdir(path: String): Bool { /* native */ }
+fun rename(from: String, to: String): Bool { /* native */ }
+fun file_size(path: String): Number { /* native */ }
+fun is_dir(path: String): Bool { /* native */ }
