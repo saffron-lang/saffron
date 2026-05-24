@@ -7,7 +7,7 @@
 #include "object.h"
 #include "ast/ast.h"
 
-#define FRAMES_MAX 64
+#define FRAMES_MAX 512
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef enum {

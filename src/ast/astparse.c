@@ -27,11 +27,15 @@ typedef enum {
     PREC_YIELD,       // yield
     PREC_OR,          // or
     PREC_AND,         // and
+    PREC_BIT_OR,      // |
+    PREC_BIT_XOR,     // ^
+    PREC_BIT_AND,     // &
     PREC_EQUALITY,    // == !=
     PREC_COMPARISON,  // < > <= >=
+    PREC_SHIFT,       // << >>
     PREC_TERM,        // + -
     PREC_FACTOR,      // * /
-    PREC_UNARY,       // ! -
+    PREC_UNARY,       // ! - ~
     PREC_CALL,        // . ()
     PREC_PRIMARY
 } Precedence;
@@ -130,6 +134,28 @@ static bool match(TokenType type) {
     if (!check(type)) return false;
     advance();
     return true;
+}
+
+static bool matchGreater() {
+    if (check(TOKEN_GREATER)) {
+        advance();
+        return true;
+    }
+    if (check(TOKEN_SHIFT_RIGHT)) {
+        // Split >> into > + >: consume the token but rewrite current as >
+        parser.previous = parser.current;
+        parser.previous.length = 1;
+        parser.current.type = TOKEN_GREATER;
+        parser.current.start++;
+        parser.current.length = 1;
+        return true;
+    }
+    return false;
+}
+
+static void consumeGreater(const char *message) {
+    if (matchGreater()) return;
+    errorAtCurrent(message);
 }
 
 static Stmt *statement();
@@ -251,6 +277,21 @@ static Expr *makeStringLiteral(const char *src, int srcLen) {
                 case '\\': buf[len++] = '\\'; break;
                 case '"': buf[len++] = '"'; break;
                 case '0': buf[len++] = '\0'; break;
+                case 'x': {
+                    if (i + 2 < srcLen) {
+                        char hi = src[i + 1], lo = src[i + 2];
+                        int val = 0;
+                        if (hi >= '0' && hi <= '9') val = (hi - '0') << 4;
+                        else if (hi >= 'a' && hi <= 'f') val = (hi - 'a' + 10) << 4;
+                        else if (hi >= 'A' && hi <= 'F') val = (hi - 'A' + 10) << 4;
+                        if (lo >= '0' && lo <= '9') val |= (lo - '0');
+                        else if (lo >= 'a' && lo <= 'f') val |= (lo - 'a' + 10);
+                        else if (lo >= 'A' && lo <= 'F') val |= (lo - 'A' + 10);
+                        buf[len++] = (char)val;
+                        i += 2;
+                    }
+                    break;
+                }
                 default: buf[len++] = src[i]; break;
             }
         } else {
@@ -562,6 +603,12 @@ ParseRule parseRules[] = {
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
         [TOKEN_YIELD]         = {yield, NULL, PREC_NONE},
         [TOKEN_AWAIT]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_BITWISE_OR]    = {NULL, binary, PREC_BIT_OR},
+        [TOKEN_BITWISE_AND]   = {NULL, binary, PREC_BIT_AND},
+        [TOKEN_BITWISE_XOR]   = {NULL, binary, PREC_BIT_XOR},
+        [TOKEN_BITWISE_NOT]   = {unary, NULL, PREC_NONE},
+        [TOKEN_SHIFT_LEFT]    = {NULL, binary, PREC_SHIFT},
+        [TOKEN_SHIFT_RIGHT]   = {NULL, binary, PREC_SHIFT},
         [TOKEN_IS]            = {NULL, binary, PREC_COMPARISON},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
@@ -832,7 +879,7 @@ static TypeNodeArray genericArgDefinitions() {
     TypeNodeArray generics;
     initTypeNodeArray(&generics);
 
-    if (match(TOKEN_GREATER)) {
+    if (matchGreater()) {
         return generics;
     }
 
@@ -851,7 +898,7 @@ static TypeNodeArray genericArgDefinitions() {
         writeTypeNodeArray(&generics, (TypeNode *) result);
     } while (match(TOKEN_COMMA));
 
-    consume(TOKEN_GREATER, "Expected '>' after generic argument list.");
+    consumeGreater("Expected '>' after generic argument list.");
 
     return generics;
 }
@@ -880,9 +927,18 @@ static TypeNode *simpleTypeAnnotation() {
     Token name = parser.previous; // TODO: We don't ever initialize the value arrays...
     // TODO: How is everything still working?
 
+    // Handle qualified type references: Module.Type
+    Token qualifier = {.type = TOKEN_EOF, .start = "", .length = 0, .line = 0};
+    if (match(TOKEN_DOT)) {
+        qualifier = name;
+        consume(TOKEN_IDENTIFIER, "Expect type name after '.' in qualified type.");
+        name = parser.previous;
+    }
+
     if (match(TOKEN_LESS)) {
         struct Simple *target = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
         target->name = name;
+        target->qualifier = qualifier;
         initTypeNodeArray(&target->generics);
 
         do {
@@ -890,11 +946,12 @@ static TypeNode *simpleTypeAnnotation() {
             writeTypeNodeArray(&target->generics, argument);
         } while (match(TOKEN_COMMA));
 
-        consume(TOKEN_GREATER, "Expect '>' after generic type argument.");
+        consumeGreater("Expect '>' after generic type argument.");
         return (TypeNode *) target;
     } else {
         struct Simple *result = ALLOCATE_NODE(struct Simple, NODE_SIMPLE);
         result->name = name;
+        result->qualifier = qualifier;
         initTypeNodeArray(&result->generics);
         return (TypeNode *) result;
     }
@@ -1111,7 +1168,7 @@ static Stmt *importStatement() {
 
 static Stmt *returnStatement() {
     Token keyword = parser.previous;
-    if (match(TOKEN_SEMICOLON)) {
+    if (match(TOKEN_SEMICOLON) || check(TOKEN_RIGHT_BRACE) || check(TOKEN_EOF)) {
         struct Return *result = ALLOCATE_NODE(struct Return, NODE_RETURN);
         result->value = NULL;
         result->keyword = keyword;
@@ -1606,14 +1663,32 @@ static Expr *matchExpression(bool canAssign) {
 
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         bool isTypePattern = match(TOKEN_IS);
+        bool isBinding = false;
 
         consume(TOKEN_IDENTIFIER, "Expect variant or type name in match arm.");
         Token variantName = parser.previous;
 
+        // Support qualified names: M.Color.Red — use last segment as variant name
+        bool hasDot = false;
+        while (match(TOKEN_DOT)) {
+            hasDot = true;
+            consume(TOKEN_IDENTIFIER, "Expect name after '.'.");
+            variantName = parser.previous;
+        }
+
+        // Detect binding pattern: lowercase or underscore first char, no dot path, no parens
+        // e.g. `x => ...` or `_ => ...` binds the subject to x/_
+        if (!isTypePattern && !hasDot &&
+            (variantName.start[0] == '_' ||
+             (variantName.start[0] >= 'a' && variantName.start[0] <= 'z')) &&
+            !check(TOKEN_LEFT_PAREN)) {
+            isBinding = true;
+        }
+
         ParameterArray bindings;
         initParameterArray(&bindings);
 
-        if (match(TOKEN_LEFT_PAREN)) {
+        if (!isBinding && match(TOKEN_LEFT_PAREN)) {
             if (!check(TOKEN_RIGHT_PAREN)) {
                 do {
                     consume(TOKEN_IDENTIFIER, "Expect binding name.");
@@ -1638,6 +1713,7 @@ static Expr *matchExpression(bool canAssign) {
         arm->bindings = bindings;
         arm->body = armBody;
         arm->isTypePattern = isTypePattern;
+        arm->isBinding = isBinding;
         writeStmtArray(&arms, (Stmt *) arm);
 
         match(TOKEN_COMMA);
