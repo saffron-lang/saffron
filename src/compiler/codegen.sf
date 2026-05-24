@@ -366,7 +366,7 @@ class Codegen {
                     arg_strs.push("i64 " + obj_val)
                     var ai = 0
                     while (ai < args.length()) {
-                        var val = this.gen_expr(args[ai])
+                        var val = this.gen_arg_value(args[ai])
                         arg_strs.push("i64 " + val)
                         ai = ai + 1
                     }
@@ -498,7 +498,7 @@ class Codegen {
     }
 
     fun has_string_literal(left: AST.Expr, right: AST.Expr): Bool {
-        return this.is_string_expr(left) or this.is_string_expr(right) or this.contains_string_lit(left) or this.contains_string_lit(right)
+        return this.is_string_expr(left) or this.is_string_expr(right) or this.contains_string_lit(left) or this.contains_string_lit(right) or this.is_string_variable(left) or this.is_string_variable(right)
     }
 
     fun contains_string_lit(expr: AST.Expr): Bool {
@@ -530,6 +530,7 @@ class Codegen {
     fun is_string_variable(expr: AST.Expr): Bool {
         var name = match (expr) {
             Variable(n) => n
+            GetField(o, f) => f
             IntLit(v) => ""
             FloatLit(v) => ""
             BoolLit(v) => ""
@@ -544,12 +545,16 @@ class Codegen {
             Match(s, a) => ""
             EnumConstruct(e, v, a) => ""
             Lambda(p, r, b) => ""
-            GetField(o, f) => ""
             SetField(o, f, v) => ""
             This => ""
         }
         if (name.length() > 0) {
-            return this.string_vars.contains(name)
+            if (this.string_vars.contains(name)) return true
+            // Check class fields
+            if (this.current_class.length() > 0 and this.class_fields.has(this.current_class)) {
+                var fields = this.class_fields.get(this.current_class)
+                if (fields.contains(name + ":String")) return true
+            }
         }
         return false
     }
@@ -845,7 +850,7 @@ class Codegen {
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
         var obj_val = this.gen_expr(object)
-        var val = this.gen_expr(value)
+        var val = this.gen_arg_value(value)
         var class_name = this.current_class
         var field_idx = this.get_field_index(class_name, field)
         var obj_ptr = this.fresh_local()
