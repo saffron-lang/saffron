@@ -109,8 +109,8 @@ fun get_dogs(): List<String> {
 Task.spawn(get_dogs)
 
 // --- Decorators ---
-fun logged(fn: Any): Any {
-    return fun (x: Any) => {
+fun logged(fn: (Number) => Number): (Number) => Number {
+    return fun (x: Number) => {
         IO.println("calling...")
         return fn(x)
     }
