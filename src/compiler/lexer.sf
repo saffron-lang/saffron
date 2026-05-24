@@ -1,0 +1,305 @@
+// Lexer for Saffron-mini
+
+enum TokenKind {
+    // Literals
+    TkInt(value: Float),
+    TkFloat(value: Float),
+    TkString(value: String),
+    TkTrue,
+    TkFalse,
+    TkNil,
+
+    // Identifiers & keywords
+    TkIdent(name: String),
+    TkVar,
+    TkLet,
+    TkFun,
+    TkReturn,
+    TkIf,
+    TkElse,
+    TkWhile,
+    TkAnd,
+    TkOr,
+    TkImport,
+    TkAs,
+
+    // Operators
+    TkPlus,
+    TkMinus,
+    TkStar,
+    TkSlash,
+    TkPercent,
+    TkAmpersand,
+    TkPipe,
+    TkCaret,
+    TkTilde,
+    TkShiftLeft,
+    TkShiftRight,
+    TkBang,
+    TkBangEq,
+    TkEq,
+    TkEqEq,
+    TkLt,
+    TkLtEq,
+    TkGt,
+    TkGtEq,
+
+    // Delimiters
+    TkLParen,
+    TkRParen,
+    TkLBrace,
+    TkRBrace,
+    TkLBracket,
+    TkRBracket,
+    TkComma,
+    TkDot,
+    TkColon,
+    TkArrow,
+    TkFatArrow,
+
+    // Special
+    TkNewline,
+    TkEof
+}
+
+enum Token {
+    Token(kind: TokenKind, line: Float, col: Float)
+}
+
+class Lexer {
+    var source: String
+    var pos: Float
+    var line: Float
+    var col: Float
+    var tokens: List<Token>
+
+    fun init(source: String) {
+        this.source = source
+        this.pos = 0
+        this.line = 1
+        this.col = 1
+        this.tokens = []
+    }
+
+    fun peek(): String {
+        if (this.pos >= this.source.length()) return ""
+        return this.source.char_at(this.pos)
+    }
+
+    fun peek_next(): String {
+        if (this.pos + 1 >= this.source.length()) return ""
+        return this.source.char_at(this.pos + 1)
+    }
+
+    fun advance(): String {
+        var ch = this.source.char_at(this.pos)
+        this.pos = this.pos + 1
+        this.col = this.col + 1
+        return ch
+    }
+
+    fun emit(kind: TokenKind) {
+        this.tokens.push(Token.Token(kind, this.line, this.col))
+    }
+
+    fun is_digit(ch: String): Bool {
+        return "0123456789".contains(ch)
+    }
+
+    fun is_alpha(ch: String): Bool {
+        return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(ch)
+    }
+
+    fun is_alnum(ch: String): Bool {
+        return this.is_digit(ch) or this.is_alpha(ch)
+    }
+
+    fun is_hex(ch: String): Bool {
+        return "0123456789abcdefABCDEF".contains(ch)
+    }
+
+    fun skip_whitespace() {
+        while (this.pos < this.source.length()) {
+            var ch = this.peek()
+            if (ch == " " or ch == "\t" or ch == "\r") {
+                this.advance()
+            } else if (ch == "\n") {
+                this.line = this.line + 1
+                this.col = 1
+                this.pos = this.pos + 1
+            } else if (ch == "/" and this.peek_next() == "/") {
+                while (this.pos < this.source.length() and this.peek() != "\n") {
+                    this.advance()
+                }
+            } else {
+                break
+            }
+        }
+    }
+
+    fun read_number() {
+        var start = this.pos - 1
+
+        // Check for hex literal: 0x or 0X
+        if (this.source.char_at(start) == "0" and this.pos < this.source.length() and (this.peek() == "x" or this.peek() == "X")) {
+            this.advance() // consume the 'x' or 'X'
+            while (this.pos < this.source.length() and this.is_hex(this.peek())) {
+                this.advance()
+            }
+            var text = this.source.slice(start, this.pos)
+            var value = text.to_number()
+            this.emit(TokenKind.TkInt(value))
+            return
+        }
+
+        while (this.pos < this.source.length() and this.is_digit(this.peek())) {
+            this.advance()
+        }
+
+        var has_dot = false
+        if (this.pos < this.source.length() and this.peek() == ".") {
+            has_dot = true
+            this.advance()
+            while (this.pos < this.source.length() and this.is_digit(this.peek())) {
+                this.advance()
+            }
+        }
+
+        var text = this.source.slice(start, this.pos)
+        var value = text.to_number()
+
+        if (has_dot) {
+            this.emit(TokenKind.TkFloat(value))
+        } else {
+            this.emit(TokenKind.TkInt(value))
+        }
+    }
+
+    fun read_string() {
+        var result = StringBuilder()
+        while (this.pos < this.source.length() and this.peek() != "\"") {
+            var ch = this.advance()
+            if (ch == "\\") {
+                var esc = this.advance()
+                if (esc == "n") { result.append("\n") }
+                else if (esc == "t") { result.append("\t") }
+                else if (esc == "\\") { result.append("\\") }
+                else if (esc == "\"") { result.append("\"") }
+                else { result.append(esc) }
+            } else {
+                result.append(ch)
+            }
+        }
+        this.advance() // closing quote
+        this.emit(TokenKind.TkString(result.to_string()))
+    }
+
+    fun read_identifier(): String {
+        var start = this.pos - 1
+        while (this.pos < this.source.length() and this.is_alnum(this.peek())) {
+            this.advance()
+        }
+        return this.source.slice(start, this.pos)
+    }
+
+    fun keyword_or_ident(text: String) {
+        if (text == "var") { this.emit(TokenKind.TkVar) }
+        else if (text == "let") { this.emit(TokenKind.TkLet) }
+        else if (text == "fun") { this.emit(TokenKind.TkFun) }
+        else if (text == "return") { this.emit(TokenKind.TkReturn) }
+        else if (text == "if") { this.emit(TokenKind.TkIf) }
+        else if (text == "else") { this.emit(TokenKind.TkElse) }
+        else if (text == "while") { this.emit(TokenKind.TkWhile) }
+        else if (text == "and") { this.emit(TokenKind.TkAnd) }
+        else if (text == "or") { this.emit(TokenKind.TkOr) }
+        else if (text == "true") { this.emit(TokenKind.TkTrue) }
+        else if (text == "false") { this.emit(TokenKind.TkFalse) }
+        else if (text == "nil") { this.emit(TokenKind.TkNil) }
+        else if (text == "import") { this.emit(TokenKind.TkImport) }
+        else if (text == "as") { this.emit(TokenKind.TkAs) }
+        else { this.emit(TokenKind.TkIdent(text)) }
+    }
+
+    fun tokenize(): List<Token> {
+        while (this.pos < this.source.length()) {
+            this.skip_whitespace()
+            if (this.pos >= this.source.length()) break
+
+            var ch = this.advance()
+
+            if (this.is_digit(ch)) { this.read_number() }
+            else if (this.is_alpha(ch)) {
+                var text = this.read_identifier()
+                this.keyword_or_ident(text)
+            }
+            else if (ch == "\"") { this.read_string() }
+            else if (ch == "(") { this.emit(TokenKind.TkLParen) }
+            else if (ch == ")") { this.emit(TokenKind.TkRParen) }
+            else if (ch == "{") { this.emit(TokenKind.TkLBrace) }
+            else if (ch == "}") { this.emit(TokenKind.TkRBrace) }
+            else if (ch == "[") { this.emit(TokenKind.TkLBracket) }
+            else if (ch == "]") { this.emit(TokenKind.TkRBracket) }
+            else if (ch == ",") { this.emit(TokenKind.TkComma) }
+            else if (ch == ".") { this.emit(TokenKind.TkDot) }
+            else if (ch == ":") { this.emit(TokenKind.TkColon) }
+            else if (ch == "+") { this.emit(TokenKind.TkPlus) }
+            else if (ch == "-") { this.emit(TokenKind.TkMinus) }
+            else if (ch == "*") { this.emit(TokenKind.TkStar) }
+            else if (ch == "/") { this.emit(TokenKind.TkSlash) }
+            else if (ch == "%") { this.emit(TokenKind.TkPercent) }
+            else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
+            else if (ch == "^") { this.emit(TokenKind.TkCaret) }
+            else if (ch == "~") { this.emit(TokenKind.TkTilde) }
+            else if (ch == "|") { this.emit(TokenKind.TkPipe) }
+            else if (ch == "!") {
+                if (this.peek() == "=") {
+                    this.advance()
+                    this.emit(TokenKind.TkBangEq)
+                } else {
+                    this.emit(TokenKind.TkBang)
+                }
+            }
+            else if (ch == "=") {
+                if (this.peek() == "=") {
+                    this.advance()
+                    this.emit(TokenKind.TkEqEq)
+                } else if (this.peek() == ">") {
+                    this.advance()
+                    this.emit(TokenKind.TkFatArrow)
+                } else {
+                    this.emit(TokenKind.TkEq)
+                }
+            }
+            else if (ch == "<") {
+                if (this.peek() == "=") {
+                    this.advance()
+                    this.emit(TokenKind.TkLtEq)
+                } else if (this.peek() == "<") {
+                    this.advance()
+                    this.emit(TokenKind.TkShiftLeft)
+                } else {
+                    this.emit(TokenKind.TkLt)
+                }
+            }
+            else if (ch == ">") {
+                if (this.peek() == "=") {
+                    this.advance()
+                    this.emit(TokenKind.TkGtEq)
+                } else if (this.peek() == ">") {
+                    this.advance()
+                    this.emit(TokenKind.TkShiftRight)
+                } else {
+                    this.emit(TokenKind.TkGt)
+                }
+            }
+        }
+
+        this.emit(TokenKind.TkEof)
+        return this.tokens
+    }
+}
+
+fun lex(source: String): List<Token> {
+    var lexer = Lexer(source)
+    return lexer.tokenize()
+}

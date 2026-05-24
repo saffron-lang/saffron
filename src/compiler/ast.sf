@@ -1,0 +1,46 @@
+// AST node definitions for Saffron-mini
+
+enum Type {
+    IntType,
+    FloatType,
+    BoolType,
+    StringType,
+    NilType,
+    FuncType(params: List<Type>, ret: Type)
+}
+
+enum Expr {
+    IntLit(value: Float),
+    FloatLit(value: Float),
+    BoolLit(value: Bool),
+    StringLit(value: String),
+    NilLit,
+    Variable(name: String),
+    Binary(left: Expr, op: String, right: Expr),
+    Unary(op: String, right: Expr),
+    Call(callee: Expr, args: List<Expr>),
+    Assign(name: String, value: Expr),
+    Logical(left: Expr, op: String, right: Expr),
+    MemberAccess(object: Expr, field: String)
+}
+
+enum Stmt {
+    ExprStmt(expr: Expr),
+    VarDecl(name: String, type_ann: String, initializer: Expr),
+    FunDecl(name: String, params: String, ret_type: String, body: List<Stmt>),
+    Return(value: Expr),
+    If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
+    While(condition: Expr, body: List<Stmt>),
+    Block(stmts: List<Stmt>)
+}
+
+fun type_to_string(t: Type): String {
+    return match (t) {
+        IntType => "Int"
+        FloatType => "Float"
+        BoolType => "Bool"
+        StringType => "String"
+        NilType => "Nil"
+        FuncType(params, ret) => "Fun"
+    }
+}

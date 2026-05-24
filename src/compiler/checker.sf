@@ -1,0 +1,232 @@
+// Type checker for Saffron-mini
+// Validates types and infers where needed before codegen.
+
+import "./ast.sf" as AST
+
+class TypeEnv {
+    var vars: Map<String, String>
+    var funcs: Map<String, String>
+
+    fun init() {
+        this.vars = {}
+        this.funcs = {}
+    }
+
+    fun define_var(name: String, typ: String) {
+        this.vars.set(name, typ)
+    }
+
+    fun get_var(name: String): String {
+        if (this.vars.has(name)) {
+            return this.vars.get(name)
+        }
+        return "Any"
+    }
+
+    fun define_func(name: String, sig: String) {
+        this.funcs.set(name, sig)
+    }
+
+    fun get_func(name: String): String {
+        if (this.funcs.has(name)) {
+            return this.funcs.get(name)
+        }
+        return ""
+    }
+}
+
+class Checker {
+    var env: TypeEnv
+    var errors: List<String>
+    var current_func_ret: String
+
+    fun init() {
+        this.env = TypeEnv()
+        this.errors = []
+        this.current_func_ret = "Nil"
+    }
+
+    fun error(msg: String) {
+        this.errors.push(msg)
+    }
+
+    fun check_program(stmts: List<AST.Stmt>): Bool {
+        // First pass: register all function signatures
+        var i = 0
+        while (i < stmts.length()) {
+            this.register_func(stmts[i])
+            i = i + 1
+        }
+
+        // Second pass: check function bodies
+        i = 0
+        while (i < stmts.length()) {
+            this.check_stmt(stmts[i])
+            i = i + 1
+        }
+
+        return this.errors.length() == 0
+    }
+
+    fun register_func(stmt: AST.Stmt) {
+        match (stmt) {
+            FunDecl(name, params, ret_type, body) => {
+                this.env.define_func(name, params + "->" + ret_type)
+            }
+        }
+    }
+
+    fun check_stmt(stmt: AST.Stmt) {
+        match (stmt) {
+            VarDecl(name, type_ann, init) => {
+                var init_type = this.infer_expr(init)
+                if (type_ann != "Any" and init_type != "Any" and init_type != type_ann) {
+                    this.error("Type mismatch: " + name + " declared as " + type_ann + " but got " + init_type)
+                }
+                this.env.define_var(name, type_ann)
+            }
+            FunDecl(name, params, ret_type, body) => {
+                var old_ret = this.current_func_ret
+                this.current_func_ret = ret_type
+                // Register params
+                if (params.length() > 0) {
+                    var param_list = params.split(",")
+                    var j = 0
+                    while (j < param_list.length()) {
+                        var parts = param_list[j].split(":")
+                        this.env.define_var(parts[0], parts[1])
+                        j = j + 1
+                    }
+                }
+                // Check body
+                var j = 0
+                while (j < body.length()) {
+                    this.check_stmt(body[j])
+                    j = j + 1
+                }
+                this.current_func_ret = old_ret
+            }
+            Return(value) => {
+                var val_type = this.infer_expr(value)
+                if (val_type != "Any" and this.current_func_ret != "Any" and val_type != this.current_func_ret) {
+                    this.error("Return type mismatch: expected " + this.current_func_ret + " but got " + val_type)
+                }
+            }
+            ExprStmt(expr) => {
+                this.infer_expr(expr)
+            }
+            If(cond, then_branch, else_branch) => {
+                var cond_type = this.infer_expr(cond)
+                if (cond_type != "Bool" and cond_type != "Any") {
+                    this.error("If condition must be Bool, got " + cond_type)
+                }
+                var j = 0
+                while (j < then_branch.length()) {
+                    this.check_stmt(then_branch[j])
+                    j = j + 1
+                }
+                j = 0
+                while (j < else_branch.length()) {
+                    this.check_stmt(else_branch[j])
+                    j = j + 1
+                }
+            }
+            While(cond, body) => {
+                var cond_type = this.infer_expr(cond)
+                if (cond_type != "Bool" and cond_type != "Any") {
+                    this.error("While condition must be Bool, got " + cond_type)
+                }
+                var j = 0
+                while (j < body.length()) {
+                    this.check_stmt(body[j])
+                    j = j + 1
+                }
+            }
+            Block(stmts) => {
+                var j = 0
+                while (j < stmts.length()) {
+                    this.check_stmt(stmts[j])
+                    j = j + 1
+                }
+            }
+        }
+    }
+
+    fun infer_expr(expr: AST.Expr): String {
+        return match (expr) {
+            IntLit(v) => "Int"
+            FloatLit(v) => "Float"
+            BoolLit(v) => "Bool"
+            StringLit(v) => "String"
+            NilLit => "Nil"
+            Variable(name) => this.env.get_var(name)
+            Binary(left, op, right) => this.infer_binary(left, op, right)
+            Unary(op, right) => this.infer_unary(op, right)
+            Call(callee, args) => this.infer_call(callee, args)
+            Assign(name, value) => {
+                var val_type = this.infer_expr(value)
+                var var_type = this.env.get_var(name)
+                if (var_type != "Any" and val_type != "Any" and val_type != var_type) {
+                    this.error("Cannot assign " + val_type + " to " + name + " (type " + var_type + ")")
+                }
+                val_type
+            }
+            Logical(left, op, right) => "Bool"
+            MemberAccess(obj, field) => "Any"
+        }
+    }
+
+    fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
+        var lt = this.infer_expr(left)
+        var rt = this.infer_expr(right)
+
+        if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
+            return "Bool"
+        }
+        // Arithmetic: both should be same numeric type
+        if (lt == rt) return lt
+        if (lt == "Any") return rt
+        if (rt == "Any") return lt
+        return "Int"
+    }
+
+    fun infer_unary(op: String, right: AST.Expr): String {
+        var rt = this.infer_expr(right)
+        if (op == "!") return "Bool"
+        return rt
+    }
+
+    fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
+        var name = match (callee) {
+            Variable(n) => n
+            MemberAccess(obj, field) => "Any"
+        }
+        var sig = this.env.get_func(name)
+        if (sig.length() == 0) return "Any"
+        // Extract return type from "params->RetType"
+        var parts = sig.split("->")
+        if (parts.length() >= 2) {
+            return parts[parts.length() - 1]
+        }
+        return "Any"
+    }
+
+    fun report(): String {
+        if (this.errors.length() == 0) {
+            return ""
+        }
+        var sb = StringBuilder()
+        var i = 0
+        while (i < this.errors.length()) {
+            sb.append("Error: " + this.errors[i] + "\n")
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+}
+
+fun check(program: List<AST.Stmt>): String {
+    var checker = Checker()
+    checker.check_program(program)
+    return checker.report()
+}
