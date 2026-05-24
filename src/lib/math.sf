@@ -1,0 +1,55 @@
+// Math utilities — common constants and numeric functions
+
+// Constants
+var PI = 3.14159265358979323846
+var E = 2.71828182845904523536
+var TAU = 6.28318530717958647692
+
+// Functions using Number methods
+fun abs(x: Number): Number { return x.abs() }
+fun floor(x: Number): Number { return x.floor() }
+fun ceil(x: Number): Number { return x.ceil() }
+fun round(x: Number, places: Number): Number { return x.round(places) }
+
+// Min/Max
+fun min(a: Number, b: Number): Number {
+    if (a < b) return a
+    return b
+}
+
+fun max(a: Number, b: Number): Number {
+    if (a > b) return a
+    return b
+}
+
+// Clamp
+fun clamp(x: Number, lo: Number, hi: Number): Number {
+    if (x < lo) return lo
+    if (x > hi) return hi
+    return x
+}
+
+// Power (integer exponent)
+fun pow(base: Number, exp: Number): Number {
+    if (exp == 0) return 1
+    var result = 1
+    var i = 0
+    while (i < exp) {
+        result = result * base
+        i = i + 1
+    }
+    return result
+}
+
+// Square root (Newton's method)
+fun sqrt(x: Number): Number {
+    if (x < 0) return 0
+    if (x == 0) return 0
+    var guess = x / 2
+    var i = 0
+    while (i < 20) {
+        guess = (guess + x / guess) / 2
+        i = i + 1
+    }
+    return guess
+}

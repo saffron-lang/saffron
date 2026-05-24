@@ -1,0 +1,9 @@
+import "@math" as Math
+
+IO.println(Math.PI)
+IO.println(Math.abs(-5))
+IO.println(Math.min(3, 7))
+IO.println(Math.max(3, 7))
+IO.println(Math.pow(2, 10))
+IO.println(Math.sqrt(16))
+IO.println(Math.clamp(15, 0, 10))
