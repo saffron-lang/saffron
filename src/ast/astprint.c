@@ -481,6 +481,10 @@ void unparseNode(Node *node) {
         }
         case NODE_SIMPLE: {
             struct Simple *casted = (struct Simple *) node;
+            if (casted->qualifier.length > 0) {
+                unparseToken(casted->qualifier);
+                printf(".");
+            }
             unparseToken(casted->name);
             break;
         }
@@ -963,6 +967,12 @@ void printNode(Node *node) {
             struct Simple *casted = (struct Simple *) node;
             printf("Simple(\n");
             indent++;
+            if (casted->qualifier.length > 0) {
+                printIndent();
+                printf("qualifier=");
+                printToken(casted->qualifier);
+                printf("\n");
+            }
             printIndent();
             printf("name=");
             printToken(casted->name);

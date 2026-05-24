@@ -6,6 +6,8 @@ var e = _Math.e
 var inf = _Math.inf
 var nan = _Math.nan
 var tau = _Math.pi * 2
+var PI = _Math.pi
+var E = _Math.e
 
 // Re-export native functions
 fun abs(x: Number): Number { return _Math.abs(x) }

@@ -53,6 +53,7 @@ typedef enum {
     OBJ_CALL_FRAME,
     OBJ_MODULE,
     OBJ_OVERLOAD_SET,
+    OBJ_PARSE_OVERLOAD_TYPE,
 } ObjType;
 
 struct Obj {

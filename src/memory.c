@@ -133,6 +133,7 @@ static void freeObject(Obj *object) {
         case OBJ_PARSE_INTERFACE_TYPE:
         case OBJ_PARSE_TYPE:
         case OBJ_PARSE_GENERIC_TYPE:
+        case OBJ_PARSE_OVERLOAD_TYPE:
             freeType((Type *) object);
             break;
     }
@@ -297,6 +298,9 @@ static void blackenObject(Obj *object) {
             if (frame->parent) {
                 markObject((Obj *) frame->parent);
             }
+            markArray(&frame->stack);
+            markValue(frame->stored);
+            markValue(frame->result);
             break;
         }
         case OBJ_OVERLOAD_SET: {
@@ -311,7 +315,8 @@ static void blackenObject(Obj *object) {
         case OBJ_PARSE_GENERIC_TYPE:
         case OBJ_PARSE_GENERIC_DEFINITION_TYPE:
         case OBJ_PARSE_UNION_TYPE:
-        case OBJ_PARSE_INTERFACE_TYPE: {
+        case OBJ_PARSE_INTERFACE_TYPE:
+        case OBJ_PARSE_OVERLOAD_TYPE: {
             markType((Type *) object);
             break;
         }

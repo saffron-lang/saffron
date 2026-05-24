@@ -13,6 +13,7 @@ Type *evaluateNode(Node *node);
 Type *parseFile(const char *path, int length);
 
 TypeEnvironment *currentEnv = NULL;
+static const char *currentTypecheckFile = NULL;
 
 SimpleType *newSimpleType() {
     SimpleType *type = ALLOCATE_OBJ(SimpleType, OBJ_PARSE_TYPE);
@@ -66,6 +67,14 @@ GenericType *newGenericType() {
 GenericTypeDefinition *newGenericTypeDefinition() {
     GenericTypeDefinition *type = ALLOCATE_OBJ(GenericTypeDefinition, OBJ_PARSE_GENERIC_DEFINITION_TYPE);
     type->extends = NULL;
+    return type;
+}
+
+OverloadType *newOverloadType() {
+    OverloadType *type = ALLOCATE_OBJ(OverloadType, OBJ_PARSE_OVERLOAD_TYPE);
+    push(OBJ_VAL(type));
+    initValueArray(&type->variants);
+    pop();
     return type;
 }
 
@@ -215,6 +224,7 @@ void defineBuiltinTypeDef(const char *path, const char *name, Type *type, bool b
 
 void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineTypeDef(typeEnvironment, "Number", (Type *) numberType);
+    defineTypeDef(typeEnvironment, "Float", (Type *) numberType);
     defineTypeDef(typeEnvironment, "Nil", (Type *) nilType);
     defineTypeDef(typeEnvironment, "Bool", (Type *) boolType);
     defineTypeDef(typeEnvironment, "Atom", (Type *) atomType);
@@ -229,6 +239,8 @@ void initGlobalEnvironment(TypeEnvironment *typeEnvironment) {
     defineLocal(typeEnvironment, "String", (Type *) stringType);
     defineLocal(typeEnvironment, "Bool", (Type *) boolType);
     defineLocal(typeEnvironment, "Nil", (Type *) nilType);
+    defineLocal(typeEnvironment, "StringBuilder", (Type *) anyType);
+    defineTypeDef(typeEnvironment, "StringBuilder", (Type *) anyType);
 }
 
 void initTypeEnvironment(TypeEnvironment *typeEnvironment, FunctionType type) {
@@ -252,6 +264,8 @@ struct Functor *initFunctor(TypeNodeArray types, TypeNode *returnType, TypeNodeA
 struct Simple *initSimple(Token name) {
     struct Simple *type = ALLOCATE_NODE(struct Simple, NODE_FUNCTOR);
     type->name = name;
+    Token emptyQualifier = {.type = TOKEN_EOF, .start = "", .length = 0, .line = 0};
+    type->qualifier = emptyQualifier;
     return type;
 }
 
@@ -676,9 +690,19 @@ static void preRegisterDeclarations(StmtArray *statements) {
             if (tableGet(&currentEnv->locals, fnName, &existingVal) &&
                 IS_OBJ(existingVal) &&
                 (AS_OBJ(existingVal)->type == OBJ_PARSE_FUNCTOR_TYPE ||
-                 AS_OBJ(existingVal) == (Obj *) anyType)) {
-                // Multiple functions with same name: mark as overloaded (Any)
-                tableSet(&currentEnv->locals, fnName, OBJ_VAL(anyType));
+                 AS_OBJ(existingVal)->type == OBJ_PARSE_OVERLOAD_TYPE)) {
+                // Multiple functions with same name: create/extend overload set
+                OverloadType *overload;
+                if (AS_OBJ(existingVal)->type == OBJ_PARSE_OVERLOAD_TYPE) {
+                    overload = (OverloadType *) AS_OBJ(existingVal);
+                } else {
+                    overload = newOverloadType();
+                    writeValueArray(&overload->variants, existingVal);
+                }
+                FunctorType *placeholder = newFunctorType();
+                placeholder->returnType = (Type *) anyType;
+                writeValueArray(&overload->variants, OBJ_VAL(placeholder));
+                tableSet(&currentEnv->locals, fnName, OBJ_VAL(overload));
             } else {
                 FunctorType *placeholder = newFunctorType();
                 placeholder->returnType = (Type *) anyType;
@@ -707,6 +731,10 @@ static void preRegisterDeclarations(StmtArray *statements) {
 
 void setTypeDiagnostics(DiagnosticArray *diagnostics) {
     typeDiagnostics = diagnostics;
+}
+
+void setTypecheckFile(const char *path) {
+    currentTypecheckFile = path;
 }
 
 bool evaluateTree(StmtArray *statements) {
@@ -745,9 +773,12 @@ Type *parseFile(const char *path, int length) {
         return AS_OBJ(cached);
     }
 
-    char *resolved = findModule(path, NULL);
+    char *resolved = findModule(path, currentTypecheckFile);
+    const char *prevFile = currentTypecheckFile;
+    currentTypecheckFile = resolved;
     char *source = readFile(resolved);
     if (source == NULL) {
+        currentTypecheckFile = prevFile;
         return NULL;
     }
 
@@ -772,9 +803,9 @@ Type *parseFile(const char *path, int length) {
     panicMode = false;
 
     StmtArray *body = parseAST(source);
-    // Type-check imported files but don't crash on errors
+    // Type-check imported files: don't bail on error so all declarations get registered
     bool oldBail = bailOnError;
-    bailOnError = true;
+    bailOnError = false;
     evaluateTypes(body);
     bailOnError = oldBail;
 
@@ -787,6 +818,7 @@ Type *parseFile(const char *path, int length) {
     tableSet(&modules, copyString(path, length), OBJ_VAL(type));
 
     currentEnv = oldEnv;
+    currentTypecheckFile = prevFile;
     return type;
 }
 
@@ -904,12 +936,54 @@ Type *evaluateNode(Node *node) {
                 }
                 return (Type *) anyType;
             }
+
+            // Overload resolution: evaluate args then find best match
+            if (calleeType != NULL && calleeType->obj.type == OBJ_PARSE_OVERLOAD_TYPE) {
+                OverloadType *overload = (OverloadType *) calleeType;
+
+                // Evaluate argument types first
+                Type *argTypes[256];
+                int argCount = casted->arguments.count;
+                for (int i = 0; i < argCount; i++) {
+                    argTypes[i] = evaluateNode((Node *) casted->arguments.exprs[i]);
+                }
+
+                // Try each variant for a match
+                FunctorType *bestMatch = NULL;
+                for (int v = 0; v < overload->variants.count; v++) {
+                    Type *variant = AS_OBJ(overload->variants.values[v]);
+                    if (variant->obj.type != OBJ_PARSE_FUNCTOR_TYPE) continue;
+                    FunctorType *fn = (FunctorType *) variant;
+
+                    if (fn->arguments.count != argCount) continue;
+
+                    bool allMatch = true;
+                    for (int i = 0; i < argCount; i++) {
+                        if (!isSubType(argTypes[i], AS_OBJ(fn->arguments.values[i]))) {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                    if (allMatch) {
+                        bestMatch = fn;
+                        break;
+                    }
+                }
+
+                if (bestMatch == NULL) {
+                    errorAt(&casted->paren, "No overload matches the given arguments");
+                    return (Type *) anyType;
+                }
+
+                return bestMatch->returnType ? resolveType(bestMatch->returnType) : (Type *) anyType;
+            }
+
             if (calleeType == NULL || calleeType->obj.type != OBJ_PARSE_FUNCTOR_TYPE) {
                 if (calleeType != NULL) errorAt(&casted->paren, "Type is not callable");
                 return (Type *) anyType;
             }
 
-            FunctorType *calleeFunctor = calleeType;
+            FunctorType *calleeFunctor = (FunctorType *) calleeType;
 
             if (casted->arguments.count != calleeFunctor->arguments.count) {
                 // TODO: Varargs — for now skip detailed checking on arity mismatch
@@ -1085,10 +1159,15 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_SET: {
             struct Set *casted = (struct Set *) node;
-            Type *valueType = evaluateNode((Node *) casted->value);
 
+            // Resolve the object and field type first so we can propagate
+            // the expected type to the value expression (enables empty list/map
+            // literals to adopt the declared element type).
             Type *objectType = evaluateNode((Node *) casted->object);
-            if (objectType == NULL || objectType == (Type *) anyType) return (Type *) anyType;
+            if (objectType == NULL || objectType == (Type *) anyType) {
+                evaluateNode((Node *) casted->value);
+                return (Type *) anyType;
+            }
 
             SimpleType *rootType = (SimpleType *) objectType;
 
@@ -1096,19 +1175,30 @@ Type *evaluateNode(Node *node) {
                 rootType = (SimpleType *) ((GenericType *) objectType)->target;
             } else if (objectType->obj.type != OBJ_PARSE_TYPE && objectType->obj.type != OBJ_PARSE_INTERFACE_TYPE) {
                 errorAt(&casted->name, "Cannot set field on this type");
+                evaluateNode((Node *) casted->value);
                 return (Type *) anyType;
             }
 
-            if (rootType == anyType) return (Type *) anyType;
+            if (rootType == anyType) {
+                evaluateNode((Node *) casted->value);
+                return (Type *) anyType;
+            }
 
             Value fieldType;
 
             if (!tableGet(&rootType->methods, copyString(casted->name.start, casted->name.length), &fieldType)) {
                 if (!tableGet(&rootType->fields, copyString(casted->name.start, casted->name.length), &fieldType)) {
                     errorAt(&casted->name, "Invalid field");
+                    evaluateNode((Node *) casted->value);
                     return (Type *) anyType;
                 }
             }
+
+            // Set currentAssignmentType so list/map literals infer element types
+            Type *oldAssignmentType = currentAssignmentType;
+            currentAssignmentType = AS_TYPE(fieldType);
+            Type *valueType = evaluateNode((Node *) casted->value);
+            currentAssignmentType = oldAssignmentType;
 
             if (!isSubType(valueType, AS_TYPE(fieldType))) {
                 errorAt(&casted->name, "Type mismatch in setter");
@@ -1247,13 +1337,29 @@ Type *evaluateNode(Node *node) {
                 writeValueArray(&type->generics, OBJ_VAL(itemType));
                 type->target = listTypeDef;
             } else {
+                if (currentAssignmentType->obj.type == OBJ_PARSE_TYPE &&
+                    (SimpleType *) currentAssignmentType == listTypeDef) {
+                    // Raw List type without generics — treat as List<Any>
+                    type = newGenericType();
+                    initValueArray(&type->generics);
+                    Type *itemType = (Type *) anyType;
+                    if (casted->items.count > 0) {
+                        itemType = evaluateNode((Node *) casted->items.exprs[0]);
+                        for (int i = 1; i < casted->items.count; i++) {
+                            evaluateNode((Node *) casted->items.exprs[i]);
+                        }
+                    }
+                    writeValueArray(&type->generics, OBJ_VAL(itemType));
+                    type->target = (Type *) listTypeDef;
+                    return (Type *) type;
+                }
                 if (currentAssignmentType->obj.type != OBJ_PARSE_GENERIC_TYPE) {
                     errorAt(&casted->bracket, "Type mismatch");
-                    return type;
+                    return (Type *) type;
                 }
-                if (!isSubType(listTypeDef, type->target)) {
+                if (!isSubType((Type *) listTypeDef, type->target)) {
                     errorAt(&casted->bracket, "Type mismatch, incompatible type");
-                    return type;
+                    return (Type *) type;
                 }
                 if (type->generics.count != 1) {
                     errorAt(&casted->bracket, "Type mismatch, missing type annotation");
@@ -1435,15 +1541,21 @@ Type *evaluateNode(Node *node) {
             type->returnType = evaluateNode((Node *) casted->returnType);
 
             // Register in enclosing scope for recursive calls
-            // If pre-registration already marked this as overloaded (anyType), keep it
             {
                 ObjString *funcName = copyString(casted->name.start, casted->name.length);
                 Value existingFunc;
                 if (tableGet(&currentEnv->enclosing->locals, funcName, &existingFunc) &&
                     IS_OBJ(existingFunc) &&
-                    AS_OBJ(existingFunc) == (Obj *) anyType) {
-                    // Already marked as overloaded by pre-registration, keep anyType
-                    tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(anyType));
+                    AS_OBJ(existingFunc)->type == OBJ_PARSE_OVERLOAD_TYPE) {
+                    // Update the placeholder in the overload set with the real type
+                    OverloadType *overload = (OverloadType *) AS_OBJ(existingFunc);
+                    for (int i = 0; i < overload->variants.count; i++) {
+                        FunctorType *variant = (FunctorType *) AS_OBJ(overload->variants.values[i]);
+                        if (variant->returnType == (Type *) anyType && variant->arguments.count == 0) {
+                            overload->variants.values[i] = OBJ_VAL(type);
+                            break;
+                        }
+                    }
                 } else {
                     tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(type));
                 }
@@ -1647,8 +1759,10 @@ Type *evaluateNode(Node *node) {
             Type *narrowType = NULL;
             Type *originalType = NULL;
 
+            fprintf(stderr, "[NARROW-CHECK] cond->type=%d\n", cond->type);
             if (cond->type == NODE_BINARY) {
                 struct Binary *binCond = (struct Binary *) cond;
+                fprintf(stderr, "[NARROW-CHECK] op=%d left=%d right=%d\n", binCond->operator.type, binCond->left->type, binCond->right->type);
                 if (binCond->operator.type == TOKEN_IS &&
                     binCond->left->type == NODE_VARIABLE &&
                     binCond->right->type == NODE_VARIABLE) {
@@ -1665,7 +1779,9 @@ Type *evaluateNode(Node *node) {
                 // Then-branch: variable has the narrowed type
                 TypeEnvironment thenEnv;
                 initTypeEnvironment(&thenEnv, currentEnv->type);
-                tableSet(&thenEnv.locals, copyString(narrowVar->start, narrowVar->length), OBJ_VAL(narrowType));
+                ObjString *nKey = copyString(narrowVar->start, narrowVar->length);
+                tableSet(&thenEnv.locals, nKey, OBJ_VAL(narrowType));
+                fprintf(stderr, "[NARROW] set '%.*s' to type %d in env %p\n", narrowVar->length, narrowVar->start, narrowType->obj.type, (void*)&thenEnv);
                 result = evaluateNode((Node *) casted->thenBranch);
                 currentEnv = currentEnv->enclosing;
 
@@ -1791,18 +1907,38 @@ Type *evaluateNode(Node *node) {
                 errorAt(&casted->name, "Could not resolve import");
                 return (Type *) anyType;
             }
-            tableSet(
-                    &currentEnv->locals, copyString(
-                            casted->name.start, casted->name.length
-                    ),
-                    OBJ_VAL(type)
-            );
-
-            // Bring imported type definitions into scope
             if (type->obj.type == OBJ_PARSE_TYPE) {
                 SimpleType *moduleType = (SimpleType *) type;
+                // Bring imported type definitions into scope
                 tableAddAll(&moduleType->methods, &currentEnv->typeDefs);
-                tableAddAll(&moduleType->fields, &currentEnv->locals);
+
+                if (casted->names.count > 0) {
+                    // Named imports: `import { a, b } from "mod"`
+                    for (int i = 0; i < casted->names.count; i++) {
+                        ObjString *importName = copyString(
+                            casted->names.tokens[i].start,
+                            casted->names.tokens[i].length);
+                        Value importedVal;
+                        if (tableGet(&moduleType->fields, importName, &importedVal)) {
+                            tableSet(&currentEnv->locals, importName, importedVal);
+                        }
+                    }
+                } else {
+                    // Qualified import: `import "mod" as Name`
+                    tableSet(
+                            &currentEnv->locals, copyString(
+                                    casted->name.start, casted->name.length
+                            ),
+                            OBJ_VAL(type)
+                    );
+                }
+            } else {
+                tableSet(
+                        &currentEnv->locals, copyString(
+                                casted->name.start, casted->name.length
+                        ),
+                        OBJ_VAL(type)
+                );
             }
 
             return (Type *) anyType;
@@ -1846,7 +1982,30 @@ Type *evaluateNode(Node *node) {
         }
         case NODE_SIMPLE: {
             struct Simple *casted = (struct Simple *) node;
-            Type *type = getTypeDef(casted->name);
+            Type *type;
+
+            // Handle qualified type references (Module.Type)
+            if (casted->qualifier.length > 0) {
+                Type *moduleType = getVariableType(casted->qualifier);
+                if (moduleType && moduleType->obj.type == OBJ_PARSE_TYPE) {
+                    SimpleType *module = (SimpleType *) moduleType;
+                    Value memberType;
+                    ObjString *typeName = copyString(casted->name.start, casted->name.length);
+                    if (tableGet(&module->methods, typeName, &memberType)) {
+                        type = (Type *) AS_OBJ(memberType);
+                    } else if (tableGet(&module->fields, typeName, &memberType)) {
+                        type = (Type *) AS_OBJ(memberType);
+                    } else {
+                        errorAt(&casted->name, "Type not found in module");
+                        type = (Type *) anyType;
+                    }
+                } else {
+                    errorAt(&casted->qualifier, "Qualifier is not a module");
+                    type = (Type *) anyType;
+                }
+            } else {
+                type = getTypeDef(casted->name);
+            }
 
             if (casted->generics.count > 0) {
                 GenericType *genericType = newGenericType();
@@ -2128,7 +2287,14 @@ Type *evaluateNode(Node *node) {
                 TypeEnvironment armEnv;
                 initTypeEnvironment(&armEnv, currentEnv->type);
 
-                if (arm->isTypePattern) {
+                if (arm->isBinding) {
+                    // Variable binding catch-all: bind subject to var name
+                    if (!(arm->variantName.length == 1 && arm->variantName.start[0] == '_')) {
+                        tableSet(&armEnv.locals,
+                                 copyString(arm->variantName.start, arm->variantName.length),
+                                 OBJ_VAL(subjectType ? subjectType : anyType));
+                    }
+                } else if (arm->isTypePattern) {
                     // is Type(binding) => ...
                     Type *narrowedType = getTypeDef(arm->variantName);
                     if (narrowedType && arm->bindings.count > 0) {
@@ -2195,15 +2361,15 @@ Type *evaluateNode(Node *node) {
                 currentEnv = currentEnv->enclosing;
             }
 
-            // Exhaustiveness check: only for enum variant patterns (not is-type patterns)
+            // Exhaustiveness check: skip if there's a catch-all binding or is-type pattern
             bool hasIsPattern = false;
+            bool hasBinding = false;
             for (int i = 0; i < casted->arms.count; i++) {
-                if (((struct MatchArm *)casted->arms.stmts[i])->isTypePattern) {
-                    hasIsPattern = true;
-                    break;
-                }
+                struct MatchArm *a = (struct MatchArm *)casted->arms.stmts[i];
+                if (a->isTypePattern) { hasIsPattern = true; break; }
+                if (a->isBinding) { hasBinding = true; break; }
             }
-            if (!hasIsPattern && subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
+            if (!hasIsPattern && !hasBinding && subjectType && subjectType->obj.type == OBJ_PARSE_TYPE) {
                 SimpleType *enumST = (SimpleType *) subjectType;
                 for (int i = 0; i < enumST->methods.capacity; i++) {
                     Entry *entry = &enumST->methods.entries[i];
@@ -2249,6 +2415,9 @@ void freeType(Type *type) {
         case OBJ_PARSE_GENERIC_TYPE:
             FREE(GenericType, type);
             break;
+        case OBJ_PARSE_OVERLOAD_TYPE:
+            FREE(OverloadType, type);
+            break;
     }
 }
 
@@ -2283,6 +2452,11 @@ void markType(Type *type) {
             struct GenericType *casted = (GenericType *) type;
             markObject((Obj *) casted->target);
             markArray(&casted->generics);
+            break;
+        }
+        case OBJ_PARSE_OVERLOAD_TYPE: {
+            OverloadType *casted = (OverloadType *) type;
+            markArray(&casted->variants);
             break;
         }
     }

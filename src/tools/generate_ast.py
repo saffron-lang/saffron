@@ -56,7 +56,7 @@ stmts = [
 
 type_items = [
     "TypeNode         : Node self",
-    "Simple           : Token name, TypeNodeArray generics",
+    "Simple           : Token name, Token qualifier, TypeNodeArray generics",
     "Functor          : TypeNodeArray arguments, TypeNode *returnType, TypeNodeArray generics",
     "Union            : TypeNode* left, TypeNode* right",
     "Interface        : Token name, struct Variable* superType, StmtArray body, TypeNodeArray generics",
