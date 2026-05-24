@@ -26,6 +26,7 @@ enum TokenKind {
     TkMatch,
     TkClass,
     TkThis,
+    TkFor,
 
     // Operators
     TkPlus,
@@ -58,6 +59,7 @@ enum TokenKind {
     TkComma,
     TkDot,
     TkColon,
+    TkSemicolon,
     TkArrow,
     TkFatArrow,
 
@@ -225,6 +227,7 @@ class Lexer {
         else if (text == "match") { this.emit(TokenKind.TkMatch) }
         else if (text == "class") { this.emit(TokenKind.TkClass) }
         else if (text == "this") { this.emit(TokenKind.TkThis) }
+        else if (text == "for") { this.emit(TokenKind.TkFor) }
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 
@@ -250,6 +253,7 @@ class Lexer {
             else if (ch == ",") { this.emit(TokenKind.TkComma) }
             else if (ch == ".") { this.emit(TokenKind.TkDot) }
             else if (ch == ":") { this.emit(TokenKind.TkColon) }
+            else if (ch == ";") { this.emit(TokenKind.TkSemicolon) }
             else if (ch == "+") { this.emit(TokenKind.TkPlus) }
             else if (ch == "-") { this.emit(TokenKind.TkMinus) }
             else if (ch == "*") { this.emit(TokenKind.TkStar) }
