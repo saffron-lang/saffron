@@ -42,8 +42,11 @@ fun is_long_flag(arg: String): Bool {
 }
 
 fun is_short_flag(arg: String): Bool {
-    if (arg.length() < 1) { return false }
-    if (arg.char_at(0) == "-") { return true }
+    if (arg.length() < 2) { return false }
+    if (arg.char_at(0) == "-") {
+        if (arg.char_at(1) == "-") { return false }
+        return true
+    }
     return false
 }
 
@@ -52,9 +55,7 @@ fun parse_list(raw: List): ParsedArgs {
     var i = 0
     while (i < raw.length()) {
         var arg: String = raw[i]
-        var handled = false
         if (is_long_flag(arg)) {
-            handled = true
             var rest = arg.slice(2, arg.length())
             var eq_pos = rest.index_of("=")
             if (eq_pos >= 0) {
@@ -64,19 +65,14 @@ fun parse_list(raw: List): ParsedArgs {
             } else {
                 result.flags.set(rest, true)
             }
-        }
-        if (handled == false) {
-            if (is_short_flag(arg)) {
-                handled = true
-                var rest = arg.slice(1, arg.length())
-                var ci = 0
-                while (ci < rest.length()) {
-                    result.flags.set(rest.char_at(ci), true)
-                    ci = ci + 1
-                }
+        } else if (is_short_flag(arg)) {
+            var rest = arg.slice(1, arg.length())
+            var ci = 0
+            while (ci < rest.length()) {
+                result.flags.set(rest.char_at(ci), true)
+                ci = ci + 1
             }
-        }
-        if (handled == false) {
+        } else {
             result.positional.push(arg)
         }
         i = i + 1

@@ -1777,9 +1777,7 @@ Type *evaluateNode(Node *node) {
                 // Then-branch: variable has the narrowed type
                 TypeEnvironment thenEnv;
                 initTypeEnvironment(&thenEnv, currentEnv->type);
-                ObjString *nKey = copyString(narrowVar->start, narrowVar->length);
-                tableSet(&thenEnv.locals, nKey, OBJ_VAL(narrowType));
-                fprintf(stderr, "[NARROW] set '%.*s' to type %d in env %p\n", narrowVar->length, narrowVar->start, narrowType->obj.type, (void*)&thenEnv);
+                tableSet(&thenEnv.locals, copyString(narrowVar->start, narrowVar->length), OBJ_VAL(narrowType));
                 result = evaluateNode((Node *) casted->thenBranch);
                 currentEnv = currentEnv->enclosing;
 
