@@ -1,0 +1,19 @@
+enum Shape {
+    Circle(radius: Int),
+    Rect(width: Int, height: Int)
+}
+
+fun area(s: Shape): Int {
+    return match (s) {
+        Circle(r) => r * r * 3
+        Rect(w, h) => w * h
+    }
+}
+
+fun main(): Int {
+    var c = Shape.Circle(5)
+    var r = Shape.Rect(4, 6)
+    IO.println(area(c))
+    IO.println(area(r))
+    return 0
+}

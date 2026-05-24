@@ -959,9 +959,21 @@ void compileNode(Node *node) {
             emitByte(OP_POP);
 
             bool oldLast = lastInBody;
-            lastInBody = true;
+            // When there's no else branch in expression context, don't let
+            // the then-branch retain its last expression value, because we
+            // need to push an explicit NIL to balance with the else path.
+            if (!casted->elseBranch && exprContext) {
+                lastInBody = false;
+            } else {
+                lastInBody = true;
+            }
             compileNode((Node *) casted->thenBranch);
             lastInBody = oldLast;
+
+            // In expression context without else, push NIL as the then-path value
+            if (!casted->elseBranch && exprContext) {
+                emitByte(OP_NIL);
+            }
 
             int elseJump = emitJump(OP_JUMP);
             patchJump(thenJump);
