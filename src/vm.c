@@ -149,6 +149,7 @@ void initVM() {
     vm.gtString = copyString("gt", 2);
     vm.eqString = copyString("eq", 2);
     vm.getItemString = copyString("getItem", 7);
+    vm.setItemString = copyString("setItem", 7);
     vm.openUpvalues = NULL;
 
     vm.handlerCount = 0;
@@ -982,6 +983,39 @@ static InterpretResult run(ObjModule *module) {
                     currentFrame = CURRENT_TASK;
                 } else {
                     runtimeError("Type does not support indexing.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
+            case OP_SETITEM: {
+                Value value = pop();
+                Value indexValue = pop();
+                Value obj = pop();
+                if (isObjType(obj, OBJ_LIST)) {
+                    ObjList *list = (ObjList *) AS_OBJ(obj);
+                    int index = (int) trunc(AS_NUMBER(indexValue));
+                    if (index < 0) index += list->items.count;
+                    if (index < 0 || index >= list->items.count) {
+                        runtimeError("Index out of bounds.");
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
+                    list->items.values[index] = value;
+                    push(value);
+                } else if (isObjType(obj, OBJ_MAP)) {
+                    ObjMap *map = (ObjMap *) AS_OBJ(obj);
+                    valueTableSet(&map->values, indexValue, value);
+                    push(value);
+                } else if (IS_INSTANCE(obj)) {
+                    // Operator overload: obj[key] = val dispatches to obj.setItem(key, val)
+                    push(obj);
+                    push(indexValue);
+                    push(value);
+                    if (!invoke(vm.setItemString, 2)) {
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
+                    currentFrame = CURRENT_TASK;
+                } else {
+                    runtimeError("Type does not support indexed assignment.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;

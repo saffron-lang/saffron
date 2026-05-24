@@ -423,11 +423,23 @@ static Expr *call(Expr *left, bool canAssign) {
 }
 
 static Expr *getItem(Expr *left, bool canAssign) {
-    Expr *expr = expression();
+    Token bracket = parser.previous;
+    Expr *indexExpr = expression();
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index.");
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        struct SetItem *result = ALLOCATE_NODE(struct SetItem, NODE_SETITEM);
+        result->object = left;
+        result->bracket = bracket;
+        result->index = indexExpr;
+        result->value = expression();
+        return (Expr *) result;
+    }
+
     struct GetItem *result = ALLOCATE_NODE(struct GetItem, NODE_GETITEM);
     result->object = left;
-    result->index = expr;
-    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index.");
+    result->bracket = bracket;
+    result->index = indexExpr;
     return (Expr *) result;
 }
 

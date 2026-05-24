@@ -18,9 +18,14 @@ var items = ["a", "b", "c"]
 var c = Random.choice(items)
 T.assert(c == "a" or c == "b" or c == "c", "choice picks from list")
 
-// shuffle - requires indexed assignment (list[i] = x)
-// var nums = [1, 2, 3, 4, 5]
-// var shuffled = Random.shuffle(nums)
-// T.assert_eq(shuffled.length(), 5, "shuffle preserves length")
+// shuffle
+var nums = [1, 2, 3, 4, 5]
+var shuffled = Random.shuffle(nums)
+T.assert_eq(shuffled.length(), 5, "shuffle preserves length")
+T.assert_eq(nums[0], 1, "shuffle does not mutate original")
+
+// sample
+var s = Random.sample([10, 20, 30, 40, 50], 3)
+T.assert_eq(s.length(), 3, "sample returns correct count")
 
 T.summary()

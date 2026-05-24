@@ -1,0 +1,64 @@
+import "time" as _Time
+
+fun clock(): Number {
+    return _Time.clock()
+}
+
+fun timestamp(): Number {
+    return _Time.timestamp()
+}
+
+fun sleep(seconds: Number) {
+    _Time.sleep(seconds)
+}
+
+fun to_iso(ts: Number): String {
+    return _Time.to_iso(ts)
+}
+
+fun year(ts: Number): Number {
+    return _Time.year(ts)
+}
+
+fun month(ts: Number): Number {
+    return _Time.month(ts)
+}
+
+fun day(ts: Number): Number {
+    return _Time.day(ts)
+}
+
+fun hour(ts: Number): Number {
+    return _Time.hour(ts)
+}
+
+fun minute(ts: Number): Number {
+    return _Time.minute(ts)
+}
+
+fun second(ts: Number): Number {
+    return _Time.second(ts)
+}
+
+fun now(): Map<String, Number> {
+    var ts = _Time.timestamp()
+    return {
+        "year": _Time.year(ts),
+        "month": _Time.month(ts),
+        "day": _Time.day(ts),
+        "hour": _Time.hour(ts),
+        "minute": _Time.minute(ts),
+        "second": _Time.second(ts),
+        "timestamp": ts
+    }
+}
+
+fun elapsed(start: Number): Number {
+    return _Time.clock() - start
+}
+
+fun measure(func: () => Any): Number {
+    var start = _Time.clock()
+    func()
+    return _Time.clock() - start
+}

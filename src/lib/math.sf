@@ -1,55 +1,68 @@
-// Math utilities — common constants and numeric functions
+import "math" as _Math
 
 // Constants
-var PI = 3.14159265358979323846
-var E = 2.71828182845904523536
-var TAU = 6.28318530717958647692
+var pi = _Math.pi
+var e = _Math.e
+var inf = _Math.inf
+var nan = _Math.nan
+var tau = _Math.pi * 2
 
-// Functions using Number methods
-fun abs(x: Number): Number { return x.abs() }
-fun floor(x: Number): Number { return x.floor() }
-fun ceil(x: Number): Number { return x.ceil() }
-fun round(x: Number, places: Number): Number { return x.round(places) }
+// Re-export native functions
+fun abs(x: Number): Number { return _Math.abs(x) }
+fun floor(x: Number): Number { return _Math.floor(x) }
+fun ceil(x: Number): Number { return _Math.ceil(x) }
+fun round(x: Number): Number { return _Math.round(x) }
+fun min(a: Number, b: Number): Number { return _Math.min(a, b) }
+fun max(a: Number, b: Number): Number { return _Math.max(a, b) }
+fun sqrt(x: Number): Number { return _Math.sqrt(x) }
+fun pow(x: Number, y: Number): Number { return _Math.pow(x, y) }
+fun sin(x: Number): Number { return _Math.sin(x) }
+fun cos(x: Number): Number { return _Math.cos(x) }
+fun tan(x: Number): Number { return _Math.tan(x) }
+fun asin(x: Number): Number { return _Math.asin(x) }
+fun acos(x: Number): Number { return _Math.acos(x) }
+fun atan(x: Number): Number { return _Math.atan(x) }
+fun atan2(y: Number, x: Number): Number { return _Math.atan2(y, x) }
+fun log(x: Number): Number { return _Math.log(x) }
+fun log2(x: Number): Number { return _Math.log2(x) }
+fun log10(x: Number): Number { return _Math.log10(x) }
+fun sign(x: Number): Number { return _Math.sign(x) }
+fun clamp(x: Number, lo: Number, hi: Number): Number { return _Math.clamp(x, lo, hi) }
 
-// Min/Max
-fun min(a: Number, b: Number): Number {
-    if (a < b) return a
-    return b
+// Higher-level utilities (pure Saffron)
+
+fun lerp(a: Number, b: Number, t: Number): Number {
+    return a + (b - a) * t
 }
 
-fun max(a: Number, b: Number): Number {
-    if (a > b) return a
-    return b
+fun deg_to_rad(degrees: Number): Number {
+    return degrees * _Math.pi / 180
 }
 
-// Clamp
-fun clamp(x: Number, lo: Number, hi: Number): Number {
-    if (x < lo) return lo
-    if (x > hi) return hi
-    return x
+fun rad_to_deg(radians: Number): Number {
+    return radians * 180 / _Math.pi
 }
 
-// Power (integer exponent)
-fun pow(base: Number, exp: Number): Number {
-    if (exp == 0) return 1
-    var result = 1
-    var i = 0
-    while (i < exp) {
-        result = result * base
-        i = i + 1
+fun hypot(x: Number, y: Number): Number {
+    return _Math.sqrt(x * x + y * y)
+}
+
+fun map_range(value: Number, in_min: Number, in_max: Number, out_min: Number, out_max: Number): Number {
+    return (value - in_min) / (in_max - in_min) * (out_max - out_min) + out_min
+}
+
+fun is_close(a: Number, b: Number, tolerance: Number): Bool {
+    return _Math.abs(a - b) <= tolerance
+}
+
+fun sum(list: List<Number>): Number {
+    var total = 0
+    for (x in list) {
+        total = total + x
     }
-    return result
+    return total
 }
 
-// Square root (Newton's method)
-fun sqrt(x: Number): Number {
-    if (x < 0) return 0
-    if (x == 0) return 0
-    var guess = x / 2
-    var i = 0
-    while (i < 20) {
-        guess = (guess + x / guess) / 2
-        i = i + 1
-    }
-    return guess
+fun avg(list: List<Number>): Number {
+    return sum(list) / list.length()
 }

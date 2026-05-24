@@ -119,6 +119,8 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             return byteInstruction("OP_CALL", chunk, offset);
         case OP_GETITEM:
             return simpleInstruction("OP_GETITEM", offset);
+        case OP_SETITEM:
+            return simpleInstruction("OP_SETITEM", offset);
         case OP_PIPE:
             return simpleInstruction("OP_PIPE", offset);
         case OP_CLOSE_UPVALUE:
