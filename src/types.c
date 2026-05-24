@@ -1328,13 +1328,24 @@ Type *evaluateNode(Node *node) {
             if (currentAssignmentType == NULL || currentAssignmentType == (Type *) anyType) {
                 type = newGenericType();
                 initValueArray(&type->generics);
-                Type *itemType = neverType;
+                Type *itemType = (Type *) neverType;
                 if (casted->items.count > 0) {
-                    if (casted->items.count > 1) {
-                        evaluateExprTypes(&casted->items);
-                    }
-
                     itemType = evaluateNode((Node *) casted->items.exprs[0]);
+                    for (int i = 1; i < casted->items.count; i++) {
+                        Type *elemType = evaluateNode((Node *) casted->items.exprs[i]);
+                        if (!isSubType(elemType, itemType)) {
+                            if (isSubType(itemType, elemType)) {
+                                // elemType is a supertype, widen
+                                itemType = elemType;
+                            } else {
+                                // Incompatible types: build a union
+                                UnionType *u = newUnionType();
+                                u->left = itemType;
+                                u->right = elemType;
+                                itemType = (Type *) u;
+                            }
+                        }
+                    }
                 }
                 writeValueArray(&type->generics, OBJ_VAL(itemType));
                 type->target = listTypeDef;
@@ -2014,6 +2025,26 @@ Type *evaluateNode(Node *node) {
                     writeValueArray(&genericType->generics, OBJ_VAL(arg));
                 }
                 return genericType;
+            }
+
+            // Warn if a generic type is used without type arguments
+            if (type != NULL && type != (Type *) anyType) {
+                bool requiresGenerics = false;
+                if (type == (Type *) listTypeDef || type == (Type *) mapTypeDef || type == (Type *) taskTypeDef) {
+                    requiresGenerics = true;
+                } else if (type->obj.type == OBJ_PARSE_TYPE) {
+                    SimpleType *st = (SimpleType *) type;
+                    if (st->genericArgs.count > 0) requiresGenerics = true;
+                } else if (type->obj.type == OBJ_PARSE_INTERFACE_TYPE) {
+                    InterfaceType *it = (InterfaceType *) type;
+                    if (it->genericArgs.count > 0) requiresGenerics = true;
+                }
+                if (requiresGenerics) {
+                    char msg[128];
+                    snprintf(msg, sizeof(msg), "Generic type '%.*s' requires type arguments",
+                             casted->name.length, casted->name.start);
+                    warnAt(&casted->name, msg);
+                }
             }
 
             return type;

@@ -231,6 +231,10 @@ class Parser {
     }
 
     fun parse_primary(): AST.Expr {
+        if (this.match_kind_check("match")) {
+            return this.parse_match_expr()
+        }
+
         var kind = this.current_kind()
         this.advance()
 
@@ -248,6 +252,42 @@ class Parser {
                 expr
             }
         }
+    }
+
+    fun parse_match_expr(): AST.Expr {
+        this.advance() // consume match
+        this.consume("(")
+        var subject = this.parse_expr()
+        this.consume(")")
+        this.consume("{")
+        var arms: List<AST.MatchArm> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            var pattern = this.parse_pattern()
+            this.consume("=>")
+            var body = this.parse_expr()
+            arms.push(AST.MatchArm.Arm(pattern, body))
+        }
+        this.consume("}")
+        return AST.Expr.Match(subject, arms)
+    }
+
+    fun parse_pattern(): AST.Pattern {
+        var name = this.expect_ident()
+        if (name == "_") {
+            return AST.Pattern.WildcardPattern
+        }
+        if (this.match_kind("(")) {
+            var bindings: List<String> = []
+            if (!this.match_kind_check(")")) {
+                bindings.push(this.expect_ident())
+                while (this.match_kind(",")) {
+                    bindings.push(this.expect_ident())
+                }
+            }
+            this.consume(")")
+            return AST.Pattern.VariantPattern(name, bindings)
+        }
+        return AST.Pattern.VariantPattern(name, [])
     }
 
     // --- Helpers for operator precedence ---
