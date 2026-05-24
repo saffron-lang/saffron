@@ -9,6 +9,10 @@ class Codegen {
     var globals: List<String>
     var string_constants: List<String>
     var block_terminated: Bool
+    var enum_defs: Map<String, List<String>>
+    var enum_variant_tags: Map<String, Float>
+    var enum_variant_fields: Map<String, String>
+    var type_defs: StringBuilder
 
     fun init() {
         this.sb = StringBuilder()
@@ -17,6 +21,10 @@ class Codegen {
         this.globals = []
         this.string_constants = []
         this.block_terminated = false
+        this.enum_defs = {}
+        this.enum_variant_tags = {}
+        this.enum_variant_fields = {}
+        this.type_defs = StringBuilder()
     }
 
     fun fresh_label(prefix: String): String {
@@ -160,6 +168,12 @@ class Codegen {
             MemberAccess(object, field) => {
                 "null"
             }
+            EnumConstruct(enum_name, variant, args) => {
+                this.gen_enum_construct(enum_name, variant, args)
+            }
+            Match(subject, arms) => {
+                this.gen_match(subject, arms)
+            }
         }
     }
 
@@ -269,6 +283,84 @@ class Codegen {
         return local
     }
 
+    fun gen_enum_construct(enum_name: String, variant: String, args: List<AST.Expr>): String {
+        var key = enum_name + "." + variant
+        var tag = this.enum_variant_tags.get(key)
+        var ptr = this.fresh_local()
+        this.emit_indent(ptr + " = alloca %" + enum_name)
+
+        // Store tag
+        var tag_ptr = this.fresh_local()
+        this.emit_indent(tag_ptr + " = getelementptr %" + enum_name + ", %" + enum_name + "* " + ptr + ", i32 0, i32 0")
+        this.emit_indent("store i8 " + tag.floor().to_string() + ", i8* " + tag_ptr)
+
+        // Store fields into payload
+        if (args.length() > 0) {
+            var payload_ptr = this.fresh_local()
+            this.emit_indent(payload_ptr + " = getelementptr %" + enum_name + ", %" + enum_name + "* " + ptr + ", i32 0, i32 1")
+            var i = 0
+            while (i < args.length()) {
+                var val = this.gen_expr(args[i])
+                var field_ptr = this.fresh_local()
+                var offset = i * 8
+                this.emit_indent(field_ptr + " = getelementptr [16 x i8], [16 x i8]* " + payload_ptr + ", i32 0, i32 " + offset.to_string())
+                var cast_ptr = this.fresh_local()
+                this.emit_indent(cast_ptr + " = bitcast i8* " + field_ptr + " to i64*")
+                this.emit_indent("store i64 " + val + ", i64* " + cast_ptr)
+                i = i + 1
+            }
+        }
+
+        return ptr
+    }
+
+    fun gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
+        var subj = this.gen_expr(subject)
+        var result_ptr = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        // Load tag from subject
+        var tag_ptr = this.fresh_local()
+        this.emit_indent(tag_ptr + " = getelementptr %" + "Enum" + ", %" + "Enum" + "* " + subj + ", i32 0, i32 0")
+        var tag_val = this.fresh_local()
+        this.emit_indent(tag_val + " = load i8, i8* " + tag_ptr)
+
+        // Build switch
+        var end_label = this.fresh_label("match.end")
+        var arm_labels: List<String> = []
+        var i = 0
+        while (i < arms.length()) {
+            arm_labels.push(this.fresh_label("match.arm"))
+            i = i + 1
+        }
+
+        var switch_str = "switch i8 " + tag_val + ", label %" + end_label + " ["
+        i = 0
+        while (i < arms.length()) {
+            switch_str = switch_str + " i8 " + i.to_string() + ", label %" + arm_labels[i]
+            i = i + 1
+        }
+        switch_str = switch_str + " ]"
+        this.emit_terminator(switch_str)
+
+        // Generate each arm
+        i = 0
+        while (i < arms.length()) {
+            this.start_block(arm_labels[i])
+            var arm = arms[i]
+            var body_expr = match (arm) { Arm(pattern, body) => body }
+            var val = this.gen_expr(body_expr)
+            this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+            this.emit_terminator("br label %" + end_label)
+            i = i + 1
+        }
+
+        this.start_block(end_label)
+        var result = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        return result
+    }
+
     fun resolve_callee(expr: AST.Expr): String {
         return match (expr) {
             Variable(n) => n
@@ -326,6 +418,7 @@ class Codegen {
             ExprStmt(expr) => {}
             Return(value) => {}
             FunDecl(name, params, ret_type, body) => {}
+            EnumDecl(name, variants) => {}
         }
     }
 
@@ -355,7 +448,27 @@ class Codegen {
             FunDecl(name, params, ret_type, body) => {
                 this.gen_function(name, params, ret_type, body)
             }
+            EnumDecl(name, variants) => {
+                this.gen_enum_decl(name, variants)
+            }
         }
+    }
+
+    fun gen_enum_decl(name: String, variants: List<AST.Variant>) {
+        var variant_names: List<String> = []
+        var i = 0
+        while (i < variants.length()) {
+            var v = variants[i]
+            var vname = match (v) { Variant(n, f) => n }
+            var vfields = match (v) { Variant(n, f) => f }
+            variant_names.push(vname)
+            this.enum_variant_tags.set(name + "." + vname, i)
+            this.enum_variant_fields.set(name + "." + vname, vfields)
+            i = i + 1
+        }
+        this.enum_defs.set(name, variant_names)
+        // Emit type definition: { i8 tag, [max_payload x i8] }
+        this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
     }
 
     fun gen_stmts(stmts: List<AST.Stmt>) {
@@ -500,6 +613,13 @@ class Codegen {
             j = j + 1
         }
         if (this.string_constants.length() > 0) {
+            out.append("\n")
+        }
+
+        // Type definitions (enums as tagged unions)
+        var td = this.type_defs.to_string()
+        if (td.length() > 0) {
+            out.append(td)
             out.append("\n")
         }
 
