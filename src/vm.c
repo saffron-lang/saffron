@@ -816,7 +816,7 @@ static InterpretResult run(ObjModule *module) {
                 Value typeVal = pop();
                 Value instance = pop();
                 bool result = false;
-                if (IS_CLASS(typeVal)) {
+                if (IS_CLASS(typeVal) || isObjType(typeVal, OBJ_BUILTIN_TYPE)) {
                     ObjClass *target = AS_CLASS(typeVal);
                     // Primitive type checks
                     if (IS_NUMBER(instance) && target == vm.numberClass) {
@@ -827,18 +827,28 @@ static InterpretResult run(ObjModule *module) {
                         result = true;
                     } else if (IS_NIL(instance) && target == vm.nilClass) {
                         result = true;
-                    } else if (IS_INSTANCE(instance)) {
-                        // Instance class hierarchy BFS
-                        ObjClass *stack[64];
-                        int stackSize = 0;
-                        stack[stackSize++] = AS_INSTANCE(instance)->klass;
-                        while (stackSize > 0 && !result) {
-                            ObjClass *current = stack[--stackSize];
-                            if (current == target) {
-                                result = true;
-                            } else {
-                                for (int i = 0; i < current->superclassCount && stackSize < 64; i++) {
-                                    stack[stackSize++] = current->superclasses[i];
+                    } else if (IS_OBJ(instance)) {
+                        Obj *obj = AS_OBJ(instance);
+                        ObjClass *klass = NULL;
+                        if (obj->type == OBJ_INSTANCE) {
+                            klass = ((ObjInstance *)obj)->klass;
+                        } else if (obj->type == OBJ_LIST) {
+                            klass = ((ObjInstance *)obj)->klass;
+                        } else if (obj->type == OBJ_MAP) {
+                            klass = ((ObjInstance *)obj)->klass;
+                        }
+                        if (klass != NULL) {
+                            ObjClass *stack[64];
+                            int stackSize = 0;
+                            stack[stackSize++] = klass;
+                            while (stackSize > 0 && !result) {
+                                ObjClass *current = stack[--stackSize];
+                                if (current == target) {
+                                    result = true;
+                                } else {
+                                    for (int i = 0; i < current->superclassCount && stackSize < 64; i++) {
+                                        stack[stackSize++] = current->superclasses[i];
+                                    }
                                 }
                             }
                         }

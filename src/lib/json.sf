@@ -144,10 +144,10 @@ fun to_string(value: Any): String {
     if (value == nil) { return "null" }
     if (value == true) { return "true" }
     if (value == false) { return "false" }
-    if (Reflect.is_number(value)) { return Reflect.number_to_string(value) }
-    if (Reflect.is_string(value)) { return escape_string(value) }
+    if (value is Number) { return Reflect.number_to_string(value) }
+    if (value is String) { return escape_string(value) }
 
-    if (Reflect.is_list(value)) {
+    if (value is List) {
         var result = "["
         var i = 0
         while (i < value.length()) {
@@ -158,7 +158,7 @@ fun to_string(value: Any): String {
         return result + "]"
     }
 
-    if (Reflect.is_map(value)) {
+    if (value is Map) {
         var keys = value.keys()
         var result = "{"
         var i = 0
@@ -200,10 +200,10 @@ fun pretty(value: Any): String {
         if (val == nil) { return "null" }
         if (val == true) { return "true" }
         if (val == false) { return "false" }
-        if (Reflect.is_number(val)) { return Reflect.number_to_string(val) }
-        if (Reflect.is_string(val)) { return escape_string(val) }
+        if (val is Number) { return Reflect.number_to_string(val) }
+        if (val is String) { return escape_string(val) }
 
-        if (Reflect.is_list(val)) {
+        if (val is List) {
             if (val.length() == 0) { return "[]" }
             var result = "[\n"
             var i = 0
@@ -215,7 +215,7 @@ fun pretty(value: Any): String {
             return result + "\n" + pad(depth) + "]"
         }
 
-        if (Reflect.is_map(val)) {
+        if (val is Map) {
             var keys = val.keys()
             if (keys.length() == 0) { return "{}" }
             var result = "{\n"
