@@ -318,6 +318,15 @@ SimpleType* createListTypeDef() {
             OBJ_VAL(sortType)
     );
 
+    FunctorType *joinType = newFunctorType();
+    writeValueArray(&joinType->arguments, OBJ_VAL(stringType));
+    joinType->returnType = (Type *) stringType;
+    tableSet(
+            &listTypeDef->methods,
+            copyString("join", 4),
+            OBJ_VAL(joinType)
+    );
+
     FunctorType *iterType = newFunctorType();
     iterType->returnType = (Type *) anyType;
     tableSet(

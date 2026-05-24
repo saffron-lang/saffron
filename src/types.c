@@ -1,4 +1,4 @@
-#include <printf.h>
+#include <stdio.h>
 #include "types.h"
 #include "object.h"
 #include "vm.h"
@@ -651,7 +651,9 @@ static void preRegisterDeclarations(StmtArray *statements) {
             ObjString *fnName = copyString(fn->name.start, fn->name.length);
             Value existingVal;
             if (tableGet(&currentEnv->locals, fnName, &existingVal) &&
-                IS_OBJ(existingVal) && AS_OBJ(existingVal)->type == OBJ_PARSE_FUNCTOR_TYPE) {
+                IS_OBJ(existingVal) &&
+                (AS_OBJ(existingVal)->type == OBJ_PARSE_FUNCTOR_TYPE ||
+                 AS_OBJ(existingVal) == (Obj *) anyType)) {
                 // Multiple functions with same name: mark as overloaded (Any)
                 tableSet(&currentEnv->locals, fnName, OBJ_VAL(anyType));
             } else {
@@ -973,6 +975,12 @@ Type *evaluateNode(Node *node) {
                 return (Type *) anyType;
             }
         }
+        case NODE_SETITEM: {
+            struct SetItem *casted = (struct SetItem *) node;
+            evaluateNode((Node *) casted->object);
+            evaluateNode((Node *) casted->index);
+            return evaluateNode((Node *) casted->value);
+        }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             Type *objectType = evaluateNode((Node *) casted->object);
@@ -1164,15 +1172,17 @@ Type *evaluateNode(Node *node) {
                     );
                 } else {
                     Type *argType = (Type *) anyType;
-                    // Infer from call-site context if available
-                    if (currentAssignmentType != NULL &&
+                    bool isVariadic = casted->params.parameters[i]->self.type == NODE_VARIADIC;
+                    if (isVariadic) {
+                        argType = (Type *) listTypeDef;
+                    } else if (currentAssignmentType != NULL &&
                         currentAssignmentType->obj.type == OBJ_PARSE_FUNCTOR_TYPE) {
                         FunctorType *expectedFunctor = (FunctorType *) currentAssignmentType;
                         if (i < expectedFunctor->arguments.count) {
                             argType = AS_OBJ(expectedFunctor->arguments.values[i]);
                         }
                     }
-                    if (argType == (Type *) anyType) {
+                    if (argType == (Type *) anyType && !isVariadic) {
                         warnAt(&casted->params.parameters[i]->name, "Missing type annotation on lambda parameter");
                     }
                     writeValueArray(&type->arguments, OBJ_VAL(argType));
@@ -1372,8 +1382,11 @@ Type *evaluateNode(Node *node) {
             for (int i = 0; i < casted->params.count; i++) {
                 TypeNode *typeNode = casted->params.parameters[i]->type;
                 Type *argType;
+                bool isVariadic = casted->params.parameters[i]->self.type == NODE_VARIADIC;
                 if (typeNode != NULL) {
                     argType = evaluateNode((Node *) typeNode);
+                } else if (isVariadic) {
+                    argType = (Type *) listTypeDef;
                 } else {
                     errorAt(&casted->params.parameters[i]->name, "Function parameters require a type annotation");
                     argType = (Type *) anyType;
@@ -1391,15 +1404,15 @@ Type *evaluateNode(Node *node) {
 
             type->returnType = evaluateNode((Node *) casted->returnType);
 
-            // Pre-register in enclosing scope for recursive calls
-            // If an overload already exists, store Any to allow flexible dispatch
+            // Register in enclosing scope for recursive calls
+            // If pre-registration already marked this as overloaded (anyType), keep it
             {
                 ObjString *funcName = copyString(casted->name.start, casted->name.length);
                 Value existingFunc;
                 if (tableGet(&currentEnv->enclosing->locals, funcName, &existingFunc) &&
                     IS_OBJ(existingFunc) &&
-                    (AS_OBJ(existingFunc)->type == OBJ_PARSE_FUNCTOR_TYPE ||
-                     AS_OBJ(existingFunc) == (Obj *) anyType)) {
+                    AS_OBJ(existingFunc) == (Obj *) anyType) {
+                    // Already marked as overloaded by pre-registration, keep anyType
                     tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(anyType));
                 } else {
                     tableSet(&currentEnv->enclosing->locals, funcName, OBJ_VAL(type));

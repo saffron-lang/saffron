@@ -29,3 +29,18 @@ fun shuffle(list: List<Any>): List<Any> {
     }
     return result
 }
+
+fun sample(list: List<Any>, count: Number): List<Any> {
+    var pool = list.copy()
+    var result: List<Any> = []
+    var n = count
+    while (n > 0 and pool.length() > 0) {
+        var idx = _Random.int(0, pool.length() - 1)
+        result.push(pool[idx])
+        var last = pool[pool.length() - 1]
+        pool[idx] = last
+        pool.pop()
+        n = n - 1
+    }
+    return result
+}

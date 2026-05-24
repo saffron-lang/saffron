@@ -37,6 +37,7 @@ typedef enum {
     OP_LOOP,
     OP_CALL,
     OP_GETITEM,
+    OP_SETITEM,
     OP_PIPE,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,

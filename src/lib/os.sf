@@ -1,0 +1,48 @@
+import "os" as _OS
+
+fun env(name: String): String {
+    return _OS.env(name)
+}
+
+fun set_env(name: String, value: String) {
+    _OS.set_env(name, value)
+}
+
+fun cwd(): String {
+    return _OS.cwd()
+}
+
+fun exit(code: Number) {
+    _OS.exit(code)
+}
+
+fun exec(command: String): String {
+    return _OS.exec(command)
+}
+
+fun platform(): String {
+    return _OS.platform()
+}
+
+fun args(): List<String> {
+    return _OS.args()
+}
+
+fun home(): String {
+    var p = _OS.platform()
+    if (p == "windows") {
+        return _OS.env("USERPROFILE")
+    }
+    return _OS.env("HOME")
+}
+
+fun path_sep(): String {
+    if (_OS.platform() == "windows") {
+        return "\\"
+    }
+    return "/"
+}
+
+fun join_path(parts: List<String>): String {
+    return parts.join(path_sep())
+}

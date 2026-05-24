@@ -580,6 +580,14 @@ void compileNode(Node *node) {
             emitByte(OP_GETITEM);
             break;
         }
+        case NODE_SETITEM: {
+            struct SetItem *casted = (struct SetItem *) node;
+            compileNode((Node *) casted->object);
+            compileNode((Node *) casted->index);
+            compileNode((Node *) casted->value);
+            emitByte(OP_SETITEM);
+            break;
+        }
         case NODE_GET: {
             struct Get *casted = (struct Get *) node;
             compileNode((Node *) casted->object);

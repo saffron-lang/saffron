@@ -89,6 +89,7 @@ typedef struct {
     ObjString *gtString;
     ObjString *eqString;
     ObjString *getItemString;
+    ObjString *setItemString;
     ObjUpvalue *openUpvalues;
 } VM;
 

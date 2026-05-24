@@ -208,6 +208,7 @@ static void markRoots() {
     markAsyncRoots();
     markObject((Obj *) vm.initString);
     markObject((Obj *) vm.getItemString);
+    markObject((Obj *) vm.setItemString);
 }
 
 void markArray(ValueArray *array) {

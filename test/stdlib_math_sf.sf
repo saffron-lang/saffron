@@ -1,0 +1,41 @@
+import "@math" as Math
+import "@test" as T
+
+// Constants
+T.assert(Math.pi > 3.14, "pi")
+T.assert(Math.e > 2.71, "e")
+T.assert(Math.tau > 6.28, "tau")
+
+// Basic math
+T.assert_eq(Math.abs(-5), 5, "abs")
+T.assert_eq(Math.floor(3.7), 3, "floor")
+T.assert_eq(Math.ceil(3.2), 4, "ceil")
+T.assert_eq(Math.round(3.5), 4, "round")
+T.assert_eq(Math.min(2, 5), 2, "min")
+T.assert_eq(Math.max(2, 5), 5, "max")
+T.assert_eq(Math.sqrt(9), 3, "sqrt")
+T.assert_eq(Math.pow(2, 10), 1024, "pow")
+T.assert_eq(Math.sign(-42), -1, "sign")
+T.assert_eq(Math.clamp(15, 0, 10), 10, "clamp")
+
+// Trig
+T.assert_eq(Math.sin(0), 0, "sin(0)")
+T.assert_eq(Math.cos(0), 1, "cos(0)")
+T.assert_eq(Math.tan(0), 0, "tan(0)")
+
+// Log
+T.assert_eq(Math.log(1), 0, "log(1)")
+T.assert_eq(Math.log2(8), 3, "log2(8)")
+T.assert_eq(Math.log10(100), 2, "log10(100)")
+
+// Higher-level utils
+T.assert_eq(Math.lerp(0, 10, 0.5), 5, "lerp")
+T.assert_eq(Math.hypot(3, 4), 5, "hypot")
+T.assert(Math.is_close(0.1 + 0.2, 0.3, 0.0001), "is_close")
+T.assert_eq(Math.deg_to_rad(180), Math.pi, "deg_to_rad")
+T.assert_eq(Math.rad_to_deg(Math.pi), 180, "rad_to_deg")
+T.assert_eq(Math.map_range(5, 0, 10, 0, 100), 50, "map_range")
+T.assert_eq(Math.sum([1, 2, 3, 4, 5]), 15, "sum")
+T.assert_eq(Math.avg([2, 4, 6]), 4, "avg")
+
+T.summary()

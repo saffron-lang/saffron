@@ -34,6 +34,7 @@ typedef enum {
     NODE_LOGICAL,
     NODE_CALL,
     NODE_GETITEM,
+    NODE_SETITEM,
     NODE_GET,
     NODE_SET,
     NODE_SUPER,
@@ -231,6 +232,14 @@ struct GetItem {
     Expr* object;
     Token bracket;
     Expr* index;
+};
+
+struct SetItem {
+    Expr self;
+    Expr* object;
+    Token bracket;
+    Expr* index;
+    Expr* value;
 };
 
 struct Get {
