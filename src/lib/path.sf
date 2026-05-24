@@ -102,17 +102,12 @@ fun normalize(p: String): String {
     var i = 0
     while (i < parts.length()) {
         var part: String = parts[i]
-        var handled = false
         if (part == "..") {
-            handled = true
             if (result.length() > 0) {
-                result = result.slice(0, result.length() - 1)
+                result.pop()
             }
-        }
-        if (handled == false) {
-            if (part != "." and part != "") {
-                result.push(part)
-            }
+        } else if (part != "." and part != "") {
+            result.push(part)
         }
         i = i + 1
     }

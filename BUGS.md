@@ -52,58 +52,12 @@ from the type checker then trigger `runtimeError()` which corrupts VM state duri
 **Impact:** Blocks `@test` import with mock/async features. Inline usage works.
 **Workaround:** Inline test functions or avoid nil-initialized captured variables.
 
-### 13. Bare `return` without semicolon consumes next `}`
 
-**Reproduction:**
-```saffron
-fun test() {
-    if (true) {
-        return
-    }
-    IO.println("after")
-}
-```
-
-**Expected:** `return` exits the function.
-**Actual:** Parser error `Expect expression` at `}` — the `return` statement tries to
-parse an expression (the `}`) because there's no semicolon or recognized terminator.
-
-**Fix:** `returnStatement()` should check for `}` and `EOF` the same way `yield` does.
-**Workaround:** Always use `return;` with a semicolon, or `return nil`.
-
-### 11. Flow narrowing doesn't work for primitives in union types
-
-**Reproduction:**
-```saffron
-fun test(x: Number | String) {
-    if (x is Number) {
-        var y = x.to_string()  // Error: "Attempting to get from invalid type"
-    }
-}
-```
-
-**Expected:** `x` narrows to `Number` in the then-branch.
-**Actual:** Narrowing creates the scope entry but variable resolution finds the original union type from the enclosing scope.
-
-**Workaround:** Narrowing works for class types, just not primitives.
 
 ### 21. `type` is a reserved keyword — can't use as parameter/variable name
 
 `type` is tokenized as `TOKEN_TYPE` for type alias declarations. Code that uses `type` as a parameter name (e.g. `fun define(name: String, type: String)`) gets a parse error. Consider making it a contextual keyword (only reserved at statement start).
 
-### 20. `List.pop()` removes first element instead of last
-
-**Reproduction:**
-```saffron
-var x = [1, 2, 3]
-x.pop()
-IO.println(x)  // [2, 3] — should be [1, 2]
-```
-
-**Expected:** `pop()` removes and returns the last element.
-**Actual:** Removes the first element (behaves like `shift()`).
-
-**Impact:** Any stack/LIFO usage of lists is broken. Workaround: use `x.slice(0, x.length() - 1)` to simulate pop.
 
 ## Fixed
 
@@ -122,3 +76,6 @@ IO.println(x)  // [2, 3] — should be [1, 2]
 - ~~#17: Type checker NULL file path for relative imports~~ — Fixed: `setTypecheckFile(path)` called before `evaluateTree` in checkFile mode.
 - ~~#18: Cross-module enum pattern matching~~ — Fixed: OP_IMPORT now pops the path string (was leaking on stack); match arms support dotted qualified names.
 - ~~#19: GC not marking suspended call frame locals~~ — Fixed: OBJ_CALL_FRAME marking now traces `frame->stack`, `frame->stored`, `frame->result`.
+- ~~#11: Flow narrowing for primitives in unions~~ — Fixed: narrowing check used `Expr.type` (TypeNode pointer) instead of `Expr.self.type` (NodeType enum) — always read as non-NODE_BINARY.
+- ~~#13: Bare return without semicolon~~ — Fixed: `returnStatement()` now checks for `}` and EOF as implicit void return.
+- ~~#20: List.pop() removes first element~~ — Fixed: pop now removes from `count - 1` instead of index 0.
