@@ -11,6 +11,7 @@
 #include "math_mod.h"
 #include "random.h"
 #include "os.h"
+#include "stringbuilder.h"
 
 void initLib() {
     defineType("Module", OBJ_VAL(createModuleType()));
@@ -18,6 +19,7 @@ void initLib() {
     createMapIteratorType();
     defineBuiltin("List", OBJ_VAL(createListType()));
     defineBuiltin("Map", OBJ_VAL(createMapType()));
+    defineBuiltin("StringBuilder", OBJ_VAL(createStringBuilderType()));
     defineType("Task", OBJ_VAL(createTaskType()));
 
     #define MODULE_COUNT 8
