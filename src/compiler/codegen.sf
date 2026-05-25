@@ -3356,7 +3356,29 @@ class Codegen {
             i = i + 1
         }
 
-        this.gen_stmts(body)
+        // Generate body statements, treating last ExprStmt as implicit return
+        if (body.length() > 0 and ret_type != "Nil" and ret_type != "void") {
+            var last_stmt = body[body.length() - 1]
+            var last_kind = this.classify_stmt(last_stmt)
+            if (last_kind == "expr") {
+                // Generate all but last
+                var bi = 0
+                while (bi < body.length() - 1) {
+                    this.gen_stmt(body[bi])
+                    bi = bi + 1
+                }
+                // Generate last as implicit return
+                var last_expr = match (last_stmt) { ExprStmt(e) => e }
+                var last_val = this.gen_arg_value(last_expr)
+                if (!this.block_terminated) {
+                    this.emit_terminator("ret i64 " + last_val)
+                }
+            } else {
+                this.gen_stmts(body)
+            }
+        } else {
+            this.gen_stmts(body)
+        }
 
         // Ensure block has a terminator
         if (!this.block_terminated) {
