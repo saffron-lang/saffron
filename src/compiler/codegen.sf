@@ -2007,7 +2007,7 @@ class Codegen {
         // %SB = { len: i64, cap: i64, buf: i8* }
         rt.append("%SB = type { i64, i64, i8* }\n\n")
 
-        // __sb_new() -> i64
+        // StringBuilder() -> i64
         rt.append("define i64 @StringBuilder() {\n")
         rt.append("entry:\n")
         rt.append("  %raw = call i8* @malloc(i64 24)\n")
@@ -2015,8 +2015,8 @@ class Codegen {
         rt.append("  %lp = getelementptr %SB, %SB* %ptr, i32 0, i32 0\n")
         rt.append("  store i64 0, i64* %lp\n")
         rt.append("  %cp = getelementptr %SB, %SB* %ptr, i32 0, i32 1\n")
-        rt.append("  store i64 256, i64* %cp\n")
-        rt.append("  %buf = call i8* @malloc(i64 256)\n")
+        rt.append("  store i64 1024, i64* %cp\n")
+        rt.append("  %buf = call i8* @malloc(i64 1024)\n")
         rt.append("  store i8 0, i8* %buf\n")
         rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
         rt.append("  store i8* %buf, i8** %bp\n")
@@ -2024,14 +2024,36 @@ class Codegen {
         rt.append("  ret i64 %result\n")
         rt.append("}\n\n")
 
-        // __sb_append(sb: i64, str: i64)
+        // __sb_append(sb: i64, str: i64) — with grow
         rt.append("define void @__sb_append(i64 %sb, i64 %str) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %sb to %SB*\n")
+        rt.append("  %lp = getelementptr %SB, %SB* %ptr, i32 0, i32 0\n")
+        rt.append("  %len = load i64, i64* %lp\n")
+        rt.append("  %cp = getelementptr %SB, %SB* %ptr, i32 0, i32 1\n")
+        rt.append("  %cap = load i64, i64* %cp\n")
         rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
         rt.append("  %buf = load i8*, i8** %bp\n")
         rt.append("  %s = inttoptr i64 %str to i8*\n")
-        rt.append("  call i8* @strcat(i8* %buf, i8* %s)\n")
+        rt.append("  %slen = call i64 @strlen(i8* %s)\n")
+        rt.append("  %needed = add i64 %len, %slen\n")
+        rt.append("  %needed1 = add i64 %needed, 1\n")
+        rt.append("  %fits = icmp slt i64 %needed1, %cap\n")
+        rt.append("  br i1 %fits, label %append, label %grow\n")
+        rt.append("grow:\n")
+        rt.append("  %new_cap = mul i64 %needed1, 2\n")
+        rt.append("  store i64 %new_cap, i64* %cp\n")
+        rt.append("  %new_buf = call i8* @realloc(i8* %buf, i64 %new_cap)\n")
+        rt.append("  store i8* %new_buf, i8** %bp\n")
+        rt.append("  br label %append\n")
+        rt.append("append:\n")
+        rt.append("  %cur_buf = load i8*, i8** %bp\n")
+        rt.append("  %dst = getelementptr i8, i8* %cur_buf, i64 %len\n")
+        rt.append("  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %dst, i8* %s, i64 %slen, i1 false)\n")
+        rt.append("  %new_len = add i64 %len, %slen\n")
+        rt.append("  store i64 %new_len, i64* %lp\n")
+        rt.append("  %null_pos = getelementptr i8, i8* %cur_buf, i64 %new_len\n")
+        rt.append("  store i8 0, i8* %null_pos\n")
         rt.append("  ret void\n")
         rt.append("}\n\n")
 
@@ -3160,18 +3182,18 @@ class Codegen {
         // Function bodies
         out.append(this.sb.to_string())
 
-        // C-compatible main entry point that stores argc/argv
-        out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
-        out.append("entry:\n")
-        out.append("  store i32 %argc, i32* @__argc\n")
-        out.append("  store i8** %argv, i8*** @__argv\n")
-        if (has_top_level) {
-            out.append("  call i64 @__saffron_entry()\n")
-        } else {
-            out.append("  call i64 @__saffron_main()\n")
+        // Only emit C main wrapper if program defines a main function
+        if (this.known_functions.contains("main") or has_top_level) {
+            out.append("\ndefine i32 @__c_main(i32 %argc, i8** %argv) {\n")
+            out.append("entry:\n")
+            if (has_top_level) {
+                out.append("  call i64 @__saffron_entry()\n")
+            } else {
+                out.append("  call i64 @main()\n")
+            }
+            out.append("  ret i32 0\n")
+            out.append("}\n")
         }
-        out.append("  ret i32 0\n")
-        out.append("}\n")
 
         return out.to_string()
     }
