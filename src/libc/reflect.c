@@ -249,6 +249,54 @@ static Value reflectConstruct(int argCount, Value *args) {
     return OBJ_VAL(instance);
 }
 
+// --- Docstring introspection ---
+
+static Value reflectDoc(int argCount, Value *args) {
+    if (argCount != 1) return NIL_VAL;
+    Value v = args[0];
+
+    if (IS_CLOSURE(v)) {
+        ObjClosure *closure = AS_CLOSURE(v);
+        if (closure->function->docstring != NULL) {
+            return OBJ_VAL(closure->function->docstring);
+        }
+        return NIL_VAL;
+    }
+
+    if (IS_CLASS(v)) {
+        ObjClass *klass = AS_CLASS(v);
+        if (klass->docstring != NULL) {
+            return OBJ_VAL(klass->docstring);
+        }
+        return NIL_VAL;
+    }
+
+    if (IS_FUNCTION(v)) {
+        ObjFunction *function = AS_FUNCTION(v);
+        if (function->docstring != NULL) {
+            return OBJ_VAL(function->docstring);
+        }
+        return NIL_VAL;
+    }
+
+    return NIL_VAL;
+}
+
+static Value reflectModuleDoc(int argCount, Value *args) {
+    // Walk call frames to find the script-level function (name == NULL)
+    ObjCallFrame *frame = CURRENT_TASK;
+    while (frame != NULL) {
+        if (frame->closure && frame->closure->function) {
+            ObjFunction *fn = frame->closure->function;
+            if (fn->name == NULL && fn->docstring != NULL) {
+                return OBJ_VAL(fn->docstring);
+            }
+        }
+        frame = frame->parent;
+    }
+    return NIL_VAL;
+}
+
 // --- Module registration ---
 
 ObjModule *createReflectModule() {
@@ -274,6 +322,8 @@ ObjModule *createReflectModule() {
     defineModuleFunction(module, "number_to_string", reflectNumberToString);
     defineModuleFunction(module, "construct", reflectConstruct);
     defineModuleFunction(module, "field_types", reflectFieldTypes);
+    defineModuleFunction(module, "doc", reflectDoc);
+    defineModuleFunction(module, "module_doc", reflectModuleDoc);
 
     pop();
     return module;
@@ -298,6 +348,8 @@ SimpleType *createReflectModuleType() {
     createBuiltinFunctorType(mod, "number_to_string", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) stringType);
     createBuiltinFunctorType(mod, "construct", (Type *[]) {(Type *) anyType, (Type *) anyType}, 2, NULL, 0, (Type *) anyType);
     createBuiltinFunctorType(mod, "field_types", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) anyType);
+    createBuiltinFunctorType(mod, "doc", (Type *[]) {(Type *) anyType}, 1, NULL, 0, (Type *) anyType);
+    createBuiltinFunctorType(mod, "module_doc", NULL, 0, NULL, 0, (Type *) anyType);
     return mod;
 }
 

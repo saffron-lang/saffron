@@ -1311,6 +1311,12 @@ static InterpretResult run(ObjModule *module) {
                 klass->fieldMetas.entries[klass->fieldMetas.count++] = meta;
                 break;
             }
+            case OP_CLASS_DOC: {
+                ObjString *doc = READ_STRING();
+                ObjClass *klass = AS_CLASS(peek(0));
+                klass->docstring = doc;
+                break;
+            }
             case OP_INVOKE: {
                 ObjString *method = READ_STRING();
                 int argCount = READ_BYTE();

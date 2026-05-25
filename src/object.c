@@ -214,6 +214,7 @@ ObjFunction *newFunction() {
     function->upvalueCount = 0;
     function->hasRest = false;
     function->name = NULL;
+    function->docstring = NULL;
     function->module = NULL;
     function->firstParamType = OVERLOAD_ANY;
     initChunk(&function->chunk);
@@ -292,6 +293,7 @@ void addOverload(ObjOverloadSet *set, ObjClosure *closure, int arity, OverloadPa
 ObjClass *newClass(ObjString *name) {
     ObjClass *klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
     klass->name = name;
+    klass->docstring = NULL;
     initTable(&klass->methods);
     initTable(&klass->fields);
     klass->superclassCount = 0;

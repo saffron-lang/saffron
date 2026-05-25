@@ -1,3 +1,6 @@
+//! This module tests docstring support.
+//! It validates both /// and //! comments.
+
 import "reflect" as Reflect
 
 /// Adds two numbers together.
@@ -31,3 +34,7 @@ fun nodoc() {
 }
 
 IO.println(Reflect.doc(nodoc))
+
+// Test module-level docstring
+var mdoc = Reflect.module_doc()
+IO.println(mdoc)

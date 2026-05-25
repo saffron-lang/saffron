@@ -80,6 +80,7 @@ typedef struct {
     bool hasRest;
     Chunk chunk;
     ObjString *name;
+    ObjString *docstring;
     void *module;
     OverloadParamType firstParamType;
 } ObjFunction;
@@ -141,6 +142,7 @@ typedef struct {
 typedef struct ObjClass {
     Obj obj;
     ObjString *name;
+    ObjString *docstring;
     Table methods;
     Table fields;
     int superclassCount;

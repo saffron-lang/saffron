@@ -29,7 +29,7 @@
 - [String Methods](./stdlib/string.md)
 - [List](./stdlib/list.md)
 - [Map](./stdlib/map.md)
-- [Set](./stdlib/set.md)
+- [Collections](./stdlib/collections.md)
 - [JSON](./stdlib/json.md)
 - [Time](./stdlib/time.md)
 - [OS](./stdlib/os.md)

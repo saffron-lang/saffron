@@ -1,4 +1,5 @@
 #include "astcompile.h"
+#include "astparse.h"
 
 #include <printf.h>
 #include "astprint.h"
@@ -388,6 +389,13 @@ ObjFunction *compile(StmtArray *body) {
     compileTree(body);
 
     ObjFunction *function = endCompiler();
+
+    // Attach module-level docstring if present
+    if (parser.moduleDocstring.start != NULL && parser.moduleDocstring.length > 0) {
+        function->docstring = copyString(parser.moduleDocstring.start,
+                                         parser.moduleDocstring.length);
+    }
+
     return hadError ? NULL : function;
 }
 
@@ -870,6 +878,13 @@ void compileNode(Node *node) {
 
             getVariable(className);
 
+            // Emit docstring if present
+            if (casted->docstring.start != NULL && casted->docstring.length > 0) {
+                uint16_t docConst = makeConstant(OBJ_VAL(
+                    copyString(casted->docstring.start, casted->docstring.length)));
+                emitByte(OP_CLASS_DOC);
+                emitConstantIndex(docConst);
+            }
 
             bool hasInit = false;
             for (int i = 0; i < casted->body.count; i++) {

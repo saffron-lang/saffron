@@ -52,7 +52,24 @@ class Parser {
     // --- Type annotations ---
 
     fun parse_type(): String {
-        return this.expect_ident()
+        var name = this.expect_ident()
+        // Skip generic args: List<Expr>, Map<String, Int>, etc.
+        if (this.match_kind_check("<")) {
+            this.advance() // consume <
+            var depth = 1
+            while (depth > 0 and !this.match_kind_check("eof")) {
+                if (this.match_kind_check("<")) {
+                    depth = depth + 1
+                    this.advance()
+                } else if (this.match_kind_check(">")) {
+                    depth = depth - 1
+                    this.advance()
+                } else {
+                    this.advance()
+                }
+            }
+        }
+        return name
     }
 
     // --- Expressions (Pratt parser) ---
@@ -674,6 +691,10 @@ class Parser {
 
     fun parse_return(): AST.Stmt {
         this.advance() // consume return
+        // Bare return (no value) → return nil
+        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+            return AST.Stmt.Return(AST.Expr.NilLit)
+        }
         var value = this.parse_expr()
         return AST.Stmt.Return(value)
     }
@@ -683,17 +704,25 @@ class Parser {
         this.consume("(")
         var cond = this.parse_expr()
         this.consume(")")
-        var then_branch = this.parse_block_stmts()
+        var then_branch = this.parse_body()
         var else_branch: List<AST.Stmt> = []
         if (this.match_kind("else")) {
             if (this.match_kind_check("if")) {
-                // else if → nested if as single-element else branch
                 else_branch = [this.parse_if()]
             } else {
-                else_branch = this.parse_block_stmts()
+                else_branch = this.parse_body()
             }
         }
         return AST.Stmt.If(cond, then_branch, else_branch)
+    }
+
+    fun parse_body(): List<AST.Stmt> {
+        // Block with braces or single statement
+        if (this.match_kind_check("{")) {
+            return this.parse_block_stmts()
+        }
+        // Single statement body (no braces)
+        return [this.parse_stmt()]
     }
 
     fun parse_while(): AST.Stmt {
