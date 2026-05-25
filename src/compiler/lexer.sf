@@ -201,6 +201,7 @@ class Lexer {
             if (ch == "\\") {
                 var esc = this.advance()
                 if (esc == "n") { result.append("\n") }
+                else if (esc == "r") { result.append("\r") }
                 else if (esc == "t") { result.append("\t") }
                 else if (esc == "\\") { result.append("\\") }
                 else if (esc == "\"") { result.append("\"") }
