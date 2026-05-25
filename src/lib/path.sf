@@ -1,11 +1,21 @@
+//! Cross-platform file path manipulation (joining, splitting, normalizing).
+
 import "@os" as OS
 
 var _sep = OS.path_sep()
 
+/// Return the platform path separator.
 fun sep(): String {
     return _sep
 }
 
+/// Return true if the path is absolute.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.is_absolute("/usr/bin")   // true
+/// Path.is_absolute("src/main")   // false
+/// ```
 fun is_absolute(p: String): Bool {
     if (p.length() == 0) { return false }
     if (p.char_at(0) == "/") { return true }
@@ -15,6 +25,12 @@ fun is_absolute(p: String): Bool {
     return false
 }
 
+/// Return the directory portion of a path.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.dirname("/home/user/docs/readme.md")  // "/home/user/docs"
+/// ```
 fun dirname(p: String): String {
     if (p.length() == 0) { return "." }
     var last = -1
@@ -29,6 +45,12 @@ fun dirname(p: String): String {
     return p.slice(0, last)
 }
 
+/// Return the final component of a path.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.basename("/home/user/docs/readme.md")  // "readme.md"
+/// ```
 fun basename(p: String): String {
     if (p.length() == 0) { return "" }
     var last = -1
@@ -42,6 +64,12 @@ fun basename(p: String): String {
     return p.slice(last + 1, p.length())
 }
 
+/// Return the file extension including the dot (e.g. ".sf").
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.ext("/home/user/readme.md")  // ".md"
+/// ```
 fun ext(p: String): String {
     var base = basename(p)
     var dot = -1
@@ -57,6 +85,12 @@ fun ext(p: String): String {
     return base.slice(dot, base.length())
 }
 
+/// Return the filename without its extension.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.stem("/home/user/readme.md")  // "readme"
+/// ```
 fun stem(p: String): String {
     var base = basename(p)
     var dot = -1
@@ -72,6 +106,13 @@ fun stem(p: String): String {
     return base.slice(0, dot)
 }
 
+/// Join path segments into a single path.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.join(["/home", "user", "docs", "readme.md"])
+/// // "/home/user/docs/readme.md"
+/// ```
 fun join(parts: List<String>): String {
     if (parts.length() == 0) { return "" }
     var result = parts[0]
@@ -94,6 +135,13 @@ fun join(parts: List<String>): String {
     return result
 }
 
+/// Normalize a path by resolving "." and ".." segments.
+///
+/// ```saffron
+/// import "@path" as Path
+/// Path.normalize("/home/user/../user/docs/./readme.md")
+/// // "/home/user/docs/readme.md"
+/// ```
 fun normalize(p: String): String {
     if (p.length() == 0) { return "." }
     var abs = is_absolute(p)
@@ -117,6 +165,7 @@ fun normalize(p: String): String {
     return joined
 }
 
+/// Resolve path segments against the current working directory into an absolute path.
 fun resolve(parts: List<String>): String {
     var base = OS.cwd()
     var i = 0
@@ -132,6 +181,7 @@ fun resolve(parts: List<String>): String {
     return normalize(base)
 }
 
+/// Compute a relative path from one location to another.
 fun relative(from: String, to: String): String {
     var from_parts = normalize(from).split("/")
     var to_parts = normalize(to).split("/")

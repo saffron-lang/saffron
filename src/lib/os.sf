@@ -1,33 +1,68 @@
+//! Operating system utilities for environment variables, process execution, and paths.
+
 import "os" as _OS
 
+/// Get the value of an environment variable.
+///
+/// ```saffron
+/// import "@os" as OS
+/// var home = OS.env("HOME")
+/// ```
 fun env(name: String): String {
     return _OS.env(name)
 }
 
+/// Set an environment variable.
 fun set_env(name: String, value: String) {
     _OS.set_env(name, value)
 }
 
+/// Return the current working directory.
+///
+/// ```saffron
+/// import "@os" as OS
+/// IO.println(OS.cwd())  // "/home/user/project"
+/// ```
 fun cwd(): String {
     return _OS.cwd()
 }
 
+/// Exit the process with the given status code.
+///
+/// ```saffron
+/// import "@os" as OS
+/// OS.exit(1)  // terminate with error
+/// ```
 fun exit(code: Number) {
     _OS.exit(code)
 }
 
+/// Execute a shell command and return its output.
 fun exec(command: String): String {
     return _OS.exec(command)
 }
 
+/// Return the platform name (e.g. "linux", "macos", "windows").
 fun platform(): String {
     return _OS.platform()
 }
 
+/// Return the command-line arguments passed to the script.
+///
+/// ```saffron
+/// import "@os" as OS
+/// var args = OS.args()
+/// if (args.length() < 2) {
+///     IO.println("Usage: saffron script.sf <name>")
+///     OS.exit(1)
+/// }
+/// IO.println("Hello, ${args[1]}!")
+/// ```
 fun args(): List<String> {
     return _OS.args()
 }
 
+/// Return the user's home directory path.
 fun home(): String {
     var p = _OS.platform()
     if (p == "windows") {
@@ -36,6 +71,7 @@ fun home(): String {
     return _OS.env("HOME")
 }
 
+/// Return the platform-specific path separator ("/" or "\\").
 fun path_sep(): String {
     if (_OS.platform() == "windows") {
         return "\\"
@@ -43,6 +79,7 @@ fun path_sep(): String {
     return "/"
 }
 
+/// Join path segments using the platform separator.
 fun join_path(parts: List<String>): String {
     return parts.join(path_sep())
 }

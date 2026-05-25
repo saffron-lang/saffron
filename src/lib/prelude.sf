@@ -1,48 +1,58 @@
-// System interfaces for operator overloading and duck typing
-// These define the protocols that classes can implement to support operators.
+//! System interfaces for operator overloading and duck typing protocols.
 
+/// Protocol for types that support the + operator.
 interface Addable<T> {
     fun add(other: T): T
 }
 
+/// Protocol for types that support the - operator.
 interface Subtractable<T> {
     fun sub(other: T): T
 }
 
+/// Protocol for types that support the * operator.
 interface Multipliable<T> {
     fun mul(other: T): T
 }
 
+/// Protocol for types that support the / operator.
 interface Dividable<T> {
     fun div(other: T): T
 }
 
+/// Protocol for types that support the % operator.
 interface Modable<T> {
     fun mod(other: T): T
 }
 
+/// Protocol for types that support < and > comparisons.
 interface Comparable<T> {
     fun lt(other: T): Bool
     fun gt(other: T): Bool
 }
 
+/// Protocol for types that support == equality.
 interface Equatable<T> {
     fun eq(other: T): Bool
 }
 
+/// Protocol for types that support subscript access via [].
 interface Indexable<K, V> {
     fun getItem(key: K): V
 }
 
+/// Protocol for types that can be converted to a string representation.
 interface Stringable {
     fun to_string(): String
 }
 
+/// Protocol for stateful iterators that produce elements one at a time.
 interface Iterator<T> {
     fun next(): T
     fun next?(): Bool
 }
 
+/// Protocol for types that can produce an iterator via .iter().
 interface Iterable<T> {
     fun iter(): Iterator<T>
 }

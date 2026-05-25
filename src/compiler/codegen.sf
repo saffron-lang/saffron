@@ -21,6 +21,7 @@ class Codegen {
     var string_vars: List<String>
     var last_type: String
     var var_types: Map<String, String>
+    var loop_end_label: String
 
     fun init() {
         this.sb = StringBuilder()
@@ -41,6 +42,7 @@ class Codegen {
         this.string_vars = []
         this.last_type = "Int"
         this.var_types = {}
+        this.loop_end_label = ""
     }
 
     fun fresh_label(prefix: String): String {
@@ -1933,23 +1935,34 @@ class Codegen {
     }
 
     fun gen_logical(left: AST.Expr, op: String, right: AST.Expr): String {
-        var lhs = this.gen_arg_value(left)
+        var lhs_raw = this.gen_arg_value(left)
+        var lhs = this.to_i1(lhs_raw)
+        var current_block = this.fresh_label("logic.entry")
         var rhs_label = this.fresh_label("rhs")
         var end_label = this.fresh_label("end")
-        var result = this.fresh_local()
+
+        // We need a label for the current block for phi
+        this.emit_terminator("br label %" + current_block)
+        this.start_block(current_block)
 
         if (op == "or") {
-            this.emit_indent("br i1 " + lhs + ", label %" + end_label + ", label %" + rhs_label)
+            this.emit_terminator("br i1 " + lhs + ", label %" + end_label + ", label %" + rhs_label)
         } else {
-            this.emit_indent("br i1 " + lhs + ", label %" + rhs_label + ", label %" + end_label)
+            this.emit_terminator("br i1 " + lhs + ", label %" + rhs_label + ", label %" + end_label)
         }
 
-        this.emit(rhs_label + ":")
-        var rhs = this.gen_arg_value(right)
-        this.emit_indent("br label %" + end_label)
+        this.start_block(rhs_label)
+        var rhs_raw = this.gen_arg_value(right)
+        var rhs = this.to_i1(rhs_raw)
+        this.emit_terminator("br label %" + end_label)
 
-        this.emit(end_label + ":")
-        this.emit_indent(result + " = phi i1 [" + lhs + ", %entry], [" + rhs + ", %" + rhs_label + "]")
+        this.start_block(end_label)
+        var phi_result = this.fresh_local()
+        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
+        // Extend back to i64 for uniform value type
+        var result = this.fresh_local()
+        this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
+        this.last_type = "Int"
         return result
     }
 
@@ -2070,6 +2083,14 @@ class Codegen {
             }
             Block(stmts) => {
                 this.gen_stmts(stmts)
+            }
+            Break => {
+                if (this.loop_end_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_end_label)
+                }
+            }
+            Continue => {
+                // Continue jumps to loop condition - not fully supported yet
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 this.gen_function(name, params, ret_type, body)
@@ -2256,6 +2277,8 @@ class Codegen {
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
+            Break => "other"
+            Continue => "other"
         }
         return kind == "if"
     }
@@ -2264,6 +2287,9 @@ class Codegen {
         var cond_label = this.fresh_label("while.cond")
         var body_label = this.fresh_label("while.body")
         var end_label = this.fresh_label("while.end")
+
+        var saved_loop_end = this.loop_end_label
+        this.loop_end_label = end_label
 
         this.emit_terminator("br label %" + cond_label)
 
@@ -2274,6 +2300,8 @@ class Codegen {
         this.start_block(body_label)
         this.gen_stmts(body)
         this.emit_terminator("br label %" + cond_label)
+
+        this.loop_end_label = saved_loop_end
 
         this.start_block(end_label)
     }

@@ -1,15 +1,4 @@
-// Saffron Test Framework
-// Decorator-based test discovery with full error reporting
-//
-// Usage:
-//   import "@test" as T
-//
-//   @T.test
-//   fun test_math() {
-//       T.assert_eq(1 + 1, 2, "addition")
-//   }
-//
-//   T.run_all()
+//! Test framework with decorator-based discovery, assertions, and error reporting.
 
 // --- Internal State ---
 var _tests = []
@@ -21,13 +10,29 @@ var _total = 0
 var _current_test = ""
 var _test_errors = []
 
-// --- Test Discovery Decorators ---
-
+/// Register a function as a test case (use as @Test.test decorator).
+///
+/// ```saffron
+/// import "@test" as Test
+///
+/// @Test.test
+/// fun test_addition() {
+///     Test.assert_eq(1 + 1, 2, "basic addition")
+/// }
+///
+/// Test.run_all()
+/// ```
 fun test(fn: Any): Any {
     _tests.push(fn)
     return fn
 }
 
+/// Skip a test with a reason (use as @Test.skip("reason") decorator).
+///
+/// ```saffron
+/// @Test.skip("not implemented yet")
+/// fun test_pending() { }
+/// ```
 fun skip(reason: String): Any {
     return fun (fn: Any) => {
         _skipped = _skipped + 1
@@ -36,13 +41,12 @@ fun skip(reason: String): Any {
     }
 }
 
+/// Mark a test to run exclusively, skipping all other tests (use as @T.only decorator).
 fun only(fn: Any): Any {
     _only_tests.push(fn)
     _tests.push(fn)
     return fn
 }
-
-// --- Assertions ---
 
 fun _record_failure(msg: String) {
     _failed = _failed + 1
@@ -50,12 +54,25 @@ fun _record_failure(msg: String) {
     IO.println("    FAIL: ${msg}")
 }
 
+/// Assert that a condition is true.
+///
+/// ```saffron
+/// import "@test" as Test
+/// Test.assert([1, 2, 3].contains(2), "list contains")
+/// ```
 fun assert(condition: Bool, msg: String) {
     _total = _total + 1
     if (condition) { _passed = _passed + 1 }
     else { _record_failure(msg) }
 }
 
+/// Assert that actual equals expected.
+///
+/// ```saffron
+/// import "@test" as Test
+/// Test.assert_eq(1 + 1, 2, "basic addition")
+/// Test.assert_eq("hello".length(), 5, "string length")
+/// ```
 fun assert_eq(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual == expected) { _passed = _passed + 1 }
@@ -66,24 +83,38 @@ fun assert_eq(actual: Any, expected: Any, msg: String) {
     }
 }
 
+/// Assert that actual does not equal expected.
+///
+/// ```saffron
+/// import "@test" as Test
+/// Test.assert_neq(true, false, "booleans differ")
+/// ```
 fun assert_neq(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual != expected) { _passed = _passed + 1 }
     else { _record_failure("${msg} (should not equal ${expected})") }
 }
 
+/// Assert that actual is greater than expected.
 fun assert_gt(actual: Number, expected: Number, msg: String) {
     _total = _total + 1
     if (actual > expected) { _passed = _passed + 1 }
     else { _record_failure("${msg} (${actual} not > ${expected})") }
 }
 
+/// Assert that actual is less than expected.
 fun assert_lt(actual: Number, expected: Number, msg: String) {
     _total = _total + 1
     if (actual < expected) { _passed = _passed + 1 }
     else { _record_failure("${msg} (${actual} not < ${expected})") }
 }
 
+/// Assert that calling body() throws an exception.
+///
+/// ```saffron
+/// import "@test" as Test
+/// Test.assert_throws(fun () { throw "oops" }, "should throw")
+/// ```
 fun assert_throws(body: Any, msg: String) {
     _total = _total + 1
     var threw = false
@@ -92,6 +123,7 @@ fun assert_throws(body: Any, msg: String) {
     else { _record_failure("${msg} (expected throw, none occurred)") }
 }
 
+/// Assert that calling body() throws with the expected message.
 fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
     _total = _total + 1
     var caught_msg = nil
@@ -106,18 +138,19 @@ fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
     }
 }
 
+/// Assert that haystack contains needle as a substring.
 fun assert_contains(haystack: String, needle: String, msg: String) {
     _total = _total + 1
     if (haystack.contains(needle)) { _passed = _passed + 1 }
     else { _record_failure("${msg} ('${haystack}' missing '${needle}')") }
 }
 
-// --- Runner ---
-
+/// Print a section heading for grouping tests visually.
 fun section(name: String) {
     IO.println("  ${name}")
 }
 
+/// Run all registered tests and report results.
 fun run_all() {
     var to_run = _only_tests
     if (_only_tests.length() == 0) {
@@ -177,6 +210,14 @@ fun run_all() {
     }
 }
 
+/// Print a brief pass/fail summary of all assertions so far.
+///
+/// ```saffron
+/// import "@test" as Test
+/// Test.assert_eq(1 + 1, 2, "math works")
+/// Test.summary()
+/// // All 1 assertions passed
+/// ```
 fun summary() {
     IO.println("")
     if (_failed == 0) {

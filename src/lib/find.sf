@@ -1,6 +1,9 @@
+//! File discovery utilities for recursively searching directories by name, extension, or content.
+
 import "@path" as Path
 import "@os" as OS
 
+/// Holds a directory listing for querying files and subdirectories.
 class FileFinder {
     var entries: List<List<Any>>
     var base_dir: String
@@ -11,10 +14,12 @@ class FileFinder {
     }
 }
 
+/// Create a FileFinder rooted at the given directory.
 fun from(dir: String): FileFinder {
     return FileFinder(dir)
 }
 
+/// Return all file paths found under the finder's root directory.
 fun files(finder: FileFinder): List<String> {
     var result = []
     var i = 0
@@ -33,6 +38,7 @@ fun files(finder: FileFinder): List<String> {
     return result
 }
 
+/// Return all subdirectory paths found under the finder's root directory.
 fun dirs(finder: FileFinder): List<String> {
     var result = []
     var i = 0
@@ -51,6 +57,7 @@ fun dirs(finder: FileFinder): List<String> {
     return result
 }
 
+/// Filter files by file extension (e.g. ".sf").
 fun by_ext(finder: FileFinder, extension: String): List<String> {
     var all = files(finder)
     var result = []
@@ -65,6 +72,7 @@ fun by_ext(finder: FileFinder, extension: String): List<String> {
     return result
 }
 
+/// Filter files by exact basename match.
 fun by_name(finder: FileFinder, name: String): List<String> {
     var all = files(finder)
     var result = []
@@ -79,6 +87,7 @@ fun by_name(finder: FileFinder, name: String): List<String> {
     return result
 }
 
+/// Return files whose content contains the given text.
 fun containing(finder: FileFinder, text: String): List<String> {
     var all = files(finder)
     var result = []
@@ -94,6 +103,7 @@ fun containing(finder: FileFinder, text: String): List<String> {
     return result
 }
 
+/// Return the first file found, or an empty string if none.
 fun first(finder: FileFinder): String {
     var all = files(finder)
     if (all.length() > 0) {
@@ -102,6 +112,7 @@ fun first(finder: FileFinder): String {
     return ""
 }
 
+/// Return the total number of files found.
 fun count(finder: FileFinder): Number {
     var all = files(finder)
     return all.length()

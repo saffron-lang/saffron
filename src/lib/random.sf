@@ -1,22 +1,51 @@
+//! Random number generation and collection sampling utilities.
+
 import "random" as _Random
 
+/// Return a random floating-point number between 0 and 1.
+///
+/// ```saffron
+/// import "@random" as Random
+/// var x = Random.float()  // e.g. 0.7312...
+/// ```
 fun float(): Number {
     return _Random.float()
 }
 
+/// Return a random integer between min and max (inclusive).
+///
+/// ```saffron
+/// import "@random" as Random
+/// var roll = Random.int(1, 6)  // roll a die
+/// ```
 fun int(min: Number, max: Number): Number {
     return _Random.int(min, max)
 }
 
+/// Seed the random number generator for reproducible sequences.
 fun seed(n: Number) {
     _Random.seed(n)
 }
 
+/// Pick a random element from the list.
+///
+/// ```saffron
+/// import "@random" as Random
+/// var suits = ["Hearts", "Diamonds", "Clubs", "Spades"]
+/// Random.choice(suits)  // e.g. "Clubs"
+/// ```
 fun choice(list: List<Any>): Any {
     var idx = _Random.int(0, list.length() - 1)
     return list[idx]
 }
 
+/// Return a new list with elements in random order.
+///
+/// ```saffron
+/// import "@random" as Random
+/// var deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+/// IO.println(Random.shuffle(deck))
+/// ```
 fun shuffle(list: List<Any>): List<Any> {
     var result = list.copy()
     var i = result.length() - 1
@@ -30,6 +59,12 @@ fun shuffle(list: List<Any>): List<Any> {
     return result
 }
 
+/// Return a random sample of count elements from the list without replacement.
+///
+/// ```saffron
+/// import "@random" as Random
+/// Random.sample([1, 2, 3, 4, 5], 3)  // e.g. [4, 1, 5]
+/// ```
 fun sample(list: List<Any>, count: Number): List<Any> {
     var pool = list.copy()
     var result: List<Any> = []

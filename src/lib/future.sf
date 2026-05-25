@@ -1,3 +1,6 @@
+//! A simple future/promise primitive for cooperative async result passing.
+
+/// Represents an eventually-available value that can be awaited via yield.
 class Future {
     var result: Any
 

@@ -1,7 +1,11 @@
+//! Cooperative async primitives for sleeping and awaiting spawned tasks.
+
+/// Suspend the current task for the given duration in seconds.
 fun sleep(duration: Number) {
     yield [1, duration]
 }
 
+/// Block until a spawned task completes and return its result.
 fun await(task: Task) {
     while (!task.isReady()) {
         yield

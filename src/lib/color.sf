@@ -1,22 +1,41 @@
+//! ANSI terminal color and style utilities for colorized output.
+
 var _esc = "\x1b["
 var _reset = "\x1b[0m"
 
+/// Wrap text in red foreground color.
 fun red(text: String): String { return _esc + "31m" + text + _reset }
+/// Wrap text in green foreground color.
 fun green(text: String): String { return _esc + "32m" + text + _reset }
+/// Wrap text in yellow foreground color.
 fun yellow(text: String): String { return _esc + "33m" + text + _reset }
+/// Wrap text in blue foreground color.
 fun blue(text: String): String { return _esc + "34m" + text + _reset }
+/// Wrap text in magenta foreground color.
 fun magenta(text: String): String { return _esc + "35m" + text + _reset }
+/// Wrap text in cyan foreground color.
 fun cyan(text: String): String { return _esc + "36m" + text + _reset }
+/// Wrap text in white foreground color.
 fun white(text: String): String { return _esc + "37m" + text + _reset }
+/// Wrap text in gray foreground color.
 fun gray(text: String): String { return _esc + "90m" + text + _reset }
 
+/// Apply bold styling to text.
 fun bold(text: String): String { return _esc + "1m" + text + _reset }
+/// Apply dim styling to text.
 fun dim(text: String): String { return _esc + "2m" + text + _reset }
+/// Apply italic styling to text.
 fun italic(text: String): String { return _esc + "3m" + text + _reset }
+/// Apply underline styling to text.
 fun underline(text: String): String { return _esc + "4m" + text + _reset }
+/// Apply strikethrough styling to text.
 fun strikethrough(text: String): String { return _esc + "9m" + text + _reset }
 
+/// Wrap text in red background color.
 fun bg_red(text: String): String { return _esc + "41m" + text + _reset }
+/// Wrap text in green background color.
 fun bg_green(text: String): String { return _esc + "42m" + text + _reset }
+/// Wrap text in yellow background color.
 fun bg_yellow(text: String): String { return _esc + "43m" + text + _reset }
+/// Wrap text in blue background color.
 fun bg_blue(text: String): String { return _esc + "44m" + text + _reset }

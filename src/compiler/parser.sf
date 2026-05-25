@@ -382,6 +382,12 @@ class Parser {
         return AST.Expr.Lambda(params, ret_type, body)
     }
 
+    fun is_ident_named(name: String): Bool {
+        var kind = this.current_kind()
+        var ident_name = match (kind) { TkIdent(n) => n }
+        return ident_name == name
+    }
+
     fun match_kind_check(expected: String): Bool {
         var kind = this.current_kind()
         var name = this.kind_name(kind)
@@ -549,6 +555,8 @@ class Parser {
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
         if (this.match_kind_check("for")) return this.parse_for()
+        if (this.is_ident_named("break")) { this.advance(); return AST.Stmt.Break }
+        if (this.is_ident_named("continue")) { this.advance(); return AST.Stmt.Continue }
         if (this.match_kind_check("{")) return this.parse_block()
         // Check for assignment: ident = expr
         if (this.match_kind_check("ident") and this.peek_is("=")) {

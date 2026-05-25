@@ -1,3 +1,15 @@
+//! Set data structure backed by a Map, with union, intersection, and difference operations.
+
+/// An unordered collection of unique values.
+///
+/// ```saffron
+/// import "@set" as Sets
+/// var s = Sets.Set()
+/// s.add(1).add(2).add(3)
+/// s.has(2)      // true
+/// s.size()      // 3
+/// s.values()    // [1, 2, 3]
+/// ```
 class Set {
     var _map: Map<Any, Bool>
 
@@ -51,6 +63,13 @@ class Set {
     }
 }
 
+/// Create a Set from a list of items.
+///
+/// ```saffron
+/// import "@set" as Sets
+/// var s = Sets.from([1, 2, 3, 2, 1])
+/// s.size()  // 3
+/// ```
 fun from(items: List<Any>): Set {
     var s = Set()
     var i = 0
@@ -61,6 +80,14 @@ fun from(items: List<Any>): Set {
     return s
 }
 
+/// Return a new Set containing all elements from both sets.
+///
+/// ```saffron
+/// import "@set" as Sets
+/// var a = Sets.from([1, 2, 3])
+/// var b = Sets.from([3, 4, 5])
+/// Sets.union(a, b).values()  // [1, 2, 3, 4, 5]
+/// ```
 fun union(a: Set, b: Set): Set {
     var result = Set()
     var av = a.values()
@@ -78,6 +105,14 @@ fun union(a: Set, b: Set): Set {
     return result
 }
 
+/// Return a new Set containing only elements present in both sets.
+///
+/// ```saffron
+/// import "@set" as Sets
+/// var a = Sets.from([1, 2, 3, 4])
+/// var b = Sets.from([3, 4, 5, 6])
+/// Sets.intersect(a, b).values()  // [3, 4]
+/// ```
 fun intersect(a: Set, b: Set): Set {
     var result = Set()
     var av = a.values()
@@ -91,6 +126,14 @@ fun intersect(a: Set, b: Set): Set {
     return result
 }
 
+/// Return a new Set containing elements in a that are not in b.
+///
+/// ```saffron
+/// import "@set" as Sets
+/// var a = Sets.from([1, 2, 3, 4])
+/// var b = Sets.from([3, 4, 5])
+/// Sets.diff(a, b).values()  // [1, 2]
+/// ```
 fun diff(a: Set, b: Set): Set {
     var result = Set()
     var av = a.values()

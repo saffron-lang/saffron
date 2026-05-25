@@ -1,69 +1,247 @@
 //! Generate mdBook markdown documentation from Saffron source files.
-//! Parses /// doc-comments and function/class/enum signatures.
+//! Uses the @parser and @ast modules for proper source analysis.
 //!
 //! Usage: saffron tools/gen_docs.sf <source_dir> <output_dir>
 
 import "@os" as OS
 import "@path" as Path
+import "@parser" as Parser
+import "@ast" as AST
 
-/// A documented item extracted from source.
-enum DocItem {
-    FunDoc(name: String, params: String, return_type: String, doc: String),
-    ClassDoc(name: String, doc: String),
-    EnumDoc(name: String, doc: String),
-    VarDoc(name: String, type_ann: String, doc: String),
-    ModuleDoc(doc: String)
-}
-
-/// Parse a single .sf file and extract documented items.
-fun parse_file(path: String): List<DocItem> {
-    var source = IO.read_file(path)
+/// Extract the module docstring (//! lines) from raw source.
+/// Parser doesn't expose this directly yet, so we parse it from the text.
+fun extract_module_doc(source: String): String {
     var lines = source.split("\n")
-    var items: List<DocItem> = []
-    var current_doc: List<String> = []
-    var module_doc: List<String> = []
-    var in_module_doc = true
-
+    var doc_lines: List<String> = []
     var i = 0
     while (i < lines.length()) {
         var line = lines[i].trim()
-
         if (line.starts_with("//!")) {
-            if (in_module_doc) {
-                var text = strip_doc_prefix(line, "//!")
-                module_doc.push(text)
+            var text = line.slice(3, line.length())
+            if (text.length() > 0 and text.char_at(0) == " ") {
+                text = text.slice(1, text.length())
             }
-            i = i + 1
-            continue
+            doc_lines.push(text)
+        } else if (!(line == "") and !(line.starts_with("//"))) {
+            break
         }
-
-        in_module_doc = false
-
-        if (line.starts_with("///")) {
-            var text = strip_doc_prefix(line, "///")
-            current_doc.push(text)
-            i = i + 1
-            continue
-        }
-
-        if (current_doc.length() > 0) {
-            var doc = join_lines(current_doc)
-            var item = parse_declaration(line, doc)
-            if (!(item is Nil)) {
-                items.push(item)
-            }
-            current_doc = []
-        }
-
         i = i + 1
     }
+    return join_lines(doc_lines)
+}
 
-    if (module_doc.length() > 0) {
-        var mod_item = DocItem.ModuleDoc(join_lines(module_doc))
-        items = [mod_item] + items
+/// Find all documented top-level var declarations in a statement list.
+fun find_vars(stmts: List<AST.Stmt>): List<AST.Stmt> {
+    var results: List<AST.Stmt> = []
+    for (stmt in stmts) {
+        match (stmt) {
+            VarDecl(name, type_ann, initializer, docstring) => {
+                if (!(docstring == "")) {
+                    results.push(stmt)
+                }
+            }
+        }
+    }
+    return results
+}
+
+/// Generate markdown documentation for a single source file.
+fun generate_file_docs(path: String): String {
+    var source = IO.read_file(path)
+    var stmts = Parser.parse_file(path)
+    var module_name = Path.stem(Path.basename(path))
+    var out: List<String> = []
+
+    out.push("# ${module_name}")
+    out.push("")
+
+    // Import line
+    out.push("```saffron")
+    out.push("import \"@${module_name}\" as ${capitalize(module_name)}")
+    out.push("```")
+    out.push("")
+
+    // Module-level docstring
+    var module_doc = extract_module_doc(source)
+    if (!(module_doc == "")) {
+        out.push(module_doc)
+        out.push("")
     }
 
-    return items
+    var functions = AST.find_functions(stmts)
+    var classes = AST.find_classes(stmts)
+    var enums = AST.find_enums(stmts)
+    var vars = find_vars(stmts)
+
+    if (enums.length() > 0) {
+        for (enum_stmt in enums) {
+            out.push(render_enum(enum_stmt))
+        }
+    }
+
+    if (classes.length() > 0) {
+        for (class_stmt in classes) {
+            out.push(render_class(class_stmt))
+        }
+    }
+
+    if (vars.length() > 0) {
+        out.push("## Constants")
+        out.push("")
+        for (var_stmt in vars) {
+            out.push(render_var(var_stmt))
+        }
+    }
+
+    if (functions.length() > 0) {
+        out.push("## Functions")
+        out.push("")
+        for (fn_stmt in functions) {
+            out.push(render_function(fn_stmt))
+        }
+    }
+
+    return join_lines(out)
+}
+
+/// Render a function declaration to markdown.
+fun render_function(stmt: AST.Stmt): String {
+    var name = AST.stmt_name(stmt)
+    var doc = AST.stmt_doc(stmt)
+    var out: List<String> = []
+
+    out.push("### `${name}`")
+    out.push("")
+
+    // Extract signature from the FunDecl fields
+    match (stmt) {
+        FunDecl(fn_name, params, ret_type, body, docstring) => {
+            var sig = "fun ${fn_name}(${params})"
+            if (!(ret_type == "")) {
+                sig = sig + ": ${ret_type}"
+            }
+            out.push("```saffron")
+            out.push(sig)
+            out.push("```")
+            out.push("")
+        }
+    }
+
+    if (!(doc == "")) {
+        out.push(doc)
+        out.push("")
+    }
+
+    return join_lines(out)
+}
+
+/// Render a class declaration to markdown.
+fun render_class(stmt: AST.Stmt): String {
+    var name = AST.stmt_name(stmt)
+    var doc = AST.stmt_doc(stmt)
+    var out: List<String> = []
+
+    out.push("## class `${name}`")
+    out.push("")
+
+    if (!(doc == "")) {
+        out.push(doc)
+        out.push("")
+    }
+
+    // Render class methods
+    match (stmt) {
+        ClassDecl(cls_name, fields, methods, docstring) => {
+            if (!(fields == "")) {
+                out.push("**Fields:** ${fields}")
+                out.push("")
+            }
+            var documented_methods = AST.find_functions(methods)
+            for (method in documented_methods) {
+                out.push(render_function(method))
+            }
+        }
+    }
+
+    return join_lines(out)
+}
+
+/// Render an enum declaration to markdown.
+fun render_enum(stmt: AST.Stmt): String {
+    var name = AST.stmt_name(stmt)
+    var doc = AST.stmt_doc(stmt)
+    var out: List<String> = []
+
+    out.push("## enum `${name}`")
+    out.push("")
+
+    if (!(doc == "")) {
+        out.push(doc)
+        out.push("")
+    }
+
+    match (stmt) {
+        EnumDecl(enum_name, variants, docstring) => {
+            if (variants.length() > 0) {
+                out.push("**Variants:**")
+                out.push("")
+                for (variant in variants) {
+                    match (variant) {
+                        Variant(vname, fields) => {
+                            if (fields == "") {
+                                out.push("- `${vname}`")
+                            } else {
+                                out.push("- `${vname}(${fields})`")
+                            }
+                        }
+                    }
+                }
+                out.push("")
+            }
+        }
+    }
+
+    return join_lines(out)
+}
+
+/// Render a documented variable/constant to markdown.
+fun render_var(stmt: AST.Stmt): String {
+    var name = AST.stmt_name(stmt)
+    var doc = AST.stmt_doc(stmt)
+    var out: List<String> = []
+
+    out.push("### `${name}`")
+    out.push("")
+
+    match (stmt) {
+        VarDecl(vname, type_ann, initializer, docstring) => {
+            if (!(type_ann == "")) {
+                out.push("```saffron")
+                out.push("var ${vname}: ${type_ann}")
+                out.push("```")
+                out.push("")
+            }
+        }
+    }
+
+    if (!(doc == "")) {
+        out.push(doc)
+        out.push("")
+    }
+
+    return join_lines(out)
+}
+
+/// Capitalize the first letter of a string.
+fun capitalize(s: String): String {
+    if (s.length() == 0) {
+        return s
+    }
+    var first = s.char_at(0).to_upper()
+    if (s.length() == 1) {
+        return first
+    }
+    return first + s.slice(1, s.length())
 }
 
 /// Join a list of strings with newlines.
@@ -80,219 +258,6 @@ fun join_lines(lines: List<String>): String {
     return result
 }
 
-/// Strip a doc-comment prefix and optional leading space.
-fun strip_doc_prefix(line: String, prefix: String): String {
-    var after = line.slice(prefix.length(), line.length())
-    if (after.length() > 0 and after.char_at(0) == " ") {
-        return after.slice(1, after.length())
-    }
-    return after
-}
-
-/// Try to parse a declaration line into a DocItem.
-fun parse_declaration(line: String, doc: String) {
-    if (line.starts_with("fun ")) {
-        return parse_fun_decl(line, doc)
-    }
-    if (line.starts_with("class ")) {
-        return parse_class_decl(line, doc)
-    }
-    if (line.starts_with("enum ")) {
-        return parse_enum_decl(line, doc)
-    }
-    if (line.starts_with("var ") or line.starts_with("let ")) {
-        return parse_var_decl(line, doc)
-    }
-    return nil
-}
-
-/// Parse a function declaration line.
-fun parse_fun_decl(line: String, doc: String): DocItem {
-    var rest = line.slice(4, line.length())
-
-    var paren_idx = rest.index_of("(")
-    if (paren_idx < 0) {
-        return DocItem.FunDoc(rest.trim(), "", "", doc)
-    }
-
-    var name = rest.slice(0, paren_idx).trim()
-
-    var generic_idx = name.index_of("<")
-    if (generic_idx >= 0) {
-        name = name.slice(0, generic_idx)
-    }
-
-    var after_name = rest.slice(paren_idx, rest.length())
-    var close_paren = find_matching_paren(after_name)
-    var params = ""
-    if (close_paren > 0) {
-        params = after_name.slice(1, close_paren)
-    }
-
-    var return_type = ""
-    if (close_paren > 0) {
-        var after_params = after_name.slice(close_paren + 1, after_name.length()).trim()
-        if (after_params.starts_with(":")) {
-            var type_str = after_params.slice(1, after_params.length()).trim()
-            var brace_idx = type_str.index_of("{")
-            if (brace_idx >= 0) {
-                type_str = type_str.slice(0, brace_idx).trim()
-            }
-            return_type = type_str
-        }
-    }
-
-    return DocItem.FunDoc(name, params, return_type, doc)
-}
-
-/// Find the index of the matching closing paren.
-fun find_matching_paren(s: String): Number {
-    var depth = 0
-    var i = 0
-    while (i < s.length()) {
-        var ch = s.char_at(i)
-        if (ch == "(") {
-            depth = depth + 1
-        } else if (ch == ")") {
-            depth = depth - 1
-            if (depth == 0) {
-                return i
-            }
-        }
-        i = i + 1
-    }
-    return -1
-}
-
-/// Parse a class declaration line.
-fun parse_class_decl(line: String, doc: String): DocItem {
-    var rest = line.slice(6, line.length()).trim()
-    var name = extract_identifier(rest)
-    return DocItem.ClassDoc(name, doc)
-}
-
-/// Parse an enum declaration line.
-fun parse_enum_decl(line: String, doc: String): DocItem {
-    var rest = line.slice(5, line.length()).trim()
-    var name = extract_identifier(rest)
-    return DocItem.EnumDoc(name, doc)
-}
-
-/// Parse a variable declaration line.
-fun parse_var_decl(line: String, doc: String): DocItem {
-    var rest = line.slice(4, line.length()).trim()
-    var colon_idx = rest.index_of(":")
-    var eq_idx = rest.index_of("=")
-
-    var name = ""
-    var type_ann = ""
-
-    if (colon_idx >= 0 and (eq_idx < 0 or colon_idx < eq_idx)) {
-        name = rest.slice(0, colon_idx).trim()
-        if (eq_idx >= 0) {
-            type_ann = rest.slice(colon_idx + 1, eq_idx).trim()
-        } else {
-            type_ann = rest.slice(colon_idx + 1, rest.length()).trim()
-        }
-    } else if (eq_idx >= 0) {
-        name = rest.slice(0, eq_idx).trim()
-    } else {
-        name = rest
-    }
-
-    return DocItem.VarDoc(name, type_ann, doc)
-}
-
-/// Extract an identifier (stops at space, <, {, or end).
-fun extract_identifier(s: String): String {
-    var i = 0
-    while (i < s.length()) {
-        var ch = s.char_at(i)
-        if (ch == " " or ch == "<" or ch == "{" or ch == "(") {
-            return s.slice(0, i)
-        }
-        i = i + 1
-    }
-    return s
-}
-
-/// Format a list of DocItems as mdBook markdown.
-fun render_module(module_name: String, items: List<DocItem>): String {
-    var out: List<String> = []
-    out.push("# ${module_name}")
-    out.push("")
-
-    for (item in items) {
-        var section = render_item(item)
-        out.push(section)
-    }
-
-    return join_lines(out)
-}
-
-/// Render a single DocItem to markdown.
-fun render_item(item: DocItem): String {
-    return match (item) {
-        ModuleDoc(doc) => doc + "\n",
-        FunDoc(name, params, return_type, doc) => render_fun(name, params, return_type, doc),
-        ClassDoc(name, doc) => render_class(name, doc),
-        EnumDoc(name, doc) => render_enum(name, doc),
-        VarDoc(name, type_ann, doc) => render_var(name, type_ann, doc)
-    }
-}
-
-fun render_fun(name: String, params: String, return_type: String, doc: String): String {
-    var sig = "fun ${name}(${params})"
-    if (return_type != "") {
-        sig = sig + ": ${return_type}"
-    }
-    var out: List<String> = []
-    out.push("### `${name}`")
-    out.push("")
-    out.push("```saffron")
-    out.push(sig)
-    out.push("```")
-    out.push("")
-    out.push(doc)
-    out.push("")
-    return join_lines(out)
-}
-
-fun render_class(name: String, doc: String): String {
-    var out: List<String> = []
-    out.push("## ${name}")
-    out.push("")
-    out.push(doc)
-    out.push("")
-    return join_lines(out)
-}
-
-fun render_enum(name: String, doc: String): String {
-    var out: List<String> = []
-    out.push("## ${name}")
-    out.push("")
-    out.push(doc)
-    out.push("")
-    return join_lines(out)
-}
-
-fun render_var(name: String, type_ann: String, doc: String): String {
-    var sig = name
-    if (type_ann != "") {
-        sig = name + ": ${type_ann}"
-    }
-    var out: List<String> = []
-    out.push("### `${name}`")
-    out.push("")
-    out.push("```saffron")
-    out.push("var ${sig}")
-    out.push("```")
-    out.push("")
-    out.push(doc)
-    out.push("")
-    return join_lines(out)
-}
-
 /// Generate docs for all .sf files in a directory.
 fun generate_docs(source_dir: String, output_dir: String) {
     var files = IO.list_dir(source_dir)
@@ -303,14 +268,9 @@ fun generate_docs(source_dir: String, output_dir: String) {
         }
 
         var filepath = Path.join([source_dir, file])
-        var items = parse_file(filepath)
-
-        if (items.length() == 0) {
-            continue
-        }
+        var markdown = generate_file_docs(filepath)
 
         var module_name = Path.stem(file)
-        var markdown = render_module(module_name, items)
         var out_path = Path.join([output_dir, module_name + ".md"])
 
         IO.write_file(out_path, markdown)
@@ -323,7 +283,8 @@ var args = OS.args()
 if (args.length() < 3) {
     IO.println("Usage: saffron tools/gen_docs.sf <source_dir> <output_dir>")
     IO.println("")
-    IO.println("Generates mdBook markdown from /// doc-comments in .sf files.")
+    IO.println("Generates mdBook markdown from documented Saffron source files.")
+    IO.println("Uses @parser and @ast for proper source analysis.")
     IO.println("")
     IO.println("Example:")
     IO.println("  saffron tools/gen_docs.sf src/lib/ docs/src/stdlib/")
