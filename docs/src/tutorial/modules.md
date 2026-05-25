@@ -6,7 +6,7 @@ Saffron has two kinds of imports — built-in modules and relative file imports:
 
 ```saffron
 import "@math" as Math            // built-in module
-import "../utils/helpers.sf" as H // relative file path
+import "../utils/helpers.sf" as Helpers // relative file path
 ```
 
 ## Built-in modules (`@` prefix)
@@ -33,7 +33,7 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 import "@iter" as Iter
 import "@math" as Math
 import "@json" as JSON
-import "@test" as T
+import "@test" as Test
 ```
 
 ## Named imports

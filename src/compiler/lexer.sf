@@ -63,6 +63,10 @@ enum TokenKind {
     TkArrow,
     TkFatArrow,
 
+    // Documentation
+    TkDocComment(text: String),
+    TkModuleDoc(text: String),
+
     // Special
     TkNewline,
     TkEof
@@ -134,6 +138,15 @@ class Lexer {
                 this.col = 1
                 this.pos = this.pos + 1
             } else if (ch == "/" and this.peek_next() == "/") {
+                // Check for /// doc comment or //! module doc
+                if (this.pos + 2 < this.source.length()) {
+                    var third = this.source.char_at(this.pos + 2)
+                    if (third == "/" or third == "!") {
+                        // Don't skip — let tokenize() handle it
+                        break
+                    }
+                }
+                // Regular comment: skip to end of line
                 while (this.pos < this.source.length() and this.peek() != "\n") {
                     this.advance()
                 }
@@ -231,10 +244,47 @@ class Lexer {
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 
+    fun read_doc_comment(): String {
+        // Position is right after /// or //!
+        // Skip optional space
+        if (this.pos < this.source.length() and this.peek() == " ") {
+            this.advance()
+        }
+        var start = this.pos
+        while (this.pos < this.source.length() and this.peek() != "\n") {
+            this.advance()
+        }
+        return this.source.slice(start, this.pos)
+    }
+
     fun tokenize(): List<Token> {
         while (this.pos < this.source.length()) {
             this.skip_whitespace()
             if (this.pos >= this.source.length()) break
+
+            // Check for doc comments before advancing
+            if (this.peek() == "/" and this.peek_next() == "/") {
+                if (this.pos + 2 < this.source.length()) {
+                    var third = this.source.char_at(this.pos + 2)
+                    if (third == "/") {
+                        // /// doc comment
+                        this.advance() // first /
+                        this.advance() // second /
+                        this.advance() // third /
+                        var text = this.read_doc_comment()
+                        this.emit(TokenKind.TkDocComment(text))
+                        continue
+                    } else if (third == "!") {
+                        // //! module doc
+                        this.advance() // first /
+                        this.advance() // second /
+                        this.advance() // !
+                        var text = this.read_doc_comment()
+                        this.emit(TokenKind.TkModuleDoc(text))
+                        continue
+                    }
+                }
+            }
 
             var ch = this.advance()
 

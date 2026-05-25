@@ -445,6 +445,8 @@ class Parser {
             TkFloat(v) => "float"
             TkString(v) => "string"
             TkIdent(v) => "ident"
+            TkDocComment(t) => "doc_comment"
+            TkModuleDoc(t) => "module_doc"
             TkNewline => "newline"
         }
     }
@@ -492,9 +494,41 @@ class Parser {
         }
     }
 
+    // --- Docstring collection ---
+
+    fun collect_doc_comments(): String {
+        var parts: List<String> = []
+        while (this.match_kind_check("doc_comment")) {
+            var kind = this.current_kind()
+            var text = match (kind) {
+                TkDocComment(t) => t
+            }
+            this.advance()
+            parts.push(text)
+        }
+        if (parts.length() == 0) return ""
+        return parts.join("\n")
+    }
+
+    fun collect_module_doc(): String {
+        var parts: List<String> = []
+        while (this.match_kind_check("module_doc")) {
+            var kind = this.current_kind()
+            var text = match (kind) {
+                TkModuleDoc(t) => t
+            }
+            this.advance()
+            parts.push(text)
+        }
+        if (parts.length() == 0) return ""
+        return parts.join("\n")
+    }
+
     // --- Statements ---
 
     fun parse_program(): List<AST.Stmt> {
+        // Collect leading //! module doc comments
+        var module_doc = this.collect_module_doc()
         var stmts: List<AST.Stmt> = []
         while (!this.match_kind_check("eof")) {
             stmts.push(this.parse_stmt())
@@ -503,11 +537,14 @@ class Parser {
     }
 
     fun parse_stmt(): AST.Stmt {
-        if (this.match_kind_check("var")) return this.parse_var_decl()
-        if (this.match_kind_check("let")) return this.parse_var_decl()
-        if (this.match_kind_check("fun")) return this.parse_fun_decl()
-        if (this.match_kind_check("enum")) return this.parse_enum_decl()
-        if (this.match_kind_check("class")) return this.parse_class_decl()
+        // Collect /// doc comments before declarations
+        var docstring = this.collect_doc_comments()
+
+        if (this.match_kind_check("var")) return this.parse_var_decl_with_doc(docstring)
+        if (this.match_kind_check("let")) return this.parse_var_decl_with_doc(docstring)
+        if (this.match_kind_check("fun")) return this.parse_fun_decl_with_doc(docstring)
+        if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
+        if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
@@ -541,6 +578,10 @@ class Parser {
     }
 
     fun parse_var_decl(): AST.Stmt {
+        return this.parse_var_decl_with_doc("")
+    }
+
+    fun parse_var_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume var/let
         var name = this.expect_ident()
         var type_ann = "Any"
@@ -549,10 +590,14 @@ class Parser {
         }
         this.consume("=")
         var init = this.parse_expr()
-        return AST.Stmt.VarDecl(name, type_ann, init)
+        return AST.Stmt.VarDecl(name, type_ann, init, docstring)
     }
 
     fun parse_fun_decl(): AST.Stmt {
+        return this.parse_fun_decl_with_doc("")
+    }
+
+    fun parse_fun_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume fun
         var name = this.expect_ident()
         this.consume("(")
@@ -583,7 +628,7 @@ class Parser {
         }
         var params = params_sb.to_string()
         var body = this.parse_block_stmts()
-        return AST.Stmt.FunDecl(name, params, ret_type, body)
+        return AST.Stmt.FunDecl(name, params, ret_type, body, docstring)
     }
 
     fun parse_enum_decl(): AST.Stmt {
@@ -708,6 +753,8 @@ class Parser {
         var else_branch: List<AST.Stmt> = []
         if (this.match_kind("else")) {
             if (this.match_kind_check("if")) {
+                // Flatten else-if: parse as nested If in else
+                // But limit depth to prevent stack overflow in codegen
                 else_branch = [this.parse_if()]
             } else {
                 else_branch = this.parse_body()

@@ -1,3 +1,0 @@
-//! Module doc test
-import "reflect" as Reflect
-IO.println(Reflect.module_doc())

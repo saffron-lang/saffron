@@ -2206,24 +2206,58 @@ class Codegen {
     }
 
     fun gen_if(cond: AST.Expr, then_branch: List<AST.Stmt>, else_branch: List<AST.Stmt>) {
-        var cond_val = this.to_i1(this.gen_arg_value(cond))
-        var then_label = this.fresh_label("then")
-        var else_label = this.fresh_label("else")
         var end_label = this.fresh_label("endif")
+        var current_cond = cond
+        var current_then = then_branch
+        var current_else = else_branch
 
-        this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+        // Iterative else-if chain to avoid deep C stack recursion
+        while (true) {
+            var cond_val = this.to_i1(this.gen_arg_value(current_cond))
+            var then_label = this.fresh_label("then")
+            var else_label = this.fresh_label("else")
 
-        this.start_block(then_label)
-        this.gen_stmts(then_branch)
-        this.emit_terminator("br label %" + end_label)
+            this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
 
-        this.start_block(else_label)
-        if (else_branch.length() > 0) {
-            this.gen_stmts(else_branch)
+            this.start_block(then_label)
+            this.gen_stmts(current_then)
+            this.emit_terminator("br label %" + end_label)
+
+            this.start_block(else_label)
+
+            // Check if else is a single If (else-if chain)
+            if (current_else.length() == 1 and this.is_if_stmt(current_else[0])) {
+                var nested = current_else[0]
+                current_cond = match (nested) { If(c, t, e) => c }
+                current_then = match (nested) { If(c, t, e) => t }
+                current_else = match (nested) { If(c, t, e) => e }
+                // Continue loop instead of recursing
+            } else {
+                // Final else or no else
+                if (current_else.length() > 0) {
+                    this.gen_stmts(current_else)
+                }
+                this.emit_terminator("br label %" + end_label)
+                break
+            }
         }
-        this.emit_terminator("br label %" + end_label)
 
         this.start_block(end_label)
+    }
+
+    fun is_if_stmt(stmt: AST.Stmt): Bool {
+        var kind = match (stmt) {
+            If(c, t, e) => "if"
+            ExprStmt(expr) => "other"
+            VarDecl(n, t, i) => "other"
+            FunDecl(n, p, r, b) => "other"
+            EnumDecl(n, v) => "other"
+            ClassDecl(n, f, m) => "other"
+            Return(v) => "other"
+            While(c, b) => "other"
+            Block(s) => "other"
+        }
+        return kind == "if"
     }
 
     fun gen_while(cond: AST.Expr, body: List<AST.Stmt>) {

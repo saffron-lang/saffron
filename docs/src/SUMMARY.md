@@ -43,6 +43,7 @@
 
 # Reference
 
+- [Style Guide](./reference/style-guide.md)
 - [Operator Overloading](./reference/operator-overloading.md)
 - [Interfaces](./reference/interfaces.md)
 - [Generics](./reference/generics.md)

@@ -1,7 +1,7 @@
 # Collections
 
 ```saffron
-import "@collections" as Collections
+import "@collections" as Collectionsollections
 ```
 
 Additional data structures beyond the built-in List and Map.
@@ -13,10 +13,10 @@ An unordered collection of unique values.
 ### Creating sets
 
 ```saffron
-import "@collections" as C
+import "@collections" as Collections
 
-var s = C.Set.new()
-var from_list = C.Set.from([1, 2, 3, 2, 1])  // {1, 2, 3}
+var s = Collections.Set.new()
+var from_list = Collections.Set.from([1, 2, 3, 2, 1])  // {1, 2, 3}
 ```
 
 ### Methods
@@ -33,19 +33,19 @@ var from_list = C.Set.from([1, 2, 3, 2, 1])  // {1, 2, 3}
 
 | Function | Description |
 |----------|-------------|
-| `C.Set.union(a, b)` | Elements in either set |
-| `C.Set.intersection(a, b)` | Elements in both sets |
-| `C.Set.difference(a, b)` | Elements in a but not b |
+| `Collections.Set.union(a, b)` | Elements in either set |
+| `Collections.Set.intersection(a, b)` | Elements in both sets |
+| `Collections.Set.difference(a, b)` | Elements in a but not b |
 
 ### Example
 
 ```saffron
-import "@collections" as C
+import "@collections" as Collections
 
-var a = C.Set.from([1, 2, 3, 4])
-var b = C.Set.from([3, 4, 5, 6])
+var a = Collections.Set.from([1, 2, 3, 4])
+var b = Collections.Set.from([3, 4, 5, 6])
 
-var both = C.Set.intersection(a, b)
+var both = Collections.Set.intersection(a, b)
 IO.println(both.to_list())  // [3, 4]
 ```
 
@@ -54,9 +54,9 @@ IO.println(both.to_list())  // [3, 4]
 A FIFO (first-in, first-out) queue.
 
 ```saffron
-import "@collections" as C
+import "@collections" as Collections
 
-var q = C.Queue.new()
+var q = Collections.Queue.new()
 q.enqueue("first")
 q.enqueue("second")
 IO.println(q.dequeue())  // "first"
@@ -81,9 +81,9 @@ IO.println(q.is_empty()) // false
 A LIFO (last-in, first-out) stack.
 
 ```saffron
-import "@collections" as C
+import "@collections" as Collections
 
-var s = C.Stack.new()
+var s = Collections.Stack.new()
 s.push("bottom")
 s.push("top")
 IO.println(s.pop())      // "top"
@@ -107,9 +107,9 @@ IO.println(s.is_empty()) // false
 A double-ended queue — efficient push/pop from both ends.
 
 ```saffron
-import "@collections" as C
+import "@collections" as Collections
 
-var d = C.Deque.new()
+var d = Collections.Deque.new()
 d.push_back(1)
 d.push_front(0)
 IO.println(d.pop_front())  // 0
