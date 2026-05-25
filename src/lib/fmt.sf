@@ -1,3 +1,11 @@
+//! String formatting utilities for templates, padding, and alignment.
+
+/// Format a template string by replacing {0}, {1}, etc. with values from the list.
+///
+/// ```saffron
+/// import "@fmt" as Fmt
+/// Fmt.format("{0} + {1} = {2}", [1, 2, 3])  // "1 + 2 = 3"
+/// ```
 fun format(template: String, values: List<Any>): String {
     var sb = StringBuilder()
     var i = 0
@@ -38,6 +46,12 @@ fun format(template: String, values: List<Any>): String {
     return sb.to_string()
 }
 
+/// Pad text on the left to reach the given width using the fill character.
+///
+/// ```saffron
+/// import "@fmt" as Fmt
+/// Fmt.pad_left("42", 5, "0")  // "00042"
+/// ```
 fun pad_left(text: String, width: Number, fill: String): String {
     var sb = StringBuilder()
     var needed = width - text.length()
@@ -50,6 +64,12 @@ fun pad_left(text: String, width: Number, fill: String): String {
     return sb.to_string()
 }
 
+/// Pad text on the right to reach the given width using the fill character.
+///
+/// ```saffron
+/// import "@fmt" as Fmt
+/// Fmt.pad_right("hi", 5, ".")  // "hi..."
+/// ```
 fun pad_right(text: String, width: Number, fill: String): String {
     var sb = StringBuilder()
     sb.append(text)
@@ -62,6 +82,12 @@ fun pad_right(text: String, width: Number, fill: String): String {
     return sb.to_string()
 }
 
+/// Center text within the given width, padding both sides with the fill character.
+///
+/// ```saffron
+/// import "@fmt" as Fmt
+/// Fmt.center("hi", 6, "-")  // "--hi--"
+/// ```
 fun center(text: String, width: Number, fill: String): String {
     var total = width - text.length()
     if (total <= 0) { return text }
@@ -76,6 +102,12 @@ fun center(text: String, width: Number, fill: String): String {
     return sb.to_string()
 }
 
+/// Repeat a string n times.
+///
+/// ```saffron
+/// import "@fmt" as Fmt
+/// Fmt.repeat("ha", 3)  // "hahaha"
+/// ```
 fun repeat(text: String, n: Number): String {
     return text.repeat(n)
 }

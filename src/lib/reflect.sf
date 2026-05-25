@@ -1,4 +1,4 @@
-// Reflect — runtime type introspection
+//! Runtime type introspection — type checking, field access, and construction.
 //
 // This module exposes type-checking and field access as a stable API.
 // Implementations (VM, compiled native, WASM) provide these as intrinsics.

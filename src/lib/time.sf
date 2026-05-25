@@ -1,45 +1,58 @@
+//! Time utilities for clocks, timestamps, date components, and measurement.
+
 import "time" as _Time
 
+/// Return a high-resolution monotonic clock value in seconds.
 fun clock(): Number {
     return _Time.clock()
 }
 
+/// Return the current Unix timestamp in seconds.
 fun timestamp(): Number {
     return _Time.timestamp()
 }
 
+/// Block the current thread for the given number of seconds.
 fun sleep(seconds: Number) {
     _Time.sleep(seconds)
 }
 
+/// Convert a Unix timestamp to an ISO 8601 date string.
 fun to_iso(ts: Number): String {
     return _Time.to_iso(ts)
 }
 
+/// Extract the year from a Unix timestamp.
 fun year(ts: Number): Number {
     return _Time.year(ts)
 }
 
+/// Extract the month (1-12) from a Unix timestamp.
 fun month(ts: Number): Number {
     return _Time.month(ts)
 }
 
+/// Extract the day of the month from a Unix timestamp.
 fun day(ts: Number): Number {
     return _Time.day(ts)
 }
 
+/// Extract the hour (0-23) from a Unix timestamp.
 fun hour(ts: Number): Number {
     return _Time.hour(ts)
 }
 
+/// Extract the minute (0-59) from a Unix timestamp.
 fun minute(ts: Number): Number {
     return _Time.minute(ts)
 }
 
+/// Extract the second (0-59) from a Unix timestamp.
 fun second(ts: Number): Number {
     return _Time.second(ts)
 }
 
+/// Return the current date and time as a map with year, month, day, hour, minute, second keys.
 fun now(): Map<String, Number> {
     var ts = _Time.timestamp()
     return {
@@ -53,10 +66,12 @@ fun now(): Map<String, Number> {
     }
 }
 
+/// Return the elapsed time in seconds since the given clock start value.
 fun elapsed(start: Number): Number {
     return _Time.clock() - start
 }
 
+/// Measure the execution time of a function and return elapsed seconds.
 fun measure(func: () => Any): Number {
     var start = _Time.clock()
     func()

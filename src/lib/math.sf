@@ -1,62 +1,174 @@
+//! Mathematical constants and functions wrapping the native math module.
+
 import "math" as _Math
 
-// Constants
+/// The ratio of a circle's circumference to its diameter.
 var pi = _Math.pi
+/// Euler's number.
 var e = _Math.e
+/// Positive infinity.
 var inf = _Math.inf
+/// Not-a-number sentinel value.
 var nan = _Math.nan
+/// Tau (2 * pi).
 var tau = _Math.pi * 2
+/// Alias for pi.
 var PI = _Math.pi
+/// Alias for e.
 var E = _Math.e
 
-// Re-export native functions
+/// Return the absolute value of x.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.abs(-5)  // 5
+/// ```
 fun abs(x: Number): Number { return _Math.abs(x) }
+/// Round x down to the nearest integer.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.floor(3.7)  // 3
+/// ```
 fun floor(x: Number): Number { return _Math.floor(x) }
+/// Round x up to the nearest integer.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.ceil(3.2)  // 4
+/// ```
 fun ceil(x: Number): Number { return _Math.ceil(x) }
+/// Round x to the nearest integer.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.round(3.5)  // 4
+/// ```
 fun round(x: Number): Number { return _Math.round(x) }
+/// Return the smaller of two numbers.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.min(3, 7)  // 3
+/// ```
 fun min(a: Number, b: Number): Number { return _Math.min(a, b) }
+/// Return the larger of two numbers.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.max(3, 7)  // 7
+/// ```
 fun max(a: Number, b: Number): Number { return _Math.max(a, b) }
+/// Return the square root of x.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.sqrt(16)  // 4
+/// ```
 fun sqrt(x: Number): Number { return _Math.sqrt(x) }
+/// Return x raised to the power y.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.pow(2, 10)  // 1024
+/// ```
 fun pow(x: Number, y: Number): Number { return _Math.pow(x, y) }
+/// Return the sine of x (radians).
 fun sin(x: Number): Number { return _Math.sin(x) }
+/// Return the cosine of x (radians).
 fun cos(x: Number): Number { return _Math.cos(x) }
+/// Return the tangent of x (radians).
 fun tan(x: Number): Number { return _Math.tan(x) }
+/// Return the arcsine of x.
 fun asin(x: Number): Number { return _Math.asin(x) }
+/// Return the arccosine of x.
 fun acos(x: Number): Number { return _Math.acos(x) }
+/// Return the arctangent of x.
 fun atan(x: Number): Number { return _Math.atan(x) }
+/// Return the arctangent of y/x, using signs to determine the quadrant.
 fun atan2(y: Number, x: Number): Number { return _Math.atan2(y, x) }
+/// Return the natural logarithm of x.
 fun log(x: Number): Number { return _Math.log(x) }
+/// Return the base-2 logarithm of x.
 fun log2(x: Number): Number { return _Math.log2(x) }
+/// Return the base-10 logarithm of x.
 fun log10(x: Number): Number { return _Math.log10(x) }
+/// Return -1, 0, or 1 indicating the sign of x.
 fun sign(x: Number): Number { return _Math.sign(x) }
+/// Clamp x to the range [lo, hi].
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.clamp(15, 0, 10)  // 10
+/// ```
 fun clamp(x: Number, lo: Number, hi: Number): Number { return _Math.clamp(x, lo, hi) }
 
-// Higher-level utilities (pure Saffron)
-
+/// Linearly interpolate between a and b by factor t.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.lerp(0, 100, 0.5)  // 50
+/// ```
 fun lerp(a: Number, b: Number, t: Number): Number {
     return a + (b - a) * t
 }
 
+/// Convert degrees to radians.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.deg_to_rad(180)  // 3.14159...
+/// ```
 fun deg_to_rad(degrees: Number): Number {
     return degrees * _Math.pi / 180
 }
 
+/// Convert radians to degrees.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.rad_to_deg(Math.pi)  // 180
+/// ```
 fun rad_to_deg(radians: Number): Number {
     return radians * 180 / _Math.pi
 }
 
+/// Compute the hypotenuse length from sides x and y.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.hypot(3, 4)  // 5
+/// ```
 fun hypot(x: Number, y: Number): Number {
     return _Math.sqrt(x * x + y * y)
 }
 
+/// Map a value from one range to another.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.map_range(5, 0, 10, 0, 100)  // 50
+/// ```
 fun map_range(value: Number, in_min: Number, in_max: Number, out_min: Number, out_max: Number): Number {
     return (value - in_min) / (in_max - in_min) * (out_max - out_min) + out_min
 }
 
+/// Return true if a and b are within the given tolerance of each other.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.is_close(Math.pi, 3.14159, 0.001)  // true
+/// ```
 fun is_close(a: Number, b: Number, tolerance: Number): Bool {
     return _Math.abs(a - b) <= tolerance
 }
 
+/// Sum all numbers in the list.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.sum([1, 2, 3, 4])  // 10
+/// ```
 fun sum(list: List<Number>): Number {
     var total = 0
     for (x in list) {
@@ -65,6 +177,12 @@ fun sum(list: List<Number>): Number {
     return total
 }
 
+/// Compute the arithmetic mean of a list of numbers.
+///
+/// ```saffron
+/// import "@math" as Math
+/// Math.avg([2, 4, 6])  // 4
+/// ```
 fun avg(list: List<Number>): Number {
     return sum(list) / list.length()
 }

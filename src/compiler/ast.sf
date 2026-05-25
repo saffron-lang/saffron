@@ -54,7 +54,9 @@ enum Stmt {
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
-    Block(stmts: List<Stmt>)
+    Block(stmts: List<Stmt>),
+    Break,
+    Continue
 }
 
 enum Variant {

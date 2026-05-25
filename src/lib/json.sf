@@ -1,6 +1,13 @@
-// JSON parser and serializer — pure Saffron implementation
-// Depends on: Reflect (builtin), String methods (char_at, slice, to_number, length)
+//! JSON parser and serializer — pure Saffron implementation.
 
+/// Parse a JSON string into native Saffron values (maps, lists, strings, numbers, bools, nil).
+///
+/// ```saffron
+/// import "@json" as JSON
+/// var data = JSON.parse("{\"name\": \"saffron\", \"version\": 1}")
+/// data.get("name")     // "saffron"
+/// data.get("version")  // 1
+/// ```
 fun parse(source: String) {
     var pos = 0
 
@@ -124,6 +131,7 @@ fun parse(source: String) {
     return parse_value()
 }
 
+/// Escape a string for safe inclusion in JSON output.
 fun escape_string(str: String): String {
     var result = "\""
     var i = 0
@@ -140,6 +148,14 @@ fun escape_string(str: String): String {
     return result + "\""
 }
 
+/// Serialize a value to a compact JSON string.
+///
+/// ```saffron
+/// import "@json" as JSON
+/// var data = {"name": "saffron", "tags": ["lang", "typed"]}
+/// JSON.to_string(data)
+/// // {"name":"saffron","tags":["lang","typed"]}
+/// ```
 fun to_string(value: Any): String {
     if (value == nil) { return "null" }
     if (value == true) { return "true" }
@@ -186,11 +202,27 @@ fun to_string(value: Any): String {
     return "null"
 }
 
+/// Parse JSON and construct an instance of the given class from the result.
+///
+/// ```saffron
+/// import "@json" as JSON
+/// var config = JSON.parse(IO.read_file("config.json"))
+/// var port = config.get("port")
+/// ```
 fun parse_into(klass: Any, source: String) {
     var parsed = parse(source)
     return Reflect.construct(klass, parsed)
 }
 
+/// Serialize a value to a pretty-printed JSON string with indentation.
+///
+/// ```saffron
+/// import "@json" as JSON
+/// IO.println(JSON.pretty({"name": "saffron"}))
+/// // {
+/// //   "name": "saffron"
+/// // }
+/// ```
 fun pretty(value: Any): String {
     fun pad(depth: Number): String {
         return "  ".repeat(depth)

@@ -1,3 +1,12 @@
+//! CSV parsing and serialization with support for quoted fields.
+
+/// Parse a CSV string into a list of rows, each row being a list of field strings.
+///
+/// ```saffron
+/// import "@csv" as CSV
+/// var data = CSV.parse("name,age\nalice,30\nbob,25")
+/// // [["name", "age"], ["alice", "30"], ["bob", "25"]]
+/// ```
 fun parse(source: String): List<List<String>> {
     var rows = []
     var pos = 0
@@ -77,6 +86,13 @@ fun parse(source: String): List<List<String>> {
     return rows
 }
 
+/// Serialize a list of rows back into a CSV-formatted string.
+///
+/// ```saffron
+/// import "@csv" as CSV
+/// var text = CSV.to_string([["a", "b"], ["1", "2"]])
+/// // "a,b\n1,2\n"
+/// ```
 fun to_string(rows: List<List<String>>): String {
     var sb = StringBuilder()
     var i = 0
@@ -101,11 +117,26 @@ fun to_string(rows: List<List<String>>): String {
     return sb.to_string()
 }
 
+/// Return the first row as column headers.
+///
+/// ```saffron
+/// import "@csv" as CSV
+/// var rows = CSV.parse("name,age\nalice,30")
+/// CSV.headers(rows)  // ["name", "age"]
+/// ```
 fun headers(rows: List<List<String>>): List<String> {
     if (rows.length() == 0) { return [] }
     return rows[0]
 }
 
+/// Convert rows into a list of maps using the first row as keys.
+///
+/// ```saffron
+/// import "@csv" as CSV
+/// var rows = CSV.parse("name,age\nalice,30\nbob,25")
+/// var records = CSV.as_maps(rows)
+/// records[0].get("name")  // "alice"
+/// ```
 fun as_maps(rows: List<List<String>>): List<Map<String, String>> {
     if (rows.length() < 2) { return [] }
     var hdrs = rows[0]

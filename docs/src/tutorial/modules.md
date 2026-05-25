@@ -28,6 +28,9 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 | `@csv` | CSV parsing |
 | `@path` | File path manipulation |
 | `@async` | Async task utilities |
+| `@lexer` | Tokenize Saffron source |
+| `@parser` | Parse source into AST |
+| `@ast` | AST types and traversal |
 
 ```saffron
 import "@iter" as Iter

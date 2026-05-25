@@ -1,0 +1,453 @@
+//! Semantic Versioning 2.0 — parse, compare, and match version constraints.
+//!
+//! ```saffron
+//! import "@semver" as SemVer
+//!
+//! var v = SemVer.parse("1.4.2-beta.1+build.789")
+//! var w = SemVer.parse("1.4.2")
+//! SemVer.gt(w, v)                    // true (release > prerelease)
+//! SemVer.satisfies(w, "^1.0.0")      // true
+//! SemVer.to_string(v)                // "1.4.2-beta.1+build.789"
+//! ```
+
+/// Represents a parsed semantic version.
+class Version {
+    var major: Number
+    var minor: Number
+    var patch: Number
+    var prerelease: String
+    var build: String
+
+    fun init(major: Number, minor: Number, patch: Number, prerelease: String, build: String) {
+        this.major = major
+        this.minor = minor
+        this.patch = patch
+        this.prerelease = prerelease
+        this.build = build
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+fun _is_digit(c: String): Bool {
+    return c == "0" or c == "1" or c == "2" or c == "3" or c == "4" or
+           c == "5" or c == "6" or c == "7" or c == "8" or c == "9"
+}
+
+fun _is_all_digits(s: String): Bool {
+    if (s.length() == 0) { return false }
+    var i = 0
+    while (i < s.length()) {
+        if (_is_digit(s.char_at(i)) == false) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+/// Compare two prerelease identifiers according to semver 2.0 rules.
+/// Numeric identifiers are compared as integers; alphanumeric identifiers are
+/// compared lexically. Numeric identifiers always have lower precedence than
+/// alphanumeric identifiers.
+fun _compare_identifiers(a: String, b: String): Number {
+    var a_num = _is_all_digits(a)
+    var b_num = _is_all_digits(b)
+    if (a_num and b_num) {
+        var an = a.to_number()
+        var bn = b.to_number()
+        if (an < bn) { return -1 }
+        if (an > bn) { return 1 }
+        return 0
+    }
+    if (a_num) { return -1 }
+    if (b_num) { return 1 }
+    // Both alphanumeric — lexical comparison
+    if (a < b) { return -1 }
+    if (a > b) { return 1 }
+    return 0
+}
+
+/// Compare prerelease strings per semver precedence rules.
+fun _compare_prerelease(a: String, b: String): Number {
+    // No prerelease on either — equal
+    if (a == "" and b == "") { return 0 }
+    // A version without prerelease has HIGHER precedence
+    if (a == "") { return 1 }
+    if (b == "") { return -1 }
+
+    var a_parts = a.split(".")
+    var b_parts = b.split(".")
+    var i = 0
+    while (i < a_parts.length() and i < b_parts.length()) {
+        var cmp = _compare_identifiers(a_parts[i], b_parts[i])
+        if (cmp != 0) { return cmp }
+        i = i + 1
+    }
+    // Shorter set of fields has lower precedence
+    if (a_parts.length() < b_parts.length()) { return -1 }
+    if (a_parts.length() > b_parts.length()) { return 1 }
+    return 0
+}
+
+/// Parse a version core (major.minor.patch) from a string that may be partial.
+/// Returns a Version with prerelease and build set to "".
+fun _parse_core(s: String): Version {
+    var parts = s.split(".")
+    var major = 0
+    var minor = 0
+    var patch = 0
+    if (parts.length() >= 1) { major = parts[0].to_number() }
+    if (parts.length() >= 2) { minor = parts[1].to_number() }
+    if (parts.length() >= 3) { patch = parts[2].to_number() }
+    return Version(major, minor, patch, "", "")
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Parse a version string into a Version instance.
+///
+/// Accepts formats: "1.2.3", "1.2.3-alpha.1", "1.2.3+build.456",
+/// "1.2.3-alpha.1+build.456", and partial versions like "1.2" (treated as "1.2.0").
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// var v = SemVer.parse("2.1.0-rc.1+build.42")
+/// v.major       // 2
+/// v.prerelease  // "rc.1"
+/// v.build       // "build.42"
+/// ```
+fun parse(version_str: String): Version {
+    var s = version_str.trim()
+    if (s.length() == 0) {
+        throw "semver: cannot parse empty string"
+    }
+    // Strip leading 'v' or 'V' if present
+    if (s.char_at(0) == "v" or s.char_at(0) == "V") {
+        s = s.slice(1, s.length())
+    }
+
+    var build = ""
+    var prerelease = ""
+
+    // Extract build metadata (after '+')
+    var plus_idx = s.index_of("+")
+    if (plus_idx >= 0) {
+        build = s.slice(plus_idx + 1, s.length())
+        s = s.slice(0, plus_idx)
+    }
+
+    // Extract prerelease (after '-')
+    var dash_idx = s.index_of("-")
+    if (dash_idx >= 0) {
+        prerelease = s.slice(dash_idx + 1, s.length())
+        s = s.slice(0, dash_idx)
+    }
+
+    // Parse major.minor.patch
+    var parts = s.split(".")
+    if (parts.length() < 1 or parts.length() > 3) {
+        throw "semver: invalid version format '${version_str}'"
+    }
+
+    var i = 0
+    while (i < parts.length()) {
+        if (_is_all_digits(parts[i]) == false) {
+            throw "semver: non-numeric version component in '${version_str}'"
+        }
+        i = i + 1
+    }
+
+    var major = parts[0].to_number()
+    var minor = 0
+    var patch = 0
+    if (parts.length() >= 2) { minor = parts[1].to_number() }
+    if (parts.length() >= 3) { patch = parts[2].to_number() }
+
+    return Version(major, minor, patch, prerelease, build)
+}
+
+/// Compare two versions according to semver precedence.
+/// Returns -1 if a < b, 0 if a == b, 1 if a > b.
+/// Build metadata is ignored per the semver specification.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.compare(SemVer.parse("1.0.0"), SemVer.parse("2.0.0"))  // -1
+/// SemVer.compare(SemVer.parse("1.0.0"), SemVer.parse("1.0.0"))  // 0
+/// ```
+fun compare(a: Version, b: Version): Number {
+    if (a.major < b.major) { return -1 }
+    if (a.major > b.major) { return 1 }
+    if (a.minor < b.minor) { return -1 }
+    if (a.minor > b.minor) { return 1 }
+    if (a.patch < b.patch) { return -1 }
+    if (a.patch > b.patch) { return 1 }
+    return _compare_prerelease(a.prerelease, b.prerelease)
+}
+
+/// Return true if version a is strictly greater than version b.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.gt(SemVer.parse("2.0.0"), SemVer.parse("1.9.9"))  // true
+/// ```
+fun gt(a: Version, b: Version): Bool {
+    return compare(a, b) == 1
+}
+
+/// Return true if version a is strictly less than version b.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.lt(SemVer.parse("1.0.0"), SemVer.parse("1.0.1"))  // true
+/// ```
+fun lt(a: Version, b: Version): Bool {
+    return compare(a, b) == -1
+}
+
+/// Return true if two versions are equal (build metadata is ignored per spec).
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.eq(SemVer.parse("1.0.0+a"), SemVer.parse("1.0.0+b"))  // true
+/// ```
+fun eq(a: Version, b: Version): Bool {
+    return compare(a, b) == 0
+}
+
+/// Return true if version a is greater than or equal to version b.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.gte(SemVer.parse("1.0.0"), SemVer.parse("1.0.0"))  // true
+/// ```
+fun gte(a: Version, b: Version): Bool {
+    return compare(a, b) >= 0
+}
+
+/// Return true if version a is less than or equal to version b.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.lte(SemVer.parse("1.0.0"), SemVer.parse("2.0.0"))  // true
+/// ```
+fun lte(a: Version, b: Version): Bool {
+    return compare(a, b) <= 0
+}
+
+/// Check if a version satisfies a constraint string.
+///
+/// Supported constraint formats:
+///   "^1.2.3"  — compatible with (>=1.2.3, <2.0.0)
+///   "~1.2.3"  — patch-level changes (>=1.2.3, <1.3.0)
+///   ">=1.0.0", ">1.0.0", "<=2.0.0", "<2.0.0", "=1.0.0"
+///   "1.2.x", "1.x" — wildcard matching
+///   "*" — matches any version
+///   ">=1.0.0 <2.0.0" — space-separated AND (all must match)
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// var v = SemVer.parse("1.4.2")
+/// SemVer.satisfies(v, "^1.0.0")    // true
+/// SemVer.satisfies(v, "~1.4.0")    // true
+/// SemVer.satisfies(v, ">=1.0.0 <2.0.0")  // true
+/// ```
+fun satisfies(version: Version, constraint: String): Bool {
+    var c = constraint.trim()
+    if (c == "" or c == "*") { return true }
+
+    // Space-separated AND — all parts must match
+    if (c.contains(" ")) {
+        var parts = c.split(" ")
+        var i = 0
+        while (i < parts.length()) {
+            var part = parts[i].trim()
+            if (part.length() > 0) {
+                if (_satisfies_single(version, part) == false) {
+                    return false
+                }
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    return _satisfies_single(version, c)
+}
+
+/// Internal: evaluate a single constraint (no spaces).
+fun _satisfies_single(version: Version, constraint: String): Bool {
+    var c = constraint.trim()
+    if (c == "" or c == "*") { return true }
+
+    // Caret range: ^1.2.3
+    if (c.starts_with("^")) {
+        var target = parse(c.slice(1, c.length()))
+        // >=target and <next_major (with special rules for 0.x)
+        if (compare(version, target) < 0) { return false }
+        if (target.major != 0) {
+            // <(major+1).0.0
+            var upper = Version(target.major + 1, 0, 0, "", "")
+            return compare(version, upper) < 0
+        }
+        if (target.minor != 0) {
+            // ^0.minor.patch — <0.(minor+1).0
+            var upper = Version(0, target.minor + 1, 0, "", "")
+            return compare(version, upper) < 0
+        }
+        // ^0.0.patch — only that exact patch
+        return version.major == 0 and version.minor == 0 and version.patch == target.patch
+    }
+
+    // Tilde range: ~1.2.3
+    if (c.starts_with("~")) {
+        var target = parse(c.slice(1, c.length()))
+        if (compare(version, target) < 0) { return false }
+        // <major.(minor+1).0
+        var upper = Version(target.major, target.minor + 1, 0, "", "")
+        return compare(version, upper) < 0
+    }
+
+    // Comparison operators: >=, >, <=, <, =
+    if (c.starts_with(">=")) {
+        var target = parse(c.slice(2, c.length()))
+        return compare(version, target) >= 0
+    }
+    if (c.starts_with(">")) {
+        var target = parse(c.slice(1, c.length()))
+        return compare(version, target) > 0
+    }
+    if (c.starts_with("<=")) {
+        var target = parse(c.slice(2, c.length()))
+        return compare(version, target) <= 0
+    }
+    if (c.starts_with("<")) {
+        var target = parse(c.slice(1, c.length()))
+        return compare(version, target) < 0
+    }
+    if (c.starts_with("=")) {
+        var target = parse(c.slice(1, c.length()))
+        return compare(version, target) == 0
+    }
+
+    // Wildcard: "1.2.x", "1.x", "1.x.x"
+    if (c.contains("x") or c.contains("X")) {
+        var parts = c.split(".")
+        // Check major
+        if (parts.length() >= 1) {
+            var p0 = parts[0]
+            if (p0 != "x" and p0 != "X") {
+                if (version.major != p0.to_number()) { return false }
+            } else {
+                return true
+            }
+        }
+        // Check minor
+        if (parts.length() >= 2) {
+            var p1 = parts[1]
+            if (p1 != "x" and p1 != "X") {
+                if (version.minor != p1.to_number()) { return false }
+            } else {
+                return true
+            }
+        }
+        // Check patch
+        if (parts.length() >= 3) {
+            var p2 = parts[2]
+            if (p2 != "x" and p2 != "X") {
+                if (version.patch != p2.to_number()) { return false }
+            }
+        }
+        return true
+    }
+
+    // Exact match (plain version string)
+    var target = parse(c)
+    return compare(version, target) == 0
+}
+
+/// Find the highest version in a list that satisfies a constraint.
+/// Returns the matching Version, or throws if none match.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// var versions = [SemVer.parse("1.0.0"), SemVer.parse("1.5.0"), SemVer.parse("2.0.0")]
+/// SemVer.to_string(SemVer.max_satisfying(versions, "^1.0.0"))  // "1.5.0"
+/// ```
+fun max_satisfying(versions: List<Version>, constraint: String): Version {
+    var best: Version = nil
+    var i = 0
+    while (i < versions.length()) {
+        var v = versions[i]
+        if (satisfies(v, constraint)) {
+            if (best == nil or compare(v, best) > 0) {
+                best = v
+            }
+        }
+        i = i + 1
+    }
+    if (best == nil) {
+        throw "semver: no version satisfies constraint '${constraint}'"
+    }
+    return best
+}
+
+/// Increment a version by the given level.
+/// Level must be "major", "minor", or "patch".
+/// Prerelease and build metadata are cleared on increment.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// var v = SemVer.parse("1.2.3-beta.1")
+/// SemVer.to_string(SemVer.increment(v, "minor"))  // "1.3.0"
+/// SemVer.to_string(SemVer.increment(v, "major"))  // "2.0.0"
+/// ```
+fun increment(v: Version, level: String): Version {
+    if (level == "major") {
+        return Version(v.major + 1, 0, 0, "", "")
+    }
+    if (level == "minor") {
+        return Version(v.major, v.minor + 1, 0, "", "")
+    }
+    if (level == "patch") {
+        return Version(v.major, v.minor, v.patch + 1, "", "")
+    }
+    throw "semver: invalid increment level '${level}' (use 'major', 'minor', or 'patch')"
+}
+
+/// Convert a Version back to its canonical string representation.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.to_string(SemVer.parse("1.2.3-alpha+build"))  // "1.2.3-alpha+build"
+/// ```
+fun to_string(v: Version): String {
+    var s = "${v.major}.${v.minor}.${v.patch}"
+    if (v.prerelease.length() > 0) {
+        s = s + "-" + v.prerelease
+    }
+    if (v.build.length() > 0) {
+        s = s + "+" + v.build
+    }
+    return s
+}
+
+/// Check if a string is a valid semver version.
+/// Returns true if the string can be parsed without error.
+///
+/// ```saffron
+/// import "@semver" as SemVer
+/// SemVer.is_valid("1.2.3")           // true
+/// SemVer.is_valid("not a version")   // false
+/// ```
+fun is_valid(version_str: String): Bool {
+    try {
+        parse(version_str)
+        return true
+    } catch (e) {
+        return false
+    }
+}

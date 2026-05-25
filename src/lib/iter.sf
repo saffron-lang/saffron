@@ -1,5 +1,12 @@
-// Iterator utilities — works with any type implementing Iterable<T>
+//! Iterator utilities — higher-order functions over any Iterable<T>.
 
+/// Apply a function to each element and return a new list of results.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
+/// // [2, 4, 6]
+/// ```
 fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     var result: List<R> = []
     var iter = iterable.iter()
@@ -9,6 +16,13 @@ fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
     return result
 }
 
+/// Return only elements for which the predicate returns true.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0)
+/// // [2, 4]
+/// ```
 fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
     var result: List<T> = []
     var iter = iterable.iter()
@@ -21,6 +35,13 @@ fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
     return result
 }
 
+/// Fold elements into a single value using an accumulator function and initial value.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.reduce([1, 2, 3, 4], fun (acc: Int, x: Int): Int => acc + x, 0)
+/// // 10
+/// ```
 fun reduce<T, R>(iterable: Iterable<T>, func: (R, T) => R, initial: R): R {
     var acc: R = initial
     var iter = iterable.iter()
@@ -30,10 +51,22 @@ fun reduce<T, R>(iterable: Iterable<T>, func: (R, T) => R, initial: R): R {
     return acc
 }
 
+/// Sum all numeric elements in the iterable.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.sum([1, 2, 3])  // 6
+/// ```
 fun sum(iterable: Iterable<Number>): Number {
     return reduce(iterable, fun (a: Number, b: Number): Number => a + b, 0)
 }
 
+/// Return true if any element satisfies the predicate.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
+/// ```
 fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -42,6 +75,12 @@ fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
     return false
 }
 
+/// Return true if all elements satisfy the predicate.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0)  // true
+/// ```
 fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -50,6 +89,12 @@ fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
     return true
 }
 
+/// Execute a side-effecting function on each element.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.each(["a", "b", "c"], IO.println)
+/// ```
 fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -57,6 +102,13 @@ fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
     }
 }
 
+/// Count elements that satisfy the predicate.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
+/// // 2
+/// ```
 fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
     var n = 0
     var iter = iterable.iter()
@@ -66,6 +118,13 @@ fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
     return n
 }
 
+/// Return the first element satisfying the predicate, or nil if none found.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1)
+/// // 2
+/// ```
 fun find<T>(iterable: Iterable<T>, func: (T) => Bool): T {
     var iter = iterable.iter()
     while (iter.next?()) {
@@ -75,6 +134,13 @@ fun find<T>(iterable: Iterable<T>, func: (T) => Bool): T {
     return nil
 }
 
+/// Map each element to an iterable and flatten the results into a single list.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Int>): List<Int> => x)
+/// // [1, 2, 3, 4]
+/// ```
 fun flat_map<T, R>(iterable: Iterable<T>, func: (T) => Iterable<R>): List<R> {
     var result: List<R> = []
     var iter = iterable.iter()
@@ -88,6 +154,13 @@ fun flat_map<T, R>(iterable: Iterable<T>, func: (T) => Iterable<R>): List<R> {
     return result
 }
 
+/// Combine two iterables into a list of [a, b] pairs, stopping at the shorter one.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.zip([1, 2, 3], ["a", "b", "c"])
+/// // [[1, "a"], [2, "b"], [3, "c"]]
+/// ```
 fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
     var result: List<List<Any>> = []
     var iter_a = a.iter()
@@ -98,6 +171,13 @@ fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
     return result
 }
 
+/// Pair each element with its index as [index, element].
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.enumerate(["a", "b", "c"])
+/// // [[0, "a"], [1, "b"], [2, "c"]]
+/// ```
 fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
     var result: List<List<Any>> = []
     var iter = iterable.iter()
@@ -109,6 +189,12 @@ fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
     return result
 }
 
+/// Take the first n elements from the iterable.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.take([1, 2, 3, 4, 5], 3)  // [1, 2, 3]
+/// ```
 fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
     var iter = iterable.iter()
@@ -120,6 +206,12 @@ fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
     return result
 }
 
+/// Skip the first n elements and return the rest.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.skip([1, 2, 3, 4, 5], 2)  // [3, 4, 5]
+/// ```
 fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
     var result: List<T> = []
     var iter = iterable.iter()

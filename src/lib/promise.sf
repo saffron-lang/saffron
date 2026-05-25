@@ -1,5 +1,8 @@
+//! Promise-style combinators for working with multiple async tasks.
+
 import "@async" as Async
 
+/// Await all tasks and return their results as a list.
 fun all(tasks: List<Task>): List<Any> {
     var results = []
     var i = 0
@@ -10,6 +13,7 @@ fun all(tasks: List<Task>): List<Any> {
     return results
 }
 
+/// Return the result of the first task that is ready.
 fun race(tasks: List<Task>): Any {
     var i = 0
     while (i < tasks.length()) {
@@ -24,10 +28,12 @@ fun race(tasks: List<Task>): Any {
     return nil
 }
 
+/// Alias for race — return the first completed task result.
 fun any(tasks: List<Task>): Any {
     return race(tasks)
 }
 
+/// Spawn a task that sleeps for the given number of milliseconds.
 fun delay(ms: Number): Task {
     var secs = ms / 1000
     return Task.spawn(fun () => Async.sleep(secs))

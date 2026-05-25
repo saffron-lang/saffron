@@ -1,5 +1,8 @@
+//! Command-line argument parsing with support for flags, options, and positional arguments.
+
 import "@os" as OS
 
+/// Holds parsed command-line arguments split into flags, key=value options, and positional args.
 class ParsedArgs {
     var flags: Map<String, Bool>
     var options: Map<String, String>
@@ -11,10 +14,12 @@ class ParsedArgs {
         this.positional = []
     }
 
+    /// Check if a flag or option with the given name was provided.
     fun has(name: String): Bool {
         return this.flags.has(name) or this.options.has(name)
     }
 
+    /// Get the value of a named option, or empty string if not set.
     fun get(name: String): String {
         if (this.options.has(name)) {
             return this.options.get(name)
@@ -22,12 +27,14 @@ class ParsedArgs {
         return ""
     }
 
+    /// Check if a boolean flag was set.
     fun flag(name: String): Bool {
         if (this.flags.has(name)) { return true }
         return false
     }
 }
 
+/// Parse the process command-line arguments and return a ParsedArgs.
 fun parse(): ParsedArgs {
     var raw = OS.args()
     return parse_list(raw)
@@ -82,6 +89,7 @@ fun process_arg(result: ParsedArgs, arg: String) {
     result.positional.push(arg)
 }
 
+/// Parse a raw list of argument strings into a ParsedArgs.
 fun parse_list(raw: List<String>): ParsedArgs {
     var result = ParsedArgs()
     var i = 0
