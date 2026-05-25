@@ -943,7 +943,6 @@ class Codegen {
     }
 
     fun gen_list_lit(elements: List<AST.Expr>): String {
-        this.last_type = "List"
         var list_val = this.fresh_local()
         this.emit_indent(list_val + " = call i64 @__list_new()")
         var i = 0
@@ -952,6 +951,7 @@ class Codegen {
             this.emit_indent("call void @__list_push(i64 " + list_val + ", i64 " + elem + ")")
             i = i + 1
         }
+        this.last_type = "List"
         return list_val
     }
 
