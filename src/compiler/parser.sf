@@ -43,9 +43,19 @@ class Parser {
         return false
     }
 
+    fun current_line(): String {
+        var tok = this.current()
+        var line = match (tok) { Token(kind, line, col) => line }
+        return line.floor().to_string()
+    }
+
+    fun parse_error(message: String) {
+        IO.println("[line " + this.current_line() + "] Parse error: " + message)
+    }
+
     fun consume(expected: String) {
         if (!this.match_kind(expected)) {
-            IO.println("Parse error: expected " + expected)
+            this.parse_error("expected " + expected)
         }
     }
 

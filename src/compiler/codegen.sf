@@ -23,6 +23,7 @@ class Codegen {
     var var_types: Map<String, String>
     var loop_end_label: String
     var current_ret_type: String
+    var called_functions: List<String>
 
     fun init() {
         this.sb = StringBuilder()
@@ -45,6 +46,7 @@ class Codegen {
         this.var_types = {}
         this.loop_end_label = ""
         this.current_ret_type = "i64"
+        this.called_functions = []
     }
 
     fun sanitize_name(name: String): String {
@@ -624,6 +626,7 @@ class Codegen {
                         ai = ai + 1
                     }
                     var full_method = class_name + "__" + method_name
+                    this.called_functions.push(full_method)
                     var local = this.fresh_local()
                     if (this.get_method_ret(class_name, method_name) == "void") {
                         this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
@@ -673,6 +676,7 @@ class Codegen {
             if (callee_name == "main") {
                 call_target = "__saffron_main"
             }
+            this.called_functions.push(callee_name)
             var arg_strs: List<String> = []
             var i = 0
             while (i < args.length()) {
@@ -688,6 +692,24 @@ class Codegen {
             } else {
                 this.last_type = "Int"
             }
+            return local
+        }
+
+        // Check if it looks like a direct function call (not a local variable)
+        // This handles cross-file function references
+        if (!this.var_types.has(callee_name) and callee_name.length() > 0) {
+            // Treat as external direct call
+            this.called_functions.push(callee_name)
+            var arg_strs: List<String> = []
+            var i = 0
+            while (i < args.length()) {
+                var val = this.gen_arg_value(args[i])
+                arg_strs.push("i64 " + val)
+                i = i + 1
+            }
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+            this.last_type = "Int"
             return local
         }
 
@@ -1504,6 +1526,7 @@ class Codegen {
                     i = i + 1
                 }
                 var full_method = class_name + "__" + method
+                this.called_functions.push(full_method)
                 if (this.get_method_ret(class_name, method) == "void") {
                     this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
                     this.last_type = "Nil"
@@ -1906,7 +1929,7 @@ class Codegen {
     fun list_runtime(): String {
         var rt = StringBuilder()
         // __list_new() -> %List* (as i64)
-        rt.append("define i64 @__list_new() {\n")
+        rt.append("define linkonce_odr i64 @__list_new() {\n")
         rt.append("entry:\n")
         rt.append("  %raw = call i8* @malloc(i64 24)\n")
         rt.append("  %ptr = bitcast i8* %raw to %List*\n")
@@ -1923,7 +1946,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_push(list: i64, value: i64)
-        rt.append("define void @__list_push(i64 %list, i64 %value) {\n")
+        rt.append("define linkonce_odr void @__list_push(i64 %list, i64 %value) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
@@ -1954,7 +1977,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_get(list: i64, index: i64) -> i64
-        rt.append("define i64 @__list_get(i64 %list, i64 %index) {\n")
+        rt.append("define linkonce_odr i64 @__list_get(i64 %list, i64 %index) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
@@ -1965,7 +1988,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_set(list: i64, index: i64, value: i64)
-        rt.append("define void @__list_set(i64 %list, i64 %index, i64 %value) {\n")
+        rt.append("define linkonce_odr void @__list_set(i64 %list, i64 %index, i64 %value) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %data_ptr = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
@@ -1976,7 +1999,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_length(list: i64) -> i64
-        rt.append("define i64 @__list_length(i64 %list) {\n")
+        rt.append("define linkonce_odr i64 @__list_length(i64 %list) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
@@ -1985,7 +2008,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_pop(list: i64) -> i64
-        rt.append("define i64 @__list_pop(i64 %list) {\n")
+        rt.append("define linkonce_odr i64 @__list_pop(i64 %list) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %count_ptr = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
@@ -2008,7 +2031,7 @@ class Codegen {
         rt.append("%SB = type { i64, i64, i8* }\n\n")
 
         // StringBuilder() -> i64
-        rt.append("define i64 @StringBuilder() {\n")
+        rt.append("define linkonce_odr i64 @StringBuilder() {\n")
         rt.append("entry:\n")
         rt.append("  %raw = call i8* @malloc(i64 24)\n")
         rt.append("  %ptr = bitcast i8* %raw to %SB*\n")
@@ -2025,7 +2048,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __sb_append(sb: i64, str: i64) — with grow
-        rt.append("define void @__sb_append(i64 %sb, i64 %str) {\n")
+        rt.append("define linkonce_odr void @__sb_append(i64 %sb, i64 %str) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %sb to %SB*\n")
         rt.append("  %lp = getelementptr %SB, %SB* %ptr, i32 0, i32 0\n")
@@ -2058,7 +2081,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __sb_to_string(sb: i64) -> i64
-        rt.append("define i64 @__sb_to_string(i64 %sb) {\n")
+        rt.append("define linkonce_odr i64 @__sb_to_string(i64 %sb) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %sb to %SB*\n")
         rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
@@ -2074,7 +2097,7 @@ class Codegen {
         var rt = StringBuilder()
 
         // __map_new() -> i64
-        rt.append("define i64 @__map_new() {\n")
+        rt.append("define linkonce_odr i64 @__map_new() {\n")
         rt.append("entry:\n")
         rt.append("  %raw = call i8* @malloc(i64 32)\n")
         rt.append("  %ptr = bitcast i8* %raw to %Map*\n")
@@ -2095,7 +2118,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __map_set(map: i64, key: i64, value: i64)
-        rt.append("define void @__map_set(i64 %map, i64 %key, i64 %value) {\n")
+        rt.append("define linkonce_odr void @__map_set(i64 %map, i64 %key, i64 %value) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
         rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
@@ -2136,7 +2159,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __map_get(map: i64, key: i64) -> i64
-        rt.append("define i64 @__map_get(i64 %map, i64 %key) {\n")
+        rt.append("define linkonce_odr i64 @__map_get(i64 %map, i64 %key) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
         rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
@@ -2170,7 +2193,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __map_has(map: i64, key: i64) -> i64 (0 or 1)
-        rt.append("define i64 @__map_has(i64 %map, i64 %key) {\n")
+        rt.append("define linkonce_odr i64 @__map_has(i64 %map, i64 %key) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
         rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
@@ -2200,7 +2223,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __map_keys(map: i64) -> i64 (returns a List of keys)
-        rt.append("define i64 @__map_keys(i64 %map) {\n")
+        rt.append("define linkonce_odr i64 @__map_keys(i64 %map) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
         rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
@@ -2230,7 +2253,7 @@ class Codegen {
         var rt = StringBuilder()
 
         // __str_ends_with(str: i8*, suffix: i8*) -> i64
-        rt.append("define i64 @__str_ends_with(i8* %str, i8* %suffix) {\n")
+        rt.append("define linkonce_odr i64 @__str_ends_with(i8* %str, i8* %suffix) {\n")
         rt.append("entry:\n")
         rt.append("  %slen = call i64 @strlen(i8* %str)\n")
         rt.append("  %plen = call i64 @strlen(i8* %suffix)\n")
@@ -2248,7 +2271,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __str_split(str: i8*, delim: i8*) -> i64 (List of strings)
-        rt.append("define i64 @__str_split(i8* %str, i8* %delim) {\n")
+        rt.append("define linkonce_odr i64 @__str_split(i8* %str, i8* %delim) {\n")
         rt.append("entry:\n")
         rt.append("  %list = call i64 @__list_new()\n")
         rt.append("  %slen = call i64 @strlen(i8* %str)\n")
@@ -2286,7 +2309,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __str_replace(str: i8*, old: i8*, new: i8*) -> i64
-        rt.append("define i64 @__str_replace(i8* %str, i8* %old, i8* %new) {\n")
+        rt.append("define linkonce_odr i64 @__str_replace(i8* %str, i8* %old, i8* %new) {\n")
         rt.append("entry:\n")
         rt.append("  %slen = call i64 @strlen(i8* %str)\n")
         rt.append("  %olen = call i64 @strlen(i8* %old)\n")
@@ -2326,7 +2349,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __int_to_string(val: i64) -> i64
-        rt.append("define i64 @__int_to_string(i64 %val) {\n")
+        rt.append("define linkonce_odr i64 @__int_to_string(i64 %val) {\n")
         rt.append("entry:\n")
         rt.append("  %buf = call i8* @malloc(i64 32)\n")
         rt.append("  %fmt = getelementptr [4 x i8], [4 x i8]* @.fmt.ld, i64 0, i64 0\n")
@@ -2336,7 +2359,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_join(list: i64, sep: i8*) -> i64
-        rt.append("define i64 @__list_join(i64 %list, i8* %sep) {\n")
+        rt.append("define linkonce_odr i64 @__list_join(i64 %list, i8* %sep) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %cp = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
@@ -2369,7 +2392,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __list_contains(list: i64, val: i64) -> i64
-        rt.append("define i64 @__list_contains(i64 %list, i64 %val) {\n")
+        rt.append("define linkonce_odr i64 @__list_contains(i64 %list, i64 %val) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %list to %List*\n")
         rt.append("  %cp = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
@@ -2399,7 +2422,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __io_read_file(path: i8*) -> i64 (string)
-        rt.append("define i64 @__io_read_file(i8* %path) {\n")
+        rt.append("define linkonce_odr i64 @__io_read_file(i8* %path) {\n")
         rt.append("entry:\n")
         rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.rb, i64 0, i64 0\n")
         rt.append("  %fp = call i8* @fopen(i8* %path, i8* %mode)\n")
@@ -2425,7 +2448,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __io_write_file(path: i8*, content: i8*)
-        rt.append("define void @__io_write_file(i8* %path, i8* %content) {\n")
+        rt.append("define linkonce_odr void @__io_write_file(i8* %path, i8* %content) {\n")
         rt.append("entry:\n")
         rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.wb, i64 0, i64 0\n")
         rt.append("  %fp = call i8* @fopen(i8* %path, i8* %mode)\n")
@@ -2441,7 +2464,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __os_exec(cmd: i8*) -> i64 (string output)
-        rt.append("define i64 @__os_exec(i8* %cmd) {\n")
+        rt.append("define linkonce_odr i64 @__os_exec(i8* %cmd) {\n")
         rt.append("entry:\n")
         rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.r, i64 0, i64 0\n")
         rt.append("  %fp = call i8* @popen(i8* %cmd, i8* %mode)\n")
@@ -2472,7 +2495,7 @@ class Codegen {
         rt.append("}\n\n")
 
         // __os_args() -> i64 (List of strings from global argc/argv)
-        rt.append("define i64 @__os_args() {\n")
+        rt.append("define linkonce_odr i64 @__os_args() {\n")
         rt.append("entry:\n")
         rt.append("  %argc = load i32, i32* @__argc\n")
         rt.append("  %argv = load i8**, i8*** @__argv\n")
@@ -2606,6 +2629,98 @@ class Codegen {
         if (ek == "assign") {
             var assign_val = match (expr) { Assign(n, v) => v }
             this.collect_vars_expr(assign_val, names, types)
+            return nil
+        }
+        if (ek == "binary") {
+            var bin_left = match (expr) { Binary(l, o, r) => l }
+            var bin_right = match (expr) { Binary(l, o, r) => r }
+            this.collect_vars_expr(bin_left, names, types)
+            this.collect_vars_expr(bin_right, names, types)
+            return nil
+        }
+        if (ek == "logical") {
+            var log_left = match (expr) { Logical(l, o, r) => l }
+            var log_right = match (expr) { Logical(l, o, r) => r }
+            this.collect_vars_expr(log_left, names, types)
+            this.collect_vars_expr(log_right, names, types)
+            return nil
+        }
+        if (ek == "unary") {
+            var un_right = match (expr) { Unary(o, r) => r }
+            this.collect_vars_expr(un_right, names, types)
+            return nil
+        }
+        if (ek == "call") {
+            var call_callee = match (expr) { Call(c, a) => c }
+            var call_args = match (expr) { Call(c, a) => a }
+            this.collect_vars_expr(call_callee, names, types)
+            var ci = 0
+            while (ci < call_args.length()) {
+                this.collect_vars_expr(call_args[ci], names, types)
+                ci = ci + 1
+            }
+            return nil
+        }
+        if (ek == "method_call") {
+            var mc_obj = match (expr) { MethodCall(o, m, a) => o }
+            var mc_args = match (expr) { MethodCall(o, m, a) => a }
+            this.collect_vars_expr(mc_obj, names, types)
+            var mi = 0
+            while (mi < mc_args.length()) {
+                this.collect_vars_expr(mc_args[mi], names, types)
+                mi = mi + 1
+            }
+            return nil
+        }
+        if (ek == "set_field") {
+            var sf_obj = match (expr) { SetField(o, f, v) => o }
+            var sf_val = match (expr) { SetField(o, f, v) => v }
+            this.collect_vars_expr(sf_obj, names, types)
+            this.collect_vars_expr(sf_val, names, types)
+            return nil
+        }
+        if (ek == "get_field") {
+            var gf_obj = match (expr) { GetField(o, f) => o }
+            this.collect_vars_expr(gf_obj, names, types)
+            return nil
+        }
+        if (ek == "index_get") {
+            var ig_obj = match (expr) { IndexGet(o, i) => o }
+            var ig_idx = match (expr) { IndexGet(o, i) => i }
+            this.collect_vars_expr(ig_obj, names, types)
+            this.collect_vars_expr(ig_idx, names, types)
+            return nil
+        }
+        if (ek == "index_set") {
+            var is_obj = match (expr) { IndexSet(o, i, v) => o }
+            var is_idx = match (expr) { IndexSet(o, i, v) => i }
+            var is_val = match (expr) { IndexSet(o, i, v) => v }
+            this.collect_vars_expr(is_obj, names, types)
+            this.collect_vars_expr(is_idx, names, types)
+            this.collect_vars_expr(is_val, names, types)
+            return nil
+        }
+        if (ek == "list_lit") {
+            var ll_elems = match (expr) { ListLit(e) => e }
+            var li = 0
+            while (li < ll_elems.length()) {
+                this.collect_vars_expr(ll_elems[li], names, types)
+                li = li + 1
+            }
+            return nil
+        }
+        if (ek == "enum") {
+            var ec_args = match (expr) { EnumConstruct(e, v, a) => a }
+            var ei = 0
+            while (ei < ec_args.length()) {
+                this.collect_vars_expr(ec_args[ei], names, types)
+                ei = ei + 1
+            }
+            return nil
+        }
+        if (ek == "member") {
+            var mem_obj = match (expr) { MemberAccess(o, f) => o }
+            this.collect_vars_expr(mem_obj, names, types)
             return nil
         }
         if (ek != "match_expr") return nil
@@ -3152,15 +3267,15 @@ class Codegen {
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n\n")
 
-        // Runtime string constants
-        out.append("@.fmt.ld = private unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
-        out.append("@.str.rb = private unnamed_addr constant [2 x i8] c\"r\\00\"\n")
-        out.append("@.str.wb = private unnamed_addr constant [2 x i8] c\"w\\00\"\n")
-        out.append("@.str.r = private unnamed_addr constant [2 x i8] c\"r\\00\"\n")
+        // Runtime string constants (linkonce_odr for multi-file linking)
+        out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
+        out.append("@.str.rb = linkonce_odr unnamed_addr constant [2 x i8] c\"r\\00\"\n")
+        out.append("@.str.wb = linkonce_odr unnamed_addr constant [2 x i8] c\"w\\00\"\n")
+        out.append("@.str.r = linkonce_odr unnamed_addr constant [2 x i8] c\"r\\00\"\n")
 
-        // Global argc/argv (set by main)
-        out.append("@__argc = global i32 0\n")
-        out.append("@__argv = global i8** null\n\n")
+        // Global argc/argv (set by main) — weak linkage for multi-file
+        out.append("@__argc = weak global i32 0\n")
+        out.append("@__argv = weak global i8** null\n\n")
 
         // List runtime
         out.append("; List = { count, capacity, data* }\n")
@@ -3182,14 +3297,31 @@ class Codegen {
         // Function bodies
         out.append(this.sb.to_string())
 
+        // Emit declares for external functions (called but not defined in this file)
+        var declared: List<String> = []
+        var ci = 0
+        while (ci < this.called_functions.length()) {
+            var cfname = this.called_functions[ci]
+            if (!this.known_functions.contains(cfname) and !declared.contains(cfname)) {
+                out.append("declare i64 @" + cfname + "(...)\n")
+                declared.push(cfname)
+            }
+            ci = ci + 1
+        }
+        if (declared.length() > 0) {
+            out.append("\n")
+        }
+
         // Only emit C main wrapper if program defines a main function
         if (this.known_functions.contains("main") or has_top_level) {
-            out.append("\ndefine i32 @__c_main(i32 %argc, i8** %argv) {\n")
+            out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
             out.append("entry:\n")
+            out.append("  store i32 %argc, i32* @__argc\n")
+            out.append("  store i8** %argv, i8*** @__argv\n")
             if (has_top_level) {
                 out.append("  call i64 @__saffron_entry()\n")
             } else {
-                out.append("  call i64 @main()\n")
+                out.append("  call i64 @__saffron_main()\n")
             }
             out.append("  ret i32 0\n")
             out.append("}\n")
