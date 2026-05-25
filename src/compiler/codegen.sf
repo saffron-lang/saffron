@@ -201,15 +201,36 @@ class Codegen {
                 if (this.is_this_expr(object)) {
                     return this.gen_get_field(object, field)
                 }
-                // Check if this is a zero-arg enum variant: EnumName.Variant
-                var obj_name = match (object) {
-                    Variable(n) => n
+                // Check if object is a variable of class type -> field access
+                var obj_name = this.get_variable_name(object)
+                if (obj_name.length() > 0) {
+                    // Check enum first
+                    var key = obj_name + "." + field
+                    if (this.enum_variant_tags.has(key)) {
+                        return this.gen_enum_construct(obj_name, field, [])
+                    }
+                    // Check if variable holds a class instance
+                    if (this.var_types.has(obj_name)) {
+                        var vtype = this.var_types.get(obj_name)
+                        if (this.class_fields.has(vtype)) {
+                            // It's a class instance — do field access
+                            var obj_val = this.gen_expr(object)
+                            var saved_class = this.current_class
+                            this.current_class = vtype
+                            var field_idx = this.get_field_index(vtype, field)
+                            var obj_ptr = this.fresh_local()
+                            this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + vtype + "*")
+                            var field_ptr = this.fresh_local()
+                            this.emit_indent(field_ptr + " = getelementptr %" + vtype + ", %" + vtype + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                            var result = this.fresh_local()
+                            this.emit_indent(result + " = load i64, i64* " + field_ptr)
+                            this.last_type = this.get_field_type(vtype, field)
+                            this.current_class = saved_class
+                            return result
+                        }
+                    }
                 }
-                var key = obj_name + "." + field
-                if (this.enum_variant_tags.has(key)) {
-                    return this.gen_enum_construct(obj_name, field, [])
-                }
-                "null"
+                "0"
             }
             EnumConstruct(enum_name, variant, args) => {
                 this.gen_enum_construct(enum_name, variant, args)
@@ -359,6 +380,36 @@ class Codegen {
             var local = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_new()")
             return local
+        }
+        if (expr_kind == "get_field") {
+            var gf_obj = match (expr) { GetField(o, f) => o }
+            var gf_field = match (expr) { GetField(o, f) => f }
+            return this.gen_get_field(gf_obj, gf_field)
+        }
+        if (expr_kind == "member") {
+            var m_obj = match (expr) { MemberAccess(o, f) => o }
+            var m_field = match (expr) { MemberAccess(o, f) => f }
+            // Handle as field access on class instance or enum
+            var mn = this.get_variable_name(m_obj)
+            if (mn.length() > 0 and this.var_types.has(mn)) {
+                var vt = this.var_types.get(mn)
+                if (this.class_fields.has(vt)) {
+                    var ov = this.gen_arg_value(m_obj)
+                    var fi = this.get_field_index(vt, m_field)
+                    var op = this.fresh_local()
+                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt + "*")
+                    var fp = this.fresh_local()
+                    this.emit_indent(fp + " = getelementptr %" + vt + ", %" + vt + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                    var result = this.fresh_local()
+                    this.emit_indent(result + " = load i64, i64* " + fp)
+                    this.last_type = this.get_field_type(vt, m_field)
+                    return result
+                }
+            }
+            if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
+                return this.gen_enum_construct(mn, m_field, [])
+            }
+            return "0"
         }
 
         // Handle string literals directly
@@ -969,8 +1020,8 @@ class Codegen {
     }
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
-        var obj = this.gen_expr(object)
-        var idx = this.gen_expr(index)
+        var obj = this.gen_arg_value(object)
+        var idx = this.gen_arg_value(index)
         var local = this.fresh_local()
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + idx + ")")
         this.last_type = "Int"
@@ -1201,7 +1252,23 @@ class Codegen {
         this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
         var result = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + field_ptr)
+        // Infer field type from class declaration
+        this.last_type = this.get_field_type(class_name, field)
         return result
+    }
+
+    fun get_field_type(class_name: String, field: String): String {
+        if (!this.class_fields.has(class_name)) return "Int"
+        var fields = this.class_fields.get(class_name)
+        if (fields.length() == 0) return "Int"
+        var parts = fields.split(",")
+        var i = 0
+        while (i < parts.length()) {
+            var fp = parts[i].split(":")
+            if (fp[0] == field) return fp[1]
+            i = i + 1
+        }
+        return "Int"
     }
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {

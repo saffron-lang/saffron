@@ -612,8 +612,35 @@ class Parser {
             var value = this.parse_expr()
             return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
         }
-        // this.field (expression) or this.method(...)
+        // Check for chained method: this.field.method(args)
         var expr = AST.Expr.GetField(AST.Expr.This, field)
+        if (this.match_kind_check(".")) {
+            this.advance()
+            var method = this.expect_ident()
+            if (this.match_kind("(")) {
+                var args: List<AST.Expr> = []
+                if (!this.match_kind_check(")")) {
+                    args.push(this.parse_expr())
+                    while (this.match_kind(",")) {
+                        args.push(this.parse_expr())
+                    }
+                }
+                this.consume(")")
+                return AST.Stmt.ExprStmt(AST.Expr.MethodCall(expr, method, args))
+            }
+        }
+        // Check for direct method call: this.method(args)
+        if (this.match_kind("(")) {
+            var args: List<AST.Expr> = []
+            if (!this.match_kind_check(")")) {
+                args.push(this.parse_expr())
+                while (this.match_kind(",")) {
+                    args.push(this.parse_expr())
+                }
+            }
+            this.consume(")")
+            return AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.This, field, args))
+        }
         return AST.Stmt.ExprStmt(expr)
     }
 
