@@ -87,9 +87,12 @@ static void runFile(const char *path) {
         free(source);
         exit(65);
     }
+    // Save module docstring before type checker (which may re-invoke parseAST)
+    Token savedModuleDoc = parser.moduleDocstring;
     setTypecheckFile(path);
     bool typeErrors = evaluateTree(body);
     setTypecheckFile(NULL);
+    parser.moduleDocstring = savedModuleDoc;
     if (typeErrors) {
         free(source);
         exit(65);
