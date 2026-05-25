@@ -98,7 +98,6 @@ fun main(): Int {
 
     // Write LLVM IR output
     IO.write_file(output_path, ir)
-    IO.println("Compiled " + input_path + " -> " + output_path)
 
     return 0
 }
