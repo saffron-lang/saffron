@@ -105,7 +105,7 @@ class Codegen {
 
     fun llvm_type(t: String): String {
         if (t == "Int") return "i64"
-        if (t == "Float") return "double"
+        if (t == "Float") return "i64"
         if (t == "Bool") return "i64"
         if (t == "String") return "i64"
         if (t == "Nil") return "i64"
@@ -1286,7 +1286,6 @@ class Codegen {
                 var idx = this.gen_arg_value(args[0])
                 var char_ptr = this.fresh_local()
                 this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
-                // Allocate 2-byte buffer for single char + null
                 var buf = this.fresh_local()
                 this.emit_indent(buf + " = call i8* @malloc(i64 2)")
                 var ch = this.fresh_local()
@@ -1313,6 +1312,51 @@ class Codegen {
                 this.last_type = "Bool"
                 return result
             }
+            if (method == "starts_with") {
+                var prefix = this.gen_arg_value(args[0])
+                var prefix_ptr = this.fresh_local()
+                this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
+                var plen = this.fresh_local()
+                this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
+                var cmp = this.fresh_local()
+                this.emit_indent(cmp + " = call i32 @strncmp(i8* " + str_ptr + ", i8* " + prefix_ptr + ", i64 " + plen + ")")
+                var is_eq = this.fresh_local()
+                this.emit_indent(is_eq + " = icmp eq i32 " + cmp + ", 0")
+                var result = this.fresh_local()
+                this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
+                this.last_type = "Bool"
+                return result
+            }
+            if (method == "ends_with") {
+                var suffix = this.gen_arg_value(args[0])
+                var suffix_ptr = this.fresh_local()
+                this.emit_indent(suffix_ptr + " = inttoptr i64 " + suffix + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__str_ends_with(i8* " + str_ptr + ", i8* " + suffix_ptr + ")")
+                this.last_type = "Bool"
+                return local
+            }
+            if (method == "split") {
+                var delim = this.gen_arg_value(args[0])
+                var delim_ptr = this.fresh_local()
+                this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
+                this.last_type = "List"
+                return local
+            }
+            if (method == "replace") {
+                var old_str = this.gen_arg_value(args[0])
+                var old_ptr = this.fresh_local()
+                this.emit_indent(old_ptr + " = inttoptr i64 " + old_str + " to i8*")
+                var new_str = this.gen_arg_value(args[1])
+                var new_ptr = this.fresh_local()
+                this.emit_indent(new_ptr + " = inttoptr i64 " + new_str + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__str_replace(i8* " + str_ptr + ", i8* " + old_ptr + ", i8* " + new_ptr + ")")
+                this.last_type = "String"
+                return local
+            }
             if (method == "slice") {
                 var start = this.gen_arg_value(args[0])
                 var end = this.gen_arg_value(args[1])
@@ -1331,6 +1375,12 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
                 this.last_type = "String"
+                return local
+            }
+            if (method == "to_number") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
+                this.last_type = "Int"
                 return local
             }
         }
