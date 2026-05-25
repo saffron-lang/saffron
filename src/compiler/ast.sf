@@ -32,7 +32,8 @@ enum Expr {
     IndexGet(object: Expr, index: Expr),
     IndexSet(object: Expr, index: Expr, value: Expr),
     MethodCall(object: Expr, method: String, args: List<Expr>),
-    MapLit
+    MapLit,
+    BlockExpr(stmts: List<Stmt>, value: Expr)
 }
 
 enum MatchArm {
