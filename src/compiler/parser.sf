@@ -273,10 +273,29 @@ class Parser {
             return this.parse_list_lit()
         }
         if (this.match_kind_check("{")) {
-            // Empty map literal: {}
             this.advance()
+            if (this.match_kind_check("}")) {
+                // Empty map literal: {}
+                this.advance()
+                return AST.Expr.MapLit
+            }
+            // Block expression: { stmts...; expr }
+            var block_stmts: List<AST.Stmt> = []
+            while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                block_stmts.push(this.parse_stmt())
+            }
             this.consume("}")
-            return AST.Expr.MapLit
+            // The last statement is the value expression
+            if (block_stmts.length() > 0) {
+                var last = block_stmts[block_stmts.length() - 1]
+                block_stmts.pop()
+                var value = match (this.classify_stmt_for_block(last)) {
+                    "expr" => this.extract_expr_from_stmt(last)
+                    _ => AST.Expr.NilLit
+                }
+                return AST.Expr.BlockExpr(block_stmts, value)
+            }
+            return AST.Expr.BlockExpr([], AST.Expr.NilLit)
         }
 
         var kind = this.current_kind()
@@ -848,6 +867,26 @@ class Parser {
         }
         this.consume("}")
         return stmts
+    }
+
+    fun classify_stmt_for_block(stmt: AST.Stmt): String {
+        return match (stmt) {
+            ExprStmt(e) => "expr"
+            VarDecl(n, t, i, d) => "var"
+            FunDecl(n, p, r, b, d) => "fun"
+            EnumDecl(n, v, d) => "enum"
+            ClassDecl(n, f, m, d) => "class"
+            Return(v) => "return"
+            If(c, t, e) => "if"
+            While(c, b) => "while"
+            Block(s) => "block"
+            Break => "break"
+            Continue => "continue"
+        }
+    }
+
+    fun extract_expr_from_stmt(stmt: AST.Stmt): AST.Expr {
+        return match (stmt) { ExprStmt(e) => e }
     }
 }
 

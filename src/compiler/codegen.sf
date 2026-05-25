@@ -2445,7 +2445,7 @@ class Codegen {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
-            param_strs.push(this.llvm_type(ptype) + " %" + pname + ".arg")
+            param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
 
@@ -2465,12 +2465,12 @@ class Codegen {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
-            this.emit_indent("%" + pname + " = alloca " + this.llvm_type(ptype))
+            this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             i = i + 1
         }
         i = 0
         while (i < var_names.length()) {
-            this.emit_indent("%" + var_names[i] + " = alloca " + this.llvm_type(var_types[i]))
+            this.emit_indent("%" + this.sanitize_name(var_names[i]) + " = alloca " + this.llvm_type(var_types[i]))
             i = i + 1
         }
 
@@ -2484,7 +2484,7 @@ class Codegen {
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }
-            this.emit_indent("store i64 %" + pname + ".arg, i64* %" + pname)
+            this.emit_indent("store i64 %" + this.sanitize_name(pname) + ".arg, i64* %" + this.sanitize_name(pname))
             i = i + 1
         }
 
