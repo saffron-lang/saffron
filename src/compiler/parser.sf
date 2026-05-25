@@ -581,6 +581,8 @@ class Parser {
         var module_doc = this.collect_module_doc()
         var stmts: List<AST.Stmt> = []
         while (!this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("eof")) { return stmts }
             stmts.push(this.parse_stmt())
         }
         return stmts
@@ -775,6 +777,8 @@ class Parser {
         var methods: List<AST.Stmt> = []
         var first_field = true
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods, docstring) }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type
                 this.advance()
@@ -883,6 +887,11 @@ class Parser {
         this.consume("{")
         var stmts: List<AST.Stmt> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                this.consume("}")
+                return stmts
+            }
             stmts.push(this.parse_stmt())
         }
         this.consume("}")
