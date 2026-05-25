@@ -551,6 +551,7 @@ class Parser {
         if (this.match_kind_check("fun")) return this.parse_fun_decl_with_doc(docstring)
         if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
         if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
+        if (this.match_kind_check("import")) return this.parse_import()
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
@@ -748,6 +749,15 @@ class Parser {
         }
         this.consume("}")
         return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods, docstring)
+    }
+
+    fun parse_import(): AST.Stmt {
+        this.advance() // consume import
+        // Skip: "path" as Name  or  { names } from "path"
+        while (!this.match_kind_check("eof") and !this.match_kind_check("var") and !this.match_kind_check("fun") and !this.match_kind_check("class") and !this.match_kind_check("enum") and !this.match_kind_check("import")) {
+            this.advance()
+        }
+        return AST.Stmt.ExprStmt(AST.Expr.NilLit)
     }
 
     fun parse_return(): AST.Stmt {
