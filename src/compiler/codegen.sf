@@ -189,7 +189,7 @@ class Codegen {
                 this.gen_call(callee, args)
             }
             Assign(name, value) => {
-                var val = this.gen_expr(value)
+                var val = this.gen_arg_value(value)
                 this.emit_indent("store i64 " + val + ", i64* %" + name)
                 val
             }
@@ -214,7 +214,7 @@ class Codegen {
                         var vtype = this.var_types.get(obj_name)
                         if (this.class_fields.has(vtype)) {
                             // It's a class instance — do field access
-                            var obj_val = this.gen_expr(object)
+                            var obj_val = this.gen_arg_value(object)
                             var saved_class = this.current_class
                             this.current_class = vtype
                             var field_idx = this.get_field_index(vtype, field)
@@ -313,8 +313,8 @@ class Codegen {
             return local
         }
 
-        var lhs = this.gen_expr(left)
-        var rhs = this.gen_expr(right)
+        var lhs = this.gen_arg_value(left)
+        var rhs = this.gen_arg_value(right)
         var local = this.fresh_local()
         this.last_type = "Int"
 
@@ -386,6 +386,35 @@ class Codegen {
             var gf_field = match (expr) { GetField(o, f) => f }
             return this.gen_get_field(gf_obj, gf_field)
         }
+        if (expr_kind == "this") {
+            this.last_type = this.current_class
+            var local = this.fresh_local()
+            this.emit_indent(local + " = load i64, i64* %self")
+            return local
+        }
+        if (expr_kind == "set_field") {
+            var sf_obj = match (expr) { SetField(o, f, v) => o }
+            var sf_field = match (expr) { SetField(o, f, v) => f }
+            var sf_val = match (expr) { SetField(o, f, v) => v }
+            return this.gen_set_field(sf_obj, sf_field, sf_val)
+        }
+        if (expr_kind == "binary") {
+            var b_left = match (expr) { Binary(l, o, r) => l }
+            var b_op = match (expr) { Binary(l, o, r) => o }
+            var b_right = match (expr) { Binary(l, o, r) => r }
+            return this.gen_binary(b_left, b_op, b_right)
+        }
+        if (expr_kind == "variable") {
+            var vname = match (expr) { Variable(n) => n }
+            if (this.var_types.has(vname)) {
+                this.last_type = this.var_types.get(vname)
+            } else {
+                this.last_type = "Int"
+            }
+            var local = this.fresh_local()
+            this.emit_indent(local + " = load i64, i64* %" + vname)
+            return local
+        }
         if (expr_kind == "member") {
             var m_obj = match (expr) { MemberAccess(o, f) => o }
             var m_field = match (expr) { MemberAccess(o, f) => f }
@@ -438,7 +467,7 @@ class Codegen {
             return ptr
         }
         // Variable or expression: gen_expr gives i64, convert to i8*
-        var val = this.gen_expr(expr)
+        var val = this.gen_arg_value(expr)
         var ptr = this.fresh_local()
         this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
         return ptr
@@ -470,7 +499,7 @@ class Codegen {
     }
 
     fun gen_unary(op: String, right: AST.Expr): String {
-        var rhs = this.gen_expr(right)
+        var rhs = this.gen_arg_value(right)
         var local = this.fresh_local()
 
         if (op == "-") { this.emit_indent(local + " = sub i64 0, " + rhs) }
@@ -609,7 +638,7 @@ class Codegen {
         arg_strs.push("i64 " + env_int)
         var i = 0
         while (i < args.length()) {
-            var val = this.gen_expr(args[i])
+            var val = this.gen_arg_value(args[i])
             arg_strs.push("i64 " + val)
             i = i + 1
         }
@@ -752,7 +781,7 @@ class Codegen {
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 return local
             }
-            var val = this.gen_expr(args[0])
+            var val = this.gen_arg_value(args[0])
             var tag_shifted = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined = this.fresh_local()
@@ -785,7 +814,7 @@ class Codegen {
         // Store fields at indices 1, 2, ...
         var i = 0
         while (i < args.length()) {
-            var val = this.gen_expr(args[i])
+            var val = this.gen_arg_value(args[i])
             var field_idx = i + 1
             var field_slot = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())
@@ -799,7 +828,7 @@ class Codegen {
     }
 
     fun gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
-        var subj = this.gen_expr(subject)
+        var subj = this.gen_arg_value(subject)
         var result_ptr = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
@@ -892,7 +921,7 @@ class Codegen {
                 }
             }
 
-            var val = this.gen_expr(body_expr)
+            var val = this.gen_arg_value(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             this.emit_terminator("br label %" + end_label)
             i = i + 1
@@ -1029,8 +1058,8 @@ class Codegen {
     }
 
     fun gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
-        var obj = this.gen_expr(object)
-        var idx = this.gen_expr(index)
+        var obj = this.gen_arg_value(object)
+        var idx = this.gen_arg_value(index)
         var val = this.gen_arg_value(value)
         this.emit_indent("call void @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
         return val
@@ -1080,7 +1109,7 @@ class Codegen {
             }
         }
 
-        var obj = this.gen_expr(object)
+        var obj = this.gen_arg_value(object)
         var obj_type = this.last_type
 
         // List methods
@@ -1243,7 +1272,7 @@ class Codegen {
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
-        var obj_val = this.gen_expr(object)
+        var obj_val = this.gen_arg_value(object)
         var class_name = this.current_class
         var field_idx = this.get_field_index(class_name, field)
         var obj_ptr = this.fresh_local()
@@ -1272,7 +1301,7 @@ class Codegen {
     }
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
-        var obj_val = this.gen_expr(object)
+        var obj_val = this.gen_arg_value(object)
         var val = this.gen_arg_value(value)
         var class_name = this.current_class
         var field_idx = this.get_field_index(class_name, field)
@@ -1843,7 +1872,7 @@ class Codegen {
     }
 
     fun gen_logical(left: AST.Expr, op: String, right: AST.Expr): String {
-        var lhs = this.gen_expr(left)
+        var lhs = this.gen_arg_value(left)
         var rhs_label = this.fresh_label("rhs")
         var end_label = this.fresh_label("end")
         var result = this.fresh_local()
@@ -1855,7 +1884,7 @@ class Codegen {
         }
 
         this.emit(rhs_label + ":")
-        var rhs = this.gen_expr(right)
+        var rhs = this.gen_arg_value(right)
         this.emit_indent("br label %" + end_label)
 
         this.emit(end_label + ":")
@@ -1969,7 +1998,7 @@ class Codegen {
                 this.emit_indent("store i64 " + val + ", i64* %" + name)
             }
             Return(value) => {
-                var val = this.gen_expr(value)
+                var val = this.gen_arg_value(value)
                 this.emit_terminator("ret i64 " + val)
             }
             If(cond, then_branch, else_branch) => {
@@ -2109,7 +2138,7 @@ class Codegen {
     }
 
     fun gen_if(cond: AST.Expr, then_branch: List<AST.Stmt>, else_branch: List<AST.Stmt>) {
-        var cond_val = this.gen_expr(cond)
+        var cond_val = this.gen_arg_value(cond)
         var then_label = this.fresh_label("then")
         var else_label = this.fresh_label("else")
         var end_label = this.fresh_label("endif")
@@ -2137,7 +2166,7 @@ class Codegen {
         this.emit_terminator("br label %" + cond_label)
 
         this.start_block(cond_label)
-        var cond_val = this.gen_expr(cond)
+        var cond_val = this.gen_arg_value(cond)
         this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
 
         this.start_block(body_label)
