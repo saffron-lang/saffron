@@ -1,0 +1,33 @@
+import "reflect" as Reflect
+
+/// Adds two numbers together.
+fun add(a: Number, b: Number): Number {
+    return a + b
+}
+
+/// A simple greeter class.
+class Greeter {
+    var name: String
+    fun init(name: String) {
+        this.name = name
+    }
+}
+
+IO.println(Reflect.doc(add))
+IO.println(Reflect.doc(Greeter))
+
+// Test multi-line doc comments
+/// Computes the product
+/// of two numbers.
+fun multiply(a: Number, b: Number): Number {
+    return a * b
+}
+
+IO.println(Reflect.doc(multiply))
+
+// Test no docstring returns nil
+fun nodoc() {
+    return 1
+}
+
+IO.println(Reflect.doc(nodoc))

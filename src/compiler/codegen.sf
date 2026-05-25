@@ -1270,9 +1270,14 @@ class Codegen {
             }
         }
 
-        // Fall back to class method call
-        if (this.current_class.length() > 0) {
-            var class_name = this.find_class_for_method(method)
+        // Fall back to class method call (inside or outside class)
+        var class_name = ""
+        if (this.class_fields.has(obj_type)) {
+            class_name = obj_type
+        } else if (this.current_class.length() > 0) {
+            class_name = this.find_class_for_method(method)
+        }
+        if (true) {
             if (class_name.length() > 0) {
                 var arg_strs: List<String> = []
                 arg_strs.push("i64 " + obj)
@@ -1283,6 +1288,11 @@ class Codegen {
                     i = i + 1
                 }
                 var full_method = class_name + "__" + method
+                if (this.get_method_ret(class_name, method) == "void") {
+                    this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
+                    this.last_type = "Nil"
+                    return "0"
+                }
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
                 if (this.func_ret_types.has(full_method)) {
