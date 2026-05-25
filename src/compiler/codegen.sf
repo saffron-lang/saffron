@@ -942,11 +942,14 @@ class Codegen {
             return as_int
         }
 
-        // Multi-field: allocate array [tag, field0, field1, ...] on stack
-        // Return pointer as i64 (ptrtoint)
+        // Multi-field: heap-allocate array [tag, field0, field1, ...]
+        // Must be heap (not stack) since enum values may outlive the creating function
         var num_slots = args.length() + 1
+        var arr_bytes = num_slots * 8
+        var arr_raw = this.fresh_local()
+        this.emit_indent(arr_raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
         var arr_ptr = this.fresh_local()
-        this.emit_indent(arr_ptr + " = alloca [" + num_slots.to_string() + " x i64]")
+        this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [" + num_slots.to_string() + " x i64]*")
         // Store tag at index 0
         var tag_slot = this.fresh_local()
         this.emit_indent(tag_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 0")
@@ -2186,23 +2189,24 @@ class Codegen {
         rt.append("  ret i64 %result\n")
         rt.append("}\n\n")
 
-        // __map_set(map: i64, key: i64, value: i64)
+        // __map_set(map: i64, key: i64, value: i64) — with grow
         rt.append("define linkonce_odr void @__map_set(i64 %map, i64 %key, i64 %value) {\n")
         rt.append("entry:\n")
         rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
         rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
         rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %cap_p = getelementptr %Map, %Map* %ptr, i32 0, i32 1\n")
+        rt.append("  %cap = load i64, i64* %cap_p\n")
         rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
         rt.append("  %keys = load i64*, i64** %kp\n")
         rt.append("  %vp = getelementptr %Map, %Map* %ptr, i32 0, i32 3\n")
         rt.append("  %vals = load i64*, i64** %vp\n")
         rt.append("  %key_ptr = inttoptr i64 %key to i8*\n")
-        // Search for existing key
         rt.append("  br label %loop\n")
         rt.append("loop:\n")
         rt.append("  %i = phi i64 [0, %entry], [%next, %cont]\n")
         rt.append("  %done = icmp sge i64 %i, %count\n")
-        rt.append("  br i1 %done, label %insert, label %check\n")
+        rt.append("  br i1 %done, label %check_grow, label %check\n")
         rt.append("check:\n")
         rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
         rt.append("  %kval = load i64, i64* %kslot\n")
@@ -2217,10 +2221,28 @@ class Codegen {
         rt.append("  %vslot_u = getelementptr i64, i64* %vals, i64 %i\n")
         rt.append("  store i64 %value, i64* %vslot_u\n")
         rt.append("  ret void\n")
+        rt.append("check_grow:\n")
+        rt.append("  %need_grow = icmp sge i64 %count, %cap\n")
+        rt.append("  br i1 %need_grow, label %grow, label %insert\n")
+        rt.append("grow:\n")
+        rt.append("  %new_cap = mul i64 %cap, 2\n")
+        rt.append("  store i64 %new_cap, i64* %cap_p\n")
+        rt.append("  %new_bytes = mul i64 %new_cap, 8\n")
+        rt.append("  %old_k_raw = bitcast i64* %keys to i8*\n")
+        rt.append("  %new_k_raw = call i8* @realloc(i8* %old_k_raw, i64 %new_bytes)\n")
+        rt.append("  %new_keys = bitcast i8* %new_k_raw to i64*\n")
+        rt.append("  store i64* %new_keys, i64** %kp\n")
+        rt.append("  %old_v_raw = bitcast i64* %vals to i8*\n")
+        rt.append("  %new_v_raw = call i8* @realloc(i8* %old_v_raw, i64 %new_bytes)\n")
+        rt.append("  %new_vals = bitcast i8* %new_v_raw to i64*\n")
+        rt.append("  store i64* %new_vals, i64** %vp\n")
+        rt.append("  br label %insert\n")
         rt.append("insert:\n")
-        rt.append("  %kslot_i = getelementptr i64, i64* %keys, i64 %count\n")
+        rt.append("  %cur_keys = load i64*, i64** %kp\n")
+        rt.append("  %cur_vals = load i64*, i64** %vp\n")
+        rt.append("  %kslot_i = getelementptr i64, i64* %cur_keys, i64 %count\n")
         rt.append("  store i64 %key, i64* %kslot_i\n")
-        rt.append("  %vslot_i = getelementptr i64, i64* %vals, i64 %count\n")
+        rt.append("  %vslot_i = getelementptr i64, i64* %cur_vals, i64 %count\n")
         rt.append("  store i64 %value, i64* %vslot_i\n")
         rt.append("  %new_count = add i64 %count, 1\n")
         rt.append("  store i64 %new_count, i64* %cp\n")
@@ -3391,6 +3413,7 @@ class Codegen {
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
+        out.append("@.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c\"\\00\"\n")
         out.append("@.str.rb = linkonce_odr unnamed_addr constant [2 x i8] c\"r\\00\"\n")
         out.append("@.str.wb = linkonce_odr unnamed_addr constant [2 x i8] c\"w\\00\"\n")
         out.append("@.str.r = linkonce_odr unnamed_addr constant [2 x i8] c\"r\\00\"\n")
