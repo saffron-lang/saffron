@@ -53,6 +53,11 @@ class Parser {
 
     fun parse_type(): String {
         var name = this.expect_ident()
+        // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
+        while (this.match_kind(".")) {
+            var part = this.expect_ident()
+            name = name + "." + part
+        }
         // Skip generic args: List<Expr>, Map<String, Int>, etc.
         if (this.match_kind_check("<")) {
             this.advance() // consume <
