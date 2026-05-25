@@ -22,6 +22,7 @@ class Codegen {
     var last_type: String
     var var_types: Map<String, String>
     var loop_end_label: String
+    var current_ret_type: String
 
     fun init() {
         this.sb = StringBuilder()
@@ -43,6 +44,7 @@ class Codegen {
         this.last_type = "Int"
         this.var_types = {}
         this.loop_end_label = ""
+        this.current_ret_type = "i64"
     }
 
     fun fresh_label(prefix: String): String {
@@ -89,10 +91,12 @@ class Codegen {
     fun llvm_type(t: String): String {
         if (t == "Int") return "i64"
         if (t == "Float") return "double"
-        if (t == "Bool") return "i1"
+        if (t == "Bool") return "i64"
         if (t == "String") return "i64"
-        if (t == "Nil") return "void"
+        if (t == "Nil") return "i64"
         if (t == "Any") return "i64"
+        if (t == "List") return "i64"
+        if (t == "Map") return "i64"
         return "i64"
     }
 
@@ -150,11 +154,11 @@ class Codegen {
                 local
             }
             BoolLit(v) => {
-                this.last_type = "Bool"
+                this.last_type = "Int"
                 var local = this.fresh_local()
                 var val_str = "0"
                 if (v) { val_str = "1" }
-                this.emit_indent(local + " = add i1 0, " + val_str)
+                this.emit_indent(local + " = add i64 0, " + val_str)
                 local
             }
             StringLit(s) => {
@@ -1183,6 +1187,22 @@ class Codegen {
             }
         }
 
+        // StringBuilder methods
+        if (obj_type == "StringBuilder") {
+            if (method == "append") {
+                var val = this.gen_arg_value(args[0])
+                this.emit_indent("call void @__sb_append(i64 " + obj + ", i64 " + val + ")")
+                this.last_type = "Nil"
+                return "0"
+            }
+            if (method == "to_string") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
+                this.last_type = "String"
+                return local
+            }
+        }
+
         // Map methods
         if (obj_type == "Map") {
             if (method == "set") {
@@ -1539,6 +1559,7 @@ class Codegen {
         this.known_functions.push(name)
         this.reset_locals()
         var ret_llvm = this.llvm_type(ret_type)
+        this.current_ret_type = ret_llvm
 
         var param_list: List<String> = []
         if (params.length() > 0) {
@@ -1777,6 +1798,52 @@ class Codegen {
         rt.append("  %slot = getelementptr i64, i64* %data, i64 %new_count\n")
         rt.append("  %val = load i64, i64* %slot\n")
         rt.append("  ret i64 %val\n")
+        rt.append("}\n\n")
+
+        return rt.to_string()
+    }
+
+    fun stringbuilder_runtime(): String {
+        var rt = StringBuilder()
+        // %SB = { len: i64, cap: i64, buf: i8* }
+        rt.append("%SB = type { i64, i64, i8* }\n\n")
+
+        // __sb_new() -> i64
+        rt.append("define i64 @StringBuilder() {\n")
+        rt.append("entry:\n")
+        rt.append("  %raw = call i8* @malloc(i64 24)\n")
+        rt.append("  %ptr = bitcast i8* %raw to %SB*\n")
+        rt.append("  %lp = getelementptr %SB, %SB* %ptr, i32 0, i32 0\n")
+        rt.append("  store i64 0, i64* %lp\n")
+        rt.append("  %cp = getelementptr %SB, %SB* %ptr, i32 0, i32 1\n")
+        rt.append("  store i64 256, i64* %cp\n")
+        rt.append("  %buf = call i8* @malloc(i64 256)\n")
+        rt.append("  store i8 0, i8* %buf\n")
+        rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
+        rt.append("  store i8* %buf, i8** %bp\n")
+        rt.append("  %result = ptrtoint %SB* %ptr to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("}\n\n")
+
+        // __sb_append(sb: i64, str: i64)
+        rt.append("define void @__sb_append(i64 %sb, i64 %str) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %sb to %SB*\n")
+        rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
+        rt.append("  %buf = load i8*, i8** %bp\n")
+        rt.append("  %s = inttoptr i64 %str to i8*\n")
+        rt.append("  call i8* @strcat(i8* %buf, i8* %s)\n")
+        rt.append("  ret void\n")
+        rt.append("}\n\n")
+
+        // __sb_to_string(sb: i64) -> i64
+        rt.append("define i64 @__sb_to_string(i64 %sb) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %sb to %SB*\n")
+        rt.append("  %bp = getelementptr %SB, %SB* %ptr, i32 0, i32 2\n")
+        rt.append("  %buf = load i8*, i8** %bp\n")
+        rt.append("  %result = ptrtoint i8* %buf to i64\n")
+        rt.append("  ret i64 %result\n")
         rt.append("}\n\n")
 
         return rt.to_string()
@@ -2072,8 +2139,12 @@ class Codegen {
                 this.emit_indent("store i64 " + val + ", i64* %" + name)
             }
             Return(value) => {
-                var val = this.gen_arg_value(value)
-                this.emit_terminator("ret i64 " + val)
+                if (this.current_ret_type == "void") {
+                    this.emit_terminator("ret void")
+                } else {
+                    var val = this.gen_arg_value(value)
+                    this.emit_terminator("ret i64 " + val)
+                }
             }
             If(cond, then_branch, else_branch) => {
                 this.gen_if(cond, then_branch, else_branch)
@@ -2387,6 +2458,10 @@ class Codegen {
     // --- Top-level ---
 
     fun generate(program: List<AST.Stmt>): String {
+        // Register built-in constructors
+        this.known_functions.push("StringBuilder")
+        this.func_ret_types.set("StringBuilder", "StringBuilder")
+
         // Generate all top-level declarations into sb
         var i = 0
         while (i < program.length()) {
@@ -2439,6 +2514,7 @@ class Codegen {
         out.append("%Map = type { i64, i64, i64*, i64* }\n\n")
         out.append(this.list_runtime())
         out.append(this.map_runtime())
+        out.append(this.stringbuilder_runtime())
 
         // Lambda functions
         var k = 0

@@ -210,6 +210,18 @@ static void markRoots() {
     markObject((Obj *) vm.initString);
     markObject((Obj *) vm.getItemString);
     markObject((Obj *) vm.setItemString);
+    markObject((Obj *) vm.addString);
+    markObject((Obj *) vm.subString);
+    markObject((Obj *) vm.mulString);
+    markObject((Obj *) vm.divString);
+    markObject((Obj *) vm.modString);
+    markObject((Obj *) vm.ltString);
+    markObject((Obj *) vm.gtString);
+    markObject((Obj *) vm.eqString);
+    markObject((Obj *) vm.numberClass);
+    markObject((Obj *) vm.stringClass);
+    markObject((Obj *) vm.boolClass);
+    markObject((Obj *) vm.nilClass);
 }
 
 void markArray(ValueArray *array) {
