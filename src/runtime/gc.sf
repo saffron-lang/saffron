@@ -1,0 +1,280 @@
+// Saffron Runtime: Mark-Sweep Garbage Collector
+// ================================================
+// All heap-allocated objects are tracked via a linked list.
+// Each object has a header: { tag: i64, marked: i64, next: i64 }
+//
+// Object tags:
+//   1 = String
+//   2 = List
+//   3 = Map
+//   4 = Closure
+//   5 = Instance
+//
+// Memory layout (all pointers stored as i64 via ptrtoint):
+//   Offset 0: tag (i64)     — type identifier
+//   Offset 8: marked (i64)  — 0=unmarked, 1=marked
+//   Offset 16: next (i64)   — pointer to next object in heap list
+//   Offset 24+: payload     — type-specific data follows header
+//
+// The GC maintains:
+//   - gc_head: pointer to first object in the linked list
+//   - gc_count: number of live objects
+//   - gc_threshold: trigger collection when gc_count exceeds this
+//
+// Roots are provided by the compiler:
+//   - Stack slots (local variables in call frames)
+//   - Global variable table
+//   - Temporary registers holding object references
+
+// --- GC State (globals) ---
+
+var gc_head: Int = 0
+var gc_count: Int = 0
+var gc_threshold: Int = 256
+
+// --- Constants ---
+
+var TAG_STRING: Int = 1
+var TAG_LIST: Int = 2
+var TAG_MAP: Int = 3
+var TAG_CLOSURE: Int = 4
+var TAG_INSTANCE: Int = 5
+
+var HEADER_SIZE: Int = 24
+
+// --- Object Allocation ---
+
+// Allocate a new GC-tracked object with the given tag and payload size.
+// Returns a pointer (as i64) to the START of the header.
+// The caller uses (result + HEADER_SIZE) to access the payload.
+fun GC_alloc(tag: Int, payload_size: Int): Int {
+    // Check if we should collect
+    if (gc_count >= gc_threshold) {
+        GC_collect()
+    }
+
+    var total_size: Int = HEADER_SIZE + payload_size
+
+    // EXTERNAL: var ptr: Int = malloc(total_size) as i64
+    var ptr: Int = 0  // placeholder — will be malloc call
+
+    // Write header fields
+    // EXTERNAL: store tag at ptr+0
+    // EXTERNAL: store 0 (unmarked) at ptr+8
+    // EXTERNAL: store gc_head at ptr+16
+
+    // Link into the object list
+    gc_head = ptr
+    gc_count = gc_count + 1
+
+    return ptr
+}
+
+// --- Mark Phase ---
+
+// Mark a single object as reachable. If already marked, return immediately
+// to avoid infinite loops on cycles.
+fun GC_mark(obj: Int) {
+    if (obj == 0) {
+        return nil
+    }
+
+    // EXTERNAL: var marked: Int = load i64 from (obj + 8)
+    var marked: Int = 0  // placeholder
+    if (marked == 1) {
+        return nil
+    }
+
+    // EXTERNAL: store 1 at (obj + 8)  — set marked flag
+
+    // Trace children based on tag
+    // EXTERNAL: var tag: Int = load i64 from (obj + 0)
+    var tag: Int = 0  // placeholder
+
+    if (tag == TAG_STRING) {
+        // Strings have no child references
+        return nil
+    }
+
+    if (tag == TAG_LIST) {
+        // List payload: { count: i64, capacity: i64, data: i64* }
+        // Each element in data may be an object pointer
+        // EXTERNAL: var count: Int = load from (obj + HEADER_SIZE + 0)
+        // EXTERNAL: var data: Int = load from (obj + HEADER_SIZE + 16)
+        var count: Int = 0  // placeholder
+        var data: Int = 0   // placeholder
+        var i: Int = 0
+        while (i < count) {
+            // EXTERNAL: var elem: Int = load from (data + i*8)
+            var elem: Int = 0  // placeholder
+            GC_mark(elem)
+            i = i + 1
+        }
+        return nil
+    }
+
+    if (tag == TAG_MAP) {
+        // Map payload: { count: i64, capacity: i64, keys: i64*, values: i64* }
+        // Both keys and values may be object pointers
+        // EXTERNAL: var count: Int = load from (obj + HEADER_SIZE + 0)
+        // EXTERNAL: var keys: Int = load from (obj + HEADER_SIZE + 16)
+        // EXTERNAL: var values: Int = load from (obj + HEADER_SIZE + 24)
+        var count: Int = 0   // placeholder
+        var keys: Int = 0    // placeholder
+        var values: Int = 0  // placeholder
+        var i: Int = 0
+        while (i < count) {
+            // EXTERNAL: var k: Int = load from (keys + i*8)
+            // EXTERNAL: var v: Int = load from (values + i*8)
+            var k: Int = 0  // placeholder
+            var v: Int = 0  // placeholder
+            GC_mark(k)
+            GC_mark(v)
+            i = i + 1
+        }
+        return nil
+    }
+
+    if (tag == TAG_CLOSURE) {
+        // Closure payload: { func_ptr: i64, upvalue_count: i64, upvalues: i64* }
+        // Each upvalue may reference an object
+        // EXTERNAL: var uv_count: Int = load from (obj + HEADER_SIZE + 8)
+        // EXTERNAL: var upvalues: Int = load from (obj + HEADER_SIZE + 16)
+        var uv_count: Int = 0  // placeholder
+        var upvalues: Int = 0  // placeholder
+        var i: Int = 0
+        while (i < uv_count) {
+            // EXTERNAL: var uv: Int = load from (upvalues + i*8)
+            var uv: Int = 0  // placeholder
+            GC_mark(uv)
+            i = i + 1
+        }
+        return nil
+    }
+
+    if (tag == TAG_INSTANCE) {
+        // Instance payload: { class_ptr: i64, field_count: i64, fields: i64* }
+        // class_ptr itself is a GC object, fields may be objects
+        // EXTERNAL: var class_ptr: Int = load from (obj + HEADER_SIZE + 0)
+        // EXTERNAL: var field_count: Int = load from (obj + HEADER_SIZE + 8)
+        // EXTERNAL: var fields: Int = load from (obj + HEADER_SIZE + 16)
+        var class_ptr: Int = 0    // placeholder
+        var field_count: Int = 0  // placeholder
+        var fields: Int = 0       // placeholder
+        GC_mark(class_ptr)
+        var i: Int = 0
+        while (i < field_count) {
+            // EXTERNAL: var f: Int = load from (fields + i*8)
+            var f: Int = 0  // placeholder
+            GC_mark(f)
+            i = i + 1
+        }
+        return nil
+    }
+}
+
+// Mark all roots. Called by the compiler-generated code which knows the
+// stack layout and global table.
+// EXTERNAL: The compiler will generate a __gc_mark_roots() function that
+// calls GC_mark() on each live stack slot and global.
+fun GC_mark_roots() {
+    // This function will be replaced/augmented by compiler-generated code.
+    // The compiler knows:
+    //   1. All global variable slots
+    //   2. The current call stack (each frame's local slots)
+    // It will emit calls to GC_mark() for each root.
+}
+
+// --- Sweep Phase ---
+
+// Walk the object list, free unmarked objects, reset marked flag on survivors.
+fun GC_sweep() {
+    var prev: Int = 0
+    var current: Int = gc_head
+
+    while (current != 0) {
+        // EXTERNAL: var marked: Int = load from (current + 8)
+        // EXTERNAL: var next: Int = load from (current + 16)
+        var marked: Int = 0  // placeholder
+        var next: Int = 0    // placeholder
+
+        if (marked == 0) {
+            // Object is unreachable — free it
+            GC_free_object(current)
+            gc_count = gc_count - 1
+
+            // Unlink from list
+            if (prev == 0) {
+                gc_head = next
+            } else {
+                // EXTERNAL: store next at (prev + 16)
+            }
+        } else {
+            // Object survives — clear mark for next cycle
+            // EXTERNAL: store 0 at (current + 8)
+            prev = current
+        }
+
+        current = next
+    }
+}
+
+// Free an object's payload memory based on its tag.
+fun GC_free_object(obj: Int) {
+    // EXTERNAL: var tag: Int = load from (obj + 0)
+    var tag: Int = 0  // placeholder
+
+    if (tag == TAG_LIST) {
+        // Free the data array
+        // EXTERNAL: var data: Int = load from (obj + HEADER_SIZE + 16)
+        // EXTERNAL: free(data)
+    }
+
+    if (tag == TAG_MAP) {
+        // Free both keys and values arrays
+        // EXTERNAL: var keys: Int = load from (obj + HEADER_SIZE + 16)
+        // EXTERNAL: var values: Int = load from (obj + HEADER_SIZE + 24)
+        // EXTERNAL: free(keys)
+        // EXTERNAL: free(values)
+    }
+
+    if (tag == TAG_CLOSURE) {
+        // Free upvalue array
+        // EXTERNAL: var upvalues: Int = load from (obj + HEADER_SIZE + 16)
+        // EXTERNAL: free(upvalues)
+    }
+
+    if (tag == TAG_INSTANCE) {
+        // Free fields array
+        // EXTERNAL: var fields: Int = load from (obj + HEADER_SIZE + 16)
+        // EXTERNAL: free(fields)
+    }
+
+    // Free the object itself (header + payload)
+    // EXTERNAL: free(obj)
+}
+
+// --- Collection ---
+
+// Run a full GC cycle: mark all reachable objects, then sweep the dead.
+fun GC_collect() {
+    GC_mark_roots()
+    GC_sweep()
+
+    // Adaptive threshold: grow if we have many survivors
+    if (gc_count > 0) {
+        gc_threshold = gc_count * 2
+    }
+}
+
+// --- Utility ---
+
+// Force a collection (for testing or explicit memory pressure).
+fun GC_force_collect() {
+    GC_collect()
+}
+
+// Return the current number of tracked objects (for diagnostics).
+fun GC_object_count(): Int {
+    return gc_count
+}

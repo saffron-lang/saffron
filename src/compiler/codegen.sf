@@ -47,6 +47,21 @@ class Codegen {
         this.current_ret_type = "i64"
     }
 
+    fun sanitize_name(name: String): String {
+        var sb = StringBuilder()
+        var i = 0
+        while (i < name.length()) {
+            var ch: String = name.char_at(i)
+            if (ch == "." or ch == "(" or ch == ")") {
+                sb.append("_")
+            } else {
+                sb.append(ch)
+            }
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
     fun fresh_label(prefix: String): String {
         this.label_counter = this.label_counter + 1
         return prefix + this.label_counter.floor().to_string()
@@ -182,7 +197,7 @@ class Codegen {
                     this.last_type = "Int"
                 }
                 var local = this.fresh_local()
-                this.emit_indent(local + " = load i64, i64* %" + name)
+                this.emit_indent(local + " = load i64, i64* %" + this.sanitize_name(name))
                 local
             }
             Binary(left, op, right) => {
@@ -196,7 +211,7 @@ class Codegen {
             }
             Assign(name, value) => {
                 var val = this.gen_arg_value(value)
-                this.emit_indent("store i64 " + val + ", i64* %" + name)
+                this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
                 val
             }
             Logical(left, op, right) => {
@@ -276,6 +291,10 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_new()")
                 local
+            }
+            BlockExpr(stmts, value) => {
+                this.gen_stmts(stmts)
+                this.gen_arg_value(value)
             }
         }
     }
@@ -432,6 +451,12 @@ class Codegen {
             // Fall through to gen_expr which handles Match(subject, arms) directly
             return this.gen_expr(expr)
         }
+        if (expr_kind == "block_expr") {
+            var be_stmts = match (expr) { BlockExpr(s, v) => s }
+            var be_value = match (expr) { BlockExpr(s, v) => v }
+            this.gen_stmts(be_stmts)
+            return this.gen_arg_value(be_value)
+        }
         if (expr_kind == "get_field") {
             var gf_obj = match (expr) { GetField(o, f) => o }
             var gf_field = match (expr) { GetField(o, f) => f }
@@ -463,7 +488,7 @@ class Codegen {
                 this.last_type = "Int"
             }
             var local = this.fresh_local()
-            this.emit_indent(local + " = load i64, i64* %" + vname)
+            this.emit_indent(local + " = load i64, i64* %" + this.sanitize_name(vname))
             return local
         }
         if (expr_kind == "member") {
@@ -589,7 +614,7 @@ class Codegen {
                 var class_name = this.find_class_for_method(method_name)
                 if (class_name.length() > 0) {
                     var obj_val = this.fresh_local()
-                    this.emit_indent(obj_val + " = load i64, i64* %" + obj_name)
+                    this.emit_indent(obj_val + " = load i64, i64* %" + this.sanitize_name(obj_name))
                     var arg_strs: List<String> = []
                     arg_strs.push("i64 " + obj_val)
                     var ai = 0
@@ -664,7 +689,7 @@ class Codegen {
 
         // Indirect call: callee is a variable holding a function pointer
         var ptr_val = this.fresh_local()
-        this.emit_indent(ptr_val + " = load i64, i64* %" + callee_name)
+        this.emit_indent(ptr_val + " = load i64, i64* %" + this.sanitize_name(callee_name))
         return this.gen_indirect_call(ptr_val, args)
     }
 
@@ -743,6 +768,7 @@ class Codegen {
             GetField(o, f) => "no"
             SetField(o, f, v) => "no"
             This => "no"
+            BlockExpr(s, v) => "no"
         }
         return kind == "yes"
     }
@@ -767,6 +793,7 @@ class Codegen {
             Lambda(p, r, b) => ""
             SetField(o, f, v) => ""
             This => ""
+            BlockExpr(s, v) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -811,6 +838,7 @@ class Codegen {
             IndexGet(o, i) => "index"
             IndexSet(o, i, v) => "index"
             MethodCall(o, m, a) => "method"
+            BlockExpr(s, v) => "block"
         }
         return kind == "string"
     }
@@ -957,17 +985,14 @@ class Codegen {
             // Extract bindings from payload
             var arm_variant = match (pattern) { VariantPattern(v, b) => v }
             var bindings = match (pattern) { VariantPattern(v, b) => b }
-            var bind_count = 0
-            if (bindings is List) {
-                bind_count = bindings.length()
-            }
+            var bind_count = bindings.length()
             if (bind_count > 0) {
                 if (max_fields <= 1) {
                     // Simple encoding: extract value with AND mask
                     var bname = bindings[0]
                     var extracted = this.fresh_local()
                     this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
-                    this.emit_indent("store i64 " + extracted + ", i64* %" + bname)
+                    this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
                 } else {
                     // Array encoding: inttoptr and GEP to extract fields
                     var total = bind_count + 1
@@ -982,7 +1007,7 @@ class Codegen {
                         this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.floor().to_string())
                         var extracted = this.fresh_local()
                         this.emit_indent(extracted + " = load i64, i64* " + field_slot)
-                        this.emit_indent("store i64 " + extracted + ", i64* %" + bname)
+                        this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
                         j = j + 1
                     }
                 }
@@ -1073,6 +1098,7 @@ class Codegen {
             GetField(o, f) => "get_field"
             SetField(o, f, v) => "set_field"
             This => "this"
+            BlockExpr(s, v) => "block_expr"
         }
     }
 
@@ -1100,6 +1126,7 @@ class Codegen {
             IndexGet(o, i) => ""
             IndexSet(o, i, v) => ""
             MethodCall(o, m, a) => ""
+            BlockExpr(s, v) => ""
         }
         return name
     }
@@ -1366,6 +1393,7 @@ class Codegen {
             Lambda(p, r, b) => "other"
             GetField(o, f) => "other"
             SetField(o, f, v) => "other"
+            BlockExpr(s, v) => "other"
         }
         return kind == "this"
     }
@@ -1488,7 +1516,7 @@ class Codegen {
             var ci = 0
             while (ci < captures.length()) {
                 var cap_val = this.fresh_local()
-                this.emit_indent(cap_val + " = load i64, i64* %" + captures[ci])
+                this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(captures[ci]))
                 var slot = this.fresh_local()
                 this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
                 this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
@@ -1588,7 +1616,7 @@ class Codegen {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
-            param_strs.push(this.llvm_type(ptype) + " %" + pname + ".arg")
+            param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
 
@@ -1603,8 +1631,8 @@ class Codegen {
             var parts = param_list[i].split(":")
             var pname = parts[0]
             var ptype = parts[1]
-            this.emit_indent("%" + pname + " = alloca " + this.llvm_type(ptype))
-            this.emit_indent("store " + this.llvm_type(ptype) + " %" + pname + ".arg, " + this.llvm_type(ptype) + "* %" + pname)
+            this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
+            this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
             i = i + 1
         }
 
@@ -1617,12 +1645,12 @@ class Codegen {
         var ci = 0
         while (ci < captures.length()) {
             var cap_name = captures[ci]
-            this.emit_indent("%" + cap_name + " = alloca i64")
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
             var cap_slot = this.fresh_local()
             this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
             var cap_val = this.fresh_local()
             this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
-            this.emit_indent("store i64 " + cap_val + ", i64* %" + cap_name)
+            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
             ci = ci + 1
         }
 
@@ -1634,7 +1662,7 @@ class Codegen {
         while (i < var_names.length()) {
             var vname = var_names[i]
             if (!captures.contains(vname)) {
-                this.emit_indent("%" + vname + " = alloca " + this.llvm_type(var_types[i]))
+                this.emit_indent("%" + this.sanitize_name(vname) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
         }
@@ -1717,6 +1745,10 @@ class Codegen {
             Match(s, a) => {}
             EnumConstruct(e, v, a) => {}
             Lambda(p, r, b) => {}
+            BlockExpr(stmts, value) => {
+                this.find_free_vars_stmts(stmts, bound, free)
+                this.find_free_vars_expr(value, bound, free)
+            }
         }
     }
 
@@ -2096,19 +2128,28 @@ class Codegen {
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
         var ek = this.classify_expr(expr)
+        if (ek == "block_expr") {
+            var be_stmts = match (expr) { BlockExpr(s, v) => s }
+            var be_value = match (expr) { BlockExpr(s, v) => v }
+            this.collect_vars(be_stmts, names, types)
+            this.collect_vars_expr(be_value, names, types)
+            return nil
+        }
         if (ek != "match_expr") return nil
-        // It's a match expression — collect bindings from patterns
+        // It's a match expression — collect bindings from patterns and vars from bodies
         var arms = this.get_match_arms(expr)
         var i = 0
         while (i < arms.length()) {
             var arm = arms[i]
             var pattern = match (arm) { Arm(p, b) => p }
+            var body_expr = match (arm) { Arm(p, b) => b }
             var bindings = match (pattern) { VariantPattern(v, b) => b }
             var j = 0
             while (j < bindings.length()) {
                 this.add_var_unique(names, types, bindings[j], "Int")
                 j = j + 1
             }
+            this.collect_vars_expr(body_expr, names, types)
             i = i + 1
         }
     }
@@ -2138,6 +2179,7 @@ class Codegen {
             IndexSet(o, i, v) => "other"
             MethodCall(o, m, a) => "other"
             MapLit => "other"
+            BlockExpr(s, v) => "other"
         }
         return kind == "match"
     }
@@ -2162,7 +2204,7 @@ class Codegen {
                 if (vtype == "String") {
                     this.string_vars.push(name)
                 }
-                this.emit_indent("store i64 " + val + ", i64* %" + name)
+                this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
             }
             Return(value) => {
                 if (this.current_ret_type == "void") {
