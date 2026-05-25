@@ -11,4 +11,4 @@ build-dir = "book"
 default-theme = "navy"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/saffron-lang/saffron"
-additional-js = ["theme/highlight.js"]
+theme = "theme"

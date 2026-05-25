@@ -172,6 +172,8 @@ static Stmt *declaration();
 
 static Expr *expression();
 
+static Token emptyDocstring();
+
 static Value identifierConstant(Token *name);
 
 static ParseRule *getRule(TokenType type);
@@ -610,6 +612,8 @@ ParseRule parseRules[] = {
         [TOKEN_SHIFT_LEFT]    = {NULL, binary, PREC_SHIFT},
         [TOKEN_SHIFT_RIGHT]   = {NULL, binary, PREC_SHIFT},
         [TOKEN_IS]            = {NULL, binary, PREC_COMPARISON},
+        [TOKEN_DOC_COMMENT]   = {NULL, NULL, PREC_NONE},
+        [TOKEN_MODULE_DOC]    = {NULL, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -843,6 +847,7 @@ static struct Function *function(FunctionType type) {
     result->returnType = returnType;
     result->generics = generics;
     initExprArray(&result->decorators);
+    result->docstring = emptyDocstring();
     return result;
 }
 
@@ -998,6 +1003,7 @@ static Stmt *fieldDeclaration(AssignmentType assignmentType) {
     var->initializer = NULL;
     var->type = type;
     var->assignmentType = assignmentType;
+    var->docstring = emptyDocstring();
     return var;
 }
 
@@ -1026,6 +1032,7 @@ static Stmt *varDeclaration(AssignmentType assignmentType) {
     var->initializer = value;
     var->type = type;
     var->assignmentType = assignmentType;
+    var->docstring = emptyDocstring();
     return var;
 }
 
@@ -1077,6 +1084,7 @@ static Stmt *forStatement() {
                 var->name = name;
                 var->type = NULL;
                 var->assignmentType = TYPE_VARIABLE;
+                var->docstring = emptyDocstring();
                 if (match(TOKEN_COLON)) {
                     var->type = typeAnnotation();
                 }
@@ -1408,6 +1416,7 @@ static Stmt *classDeclaration() {
     struct Class *result = ALLOCATE_NODE(struct Class, NODE_CLASS);
     result->name = className;
     result->isDataClass = false;
+    result->docstring = emptyDocstring();
     initExprArray(&result->superclasses);
 
     if (match(TOKEN_EXTENDS)) {
@@ -1529,6 +1538,8 @@ static Stmt *methodSignature() {
         func->name = name;
         func->returnType = returnType;
         func->generics = generics;
+        initExprArray(&func->decorators);
+        func->docstring = emptyDocstring();
         return (Stmt *) func;
     }
 
@@ -1649,6 +1660,7 @@ static Stmt *enumDeclaration() {
     result->name = enumName;
     result->generics = generics;
     result->body = body;
+    result->docstring = emptyDocstring();
     return (Stmt *) result;
 }
 
@@ -1727,7 +1739,77 @@ static Expr *matchExpression(bool canAssign) {
     return (Expr *) result;
 }
 
+static Token emptyDocstring() {
+    Token t;
+    t.type = TOKEN_EOF;
+    t.start = NULL;
+    t.length = 0;
+    t.line = 0;
+    t.column = 0;
+    return t;
+}
+
+static Token collectDocComments() {
+    if (!check(TOKEN_DOC_COMMENT)) return emptyDocstring();
+
+    // Collect consecutive doc comment tokens into a single string
+    char buf[4096];
+    int len = 0;
+
+    while (match(TOKEN_DOC_COMMENT)) {
+        Token doc = parser.previous;
+        if (len > 0 && len < 4095) {
+            buf[len++] = '\n';
+        }
+        int copyLen = doc.length;
+        if (len + copyLen > 4095) copyLen = 4095 - len;
+        memcpy(buf + len, doc.start, copyLen);
+        len += copyLen;
+    }
+
+    buf[len] = '\0';
+    ObjString *str = copyString(buf, len);
+    Token result;
+    result.type = TOKEN_DOC_COMMENT;
+    result.start = str->chars;
+    result.length = len;
+    result.line = parser.previous.line;
+    result.column = 0;
+    return result;
+}
+
+static Token collectModuleDocComments() {
+    if (!check(TOKEN_MODULE_DOC)) return emptyDocstring();
+
+    char buf[4096];
+    int len = 0;
+
+    while (match(TOKEN_MODULE_DOC)) {
+        Token doc = parser.previous;
+        if (len > 0 && len < 4095) {
+            buf[len++] = '\n';
+        }
+        int copyLen = doc.length;
+        if (len + copyLen > 4095) copyLen = 4095 - len;
+        memcpy(buf + len, doc.start, copyLen);
+        len += copyLen;
+    }
+
+    buf[len] = '\0';
+    ObjString *str = copyString(buf, len);
+    Token result;
+    result.type = TOKEN_MODULE_DOC;
+    result.start = str->chars;
+    result.length = len;
+    result.line = parser.previous.line;
+    result.column = 0;
+    return result;
+}
+
 static Stmt *declaration() {
+    // Collect doc comments before the declaration
+    Token docstring = collectDocComments();
+
     // Decorators: @expr applied to the next fun/class declaration
     if (match(TOKEN_AT)) {
         ExprArray decorators;
@@ -1742,11 +1824,11 @@ static Stmt *declaration() {
         if (match(TOKEN_FUN)) {
             Stmt *decl = funDeclaration();
             ((struct Function *) decl)->decorators = decorators;
+            ((struct Function *) decl)->docstring = docstring;
             return decl;
         } else if (match(TOKEN_CLASS)) {
-            // For classes, store decorators but apply same pattern
             Stmt *decl = classDeclaration();
-            // TODO: add decorators field to Class node
+            ((struct Class *) decl)->docstring = docstring;
             return decl;
         } else {
             error("Decorators can only be applied to functions or classes.");
@@ -1758,17 +1840,26 @@ static Stmt *declaration() {
         consume(TOKEN_CLASS, "Expect 'class' after 'data'.");
         Stmt *cls = classDeclaration();
         ((struct Class *) cls)->isDataClass = true;
+        ((struct Class *) cls)->docstring = docstring;
         return cls;
     } else if (match(TOKEN_CLASS)) {
-        return classDeclaration();
+        Stmt *cls = classDeclaration();
+        ((struct Class *) cls)->docstring = docstring;
+        return cls;
     } else if (match(TOKEN_FUN)) {
-        return funDeclaration();
+        Stmt *decl = funDeclaration();
+        ((struct Function *) decl)->docstring = docstring;
+        return decl;
     } else if (match(TOKEN_VAR)) {
-        return varDeclaration(TYPE_VARIABLE);
+        Stmt *decl = varDeclaration(TYPE_VARIABLE);
+        ((struct Var *) decl)->docstring = docstring;
+        return decl;
     } else if (match(TOKEN_INTERFACE)) {
         return interfaceDeclaration();
     } else if (match(TOKEN_ENUM)) {
-        return enumDeclaration();
+        Stmt *decl = enumDeclaration();
+        ((struct Enum *) decl)->docstring = docstring;
+        return decl;
     } else if (match(TOKEN_TYPE)) {
         return typeDeclaration();
     } else {
@@ -1787,6 +1878,9 @@ StmtArray *parseAST(const char *source) {
     parser.suppressErrors = false;
 
     advance();
+
+    // Collect leading //! module doc comments
+    parser.moduleDocstring = collectModuleDocComments();
 
     StmtArray *statements = ALLOCATE(StmtArray, 1);
     initStmtArray(statements);

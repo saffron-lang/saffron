@@ -87,6 +87,9 @@ static void skipWhitespace() {
                 if (peekNext() == '/' && scanner.current[2] == '/') {
                     // Doc comment: /// — don't skip, let scanToken emit it
                     return;
+                } else if (peekNext() == '/' && scanner.current[2] == '!') {
+                    // Module doc comment: //! — don't skip, let scanToken emit it
+                    return;
                 } else if (peekNext() == '/') {
                     // A comment goes until the end of the line.
                     while (peek() != '\n' && !isAtEnd()) advance();
@@ -375,6 +378,17 @@ Token scanToken() {
                 scanner.start = scanner.current;
                 while (peek() != '\n' && !isAtEnd()) advance();
                 return makeToken(TOKEN_DOC_COMMENT);
+            }
+            if (peek() == '/' && peekNext() == '!') {
+                // Module doc comment: //!
+                advance(); // second /
+                advance(); // !
+                // Skip optional single space after //!
+                if (peek() == ' ') advance();
+                // Token text starts here
+                scanner.start = scanner.current;
+                while (peek() != '\n' && !isAtEnd()) advance();
+                return makeToken(TOKEN_MODULE_DOC);
             }
             return makeToken(TOKEN_SLASH);
         case '*':
