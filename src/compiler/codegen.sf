@@ -983,6 +983,25 @@ class Codegen {
 
         // If enum not found, just generate the first arm's body as default
         if (enum_name == "Unknown") {
+            // Unknown enum — extract bindings from subject as multi-field array
+            var first_bindings = match (first_pattern) { VariantPattern(v, b) => b }
+            if (first_bindings.length() > 0) {
+                var num_slots = first_bindings.length() + 1
+                var total_str = num_slots.floor().to_string()
+                var arr_ptr = this.fresh_local()
+                this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+                var bi = 0
+                while (bi < first_bindings.length()) {
+                    var bname = first_bindings[bi]
+                    var field_idx = bi + 1
+                    var field_slot = this.fresh_local()
+                    this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.floor().to_string())
+                    var extracted = this.fresh_local()
+                    this.emit_indent(extracted + " = load i64, i64* " + field_slot)
+                    this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+                    bi = bi + 1
+                }
+            }
             var body_expr = match (first_arm) { Arm(p, b) => b }
             var val = this.gen_arg_value(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
