@@ -770,6 +770,11 @@ void compileNode(Node *node) {
             function->arity = casted->params.count;
             function->hasRest = hasRestParam;
 
+            // Attach docstring if present
+            if (casted->docstring.start != NULL && casted->docstring.length > 0) {
+                function->docstring = copyString(casted->docstring.start, casted->docstring.length);
+            }
+
             // Determine first parameter type for overload dispatch
             if (casted->params.count > 0) {
                 TypeNode *firstType = casted->params.parameters[0]->type;

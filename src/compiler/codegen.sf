@@ -2148,6 +2148,7 @@ class Codegen {
         var num_fields = field_list.length()
         var struct_size = num_fields * 8
         this.known_functions.push(name)
+        this.func_ret_types.set(name, name)
         this.emit("")
         this.emit("define i64 @" + name + "() {")
         this.emit("entry:")

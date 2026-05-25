@@ -113,7 +113,11 @@ hljs.registerLanguage("saffron", function(hljs) {
     };
 });
 
-// Also register as "sf" alias
-hljs.registerLanguage("sf", function(hljs) {
-    return hljs.getLanguage("saffron");
+// Re-highlight saffron code blocks that were missed on first pass
+// (book.js runs highlightBlock before this language was registered)
+document.querySelectorAll('code.language-saffron, code.language-sf').forEach(function(block) {
+    block.removeAttribute('data-highlighted');
+    block.classList.remove('hljs');
+    block.innerHTML = block.textContent;
+    hljs.highlightElement(block);
 });

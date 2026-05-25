@@ -13,6 +13,7 @@ typedef struct {
     bool suppressErrors;
     Node *nodes;
     DiagnosticArray *diagnostics;
+    Token moduleDocstring;
 } Parser;
 
 StmtArray *parseAST(const char *source);
