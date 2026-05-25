@@ -327,12 +327,17 @@ class Codegen {
         else if (op == "^") { this.emit_indent(local + " = xor i64 " + lhs + ", " + rhs) }
         else if (op == "<<") { this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs) }
         else if (op == ">>") { this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs) }
-        else if (op == "==") { this.last_type = "Bool"; this.emit_indent(local + " = icmp eq i64 " + lhs + ", " + rhs) }
-        else if (op == "!=") { this.last_type = "Bool"; this.emit_indent(local + " = icmp ne i64 " + lhs + ", " + rhs) }
-        else if (op == "<") { this.last_type = "Bool"; this.emit_indent(local + " = icmp slt i64 " + lhs + ", " + rhs) }
-        else if (op == "<=") { this.last_type = "Bool"; this.emit_indent(local + " = icmp sle i64 " + lhs + ", " + rhs) }
-        else if (op == ">") { this.last_type = "Bool"; this.emit_indent(local + " = icmp sgt i64 " + lhs + ", " + rhs) }
-        else if (op == ">=") { this.last_type = "Bool"; this.emit_indent(local + " = icmp sge i64 " + lhs + ", " + rhs) }
+        else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
+            this.last_type = "Int"
+            var cmp_local = this.fresh_local()
+            if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
+            else if (op == "!=") { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
+            else if (op == "<") { this.emit_indent(cmp_local + " = icmp slt i64 " + lhs + ", " + rhs) }
+            else if (op == "<=") { this.emit_indent(cmp_local + " = icmp sle i64 " + lhs + ", " + rhs) }
+            else if (op == ">") { this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs + ", " + rhs) }
+            else if (op == ">=") { this.emit_indent(cmp_local + " = icmp sge i64 " + lhs + ", " + rhs) }
+            this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+        }
 
         return local
     }
@@ -418,6 +423,11 @@ class Codegen {
         if (expr_kind == "member") {
             var m_obj = match (expr) { MemberAccess(o, f) => o }
             var m_field = match (expr) { MemberAccess(o, f) => f }
+            // Check if object is This → field access
+            var obj_kind = this.classify_expr(m_obj)
+            if (obj_kind == "this") {
+                return this.gen_get_field(m_obj, m_field)
+            }
             // Handle as field access on class instance or enum
             var mn = this.get_variable_name(m_obj)
             if (mn.length() > 0 and this.var_types.has(mn)) {
@@ -1238,7 +1248,11 @@ class Codegen {
                 var full_method = class_name + "__" + method
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
-                this.last_type = "Int"
+                if (this.func_ret_types.has(full_method)) {
+                    this.last_type = this.func_ret_types.get(full_method)
+                } else {
+                    this.last_type = "Int"
+                }
                 return local
             }
         }
@@ -2137,8 +2151,14 @@ class Codegen {
         }
     }
 
+    fun to_i1(val: String): String {
+        var local = this.fresh_local()
+        this.emit_indent(local + " = trunc i64 " + val + " to i1")
+        return local
+    }
+
     fun gen_if(cond: AST.Expr, then_branch: List<AST.Stmt>, else_branch: List<AST.Stmt>) {
-        var cond_val = this.gen_arg_value(cond)
+        var cond_val = this.to_i1(this.gen_arg_value(cond))
         var then_label = this.fresh_label("then")
         var else_label = this.fresh_label("else")
         var end_label = this.fresh_label("endif")
@@ -2166,7 +2186,7 @@ class Codegen {
         this.emit_terminator("br label %" + cond_label)
 
         this.start_block(cond_label)
-        var cond_val = this.gen_arg_value(cond)
+        var cond_val = this.to_i1(this.gen_arg_value(cond))
         this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
 
         this.start_block(body_label)
