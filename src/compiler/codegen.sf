@@ -244,6 +244,12 @@ class Codegen {
             MethodCall(object, method, args) => {
                 this.gen_method_call(object, method, args)
             }
+            MapLit => {
+                this.last_type = "Map"
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__map_new()")
+                local
+            }
         }
     }
 
@@ -347,6 +353,12 @@ class Codegen {
             var ig_obj = match (expr) { IndexGet(o, i) => o }
             var ig_idx = match (expr) { IndexGet(o, i) => i }
             return this.gen_index_get(ig_obj, ig_idx)
+        }
+        if (expr_kind == "map_lit") {
+            this.last_type = "Map"
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_new()")
+            return local
         }
 
         // Handle string literals directly
@@ -893,6 +905,7 @@ class Codegen {
             ListLit(e) => "list_lit"
             IndexGet(o, i) => "index_get"
             IndexSet(o, i, v) => "index_set"
+            MapLit => "map_lit"
             StringLit(s) => "string"
             IntLit(v) => "int"
             FloatLit(v) => "float"
@@ -1041,14 +1054,91 @@ class Codegen {
             }
         }
 
+        // Map methods
+        if (obj_type == "Map") {
+            if (method == "set") {
+                var key = this.gen_arg_value(args[0])
+                var val = this.gen_arg_value(args[1])
+                this.emit_indent("call void @__map_set(i64 " + obj + ", i64 " + key + ", i64 " + val + ")")
+                this.last_type = "Nil"
+                return "0"
+            }
+            if (method == "get") {
+                var key = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
+                this.last_type = "Int"
+                return local
+            }
+            if (method == "has") {
+                var key = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key + ")")
+                this.last_type = "Bool"
+                return local
+            }
+        }
+
         // String methods
         if (obj_type == "String") {
+            var str_ptr = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+
             if (method == "length") {
-                var str_ptr = this.fresh_local()
-                this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
                 this.last_type = "Int"
+                return local
+            }
+            if (method == "char_at") {
+                var idx = this.gen_arg_value(args[0])
+                var char_ptr = this.fresh_local()
+                this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
+                // Allocate 2-byte buffer for single char + null
+                var buf = this.fresh_local()
+                this.emit_indent(buf + " = call i8* @malloc(i64 2)")
+                var ch = this.fresh_local()
+                this.emit_indent(ch + " = load i8, i8* " + char_ptr)
+                this.emit_indent("store i8 " + ch + ", i8* " + buf)
+                var null_ptr = this.fresh_local()
+                this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
+                this.emit_indent("store i8 0, i8* " + null_ptr)
+                var local = this.fresh_local()
+                this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "contains") {
+                var needle = this.gen_arg_value(args[0])
+                var needle_ptr = this.fresh_local()
+                this.emit_indent(needle_ptr + " = inttoptr i64 " + needle + " to i8*")
+                var found = this.fresh_local()
+                this.emit_indent(found + " = call i8* @strstr(i8* " + str_ptr + ", i8* " + needle_ptr + ")")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = icmp ne i8* " + found + ", null")
+                var result = this.fresh_local()
+                this.emit_indent(result + " = zext i1 " + local + " to i64")
+                this.last_type = "Bool"
+                return result
+            }
+            if (method == "slice") {
+                var start = this.gen_arg_value(args[0])
+                var end = this.gen_arg_value(args[1])
+                var slice_len = this.fresh_local()
+                this.emit_indent(slice_len + " = sub i64 " + end + ", " + start)
+                var buf_size = this.fresh_local()
+                this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
+                var buf = this.fresh_local()
+                this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
+                var src = this.fresh_local()
+                this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
+                this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")
+                var null_pos = this.fresh_local()
+                this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
+                this.emit_indent("store i8 0, i8* " + null_pos)
+                var local = this.fresh_local()
+                this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+                this.last_type = "String"
                 return local
             }
         }
@@ -1533,6 +1623,138 @@ class Codegen {
         return rt.to_string()
     }
 
+    fun map_runtime(): String {
+        var rt = StringBuilder()
+
+        // __map_new() -> i64
+        rt.append("define i64 @__map_new() {\n")
+        rt.append("entry:\n")
+        rt.append("  %raw = call i8* @malloc(i64 32)\n")
+        rt.append("  %ptr = bitcast i8* %raw to %Map*\n")
+        rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
+        rt.append("  store i64 0, i64* %cp\n")
+        rt.append("  %cap = getelementptr %Map, %Map* %ptr, i32 0, i32 1\n")
+        rt.append("  store i64 16, i64* %cap\n")
+        rt.append("  %kr = call i8* @malloc(i64 128)\n")
+        rt.append("  %keys = bitcast i8* %kr to i64*\n")
+        rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
+        rt.append("  store i64* %keys, i64** %kp\n")
+        rt.append("  %vr = call i8* @malloc(i64 128)\n")
+        rt.append("  %vals = bitcast i8* %vr to i64*\n")
+        rt.append("  %vp = getelementptr %Map, %Map* %ptr, i32 0, i32 3\n")
+        rt.append("  store i64* %vals, i64** %vp\n")
+        rt.append("  %result = ptrtoint %Map* %ptr to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("}\n\n")
+
+        // __map_set(map: i64, key: i64, value: i64)
+        rt.append("define void @__map_set(i64 %map, i64 %key, i64 %value) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
+        rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
+        rt.append("  %keys = load i64*, i64** %kp\n")
+        rt.append("  %vp = getelementptr %Map, %Map* %ptr, i32 0, i32 3\n")
+        rt.append("  %vals = load i64*, i64** %vp\n")
+        rt.append("  %key_ptr = inttoptr i64 %key to i8*\n")
+        // Search for existing key
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %cont]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %insert, label %check\n")
+        rt.append("check:\n")
+        rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
+        rt.append("  %kval = load i64, i64* %kslot\n")
+        rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
+        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %eq = icmp eq i32 %cmp, 0\n")
+        rt.append("  br i1 %eq, label %update, label %cont\n")
+        rt.append("cont:\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("update:\n")
+        rt.append("  %vslot_u = getelementptr i64, i64* %vals, i64 %i\n")
+        rt.append("  store i64 %value, i64* %vslot_u\n")
+        rt.append("  ret void\n")
+        rt.append("insert:\n")
+        rt.append("  %kslot_i = getelementptr i64, i64* %keys, i64 %count\n")
+        rt.append("  store i64 %key, i64* %kslot_i\n")
+        rt.append("  %vslot_i = getelementptr i64, i64* %vals, i64 %count\n")
+        rt.append("  store i64 %value, i64* %vslot_i\n")
+        rt.append("  %new_count = add i64 %count, 1\n")
+        rt.append("  store i64 %new_count, i64* %cp\n")
+        rt.append("  ret void\n")
+        rt.append("}\n\n")
+
+        // __map_get(map: i64, key: i64) -> i64
+        rt.append("define i64 @__map_get(i64 %map, i64 %key) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
+        rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
+        rt.append("  %keys = load i64*, i64** %kp\n")
+        rt.append("  %vp = getelementptr %Map, %Map* %ptr, i32 0, i32 3\n")
+        rt.append("  %vals = load i64*, i64** %vp\n")
+        rt.append("  %key_ptr = inttoptr i64 %key to i8*\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %cont]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %notfound, label %check\n")
+        rt.append("check:\n")
+        rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
+        rt.append("  %kval = load i64, i64* %kslot\n")
+        rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
+        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %eq = icmp eq i32 %cmp, 0\n")
+        rt.append("  br i1 %eq, label %found, label %cont\n")
+        rt.append("cont:\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("found:\n")
+        rt.append("  %vslot = getelementptr i64, i64* %vals, i64 %i\n")
+        rt.append("  %val = load i64, i64* %vslot\n")
+        rt.append("  ret i64 %val\n")
+        rt.append("notfound:\n")
+        rt.append("  ret i64 0\n")
+        rt.append("}\n\n")
+
+        // __map_has(map: i64, key: i64) -> i64 (0 or 1)
+        rt.append("define i64 @__map_has(i64 %map, i64 %key) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
+        rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
+        rt.append("  %keys = load i64*, i64** %kp\n")
+        rt.append("  %key_ptr = inttoptr i64 %key to i8*\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %cont]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %no, label %check\n")
+        rt.append("check:\n")
+        rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
+        rt.append("  %kval = load i64, i64* %kslot\n")
+        rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
+        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %eq = icmp eq i32 %cmp, 0\n")
+        rt.append("  br i1 %eq, label %yes, label %cont\n")
+        rt.append("cont:\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("yes:\n")
+        rt.append("  ret i64 1\n")
+        rt.append("no:\n")
+        rt.append("  ret i64 0\n")
+        rt.append("}\n\n")
+
+        return rt.to_string()
+    }
+
     fun find_enum_for_variant(variant: String): String {
         var keys = this.enum_variant_tags.keys()
         var i = 0
@@ -1980,12 +2202,17 @@ class Codegen {
         out.append("declare i64 @strlen(i8*)\n")
         out.append("declare i8* @strcpy(i8*, i8*)\n")
         out.append("declare i8* @strcat(i8*, i8*)\n")
+        out.append("declare i8* @strstr(i8*, i8*)\n")
+        out.append("declare i32 @strcmp(i8*, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n\n")
 
         // List runtime
         out.append("; List = { count, capacity, data* }\n")
-        out.append("%List = type { i64, i64, i64* }\n\n")
+        out.append("%List = type { i64, i64, i64* }\n")
+        out.append("; Map = { count, capacity, keys*, values* }\n")
+        out.append("%Map = type { i64, i64, i64*, i64* }\n\n")
         out.append(this.list_runtime())
+        out.append(this.map_runtime())
 
         // Lambda functions
         var k = 0
