@@ -1149,11 +1149,21 @@ class Codegen {
     }
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
+        var obj_name = this.get_variable_name(object)
         var obj = this.gen_arg_value(object)
         var idx = this.gen_arg_value(index)
         var local = this.fresh_local()
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + idx + ")")
-        this.last_type = "Int"
+        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+            var vtype = this.var_types.get(obj_name)
+            if (vtype == "StringList") {
+                this.last_type = "String"
+            } else {
+                this.last_type = "Int"
+            }
+        } else {
+            this.last_type = "Int"
+        }
         return local
     }
 
@@ -1264,7 +1274,7 @@ class Codegen {
         var obj_type = this.last_type
 
         // List methods
-        if (obj_type == "List") {
+        if (obj_type == "List" or obj_type == "StringList") {
             if (method == "push") {
                 var val = this.gen_arg_value(args[0])
                 this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
@@ -1343,7 +1353,7 @@ class Codegen {
             if (method == "keys") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
-                this.last_type = "List"
+                this.last_type = "StringList"
                 return local
             }
         }
@@ -1419,7 +1429,7 @@ class Codegen {
                 this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
-                this.last_type = "List"
+                this.last_type = "StringList"
                 return local
             }
             if (method == "replace") {
@@ -2982,7 +2992,7 @@ class Codegen {
             if (ret_llvm == "void") {
                 this.emit_terminator("ret void")
             } else {
-                this.emit_terminator("unreachable")
+                this.emit_terminator("ret i64 0")
             }
         }
 
