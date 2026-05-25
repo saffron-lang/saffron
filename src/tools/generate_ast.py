@@ -12,6 +12,7 @@ exprs = [
     "Logical  : Expr* left, Token operator, Expr* right",
     "Call     : Expr* callee, Token paren, ExprArray arguments",
     "GetItem  : Expr* object, Token bracket, Expr* index",
+    "SetItem  : Expr* object, Token bracket, Expr* index, Expr* value",
     "Get      : Expr* object, Token name",
     "Set      : Expr* object, Token name, Expr* value",
     "Super    : Token keyword, Token method",
@@ -27,12 +28,12 @@ exprs = [
 stmts = [
     "Stmt       : Node self",
     "Expression : Expr* expression, TypeNode* type",
-    "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType",
+    "Var        : Token name, Expr* initializer, TypeNode *type, AssignmentType assignmentType, Token docstring",
     "Block      : StmtArray statements",
     "Function   : Token name, ParameterArray params, TypeNodeArray generics," +
-    " StmtArray body, FunctionType functionType, TypeNode *returnType, ExprArray decorators",
+    " StmtArray body, FunctionType functionType, TypeNode *returnType, ExprArray decorators, Token docstring",
     "Class      : Token name, ExprArray superclasses," +
-    " StmtArray body, TypeNodeArray generics, bool isDataClass",
+    " StmtArray body, TypeNodeArray generics, bool isDataClass, Token docstring",
     "If         : Expr* condition, Stmt* thenBranch," +
     " Stmt* elseBranch",
     "While      : Expr* condition, Stmt* body",
@@ -41,11 +42,11 @@ stmts = [
     "Break      : Token keyword",
     "Continue   : Token keyword",
     "Return     : Token keyword, Expr* value",
-    "Import     : Expr* expression, Token name",
-    "Enum       : Token name, StmtArray body, TypeNodeArray generics",
+    "Import     : Expr* expression, Token name, TokenArray names",
+    "Enum       : Token name, StmtArray body, TypeNodeArray generics, Token docstring",
     "EnumItem   : Token name, ParameterArray params",
     "Match      : Expr* subject, StmtArray arms",
-    "MatchArm   : Token variantName, ParameterArray bindings, StmtArray body, bool isTypePattern",
+    "MatchArm   : Token variantName, ParameterArray bindings, StmtArray body, bool isTypePattern, bool isBinding",
     "Destructure: ParameterArray bindings, Expr* value, Token variant, int splatPosition",
     "Throw      : Expr* value",
     "TryCatch   : StmtArray tryBody, StmtArray catchClauses, StmtArray finallyBody",

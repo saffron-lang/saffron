@@ -686,7 +686,12 @@ class Parser {
         var then_branch = this.parse_block_stmts()
         var else_branch: List<AST.Stmt> = []
         if (this.match_kind("else")) {
-            else_branch = this.parse_block_stmts()
+            if (this.match_kind_check("if")) {
+                // else if → nested if as single-element else branch
+                else_branch = [this.parse_if()]
+            } else {
+                else_branch = this.parse_block_stmts()
+            }
         }
         return AST.Stmt.If(cond, then_branch, else_branch)
     }

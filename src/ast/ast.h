@@ -34,7 +34,6 @@ typedef enum {
     NODE_LOGICAL,
     NODE_CALL,
     NODE_GETITEM,
-    NODE_SETITEM,
     NODE_GET,
     NODE_SET,
     NODE_SUPER,
@@ -235,14 +234,6 @@ struct GetItem {
     Expr* index;
 };
 
-struct SetItem {
-    Expr self;
-    Expr* object;
-    Token bracket;
-    Expr* index;
-    Expr* value;
-};
-
 struct Get {
     Expr self;
     Expr* object;
@@ -304,6 +295,7 @@ struct Var {
     Expr* initializer;
     TypeNode *type;
     AssignmentType assignmentType;
+    Token docstring;
 };
 
 struct Block {
@@ -320,6 +312,7 @@ struct Function {
     FunctionType functionType;
     TypeNode *returnType;
     ExprArray decorators;
+    Token docstring;
 };
 
 struct Class {
@@ -329,6 +322,7 @@ struct Class {
     StmtArray body;
     TypeNodeArray generics;
     bool isDataClass;
+    Token docstring;
 };
 
 struct If {
@@ -379,7 +373,6 @@ struct Import {
     Stmt self;
     Expr* expression;
     Token name;
-    TokenArray names;
 };
 
 struct Enum {
@@ -387,6 +380,7 @@ struct Enum {
     Token name;
     StmtArray body;
     TypeNodeArray generics;
+    Token docstring;
 };
 
 struct EnumItem {
@@ -407,7 +401,6 @@ struct MatchArm {
     ParameterArray bindings;
     StmtArray body;
     bool isTypePattern;
-    bool isBinding;
 };
 
 struct Destructure {
