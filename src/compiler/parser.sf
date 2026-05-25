@@ -250,6 +250,12 @@ class Parser {
         if (this.match_kind_check("[")) {
             return this.parse_list_lit()
         }
+        if (this.match_kind_check("{")) {
+            // Empty map literal: {}
+            this.advance()
+            this.consume("}")
+            return AST.Expr.MapLit
+        }
 
         var kind = this.current_kind()
         this.advance()
