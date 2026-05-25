@@ -632,6 +632,10 @@ class Parser {
     }
 
     fun parse_enum_decl(): AST.Stmt {
+        return this.parse_enum_decl_with_doc("")
+    }
+
+    fun parse_enum_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume enum
         var name = this.expect_ident()
         this.consume("{")
@@ -662,7 +666,7 @@ class Parser {
             this.match_kind(",")
         }
         this.consume("}")
-        return AST.Stmt.EnumDecl(name, variants)
+        return AST.Stmt.EnumDecl(name, variants, docstring)
     }
 
     fun parse_this_stmt(): AST.Stmt {
@@ -707,6 +711,10 @@ class Parser {
     }
 
     fun parse_class_decl(): AST.Stmt {
+        return this.parse_class_decl_with_doc("")
+    }
+
+    fun parse_class_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume class
         var name = this.expect_ident()
         this.consume("{")
@@ -731,7 +739,7 @@ class Parser {
             }
         }
         this.consume("}")
-        return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods)
+        return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods, docstring)
     }
 
     fun parse_return(): AST.Stmt {
