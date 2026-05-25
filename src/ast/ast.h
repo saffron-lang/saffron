@@ -34,6 +34,7 @@ typedef enum {
     NODE_LOGICAL,
     NODE_CALL,
     NODE_GETITEM,
+    NODE_SETITEM,
     NODE_GET,
     NODE_SET,
     NODE_SUPER,
@@ -234,6 +235,14 @@ struct GetItem {
     Expr* index;
 };
 
+struct SetItem {
+    Expr self;
+    Expr* object;
+    Token bracket;
+    Expr* index;
+    Expr* value;
+};
+
 struct Get {
     Expr self;
     Expr* object;
@@ -373,6 +382,7 @@ struct Import {
     Stmt self;
     Expr* expression;
     Token name;
+    TokenArray names;
 };
 
 struct Enum {
@@ -401,6 +411,7 @@ struct MatchArm {
     ParameterArray bindings;
     StmtArray body;
     bool isTypePattern;
+    bool isBinding;
 };
 
 struct Destructure {
