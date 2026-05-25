@@ -35,6 +35,14 @@ class Parser {
         }
     }
 
+    fun peek_ident(): String {
+        if (!this.match_kind_check("ident")) return ""
+        var kind = this.current_kind()
+        return match (kind) {
+            TkIdent(name) => name
+        }
+    }
+
     fun match_kind(expected: String): Bool {
         if (this.match_kind_check(expected)) {
             this.advance()
@@ -68,23 +76,24 @@ class Parser {
             var part = this.expect_ident()
             name = name + "." + part
         }
-        // Skip generic args: List<Expr>, Map<String, Int>, etc.
+        // Capture first generic arg for type tracking (List<String> → List<String>)
         if (this.match_kind_check("<")) {
             this.advance() // consume <
+            // Peek at first type arg before skipping generic contents
+            var first_arg = this.peek_ident()
             var depth = 1
             while (depth > 0 and !this.match_kind_check("eof")) {
                 if (this.match_kind_check("<")) {
                     depth = depth + 1
-                    this.advance()
                 } else if (this.match_kind_check(">")) {
                     depth = depth - 1
-                    this.advance()
                 } else if (this.match_kind_check(">>")) {
                     depth = depth - 2
-                    this.advance()
-                } else {
-                    this.advance()
                 }
+                this.advance()
+            }
+            if (first_arg.length() > 0) {
+                name = name + "<" + first_arg + ">"
             }
         }
         return name
@@ -417,6 +426,7 @@ class Parser {
     }
 
     fun is_ident_named(name: String): Bool {
+        if (!this.match_kind_check("ident")) return false
         var kind = this.current_kind()
         var ident_name = match (kind) { TkIdent(n) => n }
         return ident_name == name

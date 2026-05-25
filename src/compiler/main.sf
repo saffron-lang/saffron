@@ -7,27 +7,94 @@ import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./codegen.sf" as Codegen
 
+fun resolve_import_path(base_path: String, import_path: String): String {
+    if (import_path.starts_with("./")) {
+        var dir = base_path
+        var last_slash = 0
+        var i = 0
+        while (i < dir.length()) {
+            if (dir.char_at(i) == "/") {
+                last_slash = i
+            }
+            i = i + 1
+        }
+        return dir.slice(0, last_slash + 1) + import_path.slice(2, import_path.length())
+    }
+    return import_path
+}
+
+fun extract_imports(source: String): List<String> {
+    var imports: List<String> = []
+    var lines = source.split("\n")
+    var i = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        if (line.starts_with("import \"./")) {
+            var start = 8
+            var end = start + 1
+            while (end < line.length()) {
+                if (line.char_at(end) == "\"") {
+                    imports.push(line.slice(start, end))
+                    end = line.length()
+                }
+                end = end + 1
+            }
+        }
+        i = i + 1
+    }
+    return imports
+}
+
 fun main(): Int {
     var args = OS.args()
 
-    if (args.length() < 3) {
+    // Find the last .sf arg (input) and anything after it (output)
+    var last_sf_idx = 0
+    var i = 1
+    while (i < args.length()) {
+        var arg: String = args[i]
+        if (arg.contains(".sf")) {
+            last_sf_idx = i
+        }
+        i = i + 1
+    }
+
+    if (last_sf_idx == 0) {
         IO.println("Usage: saffronc <input.sf> [output.ll]")
         return 1
     }
 
-    var input_path: String = args[2]
+    var input_path: String = args[last_sf_idx]
     var output_path: String = input_path + ".ll"
-    if (args.length() >= 4) {
-        output_path = args[3]
+    if (args.length() > last_sf_idx + 1) {
+        output_path = args[last_sf_idx + 1]
     }
 
     // Read source file
     var source: String = IO.read_file(input_path)
 
-    // Compile: lex → parse → generate
+    // Resolve and parse imports for enum metadata
+    var import_paths = extract_imports(source)
+    var import_decls: List<AST.Stmt> = []
+    var pi = 0
+    while (pi < import_paths.length()) {
+        var rel_path = import_paths[pi]
+        var full_path = resolve_import_path(input_path, rel_path)
+        var imp_source: String = IO.read_file(full_path)
+        var imp_tokens = Lexer.lex(imp_source)
+        var imp_program = Parser.parse(imp_tokens)
+        var j = 0
+        while (j < imp_program.length()) {
+            import_decls.push(imp_program[j])
+            j = j + 1
+        }
+        pi = pi + 1
+    }
+
+    // Compile: lex → parse → generate (with import metadata)
     var tokens = Lexer.lex(source)
     var program = Parser.parse(tokens)
-    var ir: String = Codegen.generate(program)
+    var ir: String = Codegen.generate_with_imports(program, import_decls)
 
     // Write LLVM IR output
     IO.write_file(output_path, ir)
