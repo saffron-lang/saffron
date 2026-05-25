@@ -1,49 +1,35 @@
-// Saffron-mini LLVM compiler
-// Usage: saffron src/compiler/main.sf <input.sf> [output.ll]
+// Saffron LLVM Compiler — native entry point
+// Usage: saffronc <input.sf> [output.ll]
 
-import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./codegen.sf" as Codegen
 
-fun main() {
+fun main(): Int {
     var args = OS.args()
 
-    if (args.length() < 3) {
-        IO.println("Usage: saffron src/compiler/main.sf <input.sf> [output.ll]")
-        OS.exit(1)
+    if (args.length() < 2) {
+        IO.println("Usage: saffronc <input.sf> [output.ll]")
+        return 1
     }
 
-    var input_path = args[2]
-    var output_path = input_path.replace(".sf", ".ll")
-    if (args.length() >= 4) {
-        output_path = args[3]
+    var input_path: String = args[1]
+    var output_path: String = input_path + ".ll"
+    if (args.length() >= 3) {
+        output_path = args[2]
     }
 
-    // Read source
-    var source = IO.read_file(input_path)
+    // Read source file
+    var source: String = IO.read_file(input_path)
 
-    // Lex
+    // Compile: lex → parse → generate
     var tokens = Lexer.lex(source)
-
-    // Parse
     var program = Parser.parse(tokens)
+    var ir: String = Codegen.generate(program)
 
-    // Generate LLVM IR
-    var ir = Codegen.generate(program)
-
-    // Write output
+    // Write LLVM IR output
     IO.write_file(output_path, ir)
     IO.println("Compiled " + input_path + " -> " + output_path)
 
-    // Optionally compile to binary
-    var bin_path = output_path.replace(".ll", "")
-    var result = OS.exec("clang -O2 -o " + bin_path + " " + output_path + " 2>&1")
-    if (result.length() > 0) {
-        IO.println("clang: " + result)
-    } else {
-        IO.println("Linked  " + output_path + " -> " + bin_path)
-    }
+    return 0
 }
-
-main()

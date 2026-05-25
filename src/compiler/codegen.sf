@@ -1198,8 +1198,47 @@ class Codegen {
     }
 
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
-        // Check for IO module calls first
         var obj_name = this.get_variable_name(object)
+
+        // Check for OS module calls
+        if (obj_name == "OS") {
+            if (method == "args") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__os_args()")
+                this.last_type = "List"
+                return local
+            }
+            if (method == "exec") {
+                var cmd = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__os_exec(i64 " + cmd + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "exit") {
+                var code = this.gen_arg_value(args[0])
+                this.emit_indent("call void @exit(i32 0)")
+                this.last_type = "Nil"
+                return "0"
+            }
+        }
+
+        // Check for imported module function calls (Lexer.lex, Parser.parse, etc.)
+        if (obj_name == "Lexer" or obj_name == "Parser" or obj_name == "Codegen") {
+            var arg_strs: List<String> = []
+            var ai = 0
+            while (ai < args.length()) {
+                var val = this.gen_arg_value(args[ai])
+                arg_strs.push("i64 " + val)
+                ai = ai + 1
+            }
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + method + "(" + arg_strs.join(", ") + ")")
+            this.last_type = "Int"
+            return local
+        }
+
+        // Check for IO module calls
         if (obj_name == "IO") {
             if (method == "println") {
                 var arg = this.gen_arg_value(args[0])
