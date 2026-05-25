@@ -1,0 +1,21 @@
+//! Tokenize Saffron source code.
+//! Provides a public API wrapping the internal compiler lexer.
+
+import "../compiler/lexer.sf" as Internal
+
+/// A token produced by the lexer.
+/// Re-exports the internal Token type.
+var Token = Internal.Token
+var TokenKind = Internal.TokenKind
+
+/// Tokenize a source string into a list of Tokens.
+fun tokenize(source: String): List<Internal.Token> {
+    var lexer = Internal.Lexer(source)
+    return lexer.tokenize()
+}
+
+/// Tokenize a file by path.
+fun tokenize_file(path: String): List<Internal.Token> {
+    var source = IO.read_file(path)
+    return tokenize(source)
+}

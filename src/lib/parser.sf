@@ -1,0 +1,28 @@
+//! Parse Saffron source code into an AST.
+//! Provides a public API wrapping the internal compiler parser.
+
+import "../compiler/lexer.sf" as Lexer
+import "../compiler/parser.sf" as Internal
+import "../compiler/ast.sf" as AST
+
+/// Parse a source string into a list of top-level statements.
+fun parse(source: String): List<AST.Stmt> {
+    var lexer = Lexer.Lexer(source)
+    var tokens = lexer.tokenize()
+    var parser = Internal.Parser(tokens)
+    return parser.parse_program()
+}
+
+/// Parse a file by path into a list of top-level statements.
+fun parse_file(path: String): List<AST.Stmt> {
+    var source = IO.read_file(path)
+    return parse(source)
+}
+
+/// Parse a single expression from a source string.
+fun parse_expr(source: String): AST.Expr {
+    var lexer = Lexer.Lexer(source)
+    var tokens = lexer.tokenize()
+    var parser = Internal.Parser(tokens)
+    return parser.parse_expr()
+}

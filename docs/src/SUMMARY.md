@@ -40,6 +40,9 @@
 - [Async](./stdlib/async.md)
 - [Test](./stdlib/test.md)
 - [Reflect](./stdlib/reflect.md)
+- [Lexer](./stdlib/lexer.md)
+- [Parser](./stdlib/parser.md)
+- [AST](./stdlib/ast.md)
 
 # Reference
 
