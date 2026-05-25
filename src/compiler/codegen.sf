@@ -275,6 +275,42 @@ class Codegen {
     }
 
     fun gen_binary(left: AST.Expr, op: String, right: AST.Expr): String {
+        // String equality comparison
+        if (op == "==" or op == "!=") {
+            var lhs = this.gen_arg_value(left)
+            var left_type = this.last_type
+            var rhs = this.gen_arg_value(right)
+            var right_type = this.last_type
+
+            if (left_type == "String" or right_type == "String") {
+                var lptr = this.fresh_local()
+                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
+                var rptr = this.fresh_local()
+                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                var cmp = this.fresh_local()
+                this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
+                var cmp_result = this.fresh_local()
+                if (op == "==") {
+                    this.emit_indent(cmp_result + " = icmp eq i32 " + cmp + ", 0")
+                } else {
+                    this.emit_indent(cmp_result + " = icmp ne i32 " + cmp + ", 0")
+                }
+                var local = this.fresh_local()
+                this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
+                this.last_type = "Int"
+                return local
+            }
+
+            // Integer comparison
+            var local = this.fresh_local()
+            var cmp_local = this.fresh_local()
+            if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
+            else { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
+            this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+            this.last_type = "Int"
+            return local
+        }
+
         if (op == "+") {
             // Evaluate left to determine its type
             var lhs = this.gen_arg_value(left)
@@ -981,11 +1017,12 @@ class Codegen {
     }
 
     fun get_method_ret(class_name: String, method: String): String {
-        // For simplicity, methods named "init", "increment" etc return void
-        // Methods named "get" return i64
-        // TODO: track actual return types
-        if (method == "init") return "void"
-        if (method == "increment") return "void"
+        var full_name = class_name + "__" + method
+        if (this.func_ret_types.has(full_name)) {
+            var ret = this.func_ret_types.get(full_name)
+            if (ret == "Nil") return "void"
+            return "i64"
+        }
         return "i64"
     }
 
