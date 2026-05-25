@@ -24,7 +24,7 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 | `@random` | Random number generation |
 | `@test` | Test framework |
 | `@fmt` | String formatting |
-| `@set` | Set data structure |
+| `@collections` | Set, Queue, Stack, Deque |
 | `@csv` | CSV parsing |
 | `@path` | File path manipulation |
 | `@async` | Async task utilities |

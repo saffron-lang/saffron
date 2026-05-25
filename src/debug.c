@@ -182,6 +182,8 @@ int disassembleInstruction(Chunk *chunk, int offset) {
             printf("'\n");
             return offset + 5;
         }
+        case OP_CLASS_DOC:
+            return constantInstruction("OP_CLASS_DOC", chunk, offset);
         case OP_INHERIT:
             return simpleInstruction("OP_INHERIT", offset);
         case OP_GET_SUPER:

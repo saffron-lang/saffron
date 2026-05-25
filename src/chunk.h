@@ -74,6 +74,7 @@ typedef enum {
     OP_PACK_REST,
     OP_CALL_SPREAD,
     OP_RANGE,
+    OP_CLASS_DOC,
 } OpCode;
 
 typedef struct {
