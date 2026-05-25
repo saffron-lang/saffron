@@ -1,0 +1,80 @@
+// Test string methods, list methods, map methods, IO, and OS builtins
+
+fun test_strings() {
+    var s = "hello world"
+    IO.println(s)
+
+    // split
+    var parts = s.split(" ")
+    IO.println(parts[0])
+    IO.println(parts[1])
+
+    // join
+    var joined = parts.join("-")
+    IO.println(joined)
+
+    // contains
+    if (s.contains("world")) {
+        IO.println("contains works")
+    }
+
+    // starts_with
+    if (s.starts_with("hello")) {
+        IO.println("starts_with works")
+    }
+
+    // ends_with
+    if (s.ends_with("world")) {
+        IO.println("ends_with works")
+    }
+
+    // replace
+    var replaced = s.replace("world", "saffron")
+    IO.println(replaced)
+
+    // length
+    var len = s.length()
+    IO.println(len.to_string())
+
+    // char_at
+    var ch = s.char_at(0)
+    IO.println(ch)
+
+    // slice
+    var sl = s.slice(0, 5)
+    IO.println(sl)
+
+    // to_number
+    var num_str = "42"
+    var num = num_str.to_number()
+    IO.println(num.to_string())
+}
+
+fun test_list_contains() {
+    var names: List<String> = []
+    names.push("alice")
+    names.push("bob")
+    names.push("charlie")
+
+    if (names.contains("bob")) {
+        IO.println("list contains works")
+    }
+}
+
+fun test_map_keys() {
+    var m: Map<String, String> = {}
+    m.set("a", "1")
+    m.set("b", "2")
+    m.set("c", "3")
+
+    var keys = m.keys()
+    IO.println(keys.join(","))
+}
+
+fun main() {
+    test_strings()
+    test_list_contains()
+    test_map_keys()
+}
+
+main()

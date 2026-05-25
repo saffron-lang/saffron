@@ -669,6 +669,10 @@ class Codegen {
         // Check if it's a known direct function or an indirect call through a variable
         if (this.known_functions.contains(callee_name)) {
             // Direct call to known function
+            var call_target = callee_name
+            if (callee_name == "main") {
+                call_target = "__saffron_main"
+            }
             var arg_strs: List<String> = []
             var i = 0
             while (i < args.length()) {
@@ -677,7 +681,7 @@ class Codegen {
                 i = i + 1
             }
             var local = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+            this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
             // Set last_type from function return type
             if (this.func_ret_types.has(callee_name)) {
                 this.last_type = this.func_ret_types.get(callee_name)
@@ -1197,6 +1201,57 @@ class Codegen {
             }
         }
 
+        // OS module
+        if (obj_name == "OS") {
+            if (method == "args") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__os_args()")
+                this.last_type = "List"
+                return local
+            }
+            if (method == "exec") {
+                var cmd = this.gen_arg_value(args[0])
+                var cmd_ptr = this.fresh_local()
+                this.emit_indent(cmd_ptr + " = inttoptr i64 " + cmd + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__os_exec(i8* " + cmd_ptr + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "exit") {
+                var code = this.gen_arg_value(args[0])
+                var code32 = this.fresh_local()
+                this.emit_indent(code32 + " = trunc i64 " + code + " to i32")
+                this.emit_indent("call void @exit(i32 " + code32 + ")")
+                this.last_type = "Nil"
+                return "0"
+            }
+        }
+
+        // IO module (read_file, write_file)
+        if (obj_name == "IO") {
+            if (method == "read_file") {
+                var path = this.gen_arg_value(args[0])
+                var path_ptr = this.fresh_local()
+                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__io_read_file(i8* " + path_ptr + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "write_file") {
+                var path = this.gen_arg_value(args[0])
+                var path_ptr = this.fresh_local()
+                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
+                var content = this.gen_arg_value(args[1])
+                var content_ptr = this.fresh_local()
+                this.emit_indent(content_ptr + " = inttoptr i64 " + content + " to i8*")
+                this.emit_indent("call void @__io_write_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
+                this.last_type = "Nil"
+                return "0"
+            }
+        }
+
         // Check for enum constructor: EnumName.Variant(args)
         if (obj_name.length() > 0) {
             var key = obj_name + "." + method
@@ -1226,6 +1281,22 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__list_length(i64 " + obj + ")")
                 this.last_type = "Int"
+                return local
+            }
+            if (method == "join") {
+                var sep = this.gen_arg_value(args[0])
+                var sep_ptr = this.fresh_local()
+                this.emit_indent(sep_ptr + " = inttoptr i64 " + sep + " to i8*")
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__list_join(i64 " + obj + ", i8* " + sep_ptr + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "contains") {
+                var val = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__list_contains(i64 " + obj + ", i64 " + val + ")")
+                this.last_type = "Bool"
                 return local
             }
         }
@@ -1259,7 +1330,7 @@ class Codegen {
                 var key = this.gen_arg_value(args[0])
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
-                this.last_type = "Int"
+                this.last_type = "String"
                 return local
             }
             if (method == "has") {
@@ -1267,6 +1338,12 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key + ")")
                 this.last_type = "Bool"
+                return local
+            }
+            if (method == "keys") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
+                this.last_type = "List"
                 return local
             }
         }
@@ -1381,6 +1458,20 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
                 this.last_type = "Int"
+                return local
+            }
+        }
+
+        // Number methods
+        if (obj_type == "Int" or obj_type == "Float") {
+            if (method == "floor") {
+                this.last_type = "Int"
+                return obj
+            }
+            if (method == "to_string") {
+                var local = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
+                this.last_type = "String"
                 return local
             }
         }
@@ -2076,6 +2167,301 @@ class Codegen {
         rt.append("  ret i64 0\n")
         rt.append("}\n\n")
 
+        // __map_keys(map: i64) -> i64 (returns a List of keys)
+        rt.append("define i64 @__map_keys(i64 %map) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %map to %Map*\n")
+        rt.append("  %cp = getelementptr %Map, %Map* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %kp = getelementptr %Map, %Map* %ptr, i32 0, i32 2\n")
+        rt.append("  %keys = load i64*, i64** %kp\n")
+        rt.append("  %list = call i64 @__list_new()\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %cont]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %end, label %cont\n")
+        rt.append("cont:\n")
+        rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
+        rt.append("  %kval = load i64, i64* %kslot\n")
+        rt.append("  call void @__list_push(i64 %list, i64 %kval)\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("end:\n")
+        rt.append("  ret i64 %list\n")
+        rt.append("}\n\n")
+
+        return rt.to_string()
+    }
+
+    fun extra_runtime(): String {
+        var rt = StringBuilder()
+
+        // __str_ends_with(str: i8*, suffix: i8*) -> i64
+        rt.append("define i64 @__str_ends_with(i8* %str, i8* %suffix) {\n")
+        rt.append("entry:\n")
+        rt.append("  %slen = call i64 @strlen(i8* %str)\n")
+        rt.append("  %plen = call i64 @strlen(i8* %suffix)\n")
+        rt.append("  %too_short = icmp sgt i64 %plen, %slen\n")
+        rt.append("  br i1 %too_short, label %no, label %check\n")
+        rt.append("check:\n")
+        rt.append("  %offset = sub i64 %slen, %plen\n")
+        rt.append("  %tail = getelementptr i8, i8* %str, i64 %offset\n")
+        rt.append("  %cmp = call i32 @strcmp(i8* %tail, i8* %suffix)\n")
+        rt.append("  %eq = icmp eq i32 %cmp, 0\n")
+        rt.append("  %result = zext i1 %eq to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("no:\n")
+        rt.append("  ret i64 0\n")
+        rt.append("}\n\n")
+
+        // __str_split(str: i8*, delim: i8*) -> i64 (List of strings)
+        rt.append("define i64 @__str_split(i8* %str, i8* %delim) {\n")
+        rt.append("entry:\n")
+        rt.append("  %list = call i64 @__list_new()\n")
+        rt.append("  %slen = call i64 @strlen(i8* %str)\n")
+        rt.append("  %bufsize = add i64 %slen, 1\n")
+        rt.append("  %buf = call i8* @malloc(i64 %bufsize)\n")
+        rt.append("  call i8* @strcpy(i8* %buf, i8* %str)\n")
+        rt.append("  %dlen = call i64 @strlen(i8* %delim)\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %pos = phi i8* [%buf, %entry], [%next_pos, %found]\n")
+        rt.append("  %poslen = call i64 @strlen(i8* %pos)\n")
+        rt.append("  %is_empty = icmp eq i64 %poslen, 0\n")
+        rt.append("  br i1 %is_empty, label %end, label %search\n")
+        rt.append("search:\n")
+        rt.append("  %match = call i8* @strstr(i8* %pos, i8* %delim)\n")
+        rt.append("  %has_match = icmp ne i8* %match, null\n")
+        rt.append("  br i1 %has_match, label %found, label %last\n")
+        rt.append("found:\n")
+        rt.append("  store i8 0, i8* %match\n")
+        rt.append("  %tok_len = call i64 @strlen(i8* %pos)\n")
+        rt.append("  %tok_buf = call i8* @malloc(i64 %bufsize)\n")
+        rt.append("  call i8* @strcpy(i8* %tok_buf, i8* %pos)\n")
+        rt.append("  %tok_val = ptrtoint i8* %tok_buf to i64\n")
+        rt.append("  call void @__list_push(i64 %list, i64 %tok_val)\n")
+        rt.append("  %next_pos = getelementptr i8, i8* %match, i64 %dlen\n")
+        rt.append("  br label %loop\n")
+        rt.append("last:\n")
+        rt.append("  %last_buf = call i8* @malloc(i64 %bufsize)\n")
+        rt.append("  call i8* @strcpy(i8* %last_buf, i8* %pos)\n")
+        rt.append("  %last_val = ptrtoint i8* %last_buf to i64\n")
+        rt.append("  call void @__list_push(i64 %list, i64 %last_val)\n")
+        rt.append("  br label %end\n")
+        rt.append("end:\n")
+        rt.append("  ret i64 %list\n")
+        rt.append("}\n\n")
+
+        // __str_replace(str: i8*, old: i8*, new: i8*) -> i64
+        rt.append("define i64 @__str_replace(i8* %str, i8* %old, i8* %new) {\n")
+        rt.append("entry:\n")
+        rt.append("  %slen = call i64 @strlen(i8* %str)\n")
+        rt.append("  %olen = call i64 @strlen(i8* %old)\n")
+        rt.append("  %nlen = call i64 @strlen(i8* %new)\n")
+        rt.append("  %max_result = mul i64 %slen, 3\n")
+        rt.append("  %max_buf = add i64 %max_result, 1\n")
+        rt.append("  %result = call i8* @malloc(i64 %max_buf)\n")
+        rt.append("  store i8 0, i8* %result\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %src = phi i8* [%str, %entry], [%after, %replace]\n")
+        rt.append("  %src_len = call i64 @strlen(i8* %src)\n")
+        rt.append("  %is_done = icmp eq i64 %src_len, 0\n")
+        rt.append("  br i1 %is_done, label %end, label %search\n")
+        rt.append("search:\n")
+        rt.append("  %match = call i8* @strstr(i8* %src, i8* %old)\n")
+        rt.append("  %found = icmp ne i8* %match, null\n")
+        rt.append("  br i1 %found, label %replace, label %copy_rest\n")
+        rt.append("replace:\n")
+        rt.append("  %prefix_len = ptrtoint i8* %match to i64\n")
+        rt.append("  %src_int = ptrtoint i8* %src to i64\n")
+        rt.append("  %plen = sub i64 %prefix_len, %src_int\n")
+        rt.append("  %rlen = call i64 @strlen(i8* %result)\n")
+        rt.append("  %dst = getelementptr i8, i8* %result, i64 %rlen\n")
+        rt.append("  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %dst, i8* %src, i64 %plen, i1 false)\n")
+        rt.append("  %after_prefix = getelementptr i8, i8* %dst, i64 %plen\n")
+        rt.append("  store i8 0, i8* %after_prefix\n")
+        rt.append("  call i8* @strcat(i8* %result, i8* %new)\n")
+        rt.append("  %after = getelementptr i8, i8* %match, i64 %olen\n")
+        rt.append("  br label %loop\n")
+        rt.append("copy_rest:\n")
+        rt.append("  call i8* @strcat(i8* %result, i8* %src)\n")
+        rt.append("  br label %end\n")
+        rt.append("end:\n")
+        rt.append("  %rv = ptrtoint i8* %result to i64\n")
+        rt.append("  ret i64 %rv\n")
+        rt.append("}\n\n")
+
+        // __int_to_string(val: i64) -> i64
+        rt.append("define i64 @__int_to_string(i64 %val) {\n")
+        rt.append("entry:\n")
+        rt.append("  %buf = call i8* @malloc(i64 32)\n")
+        rt.append("  %fmt = getelementptr [4 x i8], [4 x i8]* @.fmt.ld, i64 0, i64 0\n")
+        rt.append("  call i32 (i8*, i64, i8*, ...) @snprintf(i8* %buf, i64 32, i8* %fmt, i64 %val)\n")
+        rt.append("  %result = ptrtoint i8* %buf to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("}\n\n")
+
+        // __list_join(list: i64, sep: i8*) -> i64
+        rt.append("define i64 @__list_join(i64 %list, i8* %sep) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %cp = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %dp = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %dp\n")
+        rt.append("  %buf = call i8* @malloc(i64 4096)\n")
+        rt.append("  store i8 0, i8* %buf\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %append]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %end, label %body\n")
+        rt.append("body:\n")
+        rt.append("  %need_sep = icmp sgt i64 %i, 0\n")
+        rt.append("  br i1 %need_sep, label %add_sep, label %append\n")
+        rt.append("add_sep:\n")
+        rt.append("  call i8* @strcat(i8* %buf, i8* %sep)\n")
+        rt.append("  br label %append\n")
+        rt.append("append:\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %i\n")
+        rt.append("  %elem = load i64, i64* %slot\n")
+        rt.append("  %elem_ptr = inttoptr i64 %elem to i8*\n")
+        rt.append("  call i8* @strcat(i8* %buf, i8* %elem_ptr)\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("end:\n")
+        rt.append("  %result = ptrtoint i8* %buf to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("}\n\n")
+
+        // __list_contains(list: i64, val: i64) -> i64
+        rt.append("define i64 @__list_contains(i64 %list, i64 %val) {\n")
+        rt.append("entry:\n")
+        rt.append("  %ptr = inttoptr i64 %list to %List*\n")
+        rt.append("  %cp = getelementptr %List, %List* %ptr, i32 0, i32 0\n")
+        rt.append("  %count = load i64, i64* %cp\n")
+        rt.append("  %dp = getelementptr %List, %List* %ptr, i32 0, i32 2\n")
+        rt.append("  %data = load i64*, i64** %dp\n")
+        rt.append("  %val_ptr = inttoptr i64 %val to i8*\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %no_match]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %not_found, label %check\n")
+        rt.append("check:\n")
+        rt.append("  %slot = getelementptr i64, i64* %data, i64 %i\n")
+        rt.append("  %elem = load i64, i64* %slot\n")
+        rt.append("  %elem_ptr = inttoptr i64 %elem to i8*\n")
+        rt.append("  %cmp = call i32 @strcmp(i8* %val_ptr, i8* %elem_ptr)\n")
+        rt.append("  %eq = icmp eq i32 %cmp, 0\n")
+        rt.append("  br i1 %eq, label %found, label %no_match\n")
+        rt.append("no_match:\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("found:\n")
+        rt.append("  ret i64 1\n")
+        rt.append("not_found:\n")
+        rt.append("  ret i64 0\n")
+        rt.append("}\n\n")
+
+        // __io_read_file(path: i8*) -> i64 (string)
+        rt.append("define i64 @__io_read_file(i8* %path) {\n")
+        rt.append("entry:\n")
+        rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.rb, i64 0, i64 0\n")
+        rt.append("  %fp = call i8* @fopen(i8* %path, i8* %mode)\n")
+        rt.append("  %is_null = icmp eq i8* %fp, null\n")
+        rt.append("  br i1 %is_null, label %fail, label %opened\n")
+        rt.append("opened:\n")
+        rt.append("  call i32 @fseek(i8* %fp, i64 0, i32 2)\n")
+        rt.append("  %size = call i64 @ftell(i8* %fp)\n")
+        rt.append("  call i32 @fseek(i8* %fp, i64 0, i32 0)\n")
+        rt.append("  %bufsize = add i64 %size, 1\n")
+        rt.append("  %buf = call i8* @malloc(i64 %bufsize)\n")
+        rt.append("  call i64 @fread(i8* %buf, i64 1, i64 %size, i8* %fp)\n")
+        rt.append("  %null_pos = getelementptr i8, i8* %buf, i64 %size\n")
+        rt.append("  store i8 0, i8* %null_pos\n")
+        rt.append("  call i32 @fclose(i8* %fp)\n")
+        rt.append("  %result = ptrtoint i8* %buf to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("fail:\n")
+        rt.append("  %empty = call i8* @malloc(i64 1)\n")
+        rt.append("  store i8 0, i8* %empty\n")
+        rt.append("  %r2 = ptrtoint i8* %empty to i64\n")
+        rt.append("  ret i64 %r2\n")
+        rt.append("}\n\n")
+
+        // __io_write_file(path: i8*, content: i8*)
+        rt.append("define void @__io_write_file(i8* %path, i8* %content) {\n")
+        rt.append("entry:\n")
+        rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.wb, i64 0, i64 0\n")
+        rt.append("  %fp = call i8* @fopen(i8* %path, i8* %mode)\n")
+        rt.append("  %is_null = icmp eq i8* %fp, null\n")
+        rt.append("  br i1 %is_null, label %end, label %write\n")
+        rt.append("write:\n")
+        rt.append("  %len = call i64 @strlen(i8* %content)\n")
+        rt.append("  call i64 @fwrite(i8* %content, i64 1, i64 %len, i8* %fp)\n")
+        rt.append("  call i32 @fclose(i8* %fp)\n")
+        rt.append("  br label %end\n")
+        rt.append("end:\n")
+        rt.append("  ret void\n")
+        rt.append("}\n\n")
+
+        // __os_exec(cmd: i8*) -> i64 (string output)
+        rt.append("define i64 @__os_exec(i8* %cmd) {\n")
+        rt.append("entry:\n")
+        rt.append("  %mode = getelementptr [2 x i8], [2 x i8]* @.str.r, i64 0, i64 0\n")
+        rt.append("  %fp = call i8* @popen(i8* %cmd, i8* %mode)\n")
+        rt.append("  %is_null = icmp eq i8* %fp, null\n")
+        rt.append("  br i1 %is_null, label %fail, label %read\n")
+        rt.append("read:\n")
+        rt.append("  %buf = call i8* @malloc(i64 65536)\n")
+        rt.append("  store i8 0, i8* %buf\n")
+        rt.append("  %tmp = call i8* @malloc(i64 4096)\n")
+        rt.append("  br label %read_loop\n")
+        rt.append("read_loop:\n")
+        rt.append("  %line = call i8* @fgets(i8* %tmp, i32 4096, i8* %fp)\n")
+        rt.append("  %eof = icmp eq i8* %line, null\n")
+        rt.append("  br i1 %eof, label %done, label %concat\n")
+        rt.append("concat:\n")
+        rt.append("  call i8* @strcat(i8* %buf, i8* %tmp)\n")
+        rt.append("  br label %read_loop\n")
+        rt.append("done:\n")
+        rt.append("  call void @free(i8* %tmp)\n")
+        rt.append("  call i32 @pclose(i8* %fp)\n")
+        rt.append("  %result = ptrtoint i8* %buf to i64\n")
+        rt.append("  ret i64 %result\n")
+        rt.append("fail:\n")
+        rt.append("  %empty = call i8* @malloc(i64 1)\n")
+        rt.append("  store i8 0, i8* %empty\n")
+        rt.append("  %r2 = ptrtoint i8* %empty to i64\n")
+        rt.append("  ret i64 %r2\n")
+        rt.append("}\n\n")
+
+        // __os_args() -> i64 (List of strings from global argc/argv)
+        rt.append("define i64 @__os_args() {\n")
+        rt.append("entry:\n")
+        rt.append("  %argc = load i32, i32* @__argc\n")
+        rt.append("  %argv = load i8**, i8*** @__argv\n")
+        rt.append("  %list = call i64 @__list_new()\n")
+        rt.append("  %count = sext i32 %argc to i64\n")
+        rt.append("  br label %loop\n")
+        rt.append("loop:\n")
+        rt.append("  %i = phi i64 [0, %entry], [%next, %body]\n")
+        rt.append("  %done = icmp sge i64 %i, %count\n")
+        rt.append("  br i1 %done, label %end, label %body\n")
+        rt.append("body:\n")
+        rt.append("  %slot = getelementptr i8*, i8** %argv, i64 %i\n")
+        rt.append("  %arg = load i8*, i8** %slot\n")
+        rt.append("  %arg_int = ptrtoint i8* %arg to i64\n")
+        rt.append("  call void @__list_push(i64 %list, i64 %arg_int)\n")
+        rt.append("  %next = add i64 %i, 1\n")
+        rt.append("  br label %loop\n")
+        rt.append("end:\n")
+        rt.append("  ret i64 %list\n")
+        rt.append("}\n\n")
+
         return rt.to_string()
     }
 
@@ -2183,6 +2569,11 @@ class Codegen {
             var be_value = match (expr) { BlockExpr(s, v) => v }
             this.collect_vars(be_stmts, names, types)
             this.collect_vars_expr(be_value, names, types)
+            return nil
+        }
+        if (ek == "assign") {
+            var assign_val = match (expr) { Assign(n, v) => v }
+            this.collect_vars_expr(assign_val, names, types)
             return nil
         }
         if (ek != "match_expr") return nil
@@ -2518,6 +2909,10 @@ class Codegen {
     }
 
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
+        var emit_name = name
+        if (name == "main") {
+            emit_name = "__saffron_main"
+        }
         this.known_functions.push(name)
         this.func_ret_types.set(name, ret_type)
         this.reset_locals()
@@ -2542,7 +2937,7 @@ class Codegen {
         }
 
         this.emit("")
-        this.emit("define " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
+        this.emit("define " + ret_llvm + " @" + emit_name + "(" + param_strs.join(", ") + ") {")
         this.emit("entry:")
         this.block_terminated = false
 
@@ -2597,16 +2992,80 @@ class Codegen {
 
     // --- Top-level ---
 
+    fun is_decl(stmt: AST.Stmt): Bool {
+        var kind = match (stmt) {
+            FunDecl(n, p, r, b, d) => "decl"
+            EnumDecl(n, v, d) => "decl"
+            ClassDecl(n, f, m, d) => "decl"
+            ExprStmt(e) => "expr"
+            VarDecl(n, t, i, d) => "expr"
+            Return(v) => "expr"
+            If(c, t, e) => "expr"
+            While(c, b) => "expr"
+            Block(s) => "expr"
+            Break => "expr"
+            Continue => "expr"
+        }
+        return kind == "decl"
+    }
+
     fun generate(program: List<AST.Stmt>): String {
         // Register built-in constructors
         this.known_functions.push("StringBuilder")
         this.func_ret_types.set("StringBuilder", "StringBuilder")
 
-        // Generate all top-level declarations into sb
+        // First pass: emit all declarations (functions, enums, classes)
         var i = 0
         while (i < program.length()) {
-            this.gen_stmt(program[i])
+            if (this.is_decl(program[i])) {
+                this.gen_stmt(program[i])
+            }
             i = i + 1
+        }
+
+        // Second pass: wrap top-level statements in __saffron_entry
+        var has_top_level = false
+        i = 0
+        while (i < program.length()) {
+            if (!this.is_decl(program[i])) {
+                has_top_level = true
+            }
+            i = i + 1
+        }
+        if (has_top_level) {
+            var top_vars: List<String> = []
+            var top_var_types: List<String> = []
+            i = 0
+            while (i < program.length()) {
+                if (!this.is_decl(program[i])) {
+                    var stmts: List<AST.Stmt> = []
+                    stmts.push(program[i])
+                    this.collect_vars(stmts, top_vars, top_var_types)
+                }
+                i = i + 1
+            }
+            this.emit("")
+            this.emit("define i64 @__saffron_entry() {")
+            this.emit("entry:")
+            this.block_terminated = false
+            this.reset_locals()
+            var vi = 0
+            while (vi < top_vars.length()) {
+                this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
+                vi = vi + 1
+            }
+            i = 0
+            while (i < program.length()) {
+                if (!this.is_decl(program[i])) {
+                    this.gen_stmt(program[i])
+                }
+                i = i + 1
+            }
+            if (!this.block_terminated) {
+                this.emit_terminator("ret i64 0")
+            }
+            this.emit("}")
+            this.block_terminated = false
         }
 
         // Build final output with proper ordering
@@ -2637,6 +3096,7 @@ class Codegen {
         // External declarations
         out.append("declare i32 @puts(i8*)\n")
         out.append("declare i32 @printf(i8*, ...)\n")
+        out.append("declare i32 @snprintf(i8*, i64, i8*, ...)\n")
         out.append("declare i8* @malloc(i64)\n")
         out.append("declare i8* @realloc(i8*, i64)\n")
         out.append("declare void @free(i8*)\n")
@@ -2645,7 +3105,30 @@ class Codegen {
         out.append("declare i8* @strcat(i8*, i8*)\n")
         out.append("declare i8* @strstr(i8*, i8*)\n")
         out.append("declare i32 @strcmp(i8*, i8*)\n")
+        out.append("declare i32 @strncmp(i8*, i8*, i64)\n")
+        out.append("declare i64 @atol(i8*)\n")
+        out.append("declare void @exit(i32)\n")
+        out.append("declare i8* @fopen(i8*, i8*)\n")
+        out.append("declare i64 @fread(i8*, i64, i64, i8*)\n")
+        out.append("declare i64 @fwrite(i8*, i64, i64, i8*)\n")
+        out.append("declare i32 @fclose(i8*)\n")
+        out.append("declare i32 @fseek(i8*, i64, i32)\n")
+        out.append("declare i64 @ftell(i8*)\n")
+        out.append("declare i8* @strtok(i8*, i8*)\n")
+        out.append("declare i32 @pclose(i8*)\n")
+        out.append("declare i8* @popen(i8*, i8*)\n")
+        out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n\n")
+
+        // Runtime string constants
+        out.append("@.fmt.ld = private unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
+        out.append("@.str.rb = private unnamed_addr constant [2 x i8] c\"r\\00\"\n")
+        out.append("@.str.wb = private unnamed_addr constant [2 x i8] c\"w\\00\"\n")
+        out.append("@.str.r = private unnamed_addr constant [2 x i8] c\"r\\00\"\n")
+
+        // Global argc/argv (set by main)
+        out.append("@__argc = global i32 0\n")
+        out.append("@__argv = global i8** null\n\n")
 
         // List runtime
         out.append("; List = { count, capacity, data* }\n")
@@ -2655,6 +3138,7 @@ class Codegen {
         out.append(this.list_runtime())
         out.append(this.map_runtime())
         out.append(this.stringbuilder_runtime())
+        out.append(this.extra_runtime())
 
         // Lambda functions
         var k = 0
@@ -2665,6 +3149,19 @@ class Codegen {
 
         // Function bodies
         out.append(this.sb.to_string())
+
+        // C-compatible main entry point that stores argc/argv
+        out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
+        out.append("entry:\n")
+        out.append("  store i32 %argc, i32* @__argc\n")
+        out.append("  store i8** %argv, i8*** @__argv\n")
+        if (has_top_level) {
+            out.append("  call i64 @__saffron_entry()\n")
+        } else {
+            out.append("  call i64 @__saffron_main()\n")
+        }
+        out.append("  ret i32 0\n")
+        out.append("}\n")
 
         return out.to_string()
     }
