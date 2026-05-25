@@ -677,6 +677,36 @@ class Codegen {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(callee_name)
+
+            // Check if this is a class constructor call with args
+            // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
+            var is_constructor = false
+            if (this.func_ret_types.has(callee_name)) {
+                if (this.func_ret_types.get(callee_name) == callee_name) {
+                    is_constructor = true
+                }
+            }
+
+            if (is_constructor and args.length() > 0) {
+                // Constructor with args: allocate instance, then call init
+                var instance = this.fresh_local()
+                this.emit_indent(instance + " = call i64 @" + callee_name + "()")
+                // Call init with instance + args
+                var init_args: List<String> = []
+                init_args.push("i64 " + instance)
+                var i = 0
+                while (i < args.length()) {
+                    var val = this.gen_arg_value(args[i])
+                    init_args.push("i64 " + val)
+                    i = i + 1
+                }
+                var init_name = callee_name + "__init"
+                this.called_functions.push(init_name)
+                this.emit_indent("call i64 @" + init_name + "(" + init_args.join(", ") + ")")
+                this.last_type = callee_name
+                return instance
+            }
+
             var arg_strs: List<String> = []
             var i = 0
             while (i < args.length()) {
@@ -3183,7 +3213,6 @@ class Codegen {
             FunDecl(n, p, r, b, d) => "decl"
             EnumDecl(n, v, d) => "decl"
             ClassDecl(n, f, m, d) => "decl"
-            ExprStmt(e) => "expr"
             VarDecl(n, t, i, d) => "expr"
             Return(v) => "expr"
             If(c, t, e) => "expr"
@@ -3191,6 +3220,11 @@ class Codegen {
             Block(s) => "expr"
             Break => "expr"
             Continue => "expr"
+            ExprStmt(e) => {
+                // Import statements produce ExprStmt(NilLit) — treat as decl
+                var ek = this.classify_expr(e)
+                if (ek == "nil") { "decl" } else { "expr" }
+            }
         }
         return kind == "decl"
     }

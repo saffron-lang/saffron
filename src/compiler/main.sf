@@ -1,6 +1,8 @@
-// Saffron LLVM Compiler — native entry point
-// Usage: saffronc <input.sf> [output.ll]
+// Saffron LLVM Compiler — entry point
+// Usage (on VM): saffron --no-check src/compiler/main.sf <input.sf> [output.ll]
+// Usage (native): saffronc <input.sf> [output.ll]
 
+import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./codegen.sf" as Codegen
@@ -8,15 +10,15 @@ import "./codegen.sf" as Codegen
 fun main(): Int {
     var args = OS.args()
 
-    if (args.length() < 2) {
+    if (args.length() < 3) {
         IO.println("Usage: saffronc <input.sf> [output.ll]")
         return 1
     }
 
-    var input_path: String = args[1]
+    var input_path: String = args[2]
     var output_path: String = input_path + ".ll"
-    if (args.length() >= 3) {
-        output_path = args[2]
+    if (args.length() >= 4) {
+        output_path = args[3]
     }
 
     // Read source file
