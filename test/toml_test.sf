@@ -1,0 +1,73 @@
+import "@toml" as TOML
+import "@test" as T
+
+// Test basic key-value pairs
+var basic = TOML.parse("name = \"saffron\"\nversion = \"0.1.0\"\ncount = 42")
+T.assert_eq(basic.get("name"), "saffron", "basic string value")
+T.assert_eq(basic.get("version"), "0.1.0", "basic string value 2")
+T.assert_eq(basic.get("count"), 42, "integer value")
+
+// Test booleans
+var bools = TOML.parse("enabled = true\ndisabled = false")
+T.assert_eq(bools.get("enabled"), true, "boolean true")
+T.assert_eq(bools.get("disabled"), false, "boolean false")
+
+// Test comments
+var comments = TOML.parse("# this is a comment\nkey = \"value\" # inline comment")
+T.assert_eq(comments.get("key"), "value", "value with comments")
+
+// Test tables
+var tables = TOML.parse("[package]\nname = \"saffron\"\nversion = \"0.1.0\"")
+T.assert_eq(tables.get("package").get("name"), "saffron", "table value")
+T.assert_eq(tables.get("package").get("version"), "0.1.0", "table value 2")
+
+// Test nested tables
+var nested = TOML.parse("[a]\nx = 1\n[a.b]\ny = 2")
+T.assert_eq(nested.get("a").get("x"), 1, "nested table parent")
+T.assert_eq(nested.get("a").get("b").get("y"), 2, "nested table child")
+
+// Test dotted keys
+var dotted = TOML.parse("package.name = \"saffron\"\npackage.version = \"0.1.0\"")
+T.assert_eq(dotted.get("package").get("name"), "saffron", "dotted key")
+T.assert_eq(dotted.get("package").get("version"), "0.1.0", "dotted key 2")
+
+// Test arrays
+var arrays = TOML.parse("tags = [\"lang\", \"typed\", \"fast\"]")
+var tags = arrays.get("tags")
+T.assert_eq(tags.length(), 3, "array length")
+T.assert_eq(tags[0], "lang", "array element 0")
+T.assert_eq(tags[2], "fast", "array element 2")
+
+// Test integer with underscores
+var nums = TOML.parse("big = 1_000_000\npi = 3.14")
+T.assert_eq(nums.get("big"), 1000000, "integer with underscores")
+T.assert_eq(nums.get("pi"), 3.14, "float value")
+
+// Test literal strings
+var literal = TOML.parse("path = 'C:\\Users\\foo'")
+T.assert_eq(literal.get("path"), "C:\\Users\\foo", "literal string no escapes")
+
+// Test inline tables
+var inline = TOML.parse("point = {x = 1, y = 2}")
+T.assert_eq(inline.get("point").get("x"), 1, "inline table x")
+T.assert_eq(inline.get("point").get("y"), 2, "inline table y")
+
+// Test array of tables
+var aot = TOML.parse("[[deps]]\nname = \"foo\"\nversion = \"1.0\"\n\n[[deps]]\nname = \"bar\"\nversion = \"2.0\"")
+var deps = aot.get("deps")
+T.assert_eq(deps.length(), 2, "array of tables length")
+T.assert_eq(deps[0].get("name"), "foo", "aot first name")
+T.assert_eq(deps[1].get("name"), "bar", "aot second name")
+
+// Test stringify round-trip for simple values
+var simple = Map()
+simple.set("name", "saffron")
+simple.set("version", "0.1.0")
+simple.set("count", 42)
+simple.set("enabled", true)
+var output = TOML.stringify(simple)
+T.assert(output.contains("name = \"saffron\""), "stringify string")
+T.assert(output.contains("count = 42"), "stringify number")
+T.assert(output.contains("enabled = true"), "stringify boolean")
+
+T.summary()

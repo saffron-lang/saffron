@@ -326,7 +326,8 @@ fun parse(source: String): Map<String, Any> {
         // Collect digits, underscores, dots, exponent markers
         var has_dot = false
         var has_exp = false
-        while (pos < source.length()) {
+        var num_done = false
+        while (pos < source.length() and !num_done) {
             var ch = peek()
             if (is_digit(ch)) {
                 sb.append(advance())
@@ -344,7 +345,7 @@ fun parse(source: String): Map<String, Any> {
                     sb.append(advance())
                 }
             } else {
-                break
+                num_done = true
             }
         }
 
@@ -518,18 +519,13 @@ fun parse(source: String): Map<String, Any> {
         // Skip empty lines and comments
         if (is_newline(c)) {
             pos = pos + 1
-            continue
-        }
-        if (c == "#") {
+        } else if (c == "#") {
             skip_comment()
             if (!is_at_end() and is_newline(peek())) {
                 pos = pos + 1
             }
-            continue
-        }
-
-        // Table or array of tables
-        if (c == "[") {
+        } else if (c == "[") {
+            // Table or array of tables
             if (peek_at(1) == "[") {
                 // Array of tables [[...]]
                 var keys = parse_array_table_header()
@@ -541,20 +537,19 @@ fun parse(source: String): Map<String, Any> {
                 skip_to_newline()
                 current_table = ensure_table(root, keys)
             }
-            continue
+        } else {
+            // Key-value pair
+            var key_parts = parse_dotted_key()
+            skip_ws()
+            if (peek() != "=") {
+                throw "TOML: expected '=' after key at position ${pos}, got '${peek()}'"
+            }
+            advance()  // consume '='
+            skip_ws()
+            var val = parse_value()
+            set_nested(current_table, key_parts, val)
+            skip_to_newline()
         }
-
-        // Key-value pair
-        var key_parts = parse_dotted_key()
-        skip_ws()
-        if (peek() != "=") {
-            throw "TOML: expected '=' after key at position ${pos}, got '${peek()}'"
-        }
-        advance()  // consume '='
-        skip_ws()
-        var val = parse_value()
-        set_nested(current_table, key_parts, val)
-        skip_to_newline()
     }
 
     return root
@@ -582,7 +577,7 @@ fun parse_file(path: String): Map<String, Any> {
 /// // name = "saffron"
 /// // version = "0.1.0"
 /// ```
-fun stringify(data: Map<String, Any>): String {
+fun stringify(table_data: Map<String, Any>): String {
     var sb = StringBuilder()
 
     fun escape_basic_string(str: String): String {
@@ -718,6 +713,6 @@ fun stringify(data: Map<String, Any>): String {
         }
     }
 
-    write_table(data, "")
+    write_table(table_data, "")
     return sb.to_string()
 }
