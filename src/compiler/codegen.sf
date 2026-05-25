@@ -522,6 +522,17 @@ class Codegen {
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
                 return this.gen_enum_construct(mn, m_field, [])
             }
+            // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
+            if (mn.length() == 0) {
+                var obj_kind = this.classify_expr(m_obj)
+                if (obj_kind == "member") {
+                    var inner_field = match (m_obj) { MemberAccess(o, f) => f }
+                    var key = inner_field + "." + m_field
+                    if (this.enum_variant_tags.has(key)) {
+                        return this.gen_enum_construct(inner_field, m_field, [])
+                    }
+                }
+            }
             return "0"
         }
 
@@ -950,9 +961,11 @@ class Codegen {
 
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
         if (args.length() == 0) {
-            // No-field variant in a multi-field enum: just store tag
+            // No-field variant in a multi-field enum: heap-allocate to outlive function
+            var arr_raw = this.fresh_local()
+            this.emit_indent(arr_raw + " = call i8* @malloc(i64 8)")
             var arr_ptr = this.fresh_local()
-            this.emit_indent(arr_ptr + " = alloca [1 x i64]")
+            this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [1 x i64]*")
             var tag_slot = this.fresh_local()
             this.emit_indent(tag_slot + " = getelementptr [1 x i64], [1 x i64]* " + arr_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
@@ -3101,22 +3114,41 @@ class Codegen {
         this.current_class = name
         i = 0
         while (i < methods.length()) {
-            var method = methods[i]
-            var mname = match (method) { FunDecl(n, p, r, b, d) => n }
-            var mparams = match (method) { FunDecl(n, p, r, b, d) => p }
-            var mret = match (method) { FunDecl(n, p, r, b, d) => r }
-            var mbody = match (method) { FunDecl(n, p, r, b, d) => b }
-            var full_name = name + "__" + mname
-            var full_params = "self:Int"
-            if (mparams.length() > 0) {
-                full_params = full_params + "," + mparams
-            }
-            this.gen_function(full_name, full_params, mret, mbody)
+            this.gen_class_method(name, methods[i])
             i = i + 1
         }
 
         // Generate constructor function: ClassName(args...) -> instance ptr
         this.gen_class_constructor(name, fields, field_list)
+    }
+
+    fun get_fun_name(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => n }
+    }
+
+    fun get_fun_params(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => p }
+    }
+
+    fun get_fun_ret(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => r }
+    }
+
+    fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
+        return match (stmt) { FunDecl(n, p, r, b, d) => b }
+    }
+
+    fun gen_class_method(class_name: String, method: AST.Stmt) {
+        var mname = this.get_fun_name(method)
+        var mparams = this.get_fun_params(method)
+        var mret = this.get_fun_ret(method)
+        var mbody = this.get_fun_body(method)
+        var full_name = class_name + "__" + mname
+        var full_params = "self:Int"
+        if (mparams.length() > 0) {
+            full_params = full_params + "," + mparams
+        }
+        this.gen_function(full_name, full_params, mret, mbody)
     }
 
     fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
