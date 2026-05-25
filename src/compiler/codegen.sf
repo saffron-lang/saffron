@@ -1489,7 +1489,7 @@ class Codegen {
         }
 
         // Map methods
-        if (obj_type == "Map") {
+        if (obj_type == "Map" or obj_type.starts_with("Map<")) {
             if (method == "set") {
                 var key = this.gen_arg_value(args[0])
                 var val = this.gen_arg_value(args[1])
@@ -2987,55 +2987,73 @@ class Codegen {
     // --- Statement codegen ---
 
     fun gen_stmt(stmt: AST.Stmt) {
-        match (stmt) {
-            ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init, doc) => {
-                var val = this.gen_arg_value(init)
-                // Infer type: use annotation if present, else use last_type from init
-                var vtype = type_ann
-                if (vtype == "Any") {
-                    vtype = this.last_type
-                }
-                this.var_types.set(name, vtype)
-                if (vtype == "String") {
-                    this.string_vars.push(name)
-                }
-                this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
+        var kind = this.classify_stmt(stmt)
+        if (kind == "expr") {
+            var expr = match (stmt) { ExprStmt(e) => e }
+            this.gen_arg_value(expr)
+        } else if (kind == "var") {
+            this.gen_var_decl(stmt)
+        } else if (kind == "return") {
+            this.gen_return(stmt)
+        } else if (kind == "if") {
+            var cond = match (stmt) { If(c, t, e) => c }
+            var then_branch = match (stmt) { If(c, t, e) => t }
+            var else_branch = match (stmt) { If(c, t, e) => e }
+            this.gen_if(cond, then_branch, else_branch)
+        } else if (kind == "while") {
+            var cond = match (stmt) { While(c, b) => c }
+            var body = match (stmt) { While(c, b) => b }
+            this.gen_while(cond, body)
+        } else if (kind == "block") {
+            var stmts = match (stmt) { Block(s) => s }
+            this.gen_stmts(stmts)
+        } else if (kind == "break") {
+            if (this.loop_end_label.length() > 0) {
+                this.emit_terminator("br label %" + this.loop_end_label)
             }
-            Return(value) => {
-                if (this.current_ret_type == "void") {
-                    this.emit_terminator("ret void")
-                } else {
-                    var val = this.gen_arg_value(value)
-                    this.emit_terminator("ret i64 " + val)
-                }
-            }
-            If(cond, then_branch, else_branch) => {
-                this.gen_if(cond, then_branch, else_branch)
-            }
-            While(cond, body) => {
-                this.gen_while(cond, body)
-            }
-            Block(stmts) => {
-                this.gen_stmts(stmts)
-            }
-            Break => {
-                if (this.loop_end_label.length() > 0) {
-                    this.emit_terminator("br label %" + this.loop_end_label)
-                }
-            }
-            Continue => {
-                // Continue jumps to loop condition - not fully supported yet
-            }
-            FunDecl(name, params, ret_type, body, doc) => {
-                this.gen_function(name, params, ret_type, body)
-            }
-            EnumDecl(name, variants, doc) => {
-                this.gen_enum_decl(name, variants)
-            }
-            ClassDecl(name, fields, methods, doc) => {
-                this.gen_class_decl(name, fields, methods)
-            }
+        } else if (kind == "continue") {
+            // not fully supported yet
+        } else if (kind == "fun") {
+            var name = match (stmt) { FunDecl(n, p, r, b, d) => n }
+            var params = match (stmt) { FunDecl(n, p, r, b, d) => p }
+            var ret_type = match (stmt) { FunDecl(n, p, r, b, d) => r }
+            var body = match (stmt) { FunDecl(n, p, r, b, d) => b }
+            this.gen_function(name, params, ret_type, body)
+        } else if (kind == "enum") {
+            var name = match (stmt) { EnumDecl(n, v, d) => n }
+            var variants = match (stmt) { EnumDecl(n, v, d) => v }
+            this.gen_enum_decl(name, variants)
+        } else if (kind == "class") {
+            var name = match (stmt) { ClassDecl(n, f, m, d) => n }
+            var fields = match (stmt) { ClassDecl(n, f, m, d) => f }
+            var methods = match (stmt) { ClassDecl(n, f, m, d) => m }
+            this.gen_class_decl(name, fields, methods)
+        }
+    }
+
+    fun gen_var_decl(stmt: AST.Stmt) {
+        var name = match (stmt) { VarDecl(n, t, i, d) => n }
+        var type_ann = match (stmt) { VarDecl(n, t, i, d) => t }
+        var init = match (stmt) { VarDecl(n, t, i, d) => i }
+        var val = this.gen_arg_value(init)
+        var vtype = type_ann
+        if (vtype == "Any") {
+            vtype = this.last_type
+        }
+        this.var_types.set(name, vtype)
+        if (vtype == "String") {
+            this.string_vars.push(name)
+        }
+        this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
+    }
+
+    fun gen_return(stmt: AST.Stmt) {
+        var value = match (stmt) { Return(v) => v }
+        if (this.current_ret_type == "void") {
+            this.emit_terminator("ret void")
+        } else {
+            var val = this.gen_arg_value(value)
+            this.emit_terminator("ret i64 " + val)
         }
     }
 
