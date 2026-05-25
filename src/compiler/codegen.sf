@@ -604,6 +604,13 @@ class Codegen {
                     return this.gen_enum_construct(parts[0], parts[1], args)
                 }
             }
+            // Module-qualified enum: AST.Stmt.FunDecl → try Stmt.FunDecl
+            if (parts.length() >= 3) {
+                var key2 = parts[1] + "." + parts[2]
+                if (this.enum_variant_tags.has(key2)) {
+                    return this.gen_enum_construct(parts[1], parts[2], args)
+                }
+            }
         }
 
         // Check if it's a method call on a class instance: obj.method(args)
@@ -628,11 +635,12 @@ class Codegen {
                     var full_method = class_name + "__" + method_name
                     this.called_functions.push(full_method)
                     var local = this.fresh_local()
-                    if (this.get_method_ret(class_name, method_name) == "void") {
-                        this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
-                        return "0"
-                    }
                     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+                    if (this.func_ret_types.has(full_method)) {
+                        this.last_type = this.func_ret_types.get(full_method)
+                    } else {
+                        this.last_type = "Int"
+                    }
                     return local
                 }
             }
@@ -670,6 +678,14 @@ class Codegen {
         }
 
         // Check if it's a known direct function or an indirect call through a variable
+        // Check for same-name enum variant: Token(kind, line, col) where enum Token { Token(...) }
+        if (this.enum_defs.has(callee_name)) {
+            var variants = this.enum_defs.get(callee_name)
+            if (variants.contains(callee_name)) {
+                return this.gen_enum_construct(callee_name, callee_name, args)
+            }
+        }
+
         if (this.known_functions.contains(callee_name)) {
             // Direct call to known function
             var call_target = callee_name
@@ -687,22 +703,24 @@ class Codegen {
                 }
             }
 
-            if (is_constructor and args.length() > 0) {
-                // Constructor with args: allocate instance, then call init
+            if (is_constructor) {
+                // Constructor: allocate instance, then call init
                 var instance = this.fresh_local()
                 this.emit_indent(instance + " = call i64 @" + callee_name + "()")
-                // Call init with instance + args
-                var init_args: List<String> = []
-                init_args.push("i64 " + instance)
-                var i = 0
-                while (i < args.length()) {
-                    var val = this.gen_arg_value(args[i])
-                    init_args.push("i64 " + val)
-                    i = i + 1
-                }
+                // Call init for user-defined classes (not runtime builtins)
                 var init_name = callee_name + "__init"
-                this.called_functions.push(init_name)
-                this.emit_indent("call i64 @" + init_name + "(" + init_args.join(", ") + ")")
+                if (this.known_functions.contains(init_name)) {
+                    var init_args: List<String> = []
+                    init_args.push("i64 " + instance)
+                    var i = 0
+                    while (i < args.length()) {
+                        var val = this.gen_arg_value(args[i])
+                        init_args.push("i64 " + val)
+                        i = i + 1
+                    }
+                    this.called_functions.push(init_name)
+                    this.emit_indent("call i64 @" + init_name + "(" + init_args.join(", ") + ")")
+                }
                 this.last_type = callee_name
                 return instance
             }
@@ -983,9 +1001,16 @@ class Codegen {
 
         // If enum not found, just generate the first arm's body as default
         if (enum_name == "Unknown") {
-            // Unknown enum — extract bindings from subject as multi-field array
+            // Unknown enum — extract bindings from subject
             var first_bindings = match (first_pattern) { VariantPattern(v, b) => b }
-            if (first_bindings.length() > 0) {
+            if (first_bindings.length() == 1) {
+                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
+                var bname = first_bindings[0]
+                var extracted = this.fresh_local()
+                this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+                this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+            } else if (first_bindings.length() > 1) {
+                // Multi-field variant: inttoptr → GEP for each binding
                 var num_slots = first_bindings.length() + 1
                 var total_str = num_slots.floor().to_string()
                 var arr_ptr = this.fresh_local()
@@ -1045,8 +1070,14 @@ class Codegen {
             var arm = arms[i]
             var pattern = match (arm) { Arm(p, b) => p }
             var variant_name = match (pattern) { VariantPattern(v, b) => v }
-            var tag_idx = this.enum_variant_tags.get(enum_name + "." + variant_name)
-            switch_str = switch_str + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
+            var lookup_key = enum_name + "." + variant_name
+            if (!this.enum_variant_tags.has(lookup_key)) {
+                IO.println("WARN: missing tag for " + lookup_key + " using index " + i.floor().to_string())
+                switch_str = switch_str + " i8 " + i.floor().to_string() + ", label %" + arm_labels[i]
+            } else {
+                var tag_idx = this.enum_variant_tags.get(lookup_key)
+                switch_str = switch_str + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
+            }
             i = i + 1
         }
         switch_str = switch_str + " ]"
@@ -1065,32 +1096,8 @@ class Codegen {
             var bindings = match (pattern) { VariantPattern(v, b) => b }
             var bind_count = bindings.length()
             if (bind_count > 0) {
-                if (max_fields <= 1) {
-                    // Simple encoding: extract value with AND mask
-                    var bname = bindings[0]
-                    var extracted = this.fresh_local()
-                    this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
-                    this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-                } else {
-                    // Array encoding: inttoptr and GEP to extract fields
-                    var total = bind_count + 1
-                    var total_str = total.floor().to_string()
-                    var arr_ptr = this.fresh_local()
-                    this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
-                    var j = 0
-                    while (j < bind_count) {
-                        var bname = bindings[j]
-                        var field_idx = j + 1
-                        var field_slot = this.fresh_local()
-                        this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.floor().to_string())
-                        var extracted = this.fresh_local()
-                        this.emit_indent(extracted + " = load i64, i64* " + field_slot)
-                        this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-                        j = j + 1
-                    }
-                }
+                this.extract_arm_bindings(bindings, subj, max_fields)
             }
-
             var val = this.gen_arg_value(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             this.emit_terminator("br label %" + end_label)
@@ -1101,6 +1108,37 @@ class Codegen {
         var result = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
         return result
+    }
+
+    fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
+        var bind_count = bindings.length()
+        if (max_fields <= 1) {
+            // Simple encoding: extract value with AND mask
+            var bname = bindings[0]
+            var extracted = this.fresh_local()
+            this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+            this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+        } else {
+            // Array encoding: inttoptr and GEP to extract fields
+            var total = bind_count + 1
+            var total_str = total.floor().to_string()
+            var arr_ptr = this.fresh_local()
+            this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+            // Extract each field individually to avoid VM loop variable bug
+            if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
+            if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
+            if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
+            if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
+            if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
+        }
+    }
+
+    fun extract_one_field(bname: String, arr_ptr: String, total_str: String, idx: Float) {
+        var field_slot = this.fresh_local()
+        this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + idx.floor().to_string())
+        var extracted = this.fresh_local()
+        this.emit_indent(extracted + " = load i64, i64* " + field_slot)
+        this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
     }
 
     fun get_max_fields(enum_name: String): Float {
@@ -1142,12 +1180,7 @@ class Codegen {
     }
 
     fun get_method_ret(class_name: String, method: String): String {
-        var full_name = class_name + "__" + method
-        if (this.func_ret_types.has(full_name)) {
-            var ret = this.func_ret_types.get(full_name)
-            if (ret == "Nil") return "void"
-            return "i64"
-        }
+        // All functions return i64 (no void) to avoid call type mismatches
         return "i64"
     }
 
@@ -1225,12 +1258,15 @@ class Codegen {
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
         var obj_name = this.get_variable_name(object)
         var obj = this.gen_arg_value(object)
+        var obj_type = this.last_type
         var idx = this.gen_arg_value(index)
         var local = this.fresh_local()
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + idx + ")")
-        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        if (obj_type == "StringList" or obj_type.contains("String")) {
+            this.last_type = "String"
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             var vtype = this.var_types.get(obj_name)
-            if (vtype == "StringList") {
+            if (vtype == "StringList" or vtype.contains("String")) {
                 this.last_type = "String"
             } else {
                 this.last_type = "Int"
@@ -1284,6 +1320,7 @@ class Codegen {
                 arg_strs.push("i64 " + val)
                 ai = ai + 1
             }
+            this.called_functions.push(method)
             var local = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + method + "(" + arg_strs.join(", ") + ")")
             this.last_type = "Int"
@@ -1382,12 +1419,23 @@ class Codegen {
                 return this.gen_enum_construct(obj_name, method, args)
             }
         }
+        // Module-qualified enum: AST.Stmt.FunDecl(args) → object is MemberAccess
+        if (obj_name.length() == 0) {
+            var obj_kind = this.classify_expr(object)
+            if (obj_kind == "member") {
+                var inner_field = match (object) { MemberAccess(o, f) => f }
+                var key = inner_field + "." + method
+                if (this.enum_variant_tags.has(key)) {
+                    return this.gen_enum_construct(inner_field, method, args)
+                }
+            }
+        }
 
         var obj = this.gen_arg_value(object)
         var obj_type = this.last_type
 
         // List methods
-        if (obj_type == "List" or obj_type == "StringList") {
+        if (obj_type == "List" or obj_type == "StringList" or obj_type.starts_with("List<")) {
             if (method == "push") {
                 var val = this.gen_arg_value(args[0])
                 this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
@@ -1619,7 +1667,8 @@ class Codegen {
                 var full_method = class_name + "__" + method
                 this.called_functions.push(full_method)
                 if (this.get_method_ret(class_name, method) == "void") {
-                    this.emit_indent("call void @" + full_method + "(" + arg_strs.join(", ") + ")")
+                    var discard = this.fresh_local()
+                    this.emit_indent(discard + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
                     this.last_type = "Nil"
                     return "0"
                 }
@@ -3098,6 +3147,32 @@ class Codegen {
         this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
     }
 
+    fun register_external_enums(decls: List<AST.Stmt>) {
+        // Register enum declarations from imported modules (metadata only, no IR emitted)
+        var i = 0
+        while (i < decls.length()) {
+            var decl = decls[i]
+            var kind = this.classify_stmt(decl)
+            if (kind == "enum") {
+                var name = match (decl) { EnumDecl(n, v, d) => n }
+                var variants = match (decl) { EnumDecl(n, v, d) => v }
+                var variant_names: List<String> = []
+                var j = 0
+                while (j < variants.length()) {
+                    var v = variants[j]
+                    var vname = match (v) { Variant(n, f) => n }
+                    var vfields = match (v) { Variant(n, f) => f }
+                    variant_names.push(vname)
+                    this.enum_variant_tags.set(name + "." + vname, j)
+                    this.enum_variant_fields.set(name + "." + vname, vfields)
+                    j = j + 1
+                }
+                this.enum_defs.set(name, variant_names)
+            }
+            i = i + 1
+        }
+    }
+
     fun gen_stmts(stmts: List<AST.Stmt>) {
         var i = 0
         while (i < stmts.length()) {
@@ -3299,24 +3374,16 @@ class Codegen {
     // --- Top-level ---
 
     fun is_decl(stmt: AST.Stmt): Bool {
-        var kind = match (stmt) {
-            FunDecl(n, p, r, b, d) => "decl"
-            EnumDecl(n, v, d) => "decl"
-            ClassDecl(n, f, m, d) => "decl"
-            VarDecl(n, t, i, d) => "expr"
-            Return(v) => "expr"
-            If(c, t, e) => "expr"
-            While(c, b) => "expr"
-            Block(s) => "expr"
-            Break => "expr"
-            Continue => "expr"
-            ExprStmt(e) => {
-                // Import statements produce ExprStmt(NilLit) — treat as decl
-                var ek = this.classify_expr(e)
-                if (ek == "nil") { "decl" } else { "expr" }
-            }
+        var kind = this.classify_stmt(stmt)
+        if (kind == "fun") return true
+        if (kind == "enum") return true
+        if (kind == "class") return true
+        if (kind == "expr") {
+            var expr = match (stmt) { ExprStmt(e) => e }
+            var ek = this.classify_expr(expr)
+            if (ek == "nil") return true
         }
-        return kind == "decl"
+        return false
     }
 
     fun generate(program: List<AST.Stmt>): String {
@@ -3497,5 +3564,11 @@ class Codegen {
 
 fun generate(program: List<AST.Stmt>): String {
     var gen = Codegen()
+    return gen.generate(program)
+}
+
+fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
+    var gen = Codegen()
+    gen.register_external_enums(imports)
     return gen.generate(program)
 }
