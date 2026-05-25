@@ -1,0 +1,296 @@
+// Saffron Runtime: List Type (Enhanced)
+// ================================================
+// Lists are GC-managed dynamic arrays of i64 values.
+//
+// Object layout (after GC header at offset 0-23):
+//   Offset 24: count (i64)     — number of elements
+//   Offset 32: capacity (i64)  — allocated slots
+//   Offset 40: data (i64*)     — pointer to element array (as i64)
+//
+// All values are stored as i64 (boxed via ptrtoint for objects, raw for ints).
+// This file extends the basic __list_new / __list_push / __list_get / __list_set /
+// __list_length / __list_pop already in codegen with higher-level operations.
+//
+// PAYLOAD_SIZE = 24 (count + capacity + data pointer)
+
+var LIST_PAYLOAD_SIZE: Int = 24
+var LIST_INITIAL_CAPACITY: Int = 8
+
+// --- Construction ---
+
+// Create a new empty list (GC-tracked version).
+// This parallels __list_new() but with GC header.
+fun List_new(): Int {
+    // EXTERNAL: var obj: Int = GC_alloc(2, LIST_PAYLOAD_SIZE)
+    var obj: Int = 0  // placeholder
+
+    // EXTERNAL: store 0 at (obj + 24)  — count = 0
+    // EXTERNAL: store LIST_INITIAL_CAPACITY at (obj + 32)  — capacity = 8
+
+    // Allocate initial data array
+    // EXTERNAL: var data: Int = malloc(LIST_INITIAL_CAPACITY * 8)
+    var data: Int = 0  // placeholder
+
+    // EXTERNAL: store data at (obj + 40)
+
+    return obj
+}
+
+// --- Core accessors (wrappers for clarity) ---
+
+fun List_count(list: Int): Int {
+    // EXTERNAL: var count: Int = load from (list + 24)
+    var count: Int = 0  // placeholder
+    return count
+}
+
+fun List_capacity(list: Int): Int {
+    // EXTERNAL: var cap: Int = load from (list + 32)
+    var cap: Int = 0  // placeholder
+    return cap
+}
+
+fun List_data(list: Int): Int {
+    // EXTERNAL: var data: Int = load from (list + 40)
+    var data: Int = 0  // placeholder
+    return data
+}
+
+// --- Growth ---
+
+// Ensure the list has room for at least one more element.
+fun List_ensure_capacity(list: Int) {
+    var count: Int = List_count(list)
+    var cap: Int = List_capacity(list)
+
+    if (count < cap) {
+        return nil
+    }
+
+    // Double the capacity
+    var new_cap: Int = cap * 2
+    var data: Int = List_data(list)
+
+    // EXTERNAL: var new_data: Int = realloc(data, new_cap * 8)
+    var new_data: Int = 0  // placeholder
+
+    // EXTERNAL: store new_cap at (list + 32)
+    // EXTERNAL: store new_data at (list + 40)
+}
+
+// --- Sorting ---
+
+// Sort the list in ascending order (assumes integer values).
+// Uses insertion sort for simplicity — good enough for small-to-medium lists.
+fun List_sort(list: Int) {
+    var count: Int = List_count(list)
+    if (count <= 1) {
+        return nil
+    }
+
+    var data: Int = List_data(list)
+    var i: Int = 1
+
+    while (i < count) {
+        // EXTERNAL: var key: Int = load from (data + i*8)
+        var key: Int = 0  // placeholder
+        var j: Int = i - 1
+        var searching: Int = 1
+
+        while (j >= 0 and searching == 1) {
+            // EXTERNAL: var elem_j: Int = load from (data + j*8)
+            var elem_j: Int = 0  // placeholder
+            if (elem_j <= key) {
+                // Found insertion point
+                searching = 0
+            } else {
+                // Shift element right
+                // EXTERNAL: store elem_j at (data + (j+1)*8)
+                j = j - 1
+            }
+        }
+        // Insert key at j+1
+        // EXTERNAL: store key at (data + (j+1)*8)
+
+        i = i + 1
+    }
+}
+
+// --- Reverse ---
+
+// Reverse the list in place.
+fun List_reverse(list: Int) {
+    var count: Int = List_count(list)
+    if (count <= 1) {
+        return nil
+    }
+
+    var data: Int = List_data(list)
+    var left: Int = 0
+    var right: Int = count - 1
+
+    while (left < right) {
+        // Swap elements at left and right
+        // EXTERNAL: var tmp: Int = load from (data + left*8)
+        // EXTERNAL: var right_val: Int = load from (data + right*8)
+        // EXTERNAL: store right_val at (data + left*8)
+        // EXTERNAL: store tmp at (data + right*8)
+
+        left = left + 1
+        right = right - 1
+    }
+}
+
+// --- Search ---
+
+// Check if the list contains a given value.
+// Uses integer equality (==) for comparison.
+// Returns 1 if found, 0 otherwise.
+fun List_contains(list: Int, value: Int): Int {
+    var count: Int = List_count(list)
+    var data: Int = List_data(list)
+    var i: Int = 0
+
+    while (i < count) {
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        if (elem == value) {
+            return 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+// Find the first index of a value in the list.
+// Returns the index, or -1 if not found.
+fun List_index_of(list: Int, value: Int): Int {
+    var count: Int = List_count(list)
+    var data: Int = List_data(list)
+    var i: Int = 0
+
+    while (i < count) {
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        if (elem == value) {
+            return i
+        }
+        i = i + 1
+    }
+    return 0 - 1
+}
+
+// --- Slicing ---
+
+// Create a new list from a sub-range [start, end).
+// Returns a new List object.
+fun List_slice(list: Int, start: Int, end: Int): Int {
+    var count: Int = List_count(list)
+
+    // Clamp bounds
+    if (start < 0) {
+        start = 0
+    }
+    if (end > count) {
+        end = count
+    }
+    if (start >= end) {
+        return List_new()
+    }
+
+    var result: Int = List_new()
+    var data: Int = List_data(list)
+    var i: Int = start
+
+    while (i < end) {
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        // EXTERNAL: __list_push(result, elem)  or List_push(result, elem)
+        i = i + 1
+    }
+
+    return result
+}
+
+// --- Join ---
+
+// Join all elements of a string list with a separator.
+// Each element is assumed to be a String object pointer.
+// Returns a new String.
+fun List_join(list: Int, sep: Int): Int {
+    var count: Int = List_count(list)
+
+    if (count == 0) {
+        // Return empty string
+        // EXTERNAL: var empty: Int = String_new(address of "")
+        var empty: Int = 0  // placeholder
+        return empty
+    }
+
+    var data: Int = List_data(list)
+
+    // Start with the first element
+    // EXTERNAL: var result: Int = load from (data + 0)
+    var result: Int = 0  // placeholder
+
+    var i: Int = 1
+    while (i < count) {
+        // Append separator
+        result = String_concat(result, sep)
+
+        // Append next element
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        result = String_concat(result, elem)
+
+        i = i + 1
+    }
+
+    return result
+}
+
+// --- Copy ---
+
+// Create a shallow copy of the list.
+// Returns a new List with the same elements (no deep copy of objects).
+fun List_copy(list: Int): Int {
+    var count: Int = List_count(list)
+    var result: Int = List_new()
+    var data: Int = List_data(list)
+    var i: Int = 0
+
+    while (i < count) {
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        // EXTERNAL: __list_push(result, elem)
+        i = i + 1
+    }
+
+    return result
+}
+
+// --- Concatenation ---
+
+// Concatenate two lists. Returns a new List containing all elements
+// from `a` followed by all elements from `b`.
+fun List_concat(a: Int, b: Int): Int {
+    var result: Int = List_copy(a)
+    var count_b: Int = List_count(b)
+    var data_b: Int = List_data(b)
+    var i: Int = 0
+
+    while (i < count_b) {
+        // EXTERNAL: var elem: Int = load from (data_b + i*8)
+        var elem: Int = 0  // placeholder
+        // EXTERNAL: __list_push(result, elem)
+        i = i + 1
+    }
+
+    return result
+}
+
+// --- Cross-module note ---
+// List_join depends on String_concat from string.sf.
+// When the runtime is compiled to LLVM IR and linked, the linker resolves
+// cross-file references. The compiler should emit an `declare` for
+// String_concat when compiling list.sf standalone.

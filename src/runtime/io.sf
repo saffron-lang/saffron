@@ -1,0 +1,287 @@
+// Saffron Runtime: I/O Operations
+// ================================================
+// Provides formatted printing and file I/O for compiled Saffron programs.
+//
+// All values are passed as i64. The type-dispatched print uses the GC header
+// tag to determine how to format an object. For primitive integers and
+// nil (represented as 0 with a tag scheme or sentinel), the caller must
+// indicate the type via a tag parameter or the compiler emits type-specific
+// print calls.
+//
+// Print strategy:
+//   The compiler knows the static type of each value and emits calls to
+//   the appropriate specific print function. IO_println is the high-level
+//   dispatcher used when the type is dynamic (Any).
+//
+// External C functions used:
+//   printf, puts, putchar, fopen, fread, fwrite, fclose, fseek, ftell
+
+// --- Type tags (mirrors gc.sf) ---
+
+var IO_TAG_STRING: Int = 1
+var IO_TAG_LIST: Int = 2
+var IO_TAG_MAP: Int = 3
+
+// --- Print functions (type-specific) ---
+
+// Print an integer followed by a newline.
+fun IO_print_int(value: Int) {
+    // EXTERNAL: printf("%lld\n", value)
+}
+
+// Print a boolean ("true" or "false") followed by a newline.
+fun IO_print_bool(value: Int) {
+    // value is 0 (false) or 1 (true)
+    if (value == 0) {
+        // EXTERNAL: puts("false")
+    } else {
+        // EXTERNAL: puts("true")
+    }
+}
+
+// Print nil followed by a newline.
+fun IO_print_nil() {
+    // EXTERNAL: puts("nil")
+}
+
+// Print a String object followed by a newline.
+fun IO_print_string(s: Int) {
+    // EXTERNAL: var data: Int = load from (s + 32)  — raw char*
+    // EXTERNAL: puts(data)
+}
+
+// Print a List in [a, b, c] format followed by a newline.
+fun IO_print_list(list: Int) {
+    // EXTERNAL: putchar('[')
+
+    // EXTERNAL: var count: Int = load from (list + 24)
+    // EXTERNAL: var data: Int = load from (list + 40)
+    var count: Int = 0  // placeholder
+    var data: Int = 0   // placeholder
+
+    var i: Int = 0
+    while (i < count) {
+        if (i > 0) {
+            // EXTERNAL: printf(", ")
+        }
+        // EXTERNAL: var elem: Int = load from (data + i*8)
+        var elem: Int = 0  // placeholder
+        // Print element — for now, assume integer elements
+        // A full implementation would check the element's type tag
+        // EXTERNAL: printf("%lld", elem)
+        i = i + 1
+    }
+
+    // EXTERNAL: puts("]")
+}
+
+// Print a Map in {key: value, ...} format followed by a newline.
+fun IO_print_map(map: Int) {
+    // EXTERNAL: putchar('{')
+
+    // EXTERNAL: var count: Int = load from (map + 24)
+    // EXTERNAL: var keys: Int = load from (map + 40)
+    // EXTERNAL: var values: Int = load from (map + 48)
+    var count: Int = 0   // placeholder
+    var keys: Int = 0    // placeholder
+    var values: Int = 0  // placeholder
+
+    var i: Int = 0
+    while (i < count) {
+        if (i > 0) {
+            // EXTERNAL: printf(", ")
+        }
+        // EXTERNAL: var k: Int = load from (keys + i*8)
+        // EXTERNAL: var v: Int = load from (values + i*8)
+        var k: Int = 0  // placeholder
+        var v: Int = 0  // placeholder
+
+        // Print key (String)
+        // EXTERNAL: var k_data: Int = load from (k + 32)
+        // EXTERNAL: printf("\"%s\": ", k_data)
+
+        // Print value (assume integer for now)
+        // EXTERNAL: printf("%lld", v)
+
+        i = i + 1
+    }
+
+    // EXTERNAL: puts("}")
+}
+
+// --- Dynamic dispatch print ---
+
+// Print any value, dispatching on its type.
+// The compiler emits a type tag alongside the value when the type is
+// not statically known. For GC objects, we can read the header tag.
+//
+// type_tag values:
+//   0 = Int (raw i64, not a pointer)
+//   1 = String (GC object)
+//   2 = List (GC object)
+//   3 = Map (GC object)
+//   4 = Bool (raw i64: 0 or 1)
+//   5 = Nil (sentinel value 0)
+fun IO_println(value: Int, type_tag: Int) {
+    if (type_tag == 0) {
+        IO_print_int(value)
+        return nil
+    }
+    if (type_tag == 4) {
+        IO_print_bool(value)
+        return nil
+    }
+    if (type_tag == 5) {
+        IO_print_nil()
+        return nil
+    }
+    if (type_tag == IO_TAG_STRING) {
+        IO_print_string(value)
+        return nil
+    }
+    if (type_tag == IO_TAG_LIST) {
+        IO_print_list(value)
+        return nil
+    }
+    if (type_tag == IO_TAG_MAP) {
+        IO_print_map(value)
+        return nil
+    }
+
+    // Fallback: print as integer
+    IO_print_int(value)
+}
+
+// --- File I/O ---
+
+// Read an entire file into a String object.
+// `path` is a String object (pointer to GC header).
+// Returns a new String containing the file contents, or 0 (nil) on error.
+fun IO_read_file(path: Int): Int {
+    // Get the raw char* from the path String
+    // EXTERNAL: var path_data: Int = load from (path + 32)
+    var path_data: Int = 0  // placeholder
+
+    // Open file for reading
+    // EXTERNAL: var file: Int = fopen(path_data, "r")
+    var file: Int = 0  // placeholder
+
+    if (file == 0) {
+        return 0
+    }
+
+    // Get file size
+    // EXTERNAL: fseek(file, 0, SEEK_END)
+    // EXTERNAL: var size: Int = ftell(file)
+    // EXTERNAL: fseek(file, 0, SEEK_SET)
+    var size: Int = 0  // placeholder
+
+    // Allocate buffer
+    // EXTERNAL: var buf: Int = malloc(size + 1)
+    var buf: Int = 0  // placeholder
+
+    // Read contents
+    // EXTERNAL: fread(buf, 1, size, file)
+    // EXTERNAL: store 0 at (buf + size)  — null terminator
+    // EXTERNAL: fclose(file)
+
+    // Wrap in a String object
+    // EXTERNAL: var result: Int = String_new_with_length(buf, size)
+    var result: Int = 0  // placeholder
+
+    // EXTERNAL: free(buf)  — String_new_with_length copies it
+
+    return result
+}
+
+// Write a String to a file. Overwrites if the file exists.
+// `path` is a String object, `content` is a String object.
+// Returns 1 on success, 0 on failure.
+fun IO_write_file(path: Int, content: Int): Int {
+    // Get raw char* from path and content
+    // EXTERNAL: var path_data: Int = load from (path + 32)
+    // EXTERNAL: var content_data: Int = load from (content + 32)
+    // EXTERNAL: var content_len: Int = load from (content + 24)
+    var path_data: Int = 0     // placeholder
+    var content_data: Int = 0  // placeholder
+    var content_len: Int = 0   // placeholder
+
+    // Open file for writing
+    // EXTERNAL: var file: Int = fopen(path_data, "w")
+    var file: Int = 0  // placeholder
+
+    if (file == 0) {
+        return 0
+    }
+
+    // Write contents
+    // EXTERNAL: fwrite(content_data, 1, content_len, file)
+    // EXTERNAL: fclose(file)
+
+    return 1
+}
+
+// Append a String to a file. Creates the file if it doesn't exist.
+// Returns 1 on success, 0 on failure.
+fun IO_append_file(path: Int, content: Int): Int {
+    // EXTERNAL: var path_data: Int = load from (path + 32)
+    // EXTERNAL: var content_data: Int = load from (content + 32)
+    // EXTERNAL: var content_len: Int = load from (content + 24)
+    var path_data: Int = 0     // placeholder
+    var content_data: Int = 0  // placeholder
+    var content_len: Int = 0   // placeholder
+
+    // EXTERNAL: var file: Int = fopen(path_data, "a")
+    var file: Int = 0  // placeholder
+
+    if (file == 0) {
+        return 0
+    }
+
+    // EXTERNAL: fwrite(content_data, 1, content_len, file)
+    // EXTERNAL: fclose(file)
+
+    return 1
+}
+
+// --- Standard streams ---
+
+// Read a line from stdin. Returns a String object.
+fun IO_read_line(): Int {
+    // EXTERNAL: var buf: Int = malloc(4096)
+    var buf: Int = 0  // placeholder
+
+    // EXTERNAL: var result: Int = fgets(buf, 4096, stdin)
+    var result: Int = 0  // placeholder
+
+    if (result == 0) {
+        // EXTERNAL: free(buf)
+        // Return empty string
+        // EXTERNAL: var empty: Int = String_new(address of "")
+        var empty: Int = 0  // placeholder
+        return empty
+    }
+
+    // Strip trailing newline if present
+    // EXTERNAL: var len: Int = strlen(buf)
+    var len: Int = 0  // placeholder
+    // EXTERNAL: if (buf[len-1] == '\n') { buf[len-1] = 0; len = len - 1 }
+
+    // EXTERNAL: var str: Int = String_new_with_length(buf, len)
+    var str: Int = 0  // placeholder
+    // EXTERNAL: free(buf)
+
+    return str
+}
+
+// Print a String without a trailing newline.
+fun IO_print(s: Int) {
+    // EXTERNAL: var data: Int = load from (s + 32)
+    // EXTERNAL: printf("%s", data)
+}
+
+// Print to stderr.
+fun IO_eprintln(s: Int) {
+    // EXTERNAL: var data: Int = load from (s + 32)
+    // EXTERNAL: fprintf(stderr, "%s\n", data)
+}

@@ -289,10 +289,7 @@ class Parser {
             if (block_stmts.length() > 0) {
                 var last = block_stmts[block_stmts.length() - 1]
                 block_stmts.pop()
-                var value = match (this.classify_stmt_for_block(last)) {
-                    "expr" => this.extract_expr_from_stmt(last)
-                    _ => AST.Expr.NilLit
-                }
+                var value = this.stmt_to_expr(last)
                 return AST.Expr.BlockExpr(block_stmts, value)
             }
             return AST.Expr.BlockExpr([], AST.Expr.NilLit)
@@ -869,24 +866,26 @@ class Parser {
         return stmts
     }
 
-    fun classify_stmt_for_block(stmt: AST.Stmt): String {
-        return match (stmt) {
+    fun stmt_to_expr(stmt: AST.Stmt): AST.Expr {
+        // If it's an ExprStmt, extract the expression as the block value
+        // Otherwise return NilLit
+        var kind = match (stmt) {
             ExprStmt(e) => "expr"
-            VarDecl(n, t, i, d) => "var"
-            FunDecl(n, p, r, b, d) => "fun"
-            EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, f, m, d) => "class"
-            Return(v) => "return"
-            If(c, t, e) => "if"
-            While(c, b) => "while"
-            Block(s) => "block"
-            Break => "break"
-            Continue => "continue"
+            VarDecl(n, t, i, d) => "other"
+            FunDecl(n, p, r, b, d) => "other"
+            EnumDecl(n, v, d) => "other"
+            ClassDecl(n, f, m, d) => "other"
+            Return(v) => "other"
+            If(c, t, e) => "other"
+            While(c, b) => "other"
+            Block(s) => "other"
+            Break => "other"
+            Continue => "other"
         }
-    }
-
-    fun extract_expr_from_stmt(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { ExprStmt(e) => e }
+        if (kind == "expr") {
+            return match (stmt) { ExprStmt(e) => e }
+        }
+        return AST.Expr.NilLit
     }
 }
 
