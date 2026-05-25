@@ -1639,8 +1639,8 @@ class Codegen {
                 this.find_free_vars_stmts(body, bound, free)
             }
             Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
-            FunDecl(n, p, r, b) => {}
-            EnumDecl(n, v) => {}
+            FunDecl(n, p, r, b, d) => {}
+            EnumDecl(n, v, d) => {}
         }
     }
 
@@ -1972,7 +1972,7 @@ class Codegen {
 
     fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
         match (stmt) {
-            VarDecl(name, type_ann, init) => {
+            VarDecl(name, type_ann, init, doc) => {
                 this.add_var_unique(names, types, name, type_ann)
                 this.collect_vars_expr(init, names, types)
             }
@@ -1992,9 +1992,9 @@ class Codegen {
             Return(value) => {
                 this.collect_vars_expr(value, names, types)
             }
-            FunDecl(name, params, ret_type, body) => {}
-            EnumDecl(name, variants) => {}
-            ClassDecl(name, fields, methods) => {}
+            FunDecl(name, params, ret_type, body, doc) => {}
+            EnumDecl(name, variants, doc) => {}
+            ClassDecl(name, fields, methods, doc) => {}
         }
     }
 
@@ -2045,7 +2045,7 @@ class Codegen {
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
-            VarDecl(name, type_ann, init) => {
+            VarDecl(name, type_ann, init, doc) => {
                 var val = this.gen_arg_value(init)
                 // Infer type: use annotation if present, else use last_type from init
                 var vtype = type_ann
@@ -2071,13 +2071,13 @@ class Codegen {
             Block(stmts) => {
                 this.gen_stmts(stmts)
             }
-            FunDecl(name, params, ret_type, body) => {
+            FunDecl(name, params, ret_type, body, doc) => {
                 this.gen_function(name, params, ret_type, body)
             }
-            EnumDecl(name, variants) => {
+            EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, fields, methods) => {
+            ClassDecl(name, fields, methods, doc) => {
                 this.gen_class_decl(name, fields, methods)
             }
         }
@@ -2115,7 +2115,7 @@ class Codegen {
         i = 0
         while (i < methods.length()) {
             var method = methods[i]
-            var mname = match (method) { FunDecl(n, p, r, b) => n }
+            var mname = match (method) { FunDecl(n, p, r, b, d) => n }
             method_names.push(mname)
             i = i + 1
         }
@@ -2127,10 +2127,10 @@ class Codegen {
         i = 0
         while (i < methods.length()) {
             var method = methods[i]
-            var mname = match (method) { FunDecl(n, p, r, b) => n }
-            var mparams = match (method) { FunDecl(n, p, r, b) => p }
-            var mret = match (method) { FunDecl(n, p, r, b) => r }
-            var mbody = match (method) { FunDecl(n, p, r, b) => b }
+            var mname = match (method) { FunDecl(n, p, r, b, d) => n }
+            var mparams = match (method) { FunDecl(n, p, r, b, d) => p }
+            var mret = match (method) { FunDecl(n, p, r, b, d) => r }
+            var mbody = match (method) { FunDecl(n, p, r, b, d) => b }
             var full_name = name + "__" + mname
             var full_params = "self:Int"
             if (mparams.length() > 0) {
@@ -2249,10 +2249,10 @@ class Codegen {
         var kind = match (stmt) {
             If(c, t, e) => "if"
             ExprStmt(expr) => "other"
-            VarDecl(n, t, i) => "other"
-            FunDecl(n, p, r, b) => "other"
-            EnumDecl(n, v) => "other"
-            ClassDecl(n, f, m) => "other"
+            VarDecl(n, t, i, d) => "other"
+            FunDecl(n, p, r, b, d) => "other"
+            EnumDecl(n, v, d) => "other"
+            ClassDecl(n, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
