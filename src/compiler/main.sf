@@ -1,10 +1,11 @@
 // Saffron LLVM Compiler — entry point
 // Usage (on VM): saffron --no-check src/compiler/main.sf <input.sf> [output.ll]
-// Usage (native): saffronc <input.sf> [output.ll]
+// Usage (native): saffronc [--check] <input.sf> [output.ll]
 
 import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
+import "./checker.sf" as Checker
 import "./codegen.sf" as Codegen
 
 fun resolve_import_path(base_path: String, import_path: String): String {
@@ -48,9 +49,20 @@ fun extract_imports(source: String): List<String> {
 fun main(): Int {
     var args = OS.args()
 
+    // Check for --check flag
+    var run_checker = false
+    var i = 1
+    while (i < args.length()) {
+        var arg: String = args[i]
+        if (arg == "--check") {
+            run_checker = true
+        }
+        i = i + 1
+    }
+
     // Find the last .sf arg (input) and anything after it (output)
     var last_sf_idx = 0
-    var i = 1
+    i = 1
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg.contains(".sf")) {
@@ -60,7 +72,7 @@ fun main(): Int {
     }
 
     if (last_sf_idx == 0) {
-        IO.println("Usage: saffronc <input.sf> [output.ll]")
+        IO.println("Usage: saffronc [--check] <input.sf> [output.ll]")
         return 1
     }
 
@@ -91,9 +103,18 @@ fun main(): Int {
         pi = pi + 1
     }
 
-    // Compile: lex → parse → generate (with import metadata)
+    // Compile: lex → parse → [check] → generate (with import metadata)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
+
+    // Optional type checking
+    if (run_checker) {
+        var check_result: String = Checker.check(program)
+        if (check_result.length() > 0) {
+            IO.println(check_result)
+        }
+    }
+
     var ir: String = Codegen.generate_with_imports(program, import_decls)
 
     // Write LLVM IR output
