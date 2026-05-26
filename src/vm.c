@@ -821,16 +821,19 @@ static InterpretResult run(ObjModule *module) {
                     if (!invoke(vm.addString, 1)) return INTERPRET_RUNTIME_ERROR;
                     currentFrame = CURRENT_TASK;
                 } else if (IS_STRING(peek(0)) || IS_STRING(peek(1))) {
-                    Value b = pop();
-                    Value a = pop();
+                    // Keep both operands on the stack during allocation
+                    // to protect them from GC.
                     char aBuf[2048], bBuf[2048];
-                    int aLen = sprintValue(aBuf, sizeof(aBuf), a);
-                    int bLen = sprintValue(bBuf, sizeof(bBuf), b);
+                    int bLen = sprintValue(bBuf, sizeof(bBuf), peek(0));
+                    int aLen = sprintValue(aBuf, sizeof(aBuf), peek(1));
                     char *buf = ALLOCATE(char, aLen + bLen + 1);
                     memcpy(buf, aBuf, aLen);
                     memcpy(buf + aLen, bBuf, bLen);
                     buf[aLen + bLen] = '\0';
-                    push(OBJ_VAL(takeString(buf, aLen + bLen)));
+                    ObjString *result = takeString(buf, aLen + bLen);
+                    pop();
+                    pop();
+                    push(OBJ_VAL(result));
                 } else {
                     if (!runtimeError(
                             "Operands must be two numbers or two strings.")) return INTERPRET_RUNTIME_ERROR;
@@ -1142,9 +1145,11 @@ static InterpretResult run(ObjModule *module) {
                 break;
             }
             case OP_SETITEM: {
-                Value value = pop();
-                Value indexValue = pop();
-                Value obj = pop();
+                // Stack: [obj, index, value] (top)
+                // Keep values on stack during potential GC-triggering operations.
+                Value value = peek(0);
+                Value indexValue = peek(1);
+                Value obj = peek(2);
                 if (isObjType(obj, OBJ_LIST)) {
                     ObjList *list = (ObjList *) AS_OBJ(obj);
                     int index = (int) trunc(AS_NUMBER(indexValue));
@@ -1154,13 +1159,19 @@ static InterpretResult run(ObjModule *module) {
                         return INTERPRET_RUNTIME_ERROR;
                     }
                     list->items.values[index] = value;
+                    pop(); pop(); pop();
                     push(value);
                 } else if (isObjType(obj, OBJ_MAP)) {
                     ObjMap *map = (ObjMap *) AS_OBJ(obj);
+                    // valueTableSet may trigger GC; all values are still on the stack.
                     valueTableSet(&map->values, indexValue, value);
+                    pop(); pop(); pop();
                     push(value);
                 } else if (IS_INSTANCE(obj)) {
                     // Operator overload: obj[key] = val dispatches to obj.setItem(key, val)
+                    // Rearrange stack from [obj, index, value] to [obj, index, value]
+                    // which is already the right order for invoke(setItem, 2).
+                    pop(); pop(); pop();
                     push(obj);
                     push(indexValue);
                     push(value);
@@ -1448,17 +1459,24 @@ static InterpretResult run(ObjModule *module) {
             case OP_SLICE: {
                 int fromEnd = (int) AS_NUMBER(pop());
                 int start = (int) AS_NUMBER(pop());
-                Value listVal = pop();
+                // Keep the list on the stack to protect from GC during allocations.
+                Value listVal = peek(0);
                 if (!isObjType(listVal, OBJ_LIST)) {
+                    pop();
                     if (!runtimeError("Runtime error.")) return INTERPRET_RUNTIME_ERROR; goto dispatch;
                 }
                 ObjList *source = (ObjList *) AS_OBJ(listVal);
                 int end = source->items.count - fromEnd;
                 ObjList *slice = newList();
+                // Push slice; stack now has [source, slice]
                 push(OBJ_VAL(slice));
                 for (int i = start; i < end; i++) {
                     listPush(slice, source->items.values[i]);
                 }
+                // Remove source from under slice: pop slice, pop source, push slice
+                Value sliceVal = pop();
+                pop(); // pop source
+                push(sliceVal);
                 break;
             }
             case OP_RANGE: {
