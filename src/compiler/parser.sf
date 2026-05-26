@@ -368,9 +368,6 @@ class Parser {
 
     fun parse_pattern(): AST.Pattern {
         var name = this.expect_ident()
-        if (name == "_") {
-            return AST.Pattern.WildcardPattern
-        }
         if (this.match_kind("(")) {
             var bindings: List<String> = []
             if (!this.match_kind_check(")")) {
