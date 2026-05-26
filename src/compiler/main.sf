@@ -81,8 +81,8 @@ fun main(): Int {
         var rel_path = import_paths[pi]
         var full_path = resolve_import_path(input_path, rel_path)
         var imp_source: String = IO.read_file(full_path)
-        var imp_tokens = Lexer.lex(imp_source)
-        var imp_program = Parser.parse(imp_tokens)
+        var imp_tokens: List = Lexer.lex(imp_source)
+        var imp_program: List = Parser.parse(imp_tokens)
         var j = 0
         while (j < imp_program.length()) {
             import_decls.push(imp_program[j])
@@ -92,8 +92,8 @@ fun main(): Int {
     }
 
     // Compile: lex → parse → generate (with import metadata)
-    var tokens = Lexer.lex(source)
-    var program = Parser.parse(tokens)
+    var tokens: List = Lexer.lex(source)
+    var program: List = Parser.parse(tokens)
     var ir: String = Codegen.generate_with_imports(program, import_decls)
 
     // Write LLVM IR output
