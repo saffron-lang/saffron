@@ -24,6 +24,7 @@ class Codegen {
     var loop_end_label: String
     var current_ret_type: String
     var called_functions: List<String>
+    var called_function_arity: Map<String, Float>
 
     fun init() {
         this.sb = StringBuilder()
@@ -47,6 +48,7 @@ class Codegen {
         this.loop_end_label = ""
         this.current_ret_type = "i64"
         this.called_functions = []
+        this.called_function_arity = {}
     }
 
     fun sanitize_name(name: String): String {
@@ -1367,6 +1369,7 @@ class Codegen {
                 ai = ai + 1
             }
             this.called_functions.push(method)
+            this.called_function_arity.set(method, args.length())
             var local = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + method + "(" + arg_strs.join(", ") + ")")
             this.last_type = "Int"
@@ -3678,7 +3681,18 @@ class Codegen {
         while (ci < this.called_functions.length()) {
             var cfname = this.called_functions[ci]
             if (!this.known_functions.contains(cfname) and !declared.contains(cfname)) {
-                out.append("declare i64 @" + cfname + "(...)\n")
+                var arity = 1
+                if (this.called_function_arity.has(cfname)) {
+                    arity = this.called_function_arity.get(cfname)
+                }
+                var param_str = ""
+                var pi = 0
+                while (pi < arity) {
+                    if (pi > 0) { param_str = param_str + ", " }
+                    param_str = param_str + "i64"
+                    pi = pi + 1
+                }
+                out.append("declare i64 @" + cfname + "(" + param_str + ")\n")
                 declared.push(cfname)
             }
             ci = ci + 1
