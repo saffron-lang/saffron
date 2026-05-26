@@ -307,12 +307,28 @@ class Parser {
                 block_stmts.push(this.parse_stmt())
             }
             this.consume("}")
-            // The last statement is the value expression
+            // The last statement becomes the value expression if it's an ExprStmt
             if (block_stmts.length() > 0) {
                 var last = block_stmts[block_stmts.length() - 1]
-                block_stmts.pop()
-                var value = this.stmt_to_expr(last)
-                return AST.Expr.BlockExpr(block_stmts, value)
+                var last_kind = this.stmt_to_expr(last)
+                var is_expr_stmt = match (last) {
+                    ExprStmt(e) => true
+                    VarDecl(n, t, i, d) => false
+                    FunDecl(n, p, r, b, d) => false
+                    EnumDecl(n, v, d) => false
+                    ClassDecl(n, f, m, d) => false
+                    Return(v) => false
+                    If(c, t, e) => false
+                    While(c, b) => false
+                    Block(s) => false
+                    Break => false
+                    Continue => false
+                }
+                if (is_expr_stmt) {
+                    block_stmts.pop()
+                    return AST.Expr.BlockExpr(block_stmts, last_kind)
+                }
+                return AST.Expr.BlockExpr(block_stmts, AST.Expr.NilLit)
             }
             return AST.Expr.BlockExpr([], AST.Expr.NilLit)
         }
