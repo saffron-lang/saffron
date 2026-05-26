@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./cmake-build-debug/saffron *)",
+      "Bash(cmake --build *)",
+      "Bash(cmake -B *)",
+      "Bash(clang *)",
+      "Bash(/tmp/saffronc *)",
+      "Bash(/tmp/test_*)",
+      "Bash(/tmp/h)",
+      "Bash(/tmp/h *)",
+      "Bash(lldb -b *)",
+      "Bash(timeout *)",
+      "Bash(cat *)",
+      "Bash(sed *)",
+      "Bash(awk *)"
+    ]
+  }
+}
