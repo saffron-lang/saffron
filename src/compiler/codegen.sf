@@ -1341,7 +1341,7 @@ class Codegen {
             if (method == "args") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = "List"
+                this.last_type = "StringList"
                 return local
             }
             if (method == "exec") {
@@ -1415,7 +1415,7 @@ class Codegen {
             if (method == "args") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = "List"
+                this.last_type = "StringList"
                 return local
             }
             if (method == "exec") {
@@ -2297,6 +2297,21 @@ class Codegen {
     fun map_runtime(): String {
         var rt = StringBuilder()
 
+        // __safe_strcmp: returns 1 (not equal) if either pointer is null
+        rt.append("define linkonce_odr i32 @__safe_strcmp(i8* %a, i8* %b) {\n")
+        rt.append("entry:\n")
+        rt.append("  %a_null = icmp eq i8* %a, null\n")
+        rt.append("  br i1 %a_null, label %neq, label %check_b\n")
+        rt.append("check_b:\n")
+        rt.append("  %b_null = icmp eq i8* %b, null\n")
+        rt.append("  br i1 %b_null, label %neq, label %do_cmp\n")
+        rt.append("do_cmp:\n")
+        rt.append("  %r = call i32 @strcmp(i8* %a, i8* %b)\n")
+        rt.append("  ret i32 %r\n")
+        rt.append("neq:\n")
+        rt.append("  ret i32 1\n")
+        rt.append("}\n\n")
+
         // __map_new() -> i64
         rt.append("define linkonce_odr i64 @__map_new() {\n")
         rt.append("entry:\n")
@@ -2340,7 +2355,7 @@ class Codegen {
         rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
         rt.append("  %kval = load i64, i64* %kslot\n")
         rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
-        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %cmp = call i32 @__safe_strcmp(i8* %key_ptr, i8* %kstr)\n")
         rt.append("  %eq = icmp eq i32 %cmp, 0\n")
         rt.append("  br i1 %eq, label %update, label %cont\n")
         rt.append("cont:\n")
@@ -2398,7 +2413,7 @@ class Codegen {
         rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
         rt.append("  %kval = load i64, i64* %kslot\n")
         rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
-        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %cmp = call i32 @__safe_strcmp(i8* %key_ptr, i8* %kstr)\n")
         rt.append("  %eq = icmp eq i32 %cmp, 0\n")
         rt.append("  br i1 %eq, label %found, label %cont\n")
         rt.append("cont:\n")
@@ -2430,7 +2445,7 @@ class Codegen {
         rt.append("  %kslot = getelementptr i64, i64* %keys, i64 %i\n")
         rt.append("  %kval = load i64, i64* %kslot\n")
         rt.append("  %kstr = inttoptr i64 %kval to i8*\n")
-        rt.append("  %cmp = call i32 @strcmp(i8* %key_ptr, i8* %kstr)\n")
+        rt.append("  %cmp = call i32 @__safe_strcmp(i8* %key_ptr, i8* %kstr)\n")
         rt.append("  %eq = icmp eq i32 %cmp, 0\n")
         rt.append("  br i1 %eq, label %yes, label %cont\n")
         rt.append("cont:\n")
@@ -2670,7 +2685,7 @@ class Codegen {
         rt.append("  %slot = getelementptr i64, i64* %data, i64 %i\n")
         rt.append("  %elem = load i64, i64* %slot\n")
         rt.append("  %elem_ptr = inttoptr i64 %elem to i8*\n")
-        rt.append("  %cmp = call i32 @strcmp(i8* %val_ptr, i8* %elem_ptr)\n")
+        rt.append("  %cmp = call i32 @__safe_strcmp(i8* %val_ptr, i8* %elem_ptr)\n")
         rt.append("  %eq = icmp eq i32 %cmp, 0\n")
         rt.append("  br i1 %eq, label %found, label %no_match\n")
         rt.append("no_match:\n")
@@ -3006,47 +3021,32 @@ class Codegen {
     // --- Statement codegen ---
 
     fun gen_stmt(stmt: AST.Stmt) {
-        var kind = this.classify_stmt(stmt)
-        if (kind == "expr") {
-            var expr = match (stmt) { ExprStmt(e) => e }
-            this.gen_arg_value(expr)
-        } else if (kind == "var") {
-            this.gen_var_decl(stmt)
-        } else if (kind == "return") {
-            this.gen_return(stmt)
-        } else if (kind == "if") {
-            var cond = match (stmt) { If(c, t, e) => c }
-            var then_branch = match (stmt) { If(c, t, e) => t }
-            var else_branch = match (stmt) { If(c, t, e) => e }
-            this.gen_if(cond, then_branch, else_branch)
-        } else if (kind == "while") {
-            var cond = match (stmt) { While(c, b) => c }
-            var body = match (stmt) { While(c, b) => b }
-            this.gen_while(cond, body)
-        } else if (kind == "block") {
-            var stmts = match (stmt) { Block(s) => s }
-            this.gen_stmts(stmts)
-        } else if (kind == "break") {
-            if (this.loop_end_label.length() > 0) {
-                this.emit_terminator("br label %" + this.loop_end_label)
+        match (stmt) {
+            ExprStmt(expr) => { this.gen_arg_value(expr) }
+            VarDecl(name, type_ann, init, doc) => {
+                this.gen_var_decl(stmt)
             }
-        } else if (kind == "continue") {
-            // not fully supported yet
-        } else if (kind == "fun") {
-            var name = match (stmt) { FunDecl(n, p, r, b, d) => n }
-            var params = match (stmt) { FunDecl(n, p, r, b, d) => p }
-            var ret_type = match (stmt) { FunDecl(n, p, r, b, d) => r }
-            var body = match (stmt) { FunDecl(n, p, r, b, d) => b }
-            this.gen_function(name, params, ret_type, body)
-        } else if (kind == "enum") {
-            var name = match (stmt) { EnumDecl(n, v, d) => n }
-            var variants = match (stmt) { EnumDecl(n, v, d) => v }
-            this.gen_enum_decl(name, variants)
-        } else if (kind == "class") {
-            var name = match (stmt) { ClassDecl(n, f, m, d) => n }
-            var fields = match (stmt) { ClassDecl(n, f, m, d) => f }
-            var methods = match (stmt) { ClassDecl(n, f, m, d) => m }
-            this.gen_class_decl(name, fields, methods)
+            Return(value) => { this.gen_return(stmt) }
+            If(cond, then_branch, else_branch) => {
+                this.gen_if(cond, then_branch, else_branch)
+            }
+            While(cond, body) => { this.gen_while(cond, body) }
+            Block(stmts) => { this.gen_stmts(stmts) }
+            Break => {
+                if (this.loop_end_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_end_label)
+                }
+            }
+            Continue => {}
+            FunDecl(name, params, ret_type, body, doc) => {
+                this.gen_function(name, params, ret_type, body)
+            }
+            EnumDecl(name, variants, doc) => {
+                this.gen_enum_decl(name, variants)
+            }
+            ClassDecl(name, fields, methods, doc) => {
+                this.gen_class_decl(name, fields, methods)
+            }
         }
     }
 
@@ -3520,17 +3520,25 @@ class Codegen {
 
     // --- Top-level ---
 
+    fun is_nil_expr(e: AST.Expr): Bool {
+        var k = this.classify_expr(e)
+        return k == "nil"
+    }
+
     fun is_decl(stmt: AST.Stmt): Bool {
-        var kind = this.classify_stmt(stmt)
-        if (kind == "fun") return true
-        if (kind == "enum") return true
-        if (kind == "class") return true
-        if (kind == "expr") {
-            var expr = match (stmt) { ExprStmt(e) => e }
-            var ek = this.classify_expr(expr)
-            if (ek == "nil") return true
+        return match (stmt) {
+            FunDecl(n, p, r, b, d) => true
+            EnumDecl(n, v, d) => true
+            ClassDecl(n, f, m, d) => true
+            ExprStmt(e) => this.is_nil_expr(e)
+            VarDecl(n, t, i, d) => false
+            Return(v) => false
+            If(c, t, e) => false
+            While(c, b) => false
+            Block(s) => false
+            Break => false
+            Continue => false
         }
-        return false
     }
 
     fun generate(program: List<AST.Stmt>): String {
