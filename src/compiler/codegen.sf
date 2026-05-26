@@ -1078,24 +1078,25 @@ class Codegen {
             i = i + 1
         }
 
-        var switch_str = "switch i8 " + tag_val + ", label %" + end_label + " ["
+        var default_label = end_label
+        var switch_cases = ""
         i = 0
         while (i < arms.length()) {
             var arm = arms[i]
             var pattern = match (arm) { Arm(p, b) => p }
-            var variant_name = match (pattern) { VariantPattern(v, b) => v }
-            var lookup_key = enum_name + "." + variant_name
-            if (!this.enum_variant_tags.has(lookup_key)) {
-                IO.println("WARN: missing tag for " + lookup_key + " using index " + i.floor().to_string())
-                switch_str = switch_str + " i8 " + i.floor().to_string() + ", label %" + arm_labels[i]
+            if (this.is_wildcard_in_enum(pattern, enum_name)) {
+                default_label = arm_labels[i]
             } else {
-                var tag_idx = this.enum_variant_tags.get(lookup_key)
-                switch_str = switch_str + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
+                var variant_name = match (pattern) { VariantPattern(v, b) => v }
+                var lookup_key = enum_name + "." + variant_name
+                if (this.enum_variant_tags.has(lookup_key)) {
+                    var tag_idx = this.enum_variant_tags.get(lookup_key)
+                    switch_cases = switch_cases + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
+                }
             }
             i = i + 1
         }
-        switch_str = switch_str + " ]"
-        this.emit_terminator(switch_str)
+        this.emit_terminator("switch i8 " + tag_val + ", label %" + default_label + " [" + switch_cases + " ]")
 
         // Generate each arm
         var match_result_type = "Int"
@@ -2991,9 +2992,9 @@ class Codegen {
         // match_expr is handled at the top of this function
     }
 
-    fun is_wildcard_pattern(pattern: AST.Pattern): Bool {
+    fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
         var name = match (pattern) { VariantPattern(v, b) => v }
-        return name == "_"
+        return !this.enum_variant_tags.has(enum_name + "." + name)
     }
 
     fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
@@ -3003,13 +3004,11 @@ class Codegen {
             var arm = arms[i]
             var pattern = match (arm) { Arm(p, b) => p }
             var body_expr = match (arm) { Arm(p, b) => b }
-            if (!this.is_wildcard_pattern(pattern)) {
-                var bindings = match (pattern) { VariantPattern(v, b) => b }
-                var j = 0
-                while (j < bindings.length()) {
-                    this.add_var_unique(names, types, bindings[j], "Int")
-                    j = j + 1
-                }
+            var bindings = match (pattern) { VariantPattern(v, b) => b }
+            var j = 0
+            while (j < bindings.length()) {
+                this.add_var_unique(names, types, bindings[j], "Int")
+                j = j + 1
             }
             this.collect_vars_expr(body_expr, names, types)
             i = i + 1
