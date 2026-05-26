@@ -25,7 +25,7 @@ fun resolve_import_path(base_path: String, import_path: String): String {
 
 fun extract_imports(source: String): List<String> {
     var imports: List<String> = []
-    var lines = source.split("\n")
+    var lines: List<String> = source.split("\n")
     var i = 0
     while (i < lines.length()) {
         var line: String = lines[i]
