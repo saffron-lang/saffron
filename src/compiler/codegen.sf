@@ -3102,9 +3102,7 @@ class Codegen {
         var method_names: List<String> = []
         i = 0
         while (i < methods.length()) {
-            var method = methods[i]
-            var mname = match (method) { FunDecl(n, p, r, b, d) => n }
-            method_names.push(mname)
+            method_names.push(this.get_fun_name(methods[i]))
             i = i + 1
         }
         this.class_methods.set(name, method_names)
@@ -3181,41 +3179,53 @@ class Codegen {
         this.block_terminated = false
     }
 
+    fun get_variant_name(v: AST.Variant): String {
+        return match (v) { Variant(n, f) => n }
+    }
+
+    fun get_variant_fields(v: AST.Variant): String {
+        return match (v) { Variant(n, f) => f }
+    }
+
+    fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
+        var vname = this.get_variant_name(v)
+        var vfields = this.get_variant_fields(v)
+        variant_names.push(vname)
+        this.enum_variant_tags.set(name + "." + vname, idx)
+        this.enum_variant_fields.set(name + "." + vname, vfields)
+    }
+
     fun gen_enum_decl(name: String, variants: List<AST.Variant>) {
         var variant_names: List<String> = []
         var i = 0
         while (i < variants.length()) {
-            var v = variants[i]
-            var vname = match (v) { Variant(n, f) => n }
-            var vfields = match (v) { Variant(n, f) => f }
-            variant_names.push(vname)
-            this.enum_variant_tags.set(name + "." + vname, i)
-            this.enum_variant_fields.set(name + "." + vname, vfields)
+            this.register_variant(name, variant_names, variants[i], i)
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
-        // Emit type definition: { i8 tag, [max_payload x i8] }
         this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
     }
 
+    fun get_enum_decl_name(stmt: AST.Stmt): String {
+        return match (stmt) { EnumDecl(n, v, d) => n }
+    }
+
+    fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
+        return match (stmt) { EnumDecl(n, v, d) => v }
+    }
+
     fun register_external_enums(decls: List<AST.Stmt>) {
-        // Register enum declarations from imported modules (metadata only, no IR emitted)
         var i = 0
         while (i < decls.length()) {
             var decl = decls[i]
             var kind = this.classify_stmt(decl)
             if (kind == "enum") {
-                var name = match (decl) { EnumDecl(n, v, d) => n }
-                var variants = match (decl) { EnumDecl(n, v, d) => v }
+                var name = this.get_enum_decl_name(decl)
+                var variants = this.get_enum_decl_variants(decl)
                 var variant_names: List<String> = []
                 var j = 0
                 while (j < variants.length()) {
-                    var v = variants[j]
-                    var vname = match (v) { Variant(n, f) => n }
-                    var vfields = match (v) { Variant(n, f) => f }
-                    variant_names.push(vname)
-                    this.enum_variant_tags.set(name + "." + vname, j)
-                    this.enum_variant_fields.set(name + "." + vname, vfields)
+                    this.register_variant(name, variant_names, variants[j], j)
                     j = j + 1
                 }
                 this.enum_defs.set(name, variant_names)
