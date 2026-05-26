@@ -3733,6 +3733,8 @@ fun generate(program: List<AST.Stmt>): String {
 
 fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
     var gen = Codegen()
+    // Process imports through gen_stmt to register enums, classes, functions
+    // (same as first pass of generate, but on imported declarations)
     gen.register_external_enums(imports)
     return gen.generate(program)
 }
