@@ -694,7 +694,7 @@ class Codegen {
         // Check if it's a known direct function or an indirect call through a variable
         // Check for same-name enum variant: Token(kind, line, col) where enum Token { Token(...) }
         if (this.enum_defs.has(callee_name)) {
-            var variants = this.enum_defs.get(callee_name)
+            var variants: List = this.enum_defs.get(callee_name)
             if (variants.contains(callee_name)) {
                 return this.gen_enum_construct(callee_name, callee_name, args)
             }
@@ -1192,7 +1192,7 @@ class Codegen {
     fun get_max_fields(enum_name: String): Float {
         var max_f = 0
         if (!this.enum_defs.has(enum_name)) return 0
-        var variants = this.enum_defs.get(enum_name)
+        var variants: List = this.enum_defs.get(enum_name)
         var i = 0
         while (i < variants.length()) {
             var vname = variants[i]
@@ -1218,7 +1218,7 @@ class Codegen {
         var i = 0
         while (i < keys.length()) {
             var class_name = keys[i]
-            var methods = this.class_methods.get(class_name)
+            var methods: List = this.class_methods.get(class_name)
             if (methods.contains(method)) {
                 return class_name
             }
