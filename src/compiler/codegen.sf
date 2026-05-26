@@ -3033,9 +3033,7 @@ class Codegen {
             While(cond, body) => { this.gen_while(cond, body) }
             Block(stmts) => { this.gen_stmts(stmts) }
             Break => {
-                if (this.loop_end_label.length() > 0) {
-                    this.emit_terminator("br label %" + this.loop_end_label)
-                }
+                this.emit_terminator("br label %" + this.loop_end_label)
             }
             Continue => {}
             FunDecl(name, params, ret_type, body, doc) => {
