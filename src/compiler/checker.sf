@@ -265,11 +265,131 @@ class NullChecker {
     }
 
     fun apply_narrowing(cond: AST.Expr) {
-        // If condition is x.has(...), mark that map.get results are non-nil in this scope
-        // Pattern: MethodCall(obj, "has", args) → narrow obj's get results
+        // Pattern 1: x.has(...) → map.get() is non-nullable in this scope
+        // Pattern 2: x != nil → x is non-nullable in this scope
+        // Pattern 3: x (truthy check on variable) → x is non-nullable
         var cond_kind = match (cond) {
-            MethodCall(o, m, a) => m
+            MethodCall(o, m, a) => "method:" + m
+            Binary(l, o, r) => "binary:" + o
+            Variable(n) => "var:" + n
+            Unary(o, r) => "unary"
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => ""
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+            ListLit(e) => ""
+            IndexGet(o, i) => ""
+            IndexSet(o, i, v) => ""
+            MapLit => ""
+            BlockExpr(s, v) => ""
+        }
+
+        // map.has() guard
+        if (cond_kind == "method:has") {
+            this.env.narrow("__has_guard", "active")
+        }
+
+        // v != nil or nil != v
+        if (cond_kind == "binary:!=") {
+            var lhs_name = this.get_expr_var_name(cond)
+            if (lhs_name.length() > 0) {
+                var var_type = this.env.get_var(lhs_name)
+                if (this.is_nullable(var_type)) {
+                    this.env.narrow(lhs_name, this.strip_nil(var_type))
+                }
+            }
+        }
+
+        // Truthy variable: if (v) { ... }
+        if (cond_kind.starts_with("var:")) {
+            var name = cond_kind.slice(4, cond_kind.length())
+            var var_type = this.env.get_var(name)
+            if (this.is_nullable(var_type)) {
+                this.env.narrow(name, this.strip_nil(var_type))
+            }
+        }
+    }
+
+    fun get_expr_var_name(expr: AST.Expr): String {
+        // For Binary(left, "!=", right), extract variable name if one side is NilLit
+        var result = match (expr) {
+            Binary(l, o, r) => {
+                var left_name = this.extract_var_from_nil_check(l, r)
+                if (left_name.length() > 0) {
+                    left_name
+                } else {
+                    this.extract_var_from_nil_check(r, l)
+                }
+            }
             Variable(n) => ""
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Unary(o, r) => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => ""
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+            ListLit(e) => ""
+            IndexGet(o, i) => ""
+            IndexSet(o, i, v) => ""
+            MethodCall(o, m, a) => ""
+            MapLit => ""
+            BlockExpr(s, v) => ""
+        }
+        return result
+    }
+
+    fun extract_var_from_nil_check(var_side: AST.Expr, nil_side: AST.Expr): String {
+        // Returns variable name if var_side is Variable and nil_side is NilLit
+        var is_nil = match (nil_side) {
+            NilLit => true
+            IntLit(v) => false
+            FloatLit(v) => false
+            BoolLit(v) => false
+            StringLit(s) => false
+            Variable(n) => false
+            Binary(l, o, r) => false
+            Unary(o, r) => false
+            Call(c, a) => false
+            Assign(n, v) => false
+            Logical(l, o, r) => false
+            MemberAccess(o, f) => false
+            Match(s, a) => false
+            EnumConstruct(e, v, a) => false
+            Lambda(p, r, b) => false
+            GetField(o, f) => false
+            SetField(o, f, v) => false
+            This => false
+            ListLit(e) => false
+            IndexGet(o, i) => false
+            IndexSet(o, i, v) => false
+            MethodCall(o, m, a) => false
+            MapLit => false
+            BlockExpr(s, v) => false
+        }
+        if (!is_nil) return ""
+        var name = match (var_side) {
+            Variable(n) => n
             IntLit(v) => ""
             FloatLit(v) => ""
             BoolLit(v) => ""
@@ -290,14 +410,11 @@ class NullChecker {
             ListLit(e) => ""
             IndexGet(o, i) => ""
             IndexSet(o, i, v) => ""
+            MethodCall(o, m, a) => ""
             MapLit => ""
             BlockExpr(s, v) => ""
         }
-        if (cond_kind == "has") {
-            // Inside this if-block, map.get() results are non-nullable
-            // We use a simple flag: any String|Nil variable defined here is narrowed to String
-            this.env.narrow("__has_guard", "active")
-        }
+        return name
     }
 
     // --- Expression type inference ---
