@@ -223,7 +223,8 @@ class NullChecker {
             }
             If(cond, then_branch, else_branch) => {
                 this.infer_expr(cond)
-                // Flow narrowing: if cond is `map.has(key)`, narrow map.get(key) in then-branch
+                // Flow narrowing: if cond involves .has(), narrow gets in then-branch
+                this.apply_narrowing(cond)
                 this.check_stmts(then_branch)
                 this.env.clear_narrowing()
                 this.check_stmts(else_branch)
@@ -260,6 +261,42 @@ class NullChecker {
         while (i < stmts.length()) {
             this.check_stmt(stmts[i])
             i = i + 1
+        }
+    }
+
+    fun apply_narrowing(cond: AST.Expr) {
+        // If condition is x.has(...), mark that map.get results are non-nil in this scope
+        // Pattern: MethodCall(obj, "has", args) → narrow obj's get results
+        var cond_kind = match (cond) {
+            MethodCall(o, m, a) => m
+            Variable(n) => ""
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Binary(l, o, r) => ""
+            Unary(o, r) => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => ""
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+            ListLit(e) => ""
+            IndexGet(o, i) => ""
+            IndexSet(o, i, v) => ""
+            MapLit => ""
+            BlockExpr(s, v) => ""
+        }
+        if (cond_kind == "has") {
+            // Inside this if-block, map.get() results are non-nullable
+            // We use a simple flag: any String|Nil variable defined here is narrowed to String
+            this.env.narrow("__has_guard", "active")
         }
     }
 
@@ -342,9 +379,19 @@ class NullChecker {
     fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): String {
         var obj_type = this.infer_expr(obj)
 
-        // Map.get returns nullable
+        // Check all argument expressions for null-safety too
+        var ai = 0
+        while (ai < args.length()) {
+            this.infer_expr(args[ai])
+            ai = ai + 1
+        }
+
+        // Map.get returns nullable — unless inside a has() guard
         if (method == "get") {
             if (obj_type == "Map" or obj_type.starts_with("Map<")) {
+                if (this.env.narrowed.has("__has_guard")) {
+                    return "String"
+                }
                 return this.make_nullable("String")
             }
         }
