@@ -3092,10 +3092,29 @@ class Codegen {
         }
     }
 
+    fun get_var_name(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => n }
+    }
+
+    fun get_var_type(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => t }
+    }
+
+    fun get_var_init(stmt: AST.Stmt): AST.Expr {
+        return match (stmt) { VarDecl(n, t, i, d) => i }
+    }
+
     fun gen_var_decl(stmt: AST.Stmt) {
-        var name = match (stmt) { VarDecl(n, t, i, d) => n }
-        var type_ann = match (stmt) { VarDecl(n, t, i, d) => t }
-        var init = match (stmt) { VarDecl(n, t, i, d) => i }
+        var name = this.get_var_name(stmt)
+        this.gen_var_decl_with_name(name, this.get_var_type(stmt), this.get_var_init(stmt))
+    }
+
+    fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
+        var alloc_key = "__var_" + name
+        if (!this.known_functions.contains(alloc_key)) {
+            this.known_functions.push(alloc_key)
+            this.emit_indent("%" + this.sanitize_name(name) + " = alloca i64")
+        }
         var val = this.gen_arg_value(init)
         var vtype = type_ann
         if (vtype == "Any") {
@@ -3281,6 +3300,25 @@ class Codegen {
         }
     }
 
+    fun emit_block_alloca_for(stmt: AST.Stmt) {
+        var vname = match (stmt) { VarDecl(n, t, init, d) => n }
+        if (!this.var_types.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
+            this.known_functions.push("__alloc_" + vname)
+            this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
+        }
+    }
+
+    fun emit_block_allocas(stmts: List<AST.Stmt>) {
+        var i = 0
+        while (i < stmts.length()) {
+            var kind = this.classify_stmt(stmts[i])
+            if (kind == "var") {
+                this.emit_block_alloca_for(stmts[i])
+            }
+            i = i + 1
+        }
+    }
+
     fun gen_stmts(stmts: List<AST.Stmt>) {
         var i = 0
         while (i < stmts.length()) {
@@ -3446,6 +3484,7 @@ class Codegen {
         }
         i = 0
         while (i < var_names.length()) {
+            this.known_functions.push("__var_" + var_names[i])
             this.emit_indent("%" + this.sanitize_name(var_names[i]) + " = alloca " + this.llvm_type(var_types[i]))
             i = i + 1
         }
