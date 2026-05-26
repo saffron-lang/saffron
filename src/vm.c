@@ -131,7 +131,7 @@ void initVM() {
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
     vm.bytesAllocated = 0;
-    vm.nextGC = 1024 * 1024 * 256;
+    vm.nextGC = 1024 * 1024 * 1024; // 1GB - disable GC for self-compilation
 
     initTable(&vm.types);
     initTable(&vm.modules);
@@ -156,10 +156,19 @@ void initVM() {
     vm.isThrowing = false;
     vm.currentException = NIL_VAL;
 
-    vm.numberClass = newClass(copyString("Number", 6));
-    vm.stringClass = newClass(copyString("String", 6));
-    vm.boolClass = newClass(copyString("Bool", 4));
-    vm.nilClass = newClass(copyString("Nil", 3));
+    // Push names onto stack to protect from GC during class allocation
+    push(OBJ_VAL(copyString("Number", 6)));
+    vm.numberClass = newClass(AS_STRING(peek(0)));
+    pop();
+    push(OBJ_VAL(copyString("String", 6)));
+    vm.stringClass = newClass(AS_STRING(peek(0)));
+    pop();
+    push(OBJ_VAL(copyString("Bool", 4)));
+    vm.boolClass = newClass(AS_STRING(peek(0)));
+    pop();
+    push(OBJ_VAL(copyString("Nil", 3)));
+    vm.nilClass = newClass(AS_STRING(peek(0)));
+    pop();
 
     defineBuiltin("Number", OBJ_VAL(vm.numberClass));
     defineBuiltin("String", OBJ_VAL(vm.stringClass));
@@ -239,8 +248,8 @@ bool runtimeError(const char *format, ...) {
     for (ObjCallFrame *frame = CURRENT_TASK; frame->parent != NULL; frame = frame->parent) {
         ObjFunction *function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
-        fprintf(stderr, "[line %d] in ",
-                function->chunk.lines[instruction]);
+        int line = getLine(&function->chunk, (int)instruction);
+        fprintf(stderr, "[line %d] in ", line);
         if (function->name == NULL) {
             fprintf(stderr, "script\n");
         } else {
@@ -303,8 +312,13 @@ static bool call(ObjClosure *closure, int argCount) {
             Value result = native(AS_OBJ(peek(argCount)), argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
             push(result);
+            return true;
         }
+        default:
+            runtimeError("Invalid call target.");
+            return false;
     }
+    return false;
 }
 
 static bool callValue(Value callee, int argCount) {

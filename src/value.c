@@ -35,8 +35,9 @@ void freeValueArray(ValueArray *array) {
 }
 
 void popValueArray(ValueArray *array, int index) {
+    if (array->count == 0 || index < 0 || index >= array->count) return;
     // Move everything to the left 1
-    for (int i = index; i < array->count; i++) {
+    for (int i = index; i < array->count - 1; i++) {
         array->values[i] = array->values[i + 1];
     }
     array->values[array->count - 1] = NIL_VAL;
