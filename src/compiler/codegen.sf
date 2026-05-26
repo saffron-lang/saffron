@@ -2887,116 +2887,51 @@ class Codegen {
     }
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
-        var ek = this.classify_expr(expr)
-        if (ek == "match_expr") {
-            this.collect_vars_match(expr, names, types)
-            return nil
-        }
-        if (ek == "block_expr") {
-            var be_stmts = match (expr) { BlockExpr(s, v) => s }
-            var be_value = match (expr) { BlockExpr(s, v) => v }
-            this.collect_vars(be_stmts, names, types)
-            this.collect_vars_expr(be_value, names, types)
-            return nil
-        }
-        if (ek == "assign") {
-            var assign_val = match (expr) { Assign(n, v) => v }
-            this.collect_vars_expr(assign_val, names, types)
-            return nil
-        }
-        if (ek == "binary") {
-            var bin_left = match (expr) { Binary(l, o, r) => l }
-            var bin_right = match (expr) { Binary(l, o, r) => r }
-            this.collect_vars_expr(bin_left, names, types)
-            this.collect_vars_expr(bin_right, names, types)
-            return nil
-        }
-        if (ek == "logical") {
-            var log_left = match (expr) { Logical(l, o, r) => l }
-            var log_right = match (expr) { Logical(l, o, r) => r }
-            this.collect_vars_expr(log_left, names, types)
-            this.collect_vars_expr(log_right, names, types)
-            return nil
-        }
-        if (ek == "unary") {
-            var un_right = match (expr) { Unary(o, r) => r }
-            this.collect_vars_expr(un_right, names, types)
-            return nil
-        }
-        if (ek == "call") {
-            var call_callee = match (expr) { Call(c, a) => c }
-            var call_args = match (expr) { Call(c, a) => a }
-            this.collect_vars_expr(call_callee, names, types)
-            var ci = 0
-            while (ci < call_args.length()) {
-                this.collect_vars_expr(call_args[ci], names, types)
-                ci = ci + 1
+        match (expr) {
+            Match(s, a) => { this.collect_vars_match(expr, names, types) }
+            BlockExpr(stmts, value) => {
+                this.collect_vars(stmts, names, types)
+                this.collect_vars_expr(value, names, types)
             }
-            return nil
-        }
-        if (ek == "method_call") {
-            var mc_obj = match (expr) { MethodCall(o, m, a) => o }
-            var mc_args = match (expr) { MethodCall(o, m, a) => a }
-            this.collect_vars_expr(mc_obj, names, types)
-            var mi = 0
-            while (mi < mc_args.length()) {
-                this.collect_vars_expr(mc_args[mi], names, types)
-                mi = mi + 1
+            Binary(left, op, right) => {
+                this.collect_vars_expr(left, names, types)
+                this.collect_vars_expr(right, names, types)
             }
-            return nil
-        }
-        if (ek == "set_field") {
-            var sf_obj = match (expr) { SetField(o, f, v) => o }
-            var sf_val = match (expr) { SetField(o, f, v) => v }
-            this.collect_vars_expr(sf_obj, names, types)
-            this.collect_vars_expr(sf_val, names, types)
-            return nil
-        }
-        if (ek == "get_field") {
-            var gf_obj = match (expr) { GetField(o, f) => o }
-            this.collect_vars_expr(gf_obj, names, types)
-            return nil
-        }
-        if (ek == "index_get") {
-            var ig_obj = match (expr) { IndexGet(o, i) => o }
-            var ig_idx = match (expr) { IndexGet(o, i) => i }
-            this.collect_vars_expr(ig_obj, names, types)
-            this.collect_vars_expr(ig_idx, names, types)
-            return nil
-        }
-        if (ek == "index_set") {
-            var is_obj = match (expr) { IndexSet(o, i, v) => o }
-            var is_idx = match (expr) { IndexSet(o, i, v) => i }
-            var is_val = match (expr) { IndexSet(o, i, v) => v }
-            this.collect_vars_expr(is_obj, names, types)
-            this.collect_vars_expr(is_idx, names, types)
-            this.collect_vars_expr(is_val, names, types)
-            return nil
-        }
-        if (ek == "list_lit") {
-            var ll_elems = match (expr) { ListLit(e) => e }
-            var li = 0
-            while (li < ll_elems.length()) {
-                this.collect_vars_expr(ll_elems[li], names, types)
-                li = li + 1
+            Logical(left, op, right) => {
+                this.collect_vars_expr(left, names, types)
+                this.collect_vars_expr(right, names, types)
             }
-            return nil
-        }
-        if (ek == "enum") {
-            var ec_args = match (expr) { EnumConstruct(e, v, a) => a }
-            var ei = 0
-            while (ei < ec_args.length()) {
-                this.collect_vars_expr(ec_args[ei], names, types)
-                ei = ei + 1
+            Unary(op, right) => { this.collect_vars_expr(right, names, types) }
+            Assign(name, value) => { this.collect_vars_expr(value, names, types) }
+            Call(callee, args) => { this.collect_vars_expr(callee, names, types) }
+            MethodCall(obj, method, args) => { this.collect_vars_expr(obj, names, types) }
+            SetField(obj, field, value) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(value, names, types)
             }
-            return nil
+            GetField(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            IndexGet(obj, idx) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(idx, names, types)
+            }
+            IndexSet(obj, idx, value) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(idx, names, types)
+                this.collect_vars_expr(value, names, types)
+            }
+            MemberAccess(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            IntLit(v) => {}
+            FloatLit(v) => {}
+            BoolLit(v) => {}
+            StringLit(s) => {}
+            NilLit => {}
+            Variable(n) => {}
+            This => {}
+            MapLit => {}
+            ListLit(e) => {}
+            EnumConstruct(e, v, a) => {}
+            Lambda(p, r, b) => {}
         }
-        if (ek == "member") {
-            var mem_obj = match (expr) { MemberAccess(o, f) => o }
-            this.collect_vars_expr(mem_obj, names, types)
-            return nil
-        }
-        // match_expr is handled at the top of this function
     }
 
     fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
@@ -3016,21 +2951,18 @@ class Codegen {
         return match (pattern) { VariantPattern(v, b) => b }
     }
 
-    fun collect_vars_one_arm(arm: AST.MatchArm, names: List<String>, types: List<String>) {
-        var bindings = this.get_pattern_bindings(this.get_arm_pattern(arm))
-        var j = 0
-        while (j < bindings.length()) {
-            this.add_var_unique(names, types, bindings[j], "Int")
-            j = j + 1
-        }
-        this.collect_vars_expr(this.get_arm_body(arm), names, types)
-    }
-
     fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
         var arms = this.get_match_arms(expr)
         var i = 0
         while (i < arms.length()) {
-            this.collect_vars_one_arm(arms[i], names, types)
+            var arm = arms[i]
+            var bindings = this.get_pattern_bindings(this.get_arm_pattern(arm))
+            var j = 0
+            while (j < bindings.length()) {
+                this.add_var_unique(names, types, bindings[j], "Int")
+                j = j + 1
+            }
+            this.collect_vars_expr(this.get_arm_body(arm), names, types)
             i = i + 1
         }
     }
