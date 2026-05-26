@@ -2823,32 +2823,67 @@ class Codegen {
         }
     }
 
+    fun collect_var_decl(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        var vname = match (stmt) { VarDecl(n, t, i, d) => n }
+        var vtype = match (stmt) { VarDecl(n, t, i, d) => t }
+        this.add_var_unique(names, types, vname, vtype)
+    }
+
+    fun collect_vars_if(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        var then_branch = match (stmt) { If(c, t, e) => t }
+        var else_branch = match (stmt) { If(c, t, e) => e }
+        this.collect_vars(then_branch, names, types)
+        this.collect_vars(else_branch, names, types)
+    }
+
+    fun get_while_body(stmt: AST.Stmt): List<AST.Stmt> {
+        return match (stmt) { While(c, b) => b }
+    }
+
+    fun get_block_stmts(stmt: AST.Stmt): List<AST.Stmt> {
+        return match (stmt) { Block(s) => s }
+    }
+
+    fun get_expr_stmt_expr(stmt: AST.Stmt): AST.Expr {
+        return match (stmt) { ExprStmt(e) => e }
+    }
+
+    fun get_return_value(stmt: AST.Stmt): AST.Expr {
+        return match (stmt) { Return(v) => v }
+    }
+
+    fun collect_vars_while(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        this.collect_vars(this.get_while_body(stmt), names, types)
+    }
+
+    fun collect_vars_block(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        this.collect_vars(this.get_block_stmts(stmt), names, types)
+    }
+
+    fun collect_vars_expr_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        this.collect_vars_expr(this.get_expr_stmt_expr(stmt), names, types)
+    }
+
+    fun collect_vars_return(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        this.collect_vars_expr(this.get_return_value(stmt), names, types)
+    }
+
+    fun collect_vars_dispatch_a(kind: String, stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        if (kind == "var") { this.collect_var_decl(stmt, names, types) }
+        if (kind == "if") { this.collect_vars_if(stmt, names, types) }
+        if (kind == "while") { this.collect_vars_while(stmt, names, types) }
+    }
+
+    fun collect_vars_dispatch_b(kind: String, stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        if (kind == "block") { this.collect_vars_block(stmt, names, types) }
+        if (kind == "expr") { this.collect_vars_expr_stmt(stmt, names, types) }
+        if (kind == "return") { this.collect_vars_return(stmt, names, types) }
+    }
+
     fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
-                this.add_var_unique(names, types, name, type_ann)
-                this.collect_vars_expr(init, names, types)
-            }
-            If(cond, then_branch, else_branch) => {
-                this.collect_vars(then_branch, names, types)
-                this.collect_vars(else_branch, names, types)
-            }
-            While(cond, body) => {
-                this.collect_vars(body, names, types)
-            }
-            Block(stmts) => {
-                this.collect_vars(stmts, names, types)
-            }
-            ExprStmt(expr) => {
-                this.collect_vars_expr(expr, names, types)
-            }
-            Return(value) => {
-                this.collect_vars_expr(value, names, types)
-            }
-            FunDecl(name, params, ret_type, body, doc) => {}
-            EnumDecl(name, variants, doc) => {}
-            ClassDecl(name, fields, methods, doc) => {}
-        }
+        var kind = this.classify_stmt(stmt)
+        this.collect_vars_dispatch_a(kind, stmt, names, types)
+        this.collect_vars_dispatch_b(kind, stmt, names, types)
     }
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
