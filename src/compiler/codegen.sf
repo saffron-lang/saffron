@@ -1230,8 +1230,8 @@ class Codegen {
         return "i64"
     }
 
-    fun classify_expr_a(expr: AST.Expr): String {
-        var r = match (expr) {
+    fun classify_expr(expr: AST.Expr): String {
+        return match (expr) {
             MethodCall(o, m, a) => "method_call"
             ListLit(e) => "list_lit"
             IndexGet(o, i) => "index_get"
@@ -1244,13 +1244,6 @@ class Codegen {
             Variable(n) => "variable"
             Binary(l, o, r) => "binary"
             Unary(o, r) => "unary"
-        }
-        if (r == expr) return ""
-        return r
-    }
-
-    fun classify_expr_b(expr: AST.Expr): String {
-        return match (expr) {
             Call(c, a) => "call"
             Assign(n, v) => "assign"
             Logical(l, o, r) => "logical"
@@ -1264,12 +1257,6 @@ class Codegen {
             This => "this"
             BlockExpr(s, v) => "block_expr"
         }
-    }
-
-    fun classify_expr(expr: AST.Expr): String {
-        var a = this.classify_expr_a(expr)
-        if (a == "") return this.classify_expr_b(expr)
-        return a
     }
 
     fun get_variable_name(expr: AST.Expr): String {
@@ -2868,68 +2855,27 @@ class Codegen {
         }
     }
 
-    fun collect_var_decl(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        var vname = match (stmt) { VarDecl(n, t, i, d) => n }
-        var vtype = match (stmt) { VarDecl(n, t, i, d) => t }
-        this.add_var_unique(names, types, vname, vtype)
-        this.collect_vars_expr(this.get_var_init(stmt), names, types)
-    }
-
-    fun collect_vars_if(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        var then_branch = match (stmt) { If(c, t, e) => t }
-        var else_branch = match (stmt) { If(c, t, e) => e }
-        this.collect_vars(then_branch, names, types)
-        this.collect_vars(else_branch, names, types)
-    }
-
-    fun get_while_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { While(c, b) => b }
-    }
-
-    fun get_block_stmts(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { Block(s) => s }
-    }
-
-    fun get_expr_stmt_expr(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { ExprStmt(e) => e }
-    }
-
-    fun get_return_value(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { Return(v) => v }
-    }
-
-    fun collect_vars_while(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        this.collect_vars(this.get_while_body(stmt), names, types)
-    }
-
-    fun collect_vars_block(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        this.collect_vars(this.get_block_stmts(stmt), names, types)
-    }
-
-    fun collect_vars_expr_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        this.collect_vars_expr(this.get_expr_stmt_expr(stmt), names, types)
-    }
-
-    fun collect_vars_return(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        this.collect_vars_expr(this.get_return_value(stmt), names, types)
-    }
-
-    fun collect_vars_dispatch_a(kind: String, stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        if (kind == "var") { this.collect_var_decl(stmt, names, types) }
-        if (kind == "if") { this.collect_vars_if(stmt, names, types) }
-        if (kind == "while") { this.collect_vars_while(stmt, names, types) }
-    }
-
-    fun collect_vars_dispatch_b(kind: String, stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        if (kind == "block") { this.collect_vars_block(stmt, names, types) }
-        if (kind == "expr") { this.collect_vars_expr_stmt(stmt, names, types) }
-        if (kind == "return") { this.collect_vars_return(stmt, names, types) }
-    }
-
     fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
         var kind = this.classify_stmt(stmt)
-        this.collect_vars_dispatch_a(kind, stmt, names, types)
-        this.collect_vars_dispatch_b(kind, stmt, names, types)
+        if (kind == "var") {
+            var vname = match (stmt) { VarDecl(n, t, i, d) => n }
+            var vtype = match (stmt) { VarDecl(n, t, i, d) => t }
+            this.add_var_unique(names, types, vname, vtype)
+            this.collect_vars_expr(this.get_var_init(stmt), names, types)
+        } else if (kind == "if") {
+            var then_branch = match (stmt) { If(c, t, e) => t }
+            var else_branch = match (stmt) { If(c, t, e) => e }
+            this.collect_vars(then_branch, names, types)
+            this.collect_vars(else_branch, names, types)
+        } else if (kind == "while") {
+            this.collect_vars(match (stmt) { While(c, b) => b }, names, types)
+        } else if (kind == "block") {
+            this.collect_vars(match (stmt) { Block(s) => s }, names, types)
+        } else if (kind == "expr") {
+            this.collect_vars_expr(match (stmt) { ExprStmt(e) => e }, names, types)
+        } else if (kind == "return") {
+            this.collect_vars_expr(match (stmt) { Return(v) => v }, names, types)
+        }
     }
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
@@ -3045,38 +2991,28 @@ class Codegen {
         // match_expr is handled at the top of this function
     }
 
+    fun is_wildcard_pattern(pattern: AST.Pattern): Bool {
+        var name = match (pattern) { VariantPattern(v, b) => v }
+        return name == "_"
+    }
+
     fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
         var arms = this.get_match_arms(expr)
         var i = 0
         while (i < arms.length()) {
-            this.collect_vars_arm(arms[i], names, types)
+            var arm = arms[i]
+            var pattern = match (arm) { Arm(p, b) => p }
+            var body_expr = match (arm) { Arm(p, b) => b }
+            if (!this.is_wildcard_pattern(pattern)) {
+                var bindings = match (pattern) { VariantPattern(v, b) => b }
+                var j = 0
+                while (j < bindings.length()) {
+                    this.add_var_unique(names, types, bindings[j], "Int")
+                    j = j + 1
+                }
+            }
+            this.collect_vars_expr(body_expr, names, types)
             i = i + 1
-        }
-    }
-
-    fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
-        return match (arm) { Arm(p, b) => p }
-    }
-
-    fun get_arm_body(arm: AST.MatchArm): AST.Expr {
-        return match (arm) { Arm(p, b) => b }
-    }
-
-    fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
-        return match (pattern) { VariantPattern(v, b) => b }
-    }
-
-    fun collect_vars_arm(arm: AST.MatchArm, names: List<String>, types: List<String>) {
-        var bindings = this.get_pattern_bindings(this.get_arm_pattern(arm))
-        this.collect_arm_bindings(bindings, names, types)
-        this.collect_vars_expr(this.get_arm_body(arm), names, types)
-    }
-
-    fun collect_arm_bindings(bindings: List<String>, names: List<String>, types: List<String>) {
-        var j = 0
-        while (j < bindings.length()) {
-            this.add_var_unique(names, types, bindings[j], "Int")
-            j = j + 1
         }
     }
 
