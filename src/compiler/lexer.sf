@@ -206,6 +206,7 @@ class Lexer {
 
     fun read_string() {
         var result = StringBuilder()
+        var has_interp = false
         while (this.pos < this.source.length() and this.peek() != "\"") {
             var ch = this.advance()
             if (ch == "\\") {
@@ -216,12 +217,71 @@ class Lexer {
                 else if (esc == "\\") { result.append("\\") }
                 else if (esc == "\"") { result.append("\"") }
                 else { result.append(esc) }
+            } else if (ch == "$") {
+                if (this.pos < this.source.length()) {
+                    if (this.peek() == "{") {
+                        this.advance() // consume {
+                        // Emit prefix string + plus
+                        this.emit(TokenKind.TkString(result.to_string()))
+                        this.emit(TokenKind.TkPlus)
+                        // Lex the interpolated expression
+                        this.emit(TokenKind.TkLParen)
+                        this.read_interpolation()
+                        this.emit(TokenKind.TkRParen)
+                        this.emit(TokenKind.TkPlus)
+                        // Reset for rest of string
+                        result = StringBuilder()
+                        has_interp = true
+                    } else {
+                        result.append(ch)
+                    }
+                } else {
+                    result.append(ch)
+                }
             } else {
                 result.append(ch)
             }
         }
         this.advance() // closing quote
         this.emit(TokenKind.TkString(result.to_string()))
+    }
+
+    fun read_interpolation() {
+        var depth = 1
+        while (this.pos < this.source.length() and depth > 0) {
+            this.skip_whitespace()
+            if (this.pos >= this.source.length()) break
+            var ch = this.peek()
+            if (ch == "}") {
+                depth = depth - 1
+                if (depth == 0) {
+                    this.advance() // consume closing }
+                    return nil
+                }
+            }
+            if (ch == "{") {
+                depth = depth + 1
+            }
+            // Lex one token normally
+            var start_pos = this.pos
+            var tok_ch = this.advance()
+            if (this.is_digit(tok_ch)) { this.read_number() }
+            else if (this.is_alpha(tok_ch)) {
+                var text = this.read_identifier()
+                this.keyword_or_ident(text)
+            }
+            else if (tok_ch == "\"") { this.read_string() }
+            else if (tok_ch == "(") { this.emit(TokenKind.TkLParen) }
+            else if (tok_ch == ")") { this.emit(TokenKind.TkRParen) }
+            else if (tok_ch == "+") { this.emit(TokenKind.TkPlus) }
+            else if (tok_ch == "-") { this.emit(TokenKind.TkMinus) }
+            else if (tok_ch == "*") { this.emit(TokenKind.TkStar) }
+            else if (tok_ch == "/") { this.emit(TokenKind.TkSlash) }
+            else if (tok_ch == ".") { this.emit(TokenKind.TkDot) }
+            else if (tok_ch == ",") { this.emit(TokenKind.TkComma) }
+            else if (tok_ch == "[") { this.emit(TokenKind.TkLBracket) }
+            else if (tok_ch == "]") { this.emit(TokenKind.TkRBracket) }
+        }
     }
 
     fun read_identifier(): String {
