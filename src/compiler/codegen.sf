@@ -3110,11 +3110,6 @@ class Codegen {
     }
 
     fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
-        var alloc_key = "__var_" + name
-        if (!this.known_functions.contains(alloc_key)) {
-            this.known_functions.push(alloc_key)
-            this.emit_indent("%" + this.sanitize_name(name) + " = alloca i64")
-        }
         var val = this.gen_arg_value(init)
         var vtype = type_ann
         if (vtype == "Any") {
@@ -3484,7 +3479,6 @@ class Codegen {
         }
         i = 0
         while (i < var_names.length()) {
-            this.known_functions.push("__var_" + var_names[i])
             this.emit_indent("%" + this.sanitize_name(var_names[i]) + " = alloca " + this.llvm_type(var_types[i]))
             i = i + 1
         }
