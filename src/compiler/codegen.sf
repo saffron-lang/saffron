@@ -506,7 +506,6 @@ class Codegen {
             var mn = this.get_variable_name(m_obj)
             if (mn.length() > 0 and this.var_types.has(mn)) {
                 var vt = this.var_types.get(mn)
-                IO.println("DEBUG field: mn=" + mn + " vt=" + vt + " cf_has=" + this.class_fields.has(vt).to_string())
                 if (this.class_fields.has(vt)) {
                     var ov = this.gen_arg_value(m_obj)
                     var fi = this.get_field_index(vt, m_field)
@@ -3122,6 +3121,17 @@ class Codegen {
             i = i + 1
         }
         this.class_methods.set(name, method_names)
+
+        // Pre-register all method return types so forward references resolve correctly
+        i = 0
+        while (i < methods.length()) {
+            var mname = this.get_fun_name(methods[i])
+            var mret = this.get_fun_ret(methods[i])
+            var full_name = name + "__" + mname
+            this.func_ret_types.set(full_name, mret)
+            this.known_functions.push(full_name)
+            i = i + 1
+        }
 
         // Generate methods as functions with name prefix: ClassName__method
         // Methods get 'self' (i64 pointer to instance) as first param
