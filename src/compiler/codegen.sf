@@ -506,6 +506,7 @@ class Codegen {
             var mn = this.get_variable_name(m_obj)
             if (mn.length() > 0 and this.var_types.has(mn)) {
                 var vt = this.var_types.get(mn)
+                IO.println("DEBUG field: mn=" + mn + " vt=" + vt + " cf_has=" + this.class_fields.has(vt).to_string())
                 if (this.class_fields.has(vt)) {
                     var ov = this.gen_arg_value(m_obj)
                     var fi = this.get_field_index(vt, m_field)
@@ -1046,7 +1047,6 @@ class Codegen {
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             var result = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
-            this.last_type = "Int"
             return result
         }
 
@@ -1098,6 +1098,7 @@ class Codegen {
         this.emit_terminator(switch_str)
 
         // Generate each arm
+        var match_result_type = "Int"
         i = 0
         while (i < arms.length()) {
             this.start_block(arm_labels[i])
@@ -1105,14 +1106,26 @@ class Codegen {
             var pattern = match (arm) { Arm(p, b) => p }
             var body_expr = match (arm) { Arm(p, b) => b }
 
-            // Extract bindings from payload
+            // Extract bindings from payload and set their types
             var arm_variant = match (pattern) { VariantPattern(v, b) => v }
             var bindings = match (pattern) { VariantPattern(v, b) => b }
             var bind_count = bindings.length()
             if (bind_count > 0) {
                 this.extract_arm_bindings(bindings, subj, max_fields)
+                var bi = 0
+                while (bi < bind_count) {
+                    var btype = this.get_variant_field_type(enum_name, arm_variant, bi)
+                    this.var_types.set(bindings[bi], btype)
+                    if (btype == "String") {
+                        this.string_vars.push(bindings[bi])
+                    }
+                    bi = bi + 1
+                }
             }
             var val = this.gen_arg_value(body_expr)
+            if (i == 0) {
+                match_result_type = this.last_type
+            }
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             this.emit_terminator("br label %" + end_label)
             i = i + 1
@@ -1121,6 +1134,7 @@ class Codegen {
         this.start_block(end_label)
         var result = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        this.last_type = match_result_type
         return result
     }
 
@@ -1153,6 +1167,24 @@ class Codegen {
         var extracted = this.fresh_local()
         this.emit_indent(extracted + " = load i64, i64* " + field_slot)
         this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+    }
+
+    fun get_variant_field_type(enum_name: String, variant_name: String, field_idx: Float): String {
+        var key = enum_name + "." + variant_name
+        if (!this.enum_variant_fields.has(key)) return "Int"
+        var fields = this.enum_variant_fields.get(key)
+        if (fields.length() == 0) return "Int"
+        var parts = fields.split(",")
+        if (field_idx >= parts.length()) return "Int"
+        var field_def = parts[field_idx.floor()]
+        var name_type = field_def.split(":")
+        if (name_type.length() < 2) return "Int"
+        var ftype = name_type[1]
+        if (ftype == "String") return "String"
+        if (ftype == "Float" or ftype == "Number") return "Int"
+        if (ftype == "Bool") return "Int"
+        if (ftype.starts_with("List")) return "StringList"
+        return "Int"
     }
 
     fun get_max_fields(enum_name: String): Float {
@@ -3157,7 +3189,6 @@ class Codegen {
     }
 
     fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
-        // Register class info
         this.class_fields.set(name, fields)
 
         // Parse field names for struct layout
