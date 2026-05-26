@@ -160,15 +160,20 @@ class Lexer {
         var start = this.pos - 1
 
         // Check for hex literal: 0x or 0X
-        if (this.source.char_at(start) == "0" and this.pos < this.source.length() and (this.peek() == "x" or this.peek() == "X")) {
-            this.advance() // consume the 'x' or 'X'
-            while (this.pos < this.source.length() and this.is_hex(this.peek())) {
-                this.advance()
+        if (this.source.char_at(start) == "0") {
+            if (this.pos < this.source.length()) {
+                var next_ch = this.peek()
+                if (next_ch == "x" or next_ch == "X") {
+                    this.advance() // consume the 'x' or 'X'
+                    while (this.pos < this.source.length() and this.is_hex(this.peek())) {
+                        this.advance()
+                    }
+                    var text = this.source.slice(start, this.pos)
+                    var value = text.to_number()
+                    this.emit(TokenKind.TkInt(value))
+                    return
+                }
             }
-            var text = this.source.slice(start, this.pos)
-            var value = text.to_number()
-            this.emit(TokenKind.TkInt(value))
-            return
         }
 
         while (this.pos < this.source.length() and this.is_digit(this.peek())) {
