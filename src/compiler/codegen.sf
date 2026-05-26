@@ -1230,8 +1230,8 @@ class Codegen {
         return "i64"
     }
 
-    fun classify_expr(expr: AST.Expr): String {
-        return match (expr) {
+    fun classify_expr_a(expr: AST.Expr): String {
+        var r = match (expr) {
             MethodCall(o, m, a) => "method_call"
             ListLit(e) => "list_lit"
             IndexGet(o, i) => "index_get"
@@ -1244,6 +1244,13 @@ class Codegen {
             Variable(n) => "variable"
             Binary(l, o, r) => "binary"
             Unary(o, r) => "unary"
+        }
+        if (r == expr) return ""
+        return r
+    }
+
+    fun classify_expr_b(expr: AST.Expr): String {
+        return match (expr) {
             Call(c, a) => "call"
             Assign(n, v) => "assign"
             Logical(l, o, r) => "logical"
@@ -1257,6 +1264,12 @@ class Codegen {
             This => "this"
             BlockExpr(s, v) => "block_expr"
         }
+    }
+
+    fun classify_expr(expr: AST.Expr): String {
+        var a = this.classify_expr_a(expr)
+        if (a == "") return this.classify_expr_b(expr)
+        return a
     }
 
     fun get_variable_name(expr: AST.Expr): String {
