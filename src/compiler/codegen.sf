@@ -2827,6 +2827,7 @@ class Codegen {
         var vname = match (stmt) { VarDecl(n, t, i, d) => n }
         var vtype = match (stmt) { VarDecl(n, t, i, d) => t }
         this.add_var_unique(names, types, vname, vtype)
+        this.collect_vars_expr(this.get_var_init(stmt), names, types)
     }
 
     fun collect_vars_if(stmt: AST.Stmt, names: List<String>, types: List<String>) {
@@ -2888,6 +2889,10 @@ class Codegen {
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
         var ek = this.classify_expr(expr)
+        if (ek == "match_expr") {
+            this.collect_vars_match(expr, names, types)
+            return nil
+        }
         if (ek == "block_expr") {
             var be_stmts = match (expr) { BlockExpr(s, v) => s }
             var be_value = match (expr) { BlockExpr(s, v) => v }
@@ -2992,22 +2997,41 @@ class Codegen {
             this.collect_vars_expr(mem_obj, names, types)
             return nil
         }
-        if (ek != "match_expr") return nil
-        // It's a match expression — collect bindings from patterns and vars from bodies
+        // match_expr is handled at the top of this function
+    }
+
+    fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
         var arms = this.get_match_arms(expr)
         var i = 0
         while (i < arms.length()) {
-            var arm = arms[i]
-            var pattern = match (arm) { Arm(p, b) => p }
-            var body_expr = match (arm) { Arm(p, b) => b }
-            var bindings = match (pattern) { VariantPattern(v, b) => b }
-            var j = 0
-            while (j < bindings.length()) {
-                this.add_var_unique(names, types, bindings[j], "Int")
-                j = j + 1
-            }
-            this.collect_vars_expr(body_expr, names, types)
+            this.collect_vars_arm(arms[i], names, types)
             i = i + 1
+        }
+    }
+
+    fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
+        return match (arm) { Arm(p, b) => p }
+    }
+
+    fun get_arm_body(arm: AST.MatchArm): AST.Expr {
+        return match (arm) { Arm(p, b) => b }
+    }
+
+    fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
+        return match (pattern) { VariantPattern(v, b) => b }
+    }
+
+    fun collect_vars_arm(arm: AST.MatchArm, names: List<String>, types: List<String>) {
+        var bindings = this.get_pattern_bindings(this.get_arm_pattern(arm))
+        this.collect_arm_bindings(bindings, names, types)
+        this.collect_vars_expr(this.get_arm_body(arm), names, types)
+    }
+
+    fun collect_arm_bindings(bindings: List<String>, names: List<String>, types: List<String>) {
+        var j = 0
+        while (j < bindings.length()) {
+            this.add_var_unique(names, types, bindings[j], "Int")
+            j = j + 1
         }
     }
 
