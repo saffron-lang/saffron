@@ -3243,21 +3243,37 @@ class Codegen {
     fun register_external_enums(decls: List<AST.Stmt>) {
         var i = 0
         while (i < decls.length()) {
-            var decl = decls[i]
-            var kind = this.classify_stmt(decl)
-            if (kind == "enum") {
-                var name = this.get_enum_decl_name(decl)
-                var variants = this.get_enum_decl_variants(decl)
-                var variant_names: List<String> = []
-                var j = 0
-                while (j < variants.length()) {
-                    this.register_variant(name, variant_names, variants[j], j)
-                    j = j + 1
-                }
-                this.enum_defs.set(name, variant_names)
-            }
+            this.try_register_enum(decls[i])
             i = i + 1
         }
+    }
+
+    fun try_register_enum(decl: AST.Stmt) {
+        match (decl) {
+            EnumDecl(name, variants, doc) => {
+                this.register_enum_variants(name, variants)
+            }
+            VarDecl(n, t, i, d) => {}
+            FunDecl(n, p, r, b, d) => {}
+            ClassDecl(n, f, m, d) => {}
+            If(c, t, e) => {}
+            While(c, b) => {}
+            Block(s) => {}
+            ExprStmt(e) => {}
+            Return(v) => {}
+            Break => {}
+            Continue => {}
+        }
+    }
+
+    fun register_enum_variants(name: String, variants: List<AST.Variant>) {
+        var variant_names: List<String> = []
+        var j = 0
+        while (j < variants.length()) {
+            this.register_variant(name, variant_names, variants[j], j)
+            j = j + 1
+        }
+        this.enum_defs.set(name, variant_names)
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
