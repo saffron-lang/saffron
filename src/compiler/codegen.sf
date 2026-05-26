@@ -1661,6 +1661,18 @@ class Codegen {
             }
         }
 
+        // Universal numeric methods (work on any i64 value regardless of tracked type)
+        if (method == "floor") {
+            this.last_type = "Int"
+            return obj
+        }
+        if (method == "to_string") {
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
+            this.last_type = "String"
+            return local
+        }
+
         // Fall back to class method call (inside or outside class)
         var class_name = ""
         if (this.class_fields.has(obj_type)) {
