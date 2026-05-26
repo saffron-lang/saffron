@@ -503,6 +503,7 @@ class Parser {
             TkClass => "class"
             TkThis => "this"
             TkFor => "for"
+            TkIn => "in"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -871,24 +872,74 @@ class Parser {
     fun parse_for(): AST.Stmt {
         this.advance() // consume for
         this.consume("(")
-        // Init: var i = 0
-        var init = this.parse_var_decl()
+        // Check for for-in: for (name in expr)
+        var name = this.expect_ident()
+        if (this.match_kind("in")) {
+            return this.parse_for_in(name)
+        }
+        // C-style for: for (var name = init; cond; update)
+        this.consume(":")
+        var vtype = this.parse_type()
+        this.consume("=")
+        var init_expr = this.parse_expr()
+        var init = AST.Stmt.VarDecl(name, vtype, init_expr, "")
         this.consume(";")
-        // Condition: i < 10
         var cond = this.parse_expr()
         this.consume(";")
-        // Update: i = i + 1
         var update_name = this.expect_ident()
         this.consume("=")
         var update_expr = this.parse_expr()
         this.consume(")")
-        // Body
         var body = this.parse_block_stmts()
-        // Desugar: { init; while (cond) { body; update } }
         body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
         var stmts: List<AST.Stmt> = []
         stmts.push(init)
         stmts.push(AST.Stmt.While(cond, body))
+        return AST.Stmt.Block(stmts)
+    }
+
+    fun parse_for_in(item_name: String): AST.Stmt {
+        // Desugar: for (item in list) { body }
+        // Into: { var __list = list; var __i = 0; while (__i < __list.length()) { var item = __list[__i]; body; __i = __i + 1 } }
+        var iter_expr = this.parse_expr()
+        this.consume(")")
+        var body = this.parse_block_stmts()
+
+        var list_var = "__for_list"
+        var idx_var = "__for_i"
+
+        // var __for_list = iter_expr
+        var init_list = AST.Stmt.VarDecl(list_var, "List", iter_expr, "")
+        // var __for_i = 0
+        var init_idx = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
+        // __for_i < __for_list.length()
+        var cond = AST.Expr.Binary(
+            AST.Expr.Variable(idx_var),
+            "<",
+            AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", [])
+        )
+        // var item = __for_list[__for_i]
+        var item_init = AST.Stmt.VarDecl(item_name, "Any",
+            AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
+        // __for_i = __for_i + 1
+        var increment = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
+            AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
+
+        // Build while body: item decl + user body + increment
+        var while_body: List<AST.Stmt> = []
+        while_body.push(item_init)
+        var bi = 0
+        while (bi < body.length()) {
+            while_body.push(body[bi])
+            bi = bi + 1
+        }
+        while_body.push(increment)
+
+        // Build block: list init + idx init + while
+        var stmts: List<AST.Stmt> = []
+        stmts.push(init_list)
+        stmts.push(init_idx)
+        stmts.push(AST.Stmt.While(cond, while_body))
         return AST.Stmt.Block(stmts)
     }
 
