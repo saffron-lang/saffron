@@ -57,7 +57,9 @@ enum Stmt {
     While(condition: Expr, body: List<Stmt>),
     Block(stmts: List<Stmt>),
     Break,
-    Continue
+    Continue,
+    TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>),
+    Throw(value: Expr)
 }
 
 enum Variant {

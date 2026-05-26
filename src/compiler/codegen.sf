@@ -2900,6 +2900,14 @@ class Codegen {
             ClassDecl(n, f, m, d) => {}
             Break => {}
             Continue => {}
+            TryCatch(try_body, catch_name, catch_body) => {
+                this.collect_vars(try_body, names, types)
+                this.add_var_unique(names, types, catch_name, "String")
+                this.collect_vars(catch_body, names, types)
+            }
+            Throw(value) => {
+                this.collect_vars_expr(value, names, types)
+            }
         }
     }
 
@@ -3036,6 +3044,12 @@ class Codegen {
                 this.emit_terminator("br label %" + this.loop_end_label)
             }
             Continue => {}
+            TryCatch(try_body, catch_name, catch_body) => {
+                this.gen_try_catch(try_body, catch_name, catch_body)
+            }
+            Throw(value) => {
+                this.gen_throw(value)
+            }
             FunDecl(name, params, ret_type, body, doc) => {
                 this.gen_function(name, params, ret_type, body)
             }
@@ -3264,6 +3278,8 @@ class Codegen {
             Return(v) => {}
             Break => {}
             Continue => {}
+            TryCatch(t, n, c) => {}
+            Throw(v) => {}
         }
     }
 
@@ -3369,6 +3385,8 @@ class Codegen {
             Block(s) => "block"
             Break => "break"
             Continue => "continue"
+            TryCatch(t, n, c) => "try"
+            Throw(v) => "throw"
         }
     }
 
@@ -3385,8 +3403,50 @@ class Codegen {
             Block(s) => "other"
             Break => "other"
             Continue => "other"
+            TryCatch(t, n, c) => "other"
+            Throw(v) => "other"
         }
         return kind == "if"
+    }
+
+    fun gen_throw(value: AST.Expr) {
+        var val = this.gen_arg_value(value)
+        this.emit_indent("store i64 " + val + ", i64* @__exception_value")
+        this.emit_indent("call void @longjmp(i8* @__jmp_buf_stack, i32 1)")
+        this.emit_terminator("unreachable")
+    }
+
+    fun gen_try_catch(try_body: List<AST.Stmt>, catch_name: String, catch_body: List<AST.Stmt>) {
+        var try_label = this.fresh_label("try")
+        var catch_label = this.fresh_label("catch")
+        var end_label = this.fresh_label("tryend")
+
+        // setjmp returns 0 on first call, non-zero on longjmp
+        var setjmp_result = this.fresh_local()
+        this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* @__jmp_buf_stack)")
+        var is_throw = this.fresh_local()
+        this.emit_indent(is_throw + " = icmp ne i32 " + setjmp_result + ", 0")
+        this.emit_terminator("br i1 " + is_throw + ", label %" + catch_label + ", label %" + try_label)
+
+        // Try body
+        this.start_block(try_label)
+        this.gen_stmts(try_body)
+        if (!this.block_terminated) {
+            this.emit_terminator("br label %" + end_label)
+        }
+
+        // Catch body
+        this.start_block(catch_label)
+        // Load exception value into catch variable
+        var exc_val = this.fresh_local()
+        this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
+        this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.gen_stmts(catch_body)
+        if (!this.block_terminated) {
+            this.emit_terminator("br label %" + end_label)
+        }
+
+        this.start_block(end_label)
     }
 
     fun gen_while(cond: AST.Expr, body: List<AST.Stmt>) {
@@ -3536,6 +3596,8 @@ class Codegen {
             Block(s) => false
             Break => false
             Continue => false
+            TryCatch(t, n, c) => false
+            Throw(v) => false
         }
     }
 
@@ -3648,7 +3710,9 @@ class Codegen {
         out.append("declare i32 @pclose(i8*)\n")
         out.append("declare i8* @popen(i8*, i8*)\n")
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
-        out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n\n")
+        out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
+        out.append("declare i32 @setjmp(i8*)\n")
+        out.append("declare void @longjmp(i8*, i32)\n\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
@@ -3659,7 +3723,10 @@ class Codegen {
 
         // Global argc/argv (set by main) — weak linkage for multi-file
         out.append("@__argc = weak global i32 0\n")
-        out.append("@__argv = weak global i8** null\n\n")
+        out.append("@__argv = weak global i8** null\n")
+        // Exception handling globals
+        out.append("@__exception_value = weak global i64 0\n")
+        out.append("@__jmp_buf_stack = weak global [64 x i8] zeroinitializer\n\n")
 
         // List runtime
         out.append("; List = { count, capacity, data* }\n")

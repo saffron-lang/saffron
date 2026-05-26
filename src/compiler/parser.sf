@@ -504,6 +504,10 @@ class Parser {
             TkThis => "this"
             TkFor => "for"
             TkIn => "in"
+            TkTry => "try"
+            TkCatch => "catch"
+            TkThrow => "throw"
+            TkFinally => "finally"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -616,6 +620,8 @@ class Parser {
         if (this.match_kind_check("if")) return this.parse_if()
         if (this.match_kind_check("while")) return this.parse_while()
         if (this.match_kind_check("for")) return this.parse_for()
+        if (this.match_kind_check("try")) return this.parse_try()
+        if (this.match_kind_check("throw")) return this.parse_throw()
         if (this.is_ident_named("break")) { this.advance(); return AST.Stmt.Break }
         if (this.is_ident_named("continue")) { this.advance(); return AST.Stmt.Continue }
         if (this.match_kind_check("{")) return this.parse_block()
@@ -941,6 +947,24 @@ class Parser {
         stmts.push(init_idx)
         stmts.push(AST.Stmt.While(cond, while_body))
         return AST.Stmt.Block(stmts)
+    }
+
+    fun parse_try(): AST.Stmt {
+        this.advance() // consume try
+        var try_body = this.parse_block_stmts()
+        this.consume("catch")
+        this.consume("(")
+        var catch_name = this.expect_ident()
+        this.consume(")")
+        var catch_body = this.parse_block_stmts()
+        // TODO: handle finally
+        return AST.Stmt.TryCatch(try_body, catch_name, catch_body)
+    }
+
+    fun parse_throw(): AST.Stmt {
+        this.advance() // consume throw
+        var value = this.parse_expr()
+        return AST.Stmt.Throw(value)
     }
 
     fun parse_block(): AST.Stmt {

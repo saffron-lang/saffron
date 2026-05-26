@@ -28,6 +28,10 @@ enum TokenKind {
     TkThis,
     TkFor,
     TkIn,
+    TkTry,
+    TkCatch,
+    TkThrow,
+    TkFinally,
 
     // Operators
     TkPlus,
@@ -249,6 +253,10 @@ class Lexer {
         else if (text == "this") { this.emit(TokenKind.TkThis) }
         else if (text == "for") { this.emit(TokenKind.TkFor) }
         else if (text == "in") { this.emit(TokenKind.TkIn) }
+        else if (text == "try") { this.emit(TokenKind.TkTry) }
+        else if (text == "catch") { this.emit(TokenKind.TkCatch) }
+        else if (text == "throw") { this.emit(TokenKind.TkThrow) }
+        else if (text == "finally") { this.emit(TokenKind.TkFinally) }
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 
