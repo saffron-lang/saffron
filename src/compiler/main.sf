@@ -107,9 +107,9 @@ fun main(): Int {
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
 
-    // Optional type checking
+    // Optional type checking (with import context)
     if (run_checker) {
-        var check_result: String = Checker.check(program)
+        var check_result: String = Checker.check_with_imports(program, import_decls)
         if (check_result.length() > 0) {
             IO.println(check_result)
         }

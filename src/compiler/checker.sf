@@ -840,3 +840,16 @@ fun check(program: List<AST.Stmt>): String {
     checker.check_program(program)
     return checker.report()
 }
+
+fun check_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
+    var checker = NullChecker()
+    // Register imported declarations (types, enums, classes, functions)
+    // without checking their bodies
+    var i = 0
+    while (i < imports.length()) {
+        checker.register_decl(imports[i])
+        i = i + 1
+    }
+    checker.check_program(program)
+    return checker.report()
+}
