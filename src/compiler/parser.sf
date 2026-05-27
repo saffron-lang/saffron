@@ -17,18 +17,18 @@ class Parser {
     }
 
     fun current_kind(): Lexer.TokenKind {
-        var tok = this.current()
+        var tok: Lexer.Token = this.current()
         return match (tok) { Token(kind, line, col) => kind }
     }
 
     fun advance(): Lexer.Token {
-        var tok = this.current()
+        var tok: Lexer.Token = this.current()
         this.pos = this.pos + 1
         return tok
     }
 
     fun expect_ident(): String {
-        var kind = this.current_kind()
+        var kind: Lexer.TokenKind = this.current_kind()
         this.advance()
         return match (kind) {
             TkIdent(name) => name
@@ -37,7 +37,7 @@ class Parser {
 
     fun peek_ident(): String {
         if (!this.match_kind_check("ident")) return ""
-        var kind = this.current_kind()
+        var kind: Lexer.TokenKind = this.current_kind()
         return match (kind) {
             TkIdent(name) => name
         }
@@ -52,8 +52,8 @@ class Parser {
     }
 
     fun current_line(): String {
-        var tok = this.current()
-        var line = match (tok) { Token(kind, line, col) => line }
+        var tok: Lexer.Token = this.current()
+        var line: Float = match (tok) { Token(kind, line, col) => line }
         return line.floor().to_string()
     }
 
@@ -70,28 +70,28 @@ class Parser {
     // --- Type annotations ---
 
     fun parse_type(): String {
-        var name = this.parse_single_type()
+        var name: String = this.parse_single_type()
         // Union types: String | Nil, Int | String | Nil
         while (this.match_kind("|")) {
-            var next = this.parse_single_type()
+            var next: String = this.parse_single_type()
             name = name + "|" + next
         }
         return name
     }
 
     fun parse_single_type(): String {
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
         while (this.match_kind(".")) {
-            var part = this.expect_ident()
+            var part: String = this.expect_ident()
             name = name + "." + part
         }
         // Generic args: collect tokens between < > respecting depth
         // Produces "Map<String,Number>" or "List<Map<String,Number>>"
         if (this.match_kind_check("<")) {
             this.advance()
-            var args = ""
-            var depth = 1
+            var args: String = ""
+            var depth: Float = 1
             while (depth > 0 and !this.match_kind_check("eof")) {
                 if (this.match_kind_check("<")) {
                     args = args + "<"
@@ -115,7 +115,7 @@ class Parser {
                     args = args + ","
                     this.advance()
                 } else if (this.match_kind_check("ident")) {
-                    var part = this.expect_ident()
+                    var part: String = this.expect_ident()
                     args = args + part
                 } else {
                     this.advance()
@@ -133,109 +133,109 @@ class Parser {
     }
 
     fun parse_or(): AST.Expr {
-        var left = this.parse_and()
+        var left: AST.Expr = this.parse_and()
         while (this.match_kind_check("or")) {
             this.advance()
-            var right = this.parse_and()
+            var right: AST.Expr = this.parse_and()
             left = AST.Expr.Logical(left, "or", right)
         }
         return left
     }
 
     fun parse_and(): AST.Expr {
-        var left = this.parse_equality()
+        var left: AST.Expr = this.parse_equality()
         while (this.match_kind_check("and")) {
             this.advance()
-            var right = this.parse_equality()
+            var right: AST.Expr = this.parse_equality()
             left = AST.Expr.Logical(left, "and", right)
         }
         return left
     }
 
     fun parse_equality(): AST.Expr {
-        var left = this.parse_comparison()
+        var left: AST.Expr = this.parse_comparison()
         while (this.is_equality_op()) {
-            var op = this.get_op_string()
+            var op: String = this.get_op_string()
             this.advance()
-            var right = this.parse_comparison()
+            var right: AST.Expr = this.parse_comparison()
             left = AST.Expr.Binary(left, op, right)
         }
         return left
     }
 
     fun parse_comparison(): AST.Expr {
-        var left = this.parse_bitwise_or()
+        var left: AST.Expr = this.parse_bitwise_or()
         while (this.is_comparison_op()) {
-            var op = this.get_op_string()
+            var op: String = this.get_op_string()
             this.advance()
-            var right = this.parse_bitwise_or()
+            var right: AST.Expr = this.parse_bitwise_or()
             left = AST.Expr.Binary(left, op, right)
         }
         if (this.match_kind("is")) {
-            var type_name = this.expect_ident()
+            var type_name: String = this.expect_ident()
             left = AST.Expr.IsCheck(left, type_name)
         }
         return left
     }
 
     fun parse_bitwise_or(): AST.Expr {
-        var left = this.parse_bitwise_xor()
+        var left: AST.Expr = this.parse_bitwise_xor()
         while (this.match_kind_check("|")) {
             this.advance()
-            var right = this.parse_bitwise_xor()
+            var right: AST.Expr = this.parse_bitwise_xor()
             left = AST.Expr.Binary(left, "|", right)
         }
         return left
     }
 
     fun parse_bitwise_xor(): AST.Expr {
-        var left = this.parse_bitwise_and()
+        var left: AST.Expr = this.parse_bitwise_and()
         while (this.match_kind_check("^")) {
             this.advance()
-            var right = this.parse_bitwise_and()
+            var right: AST.Expr = this.parse_bitwise_and()
             left = AST.Expr.Binary(left, "^", right)
         }
         return left
     }
 
     fun parse_bitwise_and(): AST.Expr {
-        var left = this.parse_shift()
+        var left: AST.Expr = this.parse_shift()
         while (this.match_kind_check("&")) {
             this.advance()
-            var right = this.parse_shift()
+            var right: AST.Expr = this.parse_shift()
             left = AST.Expr.Binary(left, "&", right)
         }
         return left
     }
 
     fun parse_shift(): AST.Expr {
-        var left = this.parse_term()
+        var left: AST.Expr = this.parse_term()
         while (this.is_shift_op()) {
-            var op = this.get_op_string()
+            var op: String = this.get_op_string()
             this.advance()
-            var right = this.parse_term()
+            var right: AST.Expr = this.parse_term()
             left = AST.Expr.Binary(left, op, right)
         }
         return left
     }
 
     fun parse_term(): AST.Expr {
-        var left = this.parse_factor()
+        var left: AST.Expr = this.parse_factor()
         while (this.is_term_op()) {
-            var op = this.get_op_string()
+            var op: String = this.get_op_string()
             this.advance()
-            var right = this.parse_factor()
+            var right: AST.Expr = this.parse_factor()
             left = AST.Expr.Binary(left, op, right)
         }
         return left
     }
 
     fun parse_factor(): AST.Expr {
-        var left = this.parse_unary()
+        var left: AST.Expr = this.parse_unary()
         while (this.is_factor_op()) {
-            var op = this.get_op_string()
+            var op: String = this.get_op_string()
             this.advance()
-            var right = this.parse_unary()
+            var right: AST.Expr = this.parse_unary()
             left = AST.Expr.Binary(left, op, right)
         }
         return left
@@ -244,24 +244,24 @@ class Parser {
     fun parse_unary(): AST.Expr {
         if (this.match_kind_check("-")) {
             this.advance()
-            var right = this.parse_unary()
+            var right: AST.Expr = this.parse_unary()
             return AST.Expr.Unary("-", right)
         }
         if (this.match_kind_check("!")) {
             this.advance()
-            var right = this.parse_unary()
+            var right: AST.Expr = this.parse_unary()
             return AST.Expr.Unary("!", right)
         }
         if (this.match_kind_check("~")) {
             this.advance()
-            var right = this.parse_unary()
+            var right: AST.Expr = this.parse_unary()
             return AST.Expr.Unary("~", right)
         }
         return this.parse_call()
     }
 
     fun parse_call(): AST.Expr {
-        var expr = this.parse_primary()
+        var expr: AST.Expr = this.parse_primary()
 
         while (true) {
             if (this.match_kind_check(".")) {
@@ -888,10 +888,11 @@ class Parser {
         this.consume("{")
         var fields_sb = StringBuilder()
         var methods: List<AST.Stmt> = []
+        var field_defaults: List<AST.Stmt> = []
         var first_field = true
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
-            if (this.match_kind_check("}") or this.match_kind_check("eof")) { return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring) }
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type  or  var name = default
                 this.advance()
@@ -900,9 +901,24 @@ class Parser {
                 if (this.match_kind(":")) {
                     ftype = this.parse_type()
                 }
-                // Skip default initializer if present (assigned in init)
                 if (this.match_kind("=")) {
-                    this.parse_expr()
+                    var default_val = this.parse_expr()
+                    // Infer type from default if not annotated
+                    if (ftype == "Any") {
+                        var ek = match (default_val) {
+                            StringLit(s) => "String"
+                            IntLit(v) => "Int"
+                            FloatLit(v) => "Float"
+                            BoolLit(v) => "Bool"
+                            NilLit => "Nil"
+                            ListLit(e) => "List"
+                            _ => "Any"
+                        }
+                        if (ek != "Any") { ftype = ek }
+                    }
+                    // Generate: this.fname = default_val (to prepend to init)
+                    field_defaults.push(AST.Stmt.ExprStmt(
+                        AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
                 if (!first_field) { fields_sb.append(",") }
                 fields_sb.append(fname)
@@ -915,7 +931,41 @@ class Parser {
             }
         }
         this.consume("}")
+        // Inject field defaults into init() method
+        if (field_defaults.length() > 0) {
+            this.inject_field_defaults(methods, field_defaults)
+        }
         return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring)
+    }
+
+    fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {
+        // Find existing init method and prepend defaults to its body
+        var i: Int = 0
+        while (i < methods.length()) {
+            var mname = match (methods[i]) { FunDecl(n, p, r, b, d) => n }
+            if (mname == "init") {
+                var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b }
+                var mparams = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
+                var mret = match (methods[i]) { FunDecl(n, p, r, b, d) => r }
+                // Build new body: defaults + original body
+                var new_body: List<AST.Stmt> = []
+                var di: Int = 0
+                while (di < defaults.length()) {
+                    new_body.push(defaults[di])
+                    di = di + 1
+                }
+                var bi: Int = 0
+                while (bi < mbody.length()) {
+                    new_body.push(mbody[bi])
+                    bi = bi + 1
+                }
+                methods[i] = AST.Stmt.FunDecl("init", mparams, mret, new_body, "")
+                return nil
+            }
+            i = i + 1
+        }
+        // No init found — create one with just the defaults
+        methods.push(AST.Stmt.FunDecl("init", "", "Nil", defaults, ""))
     }
 
     fun parse_import(): AST.Stmt {
