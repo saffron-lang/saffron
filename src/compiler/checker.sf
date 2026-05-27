@@ -845,7 +845,42 @@ class NullChecker {
         if (this.env.class_fields.has(obj_type)) {
             return this.get_class_field_type(obj_type, field)
         }
-        return "Any"
+        // Known module members
+        if (obj_type == "Any") {
+            // Module-qualified access: IO.println, OS.args, etc.
+            var obj_name: String = match (obj) {
+                Variable(n) => n
+                IntLit(v) => ""
+                FloatLit(v) => ""
+                BoolLit(v) => ""
+                StringLit(s) => ""
+                NilLit => ""
+                Binary(l, o, r) => ""
+                Unary(o, r) => ""
+                Call(c, a) => ""
+                Assign(n, v) => ""
+                Logical(l, o, r) => ""
+                MemberAccess(o, f) => ""
+                Match(s, a) => ""
+                EnumConstruct(e, v, a) => ""
+                Lambda(p, r, b) => ""
+                GetField(o, f) => ""
+                SetField(o, f, v) => ""
+                This => ""
+                ListLit(e) => ""
+                IndexGet(o, i) => ""
+                IndexSet(o, i, v) => ""
+                MethodCall(o, m, a) => ""
+                MapLit => ""
+                BlockExpr(s, v) => ""
+                IsCheck(v, t) => ""
+            }
+            // Enum variant access (Color.Red, Option.Some, etc.)
+            if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
+                return obj_name
+            }
+        }
+        return field
     }
 
     fun get_class_field_type(class_name: String, field: String): String {
@@ -964,10 +999,31 @@ class NullChecker {
     fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
         var name: String = match (callee) {
             Variable(n) => n
-            MemberAccess(o, f) => ""
+            MemberAccess(o, f) => f
         }
+        // Check args
+        var ai: Float = 0
+        while (ai < args.length()) {
+            this.infer_expr(args[ai])
+            ai = ai + 1
+        }
+        // Look up declared return type
         if (name.length() > 0) {
-            return this.env.get_func_ret(name)
+            var ret: String = this.env.get_func_ret(name)
+            if (ret != "Any") return ret
+            // Known builtins by name
+            if (name == "read_file") return "String"
+            if (name == "write_file") return "Nil"
+            if (name == "println" or name == "print") return "Nil"
+            if (name == "args") return "List<String>"
+            if (name == "exec") return "String"
+            if (name == "exit") return "Nil"
+            if (name == "lex") return "List"
+            if (name == "parse") return "List"
+            if (name == "generate" or name == "generate_with_imports") return "String"
+            if (name == "check" or name == "check_with_imports") return "String"
+            if (name == "resolve_import_path") return "String"
+            if (name == "extract_imports") return "List<String>"
         }
         return "Any"
     }
