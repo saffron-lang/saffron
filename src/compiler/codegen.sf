@@ -1760,23 +1760,8 @@ class Codegen {
             }
         }
 
-        // Universal numeric methods (work on any i64 value regardless of tracked type)
-        if (method == "floor") {
-            this.last_type = "Int"
-            return obj
-        }
-        if (method == "to_string") {
-            if (obj_type == "String") {
-                this.last_type = "String"
-                return obj
-            }
-            var local = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
-            this.last_type = "String"
-            return local
-        }
-
         // Fall back to class method call (inside or outside class)
+        // (must come BEFORE universal methods so class .to_string() is found)
         var class_name = ""
         if (this.class_fields.has(obj_type)) {
             class_name = obj_type
@@ -1812,6 +1797,21 @@ class Codegen {
             }
         }
 
+        // Universal methods (last resort, after class methods checked)
+        if (method == "floor") {
+            this.last_type = "Int"
+            return obj
+        }
+        if (method == "to_string") {
+            if (obj_type == "String") {
+                this.last_type = "String"
+                return obj
+            }
+            var ts_local = this.fresh_local()
+            this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + obj + ")")
+            this.last_type = "String"
+            return ts_local
+        }
         this.last_type = "Int"
         return "0"
     }

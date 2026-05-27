@@ -86,20 +86,41 @@ class Parser {
             var part = this.expect_ident()
             name = name + "." + part
         }
-        // Full generic args: Map<String, Number> → "Map<String,Number>"
+        // Generic args: collect tokens between < > respecting depth
+        // Produces "Map<String,Number>" or "List<Map<String,Number>>"
         if (this.match_kind_check("<")) {
             this.advance()
-            var args = this.parse_single_type()
-            while (this.match_kind(",")) {
-                args = args + "," + this.parse_single_type()
+            var args = ""
+            var depth = 1
+            while (depth > 0 and !this.match_kind_check("eof")) {
+                if (this.match_kind_check("<")) {
+                    args = args + "<"
+                    depth = depth + 1
+                    this.advance()
+                } else if (this.match_kind_check(">")) {
+                    depth = depth - 1
+                    if (depth > 0) {
+                        args = args + ">"
+                    }
+                    this.advance()
+                } else if (this.match_kind_check(">>")) {
+                    depth = depth - 2
+                    if (depth > 0) {
+                        args = args + ">>"
+                    } else if (depth == 0) {
+                        args = args + ">"
+                    }
+                    this.advance()
+                } else if (this.match_kind_check(",")) {
+                    args = args + ","
+                    this.advance()
+                } else if (this.match_kind_check("ident")) {
+                    var part = this.expect_ident()
+                    args = args + part
+                } else {
+                    this.advance()
+                }
             }
-            // Handle >> as two closing >
-            if (this.match_kind_check(">>")) {
-                this.advance()
-                name = name + "<" + args + ">"
-                return name
-            }
-            this.consume(">")
             name = name + "<" + args + ">"
         }
         return name
@@ -621,6 +642,7 @@ class Parser {
         if (this.match_kind_check("fun")) return this.parse_fun_decl_with_doc(docstring)
         if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
         if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
+        if (this.is_ident_named("interface")) return this.parse_class_decl_with_doc(docstring)
         if (this.match_kind_check("import")) return this.parse_import()
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
@@ -802,6 +824,10 @@ class Parser {
         if (this.is_ident_named("extends")) {
             this.advance() // consume extends
             parent = this.expect_ident()
+            // Support multiple extends (interfaces): class Foo extends A, B, C
+            while (this.match_kind(",")) {
+                this.expect_ident() // skip additional interfaces for now
+            }
         }
         this.consume("{")
         var fields_sb = StringBuilder()
