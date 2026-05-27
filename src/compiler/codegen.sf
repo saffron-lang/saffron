@@ -80,11 +80,12 @@ class Codegen {
     }
 
     fun str_to_type(s: String): AST.Type {
+        if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
         if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
-        if (s == "Any" or s == "") return AST.Type.AnyType
+        if (s == "Any") return AST.Type.AnyType
         if (s == "List" or s.starts_with("List<")) return AST.Type.GenericType("List", [AST.Type.AnyType])
         if (s == "Map" or s.starts_with("Map<")) return AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
         if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
