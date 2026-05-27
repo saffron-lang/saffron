@@ -266,7 +266,7 @@ class Parser {
         while (true) {
             if (this.match_kind_check(".")) {
                 this.advance()
-                var field = this.expect_ident()
+                var field: String = this.expect_ident()
                 if (this.match_kind_check("(")) {
                     // Method call: obj.method(args)
                     this.advance()
@@ -287,7 +287,7 @@ class Parser {
             } else if (this.match_kind_check("[")) {
                 // Index access: obj[expr]
                 this.advance()
-                var idx = this.parse_expr()
+                var idx: AST.Expr = this.parse_expr()
                 this.consume("]")
                 expr = AST.Expr.IndexGet(expr, idx)
             } else if (this.match_kind_check("(")) {
@@ -344,9 +344,9 @@ class Parser {
             this.consume("}")
             // The last statement becomes the value expression if it's an ExprStmt
             if (block_stmts.length() > 0) {
-                var last = block_stmts[block_stmts.length() - 1]
-                var last_kind = this.stmt_to_expr(last)
-                var is_expr_stmt = match (last) {
+                var last: AST.Stmt = block_stmts[block_stmts.length() - 1]
+                var last_kind: AST.Expr = this.stmt_to_expr(last)
+                var is_expr_stmt: Bool = match (last) {
                     ExprStmt(e) => true
                     VarDecl(n, t, i, d) => false
                     FunDecl(n, p, r, b, d) => false
@@ -368,7 +368,7 @@ class Parser {
             return AST.Expr.BlockExpr([], AST.Expr.NilLit)
         }
 
-        var kind = this.current_kind()
+        var kind: Lexer.TokenKind = this.current_kind()
         this.advance()
 
         return match (kind) {
@@ -380,7 +380,7 @@ class Parser {
             TkString(s) => AST.Expr.StringLit(s)
             TkIdent(name) => AST.Expr.Variable(name)
             TkLParen => {
-                var expr = this.parse_expr()
+                var expr: AST.Expr = this.parse_expr()
                 this.consume(")")
                 expr
             }
@@ -403,14 +403,14 @@ class Parser {
     fun parse_match_expr(): AST.Expr {
         this.advance() // consume match
         this.consume("(")
-        var subject = this.parse_expr()
+        var subject: AST.Expr = this.parse_expr()
         this.consume(")")
         this.consume("{")
         var arms: List<AST.MatchArm> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
-            var pattern = this.parse_pattern()
+            var pattern: AST.Pattern = this.parse_pattern()
             this.consume("=>")
-            var body = this.parse_expr()
+            var body: AST.Expr = this.parse_expr()
             arms.push(AST.MatchArm.Arm(pattern, body))
         }
         this.consume("}")
@@ -418,7 +418,7 @@ class Parser {
     }
 
     fun parse_pattern(): AST.Pattern {
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         if (this.match_kind("(")) {
             var bindings: List<String> = []
             if (!this.match_kind_check(")")) {
@@ -438,11 +438,11 @@ class Parser {
     fun parse_lambda(): AST.Expr {
         this.advance() // consume fun
         this.consume("(")
-        var params_sb = StringBuilder()
+        var params_sb: StringBuilder = StringBuilder()
         if (!this.match_kind_check(")")) {
-            var pname = this.expect_ident()
+            var pname: String = this.expect_ident()
             this.consume(":")
-            var ptype = this.parse_type()
+            var ptype: String = this.parse_type()
             params_sb.append(pname)
             params_sb.append(":")
             params_sb.append(ptype)
@@ -457,32 +457,32 @@ class Parser {
             }
         }
         this.consume(")")
-        var ret_type = "Int"
+        var ret_type: String = "Int"
         if (this.match_kind(":")) {
             ret_type = this.parse_type()
         }
         if (this.match_kind("=>")) {
             // Short form: fun (x: Int) => expr
-            var expr = this.parse_expr()
-            var params = params_sb.to_string()
+            var expr: AST.Expr = this.parse_expr()
+            var params: String = params_sb.to_string()
             return AST.Expr.Lambda(params, ret_type, [AST.Stmt.Return(expr)])
         }
         // Block form: fun (x: Int) { ... }
-        var params = params_sb.to_string()
-        var body = this.parse_block_stmts()
+        var params: String = params_sb.to_string()
+        var body: List<AST.Stmt> = this.parse_block_stmts()
         return AST.Expr.Lambda(params, ret_type, body)
     }
 
     fun is_ident_named(name: String): Bool {
         if (!this.match_kind_check("ident")) return false
-        var kind = this.current_kind()
-        var ident_name = match (kind) { TkIdent(n) => n }
+        var kind: Lexer.TokenKind = this.current_kind()
+        var ident_name: String = match (kind) { TkIdent(n) => n }
         return ident_name == name
     }
 
     fun match_kind_check(expected: String): Bool {
-        var kind = this.current_kind()
-        var name = this.kind_name(kind)
+        var kind: Lexer.TokenKind = this.current_kind()
+        var name: String = this.kind_name(kind)
         return name == expected
     }
 
@@ -577,7 +577,7 @@ class Parser {
     }
 
     fun get_op_string(): String {
-        var kind = this.current_kind()
+        var kind: Lexer.TokenKind = this.current_kind()
         return match (kind) {
             TkPlus => "+"
             TkMinus => "-"
@@ -603,7 +603,7 @@ class Parser {
     fun collect_doc_comments(): String {
         var parts: List<String> = []
         while (this.match_kind_check("doc_comment")) {
-            var kind = this.current_kind()
+            var kind: Lexer.TokenKind = this.current_kind()
             var text = match (kind) {
                 TkDocComment(t) => t
             }
@@ -617,7 +617,7 @@ class Parser {
     fun collect_module_doc(): String {
         var parts: List<String> = []
         while (this.match_kind_check("module_doc")) {
-            var kind = this.current_kind()
+            var kind: Lexer.TokenKind = this.current_kind()
             var text = match (kind) {
                 TkModuleDoc(t) => t
             }
@@ -672,12 +672,12 @@ class Parser {
         }
         // Check for index assignment: ident[expr] = value
         if (this.match_kind_check("ident") and this.peek_is("[")) {
-            var obj_name = this.expect_ident()
+            var obj_name: String = this.expect_ident()
             this.advance() // consume [
-            var idx = this.parse_expr()
+            var idx: AST.Expr = this.parse_expr()
             this.consume("]")
             if (this.match_kind("=")) {
-                var value = this.parse_expr()
+                var value: AST.Expr = this.parse_expr()
                 return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
                     AST.Expr.Variable(obj_name), idx, value))
             }
@@ -686,7 +686,7 @@ class Parser {
             return AST.Stmt.ExprStmt(get_expr)
         }
         // Default: expression statement
-        var expr = this.parse_expr()
+        var expr: AST.Expr = this.parse_expr()
         return AST.Stmt.ExprStmt(expr)
     }
 
@@ -698,9 +698,9 @@ class Parser {
     }
 
     fun parse_assign(): AST.Stmt {
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         this.consume("=")
-        var value = this.parse_expr()
+        var value: AST.Expr = this.parse_expr()
         return AST.Stmt.ExprStmt(AST.Expr.Assign(name, value))
     }
 
@@ -714,13 +714,13 @@ class Parser {
         if (this.match_kind_check("[")) {
             return this.parse_destructure()
         }
-        var name = this.expect_ident()
-        var type_ann = "Any"
+        var name: String = this.expect_ident()
+        var type_ann: String = "Any"
         if (this.match_kind(":")) {
             type_ann = this.parse_type()
         }
         this.consume("=")
-        var init = this.parse_expr()
+        var init: AST.Expr = this.parse_expr()
         return AST.Stmt.VarDecl(name, type_ann, init, docstring)
     }
 
@@ -735,10 +735,10 @@ class Parser {
         }
         this.consume("]")
         this.consume("=")
-        var init = this.parse_expr()
+        var init: AST.Expr = this.parse_expr()
         // Desugar: var __destruct = init; var a = __destruct[0]; var b = __destruct[1]; ...
         var stmts: List<AST.Stmt> = []
-        var tmp_name = "__destruct"
+        var tmp_name: String = "__destruct"
         stmts.push(AST.Stmt.VarDecl(tmp_name, "List", init, ""))
         var i: Int = 0
         while (i < names.length()) {
@@ -755,14 +755,14 @@ class Parser {
 
     fun parse_fun_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume fun
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         this.consume("(")
-        var params_sb = StringBuilder()
-        var first_param = true
+        var params_sb: StringBuilder = StringBuilder()
+        var first_param: Bool = true
         if (!this.match_kind_check(")")) {
-            var pname = this.expect_ident()
+            var pname: String = this.expect_ident()
             this.consume(":")
-            var ptype = this.parse_type()
+            var ptype: String = this.parse_type()
             params_sb.append(pname)
             params_sb.append(":")
             params_sb.append(ptype)
@@ -778,11 +778,11 @@ class Parser {
             }
         }
         this.consume(")")
-        var ret_type = "Nil"
+        var ret_type: String = "Nil"
         if (this.match_kind(":")) {
             ret_type = this.parse_type()
         }
-        var params = params_sb.to_string()
+        var params: String = params_sb.to_string()
         var body: List<AST.Stmt> = []
         if (this.match_kind_check("{")) {
             body = this.parse_block_stmts()
@@ -796,23 +796,23 @@ class Parser {
 
     fun parse_enum_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume enum
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         this.consume("{")
         var variants: List<AST.Variant> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
-            var vname = this.expect_ident()
-            var fields = ""
+            var vname: String = this.expect_ident()
+            var fields: String = ""
             if (this.match_kind("(")) {
-                var fields_sb = StringBuilder()
-                var first = true
+                var fields_sb: StringBuilder = StringBuilder()
+                var first: Bool = true
                 while (!this.match_kind_check(")")) {
                     if (!first) {
                         fields_sb.append(",")
                         this.consume(",")
                     }
-                    var fname = this.expect_ident()
+                    var fname: String = this.expect_ident()
                     this.consume(":")
-                    var ftype = this.parse_type()
+                    var ftype: String = this.parse_type()
                     fields_sb.append(fname)
                     fields_sb.append(":")
                     fields_sb.append(ftype)
@@ -831,17 +831,17 @@ class Parser {
     fun parse_this_stmt(): AST.Stmt {
         this.advance() // consume this
         this.consume(".")
-        var field = this.expect_ident()
+        var field: String = this.expect_ident()
         if (this.match_kind("=")) {
             // this.field = value
-            var value = this.parse_expr()
+            var value: AST.Expr = this.parse_expr()
             return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
         }
         // Check for chained method: this.field.method(args)
         var expr = AST.Expr.GetField(AST.Expr.This, field)
         if (this.match_kind_check(".")) {
             this.advance()
-            var method = this.expect_ident()
+            var method: String = this.expect_ident()
             if (this.match_kind("(")) {
                 var args: List<AST.Expr> = []
                 if (!this.match_kind_check(")")) {
@@ -875,8 +875,8 @@ class Parser {
 
     fun parse_class_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume class
-        var name = this.expect_ident()
-        var parent = ""
+        var name: String = this.expect_ident()
+        var parent: String = ""
         if (this.is_ident_named("extends")) {
             this.advance() // consume extends
             parent = this.expect_ident()
@@ -886,23 +886,23 @@ class Parser {
             }
         }
         this.consume("{")
-        var fields_sb = StringBuilder()
+        var fields_sb: StringBuilder = StringBuilder()
         var methods: List<AST.Stmt> = []
         var field_defaults: List<AST.Stmt> = []
-        var first_field = true
+        var first_field: Bool = true
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type  or  var name = default
                 this.advance()
-                var fname = this.expect_ident()
-                var ftype = "Any"
+                var fname: String = this.expect_ident()
+                var ftype: String = "Any"
                 if (this.match_kind(":")) {
                     ftype = this.parse_type()
                 }
                 if (this.match_kind("=")) {
-                    var default_val = this.parse_expr()
+                    var default_val: AST.Expr = this.parse_expr()
                     // Infer type from default if not annotated
                     if (ftype == "Any") {
                         var ek = match (default_val) {
@@ -983,14 +983,14 @@ class Parser {
         if (this.match_kind_check("}") or this.match_kind_check("eof")) {
             return AST.Stmt.Return(AST.Expr.NilLit)
         }
-        var value = this.parse_expr()
+        var value: AST.Expr = this.parse_expr()
         return AST.Stmt.Return(value)
     }
 
     fun parse_if(): AST.Stmt {
         this.advance() // consume if
         this.consume("(")
-        var cond = this.parse_expr()
+        var cond: AST.Expr = this.parse_expr()
         this.consume(")")
         var then_branch = this.parse_body()
         var else_branch: List<AST.Stmt> = []
@@ -1018,7 +1018,7 @@ class Parser {
     fun parse_while(): AST.Stmt {
         this.advance() // consume while
         this.consume("(")
-        var cond = this.parse_expr()
+        var cond: AST.Expr = this.parse_expr()
         this.consume(")")
         var body = this.parse_block_stmts()
         return AST.Stmt.While(cond, body)
@@ -1028,22 +1028,22 @@ class Parser {
         this.advance() // consume for
         this.consume("(")
         // Check for for-in: for (name in expr)
-        var name = this.expect_ident()
+        var name: String = this.expect_ident()
         if (this.match_kind("in")) {
             return this.parse_for_in(name)
         }
         // C-style for: for (var name = init; cond; update)
         this.consume(":")
-        var vtype = this.parse_type()
+        var vtype: String = this.parse_type()
         this.consume("=")
-        var init_expr = this.parse_expr()
+        var init_expr: AST.Expr = this.parse_expr()
         var init = AST.Stmt.VarDecl(name, vtype, init_expr, "")
         this.consume(";")
-        var cond = this.parse_expr()
+        var cond: AST.Expr = this.parse_expr()
         this.consume(";")
-        var update_name = this.expect_ident()
+        var update_name: String = this.expect_ident()
         this.consume("=")
-        var update_expr = this.parse_expr()
+        var update_expr: AST.Expr = this.parse_expr()
         this.consume(")")
         var body = this.parse_block_stmts()
         body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
@@ -1056,12 +1056,12 @@ class Parser {
     fun parse_for_in(item_name: String): AST.Stmt {
         // Desugar: for (item in list) { body }
         // Into: { var __list = list; var __i = 0; while (__i < __list.length()) { var item = __list[__i]; body; __i = __i + 1 } }
-        var iter_expr = this.parse_expr()
+        var iter_expr: AST.Expr = this.parse_expr()
         this.consume(")")
         var body = this.parse_block_stmts()
 
-        var list_var = "__for_list"
-        var idx_var = "__for_i"
+        var list_var: String = "__for_list"
+        var idx_var: String = "__for_i"
 
         // var __for_list = iter_expr
         var init_list = AST.Stmt.VarDecl(list_var, "List", iter_expr, "")
@@ -1085,7 +1085,7 @@ class Parser {
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
         while_body.push(increment)
-        var bi = 0
+        var bi: Float = 0
         while (bi < body.length()) {
             while_body.push(body[bi])
             bi = bi + 1
@@ -1104,7 +1104,7 @@ class Parser {
         var try_body = this.parse_block_stmts()
         this.consume("catch")
         this.consume("(")
-        var catch_name = this.expect_ident()
+        var catch_name: String = this.expect_ident()
         this.consume(")")
         var catch_body = this.parse_block_stmts()
         var finally_body: List<AST.Stmt> = []
@@ -1116,7 +1116,7 @@ class Parser {
 
     fun parse_throw(): AST.Stmt {
         this.advance() // consume throw
-        var value = this.parse_expr()
+        var value: AST.Expr = this.parse_expr()
         return AST.Stmt.Throw(value)
     }
 

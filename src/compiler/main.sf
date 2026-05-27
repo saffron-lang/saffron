@@ -11,8 +11,8 @@ import "./codegen.sf" as Codegen
 fun resolve_import_path(base_path: String, import_path: String): String {
     if (import_path.starts_with("./")) {
         var dir = base_path
-        var last_slash = 0
-        var i = 0
+        var last_slash: Float = 0
+        var i: Float = 0
         while (i < dir.length()) {
             if (dir.char_at(i) == "/") {
                 last_slash = i
@@ -27,11 +27,11 @@ fun resolve_import_path(base_path: String, import_path: String): String {
 fun extract_imports(source: String): List<String> {
     var imports: List<String> = []
     var lines: List<String> = source.split("\n")
-    var i = 0
+    var i: Float = 0
     while (i < lines.length()) {
         var line: String = lines[i]
         if (line.starts_with("import \"./")) {
-            var start = 8
+            var start: Float = 8
             var end = start + 1
             while (end < line.length()) {
                 if (line.char_at(end) == "\"") {
@@ -50,8 +50,8 @@ fun main(): Int {
     var args = OS.args()
 
     // Check for --check flag
-    var run_checker = false
-    var i = 1
+    var run_checker: Bool = false
+    var i: Float = 1
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg == "--check") {
@@ -61,7 +61,7 @@ fun main(): Int {
     }
 
     // Find the last .sf arg (input) and anything after it (output)
-    var last_sf_idx = 0
+    var last_sf_idx: Float = 0
     i = 1
     while (i < args.length()) {
         var arg: String = args[i]
@@ -88,14 +88,14 @@ fun main(): Int {
     // Resolve and parse imports for enum metadata
     var import_paths = extract_imports(source)
     var import_decls: List<AST.Stmt> = []
-    var pi = 0
+    var pi: Float = 0
     while (pi < import_paths.length()) {
         var rel_path = import_paths[pi]
         var full_path = resolve_import_path(input_path, rel_path)
         var imp_source: String = IO.read_file(full_path)
         var imp_tokens: List = Lexer.lex(imp_source)
         var imp_program: List = Parser.parse(imp_tokens)
-        var j = 0
+        var j: Float = 0
         while (j < imp_program.length()) {
             import_decls.push(imp_program[j])
             j = j + 1
