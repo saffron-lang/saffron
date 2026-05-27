@@ -1368,8 +1368,8 @@ class Codegen {
             }
         }
 
-        // Check for imported module function calls (Lexer.lex, Parser.parse, etc.)
-        if (obj_name == "Lexer" or obj_name == "Parser" or obj_name == "Codegen") {
+        // Check for imported module function calls (any name that's not a class, variable, or builtin module)
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)) {
             var arg_strs: List<String> = []
             var ai = 0
             while (ai < args.length()) {
@@ -1381,7 +1381,11 @@ class Codegen {
             this.called_function_arity.set(method, args.length())
             var local = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + method + "(" + arg_strs.join(", ") + ")")
-            this.last_type = "Int"
+            if (this.func_ret_types.has(method)) {
+                this.last_type = this.func_ret_types.get(method)
+            } else {
+                this.last_type = "Int"
+            }
             return local
         }
 
@@ -1526,6 +1530,20 @@ class Codegen {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__list_contains(i64 " + obj + ", i64 " + val + ")")
                 this.last_type = "Bool"
+                return local
+            }
+            if (method == "reverse") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_list_reverse")
+                this.emit_indent(local + " = call i64 @rt_list_reverse(i64 " + obj + ")")
+                this.last_type = "List"
+                return local
+            }
+            if (method == "copy") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_list_copy")
+                this.emit_indent(local + " = call i64 @rt_list_copy(i64 " + obj + ")")
+                this.last_type = "List"
                 return local
             }
         }
@@ -1680,6 +1698,43 @@ class Codegen {
                 this.emit_indent("store i8 0, i8* " + null_pos)
                 var local = this.fresh_local()
                 this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "trim") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_str_trim")
+                this.emit_indent(local + " = call i64 @rt_str_trim(i64 " + obj + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "to_upper") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_str_to_upper")
+                this.emit_indent(local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "to_lower") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_str_to_lower")
+                this.emit_indent(local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
+                this.last_type = "String"
+                return local
+            }
+            if (method == "index_of") {
+                var needle = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.called_functions.push("rt_str_index_of")
+                this.emit_indent(local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + needle + ")")
+                this.last_type = "Int"
+                return local
+            }
+            if (method == "repeat") {
+                var count = this.gen_arg_value(args[0])
+                var local = this.fresh_local()
+                this.called_functions.push("rt_str_repeat")
+                this.emit_indent(local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + count + ")")
                 this.last_type = "String"
                 return local
             }

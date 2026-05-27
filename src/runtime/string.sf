@@ -1,359 +1,95 @@
-// Saffron Runtime: String Type
-// ================================================
-// Strings are GC-managed objects wrapping a null-terminated i8* buffer.
-//
-// Object layout (after GC header at offset 0-23):
-//   Offset 24: length (i64)  — cached character count (excludes null terminator)
-//   Offset 32: data (i8*)    — pointer to character buffer (as i64)
-//
-// All String functions take and return i64 (pointer to the GC header).
-// The "chars" in String_new refers to a raw i8* (C string) cast to i64.
-//
-// PAYLOAD_SIZE = 16 (length + data pointer)
+// Saffron Core Runtime: String methods
+// Compiled to .ll and linked with every native program.
+// Method calls like s.trim() desugar to rt_str_trim(s).
 
-var STRING_PAYLOAD_SIZE: Int = 16
-
-// --- Construction ---
-
-// Create a new String object from a raw C string pointer.
-// The input `chars` is an i8* cast to i64 (null-terminated).
-// We copy the data so the original can be freed independently.
-fun String_new(chars: Int): Int {
-    // EXTERNAL: var len: Int = strlen(chars)
-    var len: Int = 0  // placeholder
-
-    // Allocate GC object: tag=1, payload=16 bytes
-    // EXTERNAL: var obj: Int = GC_alloc(1, STRING_PAYLOAD_SIZE)
-    var obj: Int = 0  // placeholder
-
-    // Allocate buffer for the copy (len + 1 for null terminator)
-    // EXTERNAL: var buf: Int = malloc(len + 1)
-    var buf: Int = 0  // placeholder
-
-    // EXTERNAL: memcpy(buf, chars, len + 1)
-
-    // Store length at obj + 24
-    // EXTERNAL: store len at (obj + 24)
-
-    // Store data pointer at obj + 32
-    // EXTERNAL: store buf at (obj + 32)
-
-    return obj
+fun rt_str_trim(s: String): String {
+    var start: Int = 0
+    var end: Int = s.length()
+    while (start < end) {
+        var ch = s.char_at(start)
+        if (ch == " " or ch == "\t" or ch == "\n") {
+            start = start + 1
+        } else {
+            break
+        }
+    }
+    while (end > start) {
+        var ch = s.char_at(end - 1)
+        if (ch == " " or ch == "\t" or ch == "\n") {
+            end = end - 1
+        } else {
+            break
+        }
+    }
+    return s.slice(start, end)
 }
 
-// Create a String from a known buffer and length (no strlen needed).
-// Used internally when we already know the size.
-fun String_new_with_length(chars: Int, len: Int): Int {
-    // EXTERNAL: var obj: Int = GC_alloc(1, STRING_PAYLOAD_SIZE)
-    var obj: Int = 0  // placeholder
-
-    // EXTERNAL: var buf: Int = malloc(len + 1)
-    var buf: Int = 0  // placeholder
-
-    // EXTERNAL: memcpy(buf, chars, len)
-    // EXTERNAL: store 0 (null byte) at (buf + len)
-
-    // EXTERNAL: store len at (obj + 24)
-    // EXTERNAL: store buf at (obj + 32)
-
-    return obj
-}
-
-// --- Access ---
-
-// Get the raw i8* data pointer from a String object.
-fun String_data(s: Int): Int {
-    // EXTERNAL: var data: Int = load from (s + 32)
-    var data: Int = 0  // placeholder
-    return data
-}
-
-// Get the cached length of a String.
-fun String_length(s: Int): Int {
-    // EXTERNAL: var len: Int = load from (s + 24)
-    var len: Int = 0  // placeholder
-    return len
-}
-
-// Get the character (as i64 code point) at the given index.
-// Returns 0 if index is out of bounds.
-fun String_char_at(s: Int, idx: Int): Int {
-    var len: Int = String_length(s)
-    if (idx < 0) {
-        return 0
-    }
-    if (idx >= len) {
-        return 0
-    }
-
-    var data: Int = String_data(s)
-    // EXTERNAL: var ch: Int = load i8 from (data + idx), zero-extended to i64
-    var ch: Int = 0  // placeholder
-    return ch
-}
-
-// --- Operations ---
-
-// Concatenate two String objects. Returns a new String.
-fun String_concat(a: Int, b: Int): Int {
-    var len_a: Int = String_length(a)
-    var len_b: Int = String_length(b)
-    var total: Int = len_a + len_b
-
-    // EXTERNAL: var buf: Int = malloc(total + 1)
-    var buf: Int = 0  // placeholder
-
-    var data_a: Int = String_data(a)
-    var data_b: Int = String_data(b)
-
-    // EXTERNAL: memcpy(buf, data_a, len_a)
-    // EXTERNAL: memcpy(buf + len_a, data_b, len_b)
-    // EXTERNAL: store 0 at (buf + total)  — null terminator
-
-    // Wrap in a new String object
-    var result: Int = String_new_with_length(buf, total)
-
-    // EXTERNAL: free(buf)  — String_new_with_length copies it
-    // Actually, we can optimize: pass buf directly and have the String own it.
-    // For now, the simple path copies.
-
-    return result
-}
-
-// Compare two Strings for equality. Returns 1 if equal, 0 otherwise.
-fun String_equals(a: Int, b: Int): Int {
-    var len_a: Int = String_length(a)
-    var len_b: Int = String_length(b)
-
-    // Fast path: different lengths cannot be equal
-    if (len_a != len_b) {
-        return 0
-    }
-
-    var data_a: Int = String_data(a)
-    var data_b: Int = String_data(b)
-
-    // EXTERNAL: var cmp: Int = memcmp(data_a, data_b, len_a)
-    var cmp: Int = 0  // placeholder
-
-    if (cmp == 0) {
-        return 1
-    }
-    return 0
-}
-
-// Extract a substring from start (inclusive) to end (exclusive).
-// Returns a new String.
-fun String_slice(s: Int, start: Int, end: Int): Int {
-    var len: Int = String_length(s)
-
-    // Clamp bounds
-    if (start < 0) {
-        start = 0
-    }
-    if (end > len) {
-        end = len
-    }
-    if (start >= end) {
-        // Return empty string
-        // EXTERNAL: var empty: Int = address of ""
-        var empty: Int = 0  // placeholder
-        return String_new(empty)
-    }
-
-    var slice_len: Int = end - start
-    var data: Int = String_data(s)
-
-    // EXTERNAL: var src: Int = data + start
-    var src: Int = 0  // placeholder
-
-    return String_new_with_length(src, slice_len)
-}
-
-// Check if `needle` is contained within `s`.
-// Returns 1 if found, 0 otherwise.
-fun String_contains(s: Int, needle: Int): Int {
-    var len_s: Int = String_length(s)
-    var len_n: Int = String_length(needle)
-
-    if (len_n == 0) {
-        return 1
-    }
-    if (len_n > len_s) {
-        return 0
-    }
-
-    var data_s: Int = String_data(s)
-    var data_n: Int = String_data(needle)
-
-    // Simple linear search (strstr equivalent)
-    var limit: Int = len_s - len_n
+fun rt_str_to_upper(s: String): String {
+    var lower: String = "abcdefghijklmnopqrstuvwxyz"
+    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var result = ""
     var i: Int = 0
-    while (i <= limit) {
-        // EXTERNAL: var cmp: Int = memcmp(data_s + i, data_n, len_n)
-        var cmp: Int = 0  // placeholder — will be memcmp result
-        if (cmp == 0) {
-            return 1
+    while (i < s.length()) {
+        var ch = s.char_at(i)
+        var pos: Int = rt_str_index_of(lower, ch)
+        if (pos >= 0) {
+            result = result + upper.char_at(pos)
+        } else {
+            result = result + ch
         }
         i = i + 1
     }
-    return 0
+    return result
 }
 
-// Find the first occurrence of `needle` in `s`.
-// Returns the index, or -1 if not found.
-fun String_index_of(s: Int, needle: Int): Int {
-    var len_s: Int = String_length(s)
-    var len_n: Int = String_length(needle)
-
-    if (len_n == 0) {
-        return 0
-    }
-    if (len_n > len_s) {
-        return 0 - 1
-    }
-
-    var data_s: Int = String_data(s)
-    var data_n: Int = String_data(needle)
-
-    var limit: Int = len_s - len_n
+fun rt_str_to_lower(s: String): String {
+    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var lower: String = "abcdefghijklmnopqrstuvwxyz"
+    var result = ""
     var i: Int = 0
+    while (i < s.length()) {
+        var ch = s.char_at(i)
+        var pos: Int = rt_str_index_of(upper, ch)
+        if (pos >= 0) {
+            result = result + lower.char_at(pos)
+        } else {
+            result = result + ch
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun rt_str_index_of(s: String, needle: String): Int {
+    var slen: Int = s.length()
+    var nlen: Int = needle.length()
+    if (nlen > slen) { return -1 }
+    var i: Int = 0
+    var limit: Int = slen - nlen
     while (i <= limit) {
-        // EXTERNAL: var cmp: Int = memcmp(data_s + i, data_n, len_n)
-        var cmp: Int = 0  // placeholder
-        if (cmp == 0) {
+        if (s.slice(i, i + nlen) == needle) {
             return i
         }
         i = i + 1
     }
-    return 0 - 1
+    return -1
 }
 
-// Split a String by a separator. Returns a List of Strings.
-fun String_split(s: Int, sep: Int): Int {
-    var len_s: Int = String_length(s)
-    var len_sep: Int = String_length(sep)
-
-    // EXTERNAL: var result: Int = __list_new()
-    var result: Int = 0  // placeholder
-
-    if (len_sep == 0) {
-        // Split into individual characters
-        var i: Int = 0
-        while (i < len_s) {
-            var data: Int = String_data(s)
-            // EXTERNAL: var ch_ptr: Int = data + i
-            var ch_ptr: Int = 0  // placeholder
-            var ch_str: Int = String_new_with_length(ch_ptr, 1)
-            // EXTERNAL: __list_push(result, ch_str)
-            i = i + 1
-        }
-        return result
-    }
-
-    // General case: find separator and split
-    var data_s: Int = String_data(s)
-    var data_sep: Int = String_data(sep)
-    var start: Int = 0
+fun rt_str_repeat(s: String, count: Int): String {
+    var result = ""
     var i: Int = 0
-
-    while (i <= len_s - len_sep) {
-        // EXTERNAL: var cmp: Int = memcmp(data_s + i, data_sep, len_sep)
-        var cmp: Int = 0  // placeholder
-        if (cmp == 0) {
-            // Found separator at position i
-            // Extract substring from start to i
-            var part: Int = String_slice(s, start, i)
-            // EXTERNAL: __list_push(result, part)
-            start = i + len_sep
-            i = start
-        } else {
-            i = i + 1
-        }
+    while (i < count) {
+        result = result + s
+        i = i + 1
     }
-
-    // Add the remaining part after the last separator
-    var last_part: Int = String_slice(s, start, len_s)
-    // EXTERNAL: __list_push(result, last_part)
-
     return result
 }
 
-// Check if string starts with the given prefix.
-// Returns 1 if true, 0 otherwise.
-fun String_starts_with(s: Int, prefix: Int): Int {
-    var len_s: Int = String_length(s)
-    var len_p: Int = String_length(prefix)
-
-    if (len_p > len_s) {
-        return 0
-    }
-
-    var data_s: Int = String_data(s)
-    var data_p: Int = String_data(prefix)
-
-    // EXTERNAL: var cmp: Int = memcmp(data_s, data_p, len_p)
-    var cmp: Int = 0  // placeholder
-    if (cmp == 0) {
-        return 1
-    }
+fun rt_str_ends_with(s: String, suffix: String): Int {
+    var slen: Int = s.length()
+    var plen: Int = suffix.length()
+    if (plen > slen) { return 0 }
+    var tail: String = s.slice(slen - plen, slen)
+    if (tail == suffix) { return 1 }
     return 0
-}
-
-// Check if string ends with the given suffix.
-// Returns 1 if true, 0 otherwise.
-fun String_ends_with(s: Int, suffix: Int): Int {
-    var len_s: Int = String_length(s)
-    var len_x: Int = String_length(suffix)
-
-    if (len_x > len_s) {
-        return 0
-    }
-
-    var data_s: Int = String_data(s)
-    var data_x: Int = String_data(suffix)
-    var offset: Int = len_s - len_x
-
-    // EXTERNAL: var cmp: Int = memcmp(data_s + offset, data_x, len_x)
-    var cmp: Int = 0  // placeholder
-    if (cmp == 0) {
-        return 1
-    }
-    return 0
-}
-
-// Repeat a string n times. Returns a new String.
-fun String_repeat(s: Int, n: Int): Int {
-    if (n <= 0) {
-        // EXTERNAL: var empty: Int = address of ""
-        var empty: Int = 0  // placeholder
-        return String_new(empty)
-    }
-
-    var len: Int = String_length(s)
-    var total: Int = len * n
-    var data: Int = String_data(s)
-
-    // EXTERNAL: var buf: Int = malloc(total + 1)
-    var buf: Int = 0  // placeholder
-
-    var i: Int = 0
-    while (i < n) {
-        // EXTERNAL: memcpy(buf + i * len, data, len)
-        i = i + 1
-    }
-    // EXTERNAL: store 0 at (buf + total)  — null terminator
-
-    return String_new_with_length(buf, total)
-}
-
-// Convert an integer to its string representation.
-fun String_from_int(value: Int): Int {
-    // EXTERNAL: Use snprintf or manual digit extraction
-    // Buffer of 21 bytes is enough for any i64 value
-    // EXTERNAL: var buf: Int = malloc(21)
-    // EXTERNAL: var len: Int = snprintf(buf, 21, "%lld", value)
-    var buf: Int = 0  // placeholder
-    var len: Int = 0  // placeholder
-    return String_new_with_length(buf, len)
 }
