@@ -39,3 +39,40 @@ fun rt_list_slice(items: List, start: Int, end: Int): List {
     }
     return result
 }
+
+fun rt_list_sort(items: List): List {
+    var len: Int = items.length()
+    if (len <= 1) { return items }
+    // In-place quicksort
+    rt_quicksort(items, 0, len - 1)
+    return items
+}
+
+fun rt_quicksort(items: List, low: Int, high: Int) {
+    if (low < high) {
+        var pivot_idx: Int = rt_partition(items, low, high)
+        rt_quicksort(items, low, pivot_idx - 1)
+        rt_quicksort(items, pivot_idx + 1, high)
+    }
+}
+
+fun rt_partition(items: List, low: Int, high: Int): Int {
+    var pivot: Int = items[high]
+    var i: Int = low - 1
+    var j: Int = low
+    while (j < high) {
+        if (items[j] <= pivot) {
+            i = i + 1
+            // swap items[i] and items[j]
+            var tmp: Int = items[i]
+            items[i] = items[j]
+            items[j] = tmp
+        }
+        j = j + 1
+    }
+    // swap items[i+1] and items[high]
+    var tmp2: Int = items[i + 1]
+    items[i + 1] = items[high]
+    items[high] = tmp2
+    return i + 1
+}
