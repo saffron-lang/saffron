@@ -1984,14 +1984,16 @@ class Codegen {
             this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
-            // Store captured values into env
+            // Store pointers to captured variables in env.
+            // Uses stack pointers — valid as long as enclosing function is on stack.
+            // For escaping closures, captured vars would need heap allocation.
             var ci = 0
             while (ci < captures.length()) {
-                var cap_val = this.fresh_local()
-                this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(captures[ci]))
+                var cap_ptr = this.fresh_local()
+                this.emit_indent(cap_ptr + " = ptrtoint i64* %" + this.sanitize_name(captures[ci]) + " to i64")
                 var slot = this.fresh_local()
                 this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-                this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
+                this.emit_indent("store i64 " + cap_ptr + ", i64* " + slot)
                 ci = ci + 1
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
@@ -2108,7 +2110,8 @@ class Codegen {
             i = i + 1
         }
 
-        // Extract captures from __env
+        // Extract capture POINTERS from __env
+        // Env stores ptrtoint'd pointers to the captured variables (heap-allocated)
         var env_size = captures.length()
         var env_int = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
@@ -2117,12 +2120,12 @@ class Codegen {
         var ci = 0
         while (ci < captures.length()) {
             var cap_name = captures[ci]
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
             var cap_slot = this.fresh_local()
             this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-            var cap_val = this.fresh_local()
-            this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
-            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
+            var cap_ptr_int = this.fresh_local()
+            this.emit_indent(cap_ptr_int + " = load i64, i64* " + cap_slot)
+            // cap_name becomes the POINTER (i64*) to the shared variable
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = inttoptr i64 " + cap_ptr_int + " to i64*")
             ci = ci + 1
         }
 
