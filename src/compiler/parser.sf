@@ -438,22 +438,17 @@ class Parser {
     fun parse_lambda(): AST.Expr {
         this.advance() // consume fun
         this.consume("(")
-        var params_sb: StringBuilder = StringBuilder()
+        var params: List<AST.Param> = []
         if (!this.match_kind_check(")")) {
             var pname: String = this.expect_ident()
             this.consume(":")
             var ptype: String = this.parse_type()
-            params_sb.append(pname)
-            params_sb.append(":")
-            params_sb.append(ptype)
+            params.push(AST.Param.Param(pname, ptype))
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 this.consume(":")
                 ptype = this.parse_type()
-                params_sb.append(",")
-                params_sb.append(pname)
-                params_sb.append(":")
-                params_sb.append(ptype)
+                params.push(AST.Param.Param(pname, ptype))
             }
         }
         this.consume(")")
@@ -464,11 +459,9 @@ class Parser {
         if (this.match_kind("=>")) {
             // Short form: fun (x: Int) => expr
             var expr: AST.Expr = this.parse_expr()
-            var params: String = params_sb.to_string()
             return AST.Expr.Lambda(params, ret_type, [AST.Stmt.Return(expr)])
         }
         // Block form: fun (x: Int) { ... }
-        var params: String = params_sb.to_string()
         var body: List<AST.Stmt> = this.parse_block_stmts()
         return AST.Expr.Lambda(params, ret_type, body)
     }
@@ -757,24 +750,17 @@ class Parser {
         this.advance() // consume fun
         var name: String = this.expect_ident()
         this.consume("(")
-        var params_sb: StringBuilder = StringBuilder()
-        var first_param: Bool = true
+        var params: List<AST.Param> = []
         if (!this.match_kind_check(")")) {
             var pname: String = this.expect_ident()
             this.consume(":")
             var ptype: String = this.parse_type()
-            params_sb.append(pname)
-            params_sb.append(":")
-            params_sb.append(ptype)
-            first_param = false
+            params.push(AST.Param.Param(pname, ptype))
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 this.consume(":")
                 ptype = this.parse_type()
-                params_sb.append(",")
-                params_sb.append(pname)
-                params_sb.append(":")
-                params_sb.append(ptype)
+                params.push(AST.Param.Param(pname, ptype))
             }
         }
         this.consume(")")
@@ -782,7 +768,6 @@ class Parser {
         if (this.match_kind(":")) {
             ret_type = this.parse_type()
         }
-        var params: String = params_sb.to_string()
         var body: List<AST.Stmt> = []
         if (this.match_kind_check("{")) {
             body = this.parse_block_stmts()
@@ -886,10 +871,9 @@ class Parser {
             }
         }
         this.consume("{")
-        var fields_sb: StringBuilder = StringBuilder()
+        var fields: List<AST.Param> = []
         var methods: List<AST.Stmt> = []
         var field_defaults: List<AST.Stmt> = []
-        var first_field: Bool = true
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
@@ -920,11 +904,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                if (!first_field) { fields_sb.append(",") }
-                fields_sb.append(fname)
-                fields_sb.append(":")
-                fields_sb.append(ftype)
-                first_field = false
+                fields.push(AST.Param.Param(fname, ftype))
             } else if (this.match_kind_check("fun")) {
                 // Method declaration
                 methods.push(this.parse_fun_decl())
@@ -935,7 +915,7 @@ class Parser {
         if (field_defaults.length() > 0) {
             this.inject_field_defaults(methods, field_defaults)
         }
-        return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring)
+        return AST.Stmt.ClassDecl(name, parent, fields, methods, docstring)
     }
 
     fun inject_field_defaults(methods: List<AST.Stmt>, defaults: List<AST.Stmt>) {
@@ -945,7 +925,7 @@ class Parser {
             var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n }
             if (mname == "init") {
                 var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b }
-                var mparams: String = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
+                var mparams: List<AST.Param> = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
                 var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r }
                 // Build new body: defaults + original body
                 var new_body: List<AST.Stmt> = []
@@ -965,7 +945,7 @@ class Parser {
             i = i + 1
         }
         // No init found — create one with just the defaults
-        methods.push(AST.Stmt.FunDecl("init", "", "Nil", defaults, ""))
+        methods.push(AST.Stmt.FunDecl("init", [], "Nil", defaults, ""))
     }
 
     fun parse_import(): AST.Stmt {

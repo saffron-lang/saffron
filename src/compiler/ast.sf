@@ -30,7 +30,7 @@ enum Expr {
     MemberAccess(object: Expr, field: String),
     Match(subject: Expr, arms: List<MatchArm>),
     EnumConstruct(enum_name: String, variant: String, args: List<Expr>),
-    Lambda(params: String, ret_type: String, body: List<Stmt>),
+    Lambda(params: List<Param>, ret_type: String, body: List<Stmt>),
     GetField(object: Expr, field: String),
     SetField(object: Expr, field: String, value: Expr),
     This,
@@ -39,7 +39,8 @@ enum Expr {
     IndexSet(object: Expr, index: Expr, value: Expr),
     MethodCall(object: Expr, method: String, args: List<Expr>),
     MapLit,
-    BlockExpr(stmts: List<Stmt>, value: Expr)
+    BlockExpr(stmts: List<Stmt>, value: Expr),
+    IsCheck(value: Expr, type_name: String)
 }
 
 enum MatchArm {
@@ -52,19 +53,23 @@ enum Pattern {
     LiteralPattern(value: Expr)
 }
 
+enum Param {
+    Param(name: String, type_ann: String)
+}
+
 enum Stmt {
     ExprStmt(expr: Expr),
     VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
-    FunDecl(name: String, params: String, ret_type: String, body: List<Stmt>, docstring: String),
+    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String),
     EnumDecl(name: String, variants: List<Variant>, docstring: String),
-    ClassDecl(name: String, parent: String, fields: String, methods: List<Stmt>, docstring: String),
+    ClassDecl(name: String, parent: String, fields: List<Param>, methods: List<Stmt>, docstring: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),
     Block(stmts: List<Stmt>),
     Break,
     Continue,
-    TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>),
+    TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>, finally_body: List<Stmt>),
     Throw(value: Expr)
 }
 
