@@ -690,6 +690,10 @@ class Parser {
 
     fun parse_var_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume var/let
+        // Check for array destructuring: let [a, b, c] = expr
+        if (this.match_kind_check("[")) {
+            return this.parse_destructure()
+        }
         var name = this.expect_ident()
         var type_ann = "Any"
         if (this.match_kind(":")) {
@@ -698,6 +702,31 @@ class Parser {
         this.consume("=")
         var init = this.parse_expr()
         return AST.Stmt.VarDecl(name, type_ann, init, docstring)
+    }
+
+    fun parse_destructure(): AST.Stmt {
+        this.advance() // consume [
+        var names: List<String> = []
+        if (!this.match_kind_check("]")) {
+            names.push(this.expect_ident())
+            while (this.match_kind(",")) {
+                names.push(this.expect_ident())
+            }
+        }
+        this.consume("]")
+        this.consume("=")
+        var init = this.parse_expr()
+        // Desugar: var __destruct = init; var a = __destruct[0]; var b = __destruct[1]; ...
+        var stmts: List<AST.Stmt> = []
+        var tmp_name = "__destruct"
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "List", init, ""))
+        var i: Int = 0
+        while (i < names.length()) {
+            var idx_expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
+            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
+            i = i + 1
+        }
+        return AST.Stmt.Block(stmts)
     }
 
     fun parse_fun_decl(): AST.Stmt {
@@ -734,7 +763,10 @@ class Parser {
             ret_type = this.parse_type()
         }
         var params = params_sb.to_string()
-        var body = this.parse_block_stmts()
+        var body: List<AST.Stmt> = []
+        if (this.match_kind_check("{")) {
+            body = this.parse_block_stmts()
+        }
         return AST.Stmt.FunDecl(name, params, ret_type, body, docstring)
     }
 
