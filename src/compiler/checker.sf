@@ -425,7 +425,7 @@ class NullChecker {
             Block(s) => {}
             Break => {}
             Continue => {}
-            TryCatch(tb, cn, cb) => {}
+            TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
         }
     }
@@ -539,13 +539,16 @@ class NullChecker {
             EnumDecl(n, v, d) => {}
             Break => {}
             Continue => {}
-            TryCatch(try_body, catch_name, catch_body) => {
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
                 this.env.push_scope()
                 this.check_stmts(try_body)
                 this.env.pop_scope()
                 this.env.push_scope()
                 this.env.define_var(catch_name, "String")
                 this.check_stmts(catch_body)
+                this.env.pop_scope()
+                this.env.push_scope()
+                this.check_stmts(finally_body)
                 this.env.pop_scope()
             }
             Throw(value) => {
@@ -571,6 +574,7 @@ class NullChecker {
             Binary(l, o, r) => "binary:" + o
             Variable(n) => "var:" + n
             Unary(o, r) => "unary"
+            IsCheck(val, typ) => "is:" + typ
             IntLit(v) => ""
             FloatLit(v) => ""
             BoolLit(v) => ""
@@ -617,6 +621,71 @@ class NullChecker {
                 this.env.narrow(name, this.strip_nil(var_type))
             }
         }
+
+        // IsCheck: if (x is Type) { ... } → narrow x to Type
+        if (cond_kind.starts_with("is:")) {
+            var narrow_type = cond_kind.slice(3, cond_kind.length())
+            // Extract variable name from the IsCheck expression
+            var is_var = match (cond) {
+                IsCheck(val, typ) => {
+                    match (val) {
+                        Variable(n) => n
+                        IntLit(v) => ""
+                        FloatLit(v) => ""
+                        BoolLit(v) => ""
+                        StringLit(s) => ""
+                        NilLit => ""
+                        Binary(l, o, r) => ""
+                        Unary(o, r) => ""
+                        Call(c, a) => ""
+                        Assign(n, v) => ""
+                        Logical(l, o, r) => ""
+                        MemberAccess(o, f) => ""
+                        Match(s, a) => ""
+                        EnumConstruct(e, v, a) => ""
+                        Lambda(p, r, b) => ""
+                        GetField(o, f) => ""
+                        SetField(o, f, v) => ""
+                        This => ""
+                        ListLit(e) => ""
+                        IndexGet(o, i) => ""
+                        IndexSet(o, i, v) => ""
+                        MethodCall(o, m, a) => ""
+                        MapLit => ""
+                        BlockExpr(s, v) => ""
+                        IsCheck(v2, t2) => ""
+                    }
+                }
+                Variable(n) => ""
+                IntLit(v) => ""
+                FloatLit(v) => ""
+                BoolLit(v) => ""
+                StringLit(s) => ""
+                NilLit => ""
+                Binary(l, o, r) => ""
+                Unary(o, r) => ""
+                Call(c, a) => ""
+                Assign(n, v) => ""
+                Logical(l, o, r) => ""
+                MemberAccess(o, f) => ""
+                Match(s, a) => ""
+                EnumConstruct(e, v, a) => ""
+                Lambda(p, r, b) => ""
+                GetField(o, f) => ""
+                SetField(o, f, v) => ""
+                This => ""
+                ListLit(e) => ""
+                IndexGet(o, i) => ""
+                IndexSet(o, i, v) => ""
+                MethodCall(o, m, a) => ""
+                MapLit => ""
+                BlockExpr(s, v) => ""
+                IsCheck(v2, t2) => ""
+            }
+            if (is_var.length() > 0) {
+                this.env.narrow(is_var, narrow_type)
+            }
+        }
     }
 
     fun get_expr_var_name(expr: AST.Expr): String {
@@ -653,6 +722,7 @@ class NullChecker {
             MethodCall(o, m, a) => ""
             MapLit => ""
             BlockExpr(s, v) => ""
+            IsCheck(v2, t2) => ""
         }
         return result
     }
@@ -711,6 +781,7 @@ class NullChecker {
             MethodCall(o, m, a) => ""
             MapLit => ""
             BlockExpr(s, v) => ""
+            IsCheck(v2, t2) => ""
         }
         return name
     }
@@ -749,6 +820,10 @@ class NullChecker {
             BlockExpr(stmts, value) => {
                 this.check_stmts(stmts)
                 this.infer_expr(value)
+            }
+            IsCheck(value, type_name) => {
+                this.infer_expr(value)
+                "Bool"
             }
         }
     }
