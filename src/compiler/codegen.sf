@@ -3265,7 +3265,8 @@ class Codegen {
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        if (!this.register_only) {
+        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+            this.known_functions.push("__type_" + name)
             var field_types_str: String = ""
             var fi: Float = 0
             while (fi < num_fields) {
