@@ -14,14 +14,14 @@ class Codegen {
     var enum_variant_fields: Map<String, String>
     var type_defs: StringBuilder
     var known_functions: List<String>
-    var func_ret_types: Map<String, AST.Type>
+    var func_ret_types: Map<String, String>
     var class_fields: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
     var current_parent: String
     var string_vars: List<String>
     var last_type: AST.Type
-    var var_types: Map<String, AST.Type>
+    var var_types: Map<String, String>
     var loop_end_label: String
     var current_ret_type: String
     var called_functions: List<String>
@@ -421,7 +421,7 @@ class Codegen {
             }
             Variable(name) => {
                 if (this.var_types.has(name)) {
-                    this.last_type = this.var_types.get(name)
+                    this.last_type = this.str_to_type(this.var_types.get(name))
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -469,7 +469,7 @@ class Codegen {
                     }
                     // Check if variable holds a class instance
                     if (this.var_types.has(obj_name)) {
-                        var vtype: String = this.type_to_string(this.var_types.get(obj_name))
+                        var vtype: String = this.var_types.get(obj_name)
                         if (this.class_fields.has(vtype)) {
                             // It's a class instance — do field access
                             var obj_val: String = this.gen_arg_value(object)
@@ -582,7 +582,7 @@ class Codegen {
         if (method_name.length() > 0) {
             var left_name: String = this.get_variable_name(left)
             if (left_name.length() > 0 and this.var_types.has(left_name)) {
-                var left_class: String = this.type_to_string(this.var_types.get(left_name))
+                var left_class: String = this.var_types.get(left_name)
                 if (this.class_methods.has(left_class)) {
                     var methods: List = this.class_methods.get(left_class)
                     if (methods.contains(method_name)) {
@@ -597,7 +597,7 @@ class Codegen {
                         var local: String = this.fresh_local()
                         this.emit_indent(local + " = call i64 @" + full_method + "(i64 " + lhs + ", i64 " + rhs + ")")
                         if (this.func_ret_types.has(full_method)) {
-                            this.last_type = this.func_ret_types.get(full_method)
+                            this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
                         } else {
                             this.last_type = this.str_to_type(left_class)
                         }
@@ -828,7 +828,7 @@ class Codegen {
                 _ => ""
             }
             if (this.var_types.has(vname)) {
-                this.last_type = this.var_types.get(vname)
+                this.last_type = this.str_to_type(this.var_types.get(vname))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -855,7 +855,7 @@ class Codegen {
             // Handle as field access on class instance or enum
             var mn: String = this.get_variable_name(m_obj)
             if (mn.length() > 0 and this.var_types.has(mn)) {
-                var vt: String = this.type_to_string(this.var_types.get(mn))
+                var vt: String = this.var_types.get(mn)
                 if (this.class_fields.has(vt)) {
                     var ov: String = this.gen_arg_value(m_obj)
                     var fi: Float = this.get_field_index(vt, m_field)
@@ -1020,7 +1020,7 @@ class Codegen {
                     var local: String = this.fresh_local()
                     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
                     if (this.func_ret_types.has(full_method)) {
-                        this.last_type = this.func_ret_types.get(full_method)
+                        this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
                     } else {
                         this.last_type = AST.Type.IntType
                     }
@@ -1089,7 +1089,7 @@ class Codegen {
             // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
             var is_constructor: Bool = false
             if (this.func_ret_types.has(resolved_callee)) {
-                if (this.type_to_string(this.func_ret_types.get(resolved_callee)) == callee_name) {
+                if (this.func_ret_types.get(resolved_callee) == callee_name) {
                     is_constructor = true
                 }
             }
@@ -1131,9 +1131,9 @@ class Codegen {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
             if (this.func_ret_types.has(resolved_callee)) {
-                this.last_type = this.func_ret_types.get(resolved_callee)
+                this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
             } else if (this.func_ret_types.has(callee_name)) {
-                this.last_type = this.func_ret_types.get(callee_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(callee_name))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -1532,7 +1532,7 @@ class Codegen {
                 var bi: Float = 0
                 while (bi < bind_count) {
                     var btype: String = this.get_variant_field_type(enum_name, arm_variant, bi)
-                    this.var_types.set(bindings[bi], this.str_to_type(btype))
+                    this.var_types.set(bindings[bi], btype)
                     if (btype == "String") {
                         this.string_vars.push(bindings[bi])
                     }
@@ -1713,7 +1713,7 @@ class Codegen {
         if (ek == "variable") {
             var vname: String = this.get_variable_name(expr)
             if (vname.length() > 0 and this.var_types.has(vname)) {
-                return this.type_to_string(this.var_types.get(vname))
+                return this.var_types.get(vname)
             }
             return "Any"
         }
@@ -1728,7 +1728,7 @@ class Codegen {
         if (ek == "get_field" or ek == "member") {
             var obj_name: String = this.get_variable_name(expr)
             if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-                return this.type_to_string(this.var_types.get(obj_name))
+                return this.var_types.get(obj_name)
             }
         }
         if (ek == "method_call") {
@@ -1750,7 +1750,7 @@ class Codegen {
             }
             var callee_name: String = this.resolve_callee(call_callee)
             if (this.func_ret_types.has(callee_name)) {
-                return this.type_to_string(this.func_ret_types.get(callee_name))
+                return this.func_ret_types.get(callee_name)
             }
         }
         if (ek == "is_check") return "Bool"
@@ -1800,7 +1800,7 @@ class Codegen {
         if (this.is_string_list_type(obj_type)) {
             this.last_type = AST.Type.StringType
         } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-            var vtype: String = this.type_to_string(this.var_types.get(obj_name))
+            var vtype: String = this.var_types.get(obj_name)
             if (vtype == "List<String>") {
                 this.last_type = AST.Type.StringType
             } else {
@@ -1895,9 +1895,9 @@ class Codegen {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
             if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.func_ret_types.get(prefixed_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
             } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.func_ret_types.get(method)
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -2386,7 +2386,7 @@ class Codegen {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
                 if (this.func_ret_types.has(full_method)) {
-                    this.last_type = this.func_ret_types.get(full_method)
+                    this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -3164,7 +3164,7 @@ class Codegen {
         if (vtype == "Any") {
             vtype = this.type_to_string(this.last_type)
         }
-        this.var_types.set(name, this.str_to_type(vtype))
+        this.var_types.set(name, vtype)
         if (vtype == "String") {
             this.string_vars.push(name)
         }
@@ -3291,7 +3291,7 @@ class Codegen {
             var mret: String = this.get_fun_ret(methods[i])
             var full_name: String = name + "__" + mname
             var prefixed_full: String = this.current_prefix + full_name
-            this.func_ret_types.set(prefixed_full, this.str_to_type(mret))
+            this.func_ret_types.set(prefixed_full, mret)
             this.known_functions.push(prefixed_full)
             i = i + 1
         }
@@ -3299,8 +3299,8 @@ class Codegen {
         // Pre-register constructor so methods can call ClassName(args)
         var prefixed_ctor: String = this.current_prefix + name
         this.known_functions.push(prefixed_ctor)
-        this.func_ret_types.set(prefixed_ctor, this.str_to_type(name))
-        this.func_ret_types.set(name, this.str_to_type(name))
+        this.func_ret_types.set(prefixed_ctor, name)
+        this.func_ret_types.set(name, name)
 
         // Generate methods as functions with name prefix: ClassName__method
         // Methods get 'self' (i64 pointer to instance) as first param
@@ -3358,8 +3358,8 @@ class Codegen {
         var struct_size: Float = num_fields * 8
         var emit_name: String = this.current_prefix + name
         this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, this.str_to_type(name))
-        this.func_ret_types.set(name, this.str_to_type(name))
+        this.func_ret_types.set(emit_name, name)
+        this.func_ret_types.set(name, name)
         if (this.register_only) { return }
         this.emit("")
         var ctor_linkage: String = "define"
@@ -3775,9 +3775,9 @@ class Codegen {
             this.known_functions.push("main")
         }
         this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+        this.func_ret_types.set(emit_name, ret_type)
         if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(name, this.str_to_type(ret_type))
+            this.func_ret_types.set(name, ret_type)
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
@@ -3840,7 +3840,7 @@ class Codegen {
             var parts: List<String> = param_list[i].split(":")
             var pname: String = parts[0]
             var ptype: String = parts[1]
-            this.var_types.set(pname, this.str_to_type(ptype))
+            this.var_types.set(pname, ptype)
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }
@@ -3946,7 +3946,7 @@ class Codegen {
         this.known_functions.push("__os_path_sep")
         this.known_functions.push("__os_platform")
         this.known_functions.push("__os_env")
-        this.func_ret_types.set("StringBuilder", this.str_to_type("StringBuilder"))
+        this.func_ret_types.set("StringBuilder", "StringBuilder")
 
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
