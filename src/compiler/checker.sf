@@ -45,7 +45,8 @@ class TypeEnv {
     }
 
     fun define_var(name: String, typ: String) {
-        this.current_scope().vars.set(name, typ)
+        var scope: Scope = this.current_scope()
+        scope.vars.set(name, typ)
     }
 
     fun get_var(name: String): String {
@@ -65,11 +66,13 @@ class TypeEnv {
     }
 
     fun narrow(name: String, typ: String) {
-        this.current_scope().narrowed.set(name, typ)
+        var scope: Scope = this.current_scope()
+        scope.narrowed.set(name, typ)
     }
 
     fun clear_narrowing() {
-        this.current_scope().narrowed = {}
+        var scope: Scope = this.current_scope()
+        scope.narrowed = {}
     }
 
     fun define_func(name: String, ret_type: String) {
