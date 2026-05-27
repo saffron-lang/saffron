@@ -59,6 +59,22 @@ class Codegen {
         this.module_globals = {}
     }
 
+    fun params_to_string(params: List<AST.Param>): String {
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pname: String = match (p) { Param(n, t) => n }
+            var ptype: String = match (p) { Param(n, t) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(ptype)
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
     fun str_to_type(s: String): AST.Type {
         if (s == "String") return AST.Type.StringType
         if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
@@ -2451,17 +2467,15 @@ class Codegen {
         return 0
     }
 
-    fun gen_lambda(params: String, ret_type: String, body: List<AST.Stmt>): String {
+    fun gen_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
         // Find captured variables (free variables in body not in params)
         var param_names: List<String> = []
-        if (params.length() > 0) {
-            var parts: List<String> = this.split_respecting_generics(params, ",")
-            var pi: Float = 0
-            while (pi < parts.length()) {
-                var pparts: List<String> = parts[pi].split(":")
-                param_names.push(pparts[0])
-                pi = pi + 1
-            }
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p: AST.Param = params[pi]
+            var pname: String = match (p) { Param(n, t) => n }
+            param_names.push(pname)
+            pi = pi + 1
         }
         var captures: List<String> = []
         this.find_free_vars_stmts(body, param_names, captures)
@@ -2471,14 +2485,15 @@ class Codegen {
         var lambda_name: String = "__lambda_" + this.label_counter.floor().to_string()
 
         // Build the lambda's params: env pointer (if captures) + original params
+        var params_str: String = this.params_to_string(params)
         var lambda_params: String = ""
         if (captures.length() > 0) {
             lambda_params = "__env:Int"
-            if (params.length() > 0) {
-                lambda_params = lambda_params + "," + params
+            if (params_str.length() > 0) {
+                lambda_params = lambda_params + "," + params_str
             }
         } else {
-            lambda_params = params
+            lambda_params = params_str
         }
 
         // Save current state
@@ -2492,7 +2507,7 @@ class Codegen {
             // Custom gen: emit function header, extract captures from env, then body
             this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures)
         } else {
-            this.gen_function(lambda_name, params, ret_type, body)
+            this.gen_function(lambda_name, params_str, ret_type, body)
         }
         var lambda_ir: String = this.sb.to_string()
 
@@ -2563,8 +2578,8 @@ class Codegen {
         var saved_counter2: Float = this.local_counter
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
-        if (params.length() > 0) {
-            full_params = full_params + "," + params
+        if (params_str.length() > 0) {
+            full_params = full_params + "," + params_str
         }
         this.gen_function(lambda_name, full_params, ret_type, body)
         this.globals.push(this.sb.to_string())
@@ -3071,7 +3086,8 @@ class Codegen {
                 this.gen_throw(value)
             }
             FunDecl(name, params, ret_type, body, doc) => {
-                this.gen_function(name, params, ret_type, body)
+                var params_str: String = this.params_to_string(params)
+                this.gen_function(name, params_str, ret_type, body)
             }
             EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
@@ -3137,9 +3153,11 @@ class Codegen {
         }
     }
 
-    fun gen_class_decl_with_parent(name: String, parent: String, fields: String, methods: List<AST.Stmt>) {
+    fun gen_class_decl_with_parent(name: String, parent: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        // Convert fields to string format for internal use
+        var fields_str: String = this.params_to_string(fields)
         // Inherit parent fields (prepend parent fields before child's own)
-        var all_fields: String = fields
+        var all_fields: String = fields_str
         if (parent.length() > 0 and this.class_fields.has(parent)) {
             var parent_fields: String = this.class_fields.get(parent)
             if (parent_fields.length() > 0) {
@@ -3267,9 +3285,9 @@ class Codegen {
         }
     }
 
-    fun get_fun_params(stmt: AST.Stmt): String {
+    fun get_fun_params(stmt: AST.Stmt): List<AST.Param> {
         return match (stmt) { FunDecl(n, p, r, b, d) => p
-            _ => ""
+            _ => []
         }
     }
 
@@ -3287,13 +3305,14 @@ class Codegen {
 
     fun gen_class_method(class_name: String, method: AST.Stmt) {
         var mname: String = this.get_fun_name(method)
-        var mparams: String = this.get_fun_params(method)
+        var mparams: List<AST.Param> = this.get_fun_params(method)
         var mret: String = this.get_fun_ret(method)
         var mbody: List<AST.Stmt> = this.get_fun_body(method)
         var full_name: String = class_name + "__" + mname
+        var mparams_str: String = this.params_to_string(mparams)
         var full_params: String = "self:Int"
-        if (mparams.length() > 0) {
-            full_params = full_params + "," + mparams
+        if (mparams_str.length() > 0) {
+            full_params = full_params + "," + mparams_str
         }
         this.gen_function(full_name, full_params, mret, mbody)
     }
