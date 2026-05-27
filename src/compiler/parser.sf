@@ -318,6 +318,10 @@ class Parser {
             this.advance()
             return AST.Expr.This
         }
+        if (this.is_ident_named("super")) {
+            this.advance()
+            return AST.Expr.Variable("super")
+        }
         if (this.match_kind_check("[")) {
             return this.parse_list_lit()
         }

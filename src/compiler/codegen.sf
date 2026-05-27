@@ -18,6 +18,7 @@ class Codegen {
     var class_fields: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
+    var current_parent: String
     var string_vars: List<String>
     var last_type: String
     var var_types: Map<String, String>
@@ -42,6 +43,7 @@ class Codegen {
         this.class_fields = {}
         this.class_methods = {}
         this.current_class = ""
+        this.current_parent = ""
         this.string_vars = []
         this.last_type = "Int"
         this.var_types = {}
@@ -1369,7 +1371,7 @@ class Codegen {
         }
 
         // Check for imported module function calls (any name that's not a class, variable, or builtin module)
-        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)) {
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)) {
             var arg_strs: List<String> = []
             var ai = 0
             while (ai < args.length()) {
@@ -1386,6 +1388,26 @@ class Codegen {
             } else {
                 this.last_type = "Int"
             }
+            return local
+        }
+
+        // Check for super.method() calls
+        if (obj_name == "super" and this.current_parent.length() > 0) {
+            var self_val = this.fresh_local()
+            this.emit_indent(self_val + " = load i64, i64* %self")
+            var arg_strs: List<String> = []
+            arg_strs.push("i64 " + self_val)
+            var ai = 0
+            while (ai < args.length()) {
+                var val = this.gen_arg_value(args[ai])
+                arg_strs.push("i64 " + val)
+                ai = ai + 1
+            }
+            var parent_method = this.current_parent + "__" + method
+            this.called_functions.push(parent_method)
+            var local = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
+            this.last_type = "String"
             return local
         }
 
@@ -3190,7 +3212,9 @@ class Codegen {
             }
         }
         // Generate the class with inherited fields
+        this.current_parent = parent
         this.gen_class_decl(name, all_fields, methods)
+        this.current_parent = ""
         // Register inherited methods: if child doesn't define a method, map it to parent's
         if (parent.length() > 0 and this.class_methods.has(parent)) {
             var parent_methods: List = this.class_methods.get(parent)
@@ -3215,6 +3239,19 @@ class Codegen {
                     this.emit("}")
                 }
                 i = i + 1
+            }
+            // Interface conformance: if parent has no fields, check all methods are implemented
+            var parent_fields_str = this.class_fields.get(parent)
+            if (parent_fields_str.length() == 0) {
+                // This is an interface — check conformance
+                var pi: Int = 0
+                while (pi < parent_methods.length()) {
+                    var required: String = parent_methods[pi]
+                    if (required != "init" and !child_methods.contains(required)) {
+                        IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
+                    }
+                    pi = pi + 1
+                }
             }
         }
     }
