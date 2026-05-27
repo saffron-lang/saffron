@@ -51,7 +51,7 @@ enum Stmt {
     VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
     FunDecl(name: String, params: String, ret_type: String, body: List<Stmt>, docstring: String),
     EnumDecl(name: String, variants: List<Variant>, docstring: String),
-    ClassDecl(name: String, fields: String, methods: List<Stmt>, docstring: String),
+    ClassDecl(name: String, parent: String, fields: String, methods: List<Stmt>, docstring: String),
     Return(value: Expr),
     If(condition: Expr, then_branch: List<Stmt>, else_branch: List<Stmt>),
     While(condition: Expr, body: List<Stmt>),

@@ -86,25 +86,21 @@ class Parser {
             var part = this.expect_ident()
             name = name + "." + part
         }
-        // Capture first generic arg for type tracking (List<String> → List<String>)
+        // Full generic args: Map<String, Number> → "Map<String,Number>"
         if (this.match_kind_check("<")) {
-            this.advance() // consume <
-            // Peek at first type arg before skipping generic contents
-            var first_arg = this.peek_ident()
-            var depth = 1
-            while (depth > 0 and !this.match_kind_check("eof")) {
-                if (this.match_kind_check("<")) {
-                    depth = depth + 1
-                } else if (this.match_kind_check(">")) {
-                    depth = depth - 1
-                } else if (this.match_kind_check(">>")) {
-                    depth = depth - 2
-                }
+            this.advance()
+            var args = this.parse_single_type()
+            while (this.match_kind(",")) {
+                args = args + "," + this.parse_single_type()
+            }
+            // Handle >> as two closing >
+            if (this.match_kind_check(">>")) {
                 this.advance()
+                name = name + "<" + args + ">"
+                return name
             }
-            if (first_arg.length() > 0) {
-                name = name + "<" + first_arg + ">"
-            }
+            this.consume(">")
+            name = name + "<" + args + ">"
         }
         return name
     }
