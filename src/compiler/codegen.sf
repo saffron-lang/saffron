@@ -1993,11 +1993,45 @@ class Codegen {
             }
         }
 
+        // Check for module-qualified function calls BEFORE loading the object.
+        // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
+        // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and this.module_prefixes.has(obj_name)) {
+            var arg_strs: List<String> = []
+            var ai: Float = 0
+            while (ai < args.length()) {
+                var val: String = this.gen_arg_value(args[ai])
+                arg_strs.push("i64 " + val)
+                ai = ai + 1
+            }
+            var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+            this.called_functions.push(prefixed_name)
+            this.called_function_arity.set(prefixed_name, args.length())
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return local
+        }
+
         // Check for enum constructor: EnumName.Variant(args) — MUST come before builtin dispatch
         if (obj_name.length() > 0) {
             var enum_key: String = obj_name + "." + method
             if (this.enum_variant_tags.has(enum_key)) {
                 return this.gen_enum_construct(obj_name, method, args)
+            }
+            // Fallback: check enum_defs in case enum_variant_tags lookup misses
+            // (e.g. when enum name == variant name: enum Token { Token(...) })
+            if (this.enum_defs.has(obj_name)) {
+                var variants: List = this.enum_defs.get(obj_name)
+                if (variants.contains(method)) {
+                    return this.gen_enum_construct(obj_name, method, args)
+                }
             }
         }
         if (obj_name.length() == 0) {
