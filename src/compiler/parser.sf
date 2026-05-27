@@ -822,11 +822,12 @@ class Parser {
             var value: AST.Expr = this.parse_expr()
             return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
         }
-        // Check for chained method: this.field.method(args)
+        // Build the initial expression and continue chaining
         var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field)
-        if (this.match_kind_check(".")) {
+        // Continue parsing any chained .field or .method(args) calls
+        while (this.match_kind_check(".")) {
             this.advance()
-            var method: String = this.expect_ident()
+            var next_field: String = this.expect_ident()
             if (this.match_kind("(")) {
                 var args: List<AST.Expr> = []
                 if (!this.match_kind_check(")")) {
@@ -836,7 +837,9 @@ class Parser {
                     }
                 }
                 this.consume(")")
-                return AST.Stmt.ExprStmt(AST.Expr.MethodCall(expr, method, args))
+                expr = AST.Expr.MethodCall(expr, next_field, args)
+            } else {
+                expr = AST.Expr.MemberAccess(expr, next_field)
             }
         }
         // Check for direct method call: this.method(args)

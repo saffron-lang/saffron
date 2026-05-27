@@ -27,6 +27,7 @@ class Codegen {
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
     var module_prefixes: Map<String, String>
+    var func_prefix_map: Map<String, String>
     var current_prefix: String
     var module_globals: Map<String, Bool>
 
@@ -55,6 +56,7 @@ class Codegen {
         this.called_functions = []
         this.called_function_arity = {}
         this.module_prefixes = {}
+        this.func_prefix_map = {}
         this.current_prefix = ""
         this.module_globals = {}
     }
@@ -870,14 +872,30 @@ class Codegen {
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
-                var obj_kind: String = this.classify_expr(m_obj)
-                if (obj_kind == "member") {
+                var obj_kind2: String = this.classify_expr(m_obj)
+                if (obj_kind2 == "member") {
                     var inner_field: String = match (m_obj) { MemberAccess(o, f) => f
                         _ => ""
                     }
                     var key: String = inner_field + "." + m_field
                     if (this.enum_variant_tags.has(key)) {
                         return this.gen_enum_construct(inner_field, m_field, [])
+                    }
+                }
+                // Nested field access: obj.field1.field2
+                if (obj_kind2 == "get_field" or obj_kind2 == "member" or obj_kind2 == "this") {
+                    var inner_val: String = this.gen_arg_value(m_obj)
+                    var inner_type: String = this.type_to_string(this.last_type)
+                    if (this.class_fields.has(inner_type)) {
+                        var fi: Float = this.get_field_index(inner_type, m_field)
+                        var op: String = this.fresh_local()
+                        this.emit_indent(op + " = inttoptr i64 " + inner_val + " to %" + inner_type + "*")
+                        var fp: String = this.fresh_local()
+                        this.emit_indent(fp + " = getelementptr %" + inner_type + ", %" + inner_type + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                        var result: String = this.fresh_local()
+                        this.emit_indent(result + " = load i64, i64* " + fp)
+                        this.last_type = this.str_to_type(this.get_field_type(inner_type, m_field))
+                        return result
                     }
                 }
             }
@@ -1124,6 +1142,13 @@ class Codegen {
         // This handles cross-file function references
         if (!this.var_types.has(callee_name) and callee_name.length() > 0) {
             var emit_callee: String = this.current_prefix + callee_name
+            if (!this.known_functions.contains(emit_callee)) {
+                if (this.known_functions.contains(callee_name)) {
+                    emit_callee = callee_name
+                } else if (this.func_prefix_map.has(callee_name)) {
+                    emit_callee = this.func_prefix_map.get(callee_name)
+                }
+            }
             this.called_functions.push(emit_callee)
             var arg_strs: List<String> = []
             var i: Float = 0
@@ -2414,7 +2439,10 @@ class Codegen {
 
     fun gen_get_field(object: AST.Expr, field: String): String {
         var obj_val: String = this.gen_arg_value(object)
-        var class_name: String = this.current_class
+        var class_name: String = this.type_to_string(this.last_type)
+        if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
+            class_name = this.current_class
+        }
         var field_idx: Float = this.get_field_index(class_name, field)
         var obj_ptr: String = this.fresh_local()
         this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
@@ -3734,6 +3762,7 @@ class Codegen {
         this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
         if (this.current_prefix.length() > 0) {
             this.func_ret_types.set(name, this.str_to_type(ret_type))
+            this.func_prefix_map.set(name, emit_name)
         }
         this.reset_locals()
         this.string_vars = []
