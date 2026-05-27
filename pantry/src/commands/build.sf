@@ -1,4 +1,5 @@
 //! `pantry build` — compile the project.
+import "@args" as Args
 
 import "@os" as OS
 import "../config.sf" as Config

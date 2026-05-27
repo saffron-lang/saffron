@@ -1,4 +1,5 @@
 //! `pantry init` — create a new pantry.toml in the current directory.
+import "@args" as Args
 
 import "@os" as OS
 import "@path" as Path

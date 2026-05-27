@@ -7,18 +7,29 @@ var MANIFEST_NAME = "pantry.toml"
 
 /// Represents a parsed pantry.toml manifest.
 class Manifest {
-    var name = ""
-    var version = "0.1.0"
-    var description = ""
-    var authors = []
-    var license = ""
-    var entry = "src/main.sf"
-    var dependencies = {}
-    var dev_dependencies = {}
-    var scripts = {}
-    var raw = {}
+    var name: String
+    var version: String
+    var description: String
+    var authors: List
+    var license: String
+    var entry: String
+    var dependencies: Map
+    var dev_dependencies: Map
+    var scripts: Map
+    var raw: Map
 
-    fun init() {}
+    fun init() {
+        this.name = ""
+        this.version = "0.1.0"
+        this.description = ""
+        this.authors = []
+        this.license = ""
+        this.entry = "src/main.sf"
+        this.dependencies = {}
+        this.dev_dependencies = {}
+        this.scripts = {}
+        this.raw = {}
+    }
 }
 
 fun _parent_dir(path: String): String {

@@ -882,7 +882,7 @@ class Codegen {
                     var fp: String = this.fresh_local()
                     this.emit_indent(fp + " = getelementptr %" + vt + ", %" + vt + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                     var result: String = this.fresh_local()
-                    this.emit_indent(result + " = load i64, i64* " + fp)
+                    this.emit_indent(result + " = load volatile i64, i64* " + fp)
                     this.last_type = this.str_to_type(this.get_field_type(vt, m_field))
                     return result
                 }
@@ -2535,7 +2535,7 @@ class Codegen {
         var field_ptr: String = this.fresh_local()
         this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = load i64, i64* " + field_ptr)
+        this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
         // Infer field type from class declaration
         this.last_type = this.str_to_type(this.get_field_type(class_name, field))
         return result
@@ -2558,7 +2558,6 @@ class Codegen {
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
         var obj_val: String = this.gen_arg_value(object)
         var class_name: String = this.type_to_string(this.last_type)
-        IO.println("SET_FIELD: field=" + field + " class_name=" + class_name + " current_class=" + this.current_class + " has=" + this.class_fields.has(class_name).to_string() + " idx=" + this.get_field_index(class_name, field).to_string())
         if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
             class_name = this.current_class
         }
@@ -2568,7 +2567,7 @@ class Codegen {
         this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
         var field_ptr: String = this.fresh_local()
         this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
-        this.emit_indent("store i64 " + val + ", i64* " + field_ptr)
+        this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)
         return val
     }
 
@@ -4532,6 +4531,5 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     }
 
     gen.current_prefix = ""
-    IO.println("CODEGEN_FLAT: about to generate(program), program.length=" + program.length().to_string())
     return gen.generate(program)
 }

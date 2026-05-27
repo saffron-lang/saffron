@@ -112,19 +112,32 @@ fun is_builtin_module(imp_path: String): Bool {
     return false
 }
 
-fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>) {
+fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
 
     var source: String = IO.read_file(file_path)
     var import_paths: List<String> = extract_imports(source)
 
+    // Collect this module's import aliases
+    var mod_aliases: Map<String, String> = extract_import_aliases(source)
+    var mak: List<String> = mod_aliases.keys()
+    var mai: Float = 0
+    while (mai < mak.length()) {
+        var ma: String = mak[mai]
+        var ma_path: String = mod_aliases.get(ma)
+        if (!is_builtin_module(ma_path) and !all_aliases.has(ma)) {
+            all_aliases.set(ma, module_prefix_from_path(ma_path))
+        }
+        mai = mai + 1
+    }
+
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, all_aliases)
         }
         pi = pi + 1
     }
@@ -208,25 +221,14 @@ fun main(): Int {
         stdlib_dir = exe_dir + "/../src/lib"
     }
 
-    // Recursively collect all imported modules with their prefixes
+    // Recursively collect all imported modules with their prefixes and aliases
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
-    var source: String = IO.read_file(input_path)
-    var import_paths: List<String> = extract_imports(source)
-    var pi: Float = 0
-    while (pi < import_paths.length()) {
-        var imp_path: String = import_paths[pi]
-        if (!is_builtin_module(imp_path)) {
-            var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list)
-        }
-        pi = pi + 1
-    }
-
-    // Build alias → prefix mapping from ALL modules' imports
     var resolved_aliases: Map<String, String> = {}
-    // Main file's imports
+    var source: String = IO.read_file(input_path)
+
+    // Main file's own aliases
     var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
     var ak: Float = 0
@@ -234,39 +236,51 @@ fun main(): Int {
         var alias: String = alias_keys[ak]
         var imp_path: String = alias_map.get(alias)
         if (!is_builtin_module(imp_path)) {
-            var prefix: String = module_prefix_from_path(imp_path)
-            resolved_aliases.set(alias, prefix)
+            resolved_aliases.set(alias, module_prefix_from_path(imp_path))
         }
         ak = ak + 1
     }
-    // Each compiled module's imports
-    var visited_keys: List<String> = visited.keys()
-    var vk: Float = 0
-    while (vk < visited_keys.length()) {
-        var mod_path: String = visited_keys[vk]
-        var mod_source: String = IO.read_file(mod_path)
-        var mod_aliases: Map<String, String> = extract_import_aliases(mod_source)
-        var mak: List<String> = mod_aliases.keys()
-        var mai: Float = 0
-        while (mai < mak.length()) {
-            var ma: String = mak[mai]
-            var ma_path: String = mod_aliases.get(ma)
-            if (!is_builtin_module(ma_path) and !resolved_aliases.has(ma)) {
-                var ma_prefix: String = module_prefix_from_path(ma_path)
-                resolved_aliases.set(ma, ma_prefix)
-            }
-            mai = mai + 1
+
+    // Recursively collect modules (also populates resolved_aliases from each module's imports)
+    var import_paths: List<String> = extract_imports(source)
+    var pi: Float = 0
+    while (pi < import_paths.length()) {
+        var imp_path: String = import_paths[pi]
+        if (!is_builtin_module(imp_path)) {
+            var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases)
         }
-        vk = vk + 1
+        pi = pi + 1
     }
+
 
     // Compile: lex → parse → [check] → generate with module awareness
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
 
+    // Flatten module_stmts into a single list with boundary markers
+    // Encode prefixes as a single joined string to avoid native list issues
+    var all_import_stmts: List<AST.Stmt> = []
+    var module_boundaries: List<Float> = []
+    var prefixes_joined: String = ""
+    var mfi: Float = 0
+    while (mfi < module_stmts.length()) {
+        var mod: List<AST.Stmt> = module_stmts[mfi]
+        module_boundaries.push(all_import_stmts.length())
+        if (mfi > 0) { prefixes_joined = prefixes_joined + "|" }
+        prefixes_joined = prefixes_joined + module_prefixes_list[mfi]
+        var msi: Float = 0
+        while (msi < mod.length()) {
+            all_import_stmts.push(mod[msi])
+            msi = msi + 1
+        }
+        mfi = mfi + 1
+    }
+    module_boundaries.push(all_import_stmts.length())
+
     var ir: String = ""
-    if (module_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules(program, module_stmts, module_prefixes_list, resolved_aliases)
+    if (all_import_stmts.length() > 0) {
+        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases)
     } else {
         ir = Codegen.generate(program)
     }

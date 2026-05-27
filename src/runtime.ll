@@ -38,6 +38,11 @@ declare i8* @fgets(i8*, i32, i8*)
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
 declare i32 @setjmp(i8*)
 declare void @longjmp(i8*, i32)
+declare i32 @access(i8*, i32)
+declare i32 @mkdir(i8*, i32)
+declare i8* @getcwd(i8*, i64)
+declare i8* @getenv(i8*)
+declare i8* @strdup(i8*)
 
 ; --- Global constants ---
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
@@ -51,6 +56,14 @@ declare void @longjmp(i8*, i32)
 @__argv = weak global i8** null
 @__exception_value = weak global i64 0
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
+
+; --- Async scheduler globals ---
+@__yield_reason = global i64 0
+@__yield_arg = global i64 0
+
+; --- Async native helpers (defined in async_native.c) ---
+declare double @sf_time_now()
+declare i64 @sf_select_fds(i64*, i64, i64*, i64, i64)
 
 ; =============================================================================
 ; List Runtime
@@ -634,6 +647,70 @@ end:
   ret void
 }
 
+define i64 @__io_file_exists(i8* %path) {
+entry:
+  %rc = call i32 @access(i8* %path, i32 0)
+  %exists = icmp eq i32 %rc, 0
+  %result = select i1 %exists, i64 1, i64 0
+  ret i64 %result
+}
+
+define void @__io_mkdir(i8* %path) {
+entry:
+  call i32 @mkdir(i8* %path, i32 493)
+  ret void
+}
+
+@.str.slash = linkonce_odr unnamed_addr constant [2 x i8] c"/\00"
+@.str.macos = linkonce_odr unnamed_addr constant [6 x i8] c"macos\00"
+
+define i64 @__os_cwd() {
+entry:
+  %buf = call i8* @malloc(i64 4096)
+  %result = call i8* @getcwd(i8* %buf, i64 4096)
+  %is_null = icmp eq i8* %result, null
+  br i1 %is_null, label %fail, label %ok
+ok:
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+fail:
+  store i8 0, i8* %buf
+  %r2 = ptrtoint i8* %buf to i64
+  ret i64 %r2
+}
+
+define i64 @__os_path_sep() {
+entry:
+  %ptr = getelementptr [2 x i8], [2 x i8]* @.str.slash, i64 0, i64 0
+  %dup = call i8* @strdup(i8* %ptr)
+  %r = ptrtoint i8* %dup to i64
+  ret i64 %r
+}
+
+define i64 @__os_platform() {
+entry:
+  %ptr = getelementptr [6 x i8], [6 x i8]* @.str.macos, i64 0, i64 0
+  %dup = call i8* @strdup(i8* %ptr)
+  %r = ptrtoint i8* %dup to i64
+  ret i64 %r
+}
+
+define i64 @__os_env(i8* %name) {
+entry:
+  %val = call i8* @getenv(i8* %name)
+  %is_null = icmp eq i8* %val, null
+  br i1 %is_null, label %empty, label %found
+found:
+  %dup = call i8* @strdup(i8* %val)
+  %r = ptrtoint i8* %dup to i64
+  ret i64 %r
+empty:
+  %buf = call i8* @malloc(i64 1)
+  store i8 0, i8* %buf
+  %r2 = ptrtoint i8* %buf to i64
+  ret i64 %r2
+}
+
 define i64 @__os_exec(i8* %cmd) {
 entry:
   %mode = getelementptr [2 x i8], [2 x i8]* @.str.r, i64 0, i64 0
@@ -692,4 +769,255 @@ body:
   br label %loop
 end:
   ret i64 %list
+}
+
+; --- Runtime string methods (rt_str_*) ---
+
+define i64 @rt_str_trim(i64 %s) {
+entry:
+  %ptr = inttoptr i64 %s to i8*
+  %len = call i64 @strlen(i8* %ptr)
+  %start_p = alloca i64
+  %end_p = alloca i64
+  store i64 0, i64* %start_p
+  store i64 %len, i64* %end_p
+  br label %trim_start
+trim_start:
+  %si = load i64, i64* %start_p
+  %ei = load i64, i64* %end_p
+  %s_done = icmp sge i64 %si, %ei
+  br i1 %s_done, label %done, label %check_start
+check_start:
+  %sc = getelementptr i8, i8* %ptr, i64 %si
+  %ch_s = load i8, i8* %sc
+  %is_sp = icmp eq i8 %ch_s, 32
+  %is_tab = icmp eq i8 %ch_s, 9
+  %is_nl = icmp eq i8 %ch_s, 10
+  %is_cr = icmp eq i8 %ch_s, 13
+  %ws1 = or i1 %is_sp, %is_tab
+  %ws2 = or i1 %ws1, %is_nl
+  %ws3 = or i1 %ws2, %is_cr
+  br i1 %ws3, label %inc_start, label %trim_end
+inc_start:
+  %si2 = add i64 %si, 1
+  store i64 %si2, i64* %start_p
+  br label %trim_start
+trim_end:
+  %ei2 = load i64, i64* %end_p
+  %ei3 = sub i64 %ei2, 1
+  %si3 = load i64, i64* %start_p
+  %e_done = icmp slt i64 %ei3, %si3
+  br i1 %e_done, label %done, label %check_end
+check_end:
+  %ec = getelementptr i8, i8* %ptr, i64 %ei3
+  %ch_e = load i8, i8* %ec
+  %is_sp2 = icmp eq i8 %ch_e, 32
+  %is_tab2 = icmp eq i8 %ch_e, 9
+  %is_nl2 = icmp eq i8 %ch_e, 10
+  %is_cr2 = icmp eq i8 %ch_e, 13
+  %ws4 = or i1 %is_sp2, %is_tab2
+  %ws5 = or i1 %ws4, %is_nl2
+  %ws6 = or i1 %ws5, %is_cr2
+  br i1 %ws6, label %dec_end, label %done
+dec_end:
+  store i64 %ei3, i64* %end_p
+  br label %trim_end
+done:
+  %fs = load i64, i64* %start_p
+  %fe = load i64, i64* %end_p
+  %new_len = sub i64 %fe, %fs
+  %buf_sz = add i64 %new_len, 1
+  %buf = call i8* @malloc(i64 %buf_sz)
+  %src = getelementptr i8, i8* %ptr, i64 %fs
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %buf, i8* %src, i64 %new_len, i1 false)
+  %term = getelementptr i8, i8* %buf, i64 %new_len
+  store i8 0, i8* %term
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+}
+
+define i64 @rt_str_index_of(i64 %s, i64 %needle) {
+entry:
+  %str_ptr = inttoptr i64 %s to i8*
+  %ndl_ptr = inttoptr i64 %needle to i8*
+  %found = call i8* @strstr(i8* %str_ptr, i8* %ndl_ptr)
+  %is_null = icmp eq i8* %found, null
+  br i1 %is_null, label %not_found, label %calc
+calc:
+  %str_int = ptrtoint i8* %str_ptr to i64
+  %found_int = ptrtoint i8* %found to i64
+  %idx = sub i64 %found_int, %str_int
+  ret i64 %idx
+not_found:
+  ret i64 -1
+}
+
+define i64 @rt_str_repeat(i64 %s, i64 %count) {
+entry:
+  %ptr = inttoptr i64 %s to i8*
+  %len = call i64 @strlen(i8* %ptr)
+  %total = mul i64 %len, %count
+  %buf_sz = add i64 %total, 1
+  %buf = call i8* @malloc(i64 %buf_sz)
+  store i8 0, i8* %buf
+  br label %loop
+loop:
+  %i = phi i64 [0, %entry], [%next, %body]
+  %done = icmp sge i64 %i, %count
+  br i1 %done, label %end, label %body
+body:
+  call i8* @strcat(i8* %buf, i8* %ptr)
+  %next = add i64 %i, 1
+  br label %loop
+end:
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+}
+
+define i64 @rt_str_to_upper(i64 %s) {
+entry:
+  %ptr = inttoptr i64 %s to i8*
+  %len = call i64 @strlen(i8* %ptr)
+  %buf_sz = add i64 %len, 1
+  %buf = call i8* @malloc(i64 %buf_sz)
+  br label %loop
+loop:
+  %i = phi i64 [0, %entry], [%next, %cont]
+  %done = icmp sge i64 %i, %len
+  br i1 %done, label %end, label %body
+body:
+  %src_p = getelementptr i8, i8* %ptr, i64 %i
+  %ch = load i8, i8* %src_p
+  %is_lower = icmp uge i8 %ch, 97
+  %is_lower2 = icmp ule i8 %ch, 122
+  %lower = and i1 %is_lower, %is_lower2
+  br i1 %lower, label %toupper, label %keep
+toupper:
+  %upper_ch = sub i8 %ch, 32
+  br label %cont
+keep:
+  br label %cont
+cont:
+  %out_ch = phi i8 [%upper_ch, %toupper], [%ch, %keep]
+  %dst_p = getelementptr i8, i8* %buf, i64 %i
+  store i8 %out_ch, i8* %dst_p
+  %next = add i64 %i, 1
+  br label %loop
+end:
+  %term = getelementptr i8, i8* %buf, i64 %len
+  store i8 0, i8* %term
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+}
+
+define i64 @rt_str_to_lower(i64 %s) {
+entry:
+  %ptr = inttoptr i64 %s to i8*
+  %len = call i64 @strlen(i8* %ptr)
+  %buf_sz = add i64 %len, 1
+  %buf = call i8* @malloc(i64 %buf_sz)
+  br label %loop
+loop:
+  %i = phi i64 [0, %entry], [%next, %cont]
+  %done = icmp sge i64 %i, %len
+  br i1 %done, label %end, label %body
+body:
+  %src_p = getelementptr i8, i8* %ptr, i64 %i
+  %ch = load i8, i8* %src_p
+  %is_upper = icmp uge i8 %ch, 65
+  %is_upper2 = icmp ule i8 %ch, 90
+  %upper = and i1 %is_upper, %is_upper2
+  br i1 %upper, label %tolower, label %keep
+tolower:
+  %lower_ch = add i8 %ch, 32
+  br label %cont
+keep:
+  br label %cont
+cont:
+  %out_ch = phi i8 [%lower_ch, %tolower], [%ch, %keep]
+  %dst_p = getelementptr i8, i8* %buf, i64 %i
+  store i8 %out_ch, i8* %dst_p
+  %next = add i64 %i, 1
+  br label %loop
+end:
+  %term = getelementptr i8, i8* %buf, i64 %len
+  store i8 0, i8* %term
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+}
+
+; --- Runtime list methods (rt_list_*) ---
+
+define i64 @rt_list_reverse(i64 %list) {
+entry:
+  %len = call i64 @__list_length(i64 %list)
+  %new = call i64 @__list_new()
+  %last = sub i64 %len, 1
+  br label %loop
+loop:
+  %i = phi i64 [%last, %entry], [%next, %body]
+  %done = icmp slt i64 %i, 0
+  br i1 %done, label %end, label %body
+body:
+  %elem = call i64 @__list_get(i64 %list, i64 %i)
+  call void @__list_push(i64 %new, i64 %elem)
+  %next = sub i64 %i, 1
+  br label %loop
+end:
+  ret i64 %new
+}
+
+define i64 @rt_list_copy(i64 %list) {
+entry:
+  %len = call i64 @__list_length(i64 %list)
+  %new = call i64 @__list_new()
+  br label %loop
+loop:
+  %i = phi i64 [0, %entry], [%next, %body]
+  %done = icmp sge i64 %i, %len
+  br i1 %done, label %end, label %body
+body:
+  %elem = call i64 @__list_get(i64 %list, i64 %i)
+  call void @__list_push(i64 %new, i64 %elem)
+  %next = add i64 %i, 1
+  br label %loop
+end:
+  ret i64 %new
+}
+
+define i64 @rt_list_sort(i64 %list) {
+entry:
+  %len = call i64 @__list_length(i64 %list)
+  %copy = call i64 @rt_list_copy(i64 %list)
+  %len_1 = sub i64 %len, 1
+  br label %outer
+outer:
+  %oi = phi i64 [0, %entry], [%onext, %outer_inc]
+  %o_done = icmp sge i64 %oi, %len_1
+  br i1 %o_done, label %end, label %inner_start
+inner_start:
+  %inner_max = sub i64 %len_1, %oi
+  br label %inner
+inner:
+  %ji = phi i64 [0, %inner_start], [%jnext, %no_swap]
+  %j_done = icmp sge i64 %ji, %inner_max
+  br i1 %j_done, label %outer_inc, label %compare
+compare:
+  %j1 = add i64 %ji, 1
+  %a = call i64 @__list_get(i64 %copy, i64 %ji)
+  %b = call i64 @__list_get(i64 %copy, i64 %j1)
+  %gt = icmp sgt i64 %a, %b
+  br i1 %gt, label %swap, label %no_swap
+swap:
+  call void @__list_set(i64 %copy, i64 %ji, i64 %b)
+  call void @__list_set(i64 %copy, i64 %j1, i64 %a)
+  br label %no_swap
+no_swap:
+  %jnext = add i64 %ji, 1
+  br label %inner
+outer_inc:
+  %onext = add i64 %oi, 1
+  br label %outer
+end:
+  ret i64 %copy
 }
