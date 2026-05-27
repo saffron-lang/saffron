@@ -171,6 +171,10 @@ class Parser {
             var right = this.parse_bitwise_or()
             left = AST.Expr.Binary(left, op, right)
         }
+        if (this.match_kind("is")) {
+            var type_name = this.expect_ident()
+            left = AST.Expr.IsCheck(left, type_name)
+        }
         return left
     }
 
@@ -539,6 +543,7 @@ class Parser {
             TkCatch => "catch"
             TkThrow => "throw"
             TkFinally => "finally"
+            TkIs => "is"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -888,11 +893,17 @@ class Parser {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring) }
             if (this.match_kind_check("var")) {
-                // Field declaration: var name: Type
+                // Field declaration: var name: Type  or  var name = default
                 this.advance()
                 var fname = this.expect_ident()
-                this.consume(":")
-                var ftype = this.parse_type()
+                var ftype = "Any"
+                if (this.match_kind(":")) {
+                    ftype = this.parse_type()
+                }
+                // Skip default initializer if present (assigned in init)
+                if (this.match_kind("=")) {
+                    this.parse_expr()
+                }
                 if (!first_field) { fields_sb.append(",") }
                 fields_sb.append(fname)
                 fields_sb.append(":")
@@ -1019,15 +1030,16 @@ class Parser {
         var increment = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
             AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
 
-        // Build while body: item decl + user body + increment
+        // Build while body: item decl + increment + user body
+        // (increment before body so that `continue` doesn't skip it)
         var while_body: List<AST.Stmt> = []
         while_body.push(item_init)
+        while_body.push(increment)
         var bi = 0
         while (bi < body.length()) {
             while_body.push(body[bi])
             bi = bi + 1
         }
-        while_body.push(increment)
 
         // Build block: list init + idx init + while
         var stmts: List<AST.Stmt> = []
@@ -1045,8 +1057,11 @@ class Parser {
         var catch_name = this.expect_ident()
         this.consume(")")
         var catch_body = this.parse_block_stmts()
-        // TODO: handle finally
-        return AST.Stmt.TryCatch(try_body, catch_name, catch_body)
+        var finally_body: List<AST.Stmt> = []
+        if (this.match_kind("finally")) {
+            finally_body = this.parse_block_stmts()
+        }
+        return AST.Stmt.TryCatch(try_body, catch_name, catch_body, finally_body)
     }
 
     fun parse_throw(): AST.Stmt {
