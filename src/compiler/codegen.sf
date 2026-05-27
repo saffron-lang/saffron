@@ -30,6 +30,7 @@ class Codegen {
     var func_prefix_map: Map<String, String>
     var current_prefix: String
     var module_globals: Map<String, Bool>
+    var register_only: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -59,6 +60,7 @@ class Codegen {
         this.func_prefix_map = {}
         this.current_prefix = ""
         this.module_globals = {}
+        this.register_only = false
     }
 
     fun params_to_string(params: List<AST.Param>): String {
@@ -3246,9 +3248,9 @@ class Codegen {
 
         // Parse field names for struct layout
         var field_list: List<String> = []
+        var i: Float = 0
         if (fields.length() > 0) {
             var parts: List<String> = this.split_respecting_generics(fields, ",")
-            var i: Float = 0
             while (i < parts.length()) {
                 var fp: List<String> = parts[i].split(":")
                 field_list.push(fp[0])
@@ -3258,14 +3260,16 @@ class Codegen {
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        var field_types_str: String = ""
-        var i: Float = 0
-        while (i < num_fields) {
-            if (i > 0) { field_types_str = field_types_str + ", " }
-            field_types_str = field_types_str + "i64"
-            i = i + 1
+        if (!this.register_only) {
+            var field_types_str: String = ""
+            var fi: Float = 0
+            while (fi < num_fields) {
+                if (fi > 0) { field_types_str = field_types_str + ", " }
+                field_types_str = field_types_str + "i64"
+                fi = fi + 1
+            }
+            this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
         }
-        this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
 
         // Register method names
         var method_names: List<String> = []
@@ -3352,6 +3356,7 @@ class Codegen {
         this.known_functions.push(emit_name)
         this.func_ret_types.set(emit_name, this.str_to_type(name))
         this.func_ret_types.set(name, this.str_to_type(name))
+        if (this.register_only) { return }
         this.emit("")
         this.emit("define i64 @" + emit_name + "() {")
         this.emit("entry:")
@@ -3405,7 +3410,9 @@ class Codegen {
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
-        this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
+        if (!this.register_only) {
+            this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
+        }
 
         // Emit constructor functions for variants with fields
         var max_fields: Float = this.get_max_fields(name)
@@ -3426,6 +3433,7 @@ class Codegen {
     }
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
+        if (this.register_only) { return }
         var parts: List<String> = this.split_respecting_generics(fields_str, ",")
         var num_fields: Float = parts.length()
 
@@ -3764,6 +3772,7 @@ class Codegen {
             this.func_ret_types.set(name, this.str_to_type(ret_type))
             this.func_prefix_map.set(name, emit_name)
         }
+        if (this.register_only) { return }
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -4192,9 +4201,27 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         mi2 = mi2 + 1
     }
 
-    // First: compile each module's declarations with its prefix
+    // First: register all module declarations (metadata only, no IR bodies)
     var module_init_names: List<String> = []
     var mi: Float = 0
+    gen.register_only = true
+    while (mi < module_stmts.length()) {
+        var stmts: List<AST.Stmt> = module_stmts[mi]
+        var prefix: String = module_prefixes_list[mi]
+        gen.current_prefix = prefix
+        var si: Float = 0
+        while (si < stmts.length()) {
+            if (gen.is_decl(stmts[si])) {
+                gen.gen_stmt(stmts[si])
+            }
+            si = si + 1
+        }
+        mi = mi + 1
+    }
+
+    // Second: emit full IR for all module declarations
+    gen.register_only = false
+    mi = 0
     while (mi < module_stmts.length()) {
         var stmts: List<AST.Stmt> = module_stmts[mi]
         var prefix: String = module_prefixes_list[mi]
