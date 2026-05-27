@@ -1,7 +1,14 @@
 //! `pantry run <script>` — run a named script from pantry.toml.
+import "@args" as Args
 
 import "@os" as OS
 import "../config.sf" as Config
+
+fun _exec(cmd: String) {
+    IO.println("> ${cmd}")
+    var output = OS.exec(cmd)
+    IO.print(output)
+}
 
 /// Run a named script from the [scripts] section.
 fun run(script_name: String, parsed: Args.ParsedArgs) {
@@ -31,10 +38,4 @@ fun run(script_name: String, parsed: Args.ParsedArgs) {
 /// Run a raw shell command in the project context.
 fun run_raw(cmd: String, parsed: Args.ParsedArgs) {
     _exec(cmd)
-}
-
-fun _exec(cmd: String) {
-    IO.println("> ${cmd}")
-    var output = OS.exec(cmd)
-    IO.print(output)
 }

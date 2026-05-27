@@ -1,4 +1,5 @@
 //! `pantry test` — run the project's test suite.
+import "@args" as Args
 
 import "@os" as OS
 import "@glob" as Glob

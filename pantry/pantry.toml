@@ -8,5 +8,5 @@ authors = ["henry232323"]
 [dependencies]
 
 [scripts]
-build = "saffron src/main.sf"
-test = "saffron test/"
+build = "saffron build src/main.sf -o build/pantry"
+run = "saffron run src/main.sf"

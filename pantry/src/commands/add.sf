@@ -1,4 +1,5 @@
 //! `pantry add <package>` — add a dependency to pantry.toml.
+import "@args" as Args
 
 import "@os" as OS
 import "@semver" as SemVer
