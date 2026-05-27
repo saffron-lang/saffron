@@ -70,6 +70,16 @@ class Parser {
     // --- Type annotations ---
 
     fun parse_type(): String {
+        var name = this.parse_single_type()
+        // Union types: String | Nil, Int | String | Nil
+        while (this.match_kind("|")) {
+            var next = this.parse_single_type()
+            name = name + "|" + next
+        }
+        return name
+    }
+
+    fun parse_single_type(): String {
         var name = this.expect_ident()
         // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
         while (this.match_kind(".")) {
