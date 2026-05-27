@@ -196,7 +196,6 @@ class NullChecker {
             }
             ClassDecl(name, fields, methods, doc) => {
                 this.env.class_fields.set(name, fields)
-                this.register_class_methods(name, methods)
             }
             VarDecl(n, t, i, d) => {}
             ExprStmt(e) => {}
@@ -225,28 +224,6 @@ class NullChecker {
         this.env.enum_variants.set(name, variant_names.join(","))
     }
 
-    fun register_class_methods(class_name: String, methods: List<AST.Stmt>) {
-        var i = 0
-        while (i < methods.length()) {
-            var method = methods[i]
-            match (method) {
-                FunDecl(mname, params, ret_type, body, doc) => {
-                    this.env.define_func(class_name + "__" + mname, ret_type)
-                }
-                VarDecl(n, t, init, d) => {}
-                ExprStmt(e) => {}
-                Return(v) => {}
-                If(c, t, e) => {}
-                While(c, b) => {}
-                Block(s) => {}
-                EnumDecl(n, v, d) => {}
-                ClassDecl(n, f, m, d) => {}
-                Break => {}
-                Continue => {}
-            }
-            i = i + 1
-        }
-    }
 
     // --- Statement checking ---
 
@@ -265,6 +242,10 @@ class NullChecker {
                 }
             }
             FunDecl(name, params, ret_type, body, doc) => {
+                // Register method with class prefix if inside a class
+                if (this.current_class.length() > 0) {
+                    this.env.define_func(this.current_class + "__" + name, ret_type)
+                }
                 var old_ret = this.current_func_ret
                 this.current_func_ret = ret_type
                 this.env.push_scope()
@@ -316,14 +297,7 @@ class NullChecker {
                 this.env.pop_scope()
             }
             ClassDecl(name, fields, methods, doc) => {
-                var old_class = this.current_class
-                this.current_class = name
-                var i = 0
-                while (i < methods.length()) {
-                    this.check_stmt(methods[i])
-                    i = i + 1
-                }
-                this.current_class = old_class
+                this.env.class_fields.set(name, fields)
             }
             EnumDecl(n, v, d) => {}
             Break => {}
@@ -560,35 +534,82 @@ class NullChecker {
         return "Any"
     }
 
-    fun extract_generic_arg(typ: String): String {
-        // "List<String>" → "String", "Map<String>" → "String"
-        if (!typ.contains("<")) return "Any"
+    fun extract_generic_args(typ: String): String {
+        // "List<String>" → "String"
+        // "Map<String,Number>" → "String,Number"
+        // "Map<String,List<Int>>" → "String,List<Int>"
+        if (!typ.contains("<")) return ""
+        // Find first < and matching >
         var start = 0
         var i = 0
         while (i < typ.length()) {
             if (typ.char_at(i) == "<") {
                 start = i + 1
+                i = typ.length()
             }
             i = i + 1
         }
+        // Remove trailing >
         var end = typ.length() - 1
         if (end > start) {
             return typ.slice(start, end)
+        }
+        return ""
+    }
+
+    fun extract_nth_generic_arg(typ: String, n: Float): String {
+        // Split generic args respecting nested <> depth
+        var args_str = this.extract_generic_args(typ)
+        if (args_str.length() == 0) return "Any"
+        var args: List<String> = []
+        var current = ""
+        var depth = 0
+        var i = 0
+        while (i < args_str.length()) {
+            var ch = args_str.char_at(i)
+            if (ch == "<") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "," and depth == 0) {
+                args.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            args.push(current)
+        }
+        if (n < args.length()) {
+            return args[n.floor()]
         }
         return "Any"
     }
 
     fun extract_map_value_type(typ: String): String {
-        // For "Map<String>" → "String" (our parser only stores first arg)
-        // For "Map" → "Any"
+        // "Map<String,Number>" → "Number" (second arg)
+        // "Map<String>" → "String" (fallback: first arg)
+        // "Map" → "Any"
         if (!typ.contains("<")) return "Any"
-        return this.extract_generic_arg(typ)
+        var second = this.extract_nth_generic_arg(typ, 1)
+        if (second != "Any") return second
+        return this.extract_nth_generic_arg(typ, 0)
+    }
+
+    fun extract_map_key_type(typ: String): String {
+        // "Map<String,Number>" → "String"
+        if (!typ.contains("<")) return "Any"
+        return this.extract_nth_generic_arg(typ, 0)
     }
 
     fun extract_list_element_type(typ: String): String {
-        // "List<String>" → "String", "List" → "Any"
+        // "List<String>" → "String"
         if (!typ.contains("<")) return "Any"
-        return this.extract_generic_arg(typ)
+        return this.extract_nth_generic_arg(typ, 0)
     }
 
     fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
