@@ -26,6 +26,9 @@ class Codegen {
     var current_ret_type: String
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
+    var module_prefixes: Map<String, String>
+    var current_prefix: String
+    var module_globals: Map<String, Bool>
 
     fun init() {
         this.sb = StringBuilder()
@@ -51,6 +54,9 @@ class Codegen {
         this.current_ret_type = "i64"
         this.called_functions = []
         this.called_function_arity = {}
+        this.module_prefixes = {}
+        this.current_prefix = ""
+        this.module_globals = {}
     }
 
     fun sanitize_name(name: String): String {
@@ -204,7 +210,11 @@ class Codegen {
                     this.last_type = "Int"
                 }
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = load i64, i64* %" + this.sanitize_name(name))
+                var var_ref: String = "%" + this.sanitize_name(name)
+                if (this.module_globals.has(this.current_prefix + name)) {
+                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                }
+                this.emit_indent(local + " = load i64, i64* " + var_ref)
                 local
             }
             Binary(left, op, right) => {
@@ -218,7 +228,11 @@ class Codegen {
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
+                var var_ref: String = "%" + this.sanitize_name(name)
+                if (this.module_globals.has(this.current_prefix + name)) {
+                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                }
+                this.emit_indent("store i64 " + val + ", i64* " + var_ref)
                 val
             }
             Logical(left, op, right) => {
@@ -360,6 +374,9 @@ class Codegen {
                         var lhs: String = this.gen_arg_value(left)
                         var rhs: String = this.gen_arg_value(right)
                         var full_method: String = left_class + "__" + method_name
+                        if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                            full_method = this.current_prefix + full_method
+                        }
                         this.called_functions.push(full_method)
                         var local: String = this.fresh_local()
                         this.emit_indent(local + " = call i64 @" + full_method + "(i64 " + lhs + ", i64 " + rhs + ")")
@@ -562,7 +579,11 @@ class Codegen {
                 this.last_type = "Int"
             }
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = load i64, i64* %" + this.sanitize_name(vname))
+            var var_ref: String = "%" + this.sanitize_name(vname)
+            if (this.module_globals.has(this.current_prefix + vname)) {
+                var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
+            }
+            this.emit_indent(local + " = load i64, i64* " + var_ref)
             return local
         }
         if (expr_kind == "member") {
@@ -716,6 +737,9 @@ class Codegen {
                         ai = ai + 1
                     }
                     var full_method: String = class_name + "__" + method_name
+                    if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                        full_method = this.current_prefix + full_method
+                    }
                     this.called_functions.push(full_method)
                     var local: String = this.fresh_local()
                     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
@@ -829,8 +853,8 @@ class Codegen {
         // Check if it looks like a direct function call (not a local variable)
         // This handles cross-file function references
         if (!this.var_types.has(callee_name) and callee_name.length() > 0) {
-            // Treat as external direct call
-            this.called_functions.push(callee_name)
+            var emit_callee: String = this.current_prefix + callee_name
+            this.called_functions.push(emit_callee)
             var arg_strs: List<String> = []
             var i: Float = 0
             while (i < args.length()) {
@@ -839,7 +863,7 @@ class Codegen {
                 i = i + 1
             }
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + callee_name + "(" + arg_strs.join(", ") + ")")
+            this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
             this.last_type = "Int"
             return local
         }
@@ -1364,6 +1388,47 @@ class Codegen {
         return name
     }
 
+    fun get_expr_type(expr: AST.Expr): String {
+        var ek: String = this.classify_expr(expr)
+        if (ek == "variable") {
+            var vname: String = match (expr) { Variable(n) => n }
+            if (this.var_types.has(vname)) {
+                return this.var_types.get(vname)
+            }
+            return "Any"
+        }
+        if (ek == "string") return "String"
+        if (ek == "int") return "Int"
+        if (ek == "float") return "Float"
+        if (ek == "bool") return "Bool"
+        if (ek == "nil") return "Nil"
+        if (ek == "list_lit") return "List<String>"
+        if (ek == "map_lit") return "Map<String,String>"
+        if (ek == "this") return this.current_class
+        if (ek == "get_field" or ek == "member") {
+            var obj_name: String = this.get_variable_name(expr)
+            if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+                return this.var_types.get(obj_name)
+            }
+        }
+        if (ek == "method_call") {
+            var mc_method: String = match (expr) { MethodCall(o, m, a) => m }
+            if (mc_method == "length") return "Float"
+            if (mc_method == "to_string" or mc_method == "join") return "String"
+            if (mc_method == "split" or mc_method == "keys") return "List<String>"
+            if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with") return "Bool"
+            if (mc_method == "get") return "String"
+            if (mc_method == "to_string") return "String"
+        }
+        if (ek == "call") {
+            var callee_name: String = this.resolve_callee(match (expr) { Call(c, a) => c })
+            if (this.func_ret_types.has(callee_name)) {
+                return this.func_ret_types.get(callee_name)
+            }
+        }
+        return "Any"
+    }
+
     fun gen_list_lit(elements: List<AST.Expr>): String {
         var list_val: String = this.fresh_local()
         this.emit_indent(list_val + " = call i64 @__list_new()")
@@ -1482,11 +1547,17 @@ class Codegen {
                 arg_strs.push("i64 " + val)
                 ai = ai + 1
             }
-            this.called_functions.push(method)
-            this.called_function_arity.set(method, args.length())
+            var prefixed_name: String = method
+            if (this.module_prefixes.has(obj_name)) {
+                prefixed_name = this.module_prefixes.get(obj_name) + method
+            }
+            this.called_functions.push(prefixed_name)
+            this.called_function_arity.set(prefixed_name, args.length())
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + method + "(" + arg_strs.join(", ") + ")")
-            if (this.func_ret_types.has(method)) {
+            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.func_ret_types.get(prefixed_name)
+            } else if (this.func_ret_types.has(method)) {
                 this.last_type = this.func_ret_types.get(method)
             } else {
                 this.last_type = "Int"
@@ -1662,8 +1733,12 @@ class Codegen {
             }
         }
 
+        // Type-directed: get type from annotations first, fall back to last_type
+        var obj_type: String = this.get_expr_type(object)
         var obj: String = this.gen_arg_value(object)
-        var obj_type: String = this.last_type
+        if (obj_type == "Any") {
+            obj_type = this.last_type
+        }
 
         // List methods
         if (obj_type == "List" or obj_type.starts_with("List<")) {
@@ -1955,6 +2030,9 @@ class Codegen {
                     i = i + 1
                 }
                 var full_method: String = class_name + "__" + method
+                if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                    full_method = this.current_prefix + full_method
+                }
                 this.called_functions.push(full_method)
                 if (this.get_method_ret(class_name, method) == "void") {
                     var discard: String = this.fresh_local()
@@ -2720,7 +2798,11 @@ class Codegen {
         if (vtype == "String") {
             this.string_vars.push(name)
         }
-        this.emit_indent("store i64 " + val + ", i64* %" + this.sanitize_name(name))
+        var var_ref: String = "%" + this.sanitize_name(name)
+        if (this.module_globals.has(this.current_prefix + name)) {
+            var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+        }
+        this.emit_indent("store i64 " + val + ", i64* " + var_ref)
     }
 
     fun gen_return(stmt: AST.Stmt) {
@@ -3275,12 +3357,15 @@ class Codegen {
     }
 
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
-        var emit_name: String = name
+        var emit_name: String = this.current_prefix + name
         if (name == "main") {
             emit_name = "__saffron_main"
         }
-        this.known_functions.push(name)
-        this.func_ret_types.set(name, ret_type)
+        this.known_functions.push(emit_name)
+        this.func_ret_types.set(emit_name, ret_type)
+        if (this.current_prefix.length() > 0) {
+            this.func_ret_types.set(name, ret_type)
+        }
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -3323,7 +3408,10 @@ class Codegen {
         }
         i = 0
         while (i < var_names.length()) {
-            this.emit_indent("%" + this.sanitize_name(var_names[i]) + " = alloca " + this.llvm_type(var_types[i]))
+            var vn: String = var_names[i]
+            if (!this.module_globals.has(this.current_prefix + vn)) {
+                this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
+            }
             i = i + 1
         }
 
@@ -3629,9 +3717,156 @@ fun generate(program: List<AST.Stmt>): String {
 }
 
 fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
+    // Merge imports and program into a single compilation unit
+    var all_stmts: List<AST.Stmt> = []
+    var i: Float = 0
+    while (i < imports.length()) {
+        all_stmts.push(imports[i])
+        i = i + 1
+    }
+    i = 0
+    while (i < program.length()) {
+        all_stmts.push(program[i])
+        i = i + 1
+    }
     var gen: Codegen = Codegen()
-    // Process imports through gen_stmt to register enums, classes, functions
-    // (same as first pass of generate, but on imported declarations)
-    gen.register_external_enums(imports)
+    return gen.generate(all_stmts)
+}
+
+fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, alias_map: Map<String, String>): String {
+    var gen: Codegen = Codegen()
+    gen.module_prefixes = alias_map
+
+    // Register runtime functions first
+    gen.known_functions.push("StringBuilder")
+    gen.known_functions.push("__list_new")
+    gen.known_functions.push("__list_push")
+    gen.known_functions.push("__list_get")
+    gen.known_functions.push("__list_set")
+    gen.known_functions.push("__list_length")
+    gen.known_functions.push("__list_pop")
+    gen.known_functions.push("__sb_append")
+    gen.known_functions.push("__sb_to_string")
+    gen.known_functions.push("__safe_strcmp")
+    gen.known_functions.push("__map_new")
+    gen.known_functions.push("__map_set")
+    gen.known_functions.push("__map_get")
+    gen.known_functions.push("__map_has")
+    gen.known_functions.push("__map_keys")
+    gen.known_functions.push("__str_ends_with")
+    gen.known_functions.push("__str_split")
+    gen.known_functions.push("__str_replace")
+    gen.known_functions.push("__int_to_string")
+    gen.known_functions.push("__list_join")
+    gen.known_functions.push("__join_append")
+    gen.known_functions.push("__list_contains")
+    gen.known_functions.push("__io_read_file")
+    gen.known_functions.push("__io_write_file")
+    gen.known_functions.push("__io_file_exists")
+    gen.known_functions.push("__io_mkdir")
+    gen.known_functions.push("__os_exec")
+    gen.known_functions.push("__os_args")
+    gen.known_functions.push("__os_cwd")
+    gen.known_functions.push("__os_path_sep")
+    gen.known_functions.push("__os_platform")
+    gen.known_functions.push("__os_env")
+    gen.func_ret_types.set("StringBuilder", "StringBuilder")
+
+    // Pre-scan: register module-level VarDecls as globals
+    var mi2: Float = 0
+    while (mi2 < module_stmts.length()) {
+        var stmts: List<AST.Stmt> = module_stmts[mi2]
+        var prefix: String = module_prefixes_list[mi2]
+        var si2: Float = 0
+        while (si2 < stmts.length()) {
+            if (!gen.is_decl(stmts[si2])) {
+                var stmt_kind: String = gen.classify_stmt(stmts[si2])
+                if (stmt_kind == "var") {
+                    var vname: String = match (stmts[si2]) { VarDecl(n, t, i, d) => n }
+                    gen.module_globals.set(prefix + vname, true)
+                    gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                }
+            }
+            si2 = si2 + 1
+        }
+        mi2 = mi2 + 1
+    }
+
+    // First: compile each module's declarations with its prefix
+    var module_init_names: List<String> = []
+    var mi: Float = 0
+    while (mi < module_stmts.length()) {
+        var stmts: List<AST.Stmt> = module_stmts[mi]
+        var prefix: String = module_prefixes_list[mi]
+        gen.current_prefix = prefix
+
+        // Compile declarations (functions, classes, enums)
+        var si: Float = 0
+        while (si < stmts.length()) {
+            if (gen.is_decl(stmts[si])) {
+                gen.gen_stmt(stmts[si])
+            }
+            si = si + 1
+        }
+
+        // Check if module has top-level code (VarDecl, ExprStmt, etc.)
+        var has_top: Bool = false
+        si = 0
+        while (si < stmts.length()) {
+            if (!gen.is_decl(stmts[si])) {
+                has_top = true
+            }
+            si = si + 1
+        }
+
+        // Wrap module's top-level code in an init function
+        if (has_top) {
+            var init_name: String = "__mod_init_" + prefix.slice(0, prefix.length() - 1)
+            gen.known_functions.push(init_name)
+            module_init_names.push(init_name)
+            gen.emit("")
+            gen.emit("define i64 @" + init_name + "() {")
+            gen.emit("entry:")
+            gen.block_terminated = false
+            gen.reset_locals()
+            // Alloca vars for module-level VarDecls
+            var top_vars: List<String> = []
+            var top_var_types: List<String> = []
+            si = 0
+            while (si < stmts.length()) {
+                if (!gen.is_decl(stmts[si])) {
+                    var single_list: List<AST.Stmt> = []
+                    single_list.push(stmts[si])
+                    gen.collect_vars(single_list, top_vars, top_var_types)
+                }
+                si = si + 1
+            }
+            var vi: Float = 0
+            while (vi < top_vars.length()) {
+                var vn: String = top_vars[vi]
+                if (!gen.module_globals.has(prefix + vn)) {
+                    gen.emit_indent("%" + gen.sanitize_name(vn) + " = alloca i64")
+                }
+                vi = vi + 1
+            }
+            si = 0
+            while (si < stmts.length()) {
+                if (!gen.is_decl(stmts[si])) {
+                    gen.gen_stmt(stmts[si])
+                }
+                si = si + 1
+            }
+            if (!gen.block_terminated) {
+                gen.emit_indent("ret i64 0")
+            }
+            gen.emit("}")
+            gen.block_terminated = false
+        }
+
+        mi = mi + 1
+    }
+
+    // Then compile the main program without prefix
+    gen.current_prefix = ""
     return gen.generate(program)
 }
