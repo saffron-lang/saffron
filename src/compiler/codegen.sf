@@ -2618,6 +2618,7 @@ class Codegen {
         var saved_sb: StringBuilder = this.sb
         var saved_terminated: Bool = this.block_terminated
         var saved_counter: Float = this.local_counter
+        var saved_var_types: Map<String, String> = this.var_types
 
         // Generate the lambda function
         this.sb = StringBuilder()
@@ -2633,6 +2634,7 @@ class Codegen {
         this.sb = saved_sb
         this.block_terminated = saved_terminated
         this.local_counter = saved_counter
+        this.var_types = saved_var_types
         this.globals.push(lambda_ir)
 
         if (captures.length() > 0) {
@@ -2694,6 +2696,7 @@ class Codegen {
         var saved_sb2: StringBuilder = this.sb
         var saved_terminated2: Bool = this.block_terminated
         var saved_counter2: Float = this.local_counter
+        var saved_var_types2: Map<String, String> = this.var_types
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
         if (params_str.length() > 0) {
@@ -2704,6 +2707,7 @@ class Codegen {
         this.sb = saved_sb2
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
+        this.var_types = saved_var_types2
 
         // Heap-allocate closure pair: [fn_ptr, 0]
         var closure_raw: String = this.fresh_local()
@@ -3873,6 +3877,7 @@ class Codegen {
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
+        var saved_vt: Map<String, String> = this.var_types
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -3977,6 +3982,7 @@ class Codegen {
 
         this.emit("}")
         this.block_terminated = false
+        this.var_types = saved_vt
     }
 
     // --- Top-level ---
