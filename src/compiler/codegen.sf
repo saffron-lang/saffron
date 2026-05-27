@@ -393,10 +393,12 @@ class Codegen {
 
         // String equality comparison
         if (op == "==" or op == "!=") {
+            var left_type: String = this.get_expr_type(left)
+            var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
-            var left_type: String = this.last_type
+            if (left_type == "Any") { left_type = this.last_type }
             var rhs: String = this.gen_arg_value(right)
-            var right_type: String = this.last_type
+            if (right_type == "Any") { right_type = this.last_type }
 
             if (left_type == "String" or right_type == "String") {
                 var lptr: String = this.fresh_local()
@@ -428,11 +430,13 @@ class Codegen {
         }
 
         if (op == "+") {
-            // Evaluate left to determine its type
+            // Type-directed: check types before generating code
+            var left_type: String = this.get_expr_type(left)
+            var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
-            var left_type: String = this.last_type
+            if (left_type == "Any") { left_type = this.last_type }
             var rhs: String = this.gen_arg_value(right)
-            var right_type: String = this.last_type
+            if (right_type == "Any") { right_type = this.last_type }
 
             if (left_type == "String" or right_type == "String") {
                 // String concatenation
@@ -755,8 +759,9 @@ class Codegen {
 
         if (callee_name == "IO.println") {
             var arg_expr: AST.Expr = args[0]
+            var arg_type: String = this.get_expr_type(arg_expr)
             var arg: String = this.gen_arg_value(arg_expr)
-            var arg_type: String = this.last_type
+            if (arg_type == "Any") { arg_type = this.last_type }
             var local: String = this.fresh_local()
             if (arg_type == "String") {
                 var str_ptr: String = this.fresh_local()
@@ -770,8 +775,9 @@ class Codegen {
         }
         if (callee_name == "IO.print") {
             var arg_expr: AST.Expr = args[0]
+            var arg_type: String = this.get_expr_type(arg_expr)
             var arg: String = this.gen_arg_value(arg_expr)
-            var arg_type: String = this.last_type
+            if (arg_type == "Any") { arg_type = this.last_type }
             var local: String = this.fresh_local()
             if (arg_type == "String") {
                 var str_ptr: String = this.fresh_local()
@@ -793,19 +799,25 @@ class Codegen {
             }
         }
 
-        if (this.known_functions.contains(callee_name)) {
+        var resolved_callee: String = callee_name
+        if (!this.known_functions.contains(callee_name) and this.current_prefix.length() > 0) {
+            if (this.known_functions.contains(this.current_prefix + callee_name)) {
+                resolved_callee = this.current_prefix + callee_name
+            }
+        }
+        if (this.known_functions.contains(resolved_callee)) {
             // Direct call to known function
-            var call_target: String = callee_name
+            var call_target: String = resolved_callee
             if (callee_name == "main") {
                 call_target = "__saffron_main"
             }
-            this.called_functions.push(callee_name)
+            this.called_functions.push(resolved_callee)
 
             // Check if this is a class constructor call with args
             // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
             var is_constructor: Bool = false
-            if (this.func_ret_types.has(callee_name)) {
-                if (this.func_ret_types.get(callee_name) == callee_name) {
+            if (this.func_ret_types.has(resolved_callee)) {
+                if (this.func_ret_types.get(resolved_callee) == callee_name) {
                     is_constructor = true
                 }
             }
@@ -813,9 +825,14 @@ class Codegen {
             if (is_constructor) {
                 // Constructor: allocate instance, then call init
                 var instance: String = this.fresh_local()
-                this.emit_indent(instance + " = call i64 @" + callee_name + "()")
+                this.emit_indent(instance + " = call i64 @" + resolved_callee + "()")
                 // Call init for user-defined classes (not runtime builtins)
                 var init_name: String = callee_name + "__init"
+                if (!this.known_functions.contains(init_name) and this.current_prefix.length() > 0) {
+                    if (this.known_functions.contains(this.current_prefix + init_name)) {
+                        init_name = this.current_prefix + init_name
+                    }
+                }
                 if (this.known_functions.contains(init_name)) {
                     var init_args: List<String> = []
                     init_args.push("i64 " + instance)
@@ -841,8 +858,9 @@ class Codegen {
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
-            // Set last_type from function return type
-            if (this.func_ret_types.has(callee_name)) {
+            if (this.func_ret_types.has(resolved_callee)) {
+                this.last_type = this.func_ret_types.get(resolved_callee)
+            } else if (this.func_ret_types.has(callee_name)) {
                 this.last_type = this.func_ret_types.get(callee_name)
             } else {
                 this.last_type = "Int"
@@ -1382,6 +1400,7 @@ class Codegen {
             IndexGet(o, i) => ""
             IndexSet(o, i, v) => ""
             MethodCall(o, m, a) => ""
+            MapLit => ""
             BlockExpr(s, v) => ""
             IsCheck(val, t) => ""
         }
@@ -1588,8 +1607,9 @@ class Codegen {
         // Check for IO module calls
         if (obj_name == "IO") {
             if (method == "println") {
+                var arg_type: String = this.get_expr_type(args[0])
                 var arg: String = this.gen_arg_value(args[0])
-                var arg_type: String = this.last_type
+                if (arg_type == "Any") { arg_type = this.last_type }
                 var local: String = this.fresh_local()
                 if (arg_type == "String") {
                     var str_ptr: String = this.fresh_local()
@@ -1603,8 +1623,9 @@ class Codegen {
                 return local
             }
             if (method == "print") {
+                var arg_type: String = this.get_expr_type(args[0])
                 var arg: String = this.gen_arg_value(args[0])
-                var arg_type: String = this.last_type
+                if (arg_type == "Any") { arg_type = this.last_type }
                 var local: String = this.fresh_local()
                 if (arg_type == "String") {
                     var str_ptr: String = this.fresh_local()
@@ -2789,8 +2810,11 @@ class Codegen {
     }
 
     fun gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
-        var val: String = this.gen_arg_value(init)
         var vtype: String = type_ann
+        if (vtype == "Any") {
+            vtype = this.get_expr_type(init)
+        }
+        var val: String = this.gen_arg_value(init)
         if (vtype == "Any") {
             vtype = this.last_type
         }
@@ -2968,10 +2992,12 @@ class Codegen {
     fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
-        this.known_functions.push(name)
+        var emit_name: String = this.current_prefix + name
+        this.known_functions.push(emit_name)
+        this.func_ret_types.set(emit_name, name)
         this.func_ret_types.set(name, name)
         this.emit("")
-        this.emit("define i64 @" + name + "() {")
+        this.emit("define i64 @" + emit_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
