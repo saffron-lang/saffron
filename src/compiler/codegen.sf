@@ -228,6 +228,33 @@ class Codegen {
         }
     }
 
+    fun split_respecting_generics(s: String, delim: String): List<String> {
+        var result: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == delim and depth == 0) {
+                result.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            result.push(current)
+        }
+        return result
+    }
+
     fun sanitize_name(name: String): String {
         var sb: StringBuilder = StringBuilder()
         var i: Float = 0
@@ -1521,7 +1548,7 @@ class Codegen {
         if (!this.enum_variant_fields.has(key)) return "Int"
         var fields: String = this.enum_variant_fields.get(key)
         if (fields.length() == 0) return "Int"
-        var parts: List<String> = fields.split(",")
+        var parts: List<String> = this.split_respecting_generics(fields, ",")
         if (field_idx >= parts.length()) return "Int"
         var field_def: String = parts[field_idx.floor()]
         var name_type: List<String> = field_def.split(":")
@@ -1545,7 +1572,7 @@ class Codegen {
             if (this.enum_variant_fields.has(key)) {
                 var fields: String = this.enum_variant_fields.get(key)
                 if (fields.length() > 0) {
-                    var parts: List<String> = fields.split(",")
+                    var parts: List<String> = this.split_respecting_generics(fields, ",")
                     // Each part is "name:Type", count them
                     var field_count: Float = parts.length()
                     if (field_count > max_f) {
@@ -2388,7 +2415,7 @@ class Codegen {
         if (!this.class_fields.has(class_name)) return "Int"
         var fields: String = this.class_fields.get(class_name)
         if (fields.length() == 0) return "Int"
-        var parts: List<String> = fields.split(",")
+        var parts: List<String> = this.split_respecting_generics(fields, ",")
         var i: Float = 0
         while (i < parts.length()) {
             var fp: List<String> = parts[i].split(":")
@@ -2414,7 +2441,7 @@ class Codegen {
     fun get_field_index(class_name: String, field: String): Float {
         var fields: String = this.class_fields.get(class_name)
         if (fields.length() == 0) return 0
-        var parts: List<String> = fields.split(",")
+        var parts: List<String> = this.split_respecting_generics(fields, ",")
         var i: Float = 0
         while (i < parts.length()) {
             var fp: List<String> = parts[i].split(":")
@@ -2428,7 +2455,7 @@ class Codegen {
         // Find captured variables (free variables in body not in params)
         var param_names: List<String> = []
         if (params.length() > 0) {
-            var parts: List<String> = params.split(",")
+            var parts: List<String> = this.split_respecting_generics(params, ",")
             var pi: Float = 0
             while (pi < parts.length()) {
                 var pparts: List<String> = parts[pi].split(":")
@@ -2580,7 +2607,7 @@ class Codegen {
 
         var param_list: List<String> = []
         if (params.length() > 0) {
-            param_list = params.split(",")
+            param_list = this.split_respecting_generics(params, ",")
         }
 
         var param_strs: List<String> = []
@@ -3174,7 +3201,7 @@ class Codegen {
         // Parse field names for struct layout
         var field_list: List<String> = []
         if (fields.length() > 0) {
-            var parts: List<String> = fields.split(",")
+            var parts: List<String> = this.split_respecting_generics(fields, ",")
             var i: Float = 0
             while (i < parts.length()) {
                 var fp: List<String> = parts[i].split(":")
@@ -3352,7 +3379,7 @@ class Codegen {
     }
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
-        var parts: List<String> = fields_str.split(",")
+        var parts: List<String> = this.split_respecting_generics(fields_str, ",")
         var num_fields: Float = parts.length()
 
         // Build param list: (i64 %f0, i64 %f1, ...)
@@ -3696,7 +3723,7 @@ class Codegen {
         // Parse params string "name:type,name:type"
         var param_list: List<String> = []
         if (params.length() > 0) {
-            param_list = params.split(",")
+            param_list = this.split_respecting_generics(params, ",")
         }
 
         var param_strs: List<String> = []
