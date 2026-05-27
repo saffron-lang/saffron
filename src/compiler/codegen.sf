@@ -64,6 +64,7 @@ class Codegen {
     }
 
     fun params_to_string(params: List<AST.Param>): String {
+        if (!(params is List)) return ""
         var sb: StringBuilder = StringBuilder()
         var i: Float = 0
         while (i < params.length()) {
@@ -1890,6 +1891,13 @@ class Codegen {
             var prefixed_name: String = method
             if (this.module_prefixes.has(obj_name)) {
                 prefixed_name = this.module_prefixes.get(obj_name) + method
+            } else if (this.func_prefix_map.has(method)) {
+                prefixed_name = this.func_prefix_map.get(method)
+            } else {
+                var guessed: String = obj_name.to_lower() + "_" + method
+                if (this.known_functions.contains(guessed)) {
+                    prefixed_name = guessed
+                }
             }
             this.called_functions.push(prefixed_name)
             this.called_function_arity.set(prefixed_name, args.length())
@@ -3420,7 +3428,8 @@ class Codegen {
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
-        if (!this.register_only) {
+        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+            this.known_functions.push("__type_" + name)
             this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
         }
 
