@@ -307,6 +307,39 @@ class NullChecker {
             this.check_stmt(stmts[i])
             i = i + 1
         }
+        // Third pass: check interface conformance
+        this.check_conformance()
+    }
+
+    fun check_conformance() {
+        // For each class with a parent, verify it implements parent's methods
+        var classes = this.class_parents.keys()
+        var i = 0
+        while (i < classes.length()) {
+            var child_name: String = classes[i]
+            var parent_name: String = this.class_parents.get(child_name)
+            // Get parent's methods
+            if (this.class_method_names.has(parent_name)) {
+                var parent_methods_str: String = this.class_method_names.get(parent_name)
+                var parent_methods = parent_methods_str.split(",")
+                // Check each parent method exists on child
+                var child_methods_str = ""
+                if (this.class_method_names.has(child_name)) {
+                    child_methods_str = this.class_method_names.get(child_name)
+                }
+                var j = 0
+                while (j < parent_methods.length()) {
+                    var method_name: String = parent_methods[j]
+                    if (method_name != "init" and method_name.length() > 0) {
+                        if (!child_methods_str.contains(method_name)) {
+                            this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
+                        }
+                    }
+                    j = j + 1
+                }
+            }
+            i = i + 1
+        }
     }
 
     fun register_decl(stmt: AST.Stmt) {
