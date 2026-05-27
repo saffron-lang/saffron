@@ -1,0 +1,53 @@
+// Test finally clause and is type checks
+
+import "@test" as T
+
+// --- Finally clause tests ---
+
+// Test 1: finally runs after try (no exception)
+var finally_ran = false
+try {
+    var x = 1
+} catch (e) {
+    T.assert(false, "should not catch")
+} finally {
+    finally_ran = true
+}
+T.assert(finally_ran, "finally runs after try")
+
+// Test 2: finally runs after catch (exception thrown)
+var order: List<String> = []
+try {
+    throw "oops"
+} catch (e) {
+    order.push("catch")
+} finally {
+    order.push("finally")
+}
+T.assert_eq(order.length(), 2, "both catch and finally ran")
+T.assert_eq(order[0], "catch", "catch ran first")
+T.assert_eq(order[1], "finally", "finally ran second")
+
+// Test 3: finally without exception, value preserved
+var result = 0
+try {
+    result = 42
+} catch (e) {
+    result = -1
+} finally {
+    result = result + 1
+}
+T.assert_eq(result, 43, "finally can modify state")
+
+// --- is type check tests ---
+
+var n = 42
+var s = "hello"
+var b = true
+var list = [1, 2, 3]
+
+T.assert(n is Number, "42 is Number")
+T.assert(s is String, "hello is String")
+T.assert(b is Bool, "true is Bool")
+
+T.summary()

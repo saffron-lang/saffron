@@ -25,9 +25,9 @@ import "./commands/list.sf" as ListCmd
 
 fun main() {
     var raw_args = OS.args()
-    // Skip interpreter + script path (first 2 args)
+    // Skip argv[0] (binary name)
     var user_args: List<String> = []
-    var ai = 2
+    var ai = 1
     while (ai < raw_args.length()) {
         user_args.push(raw_args[ai])
         ai = ai + 1

@@ -121,11 +121,13 @@ fi
 TMPDIR=$(mktemp -d /tmp/saffron_build_XXXXXX)
 trap "rm -rf $TMPDIR" EXIT
 
+STDLIB="${SAFFRON_STDLIB:-$SCRIPT_DIR/src/lib}"
+
 compile_to_ir() {
     local input="$1"
     local output="$2"
     [[ "$VERBOSE" == true ]] && echo "  compile: $input -> $output"
-    "$SAFFRONC" "$input" "$output"
+    "$SAFFRONC" --stdlib "$STDLIB" "$input" "$output"
 }
 
 # Recursively discover all .sf files imported (via relative paths) from an entry file.

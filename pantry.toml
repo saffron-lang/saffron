@@ -1,0 +1,15 @@
+[package]
+name = "saffron"
+version = "0.1.0"
+description = "The Saffron programming language"
+authors = ["henry232323"]
+entry = "src/compiler/main.sf"
+
+[dependencies]
+
+[scripts]
+bootstrap = "./bootstrap.sh"
+bootstrap-full = "./bootstrap.sh --verbose"
+build = "saffron build src/compiler/main.sf -o build/saffronc"
+test = "saffron run tools/run_tests.sf"
+docs = "cd docs && mdbook build"
