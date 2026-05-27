@@ -678,9 +678,32 @@ class Parser {
             var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
             return AST.Stmt.ExprStmt(get_expr)
         }
-        // Default: expression statement
+        // Default: expression statement (may be field assignment if followed by =)
         var expr: AST.Expr = this.parse_expr()
+        if (this.match_kind_check("=")) {
+            IO.println("PARSER_DEBUG: found = after expr, next will consume")
+        }
+        if (this.match_kind("=")) {
+            var value: AST.Expr = this.parse_expr()
+            var ek: String = this.classify_expr_for_assign(expr)
+            if (ek == "member") {
+                var obj: AST.Expr = match (expr) { MemberAccess(o, f) => o
+                    _ => AST.Expr.NilLit
+                }
+                var field: String = match (expr) { MemberAccess(o, f) => f
+                    _ => ""
+                }
+                return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, value))
+            }
+        }
         return AST.Stmt.ExprStmt(expr)
+    }
+
+    fun classify_expr_for_assign(expr: AST.Expr): String {
+        return match (expr) {
+            MemberAccess(o, f) => "member"
+            _ => "other"
+        }
     }
 
     fun peek_is(expected: String): Bool {
@@ -853,6 +876,45 @@ class Parser {
             }
             this.consume(")")
             return AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.This, field, args))
+        }
+        return AST.Stmt.ExprStmt(expr)
+    }
+
+    fun parse_dot_stmt(): AST.Stmt {
+        var obj_name: String = this.expect_ident()
+        var expr: AST.Expr = AST.Expr.Variable(obj_name)
+        while (this.match_kind_check(".")) {
+            this.advance()
+            var field: String = this.expect_ident()
+            if (this.match_kind_check("(")) {
+                this.advance()
+                var args: List<AST.Expr> = []
+                if (!this.match_kind_check(")")) {
+                    args.push(this.parse_expr())
+                    while (this.match_kind(",")) {
+                        args.push(this.parse_expr())
+                    }
+                    this.consume(")")
+                } else {
+                    this.advance()
+                }
+                expr = AST.Expr.MethodCall(expr, field, args)
+            } else if (this.match_kind("=")) {
+                var value: AST.Expr = this.parse_expr()
+                return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, field, value))
+            } else {
+                expr = AST.Expr.MemberAccess(expr, field)
+            }
+        }
+        if (this.match_kind_check("[")) {
+            this.advance()
+            var idx: AST.Expr = this.parse_expr()
+            this.consume("]")
+            if (this.match_kind("=")) {
+                var value: AST.Expr = this.parse_expr()
+                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(expr, idx, value))
+            }
+            expr = AST.Expr.IndexGet(expr, idx)
         }
         return AST.Stmt.ExprStmt(expr)
     }
