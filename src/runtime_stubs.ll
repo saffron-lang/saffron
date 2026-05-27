@@ -49,3 +49,18 @@ define i64 @TkModuleDoc(i64 %v) { %t = shl i64 60, 56
   %r = or i64 %t, %v
   ret i64 %r }
 declare i8* @malloc(i64)
+
+; AST.type_to_string stub — returns empty string for any type
+define i64 @type_to_string(i64 %t) {
+entry:
+  %empty = call i8* @malloc(i64 4)
+  store i8 65, i8* %empty
+  %p1 = getelementptr i8, i8* %empty, i64 1
+  store i8 110, i8* %p1
+  %p2 = getelementptr i8, i8* %empty, i64 2
+  store i8 121, i8* %p2
+  %p3 = getelementptr i8, i8* %empty, i64 3
+  store i8 0, i8* %p3
+  %r = ptrtoint i8* %empty to i64
+  ret i64 %r
+}

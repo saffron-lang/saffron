@@ -224,9 +224,10 @@ fun main(): Int {
         pi = pi + 1
     }
 
-    // Build alias → prefix mapping from the main file's imports
-    var alias_map: Map<String, String> = extract_import_aliases(source)
+    // Build alias → prefix mapping from ALL modules' imports
     var resolved_aliases: Map<String, String> = {}
+    // Main file's imports
+    var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
     var ak: Float = 0
     while (ak < alias_keys.length()) {
@@ -237,6 +238,26 @@ fun main(): Int {
             resolved_aliases.set(alias, prefix)
         }
         ak = ak + 1
+    }
+    // Each compiled module's imports
+    var visited_keys: List<String> = visited.keys()
+    var vk: Float = 0
+    while (vk < visited_keys.length()) {
+        var mod_path: String = visited_keys[vk]
+        var mod_source: String = IO.read_file(mod_path)
+        var mod_aliases: Map<String, String> = extract_import_aliases(mod_source)
+        var mak: List<String> = mod_aliases.keys()
+        var mai: Float = 0
+        while (mai < mak.length()) {
+            var ma: String = mak[mai]
+            var ma_path: String = mod_aliases.get(ma)
+            if (!is_builtin_module(ma_path) and !resolved_aliases.has(ma)) {
+                var ma_prefix: String = module_prefix_from_path(ma_path)
+                resolved_aliases.set(ma, ma_prefix)
+            }
+            mai = mai + 1
+        }
+        vk = vk + 1
     }
 
     // Compile: lex → parse → [check] → generate with module awareness
