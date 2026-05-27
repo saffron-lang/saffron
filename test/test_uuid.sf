@@ -1,0 +1,46 @@
+import "@test" as Test
+import "@uuid" as UUID
+
+// Generate v4
+var id = UUID.v4()
+Test.assert_eq(id.length(), 36, "uuid length is 36")
+Test.assert_eq(id.char_at(8), "-", "dash at pos 8")
+Test.assert_eq(id.char_at(13), "-", "dash at pos 13")
+Test.assert_eq(id.char_at(18), "-", "dash at pos 18")
+Test.assert_eq(id.char_at(23), "-", "dash at pos 23")
+Test.assert_eq(id.char_at(14), "4", "version 4 at pos 14")
+
+// Variant check (position 19 must be 8, 9, a, or b)
+var variant_char = id.char_at(19)
+Test.assert(
+    variant_char == "8" or variant_char == "9" or variant_char == "a" or variant_char == "b",
+    "variant is 8/9/a/b"
+)
+
+// Uniqueness
+var id2 = UUID.v4()
+Test.assert(!(UUID.eq(id, id2)), "two v4s are different")
+
+// Validation
+Test.assert(UUID.is_valid(id), "generated uuid is valid")
+Test.assert(UUID.is_valid("550e8400-e29b-41d4-a716-446655440000"), "known uuid valid")
+Test.assert(!(UUID.is_valid("not-a-uuid")), "invalid uuid rejected")
+Test.assert(!(UUID.is_valid("550e8400-e29b-41d4-a716")), "too short rejected")
+Test.assert(!(UUID.is_valid("")), "empty rejected")
+
+// Parse
+var parsed = UUID.parse("550e8400-e29b-41d4-a716-446655440000")
+Test.assert_eq(parsed.get("version"), "4", "parsed version")
+
+// Version extraction
+Test.assert_eq(UUID.version("550e8400-e29b-41d4-a716-446655440000"), 4, "version fn")
+
+// nil_uuid
+var nil_id = UUID.nil_uuid()
+Test.assert_eq(nil_id, "00000000-0000-0000-0000-000000000000", "nil uuid")
+Test.assert(UUID.is_valid(nil_id), "nil is valid format")
+
+// Case-insensitive equality
+Test.assert(UUID.eq("550E8400-E29B-41D4-A716-446655440000", "550e8400-e29b-41d4-a716-446655440000"), "case insensitive eq")
+
+Test.summary()

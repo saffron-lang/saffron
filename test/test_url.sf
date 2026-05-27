@@ -1,0 +1,48 @@
+import "@test" as Test
+import "@url" as URL
+
+// Basic parsing
+var u = URL.parse("https://user:pass@example.com:8080/path/to/page?key=val&foo=bar#section")
+Test.assert_eq(u.scheme, "https", "scheme")
+Test.assert_eq(u.host, "example.com", "host")
+Test.assert_eq(u.port, 8080, "port")
+Test.assert_eq(u.path, "/path/to/page", "path")
+Test.assert_eq(u.query, "key=val&foo=bar", "query")
+Test.assert_eq(u.fragment, "section", "fragment")
+Test.assert_eq(u.username, "user", "username")
+Test.assert_eq(u.password, "pass", "password")
+
+// Simple URL
+var simple = URL.parse("http://example.com")
+Test.assert_eq(simple.scheme, "http", "simple scheme")
+Test.assert_eq(simple.host, "example.com", "simple host")
+Test.assert_eq(simple.port, 0, "simple port")
+Test.assert_eq(simple.path, "", "simple path")
+
+// Effective port
+Test.assert_eq(URL.effective_port(URL.parse("http://example.com")), 80, "default http port")
+Test.assert_eq(URL.effective_port(URL.parse("https://example.com")), 443, "default https port")
+Test.assert_eq(URL.effective_port(URL.parse("http://example.com:3000")), 3000, "explicit port")
+
+// to_string round-trip
+var full = URL.parse("https://example.com:443/api?q=test#top")
+Test.assert_eq(URL.to_string(full), "https://example.com/api?q=test#top", "to_string omits default port")
+
+// Query parsing
+var params = URL.parse_query("name=alice&age=30&city=new+york")
+Test.assert_eq(params.get("name"), "alice", "query param name")
+Test.assert_eq(params.get("age"), "30", "query param age")
+
+// Query encoding
+var encoded = URL.encode_query({"key": "hello world", "x": "1"})
+Test.assert(encoded.contains("key=hello%20world") or encoded.contains("key=hello+world"), "query encoding")
+
+// Percent encoding/decoding
+Test.assert_eq(URL.encode("hello world"), "hello%20world", "encode space")
+Test.assert_eq(URL.decode("hello%20world"), "hello world", "decode space")
+Test.assert_eq(URL.decode("hello%2Fworld"), "hello/world", "decode slash")
+
+// Join
+Test.assert_eq(URL.join("https://example.com/api", "/v2/users"), "https://example.com/v2/users", "join absolute path")
+
+Test.summary()

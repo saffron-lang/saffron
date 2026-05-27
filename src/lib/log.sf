@@ -1,0 +1,524 @@
+//! Structured logging library with levels, formatters, and multiple outputs.
+//!
+//! ```saffron
+//! import "@log" as Log
+//!
+//! var logger = Log.Logger("my-app")
+//! logger.info("server started on port ${port}")
+//! logger.warn("connection pool running low", {"available": 2})
+//! logger.error("request failed", {"status": 500, "path": "/api/users"})
+//! ```
+
+import "@time" as Time
+import "@os" as OS
+
+/// Log severity levels.
+enum Level {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Fatal,
+    Off
+}
+
+/// Convert a Level to its string name.
+fun level_name(level: Level): String {
+    return match (level) {
+        Trace => "TRACE",
+        Debug => "DEBUG",
+        Info => "INFO",
+        Warn => "WARN",
+        Error => "ERROR",
+        Fatal => "FATAL",
+        Off => "OFF"
+    }
+}
+
+/// Convert a Level to its numeric priority (higher = more severe).
+fun level_priority(level: Level): Number {
+    return match (level) {
+        Trace => 0,
+        Debug => 1,
+        Info => 2,
+        Warn => 3,
+        Error => 4,
+        Fatal => 5,
+        Off => 6
+    }
+}
+
+/// Parse a level name string into a Level.
+///
+/// ```saffron
+/// import "@log" as Log
+/// Log.parse_level("info")   // Level.Info
+/// Log.parse_level("ERROR")  // Level.Error
+/// ```
+fun parse_level(name: String): Level {
+    var lower = name.to_lower()
+    if (lower == "trace") { return Level.Trace }
+    if (lower == "debug") { return Level.Debug }
+    if (lower == "info") { return Level.Info }
+    if (lower == "warn" or lower == "warning") { return Level.Warn }
+    if (lower == "error") { return Level.Error }
+    if (lower == "fatal") { return Level.Fatal }
+    if (lower == "off") { return Level.Off }
+    throw "log: unknown level '${name}'"
+}
+
+/// A single log record.
+class Record {
+    var level: Level
+    var message: String
+    var logger_name: String
+    var timestamp: Number
+    var fields: Map<String, String>
+
+    fun init(level: Level, message: String, logger_name: String, fields: Map<String, String>) {
+        this.level = level
+        this.message = message
+        this.logger_name = logger_name
+        this.timestamp = Time.timestamp()
+        this.fields = fields
+    }
+}
+
+/// A handler receives log records and writes them somewhere.
+interface Handler {
+    fun handle(record: Record)
+}
+
+/// Format a record as a human-readable line.
+///
+/// Output: `2026-05-25T10:30:00 [INFO] my-app: server started {port=8080}`
+fun format_text(record: Record): String {
+    var ts = _format_timestamp(record.timestamp)
+    var lvl = level_name(record.level)
+    var line = "${ts} [${lvl}] ${record.logger_name}: ${record.message}"
+
+    if (record.fields.length() > 0) {
+        line = line + " " + _format_fields(record.fields)
+    }
+
+    return line
+}
+
+/// Format a record as JSON (one object per line).
+///
+/// ```saffron
+/// import "@log" as Log
+/// var r = Log.Record(Log.Level.Info, "hello", "app", {})
+/// Log.format_json(r)
+/// // {"ts":"...","level":"INFO","logger":"app","msg":"hello"}
+/// ```
+fun format_json(record: Record): String {
+    var ts = _format_timestamp(record.timestamp)
+    var lvl = level_name(record.level)
+    var parts: List<String> = []
+    parts.push("\"ts\":\"${ts}\"")
+    parts.push("\"level\":\"${lvl}\"")
+    parts.push("\"logger\":\"${record.logger_name}\"")
+    parts.push("\"msg\":\"${_escape_json(record.message)}\"")
+
+    var keys = record.fields.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var k = keys[i]
+        var v = record.fields.get(k)
+        parts.push("\"${_escape_json(k)}\":\"${_escape_json(v)}\"")
+        i = i + 1
+    }
+
+    return "{" + _join(parts, ",") + "}"
+}
+
+/// A handler that writes to stdout with text formatting.
+class ConsoleHandler extends Handler {
+    var min_level: Level
+    var use_color: Bool
+    var format: String
+
+    // Create a console handler.
+    //
+    // ```saffron
+    // import "@log" as Log
+    // var handler = Log.ConsoleHandler(Log.Level.Debug, true, "text")
+    // ```
+    fun init(min_level: Level, use_color: Bool, format: String) {
+        this.min_level = min_level
+        this.use_color = use_color
+        this.format = format
+    }
+
+    fun handle(record: Record) {
+        if (level_priority(record.level) < level_priority(this.min_level)) {
+            return
+        }
+
+        var line = ""
+        if (this.format == "json") {
+            line = format_json(record)
+        } else {
+            line = format_text(record)
+        }
+
+        if (this.use_color) {
+            line = _colorize(record.level, line)
+        }
+
+        IO.println(line)
+    }
+}
+
+/// A handler that writes to a file.
+class FileHandler extends Handler {
+    var min_level: Level
+    var path: String
+    var format: String
+
+    // Create a file handler.
+    //
+    // ```saffron
+    // import "@log" as Log
+    // var handler = Log.FileHandler(Log.Level.Info, "app.log", "text")
+    // ```
+    fun init(min_level: Level, path: String, format: String) {
+        this.min_level = min_level
+        this.path = path
+        this.format = format
+    }
+
+    fun handle(record: Record) {
+        if (level_priority(record.level) < level_priority(this.min_level)) {
+            return
+        }
+
+        var line = ""
+        if (this.format == "json") {
+            line = format_json(record)
+        } else {
+            line = format_text(record)
+        }
+
+        IO.append_file(this.path, line + "\n")
+    }
+}
+
+/// A handler that collects records in memory (useful for testing).
+class MemoryHandler extends Handler {
+    var min_level: Level
+    var records: List<Record>
+
+    fun init(min_level: Level) {
+        this.min_level = min_level
+        this.records = []
+    }
+
+    fun handle(record: Record) {
+        if (level_priority(record.level) < level_priority(this.min_level)) {
+            return
+        }
+        this.records.push(record)
+    }
+
+    // Clear all stored records.
+    fun clear() {
+        this.records = []
+    }
+
+    // Get the number of stored records.
+    fun count(): Number {
+        return this.records.length()
+    }
+}
+
+/// The main logger. Create one per module or component.
+class Logger {
+    var name: String
+    var handlers: List<Handler>
+    var min_level: Level
+    var context: Map<String, String>
+
+    // Create a new logger with a name.
+    //
+    // ```saffron
+    // import "@log" as Log
+    // var logger = Log.Logger("http-server")
+    // logger.info("listening on :8080")
+    // ```
+    fun init(name: String) {
+        this.name = name
+        this.handlers = []
+        this.min_level = Level.Trace
+        this.context = {}
+
+        // Default: console handler with color
+        this.handlers.push(ConsoleHandler(Level.Trace, true, "text"))
+    }
+
+    // Add a handler to this logger.
+    fun add_handler(handler: Handler) {
+        this.handlers.push(handler)
+    }
+
+    // Remove all handlers.
+    fun clear_handlers() {
+        this.handlers = []
+    }
+
+    // Set the minimum log level. Messages below this level are dropped.
+    //
+    // ```saffron
+    // logger.set_level(Log.Level.Warn)  // only Warn, Error, Fatal
+    // ```
+    fun set_level(level: Level) {
+        this.min_level = level
+    }
+
+    // Add persistent context fields that appear on every log record.
+    //
+    // ```saffron
+    // logger.with_context({"request_id": "abc-123", "user": "alice"})
+    // logger.info("processing")  // fields included automatically
+    // ```
+    fun with_context(fields: Map<String, String>) {
+        var keys = fields.keys()
+        var i = 0
+        while (i < keys.length()) {
+            var k = keys[i]
+            this.context.set(k, fields.get(k))
+            i = i + 1
+        }
+    }
+
+    // Create a child logger with additional context.
+    //
+    // ```saffron
+    // var req_logger = logger.child("request", {"id": "abc-123"})
+    // req_logger.info("started")  // includes parent context + id
+    // ```
+    fun child(name: String, fields: Map<String, String>): Logger {
+        var child_logger = Logger("${this.name}.${name}")
+        child_logger.handlers = this.handlers
+        child_logger.min_level = this.min_level
+
+        // Inherit parent context
+        var ctx_keys = this.context.keys()
+        var i = 0
+        while (i < ctx_keys.length()) {
+            var k = ctx_keys[i]
+            child_logger.context.set(k, this.context.get(k))
+            i = i + 1
+        }
+
+        // Add child-specific fields
+        var new_keys = fields.keys()
+        i = 0
+        while (i < new_keys.length()) {
+            var k = new_keys[i]
+            child_logger.context.set(k, fields.get(k))
+            i = i + 1
+        }
+
+        return child_logger
+    }
+
+    // Log at TRACE level.
+    fun trace(message: String) {
+        this._log(Level.Trace, message, {})
+    }
+
+    // Log at DEBUG level.
+    fun debug(message: String) {
+        this._log(Level.Debug, message, {})
+    }
+
+    // Log at INFO level.
+    fun info(message: String) {
+        this._log(Level.Info, message, {})
+    }
+
+    // Log at WARN level.
+    fun warn(message: String) {
+        this._log(Level.Warn, message, {})
+    }
+
+    // Log at ERROR level.
+    fun error(message: String) {
+        this._log(Level.Error, message, {})
+    }
+
+    // Log at FATAL level, then exit.
+    fun fatal(message: String) {
+        this._log(Level.Fatal, message, {})
+        OS.exit(1)
+    }
+
+    // Log at TRACE level with structured fields.
+    fun trace_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Trace, message, fields)
+    }
+
+    // Log at DEBUG level with structured fields.
+    fun debug_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Debug, message, fields)
+    }
+
+    // Log at INFO level with structured fields.
+    fun info_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Info, message, fields)
+    }
+
+    // Log at WARN level with structured fields.
+    fun warn_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Warn, message, fields)
+    }
+
+    // Log at ERROR level with structured fields.
+    fun error_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Error, message, fields)
+    }
+
+    // Log at FATAL level with structured fields, then exit.
+    fun fatal_f(message: String, fields: Map<String, String>) {
+        this._log(Level.Fatal, message, fields)
+        OS.exit(1)
+    }
+
+    fun _log(level: Level, message: String, fields: Map<String, String>) {
+        if (level_priority(level) < level_priority(this.min_level)) {
+            return
+        }
+
+        // Merge context + per-call fields
+        var merged: Map<String, String> = {}
+        var ctx_keys = this.context.keys()
+        var i = 0
+        while (i < ctx_keys.length()) {
+            var k = ctx_keys[i]
+            merged.set(k, this.context.get(k))
+            i = i + 1
+        }
+        var field_keys = fields.keys()
+        i = 0
+        while (i < field_keys.length()) {
+            var k = field_keys[i]
+            merged.set(k, fields.get(k))
+            i = i + 1
+        }
+
+        var record = Record(level, message, this.name, merged)
+
+        i = 0
+        while (i < this.handlers.length()) {
+            this.handlers[i].handle(record)
+            i = i + 1
+        }
+    }
+}
+
+/// Create a preconfigured logger from environment variables.
+/// Reads LOG_LEVEL (default: "info") and LOG_FORMAT (default: "text").
+///
+/// ```saffron
+/// import "@log" as Log
+/// var logger = Log.from_env("my-service")
+/// ```
+fun from_env(name: String): Logger {
+    var logger = Logger(name)
+    logger.clear_handlers()
+
+    var env_level = OS.env("LOG_LEVEL")
+    var level = Level.Info
+    if (!(env_level is Nil)) {
+        level = parse_level(env_level)
+    }
+    logger.set_level(level)
+
+    var env_format = OS.env("LOG_FORMAT")
+    var format = "text"
+    if (!(env_format is Nil)) {
+        format = env_format
+    }
+
+    var use_color = true
+    var no_color = OS.env("NO_COLOR")
+    if (!(no_color is Nil)) {
+        use_color = false
+    }
+
+    logger.add_handler(ConsoleHandler(level, use_color, format))
+    return logger
+}
+
+// --- Internal helpers ---
+
+fun _format_timestamp(ts: Number): String {
+    // Simple ISO-ish timestamp from unix seconds
+    // Full ISO 8601 would need date math; for now use seconds since epoch
+    return Time.to_iso(ts)
+}
+
+fun _format_fields(fields: Map<String, String>): String {
+    var parts: List<String> = []
+    var keys = fields.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var k = keys[i]
+        var v = fields.get(k)
+        parts.push("${k}=${v}")
+        i = i + 1
+    }
+    return "{" + _join(parts, ", ") + "}"
+}
+
+fun _join(parts: List<String>, sep: String): String {
+    var result = ""
+    var i = 0
+    while (i < parts.length()) {
+        if (i > 0) {
+            result = result + sep
+        }
+        result = result + parts[i]
+        i = i + 1
+    }
+    return result
+}
+
+fun _escape_json(s: String): String {
+    var result = ""
+    var i = 0
+    while (i < s.length()) {
+        var ch = s.char_at(i)
+        if (ch == "\"") {
+            result = result + "\\\""
+        } else if (ch == "\\") {
+            result = result + "\\\\"
+        } else if (ch == "\n") {
+            result = result + "\\n"
+        } else if (ch == "\r") {
+            result = result + "\\r"
+        } else if (ch == "\t") {
+            result = result + "\\t"
+        } else {
+            result = result + ch
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun _colorize(level: Level, line: String): String {
+    var code = match (level) {
+        Trace => "90",
+        Debug => "36",
+        Info => "32",
+        Warn => "33",
+        Error => "31",
+        Fatal => "35",
+        Off => "0"
+    }
+    return "\x1b[${code}m${line}\x1b[0m"
+}

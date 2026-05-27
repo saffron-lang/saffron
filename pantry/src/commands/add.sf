@@ -1,0 +1,30 @@
+//! `pantry add <package>` — add a dependency to pantry.toml.
+
+import "@os" as OS
+import "@semver" as SemVer
+import "../config.sf" as Config
+
+fun run(package_name: String, parsed: Args.ParsedArgs) {
+    var manifest_path = Config.find_manifest()
+    var manifest = Config.load_from(manifest_path)
+
+    // Determine version constraint
+    var version = "*"
+    if (parsed.has("version")) {
+        version = parsed.get("version")
+    } else if (parsed.has("v")) {
+        version = parsed.get("v")
+    }
+
+    // Check if already present
+    if (manifest.dependencies.has(package_name)) {
+        var existing = manifest.dependencies.get(package_name)
+        IO.println("pantry: updating '${package_name}' from ${existing} to ${version}")
+    } else {
+        IO.println("pantry: adding '${package_name}' @ ${version}")
+    }
+
+    manifest.dependencies.set(package_name, version)
+    Config.save(manifest, manifest_path)
+    IO.println("Updated pantry.toml")
+}

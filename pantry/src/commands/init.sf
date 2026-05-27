@@ -1,0 +1,39 @@
+//! `pantry init` — create a new pantry.toml in the current directory.
+
+import "@os" as OS
+import "@path" as Path
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest_path = OS.cwd() + "/pantry.toml"
+
+    if (IO.file_exists(manifest_path)) {
+        IO.println("pantry.toml already exists in this directory.")
+        OS.exit(1)
+    }
+
+    // Derive project name from directory name
+    var cwd = OS.cwd()
+    var project_name = Path.basename(cwd)
+
+    var content = "[package]\n"
+    content = content + "name = \"${project_name}\"\n"
+    content = content + "version = \"0.1.0\"\n"
+    content = content + "description = \"\"\n"
+    content = content + "entry = \"src/main.sf\"\n"
+    content = content + "\n"
+    content = content + "[dependencies]\n"
+    content = content + "\n"
+    content = content + "[scripts]\n"
+    content = content + "build = \"saffron build src/main.sf\"\n"
+    content = content + "test = \"saffron test/\"\n"
+
+    IO.write_file(manifest_path, content)
+    IO.println("Created pantry.toml for '${project_name}'")
+
+    // Create src/ directory if it doesn't exist
+    if (!(IO.file_exists("src"))) {
+        IO.mkdir("src")
+        IO.write_file("src/main.sf", "IO.println(\"Hello from ${project_name}!\")\n")
+        IO.println("Created src/main.sf")
+    }
+}

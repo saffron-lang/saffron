@@ -1,0 +1,113 @@
+//! Pantry — package manager and build tool for Saffron.
+//!
+//! Usage:
+//!   pantry init              Create a new pantry.toml
+//!   pantry run <script>      Run a named script from pantry.toml
+//!   pantry build             Compile the project
+//!   pantry test              Run tests
+//!   pantry add <package>     Add a dependency
+//!   pantry remove <package>  Remove a dependency
+//!   pantry install            Install dependencies
+//!   pantry list              List installed packages
+//!   pantry script <cmd>      Run an arbitrary shell command in project context
+
+import "@os" as OS
+import "@args" as Args
+import "./config.sf" as Config
+import "./commands/init.sf" as Init
+import "./commands/run.sf" as Run
+import "./commands/build.sf" as Build
+import "./commands/test_cmd.sf" as TestCmd
+import "./commands/add.sf" as Add
+import "./commands/remove.sf" as Remove
+import "./commands/install.sf" as Install
+import "./commands/list.sf" as ListCmd
+
+fun main() {
+    var raw_args = OS.args()
+    // Skip interpreter + script path (first 2 args)
+    var user_args: List<String> = []
+    var ai = 2
+    while (ai < raw_args.length()) {
+        user_args.push(raw_args[ai])
+        ai = ai + 1
+    }
+    var parsed = Args.parse_list(user_args)
+    var positional = parsed.positional
+
+    if (positional.length() == 0 or parsed.flag("help") or parsed.flag("h")) {
+        print_usage()
+        return
+    }
+
+    var command = positional[0]
+
+    if (command == "init") {
+        Init.run(parsed)
+    } else if (command == "run") {
+        if (positional.length() < 2) {
+            IO.println("pantry run: missing script name")
+            IO.println("Usage: pantry run <script_name>")
+            OS.exit(1)
+        }
+        Run.run(positional[1], parsed)
+    } else if (command == "build") {
+        Build.run(parsed)
+    } else if (command == "test") {
+        TestCmd.run(parsed)
+    } else if (command == "add") {
+        if (positional.length() < 2) {
+            IO.println("pantry add: missing package name")
+            IO.println("Usage: pantry add <package> [--version <constraint>]")
+            OS.exit(1)
+        }
+        Add.run(positional[1], parsed)
+    } else if (command == "remove") {
+        if (positional.length() < 2) {
+            IO.println("pantry remove: missing package name")
+            IO.println("Usage: pantry remove <package>")
+            OS.exit(1)
+        }
+        Remove.run(positional[1], parsed)
+    } else if (command == "install") {
+        Install.run(parsed)
+    } else if (command == "list") {
+        ListCmd.run(parsed)
+    } else if (command == "script") {
+        if (positional.length() < 2) {
+            IO.println("pantry script: missing command")
+            OS.exit(1)
+        }
+        Run.run_raw(positional[1], parsed)
+    } else if (command == "version" or command == "--version") {
+        IO.println("pantry 0.1.0")
+    } else {
+        IO.println("pantry: unknown command '${command}'")
+        IO.println("Run 'pantry --help' for usage.")
+        OS.exit(1)
+    }
+}
+
+fun print_usage() {
+    IO.println("pantry — package manager and build tool for Saffron")
+    IO.println("")
+    IO.println("Usage: pantry <command> [options]")
+    IO.println("")
+    IO.println("Commands:")
+    IO.println("  init              Create a new pantry.toml in the current directory")
+    IO.println("  run <script>      Run a named script defined in [scripts]")
+    IO.println("  build             Compile the project (runs [scripts.build] or default)")
+    IO.println("  test              Run tests (runs [scripts.test] or finds test files)")
+    IO.println("  add <pkg>         Add a dependency to pantry.toml")
+    IO.println("  remove <pkg>      Remove a dependency from pantry.toml")
+    IO.println("  install           Install all dependencies from pantry.toml")
+    IO.println("  list              List installed packages")
+    IO.println("  script <cmd>      Run a shell command in the project context")
+    IO.println("  version           Show pantry version")
+    IO.println("")
+    IO.println("Options:")
+    IO.println("  --help, -h        Show this help message")
+    IO.println("  --verbose, -v     Verbose output")
+}
+
+main()

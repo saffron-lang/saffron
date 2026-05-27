@@ -1,0 +1,117 @@
+//! Load and manage pantry.toml configuration.
+
+import "@toml" as TOML
+import "@os" as OS
+
+var MANIFEST_NAME = "pantry.toml"
+
+/// Represents a parsed pantry.toml manifest.
+class Manifest {
+    var name = ""
+    var version = "0.1.0"
+    var description = ""
+    var authors = []
+    var license = ""
+    var entry = "src/main.sf"
+    var dependencies = {}
+    var dev_dependencies = {}
+    var scripts = {}
+    var raw = {}
+
+    fun init() {}
+}
+
+fun _parent_dir(path: String): String {
+    var last_slash = -1
+    var i = 0
+    while (i < path.length()) {
+        if (path.char_at(i) == "/") {
+            last_slash = i
+        }
+        i = i + 1
+    }
+    if (last_slash <= 0) { return "" }
+    return path.slice(0, last_slash)
+}
+
+/// Find the pantry.toml by walking up from the current directory.
+fun find_manifest(): String {
+    var dir = OS.cwd()
+    while (true) {
+        var candidate = dir + "/" + MANIFEST_NAME
+        if (IO.file_exists(candidate)) {
+            return candidate
+        }
+        var parent = _parent_dir(dir)
+        if (parent == dir or parent == "") {
+            throw "pantry: no ${MANIFEST_NAME} found in ${OS.cwd()} or any parent directory"
+        }
+        dir = parent
+    }
+    return ""
+}
+
+/// Load a manifest from a specific path.
+fun load_from(path: String): Manifest {
+    var toml_data = TOML.parse_file(path)
+    var manifest = Manifest()
+    manifest.raw = toml_data
+
+    if (toml_data.has("package")) {
+        var pkg = toml_data.get("package")
+        if (pkg.has("name")) { manifest.name = pkg.get("name") }
+        if (pkg.has("version")) { manifest.version = pkg.get("version") }
+        if (pkg.has("description")) { manifest.description = pkg.get("description") }
+        if (pkg.has("license")) { manifest.license = pkg.get("license") }
+        if (pkg.has("entry")) { manifest.entry = pkg.get("entry") }
+        if (pkg.has("authors")) { manifest.authors = pkg.get("authors") }
+    }
+
+    if (toml_data.has("dependencies")) {
+        manifest.dependencies = toml_data.get("dependencies")
+    }
+
+    if (toml_data.has("dev-dependencies")) {
+        manifest.dev_dependencies = toml_data.get("dev-dependencies")
+    }
+
+    if (toml_data.has("scripts")) {
+        manifest.scripts = toml_data.get("scripts")
+    }
+
+    return manifest
+}
+
+/// Load and parse the manifest file from the current project.
+fun load(): Manifest {
+    var path = find_manifest()
+    return load_from(path)
+}
+
+/// Serialize a manifest back to TOML and write to disk.
+fun save(manifest: Manifest, path: String) {
+    var toml_data = {}
+
+    var pkg = {}
+    pkg.set("name", manifest.name)
+    pkg.set("version", manifest.version)
+    if (manifest.description != "") { pkg.set("description", manifest.description) }
+    if (manifest.license != "") { pkg.set("license", manifest.license) }
+    if (manifest.entry != "src/main.sf") { pkg.set("entry", manifest.entry) }
+    if (manifest.authors.length() > 0) { pkg.set("authors", manifest.authors) }
+    toml_data.set("package", pkg)
+
+    if (manifest.dependencies.length() > 0) {
+        toml_data.set("dependencies", manifest.dependencies)
+    }
+
+    if (manifest.dev_dependencies.length() > 0) {
+        toml_data.set("dev-dependencies", manifest.dev_dependencies)
+    }
+
+    if (manifest.scripts.length() > 0) {
+        toml_data.set("scripts", manifest.scripts)
+    }
+
+    IO.write_file(path, TOML.stringify(toml_data))
+}

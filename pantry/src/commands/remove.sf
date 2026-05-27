@@ -1,0 +1,18 @@
+//! `pantry remove <package>` — remove a dependency from pantry.toml.
+
+import "@os" as OS
+import "../config.sf" as Config
+
+fun run(package_name: String, parsed: Args.ParsedArgs) {
+    var manifest_path = Config.find_manifest()
+    var manifest = Config.load_from(manifest_path)
+
+    if (!(manifest.dependencies.has(package_name))) {
+        IO.println("pantry: '${package_name}' is not in dependencies")
+        OS.exit(1)
+    }
+
+    manifest.dependencies.delete(package_name)
+    Config.save(manifest, manifest_path)
+    IO.println("Removed '${package_name}' from pantry.toml")
+}

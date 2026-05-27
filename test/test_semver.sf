@@ -1,0 +1,71 @@
+import "@test" as Test
+import "@semver" as SemVer
+
+// Parsing
+var v = SemVer.parse("1.2.3")
+Test.assert_eq(SemVer.to_string(v), "1.2.3", "parse basic")
+
+var pre = SemVer.parse("1.0.0-alpha.1")
+Test.assert_eq(SemVer.to_string(pre), "1.0.0-alpha.1", "parse prerelease")
+
+var build = SemVer.parse("1.0.0+build.456")
+Test.assert_eq(SemVer.to_string(build), "1.0.0+build.456", "parse build metadata")
+
+var full = SemVer.parse("2.1.3-beta.2+sha.abc")
+Test.assert_eq(SemVer.to_string(full), "2.1.3-beta.2+sha.abc", "parse full")
+
+// Partial versions
+Test.assert_eq(SemVer.to_string(SemVer.parse("1.2")), "1.2.0", "parse partial")
+
+// Comparison
+Test.assert(SemVer.gt(SemVer.parse("2.0.0"), SemVer.parse("1.9.9")), "2.0.0 > 1.9.9")
+Test.assert(SemVer.lt(SemVer.parse("0.1.0"), SemVer.parse("0.2.0")), "0.1.0 < 0.2.0")
+Test.assert(SemVer.eq(SemVer.parse("1.0.0"), SemVer.parse("1.0.0")), "1.0.0 == 1.0.0")
+Test.assert(SemVer.gte(SemVer.parse("1.0.1"), SemVer.parse("1.0.0")), "1.0.1 >= 1.0.0")
+Test.assert(SemVer.gte(SemVer.parse("1.0.0"), SemVer.parse("1.0.0")), "1.0.0 >= 1.0.0")
+Test.assert(SemVer.lte(SemVer.parse("1.0.0"), SemVer.parse("1.0.1")), "1.0.0 <= 1.0.1")
+
+// Prerelease ordering
+Test.assert(SemVer.lt(SemVer.parse("1.0.0-alpha"), SemVer.parse("1.0.0")), "prerelease < release")
+Test.assert(SemVer.lt(SemVer.parse("1.0.0-alpha"), SemVer.parse("1.0.0-beta")), "alpha < beta")
+
+// Build metadata ignored in comparison
+Test.assert(SemVer.eq(SemVer.parse("1.0.0+build1"), SemVer.parse("1.0.0+build2")), "build metadata ignored")
+
+// Constraints: caret
+Test.assert(SemVer.satisfies(SemVer.parse("1.5.0"), "^1.0.0"), "^1.0.0 satisfies 1.5.0")
+Test.assert(!(SemVer.satisfies(SemVer.parse("2.0.0"), "^1.0.0")), "^1.0.0 rejects 2.0.0")
+Test.assert(!(SemVer.satisfies(SemVer.parse("0.9.0"), "^1.0.0")), "^1.0.0 rejects 0.9.0")
+
+// Constraints: tilde
+Test.assert(SemVer.satisfies(SemVer.parse("1.2.5"), "~1.2.0"), "~1.2.0 satisfies 1.2.5")
+Test.assert(!(SemVer.satisfies(SemVer.parse("1.3.0"), "~1.2.0")), "~1.2.0 rejects 1.3.0")
+
+// Constraints: comparison operators
+Test.assert(SemVer.satisfies(SemVer.parse("2.0.0"), ">=1.0.0"), ">= satisfied")
+Test.assert(!(SemVer.satisfies(SemVer.parse("0.9.0"), ">=1.0.0")), ">= rejected")
+Test.assert(SemVer.satisfies(SemVer.parse("1.5.0"), "<2.0.0"), "< satisfied")
+
+// Constraints: wildcard
+Test.assert(SemVer.satisfies(SemVer.parse("1.5.0"), "1.x"), "1.x matches 1.5.0")
+Test.assert(!(SemVer.satisfies(SemVer.parse("2.0.0"), "1.x")), "1.x rejects 2.0.0")
+
+// Constraints: AND (space-separated)
+Test.assert(SemVer.satisfies(SemVer.parse("1.5.0"), ">=1.0.0 <2.0.0"), "AND constraint")
+Test.assert(!(SemVer.satisfies(SemVer.parse("2.0.0"), ">=1.0.0 <2.0.0")), "AND rejects")
+
+// max_satisfying
+var versions = [SemVer.parse("1.0.0"), SemVer.parse("1.5.0"), SemVer.parse("2.0.0")]
+Test.assert_eq(SemVer.to_string(SemVer.max_satisfying(versions, "^1.0.0")), "1.5.0", "max satisfying")
+
+// Increment
+Test.assert_eq(SemVer.to_string(SemVer.increment(SemVer.parse("1.2.3"), "patch")), "1.2.4", "increment patch")
+Test.assert_eq(SemVer.to_string(SemVer.increment(SemVer.parse("1.2.3"), "minor")), "1.3.0", "increment minor")
+Test.assert_eq(SemVer.to_string(SemVer.increment(SemVer.parse("1.2.3"), "major")), "2.0.0", "increment major")
+
+// is_valid
+Test.assert(SemVer.is_valid("1.2.3"), "valid semver")
+Test.assert(SemVer.is_valid("0.0.1-alpha"), "valid prerelease")
+Test.assert(!(SemVer.is_valid("not.a.version.at.all")), "invalid semver")
+
+Test.summary()

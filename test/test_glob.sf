@@ -1,0 +1,46 @@
+import "@test" as Test
+import "@glob" as Glob
+
+// Basic wildcard
+Test.assert(Glob.matches("*.sf", "hello.sf"), "*.sf matches hello.sf")
+Test.assert(Glob.matches("*.sf", "test.sf"), "*.sf matches test.sf")
+Test.assert(!(Glob.matches("*.sf", "hello.txt")), "*.sf rejects .txt")
+Test.assert(!(Glob.matches("*.sf", "dir/hello.sf")), "* does not cross /")
+
+// Double star
+Test.assert(Glob.matches("**/*.sf", "src/lib/math.sf"), "** crosses directories")
+Test.assert(Glob.matches("**/*.sf", "math.sf"), "** matches zero dirs")
+Test.assert(Glob.matches("src/**/*.sf", "src/lib/iter.sf"), "prefix + **")
+
+// Question mark
+Test.assert(Glob.matches("?.sf", "a.sf"), "? matches single char")
+Test.assert(!(Glob.matches("?.sf", "ab.sf")), "? rejects two chars")
+
+// Character classes
+Test.assert(Glob.matches("[abc].sf", "a.sf"), "[abc] matches a")
+Test.assert(Glob.matches("[abc].sf", "b.sf"), "[abc] matches b")
+Test.assert(!(Glob.matches("[abc].sf", "d.sf")), "[abc] rejects d")
+Test.assert(Glob.matches("[!abc].sf", "d.sf"), "[!abc] matches d")
+Test.assert(!(Glob.matches("[!abc].sf", "a.sf")), "[!abc] rejects a")
+
+// Complex patterns
+Test.assert(Glob.matches("src/lib/*.sf", "src/lib/math.sf"), "fixed prefix + *")
+Test.assert(!(Glob.matches("src/lib/*.sf", "src/compiler/lexer.sf")), "wrong prefix")
+Test.assert(Glob.matches("test/test_*.sf", "test/test_url.sf"), "test pattern")
+
+// split_prefix
+var parts = Glob.split_prefix("src/lib/**/*.sf")
+Test.assert_eq(parts[0], "src/lib", "prefix extraction")
+Test.assert_eq(parts[1], "**/*.sf", "suffix extraction")
+
+// is_ignored
+var ignore_patterns = ["*.log", "build/", "!important.log"]
+Test.assert(Glob.is_ignored("debug.log", ignore_patterns), "ignore .log")
+Test.assert(Glob.is_ignored("build/output.o", ignore_patterns), "ignore build/")
+Test.assert(!(Glob.is_ignored("src/main.sf", ignore_patterns)), "don't ignore source")
+
+// find_in (real filesystem)
+var sf_files = Glob.find_in("src/lib", "*.sf")
+Test.assert(sf_files.length() > 10, "found stdlib files")
+
+Test.summary()

@@ -4,22 +4,22 @@ import "@os" as OS
 
 /// Holds parsed command-line arguments split into flags, key=value options, and positional args.
 class ParsedArgs {
-    var flags: Map<String, Bool>
-    var options: Map<String, String>
-    var positional: List<String>
+    var flags = {}
+    var options = {}
+    var positional = []
 
     fun init() {
-        this.flags = Map()
-        this.options = Map()
+        this.flags = {}
+        this.options = {}
         this.positional = []
     }
 
-    /// Check if a flag or option with the given name was provided.
+    // Check if a flag or option with the given name was provided.
     fun has(name: String): Bool {
         return this.flags.has(name) or this.options.has(name)
     }
 
-    /// Get the value of a named option, or empty string if not set.
+    // Get the value of a named option, or empty string if not set.
     fun get(name: String): String {
         if (this.options.has(name)) {
             return this.options.get(name)
@@ -27,20 +27,14 @@ class ParsedArgs {
         return ""
     }
 
-    /// Check if a boolean flag was set.
+    // Check if a boolean flag was set.
     fun flag(name: String): Bool {
         if (this.flags.has(name)) { return true }
         return false
     }
 }
 
-/// Parse the process command-line arguments and return a ParsedArgs.
-fun parse(): ParsedArgs {
-    var raw = OS.args()
-    return parse_list(raw)
-}
-
-fun is_long_flag(arg: String): Bool {
+fun _is_long_flag(arg: String): Bool {
     if (arg.length() < 2) { return false }
     if (arg.char_at(0) == "-") {
         if (arg.char_at(1) == "-") { return true }
@@ -48,7 +42,7 @@ fun is_long_flag(arg: String): Bool {
     return false
 }
 
-fun is_short_flag(arg: String): Bool {
+fun _is_short_flag(arg: String): Bool {
     if (arg.length() < 2) { return false }
     if (arg.char_at(0) == "-") {
         if (arg.char_at(1) == "-") { return false }
@@ -57,15 +51,8 @@ fun is_short_flag(arg: String): Bool {
     return false
 }
 
-fun classify_arg(arg: String): String {
-    if (is_long_flag(arg)) { return "long" }
-    if (is_short_flag(arg)) { return "short" }
-    return "positional"
-}
-
-fun process_arg(result: ParsedArgs, arg: String) {
-    var kind = classify_arg(arg)
-    if (kind == "long") {
+fun _process_arg(result: ParsedArgs, arg: String) {
+    if (_is_long_flag(arg)) {
         var rest = arg.slice(2, arg.length())
         var eq_pos = rest.index_of("=")
         if (eq_pos >= 0) {
@@ -75,16 +62,16 @@ fun process_arg(result: ParsedArgs, arg: String) {
         } else {
             result.flags.set(rest, true)
         }
-        return nil
+        return
     }
-    if (kind == "short") {
+    if (_is_short_flag(arg)) {
         var rest = arg.slice(1, arg.length())
         var ci = 0
         while (ci < rest.length()) {
             result.flags.set(rest.char_at(ci), true)
             ci = ci + 1
         }
-        return nil
+        return
     }
     result.positional.push(arg)
 }
@@ -95,8 +82,14 @@ fun parse_list(raw: List<String>): ParsedArgs {
     var i = 0
     while (i < raw.length()) {
         var arg: String = raw[i]
-        process_arg(result, arg)
+        _process_arg(result, arg)
         i = i + 1
     }
     return result
+}
+
+/// Parse the process command-line arguments and return a ParsedArgs.
+fun parse(): ParsedArgs {
+    var raw = OS.args()
+    return parse_list(raw)
 }
