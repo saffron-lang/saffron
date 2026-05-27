@@ -1,0 +1,60 @@
+// Test finally clause and is type checks (for bootstrapped compiler)
+
+// --- Finally clause tests ---
+
+// Test 1: finally runs after try (no exception)
+var finally_ran = 0
+try {
+    var x = 1
+} catch (e) {
+    finally_ran = -1
+} finally {
+    finally_ran = 1
+}
+IO.println(finally_ran)
+
+// Test 2: finally runs after catch (exception thrown)
+var catch_ran = 0
+var finally_ran2 = 0
+try {
+    throw "oops"
+} catch (e) {
+    catch_ran = 1
+} finally {
+    finally_ran2 = 1
+}
+IO.println(catch_ran)
+IO.println(finally_ran2)
+
+// Test 3: finally can modify state
+var result = 0
+try {
+    result = 42
+} catch (e) {
+    result = -1
+} finally {
+    result = result + 1
+}
+IO.println(result)
+
+// --- is type check tests ---
+var n: Number = 42
+var s: String = "hello"
+
+if (n is Number) {
+    IO.println(1)
+} else {
+    IO.println(0)
+}
+
+if (s is String) {
+    IO.println(1)
+} else {
+    IO.println(0)
+}
+
+if (s is Number) {
+    IO.println(0)
+} else {
+    IO.println(1)
+}

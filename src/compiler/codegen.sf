@@ -620,7 +620,9 @@ class Codegen {
                         var lhs: String = this.gen_arg_value(left)
                         var rhs: String = this.gen_arg_value(right)
                         var full_method: String = left_class + "__" + method_name
-                        if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                        if (this.func_prefix_map.has(full_method)) {
+                            full_method = this.func_prefix_map.get(full_method)
+                        } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
                             full_method = this.current_prefix + full_method
                         }
                         this.called_functions.push(full_method)
@@ -1920,6 +1922,11 @@ class Codegen {
                 ai = ai + 1
             }
             var full_method: String = this.current_class + "__" + method
+            if (this.func_prefix_map.has(full_method)) {
+                full_method = this.func_prefix_map.get(full_method)
+            } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                full_method = this.current_prefix + full_method
+            }
             this.called_functions.push(full_method)
             this.called_function_arity.set(full_method, args.length() + 1)
             var local: String = this.fresh_local()

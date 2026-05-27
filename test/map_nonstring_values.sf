@@ -1,0 +1,50 @@
+// Test: Map with non-string values (pointer-sized integers / enum pointers)
+// Verifies that map.get() returns the exact i64 that was stored, regardless
+// of the value type.
+
+import "@test" as T
+
+// --- Test 1: Map<String, Number> (baseline) ---
+var counts: Map<String, Number> = {}
+counts.set("a", 42)
+counts.set("b", 100)
+counts.set("c", 7)
+
+T.assert_eq(counts.get("a"), 42, "Map<String,Number> get a")
+T.assert_eq(counts.get("b"), 100, "Map<String,Number> get b")
+T.assert_eq(counts.get("c"), 7, "Map<String,Number> get c")
+
+// --- Test 2: Map<String, Number> — update existing key ---
+counts.set("a", 99)
+T.assert_eq(counts.get("a"), 99, "Map<String,Number> update key")
+
+// --- Test 3: Map<String, Number> — has / missing ---
+T.assert(counts.has("b"), "Map has 'b'")
+T.assert(!counts.has("z"), "Map !has 'z'")
+
+// --- Test 4: Map value used in arithmetic ---
+var x: Number = counts.get("b") + counts.get("c")
+T.assert_eq(x, 107, "Map values used in arithmetic")
+
+// --- Test 5: Map<String, Bool> (bool stored as i64 0/1) ---
+var flags: Map<String, Bool> = {}
+flags.set("enabled", true)
+flags.set("debug", false)
+
+T.assert(flags.get("enabled"), "Map<String,Bool> true")
+T.assert(!flags.get("debug"), "Map<String,Bool> false")
+
+// --- Test 6: Multiple maps coexist ---
+var names: Map<String, String> = {}
+names.set("first", "Alice")
+names.set("second", "Bob")
+var nums2: Map<String, Number> = {}
+nums2.set("first", 1)
+nums2.set("second", 2)
+
+T.assert_eq(names.get("first"), "Alice", "names map first")
+T.assert_eq(nums2.get("first"), 1, "nums2 map first")
+T.assert_eq(names.get("second"), "Bob", "names map second")
+T.assert_eq(nums2.get("second"), 2, "nums2 map second")
+
+T.summary()

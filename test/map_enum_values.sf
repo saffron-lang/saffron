@@ -1,0 +1,70 @@
+// Test: Map<String, SomeEnum> — enum instances as map values
+// Verifies that enum pointers stored as i64 in a Map survive store/load
+// and can be matched on after retrieval.
+
+enum TypeTag {
+    IntType,
+    StringType,
+    BoolType,
+    ClassType(name: String)
+}
+
+import "@test" as T
+
+var type_map: Map<String, TypeTag> = {}
+
+// Store enum values (heap-allocated tagged arrays) as map values
+type_map.set("x", TypeTag.IntType)
+type_map.set("name", TypeTag.StringType)
+type_map.set("flag", TypeTag.BoolType)
+type_map.set("obj", TypeTag.ClassType("Foo"))
+
+// Retrieve and match on them
+var t1: TypeTag = type_map.get("x")
+var r1: String = match (t1) {
+    IntType => "int"
+    StringType => "str"
+    BoolType => "bool"
+    ClassType(n) => n
+}
+T.assert_eq(r1, "int", "retrieved IntType from map")
+
+var t2: TypeTag = type_map.get("name")
+var r2: String = match (t2) {
+    IntType => "int"
+    StringType => "str"
+    BoolType => "bool"
+    ClassType(n) => n
+}
+T.assert_eq(r2, "str", "retrieved StringType from map")
+
+var t3: TypeTag = type_map.get("flag")
+var r3: String = match (t3) {
+    IntType => "int"
+    StringType => "str"
+    BoolType => "bool"
+    ClassType(n) => n
+}
+T.assert_eq(r3, "bool", "retrieved BoolType from map")
+
+var t4: TypeTag = type_map.get("obj")
+var r4: String = match (t4) {
+    IntType => "int"
+    StringType => "str"
+    BoolType => "bool"
+    ClassType(n) => n
+}
+T.assert_eq(r4, "Foo", "retrieved ClassType(Foo) from map")
+
+// Update an existing key with a different enum variant
+type_map.set("x", TypeTag.BoolType)
+var t5: TypeTag = type_map.get("x")
+var r5: String = match (t5) {
+    IntType => "int"
+    StringType => "str"
+    BoolType => "bool"
+    ClassType(n) => n
+}
+T.assert_eq(r5, "bool", "updated map key returns new enum variant")
+
+T.summary()

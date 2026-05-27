@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-VM="$ROOT/cmake-build-debug/saffron"
+VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME="$ROOT/src/runtime.ll"
 STUBS="$ROOT/src/runtime_stubs.ll"
@@ -60,8 +60,8 @@ if [[ "$SKIP_CMAKE" == true && -x "$VM" ]]; then
     info "STAGE 1" "Skipping cmake (--skip-cmake, VM exists)"
 else
     info "STAGE 1" "Building C VM..."
-    cmake -B "$ROOT/cmake-build-debug" -DCMAKE_BUILD_TYPE=Debug -S "$ROOT" > /dev/null 2>&1
-    cmake --build "$ROOT/cmake-build-debug" > /dev/null 2>&1
+    cmake -B "$ROOT/cvm/cmake-build-debug" -DCMAKE_BUILD_TYPE=Debug -S "$ROOT/cvm" > /dev/null 2>&1
+    cmake --build "$ROOT/cvm/cmake-build-debug" > /dev/null 2>&1
     [[ -x "$VM" ]] || fail "STAGE 1" "Failed to build C VM"
     pass "STAGE 1" "C VM built: $VM"
 fi

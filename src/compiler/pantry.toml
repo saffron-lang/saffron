@@ -1,0 +1,12 @@
+[package]
+name = "saffron"
+version = "0.1.0"
+description = "The Saffron compiler — compiles .sf to native binaries via LLVM"
+entry = "main.sf"
+authors = ["henry232323"]
+
+[dependencies]
+
+[scripts]
+build = "saffron main.sf -- self.sf -o saffronc"
+test = "saffron ../../test/"
