@@ -802,13 +802,18 @@ class Parser {
     fun parse_class_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume class
         var name = this.expect_ident()
+        var parent = ""
+        if (this.is_ident_named("extends")) {
+            this.advance() // consume extends
+            parent = this.expect_ident()
+        }
         this.consume("{")
         var fields_sb = StringBuilder()
         var methods: List<AST.Stmt> = []
         var first_field = true
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
-            if (this.match_kind_check("}") or this.match_kind_check("eof")) { return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods, docstring) }
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring) }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type
                 this.advance()
@@ -826,7 +831,7 @@ class Parser {
             }
         }
         this.consume("}")
-        return AST.Stmt.ClassDecl(name, fields_sb.to_string(), methods, docstring)
+        return AST.Stmt.ClassDecl(name, parent, fields_sb.to_string(), methods, docstring)
     }
 
     fun parse_import(): AST.Stmt {
