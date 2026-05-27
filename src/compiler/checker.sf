@@ -793,44 +793,51 @@ class NullChecker {
 
     // --- Expression type inference ---
 
-    fun infer_expr(expr: AST.Expr): String {
+    // Returns the type as AST.Type node — the authoritative type inference
+    fun infer_type(expr: AST.Expr): AST.Type {
         return match (expr) {
-            IntLit(v) => "Int"
-            FloatLit(v) => "Float"
-            BoolLit(v) => "Bool"
-            StringLit(s) => "String"
-            NilLit => "Nil"
-            Variable(name) => this.env.get_var(name)
-            Binary(left, op, right) => this.infer_binary(left, op, right)
-            Unary(op, right) => this.infer_unary(op, right)
-            Call(callee, args) => this.infer_call(callee, args)
-            Assign(name, value) => this.check_assign(name, value)
-            Logical(left, op, right) => "Bool"
-            MemberAccess(obj, field) => this.infer_member_access(obj, field)
-            Match(subject, arms) => this.infer_match(subject, arms)
-            EnumConstruct(e, v, a) => e
-            Lambda(p, r, b) => "Fun"
-            GetField(obj, field) => "Any"
-            SetField(obj, field, value) => this.infer_expr(value)
-            This => this.current_class
-            ListLit(elements) => "List"
+            IntLit(v) => AST.Type.IntType
+            FloatLit(v) => AST.Type.FloatType
+            BoolLit(v) => AST.Type.BoolType
+            StringLit(s) => AST.Type.StringType
+            NilLit => AST.Type.NilType
+            Variable(name) => this.parse_type_node(this.env.get_var(name))
+            Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
+            Unary(op, right) => this.infer_type(right)
+            Call(callee, args) => this.parse_type_node(this.infer_call(callee, args))
+            Assign(name, value) => this.parse_type_node(this.check_assign(name, value))
+            Logical(left, op, right) => AST.Type.BoolType
+            MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
+            Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
+            EnumConstruct(e, v, a) => AST.Type.EnumType(e)
+            Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
+            GetField(obj, field) => AST.Type.AnyType
+            SetField(obj, field, value) => this.infer_type(value)
+            This => AST.Type.ClassType(this.current_class)
+            ListLit(elements) => AST.Type.GenericType("List", [AST.Type.AnyType])
             IndexGet(obj, index) => {
                 var list_type: String = this.infer_expr(obj)
                 this.infer_expr(index)
-                this.extract_list_element_type(list_type)
+                this.parse_type_node(this.extract_list_element_type(list_type))
             }
-            IndexSet(obj, index, value) => this.infer_expr(value)
-            MethodCall(obj, method, args) => this.infer_method_call(obj, method, args)
-            MapLit => "Map"
+            IndexSet(obj, index, value) => this.infer_type(value)
+            MethodCall(obj, method, args) => this.parse_type_node(this.infer_method_call(obj, method, args))
+            MapLit => AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
             BlockExpr(stmts, value) => {
                 this.check_stmts(stmts)
-                this.infer_expr(value)
+                this.infer_type(value)
             }
             IsCheck(value, type_name) => {
                 this.infer_expr(value)
-                "Bool"
+                AST.Type.BoolType
             }
         }
+    }
+
+    // String wrapper for backward compat — delegates to infer_type
+    fun infer_expr(expr: AST.Expr): String {
+        var t: AST.Type = this.infer_type(expr)
+        return this.type_to_str(t)
     }
 
     fun infer_member_access(obj: AST.Expr, field: String): String {
