@@ -1891,7 +1891,7 @@ class Codegen {
         }
 
         // Check for imported module function calls (module alias or unknown name)
-        if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "IO" and obj_name != "OS" and obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
             var arg_strs: List<String> = []
             var ai: Float = 0
             while (ai < args.length()) {
@@ -4318,10 +4318,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     return gen.generate(program)
 }
 
-fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>, alias_map: Map<String, String>): String {
+fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>): String {
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
     gen.register_only = false
+    var prefixes: List<String> = prefixes_joined.split("|")
 
     // Register runtime functions
     gen.known_functions.push("StringBuilder")
