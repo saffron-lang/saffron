@@ -4,43 +4,72 @@
 
 import "./ast.sf" as AST
 
-class TypeEnv {
+class Scope {
     var vars: Map<String, String>
-    var funcs: Map<String, String>
-    var enum_variants: Map<String, String>
-    var class_fields: Map<String, String>
-    var class_methods: Map<String, String>
     var narrowed: Map<String, String>
 
     fun init() {
         this.vars = {}
+        this.narrowed = {}
+    }
+}
+
+class TypeEnv {
+    var scopes: List<Scope>
+    var funcs: Map<String, String>
+    var enum_variants: Map<String, String>
+    var enum_fields: Map<String, String>
+    var class_fields: Map<String, String>
+    var class_methods: Map<String, String>
+
+    fun init() {
+        this.scopes = []
+        this.scopes.push(Scope())
         this.funcs = {}
         this.enum_variants = {}
+        this.enum_fields = {}
         this.class_fields = {}
         this.class_methods = {}
-        this.narrowed = {}
+    }
+
+    fun push_scope() {
+        this.scopes.push(Scope())
+    }
+
+    fun pop_scope() {
+        this.scopes.pop()
+    }
+
+    fun current_scope(): Scope {
+        return this.scopes[this.scopes.length() - 1]
     }
 
     fun define_var(name: String, typ: String) {
-        this.vars.set(name, typ)
+        this.current_scope().vars.set(name, typ)
     }
 
     fun get_var(name: String): String {
-        if (this.narrowed.has(name)) {
-            return this.narrowed.get(name)
-        }
-        if (this.vars.has(name)) {
-            return this.vars.get(name)
+        // Search from innermost scope outward
+        var i = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: Scope = this.scopes[i]
+            if (scope.narrowed.has(name)) {
+                return scope.narrowed.get(name)
+            }
+            if (scope.vars.has(name)) {
+                return scope.vars.get(name)
+            }
+            i = i - 1
         }
         return "Any"
     }
 
     fun narrow(name: String, typ: String) {
-        this.narrowed.set(name, typ)
+        this.current_scope().narrowed.set(name, typ)
     }
 
     fun clear_narrowing() {
-        this.narrowed = {}
+        this.current_scope().narrowed = {}
     }
 
     fun define_func(name: String, ret_type: String) {
@@ -222,7 +251,7 @@ class NullChecker {
             FunDecl(name, params, ret_type, body, doc) => {
                 var old_ret = this.current_func_ret
                 this.current_func_ret = ret_type
-                // Register params
+                this.env.push_scope()
                 if (params.length() > 0) {
                     var parts = params.split(",")
                     var j = 0
@@ -235,6 +264,7 @@ class NullChecker {
                     }
                 }
                 this.check_stmts(body)
+                this.env.pop_scope()
                 this.current_func_ret = old_ret
             }
             Return(value) => {
@@ -247,22 +277,27 @@ class NullChecker {
             }
             If(cond, then_branch, else_branch) => {
                 this.infer_expr(cond)
-                // Flow narrowing: if cond involves .has(), narrow gets in then-branch
+                this.env.push_scope()
                 this.apply_narrowing(cond)
                 this.check_stmts(then_branch)
-                this.env.clear_narrowing()
+                this.env.pop_scope()
+                this.env.push_scope()
                 this.check_stmts(else_branch)
-                this.env.clear_narrowing()
+                this.env.pop_scope()
             }
             While(cond, body) => {
                 this.infer_expr(cond)
+                this.env.push_scope()
                 this.check_stmts(body)
+                this.env.pop_scope()
             }
             ExprStmt(expr) => {
                 this.infer_expr(expr)
             }
             Block(stmts) => {
+                this.env.push_scope()
                 this.check_stmts(stmts)
+                this.env.pop_scope()
             }
             ClassDecl(name, fields, methods, doc) => {
                 var old_class = this.current_class
@@ -464,7 +499,11 @@ class NullChecker {
             SetField(obj, field, value) => this.infer_expr(value)
             This => this.current_class
             ListLit(elements) => "List"
-            IndexGet(obj, index) => "Any"
+            IndexGet(obj, index) => {
+                var list_type = this.infer_expr(obj)
+                this.infer_expr(index)
+                this.extract_list_element_type(list_type)
+            }
             IndexSet(obj, index, value) => this.infer_expr(value)
             MethodCall(obj, method, args) => this.infer_method_call(obj, method, args)
             MapLit => "Map"
@@ -503,6 +542,37 @@ class NullChecker {
             i = i + 1
         }
         return "Any"
+    }
+
+    fun extract_generic_arg(typ: String): String {
+        // "List<String>" → "String", "Map<String>" → "String"
+        if (!typ.contains("<")) return "Any"
+        var start = 0
+        var i = 0
+        while (i < typ.length()) {
+            if (typ.char_at(i) == "<") {
+                start = i + 1
+            }
+            i = i + 1
+        }
+        var end = typ.length() - 1
+        if (end > start) {
+            return typ.slice(start, end)
+        }
+        return "Any"
+    }
+
+    fun extract_map_value_type(typ: String): String {
+        // For "Map<String>" → "String" (our parser only stores first arg)
+        // For "Map" → "Any"
+        if (!typ.contains("<")) return "Any"
+        return this.extract_generic_arg(typ)
+    }
+
+    fun extract_list_element_type(typ: String): String {
+        // "List<String>" → "String", "List" → "Any"
+        if (!typ.contains("<")) return "Any"
+        return this.extract_generic_arg(typ)
     }
 
     fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
@@ -560,17 +630,19 @@ class NullChecker {
         // Map.get returns nullable — unless inside a has() guard
         if (method == "get") {
             if (obj_type == "Map" or obj_type.starts_with("Map<")) {
-                if (this.env.narrowed.has("__has_guard")) {
-                    return "String"
+                var val_type = this.extract_map_value_type(obj_type)
+                var has_guard = this.env.get_var("__has_guard")
+                if (has_guard == "active") {
+                    return val_type
                 }
-                return this.make_nullable("String")
+                return this.make_nullable(val_type)
             }
         }
         // Map.has returns Bool
         if (method == "has") {
             return "Bool"
         }
-        // Map.keys returns List
+        // Map.keys returns List<String>
         if (method == "keys") {
             return "List<String>"
         }
