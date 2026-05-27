@@ -2965,7 +2965,7 @@ class Codegen {
             }
             FunDecl(n, p, r, b, d) => {}
             EnumDecl(n, v, d) => {}
-            ClassDecl(n, f, m, d) => {}
+            ClassDecl(n, p, f, m, d) => {}
             Break => {}
             Continue => {}
             TryCatch(try_body, catch_name, catch_body) => {
@@ -3130,8 +3130,8 @@ class Codegen {
             EnumDecl(name, variants, doc) => {
                 this.gen_enum_decl(name, variants)
             }
-            ClassDecl(name, fields, methods, doc) => {
-                this.gen_class_decl(name, fields, methods)
+            ClassDecl(name, parent, fields, methods, doc) => {
+                this.gen_class_decl_with_parent(name, parent, fields, methods)
             }
         }
     }
@@ -3173,6 +3173,49 @@ class Codegen {
         } else {
             var val = this.gen_arg_value(value)
             this.emit_terminator("ret i64 " + val)
+        }
+    }
+
+    fun gen_class_decl_with_parent(name: String, parent: String, fields: String, methods: List<AST.Stmt>) {
+        // Inherit parent fields (prepend parent fields before child's own)
+        var all_fields = fields
+        if (parent.length() > 0 and this.class_fields.has(parent)) {
+            var parent_fields = this.class_fields.get(parent)
+            if (parent_fields.length() > 0) {
+                if (all_fields.length() > 0) {
+                    all_fields = parent_fields + "," + all_fields
+                } else {
+                    all_fields = parent_fields
+                }
+            }
+        }
+        // Generate the class with inherited fields
+        this.gen_class_decl(name, all_fields, methods)
+        // Register inherited methods: if child doesn't define a method, map it to parent's
+        if (parent.length() > 0 and this.class_methods.has(parent)) {
+            var parent_methods: List = this.class_methods.get(parent)
+            var child_methods: List = this.class_methods.get(name)
+            var i: Int = 0
+            while (i < parent_methods.length()) {
+                var mname: String = parent_methods[i]
+                if (!child_methods.contains(mname) and mname != "init") {
+                    // Register parent method as callable on child
+                    child_methods.push(mname)
+                    // Map ChildClass__method to ParentClass__method
+                    var child_full = name + "__" + mname
+                    var parent_full = parent + "__" + mname
+                    this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
+                    this.known_functions.push(child_full)
+                    // Emit a thin forwarder
+                    this.emit("")
+                    this.emit("define i64 @" + child_full + "(i64 %self) {")
+                    this.emit("entry:")
+                    this.emit("  %r = call i64 @" + parent_full + "(i64 %self)")
+                    this.emit("  ret i64 %r")
+                    this.emit("}")
+                }
+                i = i + 1
+            }
         }
     }
 
@@ -3344,7 +3387,7 @@ class Codegen {
             }
             VarDecl(n, t, i, d) => {}
             FunDecl(n, p, r, b, d) => {}
-            ClassDecl(n, f, m, d) => {}
+            ClassDecl(n, p, f, m, d) => {}
             If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
@@ -3453,7 +3496,7 @@ class Codegen {
             VarDecl(n, t, i, d) => "var"
             FunDecl(n, p, r, b, d) => "fun"
             EnumDecl(n, v, d) => "enum"
-            ClassDecl(n, f, m, d) => "class"
+            ClassDecl(n, p, f, m, d) => "class"
             Return(v) => "return"
             While(c, b) => "while"
             Block(s) => "block"
@@ -3471,7 +3514,7 @@ class Codegen {
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
             EnumDecl(n, v, d) => "other"
-            ClassDecl(n, f, m, d) => "other"
+            ClassDecl(n, p, f, m, d) => "other"
             Return(v) => "other"
             While(c, b) => "other"
             Block(s) => "other"
@@ -3661,7 +3704,7 @@ class Codegen {
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true
             EnumDecl(n, v, d) => true
-            ClassDecl(n, f, m, d) => true
+            ClassDecl(n, p, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
             VarDecl(n, t, i, d) => false
             Return(v) => false
