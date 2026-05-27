@@ -217,39 +217,80 @@ class NullChecker {
         }
     }
 
-    // --- Nullable type helpers (string-based, for backward compat) ---
+    // --- Type analysis (uses Type nodes internally) ---
 
     fun is_nullable(typ: String): Bool {
-        if (typ.contains("|")) {
-            if (typ.contains("Nil")) {
-                return true
-            }
-        }
-        if (typ == "Nil") {
-            return true
-        }
-        return false
+        var node = this.parse_type_node(typ)
+        return this.is_nullable_type(node)
     }
 
     fun strip_nil(typ: String): String {
         if (typ == "Nil") return "Nil"
         if (!typ.contains("|")) return typ
-        var parts = typ.split("|")
-        var result = ""
-        var i = 0
-        while (i < parts.length()) {
-            var p = parts[i]
-            if (p != "Nil" and p != " Nil" and p != "Nil ") {
-                if (result.length() > 0) {
-                    result = result + "|" + p
+        var node = this.parse_type_node(typ)
+        var stripped = this.strip_nil_from_node(node)
+        return this.type_to_str(stripped)
+    }
+
+    fun strip_nil_from_node(t: AST.Type): AST.Type {
+        return match (t) {
+            UnionType(types) => {
+                var filtered: List<AST.Type> = []
+                var i = 0
+                while (i < types.length()) {
+                    var sub = types[i]
+                    var sub_str = this.type_to_str(sub)
+                    if (sub_str != "Nil") {
+                        filtered.push(sub)
+                    }
+                    i = i + 1
+                }
+                if (filtered.length() == 1) {
+                    filtered[0]
+                } else if (filtered.length() == 0) {
+                    AST.Type.NilType
                 } else {
-                    result = p
+                    AST.Type.UnionType(filtered)
                 }
             }
-            i = i + 1
+            NullableType(inner) => inner
+            NilType => AST.Type.NilType
+            IntType => AST.Type.IntType
+            FloatType => AST.Type.FloatType
+            BoolType => AST.Type.BoolType
+            StringType => AST.Type.StringType
+            AnyType => AST.Type.AnyType
+            ClassType(n) => AST.Type.ClassType(n)
+            EnumType(n) => AST.Type.EnumType(n)
+            GenericType(b, a) => AST.Type.GenericType(b, a)
+            FuncType(p, r) => AST.Type.FuncType(p, r)
         }
-        if (result.length() == 0) return "Nil"
-        return result
+    }
+
+    fun type_to_str(t: AST.Type): String {
+        return match (t) {
+            IntType => "Int"
+            FloatType => "Float"
+            BoolType => "Bool"
+            StringType => "String"
+            NilType => "Nil"
+            AnyType => "Any"
+            ClassType(n) => n
+            EnumType(n) => n
+            GenericType(base, args) => base
+            FuncType(p, r) => "Fun"
+            NullableType(inner) => this.type_to_str(inner) + "|Nil"
+            UnionType(types) => {
+                var result = ""
+                var i = 0
+                while (i < types.length()) {
+                    if (i > 0) { result = result + "|" }
+                    result = result + this.type_to_str(types[i])
+                    i = i + 1
+                }
+                result
+            }
+        }
     }
 
     fun make_nullable(typ: String): String {
@@ -262,10 +303,26 @@ class NullChecker {
         if (child == parent) return true
         if (parent == "Any") return true
         if (child == "Any") return true
+        // Check via Type nodes
+        var child_node = this.parse_type_node(child)
+        var parent_node = this.parse_type_node(parent)
+        return this.is_subtype_node(child_node, parent_node)
+    }
+
+    fun is_subtype_node(child: AST.Type, parent: AST.Type): Bool {
+        var cs = this.type_to_str(child)
+        var ps = this.type_to_str(parent)
+        if (cs == ps) return true
+        if (ps == "Any") return true
+        if (cs == "Any") return true
+        // Nullable is subtype of its nullable variant
+        if (this.is_nullable_type(parent) and !this.is_nullable_type(child)) {
+            return true
+        }
         // Check inheritance chain
-        var current = child
+        var current = cs
         while (current.length() > 0) {
-            if (current == parent) return true
+            if (current == ps) return true
             var parent_key = current + "__parent"
             var next = this.env.get_var(parent_key)
             if (next == "Any" or next == current) return false
