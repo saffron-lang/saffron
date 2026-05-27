@@ -252,6 +252,20 @@ class Codegen {
         }
     }
 
+    // Extract the value type string from a Map<K, V> type annotation.
+    // e.g. "Map<String,AST.Type>" → "AST.Type"
+    //      "Map<String,String>"   → "String"
+    //      "Map" or unknown       → "Any"
+    fun get_map_value_type(map_type: String): String {
+        if (!map_type.starts_with("Map<")) return "Any"
+        // Strip "Map<" prefix and trailing ">"
+        var inner: String = map_type.slice(4, map_type.length() - 1)
+        // Split on first comma respecting nested generics
+        var parts: List<String> = this.split_respecting_generics(inner, ",")
+        if (parts.length() < 2) return "Any"
+        return parts[1]
+    }
+
     fun split_respecting_generics(s: String, delim: String): List<String> {
         var result: List<String> = []
         var current: String = ""
@@ -1755,7 +1769,21 @@ class Codegen {
             if (mc_method == "to_string" or mc_method == "join") return "String"
             if (mc_method == "split" or mc_method == "keys") return "List<String>"
             if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with") return "Bool"
-            if (mc_method == "get") return "String"
+            if (mc_method == "get") {
+                // Infer return type from Map<K, V> annotation rather than always "String"
+                var mc_obj: AST.Expr = match (expr) {
+                    MethodCall(o, m, a) => o
+                    _ => AST.Expr.NilLit
+                }
+                var mc_obj_name: String = this.get_variable_name(mc_obj)
+                if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
+                    var mc_map_type: String = this.var_types.get(mc_obj_name)
+                    if (mc_map_type.starts_with("Map<")) {
+                        return this.get_map_value_type(mc_map_type)
+                    }
+                }
+                return "String"
+            }
             if (mc_method == "to_string") return "String"
         }
         if (ek == "call") {
@@ -2196,7 +2224,11 @@ class Codegen {
                 var key: String = this.gen_arg_value(args[0])
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
-                this.last_type = AST.Type.StringType
+                // Infer the value type from the Map<K, V> annotation instead of
+                // hard-coding StringType.  This allows Map<String, AST.Type> (and
+                // any other non-string value type) to be used correctly downstream.
+                var val_type_str: String = this.get_map_value_type(obj_type)
+                this.last_type = this.str_to_type(val_type_str)
                 return local
             }
             if (method == "has") {
@@ -2499,6 +2531,7 @@ class Codegen {
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
         var obj_val: String = this.gen_arg_value(object)
         var class_name: String = this.type_to_string(this.last_type)
+        IO.println("SET_FIELD: field=" + field + " class_name=" + class_name + " current_class=" + this.current_class + " has=" + this.class_fields.has(class_name).to_string() + " idx=" + this.get_field_index(class_name, field).to_string())
         if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
             class_name = this.current_class
         }
