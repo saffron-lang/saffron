@@ -50,3 +50,18 @@ define i64 @TkModuleDoc(i64 %v) { %t = shl i64 60, 56
   ret i64 %r }
 declare i8* @malloc(i64)
 
+
+; Param enum constructor: [tag=0, name, type_ann]
+define linkonce_odr i64 @Param(i64 %f0, i64 %f1) {
+entry:
+  %raw = call i8* @malloc(i64 24)
+  %arr = bitcast i8* %raw to [3 x i64]*
+  %s0 = getelementptr [3 x i64], [3 x i64]* %arr, i64 0, i64 0
+  store i64 0, i64* %s0
+  %s1 = getelementptr [3 x i64], [3 x i64]* %arr, i64 0, i64 1
+  store i64 %f0, i64* %s1
+  %s2 = getelementptr [3 x i64], [3 x i64]* %arr, i64 0, i64 2
+  store i64 %f1, i64* %s2
+  %r = ptrtoint [3 x i64]* %arr to i64
+  ret i64 %r
+}
