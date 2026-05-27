@@ -64,7 +64,9 @@ class Codegen {
     }
 
     fun params_to_string(params: List<AST.Param>): String {
-        if (!(params is List)) return ""
+        if (!(params is List)) {
+            return ""
+        }
         var sb: StringBuilder = StringBuilder()
         var i: Float = 0
         while (i < params.length()) {
@@ -1891,6 +1893,8 @@ class Codegen {
         }
 
         // Check for imported module function calls (module alias or unknown name)
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS") {
+        }
         if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
             var arg_strs: List<String> = []
             var ai: Float = 0
@@ -2102,6 +2106,7 @@ class Codegen {
         if (obj_type == "Any") {
             obj_type = this.type_to_string(this.last_type)
         }
+
 
         // List methods
         if (obj_type == "List" or obj_type.starts_with("List<")) {
@@ -2493,8 +2498,11 @@ class Codegen {
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
         var obj_val: String = this.gen_arg_value(object)
+        var class_name: String = this.type_to_string(this.last_type)
+        if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
+            class_name = this.current_class
+        }
         var val: String = this.gen_arg_value(value)
-        var class_name: String = this.current_class
         var field_idx: Float = this.get_field_index(class_name, field)
         var obj_ptr: String = this.fresh_local()
         this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
@@ -4323,6 +4331,10 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     gen.module_prefixes = alias_map
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
+    var dbgi: Float = 0
+    while (dbgi < prefixes.length()) {
+        dbgi = dbgi + 1
+    }
 
     // Register runtime functions
     gen.known_functions.push("StringBuilder")
@@ -4452,5 +4464,6 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     }
 
     gen.current_prefix = ""
+    IO.println("CODEGEN_FLAT: about to generate(program), program.length=" + program.length().to_string())
     return gen.generate(program)
 }
