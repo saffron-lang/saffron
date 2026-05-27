@@ -90,6 +90,8 @@ class NullChecker {
     var warnings: List<String>
     var current_func_ret: String
     var current_class: String
+    var class_parents: Map<String, String>
+    var class_method_names: Map<String, String>
 
     fun init() {
         this.env = TypeEnv()
@@ -97,6 +99,8 @@ class NullChecker {
         this.warnings = []
         this.current_func_ret = "Nil"
         this.current_class = ""
+        this.class_parents = {}
+        this.class_method_names = {}
     }
 
     fun error(msg: String) {
@@ -148,6 +152,22 @@ class NullChecker {
         return typ + "|Nil"
     }
 
+    fun is_subtype(child: String, parent: String): Bool {
+        if (child == parent) return true
+        if (parent == "Any") return true
+        if (child == "Any") return true
+        // Check inheritance chain
+        var current = child
+        while (current.length() > 0) {
+            if (current == parent) return true
+            var parent_key = current + "__parent"
+            var next = this.env.get_var(parent_key)
+            if (next == "Any" or next == current) return false
+            current = next
+        }
+        return false
+    }
+
     fun requires_non_nil(method: String): Bool {
         if (method == "length") return true
         if (method == "split") return true
@@ -194,8 +214,12 @@ class NullChecker {
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
             }
-            ClassDecl(name, fields, methods, doc) => {
+            ClassDecl(name, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, fields)
+                if (parent.length() > 0) {
+                    this.env.define_var(name + "__parent", parent)
+                    this.class_parents.set(name, parent)
+                }
             }
             VarDecl(n, t, i, d) => {}
             ExprStmt(e) => {}
@@ -205,6 +229,8 @@ class NullChecker {
             Block(s) => {}
             Break => {}
             Continue => {}
+            TryCatch(tb, cn, cb) => {}
+            Throw(v) => {}
         }
     }
 
@@ -245,6 +271,17 @@ class NullChecker {
                 // Register method with class prefix if inside a class
                 if (this.current_class.length() > 0) {
                     this.env.define_func(this.current_class + "__" + name, ret_type)
+                    // Track method names for conformance checking
+                    var existing = ""
+                    if (this.class_method_names.has(this.current_class)) {
+                        existing = this.class_method_names.get(this.current_class)
+                    }
+                    if (existing.length() > 0) {
+                        existing = existing + "," + name
+                    } else {
+                        existing = name
+                    }
+                    this.class_method_names.set(this.current_class, existing)
                 }
                 var old_ret = this.current_func_ret
                 this.current_func_ret = ret_type
@@ -296,12 +333,28 @@ class NullChecker {
                 this.check_stmts(stmts)
                 this.env.pop_scope()
             }
-            ClassDecl(name, fields, methods, doc) => {
+            ClassDecl(name, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, fields)
+                if (parent.length() > 0) {
+                    this.env.define_var(name + "__parent", parent)
+                    this.class_parents.set(name, parent)
+                }
             }
             EnumDecl(n, v, d) => {}
             Break => {}
             Continue => {}
+            TryCatch(try_body, catch_name, catch_body) => {
+                this.env.push_scope()
+                this.check_stmts(try_body)
+                this.env.pop_scope()
+                this.env.push_scope()
+                this.env.define_var(catch_name, "String")
+                this.check_stmts(catch_body)
+                this.env.pop_scope()
+            }
+            Throw(value) => {
+                this.infer_expr(value)
+            }
         }
     }
 
