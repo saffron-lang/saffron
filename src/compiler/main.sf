@@ -264,7 +264,12 @@ fun main(): Int {
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
 
-    var ir: String = Codegen.generate_with_modules(program, module_stmts, module_prefixes_list, resolved_aliases)
+    var ir: String = ""
+    if (module_stmts.length() > 0) {
+        ir = Codegen.generate_with_modules(program, module_stmts, module_prefixes_list, resolved_aliases)
+    } else {
+        ir = Codegen.generate(program)
+    }
 
     // Write LLVM IR output
     IO.write_file(output_path, ir)
