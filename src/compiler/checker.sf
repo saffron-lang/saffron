@@ -114,6 +114,22 @@ class NullChecker {
         this.warnings.push(msg)
     }
 
+    fun params_list_to_string(params: List<AST.Param>): String {
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pname: String = match (p) { Param(n, t) => n }
+            var ptype: String = match (p) { Param(n, t) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(ptype)
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
     // --- String → Type node conversion ---
 
     fun parse_type_node(s: String): AST.Type {
@@ -411,7 +427,7 @@ class NullChecker {
                 this.register_enum(name, variants)
             }
             ClassDecl(name, parent, fields, methods, doc) => {
-                this.env.class_fields.set(name, fields)
+                this.env.class_fields.set(name, this.params_list_to_string(fields))
                 if (parent.length() > 0) {
                     this.env.define_var(name + "__parent", parent)
                     this.class_parents.set(name, parent)
@@ -487,16 +503,13 @@ class NullChecker {
                 var old_ret: String = this.current_func_ret
                 this.current_func_ret = ret_type
                 this.env.push_scope()
-                if (params.length() > 0) {
-                    var parts: List<String> = params.split(",")
-                    var j: Float = 0
-                    while (j < parts.length()) {
-                        var kv: List<String> = parts[j].split(":")
-                        if (kv.length() >= 2) {
-                            this.env.define_var(kv[0], kv[1])
-                        }
-                        j = j + 1
-                    }
+                var j: Float = 0
+                while (j < params.length()) {
+                    var p: AST.Param = params[j]
+                    var pname: String = match (p) { Param(n, t) => n }
+                    var ptype: String = match (p) { Param(n, t) => t }
+                    this.env.define_var(pname, ptype)
+                    j = j + 1
                 }
                 this.check_stmts(body)
                 this.env.pop_scope()
@@ -535,7 +548,7 @@ class NullChecker {
                 this.env.pop_scope()
             }
             ClassDecl(name, parent, fields, methods, doc) => {
-                this.env.class_fields.set(name, fields)
+                this.env.class_fields.set(name, this.params_list_to_string(fields))
                 if (parent.length() > 0) {
                     this.env.define_var(name + "__parent", parent)
                     this.class_parents.set(name, parent)
