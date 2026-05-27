@@ -639,6 +639,24 @@ class Parser {
         // Collect /// doc comments before declarations
         var docstring: String = this.collect_doc_comments()
 
+        // Check for decorator: @intrinsic or @extern("...")
+        if (this.is_ident_named("@")) {
+            this.advance()
+            var decorator: String = this.expect_ident()
+            var annotation: String = ""
+            if (decorator == "intrinsic") {
+                annotation = "@intrinsic"
+            } else if (decorator == "extern") {
+                this.consume("(")
+                var kind: Lexer.TokenKind = this.current_kind()
+                var sig: String = match (kind) { TkString(s) => s }
+                this.advance()
+                this.consume(")")
+                annotation = "@extern:" + sig
+            }
+            return this.parse_fun_decl_with_doc(annotation)
+        }
+
         if (this.match_kind_check("var")) return this.parse_var_decl_with_doc(docstring)
         if (this.match_kind_check("let")) return this.parse_var_decl_with_doc(docstring)
         if (this.match_kind_check("fun")) return this.parse_fun_decl_with_doc(docstring)

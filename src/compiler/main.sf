@@ -84,26 +84,24 @@ fun extract_import_aliases(source: String): Map<String, String> {
 }
 
 fun module_prefix_from_path(imp_path: String): String {
-    if (imp_path.starts_with("@")) {
-        return imp_path.slice(1, imp_path.length()) + "_"
+    var name: String = imp_path
+    if (name.starts_with("@")) {
+        name = name.slice(1, name.length())
     }
-    if (imp_path.starts_with("./")) {
-        var name: String = imp_path
-        var slash_idx: Float = -1
-        var j: Float = 0
-        while (j < name.length()) {
-            if (name.char_at(j) == "/") { slash_idx = j }
-            j = j + 1
-        }
-        if (slash_idx >= 0) {
-            name = name.slice(slash_idx + 1, name.length())
-        }
-        if (name.ends_with(".sf")) {
-            name = name.slice(0, name.length() - 3)
-        }
-        return name + "_"
+    // Extract basename (last component after /)
+    var slash_idx: Float = -1
+    var j: Float = 0
+    while (j < name.length()) {
+        if (name.char_at(j) == "/") { slash_idx = j }
+        j = j + 1
     }
-    return imp_path + "_"
+    if (slash_idx >= 0) {
+        name = name.slice(slash_idx + 1, name.length())
+    }
+    if (name.ends_with(".sf")) {
+        name = name.slice(0, name.length() - 3)
+    }
+    return name + "_"
 }
 
 fun is_builtin_module(imp_path: String): Bool {

@@ -41,6 +41,9 @@ declare void @longjmp(i8*, i32)
 declare i32 @access(i8*, i32)
 declare i32 @mkdir(i8*, i32)
 declare i8* @getcwd(i8*, i64)
+declare i8* @opendir(i8*)
+declare i8* @readdir(i8*)
+declare i32 @closedir(i8*)
 declare i8* @getenv(i8*)
 declare i8* @strdup(i8*)
 
@@ -1020,4 +1023,67 @@ outer_inc:
   br label %outer
 end:
   ret i64 %copy
+}
+
+; --- IO: walk_dir and append_file ---
+
+@.str.a = linkonce_odr unnamed_addr constant [2 x i8] c"a\00"
+
+define i64 @__io_walk_dir(i8* %path) {
+entry:
+  %dir = call i8* @opendir(i8* %path)
+  %is_null = icmp eq i8* %dir, null
+  %list = call i64 @__list_new()
+  br i1 %is_null, label %done, label %loop
+loop:
+  %ent = call i8* @readdir(i8* %dir)
+  %ent_null = icmp eq i8* %ent, null
+  br i1 %ent_null, label %close, label %process
+process:
+  ; dirent.d_name is at offset 21 on macOS (after d_ino=8, d_seekoff=8, d_reclen=2, d_namlen=2, d_type=1)
+  %name_ptr = getelementptr i8, i8* %ent, i64 21
+  ; Skip . and ..
+  %first = load i8, i8* %name_ptr
+  %is_dot = icmp eq i8 %first, 46
+  br i1 %is_dot, label %check_dotdot, label %add_entry
+check_dotdot:
+  %second_ptr = getelementptr i8, i8* %name_ptr, i64 1
+  %second = load i8, i8* %second_ptr
+  %is_nul = icmp eq i8 %second, 0
+  br i1 %is_nul, label %loop, label %check_dd2
+check_dd2:
+  %is_dot2 = icmp eq i8 %second, 46
+  %third_ptr = getelementptr i8, i8* %name_ptr, i64 2
+  %third = load i8, i8* %third_ptr
+  %third_nul = icmp eq i8 %third, 0
+  %is_dd = and i1 %is_dot2, %third_nul
+  br i1 %is_dd, label %loop, label %add_entry
+add_entry:
+  %len = call i64 @strlen(i8* %name_ptr)
+  %buf_sz = add i64 %len, 1
+  %buf = call i8* @malloc(i64 %buf_sz)
+  call i8* @strcpy(i8* %buf, i8* %name_ptr)
+  %str_int = ptrtoint i8* %buf to i64
+  call void @__list_push(i64 %list, i64 %str_int)
+  br label %loop
+close:
+  call i32 @closedir(i8* %dir)
+  br label %done
+done:
+  ret i64 %list
+}
+
+define void @__io_append_file(i8* %path, i8* %content) {
+entry:
+  %mode = getelementptr [2 x i8], [2 x i8]* @.str.a, i64 0, i64 0
+  %fp = call i8* @fopen(i8* %path, i8* %mode)
+  %is_null = icmp eq i8* %fp, null
+  br i1 %is_null, label %end, label %write
+write:
+  %len = call i64 @strlen(i8* %content)
+  call i64 @fwrite(i8* %content, i64 1, i64 %len, i8* %fp)
+  call i32 @fclose(i8* %fp)
+  br label %end
+end:
+  ret void
 }

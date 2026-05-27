@@ -394,6 +394,7 @@ class Lexer {
             else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
             else if (ch == "^") { this.emit(TokenKind.TkCaret) }
             else if (ch == "~") { this.emit(TokenKind.TkTilde) }
+            else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
             else if (ch == "|") { this.emit(TokenKind.TkPipe) }
             else if (ch == "!") {
                 if (this.peek() == "=") {
