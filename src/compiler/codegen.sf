@@ -1308,8 +1308,17 @@ class Codegen {
         var obj = this.gen_arg_value(object)
         var obj_type = this.last_type
         var idx = this.gen_arg_value(index)
+        // Negative indexing: if idx < 0, use length + idx
+        var is_neg = this.fresh_local()
+        this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
+        var len = this.fresh_local()
+        this.emit_indent(len + " = call i64 @__list_length(i64 " + obj + ")")
+        var adjusted = this.fresh_local()
+        this.emit_indent(adjusted + " = add i64 " + len + ", " + idx)
+        var final_idx = this.fresh_local()
+        this.emit_indent(final_idx + " = select i1 " + is_neg + ", i64 " + adjusted + ", i64 " + idx)
         var local = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + idx + ")")
+        this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
         if (obj_type == "StringList" or obj_type.contains("String")) {
             this.last_type = "String"
         } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
@@ -3045,9 +3054,15 @@ class Codegen {
             While(cond, body) => { this.gen_while(cond, body) }
             Block(stmts) => { this.gen_stmts(stmts) }
             Break => {
-                this.emit_terminator("br label %" + this.loop_end_label)
+                if (this.loop_end_label.contains(":")) {
+                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[0])
+                }
             }
-            Continue => {}
+            Continue => {
+                if (this.loop_end_label.contains(":")) {
+                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[1])
+                }
+            }
             TryCatch(try_body, catch_name, catch_body) => {
                 this.gen_try_catch(try_body, catch_name, catch_body)
             }
@@ -3459,7 +3474,7 @@ class Codegen {
         var end_label = this.fresh_label("while.end")
 
         var saved_loop_end = this.loop_end_label
-        this.loop_end_label = end_label
+        this.loop_end_label = end_label + ":" + cond_label
 
         this.emit_terminator("br label %" + cond_label)
 
