@@ -224,9 +224,13 @@ class Lexer {
                         // Emit prefix string + plus
                         this.emit(TokenKind.TkString(result.to_string()))
                         this.emit(TokenKind.TkPlus)
-                        // Lex the interpolated expression
+                        // Lex the interpolated expression, wrapped in (expr).to_string()
                         this.emit(TokenKind.TkLParen)
                         this.read_interpolation()
+                        this.emit(TokenKind.TkRParen)
+                        this.emit(TokenKind.TkDot)
+                        this.emit(TokenKind.TkIdent("to_string"))
+                        this.emit(TokenKind.TkLParen)
                         this.emit(TokenKind.TkRParen)
                         this.emit(TokenKind.TkPlus)
                         // Reset for rest of string
