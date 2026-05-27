@@ -1850,8 +1850,8 @@ class Codegen {
             }
         }
 
-        // Check for imported module function calls (any name that's not a class, variable, or builtin module)
-        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)) {
+        // Check for imported module function calls (module alias or unknown name)
+        if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "IO" and obj_name != "OS" and obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
             var arg_strs: List<String> = []
             var ai: Float = 0
             while (ai < args.length()) {
@@ -3728,6 +3728,7 @@ class Codegen {
         var emit_name: String = this.current_prefix + name
         if (name == "main") {
             emit_name = "__saffron_main"
+            this.known_functions.push("main")
         }
         this.known_functions.push(emit_name)
         this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
