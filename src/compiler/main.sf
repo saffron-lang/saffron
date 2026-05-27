@@ -8,18 +8,27 @@ import "./parser.sf" as Parser
 import "./checker.sf" as Checker
 import "./codegen.sf" as Codegen
 
-fun resolve_import_path(base_path: String, import_path: String): String {
-    if (import_path.starts_with("./")) {
-        var dir = base_path
-        var last_slash: Float = 0
-        var i: Float = 0
-        while (i < dir.length()) {
-            if (dir.char_at(i) == "/") {
-                last_slash = i
-            }
-            i = i + 1
+fun dir_of(path: String): String {
+    var last_slash: Float = -1
+    var i: Float = 0
+    while (i < path.length()) {
+        if (path.char_at(i) == "/") {
+            last_slash = i
         }
-        return dir.slice(0, last_slash + 1) + import_path.slice(2, import_path.length())
+        i = i + 1
+    }
+    if (last_slash < 0) { return "." }
+    return path.slice(0, last_slash)
+}
+
+fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: String): String {
+    if (import_path.starts_with("@")) {
+        var name: String = import_path.slice(1, import_path.length())
+        return stdlib_dir + "/" + name + ".sf"
+    }
+    if (import_path.starts_with("./")) {
+        var dir: String = dir_of(base_path)
+        return dir + "/" + import_path.slice(2, import_path.length())
     }
     return import_path
 }
@@ -30,9 +39,9 @@ fun extract_imports(source: String): List<String> {
     var i: Float = 0
     while (i < lines.length()) {
         var line: String = lines[i]
-        if (line.starts_with("import \"./")) {
+        if (line.starts_with("import \"./") or line.starts_with("import \"@")) {
             var start: Float = 8
-            var end = start + 1
+            var end: Float = start + 1
             while (end < line.length()) {
                 if (line.char_at(end) == "\"") {
                     imports.push(line.slice(start, end))
@@ -46,8 +55,41 @@ fun extract_imports(source: String): List<String> {
     return imports
 }
 
+fun resolve_imports_recursive(file_path: String, stdlib_dir: String, visited: Map<String, Bool>): List<AST.Stmt> {
+    if (visited.has(file_path)) { return [] }
+    visited.set(file_path, true)
+
+    var source: String = IO.read_file(file_path)
+    var import_paths: List<String> = extract_imports(source)
+
+    var all_decls: List<AST.Stmt> = []
+
+    var pi: Float = 0
+    while (pi < import_paths.length()) {
+        var imp_path: String = import_paths[pi]
+        var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
+        var sub_decls: List<AST.Stmt> = resolve_imports_recursive(full_path, stdlib_dir, visited)
+        var si: Float = 0
+        while (si < sub_decls.length()) {
+            all_decls.push(sub_decls[si])
+            si = si + 1
+        }
+        pi = pi + 1
+    }
+
+    var tokens: List = Lexer.lex(source)
+    var program: List = Parser.parse(tokens)
+    var j: Float = 0
+    while (j < program.length()) {
+        all_decls.push(program[j])
+        j = j + 1
+    }
+
+    return all_decls
+}
+
 fun main(): Int {
-    var args = OS.args()
+    var args: List<String> = OS.args()
 
     // Check for --check flag
     var run_checker: Bool = false
@@ -82,23 +124,25 @@ fun main(): Int {
         output_path = args[last_sf_idx + 1]
     }
 
-    // Read source file
-    var source: String = IO.read_file(input_path)
+    // Determine stdlib directory from executable location
+    var exe_path: String = args[0]
+    var exe_dir: String = dir_of(exe_path)
+    var stdlib_dir: String = exe_dir + "/../src/lib"
 
-    // Resolve and parse imports for enum metadata
-    var import_paths = extract_imports(source)
+    // Recursively resolve all imports (including @module imports)
+    var visited: Map<String, Bool> = {}
     var import_decls: List<AST.Stmt> = []
+    var source: String = IO.read_file(input_path)
+    var import_paths: List<String> = extract_imports(source)
     var pi: Float = 0
     while (pi < import_paths.length()) {
-        var rel_path = import_paths[pi]
-        var full_path = resolve_import_path(input_path, rel_path)
-        var imp_source: String = IO.read_file(full_path)
-        var imp_tokens: List = Lexer.lex(imp_source)
-        var imp_program: List = Parser.parse(imp_tokens)
-        var j: Float = 0
-        while (j < imp_program.length()) {
-            import_decls.push(imp_program[j])
-            j = j + 1
+        var imp_path: String = import_paths[pi]
+        var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
+        var sub_decls: List<AST.Stmt> = resolve_imports_recursive(full_path, stdlib_dir, visited)
+        var si: Float = 0
+        while (si < sub_decls.length()) {
+            import_decls.push(sub_decls[si])
+            si = si + 1
         }
         pi = pi + 1
     }

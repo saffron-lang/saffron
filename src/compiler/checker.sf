@@ -144,9 +144,9 @@ class NullChecker {
                 }
                 i = i + 1
             }
-            var base = s.slice(0, lt_pos)
-            var args_str = s.slice(lt_pos + 1, s.length() - 1)
-            var arg_strs = this.split_type_args(args_str)
+            var base: String = s.slice(0, lt_pos)
+            var args_str: String = s.slice(lt_pos + 1, s.length() - 1)
+            var arg_strs: List<String> = this.split_type_args(args_str)
             var args: List<AST.Type> = []
             var j: Float = 0
             while (j < arg_strs.length()) {
@@ -165,7 +165,7 @@ class NullChecker {
         var depth: Float = 0
         var i: Float = 0
         while (i < s.length()) {
-            var ch = s.char_at(i)
+            var ch: String = s.char_at(i)
             if (ch == "<") {
                 depth = depth + 1
                 current = current + ch
@@ -198,7 +198,7 @@ class NullChecker {
                 var has_nil: Bool = false
                 var i: Float = 0
                 while (i < types.length()) {
-                    var sub = AST.type_to_string(types[i])
+                    var sub: String = AST.type_to_string(types[i])
                     if (sub == "Nil") { has_nil = true }
                     i = i + 1
                 }
@@ -228,7 +228,7 @@ class NullChecker {
         if (typ == "Nil") return "Nil"
         if (!typ.contains("|")) return typ
         var node: AST.Type = this.parse_type_node(typ)
-        var stripped = this.strip_nil_from_node(node)
+        var stripped: AST.Type = this.strip_nil_from_node(node)
         return this.type_to_str(stripped)
     }
 
@@ -238,7 +238,7 @@ class NullChecker {
                 var filtered: List<AST.Type> = []
                 var i: Float = 0
                 while (i < types.length()) {
-                    var sub = types[i]
+                    var sub: AST.Type = types[i]
                     var sub_str: String = this.type_to_str(sub)
                     if (sub_str != "Nil") {
                         filtered.push(sub)
@@ -320,7 +320,7 @@ class NullChecker {
             return true
         }
         // Check inheritance chain
-        var current = cs
+        var current: String = cs
         while (current.length() > 0) {
             if (current == ps) return true
             var parent_key: String = current + "__parent"
@@ -373,7 +373,7 @@ class NullChecker {
 
     fun check_conformance() {
         // For each class with a parent, verify it implements parent's methods
-        var classes = this.class_parents.keys()
+        var classes: List<String> = this.class_parents.keys()
         var i: Float = 0
         while (i < classes.length()) {
             var child_name: String = classes[i]
@@ -434,9 +434,9 @@ class NullChecker {
         var variant_names: List<String> = []
         var i: Float = 0
         while (i < variants.length()) {
-            var v = variants[i]
-            var vname = match (v) { Variant(n, f) => n }
-            var vfields = match (v) { Variant(n, f) => f }
+            var v: AST.Variant = variants[i]
+            var vname: String = match (v) { Variant(n, f) => n }
+            var vfields: String = match (v) { Variant(n, f) => f }
             variant_names.push(vname)
             if (vfields.length() > 0) {
                 this.env.enum_fields.set(name + "." + vname, vfields)
@@ -454,13 +454,18 @@ class NullChecker {
             VarDecl(name, type_ann, init, doc) => {
                 var init_type: String = this.infer_expr(init)
                 if (type_ann != "Any") {
-                    // Check: assigning nullable to non-nullable
+                    // Explicit annotation: check nullable assignment
                     if (!this.is_nullable(type_ann) and this.is_nullable(init_type)) {
                         this.error(name + ": cannot assign nullable " + init_type + " to non-nullable " + type_ann)
                     }
                     this.env.define_var(name, type_ann)
-                } else {
+                } else if (init_type != "Any") {
+                    // Inferred from initializer
                     this.env.define_var(name, init_type)
+                } else {
+                    // Cannot infer type — error
+                    this.error(name + ": cannot infer type, add explicit annotation")
+                    this.env.define_var(name, "Any")
                 }
             }
             FunDecl(name, params, ret_type, body, doc) => {
@@ -479,14 +484,14 @@ class NullChecker {
                     }
                     this.class_method_names.set(this.current_class, existing)
                 }
-                var old_ret = this.current_func_ret
+                var old_ret: String = this.current_func_ret
                 this.current_func_ret = ret_type
                 this.env.push_scope()
                 if (params.length() > 0) {
                     var parts: List<String> = params.split(",")
                     var j: Float = 0
                     while (j < parts.length()) {
-                        var kv = parts[j].split(":")
+                        var kv: List<String> = parts[j].split(":")
                         if (kv.length() >= 2) {
                             this.env.define_var(kv[0], kv[1])
                         }
@@ -569,7 +574,7 @@ class NullChecker {
         // Pattern 1: x.has(...) → map.get() is non-nullable in this scope
         // Pattern 2: x != nil → x is non-nullable in this scope
         // Pattern 3: x (truthy check on variable) → x is non-nullable
-        var cond_kind = match (cond) {
+        var cond_kind: String = match (cond) {
             MethodCall(o, m, a) => "method:" + m
             Binary(l, o, r) => "binary:" + o
             Variable(n) => "var:" + n
@@ -604,7 +609,7 @@ class NullChecker {
 
         // v != nil or nil != v
         if (cond_kind == "binary:!=") {
-            var lhs_name = this.get_expr_var_name(cond)
+            var lhs_name: String = this.get_expr_var_name(cond)
             if (lhs_name.length() > 0) {
                 var var_type: String = this.env.get_var(lhs_name)
                 if (this.is_nullable(var_type)) {
@@ -615,7 +620,7 @@ class NullChecker {
 
         // Truthy variable: if (v) { ... }
         if (cond_kind.starts_with("var:")) {
-            var name = cond_kind.slice(4, cond_kind.length())
+            var name: String = cond_kind.slice(4, cond_kind.length())
             var var_type: String = this.env.get_var(name)
             if (this.is_nullable(var_type)) {
                 this.env.narrow(name, this.strip_nil(var_type))
@@ -624,9 +629,9 @@ class NullChecker {
 
         // IsCheck: if (x is Type) { ... } → narrow x to Type
         if (cond_kind.starts_with("is:")) {
-            var narrow_type = cond_kind.slice(3, cond_kind.length())
+            var narrow_type: String = cond_kind.slice(3, cond_kind.length())
             // Extract variable name from the IsCheck expression
-            var is_var = match (cond) {
+            var is_var: String = match (cond) {
                 IsCheck(val, typ) => {
                     match (val) {
                         Variable(n) => n
@@ -690,9 +695,9 @@ class NullChecker {
 
     fun get_expr_var_name(expr: AST.Expr): String {
         // For Binary(left, "!=", right), extract variable name if one side is NilLit
-        var result = match (expr) {
+        var result: String = match (expr) {
             Binary(l, o, r) => {
-                var left_name = this.extract_var_from_nil_check(l, r)
+                var left_name: String = this.extract_var_from_nil_check(l, r)
                 if (left_name.length() > 0) {
                     left_name
                 } else {
@@ -729,7 +734,7 @@ class NullChecker {
 
     fun extract_var_from_nil_check(var_side: AST.Expr, nil_side: AST.Expr): String {
         // Returns variable name if var_side is Variable and nil_side is NilLit
-        var is_nil = match (nil_side) {
+        var is_nil: Bool = match (nil_side) {
             NilLit => true
             IntLit(v) => false
             FloatLit(v) => false
@@ -756,7 +761,7 @@ class NullChecker {
             BlockExpr(s, v) => false
         }
         if (!is_nil) return ""
-        var name = match (var_side) {
+        var name: String = match (var_side) {
             Variable(n) => n
             IntLit(v) => ""
             FloatLit(v) => ""
@@ -844,12 +849,12 @@ class NullChecker {
     }
 
     fun get_class_field_type(class_name: String, field: String): String {
-        var fields_str = this.env.class_fields.get(class_name)
+        var fields_str: String = this.env.class_fields.get(class_name)
         if (fields_str.length() == 0) return "Any"
         var parts: List<String> = fields_str.split(",")
         var i: Float = 0
         while (i < parts.length()) {
-            var kv = parts[i].split(":")
+            var kv: List<String> = parts[i].split(":")
             if (kv.length() >= 2) {
                 if (kv[0] == field) return kv[1]
             }
@@ -890,7 +895,7 @@ class NullChecker {
         var depth: Float = 0
         var i: Float = 0
         while (i < args_str.length()) {
-            var ch = args_str.char_at(i)
+            var ch: String = args_str.char_at(i)
             if (ch == "<") {
                 depth = depth + 1
                 current = current + ch
@@ -957,7 +962,7 @@ class NullChecker {
     }
 
     fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
-        var name = match (callee) {
+        var name: String = match (callee) {
             Variable(n) => n
             MemberAccess(o, f) => ""
         }
@@ -1071,11 +1076,11 @@ class NullChecker {
         var result_type: String = "Any"
         var i: Float = 0
         while (i < arms.length()) {
-            var arm = arms[i]
-            var pattern = match (arm) { Arm(p, b) => p }
-            var body = match (arm) { Arm(p, b) => b }
+            var arm: AST.MatchArm = arms[i]
+            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p }
+            var body: AST.Expr = match (arm) { Arm(p, b) => b }
 
-            var variant_name = match (pattern) {
+            var variant_name: String = match (pattern) {
                 VariantPattern(v, bindings) => v
             }
 
@@ -1087,11 +1092,11 @@ class NullChecker {
 
             // Push scope for arm bindings
             this.env.push_scope()
-            var bindings = match (pattern) { VariantPattern(v, b) => b }
+            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b }
             var bi: Float = 0
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
-                var field_type = this.get_enum_binding_type(subj_type, variant_name, bi)
+                var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
                 this.env.define_var(bindings[bi], field_type)
                 bi = bi + 1
             }
@@ -1121,11 +1126,11 @@ class NullChecker {
         // Look up "EnumName.Variant" in enum_fields
         var key: String = enum_type + "." + variant
         if (this.env.enum_fields.has(key)) {
-            var fields_str = this.env.enum_fields.get(key)
+            var fields_str: String = this.env.enum_fields.get(key)
             if (fields_str.length() > 0) {
                 var parts: List<String> = fields_str.split(",")
                 if (field_idx < parts.length()) {
-                    var kv = parts[field_idx.floor()].split(":")
+                    var kv: List<String> = parts[field_idx.floor()].split(":")
                     if (kv.length() >= 2) {
                         return kv[1]
                     }
@@ -1138,12 +1143,12 @@ class NullChecker {
     fun check_exhaustiveness(enum_type: String, matched: List<String>) {
         // Look up all variants of this enum
         if (!this.env.enum_variants.has(enum_type)) return nil
-        var all_variants_str = this.env.enum_variants.get(enum_type)
+        var all_variants_str: String = this.env.enum_variants.get(enum_type)
         if (all_variants_str.length() == 0) return nil
         var all_variants: List<String> = all_variants_str.split(",")
         var i: Float = 0
         while (i < all_variants.length()) {
-            var v = all_variants[i]
+            var v: String = all_variants[i]
             if (!matched.contains(v)) {
                 this.warn("non-exhaustive match on " + enum_type + ": missing " + v)
             }
@@ -1181,13 +1186,13 @@ class NullChecker {
 }
 
 fun check(program: List<AST.Stmt>): String {
-    var checker = NullChecker()
+    var checker: NullChecker = NullChecker()
     checker.check_program(program)
     return checker.report()
 }
 
 fun check_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
-    var checker = NullChecker()
+    var checker: NullChecker = NullChecker()
     // Register imported declarations (types, enums, classes, functions)
     // without checking their bodies
     var i: Float = 0
