@@ -691,18 +691,30 @@ class Codegen {
         // Handle specific expression types that don't match reliably in gen_expr
         var expr_kind: String = this.classify_expr(expr)
         if (expr_kind == "method_call") {
-            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o }
-            var mc_method: String = match (expr) { MethodCall(o, m, a) => m }
-            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a }
+            var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o
+                _ => AST.Expr.NilLit
+            }
+            var mc_method: String = match (expr) { MethodCall(o, m, a) => m
+                _ => ""
+            }
+            var mc_args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a
+                _ => []
+            }
             return this.gen_method_call(mc_obj, mc_method, mc_args)
         }
         if (expr_kind == "list_lit") {
-            var elems: List<AST.Expr> = match (expr) { ListLit(e) => e }
+            var elems: List<AST.Expr> = match (expr) { ListLit(e) => e
+                _ => []
+            }
             return this.gen_list_lit(elems)
         }
         if (expr_kind == "index_get") {
-            var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o }
-            var ig_idx: AST.Expr = match (expr) { IndexGet(o, i) => i }
+            var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o
+                _ => AST.Expr.NilLit
+            }
+            var ig_idx: AST.Expr = match (expr) { IndexGet(o, i) => i
+                _ => AST.Expr.NilLit
+            }
             return this.gen_index_get(ig_obj, ig_idx)
         }
         if (expr_kind == "map_lit") {
@@ -716,14 +728,22 @@ class Codegen {
             return this.gen_expr(expr)
         }
         if (expr_kind == "block_expr") {
-            var be_stmts: List<AST.Stmt> = match (expr) { BlockExpr(s, v) => s }
-            var be_value: AST.Expr = match (expr) { BlockExpr(s, v) => v }
+            var be_stmts: List<AST.Stmt> = match (expr) { BlockExpr(s, v) => s
+                _ => []
+            }
+            var be_value: AST.Expr = match (expr) { BlockExpr(s, v) => v
+                _ => AST.Expr.NilLit
+            }
             this.gen_stmts(be_stmts)
             return this.gen_arg_value(be_value)
         }
         if (expr_kind == "get_field") {
-            var gf_obj: AST.Expr = match (expr) { GetField(o, f) => o }
-            var gf_field: String = match (expr) { GetField(o, f) => f }
+            var gf_obj: AST.Expr = match (expr) { GetField(o, f) => o
+                _ => AST.Expr.NilLit
+            }
+            var gf_field: String = match (expr) { GetField(o, f) => f
+                _ => ""
+            }
             return this.gen_get_field(gf_obj, gf_field)
         }
         if (expr_kind == "this") {
@@ -733,19 +753,33 @@ class Codegen {
             return local
         }
         if (expr_kind == "set_field") {
-            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v) => o }
-            var sf_field: String = match (expr) { SetField(o, f, v) => f }
-            var sf_val: AST.Expr = match (expr) { SetField(o, f, v) => v }
+            var sf_obj: AST.Expr = match (expr) { SetField(o, f, v) => o
+                _ => AST.Expr.NilLit
+            }
+            var sf_field: String = match (expr) { SetField(o, f, v) => f
+                _ => ""
+            }
+            var sf_val: AST.Expr = match (expr) { SetField(o, f, v) => v
+                _ => AST.Expr.NilLit
+            }
             return this.gen_set_field(sf_obj, sf_field, sf_val)
         }
         if (expr_kind == "binary") {
-            var b_left: AST.Expr = match (expr) { Binary(l, o, r) => l }
-            var b_op: String = match (expr) { Binary(l, o, r) => o }
-            var b_right: AST.Expr = match (expr) { Binary(l, o, r) => r }
+            var b_left: AST.Expr = match (expr) { Binary(l, o, r) => l
+                _ => AST.Expr.NilLit
+            }
+            var b_op: String = match (expr) { Binary(l, o, r) => o
+                _ => ""
+            }
+            var b_right: AST.Expr = match (expr) { Binary(l, o, r) => r
+                _ => AST.Expr.NilLit
+            }
             return this.gen_binary(b_left, b_op, b_right)
         }
         if (expr_kind == "variable") {
-            var vname: String = match (expr) { Variable(n) => n }
+            var vname: String = match (expr) { Variable(n) => n
+                _ => ""
+            }
             if (this.var_types.has(vname)) {
                 this.last_type = this.var_types.get(vname)
             } else {
@@ -760,8 +794,12 @@ class Codegen {
             return local
         }
         if (expr_kind == "member") {
-            var m_obj: Any = match (expr) { MemberAccess(o, f) => o }
-            var m_field: String = match (expr) { MemberAccess(o, f) => f }
+            var m_obj: Any = match (expr) { MemberAccess(o, f) => o
+                _ => ""
+            }
+            var m_field: String = match (expr) { MemberAccess(o, f) => f
+                _ => ""
+            }
             // Check if object is This → field access
             var obj_kind: String = this.classify_expr(m_obj)
             if (obj_kind == "this") {
@@ -791,7 +829,9 @@ class Codegen {
             if (mn.length() == 0) {
                 var obj_kind: String = this.classify_expr(m_obj)
                 if (obj_kind == "member") {
-                    var inner_field: String = match (m_obj) { MemberAccess(o, f) => f }
+                    var inner_field: String = match (m_obj) { MemberAccess(o, f) => f
+                        _ => ""
+                    }
                     var key: String = inner_field + "." + m_field
                     if (this.enum_variant_tags.has(key)) {
                         return this.gen_enum_construct(inner_field, m_field, [])
@@ -1177,7 +1217,9 @@ class Codegen {
     }
 
     fun get_string_lit_value(expr: AST.Expr): String {
-        return match (expr) { StringLit(s) => s }
+        return match (expr) { StringLit(s) => s
+            _ => ""
+        }
     }
 
     fun is_string_expr(expr: AST.Expr): Bool {
@@ -1294,14 +1336,20 @@ class Codegen {
 
         // Determine which enum from first arm's pattern
         var first_arm: AST.MatchArm = arms[0]
-        var first_pattern: AST.Pattern = match (first_arm) { Arm(p, b) => p }
-        var first_variant: String = match (first_pattern) { VariantPattern(v, b) => v }
+        var first_pattern: AST.Pattern = match (first_arm) { Arm(p, b) => p
+            _ => AST.Pattern.VariantPattern("", [])
+        }
+        var first_variant: String = match (first_pattern) { VariantPattern(v, b) => v
+            _ => ""
+        }
         var enum_name: String = this.find_enum_for_variant(first_variant)
 
         // If enum not found, just generate the first arm's body as default
         if (enum_name == "Unknown") {
             // Unknown enum — extract bindings from subject
-            var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b }
+            var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
+                _ => []
+            }
             if (first_bindings.length() == 1) {
                 // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
                 var bname: String = first_bindings[0]
@@ -1326,7 +1374,9 @@ class Codegen {
                     bi = bi + 1
                 }
             }
-            var body_expr: AST.Expr = match (first_arm) { Arm(p, b) => b }
+            var body_expr: AST.Expr = match (first_arm) { Arm(p, b) => b
+                _ => AST.Expr.NilLit
+            }
             var val: String = this.gen_arg_value(body_expr)
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             var result: String = this.fresh_local()
@@ -1367,11 +1417,15 @@ class Codegen {
         i = 0
         while (i < arms.length()) {
             var arm: AST.MatchArm = arms[i]
-            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p }
+            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p
+                _ => AST.Pattern.VariantPattern("", [])
+            }
             if (this.is_wildcard_in_enum(pattern, enum_name)) {
                 default_label = arm_labels[i]
             } else {
-                var variant_name: String = match (pattern) { VariantPattern(v, b) => v }
+                var variant_name: String = match (pattern) { VariantPattern(v, b) => v
+                    _ => ""
+                }
                 var lookup_key: String = enum_name + "." + variant_name
                 if (this.enum_variant_tags.has(lookup_key)) {
                     var tag_idx: Float = this.enum_variant_tags.get(lookup_key)
@@ -1388,12 +1442,20 @@ class Codegen {
         while (i < arms.length()) {
             this.start_block(arm_labels[i])
             var arm: AST.MatchArm = arms[i]
-            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p }
-            var body_expr: AST.Expr = match (arm) { Arm(p, b) => b }
+            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p
+                _ => AST.Pattern.VariantPattern("", [])
+            }
+            var body_expr: AST.Expr = match (arm) { Arm(p, b) => b
+                _ => AST.Expr.NilLit
+            }
 
             // Extract bindings from payload and set their types
-            var arm_variant: String = match (pattern) { VariantPattern(v, b) => v }
-            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b }
+            var arm_variant: String = match (pattern) { VariantPattern(v, b) => v
+                _ => ""
+            }
+            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b
+                _ => []
+            }
             var bind_count: Float = bindings.length()
             if (bind_count > 0) {
                 this.extract_arm_bindings(bindings, subj, max_fields)
@@ -1934,7 +1996,9 @@ class Codegen {
         if (obj_name.length() == 0) {
             var obj_kind: String = this.classify_expr(object)
             if (obj_kind == "member") {
-                var inner_field: String = match (object) { MemberAccess(o, f) => f }
+                var inner_field: String = match (object) { MemberAccess(o, f) => f
+                    _ => ""
+                }
                 var key: String = inner_field + "." + method
                 if (this.enum_variant_tags.has(key)) {
                     return this.gen_enum_construct(inner_field, method, args)
@@ -2872,20 +2936,28 @@ class Codegen {
     }
 
     fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
-        var name: String = match (pattern) { VariantPattern(v, b) => v }
+        var name: String = match (pattern) { VariantPattern(v, b) => v
+            _ => ""
+        }
         return !this.enum_variant_tags.has(enum_name + "." + name)
     }
 
     fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
-        return match (arm) { Arm(p, b) => p }
+        return match (arm) { Arm(p, b) => p
+            _ => ""
+        }
     }
 
     fun get_arm_body(arm: AST.MatchArm): AST.Expr {
-        return match (arm) { Arm(p, b) => b }
+        return match (arm) { Arm(p, b) => b
+            _ => ""
+        }
     }
 
     fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
-        return match (pattern) { VariantPattern(v, b) => b }
+        return match (pattern) { VariantPattern(v, b) => b
+            _ => ""
+        }
     }
 
     fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
@@ -2936,7 +3008,9 @@ class Codegen {
     }
 
     fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
-        return match (expr) { Match(s, a) => a }
+        return match (expr) { Match(s, a) => a
+            _ => ""
+        }
     }
 
     // --- Statement codegen ---
@@ -2982,15 +3056,21 @@ class Codegen {
     }
 
     fun get_var_name(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => n }
+        return match (stmt) { VarDecl(n, t, i, d) => n
+            _ => ""
+        }
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => t }
+        return match (stmt) { VarDecl(n, t, i, d) => t
+            _ => ""
+        }
     }
 
     fun get_var_init(stmt: AST.Stmt): AST.Expr {
-        return match (stmt) { VarDecl(n, t, i, d) => i }
+        return match (stmt) { VarDecl(n, t, i, d) => i
+            _ => ""
+        }
     }
 
     fun gen_var_decl(stmt: AST.Stmt) {
@@ -3019,7 +3099,9 @@ class Codegen {
     }
 
     fun gen_return(stmt: AST.Stmt) {
-        var value: AST.Expr = match (stmt) { Return(v) => v }
+        var value: AST.Expr = match (stmt) { Return(v) => v
+            _ => AST.Expr.NilLit
+        }
         if (this.current_ret_type == "void") {
             this.emit_terminator("ret void")
         } else {
@@ -3127,13 +3209,16 @@ class Codegen {
             var mname: String = this.get_fun_name(methods[i])
             var mret: String = this.get_fun_ret(methods[i])
             var full_name: String = name + "__" + mname
-            this.func_ret_types.set(full_name, this.str_to_type(mret))
-            this.known_functions.push(full_name)
+            var prefixed_full: String = this.current_prefix + full_name
+            this.func_ret_types.set(prefixed_full, this.str_to_type(mret))
+            this.known_functions.push(prefixed_full)
             i = i + 1
         }
 
         // Pre-register constructor so methods can call ClassName(args)
-        this.known_functions.push(name)
+        var prefixed_ctor: String = this.current_prefix + name
+        this.known_functions.push(prefixed_ctor)
+        this.func_ret_types.set(prefixed_ctor, this.str_to_type(name))
         this.func_ret_types.set(name, this.str_to_type(name))
 
         // Generate methods as functions with name prefix: ClassName__method
@@ -3150,19 +3235,27 @@ class Codegen {
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => n }
+        return match (stmt) { FunDecl(n, p, r, b, d) => n
+            _ => ""
+        }
     }
 
     fun get_fun_params(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => p }
+        return match (stmt) { FunDecl(n, p, r, b, d) => p
+            _ => ""
+        }
     }
 
     fun get_fun_ret(stmt: AST.Stmt): String {
-        return match (stmt) { FunDecl(n, p, r, b, d) => r }
+        return match (stmt) { FunDecl(n, p, r, b, d) => r
+            _ => ""
+        }
     }
 
     fun get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
-        return match (stmt) { FunDecl(n, p, r, b, d) => b }
+        return match (stmt) { FunDecl(n, p, r, b, d) => b
+            _ => ""
+        }
     }
 
     fun gen_class_method(class_name: String, method: AST.Stmt) {
@@ -3211,11 +3304,15 @@ class Codegen {
     }
 
     fun get_variant_name(v: AST.Variant): String {
-        return match (v) { Variant(n, f) => n }
+        return match (v) { Variant(n, f) => n
+            _ => ""
+        }
     }
 
     fun get_variant_fields(v: AST.Variant): String {
-        return match (v) { Variant(n, f) => f }
+        return match (v) { Variant(n, f) => f
+            _ => ""
+        }
     }
 
     fun register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
@@ -3241,8 +3338,12 @@ class Codegen {
         i = 0
         while (i < variants.length()) {
             var v: AST.Variant = variants[i]
-            var vname: String = match (v) { Variant(n, f) => n }
-            var vfields: String = match (v) { Variant(n, f) => f }
+            var vname: String = match (v) { Variant(n, f) => n
+                _ => ""
+            }
+            var vfields: String = match (v) { Variant(n, f) => f
+                _ => ""
+            }
             if (vfields.length() > 0) {
                 this.emit_enum_constructor(vname, i, vfields, max_fields)
             }
@@ -3308,11 +3409,15 @@ class Codegen {
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
-        return match (stmt) { EnumDecl(n, v, d) => n }
+        return match (stmt) { EnumDecl(n, v, d) => n
+            _ => ""
+        }
     }
 
     fun get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
-        return match (stmt) { EnumDecl(n, v, d) => v }
+        return match (stmt) { EnumDecl(n, v, d) => v
+            _ => ""
+        }
     }
 
     fun register_external_enums(decls: List<AST.Stmt>) {
@@ -3354,7 +3459,9 @@ class Codegen {
     }
 
     fun emit_block_alloca_for(stmt: AST.Stmt) {
-        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n }
+        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
+            _ => ""
+        }
         if (!this.var_types.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
@@ -3656,7 +3763,9 @@ class Codegen {
                     bi = bi + 1
                 }
                 // Generate last as implicit return
-                var last_expr: AST.Expr = match (last_stmt) { ExprStmt(e) => e }
+                var last_expr: AST.Expr = match (last_stmt) { ExprStmt(e) => e
+                    _ => AST.Expr.NilLit
+                }
                 var last_val: String = this.gen_arg_value(last_expr)
                 if (!this.block_terminated) {
                     this.emit_terminator("ret i64 " + last_val)
@@ -3985,7 +4094,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", "StringBuilder")
+    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
     var mi2: Float = 0
