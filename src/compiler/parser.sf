@@ -604,7 +604,7 @@ class Parser {
         var parts: List<String> = []
         while (this.match_kind_check("doc_comment")) {
             var kind: Lexer.TokenKind = this.current_kind()
-            var text = match (kind) {
+            var text: String = match (kind) {
                 TkDocComment(t) => t
             }
             this.advance()
@@ -618,7 +618,7 @@ class Parser {
         var parts: List<String> = []
         while (this.match_kind_check("module_doc")) {
             var kind: Lexer.TokenKind = this.current_kind()
-            var text = match (kind) {
+            var text: String = match (kind) {
                 TkModuleDoc(t) => t
             }
             this.advance()
@@ -632,7 +632,7 @@ class Parser {
 
     fun parse_program(): List<AST.Stmt> {
         // Collect leading //! module doc comments
-        var module_doc = this.collect_module_doc()
+        var module_doc: String = this.collect_module_doc()
         var stmts: List<AST.Stmt> = []
         while (!this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
@@ -644,7 +644,7 @@ class Parser {
 
     fun parse_stmt(): AST.Stmt {
         // Collect /// doc comments before declarations
-        var docstring = this.collect_doc_comments()
+        var docstring: String = this.collect_doc_comments()
 
         if (this.match_kind_check("var")) return this.parse_var_decl_with_doc(docstring)
         if (this.match_kind_check("let")) return this.parse_var_decl_with_doc(docstring)
@@ -682,7 +682,7 @@ class Parser {
                     AST.Expr.Variable(obj_name), idx, value))
             }
             // Not an assignment — just index access as expression
-            var get_expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
+            var get_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
             return AST.Stmt.ExprStmt(get_expr)
         }
         // Default: expression statement
@@ -692,8 +692,8 @@ class Parser {
 
     fun peek_is(expected: String): Bool {
         if (this.pos + 1 >= this.tokens.length()) return false
-        var next_tok = this.tokens[this.pos + 1]
-        var next_kind = match (next_tok) { Token(k, l, c) => k }
+        var next_tok: Lexer.Token = this.tokens[this.pos + 1]
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
         return this.kind_name(next_kind) == expected
     }
 
@@ -742,7 +742,7 @@ class Parser {
         stmts.push(AST.Stmt.VarDecl(tmp_name, "List", init, ""))
         var i: Int = 0
         while (i < names.length()) {
-            var idx_expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
+            var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
             stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
             i = i + 1
         }
@@ -838,7 +838,7 @@ class Parser {
             return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
         }
         // Check for chained method: this.field.method(args)
-        var expr = AST.Expr.GetField(AST.Expr.This, field)
+        var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field)
         if (this.match_kind_check(".")) {
             this.advance()
             var method: String = this.expect_ident()
@@ -905,7 +905,7 @@ class Parser {
                     var default_val: AST.Expr = this.parse_expr()
                     // Infer type from default if not annotated
                     if (ftype == "Any") {
-                        var ek = match (default_val) {
+                        var ek: String = match (default_val) {
                             StringLit(s) => "String"
                             IntLit(v) => "Int"
                             FloatLit(v) => "Float"
@@ -942,11 +942,11 @@ class Parser {
         // Find existing init method and prepend defaults to its body
         var i: Int = 0
         while (i < methods.length()) {
-            var mname = match (methods[i]) { FunDecl(n, p, r, b, d) => n }
+            var mname: String = match (methods[i]) { FunDecl(n, p, r, b, d) => n }
             if (mname == "init") {
                 var mbody: List<AST.Stmt> = match (methods[i]) { FunDecl(n, p, r, b, d) => b }
-                var mparams = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
-                var mret = match (methods[i]) { FunDecl(n, p, r, b, d) => r }
+                var mparams: String = match (methods[i]) { FunDecl(n, p, r, b, d) => p }
+                var mret: String = match (methods[i]) { FunDecl(n, p, r, b, d) => r }
                 // Build new body: defaults + original body
                 var new_body: List<AST.Stmt> = []
                 var di: Int = 0
@@ -992,7 +992,7 @@ class Parser {
         this.consume("(")
         var cond: AST.Expr = this.parse_expr()
         this.consume(")")
-        var then_branch = this.parse_body()
+        var then_branch: List<AST.Stmt> = this.parse_body()
         var else_branch: List<AST.Stmt> = []
         if (this.match_kind("else")) {
             if (this.match_kind_check("if")) {
@@ -1020,7 +1020,7 @@ class Parser {
         this.consume("(")
         var cond: AST.Expr = this.parse_expr()
         this.consume(")")
-        var body = this.parse_block_stmts()
+        var body: List<AST.Stmt> = this.parse_block_stmts()
         return AST.Stmt.While(cond, body)
     }
 
@@ -1037,7 +1037,7 @@ class Parser {
         var vtype: String = this.parse_type()
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
-        var init = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+        var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
         this.consume(";")
         var cond: AST.Expr = this.parse_expr()
         this.consume(";")
@@ -1045,7 +1045,7 @@ class Parser {
         this.consume("=")
         var update_expr: AST.Expr = this.parse_expr()
         this.consume(")")
-        var body = this.parse_block_stmts()
+        var body: List<AST.Stmt> = this.parse_block_stmts()
         body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
         var stmts: List<AST.Stmt> = []
         stmts.push(init)
@@ -1058,26 +1058,26 @@ class Parser {
         // Into: { var __list = list; var __i = 0; while (__i < __list.length()) { var item = __list[__i]; body; __i = __i + 1 } }
         var iter_expr: AST.Expr = this.parse_expr()
         this.consume(")")
-        var body = this.parse_block_stmts()
+        var body: List<AST.Stmt> = this.parse_block_stmts()
 
         var list_var: String = "__for_list"
         var idx_var: String = "__for_i"
 
         // var __for_list = iter_expr
-        var init_list = AST.Stmt.VarDecl(list_var, "List", iter_expr, "")
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "List", iter_expr, "")
         // var __for_i = 0
-        var init_idx = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
+        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
         // __for_i < __for_list.length()
-        var cond = AST.Expr.Binary(
+        var cond: AST.Expr = AST.Expr.Binary(
             AST.Expr.Variable(idx_var),
             "<",
             AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", [])
         )
         // var item = __for_list[__for_i]
-        var item_init = AST.Stmt.VarDecl(item_name, "Any",
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any",
             AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
         // __for_i = __for_i + 1
-        var increment = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
+        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
             AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
 
         // Build while body: item decl + increment + user body
@@ -1101,12 +1101,12 @@ class Parser {
 
     fun parse_try(): AST.Stmt {
         this.advance() // consume try
-        var try_body = this.parse_block_stmts()
+        var try_body: List<AST.Stmt> = this.parse_block_stmts()
         this.consume("catch")
         this.consume("(")
         var catch_name: String = this.expect_ident()
         this.consume(")")
-        var catch_body = this.parse_block_stmts()
+        var catch_body: List<AST.Stmt> = this.parse_block_stmts()
         var finally_body: List<AST.Stmt> = []
         if (this.match_kind("finally")) {
             finally_body = this.parse_block_stmts()
@@ -1142,7 +1142,7 @@ class Parser {
     fun stmt_to_expr(stmt: AST.Stmt): AST.Expr {
         // If it's an ExprStmt, extract the expression as the block value
         // Otherwise return NilLit
-        var kind = match (stmt) {
+        var kind: String = match (stmt) {
             ExprStmt(e) => "expr"
             VarDecl(n, t, i, d) => "other"
             FunDecl(n, p, r, b, d) => "other"
@@ -1163,6 +1163,6 @@ class Parser {
 }
 
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
-    var p = Parser(tokens)
+    var p: Parser = Parser(tokens)
     return p.parse_program()
 }

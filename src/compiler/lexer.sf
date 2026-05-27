@@ -32,6 +32,7 @@ enum TokenKind {
     TkCatch,
     TkThrow,
     TkFinally,
+    TkIs,
 
     // Operators
     TkPlus,
@@ -107,7 +108,7 @@ class Lexer {
     }
 
     fun advance(): String {
-        var ch = this.source.char_at(this.pos)
+        var ch: String = this.source.char_at(this.pos)
         this.pos = this.pos + 1
         this.col = this.col + 1
         return ch
@@ -135,7 +136,7 @@ class Lexer {
 
     fun skip_whitespace() {
         while (this.pos < this.source.length()) {
-            var ch = this.peek()
+            var ch: String = this.peek()
             if (ch == " " or ch == "\t" or ch == "\r") {
                 this.advance()
             } else if (ch == "\n") {
@@ -145,7 +146,7 @@ class Lexer {
             } else if (ch == "/" and this.peek_next() == "/") {
                 // Check for /// doc comment or //! module doc
                 if (this.pos + 2 < this.source.length()) {
-                    var third = this.source.char_at(this.pos + 2)
+                    var third: String = this.source.char_at(this.pos + 2)
                     if (third == "/" or third == "!") {
                         // Don't skip — let tokenize() handle it
                         break
@@ -162,19 +163,19 @@ class Lexer {
     }
 
     fun read_number() {
-        var start = this.pos - 1
+        var start: Float = this.pos - 1
 
         // Check for hex literal: 0x or 0X
         if (this.source.char_at(start) == "0") {
             if (this.pos < this.source.length()) {
-                var next_ch = this.peek()
+                var next_ch: String = this.peek()
                 if (next_ch == "x" or next_ch == "X") {
                     this.advance() // consume the 'x' or 'X'
                     while (this.pos < this.source.length() and this.is_hex(this.peek())) {
                         this.advance()
                     }
-                    var text = this.source.slice(start, this.pos)
-                    var value = text.to_number()
+                    var text: String = this.source.slice(start, this.pos)
+                    var value: Float = text.to_number()
                     this.emit(TokenKind.TkInt(value))
                     return
                 }
@@ -185,7 +186,7 @@ class Lexer {
             this.advance()
         }
 
-        var has_dot = false
+        var has_dot: Bool = false
         if (this.pos < this.source.length() and this.peek() == ".") {
             has_dot = true
             this.advance()
@@ -194,8 +195,8 @@ class Lexer {
             }
         }
 
-        var text = this.source.slice(start, this.pos)
-        var value = text.to_number()
+        var text: String = this.source.slice(start, this.pos)
+        var value: Float = text.to_number()
 
         if (has_dot) {
             this.emit(TokenKind.TkFloat(value))
@@ -205,12 +206,12 @@ class Lexer {
     }
 
     fun read_string() {
-        var result = StringBuilder()
-        var has_interp = false
+        var result: StringBuilder = StringBuilder()
+        var has_interp: Bool = false
         while (this.pos < this.source.length() and this.peek() != "\"") {
-            var ch = this.advance()
+            var ch: String = this.advance()
             if (ch == "\\") {
-                var esc = this.advance()
+                var esc: String = this.advance()
                 if (esc == "n") { result.append("\n") }
                 else if (esc == "r") { result.append("\r") }
                 else if (esc == "t") { result.append("\t") }
@@ -251,11 +252,11 @@ class Lexer {
     }
 
     fun read_interpolation() {
-        var depth = 1
+        var depth: Float = 1
         while (this.pos < this.source.length() and depth > 0) {
             this.skip_whitespace()
             if (this.pos >= this.source.length()) break
-            var ch = this.peek()
+            var ch: String = this.peek()
             if (ch == "}") {
                 depth = depth - 1
                 if (depth == 0) {
@@ -267,11 +268,11 @@ class Lexer {
                 depth = depth + 1
             }
             // Lex one token normally
-            var start_pos = this.pos
-            var tok_ch = this.advance()
+            var start_pos: Float = this.pos
+            var tok_ch: String = this.advance()
             if (this.is_digit(tok_ch)) { this.read_number() }
             else if (this.is_alpha(tok_ch)) {
-                var text = this.read_identifier()
+                var text: String = this.read_identifier()
                 this.keyword_or_ident(text)
             }
             else if (tok_ch == "\"") { this.read_string() }
@@ -289,7 +290,7 @@ class Lexer {
     }
 
     fun read_identifier(): String {
-        var start = this.pos - 1
+        var start: Float = this.pos - 1
         while (this.pos < this.source.length() and this.is_alnum(this.peek())) {
             this.advance()
         }
@@ -321,6 +322,7 @@ class Lexer {
         else if (text == "catch") { this.emit(TokenKind.TkCatch) }
         else if (text == "throw") { this.emit(TokenKind.TkThrow) }
         else if (text == "finally") { this.emit(TokenKind.TkFinally) }
+        else if (text == "is") { this.emit(TokenKind.TkIs) }
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 
@@ -330,7 +332,7 @@ class Lexer {
         if (this.pos < this.source.length() and this.peek() == " ") {
             this.advance()
         }
-        var start = this.pos
+        var start: Float = this.pos
         while (this.pos < this.source.length() and this.peek() != "\n") {
             this.advance()
         }
@@ -345,13 +347,13 @@ class Lexer {
             // Check for doc comments before advancing
             if (this.peek() == "/" and this.peek_next() == "/") {
                 if (this.pos + 2 < this.source.length()) {
-                    var third = this.source.char_at(this.pos + 2)
+                    var third: String = this.source.char_at(this.pos + 2)
                     if (third == "/") {
                         // /// doc comment
                         this.advance() // first /
                         this.advance() // second /
                         this.advance() // third /
-                        var text = this.read_doc_comment()
+                        var text: String = this.read_doc_comment()
                         this.emit(TokenKind.TkDocComment(text))
                         continue
                     } else if (third == "!") {
@@ -359,18 +361,18 @@ class Lexer {
                         this.advance() // first /
                         this.advance() // second /
                         this.advance() // !
-                        var text = this.read_doc_comment()
+                        var text: String = this.read_doc_comment()
                         this.emit(TokenKind.TkModuleDoc(text))
                         continue
                     }
                 }
             }
 
-            var ch = this.advance()
+            var ch: String = this.advance()
 
             if (this.is_digit(ch)) { this.read_number() }
             else if (this.is_alpha(ch)) {
-                var text = this.read_identifier()
+                var text: String = this.read_identifier()
                 this.keyword_or_ident(text)
             }
             else if (ch == "\"") { this.read_string() }
@@ -442,6 +444,6 @@ class Lexer {
 }
 
 fun lex(source: String): List<Token> {
-    var lexer = Lexer(source)
+    var lexer: Lexer = Lexer(source)
     return lexer.tokenize()
 }
