@@ -2128,153 +2128,263 @@ class Codegen {
             }
         }
 
-        // Type-directed: get type from annotations first, fall back to last_type
-        var obj_type: String = this.get_expr_type(object)
+        // --- Unambiguous builtin dispatch by method name (TEMPORARY) ---
+        // Bypasses broken var_types lookup in native binary.
+        // No method overloading exists, so method name uniquely identifies builtins.
         var obj: String = this.gen_arg_value(object)
-        if (obj_type == "Any") {
-            obj_type = this.type_to_string(this.last_type)
+
+        if (method == "push") {
+            var val: String = this.gen_arg_value(args[0])
+            this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "pop") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_pop(i64 " + obj + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "join") {
+            var sep: String = this.gen_arg_value(args[0])
+            var sep_ptr: String = this.fresh_local()
+            this.emit_indent(sep_ptr + " = inttoptr i64 " + sep + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_join(i64 " + obj + ", i8* " + sep_ptr + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "append") {
+            var val: String = this.gen_arg_value(args[0])
+            this.emit_indent("call void @__sb_append(i64 " + obj + ", i64 " + val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "get") {
+            var key: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
+            // Try to infer value type from type annotations
+            var obj_type_for_get: String = this.get_expr_type(object)
+            if (obj_type_for_get == "Any") {
+                obj_type_for_get = this.type_to_string(this.last_type)
+            }
+            if (obj_type_for_get.starts_with("Map<")) {
+                var val_type_str: String = this.get_map_value_type(obj_type_for_get)
+                this.last_type = this.str_to_type(val_type_str)
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return local
+        }
+        if (method == "set") {
+            var key: String = this.gen_arg_value(args[0])
+            var val: String = this.gen_arg_value(args[1])
+            this.emit_indent("call void @__map_set(i64 " + obj + ", i64 " + key + ", i64 " + val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "has") {
+            var key: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key + ")")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+        if (method == "keys") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
+            return local
+        }
+        if (method == "split") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var delim: String = this.gen_arg_value(args[0])
+            var delim_ptr: String = this.fresh_local()
+            this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
+            return local
+        }
+        if (method == "replace") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var old_str: String = this.gen_arg_value(args[0])
+            var old_ptr: String = this.fresh_local()
+            this.emit_indent(old_ptr + " = inttoptr i64 " + old_str + " to i8*")
+            var new_str: String = this.gen_arg_value(args[1])
+            var new_ptr: String = this.fresh_local()
+            this.emit_indent(new_ptr + " = inttoptr i64 " + new_str + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__str_replace(i8* " + str_ptr + ", i8* " + old_ptr + ", i8* " + new_ptr + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "starts_with") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var prefix: String = this.gen_arg_value(args[0])
+            var prefix_ptr: String = this.fresh_local()
+            this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
+            var plen: String = this.fresh_local()
+            this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
+            var cmp: String = this.fresh_local()
+            this.emit_indent(cmp + " = call i32 @strncmp(i8* " + str_ptr + ", i8* " + prefix_ptr + ", i64 " + plen + ")")
+            var is_eq: String = this.fresh_local()
+            this.emit_indent(is_eq + " = icmp eq i32 " + cmp + ", 0")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
+            this.last_type = AST.Type.BoolType
+            return result
+        }
+        if (method == "ends_with") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var suffix: String = this.gen_arg_value(args[0])
+            var suffix_ptr: String = this.fresh_local()
+            this.emit_indent(suffix_ptr + " = inttoptr i64 " + suffix + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__str_ends_with(i8* " + str_ptr + ", i8* " + suffix_ptr + ")")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+        if (method == "char_at") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var idx: String = this.gen_arg_value(args[0])
+            var char_ptr: String = this.fresh_local()
+            this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
+            var buf: String = this.fresh_local()
+            this.emit_indent(buf + " = call i8* @malloc(i64 2)")
+            var ch: String = this.fresh_local()
+            this.emit_indent(ch + " = load i8, i8* " + char_ptr)
+            this.emit_indent("store i8 " + ch + ", i8* " + buf)
+            var null_ptr: String = this.fresh_local()
+            this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
+            this.emit_indent("store i8 0, i8* " + null_ptr)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "slice") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var start: String = this.gen_arg_value(args[0])
+            var end: String = this.gen_arg_value(args[1])
+            var slice_len: String = this.fresh_local()
+            this.emit_indent(slice_len + " = sub i64 " + end + ", " + start)
+            var buf_size: String = this.fresh_local()
+            this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
+            var buf: String = this.fresh_local()
+            this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
+            var src: String = this.fresh_local()
+            this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
+            this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")
+            var null_pos: String = this.fresh_local()
+            this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
+            this.emit_indent("store i8 0, i8* " + null_pos)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "to_number") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "reverse") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_list_reverse")
+            this.emit_indent(local + " = call i64 @rt_list_reverse(i64 " + obj + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
+            return local
+        }
+        if (method == "copy") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_list_copy")
+            this.emit_indent(local + " = call i64 @rt_list_copy(i64 " + obj + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
+            return local
+        }
+        if (method == "sort") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_list_sort")
+            this.emit_indent(local + " = call i64 @rt_list_sort(i64 " + obj + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
+            return local
+        }
+        if (method == "trim") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_str_trim")
+            this.emit_indent(local + " = call i64 @rt_str_trim(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "to_upper") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_str_to_upper")
+            this.emit_indent(local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "to_lower") {
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_str_to_lower")
+            this.emit_indent(local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+        if (method == "index_of") {
+            var needle: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_str_index_of")
+            this.emit_indent(local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + needle + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "repeat") {
+            var count: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.called_functions.push("rt_str_repeat")
+            this.emit_indent(local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + count + ")")
+            this.last_type = AST.Type.StringType
+            return local
         }
 
+        // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
+        // Prefer var_types annotation over last_type because the native binary's
+        // last_type is unreliable when var_types.has() returns false mid-execution.
+        var obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+            obj_type = this.var_types.get(obj_name)
+        }
 
-        // List methods
-        if (obj_type == "List" or obj_type.starts_with("List<")) {
-            if (method == "push") {
-                var val: String = this.gen_arg_value(args[0])
-                this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "pop") {
+        if (method == "length") {
+            if (obj_type == "String") {
+                var str_ptr: String = this.fresh_local()
+                this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__list_pop(i64 " + obj + ")")
+                this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
                 this.last_type = AST.Type.IntType
                 return local
-            }
-            if (method == "length") {
+            } else {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__list_length(i64 " + obj + ")")
                 this.last_type = AST.Type.IntType
                 return local
             }
-            if (method == "join") {
-                var sep: String = this.gen_arg_value(args[0])
-                var sep_ptr: String = this.fresh_local()
-                this.emit_indent(sep_ptr + " = inttoptr i64 " + sep + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__list_join(i64 " + obj + ", i8* " + sep_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "contains") {
-                var val: String = this.gen_arg_value(args[0])
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__list_contains(i64 " + obj + ", i64 " + val + ")")
-                this.last_type = AST.Type.BoolType
-                return local
-            }
-            if (method == "reverse") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_list_reverse")
-                this.emit_indent(local + " = call i64 @rt_list_reverse(i64 " + obj + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-                return local
-            }
-            if (method == "copy") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_list_copy")
-                this.emit_indent(local + " = call i64 @rt_list_copy(i64 " + obj + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-                return local
-            }
-            if (method == "sort") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_list_sort")
-                this.emit_indent(local + " = call i64 @rt_list_sort(i64 " + obj + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-                return local
-            }
         }
-
-        // StringBuilder methods
-        if (obj_type == "StringBuilder") {
-            if (method == "append") {
-                var val: String = this.gen_arg_value(args[0])
-                this.emit_indent("call void @__sb_append(i64 " + obj + ", i64 " + val + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "to_string") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-        }
-
-        // Map methods
-        if (obj_type == "Map" or obj_type.starts_with("Map<")) {
-            if (method == "set") {
-                var key: String = this.gen_arg_value(args[0])
-                var val: String = this.gen_arg_value(args[1])
-                this.emit_indent("call void @__map_set(i64 " + obj + ", i64 " + key + ", i64 " + val + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "get") {
-                var key: String = this.gen_arg_value(args[0])
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
-                // Infer the value type from the Map<K, V> annotation instead of
-                // hard-coding StringType.  This allows Map<String, AST.Type> (and
-                // any other non-string value type) to be used correctly downstream.
-                var val_type_str: String = this.get_map_value_type(obj_type)
-                this.last_type = this.str_to_type(val_type_str)
-                return local
-            }
-            if (method == "has") {
-                var key: String = this.gen_arg_value(args[0])
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key + ")")
-                this.last_type = AST.Type.BoolType
-                return local
-            }
-            if (method == "keys") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-                return local
-            }
-        }
-
-        // String methods
-        if (obj_type == "String") {
-            var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-
-            if (method == "length") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
-                this.last_type = AST.Type.IntType
-                return local
-            }
-            if (method == "char_at") {
-                var idx: String = this.gen_arg_value(args[0])
-                var char_ptr: String = this.fresh_local()
-                this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
-                var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(i64 2)")
-                var ch: String = this.fresh_local()
-                this.emit_indent(ch + " = load i8, i8* " + char_ptr)
-                this.emit_indent("store i8 " + ch + ", i8* " + buf)
-                var null_ptr: String = this.fresh_local()
-                this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
-                this.emit_indent("store i8 0, i8* " + null_ptr)
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "contains") {
+        if (method == "contains") {
+            if (obj_type == "String") {
+                var str_ptr: String = this.fresh_local()
+                this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
                 var needle: String = this.gen_arg_value(args[0])
                 var needle_ptr: String = this.fresh_local()
                 this.emit_indent(needle_ptr + " = inttoptr i64 " + needle + " to i8*")
@@ -2286,136 +2396,44 @@ class Codegen {
                 this.emit_indent(result + " = zext i1 " + local + " to i64")
                 this.last_type = AST.Type.BoolType
                 return result
-            }
-            if (method == "starts_with") {
-                var prefix: String = this.gen_arg_value(args[0])
-                var prefix_ptr: String = this.fresh_local()
-                this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
-                var plen: String = this.fresh_local()
-                this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
-                var cmp: String = this.fresh_local()
-                this.emit_indent(cmp + " = call i32 @strncmp(i8* " + str_ptr + ", i8* " + prefix_ptr + ", i64 " + plen + ")")
-                var is_eq: String = this.fresh_local()
-                this.emit_indent(is_eq + " = icmp eq i32 " + cmp + ", 0")
-                var result: String = this.fresh_local()
-                this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
+            } else {
+                var val: String = this.gen_arg_value(args[0])
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__list_contains(i64 " + obj + ", i64 " + val + ")")
                 this.last_type = AST.Type.BoolType
-                return result
-            }
-            if (method == "ends_with") {
-                var suffix: String = this.gen_arg_value(args[0])
-                var suffix_ptr: String = this.fresh_local()
-                this.emit_indent(suffix_ptr + " = inttoptr i64 " + suffix + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__str_ends_with(i8* " + str_ptr + ", i8* " + suffix_ptr + ")")
-                this.last_type = AST.Type.BoolType
-                return local
-            }
-            if (method == "split") {
-                var delim: String = this.gen_arg_value(args[0])
-                var delim_ptr: String = this.fresh_local()
-                this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-                return local
-            }
-            if (method == "replace") {
-                var old_str: String = this.gen_arg_value(args[0])
-                var old_ptr: String = this.fresh_local()
-                this.emit_indent(old_ptr + " = inttoptr i64 " + old_str + " to i8*")
-                var new_str: String = this.gen_arg_value(args[1])
-                var new_ptr: String = this.fresh_local()
-                this.emit_indent(new_ptr + " = inttoptr i64 " + new_str + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__str_replace(i8* " + str_ptr + ", i8* " + old_ptr + ", i8* " + new_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "slice") {
-                var start: String = this.gen_arg_value(args[0])
-                var end: String = this.gen_arg_value(args[1])
-                var slice_len: String = this.fresh_local()
-                this.emit_indent(slice_len + " = sub i64 " + end + ", " + start)
-                var buf_size: String = this.fresh_local()
-                this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
-                var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
-                var src: String = this.fresh_local()
-                this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
-                this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")
-                var null_pos: String = this.fresh_local()
-                this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
-                this.emit_indent("store i8 0, i8* " + null_pos)
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "trim") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_str_trim")
-                this.emit_indent(local + " = call i64 @rt_str_trim(i64 " + obj + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "to_upper") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_str_to_upper")
-                this.emit_indent(local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "to_lower") {
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_str_to_lower")
-                this.emit_indent(local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "index_of") {
-                var needle: String = this.gen_arg_value(args[0])
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_str_index_of")
-                this.emit_indent(local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + needle + ")")
-                this.last_type = AST.Type.IntType
-                return local
-            }
-            if (method == "repeat") {
-                var count: String = this.gen_arg_value(args[0])
-                var local: String = this.fresh_local()
-                this.called_functions.push("rt_str_repeat")
-                this.emit_indent(local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + count + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "to_number") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
-                this.last_type = AST.Type.IntType
                 return local
             }
         }
-
-        // Number methods
-        if (obj_type == "Int" or obj_type == "Float") {
-            if (method == "floor") {
-                this.last_type = AST.Type.IntType
+        if (method == "to_string") {
+            if (obj_type == "StringBuilder" or obj_type == "SB") {
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
+                this.last_type = AST.Type.StringType
+                return local
+            } else if (obj_type == "String") {
+                this.last_type = AST.Type.StringType
                 return obj
-            }
-            if (method == "to_string") {
+            } else {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
                 this.last_type = AST.Type.StringType
                 return local
             }
         }
+        if (method == "floor") {
+            this.last_type = AST.Type.IntType
+            return obj
+        }
 
         // Fall back to class method call (inside or outside class)
         // (must come BEFORE universal methods so class .to_string() is found)
+        // Also check obj_name directly in case obj_type was not updated from var_types
+        // (workaround for native binary where var_types.has may return false)
         var class_name: String = ""
         if (this.class_fields.has(obj_type)) {
             class_name = obj_type
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
+            class_name = this.var_types.get(obj_name)
         } else if (this.current_class.length() > 0) {
             class_name = this.find_class_for_method(method)
         }
@@ -3226,6 +3244,8 @@ class Codegen {
             vtype = this.type_to_string(this.last_type)
         }
         this.var_types.set(name, vtype)
+        // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
+        // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
             this.string_vars.push(name)
         }
