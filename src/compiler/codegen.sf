@@ -1568,6 +1568,13 @@ class Codegen {
                 this.last_type = "List"
                 return local
             }
+            if (method == "sort") {
+                var local = this.fresh_local()
+                this.called_functions.push("rt_list_sort")
+                this.emit_indent(local + " = call i64 @rt_list_sort(i64 " + obj + ")")
+                this.last_type = "List"
+                return local
+            }
         }
 
         // StringBuilder methods

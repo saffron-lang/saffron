@@ -665,6 +665,21 @@ class Parser {
         if (this.match_kind_check("this")) {
             return this.parse_this_stmt()
         }
+        // Check for index assignment: ident[expr] = value
+        if (this.match_kind_check("ident") and this.peek_is("[")) {
+            var obj_name = this.expect_ident()
+            this.advance() // consume [
+            var idx = this.parse_expr()
+            this.consume("]")
+            if (this.match_kind("=")) {
+                var value = this.parse_expr()
+                return AST.Stmt.ExprStmt(AST.Expr.IndexSet(
+                    AST.Expr.Variable(obj_name), idx, value))
+            }
+            // Not an assignment — just index access as expression
+            var get_expr = AST.Expr.IndexGet(AST.Expr.Variable(obj_name), idx)
+            return AST.Stmt.ExprStmt(get_expr)
+        }
         // Default: expression statement
         var expr = this.parse_expr()
         return AST.Stmt.ExprStmt(expr)
