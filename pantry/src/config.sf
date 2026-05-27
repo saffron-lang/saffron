@@ -3,7 +3,9 @@
 import "@toml" as TOML
 import "@os" as OS
 
-var MANIFEST_NAME = "pantry.toml"
+fun manifest_name(): String {
+    return "pantry.toml"
+}
 
 /// Represents a parsed pantry.toml manifest.
 class Manifest {
@@ -49,13 +51,13 @@ fun _parent_dir(path: String): String {
 fun find_manifest(): String {
     var dir = OS.cwd()
     while (true) {
-        var candidate = dir + "/" + MANIFEST_NAME
+        var candidate = dir + "/" + manifest_name()
         if (IO.file_exists(candidate)) {
             return candidate
         }
         var parent = _parent_dir(dir)
         if (parent == dir or parent == "") {
-            throw "pantry: no ${MANIFEST_NAME} found in ${OS.cwd()} or any parent directory"
+            throw "pantry: no ${manifest_name()} found in ${OS.cwd()} or any parent directory"
         }
         dir = parent
     }

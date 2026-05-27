@@ -1,5 +1,3 @@
-// AST node definitions for Saffron-mini
-
 enum Type {
     IntType,
     FloatType,

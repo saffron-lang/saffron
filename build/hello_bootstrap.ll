@@ -52,7 +52,7 @@ declare void @longjmp(i8*, i32)
 ; Map = { count, capacity, keys*, values* }
 %Map = type { i64, i64, i64*, i64* }
 
-; --- Runtime declarations (defined in runtime.ll) ---
+; --- Runtime declarations ---
 %SB = type { i64, i64, i8* }
 
 declare i64 @__list_new()
