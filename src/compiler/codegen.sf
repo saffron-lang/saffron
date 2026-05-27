@@ -2807,6 +2807,76 @@ class Codegen {
         }
         this.enum_defs.set(name, variant_names)
         this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
+
+        // Emit constructor functions for variants with fields
+        var max_fields = this.get_max_fields(name)
+        i = 0
+        while (i < variants.length()) {
+            var v = variants[i]
+            var vname = match (v) { Variant(n, f) => n }
+            var vfields = match (v) { Variant(n, f) => f }
+            if (vfields.length() > 0) {
+                this.emit_enum_constructor(vname, i, vfields, max_fields)
+            }
+            i = i + 1
+        }
+    }
+
+    fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
+        var parts = fields_str.split(",")
+        var num_fields = parts.length()
+
+        // Build param list: (i64 %f0, i64 %f1, ...)
+        var params = ""
+        var pi = 0
+        while (pi < num_fields) {
+            if (pi > 0) { params = params + ", " }
+            params = params + "i64 %f" + pi.floor().to_string()
+            pi = pi + 1
+        }
+
+        this.emit("")
+        this.emit("define linkonce_odr i64 @" + vname + "(" + params + ") {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+
+        if (max_fields <= 1) {
+            // Simple encoding: (tag << 56) | value
+            var t = this.fresh_local()
+            this.emit_indent(t + " = shl i64 " + tag.floor().to_string() + ", 56")
+            var r = this.fresh_local()
+            this.emit_indent(r + " = or i64 " + t + ", %f0")
+            this.emit_terminator("ret i64 " + r)
+        } else {
+            // Array encoding: malloc [tag, f0, f1, ...]
+            var num_slots = num_fields + 1
+            var arr_bytes = num_slots * 8
+            var raw = this.fresh_local()
+            this.emit_indent(raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+            var arr = this.fresh_local()
+            this.emit_indent(arr + " = bitcast i8* " + raw + " to [" + num_slots.floor().to_string() + " x i64]*")
+            // Store tag
+            var ts = this.fresh_local()
+            this.emit_indent(ts + " = getelementptr [" + num_slots.floor().to_string() + " x i64], [" + num_slots.floor().to_string() + " x i64]* " + arr + ", i64 0, i64 0")
+            this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + ts)
+            // Store fields
+            var fi = 0
+            while (fi < num_fields) {
+                var slot = this.fresh_local()
+                var slot_idx = fi + 1
+                this.emit_indent(slot + " = getelementptr [" + num_slots.floor().to_string() + " x i64], [" + num_slots.floor().to_string() + " x i64]* " + arr + ", i64 0, i64 " + slot_idx.floor().to_string())
+                this.emit_indent("store i64 %f" + fi.floor().to_string() + ", i64* " + slot)
+                fi = fi + 1
+            }
+            var result = this.fresh_local()
+            this.emit_indent(result + " = ptrtoint [" + num_slots.floor().to_string() + " x i64]* " + arr + " to i64")
+            this.emit_terminator("ret i64 " + result)
+        }
+
+        this.emit("}")
+        this.block_terminated = false
+        this.known_functions.push(vname)
     }
 
     fun get_enum_decl_name(stmt: AST.Stmt): String {
