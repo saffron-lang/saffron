@@ -192,7 +192,7 @@ class NullChecker {
                 this.env.define_func(name, ret_type)
             }
             EnumDecl(name, variants, doc) => {
-                // Register enum variant constructors
+                this.register_enum(name, variants)
             }
             ClassDecl(name, fields, methods, doc) => {
                 this.env.class_fields.set(name, fields)
@@ -207,6 +207,22 @@ class NullChecker {
             Break => {}
             Continue => {}
         }
+    }
+
+    fun register_enum(name: String, variants: List<AST.Variant>) {
+        var variant_names: List<String> = []
+        var i = 0
+        while (i < variants.length()) {
+            var v = variants[i]
+            var vname = match (v) { Variant(n, f) => n }
+            var vfields = match (v) { Variant(n, f) => f }
+            variant_names.push(vname)
+            if (vfields.length() > 0) {
+                this.env.enum_fields.set(name + "." + vname, vfields)
+            }
+            i = i + 1
+        }
+        this.env.enum_variants.set(name, variant_names.join(","))
     }
 
     fun register_class_methods(class_name: String, methods: List<AST.Stmt>) {
@@ -492,7 +508,7 @@ class NullChecker {
             Assign(name, value) => this.check_assign(name, value)
             Logical(left, op, right) => "Bool"
             MemberAccess(obj, field) => this.infer_member_access(obj, field)
-            Match(subject, arms) => "Any"
+            Match(subject, arms) => this.infer_match(subject, arms)
             EnumConstruct(e, v, a) => e
             Lambda(p, r, b) => "Fun"
             GetField(obj, field) => "Any"
@@ -695,6 +711,99 @@ class NullChecker {
         if (ret != "Any") return ret
 
         return "Any"
+    }
+
+    // --- Match type inference + exhaustiveness ---
+
+    fun infer_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
+        var subj_type = this.infer_expr(subject)
+
+        // Check exhaustiveness: collect matched variant names
+        var matched_variants: List<String> = []
+        var has_wildcard = false
+
+        // Infer each arm body type; unify across arms
+        var result_type = "Any"
+        var i = 0
+        while (i < arms.length()) {
+            var arm = arms[i]
+            var pattern = match (arm) { Arm(p, b) => p }
+            var body = match (arm) { Arm(p, b) => b }
+
+            var variant_name = match (pattern) {
+                VariantPattern(v, bindings) => v
+            }
+
+            if (variant_name == "_") {
+                has_wildcard = true
+            } else {
+                matched_variants.push(variant_name)
+            }
+
+            // Push scope for arm bindings
+            this.env.push_scope()
+            var bindings = match (pattern) { VariantPattern(v, b) => b }
+            var bi = 0
+            while (bi < bindings.length()) {
+                // Bindings from enum fields — try to get type from enum_fields
+                var field_type = this.get_enum_binding_type(subj_type, variant_name, bi)
+                this.env.define_var(bindings[bi], field_type)
+                bi = bi + 1
+            }
+
+            var arm_type = this.infer_expr(body)
+            this.env.pop_scope()
+
+            if (i == 0) {
+                result_type = arm_type
+            } else {
+                if (arm_type != result_type and arm_type != "Any" and result_type != "Any") {
+                    result_type = result_type + "|" + arm_type
+                }
+            }
+            i = i + 1
+        }
+
+        // Exhaustiveness: check if all variants of an enum are covered
+        if (!has_wildcard and subj_type != "Any") {
+            this.check_exhaustiveness(subj_type, matched_variants)
+        }
+
+        return result_type
+    }
+
+    fun get_enum_binding_type(enum_type: String, variant: String, field_idx: Float): String {
+        // Look up "EnumName.Variant" in enum_fields
+        var key = enum_type + "." + variant
+        if (this.env.enum_fields.has(key)) {
+            var fields_str = this.env.enum_fields.get(key)
+            if (fields_str.length() > 0) {
+                var parts = fields_str.split(",")
+                if (field_idx < parts.length()) {
+                    var kv = parts[field_idx.floor()].split(":")
+                    if (kv.length() >= 2) {
+                        return kv[1]
+                    }
+                }
+            }
+        }
+        return "Any"
+    }
+
+    fun check_exhaustiveness(enum_type: String, matched: List<String>) {
+        // Look up all variants of this enum
+        if (!this.env.enum_variants.has(enum_type)) return nil
+        var all_variants_str = this.env.enum_variants.get(enum_type)
+        if (all_variants_str.length() == 0) return nil
+        var all_variants = all_variants_str.split(",")
+        var i = 0
+        while (i < all_variants.length()) {
+            var v = all_variants[i]
+            if (!matched.contains(v)) {
+                this.warn("non-exhaustive match on " + enum_type + ": missing " + v)
+            }
+            i = i + 1
+        }
     }
 
     // --- Report ---
