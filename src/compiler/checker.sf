@@ -167,6 +167,7 @@ class NullChecker {
             }
             ClassDecl(name, fields, methods, doc) => {
                 this.env.class_fields.set(name, fields)
+                this.register_class_methods(name, methods)
             }
             VarDecl(n, t, i, d) => {}
             ExprStmt(e) => {}
@@ -176,6 +177,29 @@ class NullChecker {
             Block(s) => {}
             Break => {}
             Continue => {}
+        }
+    }
+
+    fun register_class_methods(class_name: String, methods: List<AST.Stmt>) {
+        var i = 0
+        while (i < methods.length()) {
+            var method = methods[i]
+            match (method) {
+                FunDecl(mname, params, ret_type, body, doc) => {
+                    this.env.define_func(class_name + "__" + mname, ret_type)
+                }
+                VarDecl(n, t, init, d) => {}
+                ExprStmt(e) => {}
+                Return(v) => {}
+                If(c, t, e) => {}
+                While(c, b) => {}
+                Block(s) => {}
+                EnumDecl(n, v, d) => {}
+                ClassDecl(n, f, m, d) => {}
+                Break => {}
+                Continue => {}
+            }
+            i = i + 1
         }
     }
 
@@ -432,7 +456,7 @@ class NullChecker {
             Call(callee, args) => this.infer_call(callee, args)
             Assign(name, value) => this.check_assign(name, value)
             Logical(left, op, right) => "Bool"
-            MemberAccess(obj, field) => "Any"
+            MemberAccess(obj, field) => this.infer_member_access(obj, field)
             Match(subject, arms) => "Any"
             EnumConstruct(e, v, a) => e
             Lambda(p, r, b) => "Fun"
@@ -449,6 +473,36 @@ class NullChecker {
                 this.infer_expr(value)
             }
         }
+    }
+
+    fun infer_member_access(obj: AST.Expr, field: String): String {
+        var obj_type = this.infer_expr(obj)
+        // this.field → look up field type from current class
+        if (obj_type == this.current_class or obj_type == "This") {
+            if (this.env.class_fields.has(this.current_class)) {
+                return this.get_class_field_type(this.current_class, field)
+            }
+        }
+        // variable.field → look up from variable's class type
+        if (this.env.class_fields.has(obj_type)) {
+            return this.get_class_field_type(obj_type, field)
+        }
+        return "Any"
+    }
+
+    fun get_class_field_type(class_name: String, field: String): String {
+        var fields_str = this.env.class_fields.get(class_name)
+        if (fields_str.length() == 0) return "Any"
+        var parts = fields_str.split(",")
+        var i = 0
+        while (i < parts.length()) {
+            var kv = parts[i].split(":")
+            if (kv.length() >= 2) {
+                if (kv[0] == field) return kv[1]
+            }
+            i = i + 1
+        }
+        return "Any"
     }
 
     fun infer_binary(left: AST.Expr, op: String, right: AST.Expr): String {
@@ -557,6 +611,16 @@ class NullChecker {
             if (method == "floor") return "Int"
             if (method == "to_string") return "String"
         }
+
+        // Class method: look up return type from registered functions
+        // Methods are registered as "ClassName__method" or just "method"
+        if (obj_type != "Any") {
+            var full_name = obj_type + "__" + method
+            var ret = this.env.get_func_ret(full_name)
+            if (ret != "Any") return ret
+        }
+        var ret = this.env.get_func_ret(method)
+        if (ret != "Any") return ret
 
         return "Any"
     }
