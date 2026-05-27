@@ -1,0 +1,652 @@
+//! Parse, construct, and manipulate URLs per RFC 3986.
+//!
+//! ```saffron
+//! import "@url" as URL
+//!
+//! var u = URL.parse("https://user:pass@example.com:8080/path?q=1#frag")
+//! u.scheme    // "https"
+//! u.host      // "example.com"
+//! u.port      // 8080
+//! u.path      // "/path"
+//! u.query     // "q=1"
+//! u.fragment  // "frag"
+//! u.username  // "user"
+//! u.password  // "pass"
+//!
+//! URL.to_string(u)  // "https://user:pass@example.com:8080/path?q=1#frag"
+//! URL.join("https://example.com/api/", "../v2/users")  // "https://example.com/v2/users"
+//! ```
+
+/// Represents a parsed URL.
+class URL {
+    var scheme: String
+    var host: String
+    var port: Number
+    var path: String
+    var query: String
+    var fragment: String
+    var username: String
+    var password: String
+
+    fun init(scheme: String, host: String, port: Number, path: String,
+             query: String, fragment: String, username: String, password: String) {
+        this.scheme = scheme
+        this.host = host
+        this.port = port
+        this.path = path
+        this.query = query
+        this.fragment = fragment
+        this.username = username
+        this.password = password
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+fun _is_digit(c: String): Bool {
+    return c == "0" or c == "1" or c == "2" or c == "3" or c == "4" or
+           c == "5" or c == "6" or c == "7" or c == "8" or c == "9"
+}
+
+fun _is_hex(c: String): Bool {
+    var lower = c.to_lower()
+    return _is_digit(c) or lower == "a" or lower == "b" or lower == "c" or
+           lower == "d" or lower == "e" or lower == "f"
+}
+
+/// Convert a single hex digit character to its numeric value.
+fun _hex_value(c: String): Number {
+    if (c == "0") { return 0 }
+    if (c == "1") { return 1 }
+    if (c == "2") { return 2 }
+    if (c == "3") { return 3 }
+    if (c == "4") { return 4 }
+    if (c == "5") { return 5 }
+    if (c == "6") { return 6 }
+    if (c == "7") { return 7 }
+    if (c == "8") { return 8 }
+    if (c == "9") { return 9 }
+    var lower = c.to_lower()
+    if (lower == "a") { return 10 }
+    if (lower == "b") { return 11 }
+    if (lower == "c") { return 12 }
+    if (lower == "d") { return 13 }
+    if (lower == "e") { return 14 }
+    if (lower == "f") { return 15 }
+    throw "url: invalid hex digit '${c}'"
+}
+
+/// Convert a byte value (0-255) to a two-character uppercase hex string.
+fun _to_hex(n: Number): String {
+    var digits = "0123456789ABCDEF"
+    var hi = (n / 16).floor()
+    var lo = n - hi * 16
+    return digits.char_at(hi) + digits.char_at(lo)
+}
+
+/// Return true if the character is unreserved per RFC 3986.
+var _unreserved_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+
+fun _is_unreserved(c: String): Bool {
+    if (c.length() != 1) { return false }
+    return _unreserved_chars.contains(c)
+}
+
+/// Return the default port for common schemes, or 0 if unknown.
+fun _default_port(scheme: String): Number {
+    var s = scheme.to_lower()
+    if (s == "http") { return 80 }
+    if (s == "https") { return 443 }
+    if (s == "ftp") { return 21 }
+    if (s == "ftps") { return 990 }
+    if (s == "ssh") { return 22 }
+    if (s == "ws") { return 80 }
+    if (s == "wss") { return 443 }
+    return 0
+}
+
+/// Normalize path by resolving "." and ".." segments.
+fun _normalize_path(p: String): String {
+    if (p.length() == 0) { return "" }
+    var segments = p.split("/")
+    var result = []
+    var i = 0
+    while (i < segments.length()) {
+        var seg: String = segments[i]
+        if (seg == ".") {
+            // skip
+        } else if (seg == "..") {
+            if (result.length() > 1) {
+                result.pop()
+            }
+        } else {
+            result.push(seg)
+        }
+        i = i + 1
+    }
+    if (result.length() == 0) { return "/" }
+    var sb = StringBuilder()
+    var j = 0
+    while (j < result.length()) {
+        if (j > 0) { sb.append("/") }
+        sb.append(result[j])
+        j = j + 1
+    }
+    var out = sb.to_string()
+    // Ensure leading slash for absolute paths
+    if (p.starts_with("/") and out.starts_with("/") == false) {
+        return "/" + out
+    }
+    return out
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Percent-encode a string for use in URLs.
+/// Unreserved characters (A-Z, a-z, 0-9, -, ., _, ~) are not encoded.
+///
+/// ```saffron
+/// import "@url" as URL
+/// URL.encode("hello world")   // "hello%20world"
+/// URL.encode("a+b=c&d")      // "a%2Bb%3Dc%26d"
+/// ```
+fun encode(s: String): String {
+    var sb = StringBuilder()
+    var i = 0
+    while (i < s.length()) {
+        var c = s.char_at(i)
+        if (_is_unreserved(c)) {
+            sb.append(c)
+        } else {
+            // For ASCII characters, encode as %XX
+            // We use char_at which gives a single character string
+            // Encode common characters directly
+            if (c == " ") { sb.append("%20") }
+            else if (c == "!") { sb.append("%21") }
+            else if (c == "#") { sb.append("%23") }
+            else if (c == "$") { sb.append("%24") }
+            else if (c == "%") { sb.append("%25") }
+            else if (c == "&") { sb.append("%26") }
+            else if (c == "'") { sb.append("%27") }
+            else if (c == "(") { sb.append("%28") }
+            else if (c == ")") { sb.append("%29") }
+            else if (c == "*") { sb.append("%2A") }
+            else if (c == "+") { sb.append("%2B") }
+            else if (c == ",") { sb.append("%2C") }
+            else if (c == "/") { sb.append("%2F") }
+            else if (c == ":") { sb.append("%3A") }
+            else if (c == ";") { sb.append("%3B") }
+            else if (c == "=") { sb.append("%3D") }
+            else if (c == "?") { sb.append("%3F") }
+            else if (c == "@") { sb.append("%40") }
+            else if (c == "[") { sb.append("%5B") }
+            else if (c == "]") { sb.append("%5D") }
+            else if (c == "{") { sb.append("%7B") }
+            else if (c == "}") { sb.append("%7D") }
+            else if (c == "|") { sb.append("%7C") }
+            else if (c == "\\") { sb.append("%5C") }
+            else if (c == "^") { sb.append("%5E") }
+            else if (c == "`") { sb.append("%60") }
+            else if (c == "\"") { sb.append("%22") }
+            else if (c == "<") { sb.append("%3C") }
+            else if (c == ">") { sb.append("%3E") }
+            else if (c == "\t") { sb.append("%09") }
+            else if (c == "\n") { sb.append("%0A") }
+            else if (c == "\r") { sb.append("%0D") }
+            else {
+                // Fallback: pass through (non-ASCII will be implementation-dependent)
+                sb.append(c)
+            }
+        }
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+/// Decode a percent-encoded string.
+///
+/// ```saffron
+/// import "@url" as URL
+/// URL.decode("hello%20world")  // "hello world"
+/// URL.decode("a%2Bb%3Dc")     // "a+b=c"
+/// ```
+fun decode(s: String): String {
+    var sb = StringBuilder()
+    var i = 0
+    while (i < s.length()) {
+        var c = s.char_at(i)
+        if (c == "%") {
+            if (i + 2 >= s.length()) {
+                throw "url: incomplete percent-encoding at position ${i}"
+            }
+            var h1 = s.char_at(i + 1)
+            var h2 = s.char_at(i + 2)
+            if (_is_hex(h1) == false or _is_hex(h2) == false) {
+                throw "url: invalid percent-encoding '%${h1}${h2}' at position ${i}"
+            }
+            var code = _hex_value(h1) * 16 + _hex_value(h2)
+            // Convert code point to character using known ASCII table
+            sb.append(_code_to_char(code))
+            i = i + 3
+        } else if (c == "+") {
+            // In query strings, + is sometimes used for space
+            sb.append("+")
+            i = i + 1
+        } else {
+            sb.append(c)
+            i = i + 1
+        }
+    }
+    return sb.to_string()
+}
+
+/// Convert an ASCII code point (0-127) to its character.
+fun _code_to_char(code: Number): String {
+    if (code == 9) { return "\t" }
+    if (code == 10) { return "\n" }
+    if (code == 13) { return "\r" }
+    if (code == 32) { return " " }
+    if (code == 33) { return "!" }
+    if (code == 34) { return "\"" }
+    if (code == 35) { return "#" }
+    if (code == 36) { return "$" }
+    if (code == 37) { return "%" }
+    if (code == 38) { return "&" }
+    if (code == 39) { return "'" }
+    if (code == 40) { return "(" }
+    if (code == 41) { return ")" }
+    if (code == 42) { return "*" }
+    if (code == 43) { return "+" }
+    if (code == 44) { return "," }
+    if (code == 45) { return "-" }
+    if (code == 46) { return "." }
+    if (code == 47) { return "/" }
+    // 48-57: digits 0-9
+    if (code >= 48 and code <= 57) {
+        var digits = "0123456789"
+        return digits.char_at(code - 48)
+    }
+    if (code == 58) { return ":" }
+    if (code == 59) { return ";" }
+    if (code == 60) { return "<" }
+    if (code == 61) { return "=" }
+    if (code == 62) { return ">" }
+    if (code == 63) { return "?" }
+    if (code == 64) { return "@" }
+    // 65-90: uppercase A-Z
+    if (code >= 65 and code <= 90) {
+        var upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        return upper.char_at(code - 65)
+    }
+    if (code == 91) { return "[" }
+    if (code == 92) { return "\\" }
+    if (code == 93) { return "]" }
+    if (code == 94) { return "^" }
+    if (code == 95) { return "_" }
+    if (code == 96) { return "`" }
+    // 97-122: lowercase a-z
+    if (code >= 97 and code <= 122) {
+        var lower = "abcdefghijklmnopqrstuvwxyz"
+        return lower.char_at(code - 97)
+    }
+    if (code == 123) { return "{" }
+    if (code == 124) { return "|" }
+    if (code == 125) { return "}" }
+    if (code == 126) { return "~" }
+    if (code == 0) { return "" }
+    throw "url: cannot decode byte value ${code} to character"
+}
+
+/// Parse a URL string into a URL object.
+///
+/// Supports the general syntax:
+///   scheme://[username[:password]@]host[:port][/path][?query][#fragment]
+///
+/// ```saffron
+/// import "@url" as URL
+/// var u = URL.parse("https://example.com:8080/api?key=val#top")
+/// u.scheme    // "https"
+/// u.host      // "example.com"
+/// u.port      // 8080
+/// u.path      // "/api"
+/// u.query     // "key=val"
+/// u.fragment  // "top"
+/// ```
+fun parse(url_str: String): URL {
+    var s = url_str.trim()
+    if (s.length() == 0) {
+        throw "url: cannot parse empty string"
+    }
+
+    var scheme = ""
+    var username = ""
+    var password = ""
+    var host = ""
+    var port = 0
+    var path = ""
+    var query = ""
+    var fragment = ""
+
+    var pos = 0
+
+    // --- Extract scheme ---
+    var colon_slash = s.index_of("://")
+    if (colon_slash < 0) {
+        throw "url: missing scheme in '${url_str}'"
+    }
+    scheme = s.slice(0, colon_slash).to_lower()
+    pos = colon_slash + 3
+
+    // --- Extract fragment (from the end) ---
+    var hash_idx = s.index_of("#")
+    var working = ""
+    if (hash_idx >= pos) {
+        fragment = s.slice(hash_idx + 1, s.length())
+        working = s.slice(pos, hash_idx)
+    } else {
+        working = s.slice(pos, s.length())
+    }
+
+    // --- Extract query (from the end of working) ---
+    var q_idx = working.index_of("?")
+    if (q_idx >= 0) {
+        query = working.slice(q_idx + 1, working.length())
+        working = working.slice(0, q_idx)
+    }
+
+    // Now `working` contains: [userinfo@]host[:port][/path]
+
+    // --- Split authority from path ---
+    var authority = ""
+    var slash_idx = working.index_of("/")
+    if (slash_idx >= 0) {
+        authority = working.slice(0, slash_idx)
+        path = working.slice(slash_idx, working.length())
+    } else {
+        authority = working
+        path = ""
+    }
+
+    // --- Extract userinfo from authority ---
+    var at_idx = authority.index_of("@")
+    if (at_idx >= 0) {
+        var userinfo = authority.slice(0, at_idx)
+        authority = authority.slice(at_idx + 1, authority.length())
+        var ui_colon = userinfo.index_of(":")
+        if (ui_colon >= 0) {
+            username = userinfo.slice(0, ui_colon)
+            password = userinfo.slice(ui_colon + 1, userinfo.length())
+        } else {
+            username = userinfo
+        }
+    }
+
+    // --- Extract port from authority ---
+    // Handle IPv6 addresses in brackets
+    if (authority.starts_with("[")) {
+        var bracket_close = authority.index_of("]")
+        if (bracket_close < 0) {
+            throw "url: unclosed bracket in host '${authority}'"
+        }
+        host = authority.slice(0, bracket_close + 1)
+        if (bracket_close + 1 < authority.length()) {
+            var after = authority.slice(bracket_close + 1, authority.length())
+            if (after.starts_with(":")) {
+                var port_str = after.slice(1, after.length())
+                if (port_str.length() > 0) {
+                    port = port_str.to_number()
+                }
+            }
+        }
+    } else {
+        // Find the LAST colon for port (to handle IPv6 without brackets gracefully)
+        var port_colon = -1
+        var ci = 0
+        while (ci < authority.length()) {
+            if (authority.char_at(ci) == ":") {
+                port_colon = ci
+            }
+            ci = ci + 1
+        }
+        if (port_colon >= 0) {
+            var potential_port = authority.slice(port_colon + 1, authority.length())
+            // Only treat as port if it's all digits
+            var all_digits = true
+            var di = 0
+            while (di < potential_port.length()) {
+                if (_is_digit(potential_port.char_at(di)) == false) {
+                    all_digits = false
+                    break
+                }
+                di = di + 1
+            }
+            if (all_digits and potential_port.length() > 0) {
+                host = authority.slice(0, port_colon)
+                port = potential_port.to_number()
+            } else {
+                host = authority
+            }
+        } else {
+            host = authority
+        }
+    }
+
+    return URL(scheme, host, port, path, query, fragment, username, password)
+}
+
+/// Construct a URL string from a URL object.
+///
+/// ```saffron
+/// import "@url" as URL
+/// var u = URL.parse("https://example.com/path?q=1#frag")
+/// URL.to_string(u)  // "https://example.com/path?q=1#frag"
+/// ```
+fun to_string(url: URL): String {
+    var sb = StringBuilder()
+    sb.append(url.scheme)
+    sb.append("://")
+
+    // Userinfo
+    if (url.username.length() > 0) {
+        sb.append(url.username)
+        if (url.password.length() > 0) {
+            sb.append(":")
+            sb.append(url.password)
+        }
+        sb.append("@")
+    }
+
+    sb.append(url.host)
+
+    // Port (omit if 0 or matches default for scheme)
+    if (url.port > 0 and url.port != _default_port(url.scheme)) {
+        sb.append(":")
+        sb.append("${url.port}")
+    }
+
+    sb.append(url.path)
+
+    if (url.query.length() > 0) {
+        sb.append("?")
+        sb.append(url.query)
+    }
+
+    if (url.fragment.length() > 0) {
+        sb.append("#")
+        sb.append(url.fragment)
+    }
+
+    return sb.to_string()
+}
+
+/// Parse a query string into a Map of key-value pairs.
+/// Handles percent-encoded keys and values.
+///
+/// ```saffron
+/// import "@url" as URL
+/// var params = URL.parse_query("page=1&limit=10&q=hello%20world")
+/// params.get("page")   // "1"
+/// params.get("q")      // "hello world"
+/// ```
+fun parse_query(query_str: String): Map<String, String> {
+    var result = Map()
+    if (query_str.length() == 0) { return result }
+
+    var pairs = query_str.split("&")
+    var i = 0
+    while (i < pairs.length()) {
+        var pair: String = pairs[i]
+        if (pair.length() > 0) {
+            var eq_idx = pair.index_of("=")
+            if (eq_idx >= 0) {
+                var key = decode(pair.slice(0, eq_idx))
+                var value = decode(pair.slice(eq_idx + 1, pair.length()))
+                result.set(key, value)
+            } else {
+                // Key with no value
+                result.set(decode(pair), "")
+            }
+        }
+        i = i + 1
+    }
+    return result
+}
+
+/// Encode a Map of key-value pairs as a query string.
+/// Keys and values are percent-encoded.
+///
+/// ```saffron
+/// import "@url" as URL
+/// var params = Map()
+/// params.set("page", "1")
+/// params.set("q", "hello world")
+/// URL.encode_query(params)  // "page=1&q=hello%20world"
+/// ```
+fun encode_query(params: Map<String, String>): String {
+    var keys = params.keys()
+    var sb = StringBuilder()
+    var i = 0
+    while (i < keys.length()) {
+        if (i > 0) { sb.append("&") }
+        var key: String = keys[i]
+        var value: String = params.get(key)
+        sb.append(encode(key))
+        sb.append("=")
+        sb.append(encode(value))
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+/// Get the effective port for a URL, using the default port for the scheme
+/// when no explicit port is specified.
+///
+/// ```saffron
+/// import "@url" as URL
+/// var u = URL.parse("https://example.com/path")
+/// URL.effective_port(u)  // 443
+///
+/// var u2 = URL.parse("http://example.com:9090/")
+/// URL.effective_port(u2)  // 9090
+/// ```
+fun effective_port(url: URL): Number {
+    if (url.port > 0) { return url.port }
+    return _default_port(url.scheme)
+}
+
+/// Resolve a relative URL reference against a base URL.
+/// Implements RFC 3986 Section 5.3 reference resolution.
+///
+/// ```saffron
+/// import "@url" as URL
+/// var base = URL.parse("https://example.com/a/b/c")
+/// var resolved = URL.resolve(base, "../d?q=1")
+/// URL.to_string(resolved)  // "https://example.com/a/d?q=1"
+/// ```
+fun resolve(base: URL, relative: String): URL {
+    var rel = relative.trim()
+    if (rel.length() == 0) {
+        return URL(base.scheme, base.host, base.port, base.path,
+                   base.query, base.fragment, base.username, base.password)
+    }
+
+    // If relative has a scheme, it's an absolute URI
+    if (rel.index_of("://") >= 0) {
+        return parse(rel)
+    }
+
+    var r_fragment = ""
+    var r_query = ""
+    var r_path = ""
+
+    // Extract fragment
+    var hash_idx = rel.index_of("#")
+    if (hash_idx >= 0) {
+        r_fragment = rel.slice(hash_idx + 1, rel.length())
+        rel = rel.slice(0, hash_idx)
+    }
+
+    // Extract query
+    var q_idx = rel.index_of("?")
+    if (q_idx >= 0) {
+        r_query = rel.slice(q_idx + 1, rel.length())
+        rel = rel.slice(0, q_idx)
+    }
+
+    r_path = rel
+
+    // If relative path is empty, use base path (with new query/fragment)
+    if (r_path.length() == 0) {
+        var new_query = r_query
+        if (new_query.length() == 0) { new_query = base.query }
+        return URL(base.scheme, base.host, base.port, base.path,
+                   new_query, r_fragment, base.username, base.password)
+    }
+
+    // If relative path starts with /, it's absolute path
+    if (r_path.starts_with("/")) {
+        var resolved_path = _normalize_path(r_path)
+        return URL(base.scheme, base.host, base.port, resolved_path,
+                   r_query, r_fragment, base.username, base.password)
+    }
+
+    // Relative path — merge with base
+    var base_dir = ""
+    var last_slash = -1
+    var si = 0
+    while (si < base.path.length()) {
+        if (base.path.char_at(si) == "/") { last_slash = si }
+        si = si + 1
+    }
+    if (last_slash >= 0) {
+        base_dir = base.path.slice(0, last_slash + 1)
+    } else {
+        base_dir = "/"
+    }
+
+    var merged = base_dir + r_path
+    var resolved_path = _normalize_path(merged)
+
+    return URL(base.scheme, base.host, base.port, resolved_path,
+               r_query, r_fragment, base.username, base.password)
+}
+
+/// Join a base URL string with a relative path, returning the resulting URL string.
+///
+/// ```saffron
+/// import "@url" as URL
+/// URL.join("https://example.com/api/v1/", "users")
+/// // "https://example.com/api/v1/users"
+///
+/// URL.join("https://example.com/api/v1/items", "../v2/users")
+/// // "https://example.com/api/v2/users"
+/// ```
+fun join(base_str: String, path: String): String {
+    var base = parse(base_str)
+    var resolved = resolve(base, path)
+    return to_string(resolved)
+}

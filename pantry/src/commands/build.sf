@@ -1,0 +1,29 @@
+//! `pantry build` — compile the project.
+
+import "@os" as OS
+import "../config.sf" as Config
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+
+    // If there's a build script defined, use it
+    if (manifest.scripts.has("build")) {
+        var cmd = manifest.scripts.get("build")
+        IO.println("> ${cmd}")
+        var output = OS.exec(cmd)
+        IO.print(output)
+        return
+    }
+
+    // Default: compile the entry point
+    var entry = manifest.entry
+    if (!(IO.file_exists(entry))) {
+        IO.println("pantry build: entry file '${entry}' not found")
+        OS.exit(1)
+    }
+
+    var cmd = "saffron ${entry}"
+    IO.println("> ${cmd}")
+    var output = OS.exec(cmd)
+    IO.print(output)
+}

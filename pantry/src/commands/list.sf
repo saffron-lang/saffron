@@ -1,0 +1,38 @@
+//! `pantry list` — list installed packages.
+
+import "@os" as OS
+import "../config.sf" as Config
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+
+    if (manifest.dependencies.length() == 0 and manifest.dev_dependencies.length() == 0) {
+        IO.println("No dependencies.")
+        return
+    }
+
+    if (manifest.dependencies.length() > 0) {
+        IO.println("Dependencies:")
+        var keys = manifest.dependencies.keys()
+        var i = 0
+        while (i < keys.length()) {
+            var name = keys[i]
+            var version = manifest.dependencies.get(name)
+            IO.println("  ${name} @ ${version}")
+            i = i + 1
+        }
+    }
+
+    if (manifest.dev_dependencies.length() > 0) {
+        IO.println("")
+        IO.println("Dev dependencies:")
+        var keys = manifest.dev_dependencies.keys()
+        var i = 0
+        while (i < keys.length()) {
+            var name = keys[i]
+            var version = manifest.dev_dependencies.get(name)
+            IO.println("  ${name} @ ${version}")
+            i = i + 1
+        }
+    }
+}

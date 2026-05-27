@@ -1,0 +1,40 @@
+//! `pantry run <script>` — run a named script from pantry.toml.
+
+import "@os" as OS
+import "../config.sf" as Config
+
+/// Run a named script from the [scripts] section.
+fun run(script_name: String, parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+
+    if (!(manifest.scripts.has(script_name))) {
+        IO.println("pantry run: no script named '${script_name}'")
+        IO.println("")
+        if (manifest.scripts.length() > 0) {
+            IO.println("Available scripts:")
+            var keys = manifest.scripts.keys()
+            var i = 0
+            while (i < keys.length()) {
+                IO.println("  ${keys[i]} = ${manifest.scripts.get(keys[i])}")
+                i = i + 1
+            }
+        } else {
+            IO.println("No scripts defined in pantry.toml. Add a [scripts] section.")
+        }
+        OS.exit(1)
+    }
+
+    var cmd = manifest.scripts.get(script_name)
+    _exec(cmd)
+}
+
+/// Run a raw shell command in the project context.
+fun run_raw(cmd: String, parsed: Args.ParsedArgs) {
+    _exec(cmd)
+}
+
+fun _exec(cmd: String) {
+    IO.println("> ${cmd}")
+    var output = OS.exec(cmd)
+    IO.print(output)
+}

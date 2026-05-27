@@ -1,0 +1,74 @@
+import "@test" as Test
+import "@log" as Log
+
+// Level priority
+Test.assert(Log.level_priority(Log.Level.Error) > Log.level_priority(Log.Level.Info), "error > info")
+Test.assert(Log.level_priority(Log.Level.Trace) < Log.level_priority(Log.Level.Debug), "trace < debug")
+
+// Level names
+Test.assert_eq(Log.level_name(Log.Level.Info), "INFO", "info name")
+Test.assert_eq(Log.level_name(Log.Level.Warn), "WARN", "warn name")
+Test.assert_eq(Log.level_name(Log.Level.Error), "ERROR", "error name")
+
+// parse_level
+Test.assert_eq(Log.level_priority(Log.parse_level("info")), Log.level_priority(Log.Level.Info), "parse info")
+Test.assert_eq(Log.level_priority(Log.parse_level("ERROR")), Log.level_priority(Log.Level.Error), "parse ERROR")
+Test.assert_eq(Log.level_priority(Log.parse_level("warning")), Log.level_priority(Log.Level.Warn), "parse warning alias")
+
+// Record creation
+var record = Log.Record(Log.Level.Info, "test message", "test-logger", {"key": "value"})
+Test.assert_eq(record.message, "test message", "record message")
+Test.assert_eq(record.logger_name, "test-logger", "record logger name")
+Test.assert(record.timestamp > 0, "record has timestamp")
+
+// Text formatting
+var text = Log.format_text(record)
+Test.assert(text.contains("[INFO]"), "format contains level")
+Test.assert(text.contains("test-logger"), "format contains logger name")
+Test.assert(text.contains("test message"), "format contains message")
+Test.assert(text.contains("key=value"), "format contains fields")
+
+// JSON formatting
+var json = Log.format_json(record)
+Test.assert(json.contains("\"level\":\"INFO\""), "json has level")
+Test.assert(json.contains("\"msg\":\"test message\""), "json has message")
+Test.assert(json.contains("\"logger\":\"test-logger\""), "json has logger")
+
+// MemoryHandler
+var mem = Log.MemoryHandler(Log.Level.Warn)
+mem.handle(Log.Record(Log.Level.Info, "ignored", "test", {}))
+mem.handle(Log.Record(Log.Level.Warn, "kept", "test", {}))
+mem.handle(Log.Record(Log.Level.Error, "also kept", "test", {}))
+Test.assert_eq(mem.count(), 2, "memory handler filters by level")
+
+mem.clear()
+Test.assert_eq(mem.count(), 0, "memory handler clears")
+
+// Logger with memory handler
+var logger = Log.Logger("test-app")
+logger.clear_handlers()
+var collector = Log.MemoryHandler(Log.Level.Trace)
+logger.add_handler(collector)
+
+logger.info("hello")
+logger.debug("world")
+logger.error("oops")
+Test.assert_eq(collector.count(), 3, "logger sends to handler")
+
+// Logger level filtering
+collector.clear()
+logger.set_level(Log.Level.Error)
+logger.debug("filtered out")
+logger.info("filtered out")
+logger.error("passes through")
+Test.assert_eq(collector.count(), 1, "logger level filtering")
+
+// Context
+collector.clear()
+logger.set_level(Log.Level.Trace)
+logger.with_context({"service": "api"})
+logger.info("with context")
+var ctx_record = collector.records[0]
+Test.assert_eq(ctx_record.fields.get("service"), "api", "context fields attached")
+
+Test.summary()

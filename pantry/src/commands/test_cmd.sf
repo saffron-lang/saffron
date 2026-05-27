@@ -1,0 +1,55 @@
+//! `pantry test` — run the project's test suite.
+
+import "@os" as OS
+import "@glob" as Glob
+import "../config.sf" as Config
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+
+    // If there's a test script, use it
+    if (manifest.scripts.has("test")) {
+        var cmd = manifest.scripts.get("test")
+        IO.println("> ${cmd}")
+        var output = OS.exec(cmd)
+        IO.print(output)
+        return
+    }
+
+    // Default: find and run all test_*.sf files
+    var test_files = Glob.find("test/test_*.sf")
+    if (test_files.length() == 0) {
+        test_files = Glob.find("test/*.sf")
+    }
+
+    if (test_files.length() == 0) {
+        IO.println("pantry test: no test files found in test/")
+        IO.println("Create test files matching test/test_*.sf or define [scripts.test]")
+        OS.exit(1)
+    }
+
+    var passed = 0
+    var failed = 0
+
+    var i = 0
+    while (i < test_files.length()) {
+        var file = test_files[i]
+        IO.print("  ${file} ... ")
+        var output = OS.exec("saffron ${file}")
+        if (output.contains("passed") and !(output.contains("failed"))) {
+            IO.println("ok")
+            passed = passed + 1
+        } else {
+            IO.println("FAIL")
+            IO.println(output)
+            failed = failed + 1
+        }
+        i = i + 1
+    }
+
+    IO.println("")
+    IO.println("${passed} passed, ${failed} failed")
+    if (failed > 0) {
+        OS.exit(1)
+    }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "pantry"
+version = "0.1.0"
+description = "Package manager and build tool for Saffron"
+entry = "src/main.sf"
+authors = ["henry232323"]
+
+[dependencies]
+
+[scripts]
+build = "saffron src/main.sf"
+test = "saffron test/"

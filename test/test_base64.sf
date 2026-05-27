@@ -1,0 +1,37 @@
+import "@test" as Test
+import "@base64" as Base64
+
+// RFC 4648 test vectors
+Test.assert_eq(Base64.encode(""), "", "encode empty")
+Test.assert_eq(Base64.encode("f"), "Zg==", "encode f")
+Test.assert_eq(Base64.encode("fo"), "Zm8=", "encode fo")
+Test.assert_eq(Base64.encode("foo"), "Zm9v", "encode foo")
+Test.assert_eq(Base64.encode("foob"), "Zm9vYg==", "encode foob")
+Test.assert_eq(Base64.encode("fooba"), "Zm9vYmE=", "encode fooba")
+Test.assert_eq(Base64.encode("foobar"), "Zm9vYmFy", "encode foobar")
+
+// Decode
+Test.assert_eq(Base64.decode("Zg=="), "f", "decode f")
+Test.assert_eq(Base64.decode("Zm8="), "fo", "decode fo")
+Test.assert_eq(Base64.decode("Zm9v"), "foo", "decode foo")
+Test.assert_eq(Base64.decode("Zm9vYmFy"), "foobar", "decode foobar")
+
+// Round-trip
+Test.assert_eq(Base64.decode(Base64.encode("Hello, World!")), "Hello, World!", "round-trip hello")
+Test.assert_eq(Base64.decode(Base64.encode("saffron lang")), "saffron lang", "round-trip saffron")
+
+// URL-safe
+var url_encoded = Base64.encode_url_safe("subjects?_d")
+Test.assert(!(url_encoded.contains("+")), "url-safe no +")
+Test.assert(!(url_encoded.contains("/")), "url-safe no /")
+Test.assert(!(url_encoded.contains("=")), "url-safe no padding")
+
+// URL-safe round-trip
+Test.assert_eq(Base64.decode_url_safe(Base64.encode_url_safe("hello/world+test")), "hello/world+test", "url-safe round-trip")
+
+// Validation
+Test.assert(Base64.is_valid("Zm9vYmFy"), "valid base64")
+Test.assert(Base64.is_valid("Zg=="), "valid with padding")
+Test.assert(!(Base64.is_valid("not valid!!")), "invalid base64")
+
+Test.summary()
