@@ -885,6 +885,17 @@ class Codegen {
                     if (this.enum_variant_tags.has(key)) {
                         return this.gen_enum_construct(inner_field, m_field, [])
                     }
+                    // Fallback: maybe the inner MemberAccess root is a module alias
+                    // e.g. AST.Type.IntType where AST is module, Type is enum, IntType is variant
+                    var inner_obj: AST.Expr = match (m_obj) { MemberAccess(o, f) => o
+                        _ => AST.Expr.NilLit
+                    }
+                    var root_name: String = this.get_variable_name(inner_obj)
+                    if (root_name.length() > 0 and !this.var_types.has(root_name)) {
+                        if (this.enum_variant_tags.has(inner_field + "." + m_field)) {
+                            return this.gen_enum_construct(inner_field, m_field, [])
+                        }
+                    }
                 }
                 // Nested field access: obj.field1.field2
                 if (obj_kind2 == "get_field" or obj_kind2 == "member" or obj_kind2 == "this") {
@@ -3962,8 +3973,9 @@ class Codegen {
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {
-            if (this.is_decl(program[i])) {
-                this.gen_stmt(program[i])
+            var stmt: AST.Stmt = program[i]
+            if (this.is_decl(stmt)) {
+                this.gen_stmt(stmt)
             }
             i = i + 1
         }
@@ -4166,6 +4178,8 @@ fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): Str
 }
 
 fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, alias_map: Map<String, String>): String {
+    // Merge all module code + main program into one compilation unit
+    // Each module's functions get prefixed via current_prefix during gen_stmt
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
 
@@ -4224,27 +4238,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         mi2 = mi2 + 1
     }
 
-    // First: register all module declarations (metadata only, no IR bodies)
+    // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
-    var mi: Float = 0
-    gen.register_only = true
-    while (mi < module_stmts.length()) {
-        var stmts: List<AST.Stmt> = module_stmts[mi]
-        var prefix: String = module_prefixes_list[mi]
-        gen.current_prefix = prefix
-        var si: Float = 0
-        while (si < stmts.length()) {
-            if (gen.is_decl(stmts[si])) {
-                gen.gen_stmt(stmts[si])
-            }
-            si = si + 1
-        }
-        mi = mi + 1
-    }
-
-    // Second: emit full IR for all module declarations
     gen.register_only = false
-    mi = 0
+    var mi: Float = 0
     while (mi < module_stmts.length()) {
         var stmts: List<AST.Stmt> = module_stmts[mi]
         var prefix: String = module_prefixes_list[mi]
@@ -4317,6 +4314,142 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     }
 
     // Then compile the main program without prefix
+    gen.current_prefix = ""
+    return gen.generate(program)
+}
+
+fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes: List<String>, alias_map: Map<String, String>): String {
+    var gen: Codegen = Codegen()
+    gen.module_prefixes = alias_map
+    gen.register_only = false
+
+    // Register runtime functions
+    gen.known_functions.push("StringBuilder")
+    gen.known_functions.push("__list_new")
+    gen.known_functions.push("__list_push")
+    gen.known_functions.push("__list_get")
+    gen.known_functions.push("__list_set")
+    gen.known_functions.push("__list_length")
+    gen.known_functions.push("__list_pop")
+    gen.known_functions.push("__sb_append")
+    gen.known_functions.push("__sb_to_string")
+    gen.known_functions.push("__safe_strcmp")
+    gen.known_functions.push("__map_new")
+    gen.known_functions.push("__map_set")
+    gen.known_functions.push("__map_get")
+    gen.known_functions.push("__map_has")
+    gen.known_functions.push("__map_keys")
+    gen.known_functions.push("__str_ends_with")
+    gen.known_functions.push("__str_split")
+    gen.known_functions.push("__str_replace")
+    gen.known_functions.push("__int_to_string")
+    gen.known_functions.push("__list_join")
+    gen.known_functions.push("__join_append")
+    gen.known_functions.push("__list_contains")
+    gen.known_functions.push("__io_read_file")
+    gen.known_functions.push("__io_write_file")
+    gen.known_functions.push("__io_file_exists")
+    gen.known_functions.push("__io_mkdir")
+    gen.known_functions.push("__os_exec")
+    gen.known_functions.push("__os_args")
+    gen.known_functions.push("__os_cwd")
+    gen.known_functions.push("__os_path_sep")
+    gen.known_functions.push("__os_platform")
+    gen.known_functions.push("__os_env")
+    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
+
+    // Pre-scan: register module-level VarDecls as globals
+    var mi: Float = 0
+    while (mi < prefixes.length()) {
+        var prefix: String = prefixes[mi]
+        var start: Float = boundaries[mi]
+        var end: Float = boundaries[mi + 1]
+        var si: Float = start
+        while (si < end) {
+            if (!gen.is_decl(all_stmts[si])) {
+                var stmt_kind: String = gen.classify_stmt(all_stmts[si])
+                if (stmt_kind == "var") {
+                    var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
+                        _ => ""
+                    }
+                    gen.module_globals.set(prefix + vname, true)
+                    gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                }
+            }
+            si = si + 1
+        }
+        mi = mi + 1
+    }
+
+    // Compile each module's declarations
+    var module_init_names: List<String> = []
+    mi = 0
+    while (mi < prefixes.length()) {
+        var prefix: String = prefixes[mi]
+        var start: Float = boundaries[mi]
+        var end: Float = boundaries[mi + 1]
+        gen.current_prefix = prefix
+
+        var si: Float = start
+        while (si < end) {
+            if (gen.is_decl(all_stmts[si])) {
+                gen.gen_stmt(all_stmts[si])
+            }
+            si = si + 1
+        }
+
+        // Module top-level code
+        var has_top: Bool = false
+        si = start
+        while (si < end) {
+            if (!gen.is_decl(all_stmts[si])) { has_top = true }
+            si = si + 1
+        }
+        if (has_top) {
+            var init_name: String = "__mod_init_" + prefix.slice(0, prefix.length() - 1)
+            gen.known_functions.push(init_name)
+            module_init_names.push(init_name)
+            gen.emit("")
+            gen.emit("define i64 @" + init_name + "() {")
+            gen.emit("entry:")
+            gen.block_terminated = false
+            gen.reset_locals()
+            var top_vars: List<String> = []
+            var top_var_types: List<String> = []
+            si = start
+            while (si < end) {
+                if (!gen.is_decl(all_stmts[si])) {
+                    var single_list: List<AST.Stmt> = []
+                    single_list.push(all_stmts[si])
+                    gen.collect_vars(single_list, top_vars, top_var_types)
+                }
+                si = si + 1
+            }
+            var vi: Float = 0
+            while (vi < top_vars.length()) {
+                var vn: String = top_vars[vi]
+                if (!gen.module_globals.has(prefix + vn)) {
+                    gen.emit_indent("%" + gen.sanitize_name(vn) + " = alloca i64")
+                }
+                vi = vi + 1
+            }
+            si = start
+            while (si < end) {
+                if (!gen.is_decl(all_stmts[si])) {
+                    gen.gen_stmt(all_stmts[si])
+                }
+                si = si + 1
+            }
+            if (!gen.block_terminated) {
+                gen.emit_indent("ret i64 0")
+            }
+            gen.emit("}")
+            gen.block_terminated = false
+        }
+
+        mi = mi + 1
+    }
+
     gen.current_prefix = ""
     return gen.generate(program)
 }
