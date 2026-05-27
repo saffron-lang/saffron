@@ -111,7 +111,110 @@ class NullChecker {
         this.warnings.push(msg)
     }
 
-    // --- Nullable type helpers ---
+    // --- String → Type node conversion ---
+
+    fun parse_type_node(s: String): AST.Type {
+        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Bool") return AST.Type.BoolType
+        if (s == "String") return AST.Type.StringType
+        if (s == "Nil") return AST.Type.NilType
+        if (s == "Any") return AST.Type.AnyType
+        // Union: "String|Nil" or "Int|String"
+        if (s.contains("|")) {
+            var parts = s.split("|")
+            var types: List<AST.Type> = []
+            var i = 0
+            while (i < parts.length()) {
+                types.push(this.parse_type_node(parts[i]))
+                i = i + 1
+            }
+            return AST.Type.UnionType(types)
+        }
+        // Generic: "List<String>" or "Map<String,Number>"
+        if (s.contains("<")) {
+            var lt_pos = 0
+            var i = 0
+            while (i < s.length()) {
+                if (s.char_at(i) == "<") {
+                    lt_pos = i
+                    i = s.length()
+                }
+                i = i + 1
+            }
+            var base = s.slice(0, lt_pos)
+            var args_str = s.slice(lt_pos + 1, s.length() - 1)
+            var arg_strs = this.split_type_args(args_str)
+            var args: List<AST.Type> = []
+            var j = 0
+            while (j < arg_strs.length()) {
+                args.push(this.parse_type_node(arg_strs[j]))
+                j = j + 1
+            }
+            return AST.Type.GenericType(base, args)
+        }
+        // Class/Enum type
+        return AST.Type.ClassType(s)
+    }
+
+    fun split_type_args(s: String): List<String> {
+        var args: List<String> = []
+        var current = ""
+        var depth = 0
+        var i = 0
+        while (i < s.length()) {
+            var ch = s.char_at(i)
+            if (ch == "<") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "," and depth == 0) {
+                args.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            args.push(current)
+        }
+        return args
+    }
+
+    fun type_node_to_string(t: AST.Type): String {
+        return AST.type_to_string(t)
+    }
+
+    fun is_nullable_type(t: AST.Type): Bool {
+        return match (t) {
+            NullableType(inner) => true
+            UnionType(types) => {
+                // Check if any type in the union is Nil
+                var has_nil = false
+                var i = 0
+                while (i < types.length()) {
+                    var sub = AST.type_to_string(types[i])
+                    if (sub == "Nil") { has_nil = true }
+                    i = i + 1
+                }
+                has_nil
+            }
+            NilType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(b, a) => false
+            FuncType(p, r) => false
+        }
+    }
+
+    // --- Nullable type helpers (string-based, for backward compat) ---
 
     fun is_nullable(typ: String): Bool {
         if (typ.contains("|")) {
