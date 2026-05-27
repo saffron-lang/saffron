@@ -1920,62 +1920,6 @@ class Codegen {
             }
         }
 
-        // Check for imported module function calls (module alias or unknown name)
-        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS") {
-        }
-        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
-            var arg_strs: List<String> = []
-            var ai: Float = 0
-            while (ai < args.length()) {
-                var val: String = this.gen_arg_value(args[ai])
-                arg_strs.push("i64 " + val)
-                ai = ai + 1
-            }
-            var prefixed_name: String = method
-            if (this.module_prefixes.has(obj_name)) {
-                prefixed_name = this.module_prefixes.get(obj_name) + method
-            } else if (this.func_prefix_map.has(method)) {
-                prefixed_name = this.func_prefix_map.get(method)
-            } else {
-                var guessed: String = obj_name.to_lower() + "_" + method
-                if (this.known_functions.contains(guessed)) {
-                    prefixed_name = guessed
-                }
-            }
-            this.called_functions.push(prefixed_name)
-            this.called_function_arity.set(prefixed_name, args.length())
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
-            if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
-            } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(method))
-            } else {
-                this.last_type = AST.Type.IntType
-            }
-            return local
-        }
-
-        // Check for super.method() calls
-        if (obj_name == "super" and this.current_parent.length() > 0) {
-            var self_val: String = this.fresh_local()
-            this.emit_indent(self_val + " = load i64, i64* %self")
-            var arg_strs: List<String> = []
-            arg_strs.push("i64 " + self_val)
-            var ai: Float = 0
-            while (ai < args.length()) {
-                var val: String = this.gen_arg_value(args[ai])
-                arg_strs.push("i64 " + val)
-                ai = ai + 1
-            }
-            var parent_method: String = this.current_parent + "__" + method
-            this.called_functions.push(parent_method)
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-
         // Check for IO module calls
         if (obj_name == "IO") {
             if (method == "println") {
@@ -2010,64 +1954,6 @@ class Codegen {
                 this.last_type = AST.Type.NilType
                 return local
             }
-        }
-
-        // OS module
-        if (obj_name == "OS") {
-            if (method == "args") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-                return local
-            }
-            if (method == "exec") {
-                var cmd: String = this.gen_arg_value(args[0])
-                var cmd_ptr: String = this.fresh_local()
-                this.emit_indent(cmd_ptr + " = inttoptr i64 " + cmd + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_exec(i8* " + cmd_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "exit") {
-                var code: String = this.gen_arg_value(args[0])
-                var code32: String = this.fresh_local()
-                this.emit_indent(code32 + " = trunc i64 " + code + " to i32")
-                this.emit_indent("call void @exit(i32 " + code32 + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "cwd") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_cwd()")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "path_sep") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_path_sep()")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "platform") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_platform()")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "env") {
-                var name_val: String = this.gen_arg_value(args[0])
-                var name_ptr: String = this.fresh_local()
-                this.emit_indent(name_ptr + " = inttoptr i64 " + name_val + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_env(i8* " + name_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-        }
-
-        // IO module (read_file, write_file)
-        if (obj_name == "IO") {
             if (method == "read_file") {
                 var path: String = this.gen_arg_value(args[0])
                 var path_ptr: String = this.fresh_local()
@@ -2107,30 +1993,32 @@ class Codegen {
             }
         }
 
-        // Check for enum constructor: EnumName.Variant(args)
+        // Check for enum constructor: EnumName.Variant(args) — MUST come before builtin dispatch
         if (obj_name.length() > 0) {
-            var key: String = obj_name + "." + method
-            if (this.enum_variant_tags.has(key)) {
+            var enum_key: String = obj_name + "." + method
+            if (this.enum_variant_tags.has(enum_key)) {
                 return this.gen_enum_construct(obj_name, method, args)
             }
         }
-        // Module-qualified enum: AST.Stmt.FunDecl(args) → object is MemberAccess
         if (obj_name.length() == 0) {
             var obj_kind: String = this.classify_expr(object)
             if (obj_kind == "member") {
                 var inner_field: String = match (object) { MemberAccess(o, f) => f
                     _ => ""
                 }
-                var key: String = inner_field + "." + method
-                if (this.enum_variant_tags.has(key)) {
+                var enum_key2: String = inner_field + "." + method
+                if (this.enum_variant_tags.has(enum_key2)) {
                     return this.gen_enum_construct(inner_field, method, args)
                 }
             }
         }
 
-        // --- Unambiguous builtin dispatch by method name (TEMPORARY) ---
-        // Bypasses broken var_types lookup in native binary.
-        // No method overloading exists, so method name uniquely identifies builtins.
+        // --- Unambiguous builtin dispatch by method name ---
+        // Must come BEFORE module check so that builtin methods (push, get, set, length, etc.)
+        // are dispatched correctly even when var_types.has(obj_name) returns false in the
+        // native binary. No method overloading exists, so method name uniquely identifies builtins.
+        // If the method name does not match any builtin, execution falls through to the module
+        // check and class method dispatch below.
         var obj: String = this.gen_arg_value(object)
 
         if (method == "push") {
@@ -2423,6 +2311,62 @@ class Codegen {
         if (method == "floor") {
             this.last_type = AST.Type.IntType
             return obj
+        }
+
+        // Check for super.method() calls
+        if (obj_name == "super" and this.current_parent.length() > 0) {
+            var self_val: String = this.fresh_local()
+            this.emit_indent(self_val + " = load i64, i64* %self")
+            var arg_strs: List<String> = []
+            arg_strs.push("i64 " + self_val)
+            var ai: Float = 0
+            while (ai < args.length()) {
+                var val: String = this.gen_arg_value(args[ai])
+                arg_strs.push("i64 " + val)
+                ai = ai + 1
+            }
+            var parent_method: String = this.current_parent + "__" + method
+            this.called_functions.push(parent_method)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+
+        // (enum check moved above builtin dispatch)
+
+        // Check for imported module function calls (module alias or unknown name)
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
+            var arg_strs: List<String> = []
+            var ai: Float = 0
+            while (ai < args.length()) {
+                var val: String = this.gen_arg_value(args[ai])
+                arg_strs.push("i64 " + val)
+                ai = ai + 1
+            }
+            var prefixed_name: String = method
+            if (this.module_prefixes.has(obj_name)) {
+                prefixed_name = this.module_prefixes.get(obj_name) + method
+            } else if (this.func_prefix_map.has(method)) {
+                prefixed_name = this.func_prefix_map.get(method)
+            } else {
+                var guessed: String = obj_name.to_lower() + "_" + method
+                if (this.known_functions.contains(guessed)) {
+                    prefixed_name = guessed
+                }
+            }
+            this.called_functions.push(prefixed_name)
+            this.called_function_arity.set(prefixed_name, args.length())
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return local
         }
 
         // Fall back to class method call (inside or outside class)
