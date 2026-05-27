@@ -2666,7 +2666,11 @@ class Codegen {
         }
 
         this.emit("")
-        this.emit("define " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
+        var closure_linkage: String = "define"
+        if (this.current_prefix.length() > 0) {
+            closure_linkage = "define linkonce_odr"
+        }
+        this.emit(closure_linkage + " " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
         this.emit("entry:")
         this.block_terminated = false
 
@@ -3358,7 +3362,11 @@ class Codegen {
         this.func_ret_types.set(name, this.str_to_type(name))
         if (this.register_only) { return }
         this.emit("")
-        this.emit("define i64 @" + emit_name + "() {")
+        var ctor_linkage: String = "define"
+        if (this.current_prefix.length() > 0) {
+            ctor_linkage = "define linkonce_odr"
+        }
+        this.emit(ctor_linkage + " i64 @" + emit_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
@@ -3795,7 +3803,11 @@ class Codegen {
         }
 
         this.emit("")
-        this.emit("define " + ret_llvm + " @" + emit_name + "(" + param_strs.join(", ") + ") {")
+        var linkage: String = "define"
+        if (this.current_prefix.length() > 0) {
+            linkage = "define linkonce_odr"
+        }
+        this.emit(linkage + " " + ret_llvm + " @" + emit_name + "(" + param_strs.join(", ") + ") {")
         this.emit("entry:")
         this.block_terminated = false
 
