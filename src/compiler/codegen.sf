@@ -1226,7 +1226,7 @@ class Codegen {
         if (ftype == "String") return "String"
         if (ftype == "Float" or ftype == "Number") return "Int"
         if (ftype == "Bool") return "Int"
-        if (ftype.starts_with("List")) return "StringList"
+        if (ftype.starts_with("List")) return "List<String>"
         return "Int"
     }
 
@@ -1360,11 +1360,11 @@ class Codegen {
         this.emit_indent(final_idx + " = select i1 " + is_neg + ", i64 " + adjusted + ", i64 " + idx)
         var local = this.fresh_local()
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
-        if (obj_type == "StringList" or obj_type.contains("String")) {
+        if (obj_type == "List<String>") {
             this.last_type = "String"
         } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             var vtype = this.var_types.get(obj_name)
-            if (vtype == "StringList" or vtype.contains("String")) {
+            if (vtype == "List<String>") {
                 this.last_type = "String"
             } else {
                 this.last_type = "Int"
@@ -1391,7 +1391,7 @@ class Codegen {
             if (method == "args") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = "StringList"
+                this.last_type = "List<String>"
                 return local
             }
             if (method == "exec") {
@@ -1489,7 +1489,7 @@ class Codegen {
             if (method == "args") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = "StringList"
+                this.last_type = "List<String>"
                 return local
             }
             if (method == "exec") {
@@ -1558,7 +1558,7 @@ class Codegen {
         var obj_type = this.last_type
 
         // List methods
-        if (obj_type == "List" or obj_type == "StringList" or obj_type.starts_with("List<")) {
+        if (obj_type == "List" or obj_type.starts_with("List<")) {
             if (method == "push") {
                 var val = this.gen_arg_value(args[0])
                 this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
@@ -1658,7 +1658,7 @@ class Codegen {
             if (method == "keys") {
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
-                this.last_type = "StringList"
+                this.last_type = "List<String>"
                 return local
             }
         }
@@ -1734,7 +1734,7 @@ class Codegen {
                 this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
                 var local = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
-                this.last_type = "StringList"
+                this.last_type = "List<String>"
                 return local
             }
             if (method == "replace") {
