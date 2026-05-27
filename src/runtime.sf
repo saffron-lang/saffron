@@ -1,0 +1,598 @@
+// Saffron Runtime Library
+// Provides List, Map, StringBuilder, String ops, I/O, and OS primitives.
+// Compiled to LLVM IR and linked with every native program.
+
+// --- C Library Bindings ---
+
+@extern("void* malloc(i64)") fun rt_malloc(size: Int): Int
+@extern("void* realloc(void*, i64)") fun rt_realloc(ptr: Int, size: Int): Int
+@extern("void free(void*)") fun rt_free(ptr: Int)
+@extern("i64 strlen(void*)") fun rt_strlen(s: Int): Int
+@extern("void* strcpy(void*, void*)") fun rt_strcpy(dst: Int, src: Int): Int
+@extern("void* strcat(void*, void*)") fun rt_strcat(dst: Int, src: Int): Int
+@extern("void* strstr(void*, void*)") fun rt_strstr(haystack: Int, needle: Int): Int
+@extern("i32 strcmp(void*, void*)") fun rt_strcmp(a: Int, b: Int): Int
+@extern("void* strdup(void*)") fun rt_strdup(s: Int): Int
+@extern("void* memcpy(void*, void*, i64)") fun rt_memcpy(dst: Int, src: Int, n: Int): Int
+@extern("i32 snprintf(void*, i64, void*, ...)") fun rt_snprintf(buf: Int, size: Int, fmt: Int, val: Int): Int
+@extern("void* fopen(void*, void*)") fun rt_fopen(path: Int, mode: Int): Int
+@extern("i64 fread(void*, i64, i64, void*)") fun rt_fread(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fwrite(void*, i64, i64, void*)") fun rt_fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i32 fclose(void*)") fun rt_fclose(fp: Int): Int
+@extern("i32 fseek(void*, i64, i32)") fun rt_fseek(fp: Int, offset: Int, whence: Int): Int
+@extern("i64 ftell(void*)") fun rt_ftell(fp: Int): Int
+@extern("void* fgets(void*, i32, void*)") fun rt_fgets(buf: Int, size: Int, fp: Int): Int
+@extern("void* popen(void*, void*)") fun rt_popen(cmd: Int, mode: Int): Int
+@extern("i32 pclose(void*)") fun rt_pclose(fp: Int): Int
+@extern("i32 access(void*, i32)") fun rt_access(path: Int, mode: Int): Int
+@extern("i32 mkdir(void*, i32)") fun rt_mkdir(path: Int, mode: Int): Int
+@extern("void* getcwd(void*, i64)") fun rt_getcwd(buf: Int, size: Int): Int
+@extern("void* getenv(void*)") fun rt_getenv(name: Int): Int
+
+// --- Intrinsics ---
+
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
+@intrinsic fun load8(addr: Int): Int
+@intrinsic fun store8(addr: Int, val: Int)
+
+// =============================================================================
+// List: { count@0, capacity@8, data*@16 } — 24 bytes
+// =============================================================================
+
+fun __list_new(): Int {
+    var raw: Int = rt_malloc(24)
+    store64(raw, 0)
+    store64(raw + 8, 8)
+    store64(raw + 16, rt_malloc(64))
+    return raw
+}
+
+fun __list_push(list: Int, value: Int) {
+    var count: Int = load64(list)
+    var cap: Int = load64(list + 8)
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        store64(list + 8, new_cap)
+        store64(list + 16, rt_realloc(load64(list + 16), new_cap * 8))
+    }
+    var data: Int = load64(list + 16)
+    store64(data + count * 8, value)
+    store64(list, count + 1)
+}
+
+fun __list_get(list: Int, index: Int): Int {
+    var data: Int = load64(list + 16)
+    return load64(data + index * 8)
+}
+
+fun __list_set(list: Int, index: Int, value: Int) {
+    var data: Int = load64(list + 16)
+    store64(data + index * 8, value)
+}
+
+fun __list_length(list: Int): Int {
+    return load64(list)
+}
+
+fun __list_pop(list: Int): Int {
+    var count: Int = load64(list)
+    var new_count: Int = count - 1
+    store64(list, new_count)
+    var data: Int = load64(list + 16)
+    return load64(data + new_count * 8)
+}
+
+// =============================================================================
+// StringBuilder: { len@0, cap@8, buf*@16 } — 24 bytes
+// =============================================================================
+
+fun StringBuilder(): Int {
+    var raw: Int = rt_malloc(24)
+    store64(raw, 0)
+    store64(raw + 8, 1024)
+    var buf: Int = rt_malloc(1024)
+    store8(buf, 0)
+    store64(raw + 16, buf)
+    return raw
+}
+
+fun __sb_append(sb: Int, str: Int) {
+    var len: Int = load64(sb)
+    var cap: Int = load64(sb + 8)
+    var buf: Int = load64(sb + 16)
+    var slen: Int = rt_strlen(str)
+    var needed: Int = len + slen + 1
+    if (needed >= cap) {
+        var new_cap: Int = needed * 2
+        store64(sb + 8, new_cap)
+        buf = rt_realloc(buf, new_cap)
+        store64(sb + 16, buf)
+    }
+    rt_memcpy(buf + len, str, slen)
+    var new_len: Int = len + slen
+    store64(sb, new_len)
+    store8(buf + new_len, 0)
+}
+
+fun __sb_to_string(sb: Int): Int {
+    return load64(sb + 16)
+}
+
+// =============================================================================
+// Map: { count@0, capacity@8, keys*@16, values*@24 } — 32 bytes
+// =============================================================================
+
+fun __safe_strcmp(a: Int, b: Int): Int {
+    if (a == 0) { return 1 }
+    if (b == 0) { return 1 }
+    return rt_strcmp(a, b)
+}
+
+fun __map_new(): Int {
+    var raw: Int = rt_malloc(32)
+    store64(raw, 0)
+    store64(raw + 8, 16)
+    store64(raw + 16, rt_malloc(128))
+    store64(raw + 24, rt_malloc(128))
+    return raw
+}
+
+fun __map_set(map: Int, key: Int, value: Int) {
+    var count: Int = load64(map)
+    var cap: Int = load64(map + 8)
+    var keys: Int = load64(map + 16)
+    var vals: Int = load64(map + 24)
+    var i: Int = 0
+    while (i < count) {
+        var kval: Int = load64(keys + i * 8)
+        if (__safe_strcmp(key, kval) == 0) {
+            store64(vals + i * 8, value)
+            return
+        }
+        i = i + 1
+    }
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        store64(map + 8, new_cap)
+        var new_bytes: Int = new_cap * 8
+        keys = rt_realloc(keys, new_bytes)
+        store64(map + 16, keys)
+        vals = rt_realloc(vals, new_bytes)
+        store64(map + 24, vals)
+    }
+    var cur_keys: Int = load64(map + 16)
+    var cur_vals: Int = load64(map + 24)
+    store64(cur_keys + count * 8, key)
+    store64(cur_vals + count * 8, value)
+    store64(map, count + 1)
+}
+
+fun __map_get(map: Int, key: Int): Int {
+    var count: Int = load64(map)
+    var keys: Int = load64(map + 16)
+    var vals: Int = load64(map + 24)
+    var i: Int = 0
+    while (i < count) {
+        var kval: Int = load64(keys + i * 8)
+        if (__safe_strcmp(key, kval) == 0) {
+            return load64(vals + i * 8)
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fun __map_has(map: Int, key: Int): Int {
+    var count: Int = load64(map)
+    var keys: Int = load64(map + 16)
+    var i: Int = 0
+    while (i < count) {
+        var kval: Int = load64(keys + i * 8)
+        if (__safe_strcmp(key, kval) == 0) {
+            return 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fun __map_keys(map: Int): Int {
+    var count: Int = load64(map)
+    var kp: Int = load64(map + 16)
+    var list: Int = __list_new()
+    var i: Int = 0
+    while (i < count) {
+        __list_push(list, load64(kp + i * 8))
+        i = i + 1
+    }
+    return list
+}
+
+// =============================================================================
+// String Utilities
+// =============================================================================
+
+fun __int_to_string(val: Int): Int {
+    var buf: Int = rt_malloc(32)
+    var fmt: Int = rt_malloc(4)
+    store8(fmt, 37)
+    store8(fmt + 1, 108)
+    store8(fmt + 2, 100)
+    store8(fmt + 3, 0)
+    rt_snprintf(buf, 32, fmt, val)
+    rt_free(fmt)
+    return buf
+}
+
+fun __str_ends_with(str: Int, suffix: Int): Int {
+    var slen: Int = rt_strlen(str)
+    var plen: Int = rt_strlen(suffix)
+    if (plen > slen) { return 0 }
+    var offset: Int = slen - plen
+    var cmp: Int = rt_strcmp(str + offset, suffix)
+    if (cmp == 0) { return 1 }
+    return 0
+}
+
+fun __str_split(input: Int, delim: Int): Int {
+    var list: Int = __list_new()
+    var slen: Int = rt_strlen(input)
+    var buf: Int = rt_malloc(slen + 1)
+    rt_strcpy(buf, input)
+    var dlen: Int = rt_strlen(delim)
+    var pos: Int = buf
+    while (rt_strlen(pos) > 0) {
+        var m: Int = rt_strstr(pos, delim)
+        if (m == 0) {
+            var lb: Int = rt_malloc(slen + 1)
+            rt_strcpy(lb, pos)
+            __list_push(list, lb)
+            return list
+        }
+        store8(m, 0)
+        var tb: Int = rt_malloc(slen + 1)
+        rt_strcpy(tb, pos)
+        __list_push(list, tb)
+        pos = m + dlen
+    }
+    return list
+}
+
+fun __join_append(buf_p: Int, len_p: Int, cap_p: Int, src: Int, src_len: Int) {
+    var len: Int = load64(len_p)
+    var cap: Int = load64(cap_p)
+    var buf: Int = load64(buf_p)
+    var needed: Int = len + src_len + 1
+    if (needed >= cap) {
+        var new_cap: Int = needed * 2
+        store64(cap_p, new_cap)
+        buf = rt_realloc(buf, new_cap)
+        store64(buf_p, buf)
+    }
+    var cur_buf: Int = load64(buf_p)
+    rt_memcpy(cur_buf + len, src, src_len)
+    var new_len: Int = len + src_len
+    store64(len_p, new_len)
+    store8(cur_buf + new_len, 0)
+}
+
+fun __str_replace(str: Int, old: Int, replacement: Int): Int {
+    var slen: Int = rt_strlen(str)
+    var olen: Int = rt_strlen(old)
+    var nlen: Int = rt_strlen(replacement)
+    var init_cap: Int = (slen + 1) * 2
+    var buf_p: Int = rt_malloc(8)
+    var len_p: Int = rt_malloc(8)
+    var cap_p: Int = rt_malloc(8)
+    var init_buf: Int = rt_malloc(init_cap)
+    store8(init_buf, 0)
+    store64(buf_p, init_buf)
+    store64(len_p, 0)
+    store64(cap_p, init_cap)
+    var src: Int = str
+    while (rt_strlen(src) > 0) {
+        var found: Int = rt_strstr(src, old)
+        if (found == 0) {
+            __join_append(buf_p, len_p, cap_p, src, rt_strlen(src))
+            return load64(buf_p)
+        }
+        var plen: Int = found - src
+        __join_append(buf_p, len_p, cap_p, src, plen)
+        __join_append(buf_p, len_p, cap_p, replacement, nlen)
+        src = found + olen
+    }
+    return load64(buf_p)
+}
+
+fun __list_join(list: Int, sep: Int): Int {
+    var count: Int = load64(list)
+    var data: Int = load64(list + 16)
+    var sep_len: Int = rt_strlen(sep)
+    var buf_p: Int = rt_malloc(8)
+    var len_p: Int = rt_malloc(8)
+    var cap_p: Int = rt_malloc(8)
+    var init_buf: Int = rt_malloc(1024)
+    store8(init_buf, 0)
+    store64(buf_p, init_buf)
+    store64(len_p, 0)
+    store64(cap_p, 1024)
+    var i: Int = 0
+    while (i < count) {
+        if (i > 0) {
+            __join_append(buf_p, len_p, cap_p, sep, sep_len)
+        }
+        var elem: Int = load64(data + i * 8)
+        var elem_len: Int = rt_strlen(elem)
+        __join_append(buf_p, len_p, cap_p, elem, elem_len)
+        i = i + 1
+    }
+    return load64(buf_p)
+}
+
+fun __list_contains(list: Int, val: Int): Int {
+    var count: Int = load64(list)
+    var data: Int = load64(list + 16)
+    var i: Int = 0
+    while (i < count) {
+        var elem: Int = load64(data + i * 8)
+        if (__safe_strcmp(val, elem) == 0) {
+            return 1
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+// =============================================================================
+// I/O
+// =============================================================================
+
+fun __io_read_file(path: Int): Int {
+    var mode: Int = rt_malloc(2)
+    store8(mode, 114)
+    store8(mode + 1, 0)
+    var fp: Int = rt_fopen(path, mode)
+    rt_free(mode)
+    if (fp == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
+    rt_fseek(fp, 0, 2)
+    var size: Int = rt_ftell(fp)
+    rt_fseek(fp, 0, 0)
+    var buf: Int = rt_malloc(size + 1)
+    rt_fread(buf, 1, size, fp)
+    store8(buf + size, 0)
+    rt_fclose(fp)
+    return buf
+}
+
+fun __io_write_file(path: Int, content: Int) {
+    var mode: Int = rt_malloc(2)
+    store8(mode, 119)
+    store8(mode + 1, 0)
+    var fp: Int = rt_fopen(path, mode)
+    rt_free(mode)
+    if (fp == 0) { return }
+    var len: Int = rt_strlen(content)
+    rt_fwrite(content, 1, len, fp)
+    rt_fclose(fp)
+}
+
+fun __io_file_exists(path: Int): Int {
+    var rc: Int = rt_access(path, 0)
+    if (rc == 0) { return 1 }
+    return 0
+}
+
+fun __io_mkdir(path: Int) {
+    rt_mkdir(path, 493)
+}
+
+// =============================================================================
+// OS
+// =============================================================================
+
+fun __os_cwd(): Int {
+    var buf: Int = rt_malloc(4096)
+    var result: Int = rt_getcwd(buf, 4096)
+    if (result == 0) {
+        store8(buf, 0)
+    }
+    return buf
+}
+
+fun __os_path_sep(): Int {
+    var s: Int = rt_malloc(2)
+    store8(s, 47)
+    store8(s + 1, 0)
+    return s
+}
+
+fun __os_platform(): Int {
+    var s: Int = rt_malloc(6)
+    store8(s, 109)
+    store8(s + 1, 97)
+    store8(s + 2, 99)
+    store8(s + 3, 111)
+    store8(s + 4, 115)
+    store8(s + 5, 0)
+    return s
+}
+
+fun __os_env(name: Int): Int {
+    var val: Int = rt_getenv(name)
+    if (val == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
+    return rt_strdup(val)
+}
+
+fun __os_exec(cmd: Int): Int {
+    var mode: Int = rt_malloc(2)
+    store8(mode, 114)
+    store8(mode + 1, 0)
+    var fp: Int = rt_popen(cmd, mode)
+    rt_free(mode)
+    if (fp == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
+    var buf_p: Int = rt_malloc(8)
+    var len_p: Int = rt_malloc(8)
+    var cap_p: Int = rt_malloc(8)
+    var init_buf: Int = rt_malloc(4096)
+    store8(init_buf, 0)
+    store64(buf_p, init_buf)
+    store64(len_p, 0)
+    store64(cap_p, 4096)
+    var tmp: Int = rt_malloc(4096)
+    var line: Int = rt_fgets(tmp, 4096, fp)
+    while (line != 0) {
+        var chunk_len: Int = rt_strlen(tmp)
+        __join_append(buf_p, len_p, cap_p, tmp, chunk_len)
+        line = rt_fgets(tmp, 4096, fp)
+    }
+    rt_free(tmp)
+    rt_pclose(fp)
+    return load64(buf_p)
+}
+
+fun __os_args(): Int {
+    return __list_new()
+}
+
+// =============================================================================
+// Runtime String Methods
+// =============================================================================
+
+fun rt_str_trim(s: Int): Int {
+    var len: Int = rt_strlen(s)
+    var start: Int = 0
+    var end: Int = len
+    while (start < end) {
+        var ch: Int = load8(s + start)
+        if (ch == 32 or ch == 9 or ch == 10 or ch == 13) {
+            start = start + 1
+        } else {
+            break
+        }
+    }
+    while (end > start) {
+        var ch: Int = load8(s + end - 1)
+        if (ch == 32 or ch == 9 or ch == 10 or ch == 13) {
+            end = end - 1
+        } else {
+            break
+        }
+    }
+    var new_len: Int = end - start
+    var buf: Int = rt_malloc(new_len + 1)
+    rt_memcpy(buf, s + start, new_len)
+    store8(buf + new_len, 0)
+    return buf
+}
+
+fun rt_str_index_of(s: Int, needle: Int): Int {
+    var found: Int = rt_strstr(s, needle)
+    if (found == 0) { return 0 - 1 }
+    return found - s
+}
+
+fun rt_str_repeat(s: Int, count: Int): Int {
+    var len: Int = rt_strlen(s)
+    var total: Int = len * count
+    var buf: Int = rt_malloc(total + 1)
+    store8(buf, 0)
+    var i: Int = 0
+    while (i < count) {
+        rt_strcat(buf, s)
+        i = i + 1
+    }
+    return buf
+}
+
+fun rt_str_to_upper(s: Int): Int {
+    var len: Int = rt_strlen(s)
+    var buf: Int = rt_malloc(len + 1)
+    var i: Int = 0
+    while (i < len) {
+        var ch: Int = load8(s + i)
+        if (ch >= 97 and ch <= 122) {
+            store8(buf + i, ch - 32)
+        } else {
+            store8(buf + i, ch)
+        }
+        i = i + 1
+    }
+    store8(buf + len, 0)
+    return buf
+}
+
+fun rt_str_to_lower(s: Int): Int {
+    var len: Int = rt_strlen(s)
+    var buf: Int = rt_malloc(len + 1)
+    var i: Int = 0
+    while (i < len) {
+        var ch: Int = load8(s + i)
+        if (ch >= 65 and ch <= 90) {
+            store8(buf + i, ch + 32)
+        } else {
+            store8(buf + i, ch)
+        }
+        i = i + 1
+    }
+    store8(buf + len, 0)
+    return buf
+}
+
+// =============================================================================
+// Runtime List Methods
+// =============================================================================
+
+fun rt_list_reverse(list: Int): Int {
+    var len: Int = __list_length(list)
+    var new_list: Int = __list_new()
+    var i: Int = len - 1
+    while (i >= 0) {
+        __list_push(new_list, __list_get(list, i))
+        i = i - 1
+    }
+    return new_list
+}
+
+fun rt_list_copy(list: Int): Int {
+    var len: Int = __list_length(list)
+    var new_list: Int = __list_new()
+    var i: Int = 0
+    while (i < len) {
+        __list_push(new_list, __list_get(list, i))
+        i = i + 1
+    }
+    return new_list
+}
+
+fun rt_list_sort(list: Int): Int {
+    var copy: Int = rt_list_copy(list)
+    var len: Int = __list_length(copy)
+    var outer: Int = 0
+    while (outer < len - 1) {
+        var inner: Int = 0
+        while (inner < len - 1 - outer) {
+            var a: Int = __list_get(copy, inner)
+            var b: Int = __list_get(copy, inner + 1)
+            if (a > b) {
+                __list_set(copy, inner, b)
+                __list_set(copy, inner + 1, a)
+            }
+            inner = inner + 1
+        }
+        outer = outer + 1
+    }
+    return copy
+}
