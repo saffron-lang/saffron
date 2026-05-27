@@ -1702,6 +1702,10 @@ class Codegen {
             return obj
         }
         if (method == "to_string") {
+            if (obj_type == "String") {
+                this.last_type = "String"
+                return obj
+            }
             var local = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
             this.last_type = "String"
