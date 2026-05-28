@@ -1,4 +1,0 @@
-import "os" as OS
-import "./ast.sf" as AST
-fun main(): Int { return 0 }
-main()

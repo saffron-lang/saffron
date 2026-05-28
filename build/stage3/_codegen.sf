@@ -164,6 +164,18 @@ class Codegen {
         this.local_counter = 0
     }
 
+    fun set_last_type(t: AST.Type) {
+        this.last_type = t
+    }
+
+    fun set_current_class(c: String) {
+        this.current_class = c
+    }
+
+    fun set_current_prefix(p: String) {
+        this.current_prefix = p
+    }
+
     fun emit(line: String) {
         this.sb.append(line)
         this.sb.append("\n")
