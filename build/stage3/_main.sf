@@ -32,6 +32,11 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
         var dir: String = dir_of(base_path)
         return dir + "/" + import_path.slice(2, import_path.length())
     }
+    if (import_path.starts_with("../")) {
+        var dir: String = dir_of(base_path)
+        var parent: String = dir_of(dir)
+        return parent + "/" + import_path.slice(3, import_path.length())
+    }
     return import_path
 }
 
@@ -52,14 +57,11 @@ fun get_stmt_name(stmt: AST.Stmt): String {
 }
 
 fun is_import_stmt(stmt: AST.Stmt): Bool {
-    return match (stmt) {
-        VarDecl(n, t, init, d) => {
-            if (d.starts_with("@import:")) { return true }
-            if (n.starts_with("_import_")) { return true }
-            false
-        }
-        _ => false
-    }
+    var doc: String = get_stmt_doc(stmt)
+    if (doc.starts_with("@import:")) { return true }
+    var name: String = get_stmt_name(stmt)
+    if (name.starts_with("_import_")) { return true }
+    return false
 }
 
 fun extract_imports_from_ast(program: List<AST.Stmt>): List<String> {
@@ -72,7 +74,7 @@ fun extract_imports_from_ast(program: List<AST.Stmt>): List<String> {
             var pipe_idx: Float = info.index_of("|")
             if (pipe_idx >= 0) {
                 var path: String = info.slice(0, pipe_idx)
-                if (path.starts_with("./") or path.starts_with("@")) {
+                if (path.starts_with("./") or path.starts_with("../") or path.starts_with("@")) {
                     imports.push(path)
                 }
             }
@@ -134,7 +136,7 @@ fun extract_imports(source: String): List<String> {
     var i: Float = 0
     while (i < lines.length()) {
         var line: String = lines[i]
-        if (line.starts_with("import \"./") or line.starts_with("import \"@")) {
+        if (line.starts_with("import \"./") or line.starts_with("import \"../") or line.starts_with("import \"@")) {
             var start: Float = 8
             var end: Float = start + 1
             while (end < line.length()) {
@@ -158,7 +160,7 @@ fun extract_imports(source: String): List<String> {
                     path_end = path_end + 1
                 }
                 var imp_path: String = line.slice(path_start, path_end)
-                if (imp_path.starts_with("./") or imp_path.starts_with("@")) {
+                if (imp_path.starts_with("./") or imp_path.starts_with("../") or imp_path.starts_with("@")) {
                     imports.push(imp_path)
                 }
             }

@@ -10,8 +10,15 @@
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
+                // In identity mode, v's raw i64 bits ARE the IEEE 754 double.
+                // Emit as bitcast from those bits directly.
+                var bits: String = v.to_string()
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = add i64 0, " + bits)
+                var dbl: String = this.fresh_local()
+                this.emit_indent(dbl + " = bitcast i64 " + raw + " to double")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v.to_string() + ")")
+                this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
                 local
             }
             BoolLit(v) => {
@@ -351,9 +358,16 @@
             return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
+        var left_type: String = this.get_expr_type(left)
         var lhs: String = this.gen_arg_value(left)
+        if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
+        var right_type: String = this.get_expr_type(right)
         var rhs: String = this.gen_arg_value(right)
+        if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
+        if (left_type == "Float" or right_type == "Float") {
+            return this.gen_binary_float(lhs, rhs, op)
+        }
         return this.gen_binary_nanboxed(lhs, rhs, op)
     }
 
@@ -436,6 +450,38 @@
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + l_raw + ")")
         this.last_type = AST.Type.IntType
+        return local
+    }
+
+    fun gen_binary_float(lhs: String, rhs: String, op: String): String {
+        // Float arithmetic: untag as double → operate → retag
+        var is_cmp: Bool = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+        var l_f: String = this.fresh_local()
+        this.emit_indent(l_f + " = call double @__val_untag_float(i64 " + lhs + ")")
+        var r_f: String = this.fresh_local()
+        this.emit_indent(r_f + " = call double @__val_untag_float(i64 " + rhs + ")")
+        if (!is_cmp) {
+            var result_f: String = this.fresh_local()
+            if (op == "+") { this.emit_indent(result_f + " = fadd double " + l_f + ", " + r_f) }
+            else if (op == "-") { this.emit_indent(result_f + " = fsub double " + l_f + ", " + r_f) }
+            else if (op == "*") { this.emit_indent(result_f + " = fmul double " + l_f + ", " + r_f) }
+            else if (op == "/") { this.emit_indent(result_f + " = fdiv double " + l_f + ", " + r_f) }
+            else if (op == "%") { this.emit_indent(result_f + " = frem double " + l_f + ", " + r_f) }
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_float(double " + result_f + ")")
+            this.last_type = AST.Type.FloatType
+            return local
+        }
+        var cmp_result: String = this.fresh_local()
+        if (op == "==") { this.emit_indent(cmp_result + " = fcmp oeq double " + l_f + ", " + r_f) }
+        else if (op == "!=") { this.emit_indent(cmp_result + " = fcmp one double " + l_f + ", " + r_f) }
+        else if (op == "<") { this.emit_indent(cmp_result + " = fcmp olt double " + l_f + ", " + r_f) }
+        else if (op == "<=") { this.emit_indent(cmp_result + " = fcmp ole double " + l_f + ", " + r_f) }
+        else if (op == ">") { this.emit_indent(cmp_result + " = fcmp ogt double " + l_f + ", " + r_f) }
+        else if (op == ">=") { this.emit_indent(cmp_result + " = fcmp oge double " + l_f + ", " + r_f) }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = select i1 " + cmp_result + ", i64 9222246136947933185, i64 9222246136947933184")
+        this.last_type = AST.Type.BoolType
         return local
     }
 
@@ -1143,13 +1189,16 @@
         var max_fields: Float = this.get_max_fields(enum_name)
 
         if (max_fields <= 1) {
-            // Simple encoding: (tag << 56) | value
+            // Simple encoding: (tag << 56) | raw_value
+            // Untag value before storing to avoid NaN-box tag collision
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 this.last_type = AST.Type.EnumType(enum_name); return local
             }
-            var val: String = this.gen_arg_value(args[0])
+            var val_tagged: String = this.gen_arg_value(args[0])
+            var val: String = this.fresh_local()
+            this.emit_indent(val + " = call i64 @__val_untag_int(i64 " + val_tagged + ")")
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined: String = this.fresh_local()
