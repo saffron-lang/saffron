@@ -1,0 +1,34 @@
+//! Compile Saffron source code to LLVM IR.
+//! Provides a public API wrapping the internal compiler codegen.
+
+import "../compiler/lexer.sf" as Lexer
+import "../compiler/parser.sf" as Parser
+import "../compiler/codegen.sf" as Codegen
+import "../compiler/ast.sf" as AST
+
+/// Compile a source string to LLVM IR text.
+fun compile(source: String): String {
+    var lexer = Lexer.Lexer(source)
+    var tokens = lexer.tokenize()
+    var parser = Parser.Parser(tokens)
+    var program = parser.parse_program()
+    return Codegen.generate(program)
+}
+
+/// Compile an already-parsed AST to LLVM IR text.
+fun compile_ast(program: List<AST.Stmt>): String {
+    return Codegen.generate(program)
+}
+
+/// Compile a source file to LLVM IR and write to output path.
+fun compile_file(input_path: String, output_path: String) {
+    var source = IO.read_file(input_path)
+    var ir = compile(source)
+    IO.write_file(output_path, ir)
+}
+
+/// Compile source and return whether it succeeded (no IR errors).
+fun can_compile(source: String): Bool {
+    var ir = compile(source)
+    return ir.length() > 0
+}

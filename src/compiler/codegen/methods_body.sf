@@ -246,6 +246,15 @@
     this.current_prefix = saved_prefix
     }
 
+    fun set_result_type(result_type: String) {
+    if (result_type == "Nil") { this.last_type = AST.Type.NilType }
+    else if (result_type == "Int") { this.last_type = AST.Type.IntType }
+    else if (result_type == "Bool") { this.last_type = AST.Type.BoolType }
+    else if (result_type == "String") { this.last_type = AST.Type.StringType }
+    else if (result_type == "List") { this.last_type = this.make_list_type() }
+    else if (result_type == "ListStr") { this.last_type = this.make_list_str_type() }
+    }
+
     fun emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
     var desc: String = this.builtin_methods.get(method)
     var parts: List<String> = desc.split("|")
@@ -254,16 +263,11 @@
     var result_type: String = parts[2]
     var needs_push: String = parts[3]
     if (needs_push == "1") { this.called_functions.push(func_name) }
-    if (result_type == "Nil") { this.last_type = AST.Type.NilType }
-    else if (result_type == "Int") { this.last_type = AST.Type.IntType }
-    else if (result_type == "Bool") { this.last_type = AST.Type.BoolType }
-    else if (result_type == "String") { this.last_type = AST.Type.StringType }
-    else if (result_type == "List") { this.last_type = this.make_list_type() }
-    else if (result_type == "ListStr") { this.last_type = this.make_list_str_type() }
     if (pattern == "v2") {
         var val: String = this.gen_arg_value(args[0])
         var discard: String = this.fresh_local()
         this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        this.set_result_type(result_type)
         return "0"
     }
     if (pattern == "v3") {
@@ -271,28 +275,33 @@
         var a2: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
         this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        this.set_result_type(result_type)
         return "0"
     }
     if (pattern == "r1") {
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        this.set_result_type(result_type)
         return local
     }
     if (pattern == "r2") {
         var val: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        this.set_result_type(result_type)
         return local
     }
     if (pattern == "p1") {
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        this.set_result_type(result_type)
         return local
     }
     if (pattern == "p2") {
         var a1: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        this.set_result_type(result_type)
         return local
     }
     if (pattern == "p3") {
@@ -300,14 +309,17 @@
         var a2: String = this.gen_arg_value(args[1])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        this.set_result_type(result_type)
         return local
     }
     if (pattern == "m2") {
         var a1: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        this.set_result_type(result_type)
         return local
     }
+    this.set_result_type(result_type)
     return "0"
     }
 
@@ -675,6 +687,12 @@
             this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + obj + ")")
             this.last_type = AST.Type.StringType
             return local
+        } else if (this.enum_defs.has(obj_type)) {
+            var ts_func: String = obj_type + "__to_string"
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
         } else {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
@@ -774,6 +792,13 @@
         if (obj_type == "String") {
             this.last_type = AST.Type.StringType
             return obj
+        }
+        if (this.enum_defs.has(obj_type)) {
+            var ts_func: String = obj_type + "__to_string"
+            var ts_local: String = this.fresh_local()
+            this.emit_indent(ts_local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return ts_local
         }
         var ts_local: String = this.fresh_local()
         this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + obj + ")")

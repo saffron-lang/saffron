@@ -426,6 +426,180 @@
             }
             i = i + 1
         }
+
+        // Emit to_string function for this enum
+        this.emit_enum_to_string(name, variants)
+    }
+
+    fun emit_enum_to_string(name: String, variants: List<AST.Variant>) {
+        if (this.register_only) { return }
+        var max_fields: Float = this.get_max_fields(name)
+        var func_name: String = name + "__to_string"
+
+        this.emit("")
+        this.emit("define linkonce_odr i64 @" + func_name + "(i64 %self) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+
+        // Extract tag based on encoding
+        var tag_val: String = ""
+        if (max_fields <= 1) {
+            tag_val = this.fresh_local()
+            this.emit_indent(tag_val + " = lshr i64 %self, 56")
+        } else {
+            var arr_ptr: String = this.fresh_local()
+            this.emit_indent(arr_ptr + " = inttoptr i64 %self to i64*")
+            tag_val = this.fresh_local()
+            this.emit_indent(tag_val + " = load i64, i64* " + arr_ptr)
+        }
+
+        // Build switch on tag
+        var end_label: String = this.fresh_label("ets.end")
+        var arm_labels: List<String> = []
+        var i: Float = 0
+        while (i < variants.length()) {
+            arm_labels.push(this.fresh_label("ets.v"))
+            i = i + 1
+        }
+
+        var switch_cases: String = ""
+        i = 0
+        while (i < variants.length()) {
+            switch_cases = switch_cases + " i64 " + i.floor().to_string() + ", label %" + arm_labels[i]
+            i = i + 1
+        }
+        this.emit_indent("switch i64 " + tag_val + ", label %" + end_label + " [" + switch_cases + " ]")
+        this.block_terminated = true
+
+        // Emit each variant arm
+        i = 0
+        while (i < variants.length()) {
+            var v: AST.Variant = variants[i]
+            var vname: String = this.get_variant_name(v)
+            var vfields: String = this.get_variant_fields(v)
+
+            this.start_block(arm_labels[i])
+
+            if (vfields.length() == 0) {
+                // No fields: just return "VariantName"
+                var const_name: String = this.add_string_constant(vname)
+                var str_len: Float = vname.length() + 1
+                var gep: String = this.fresh_local()
+                this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                var as_i64: String = this.fresh_local()
+                this.emit_indent(as_i64 + " = ptrtoint i8* " + gep + " to i64")
+                this.emit_terminator("ret i64 " + as_i64)
+            } else {
+                // Has fields: build "VariantName(field0, field1, ...)"
+                var parts: List<String> = this.split_respecting_generics(vfields, ",")
+                var num_fields: Float = parts.length()
+
+                // Start with "VariantName("
+                var prefix_str: String = vname + "("
+                var prefix_const: String = this.add_string_constant(prefix_str)
+                var prefix_len: Float = prefix_str.length() + 1
+                var prefix_gep: String = this.fresh_local()
+                this.emit_indent(prefix_gep + " = getelementptr [" + prefix_len.to_string() + " x i8], [" + prefix_len.to_string() + " x i8]* " + prefix_const + ", i64 0, i64 0")
+                var prefix_i64: String = this.fresh_local()
+                this.emit_indent(prefix_i64 + " = ptrtoint i8* " + prefix_gep + " to i64")
+
+                // Create a StringBuilder, append prefix
+                var sb: String = this.fresh_local()
+                this.emit_indent(sb + " = call i64 @StringBuilder()")
+                this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + prefix_i64 + ")")
+
+                // For each field, extract, convert to string, append
+                var fi: Float = 0
+                while (fi < num_fields) {
+                    // Extract field value
+                    var field_val: String = ""
+                    if (max_fields <= 1) {
+                        // Simple encoding: value = self & 0x00FFFFFFFFFFFFFF
+                        field_val = this.fresh_local()
+                        this.emit_indent(field_val + " = and i64 %self, 72057594037927935")
+                    } else {
+                        // Array encoding: fields start at index 1
+                        var num_slots: Float = num_fields + 1
+                        var total_str: String = num_slots.floor().to_string()
+                        var f_arr: String = this.fresh_local()
+                        this.emit_indent(f_arr + " = inttoptr i64 %self to [" + total_str + " x i64]*")
+                        var field_idx: Float = fi + 1
+                        var f_slot: String = this.fresh_local()
+                        this.emit_indent(f_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + f_arr + ", i64 0, i64 " + field_idx.floor().to_string())
+                        field_val = this.fresh_local()
+                        this.emit_indent(field_val + " = load i64, i64* " + f_slot)
+                    }
+
+                    // Determine field type and convert to string
+                    var field_part: String = parts[fi]
+                    var field_type: String = "Int"
+                    if (field_part.contains(":")) {
+                        var ft_parts: List<String> = field_part.split(":")
+                        if (ft_parts.length() > 1) {
+                            field_type = ft_parts[1]
+                        }
+                    }
+
+                    var field_str: String = ""
+                    if (field_type == "String") {
+                        field_str = field_val
+                    } else if (field_type == "Bool") {
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + field_val + ")")
+                    } else {
+                        field_str = this.fresh_local()
+                        this.emit_indent(field_str + " = call i64 @__int_to_string(i64 " + field_val + ")")
+                    }
+
+                    this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + field_str + ")")
+
+                    // Append ", " between fields
+                    if (fi < num_fields - 1) {
+                        var comma_const: String = this.add_string_constant(", ")
+                        var comma_len: Float = 3
+                        var comma_gep: String = this.fresh_local()
+                        this.emit_indent(comma_gep + " = getelementptr [" + comma_len.to_string() + " x i8], [" + comma_len.to_string() + " x i8]* " + comma_const + ", i64 0, i64 0")
+                        var comma_i64: String = this.fresh_local()
+                        this.emit_indent(comma_i64 + " = ptrtoint i8* " + comma_gep + " to i64")
+                        this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + comma_i64 + ")")
+                    }
+
+                    fi = fi + 1
+                }
+
+                // Append closing ")"
+                var close_const: String = this.add_string_constant(")")
+                var close_len: Float = 2
+                var close_gep: String = this.fresh_local()
+                this.emit_indent(close_gep + " = getelementptr [" + close_len.to_string() + " x i8], [" + close_len.to_string() + " x i8]* " + close_const + ", i64 0, i64 0")
+                var close_i64: String = this.fresh_local()
+                this.emit_indent(close_i64 + " = ptrtoint i8* " + close_gep + " to i64")
+                this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + close_i64 + ")")
+
+                // Finalize
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = call i64 @__sb_to_string(i64 " + sb + ")")
+                this.emit_terminator("ret i64 " + result)
+            }
+
+            i = i + 1
+        }
+
+        // Default case (unreachable but needed)
+        this.start_block(end_label)
+        var empty_const: String = this.add_string_constant("Unknown")
+        var empty_len: Float = 8
+        var empty_gep: String = this.fresh_local()
+        this.emit_indent(empty_gep + " = getelementptr [" + empty_len.to_string() + " x i8], [" + empty_len.to_string() + " x i8]* " + empty_const + ", i64 0, i64 0")
+        var empty_i64: String = this.fresh_local()
+        this.emit_indent(empty_i64 + " = ptrtoint i8* " + empty_gep + " to i64")
+        this.emit_terminator("ret i64 " + empty_i64)
+
+        this.emit("}")
+        this.block_terminated = false
+        this.known_functions.push(func_name)
+        this.func_ret_types.set(func_name, "String")
     }
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {

@@ -95,6 +95,13 @@ extend fun Codegen.coerce_to_string(val: String, val_type: String): String {
             this.emit_indent(result + " = call i64 @__nil_to_string()")
             return result
         }
+        // Enum with generated to_string
+        if (this.enum_defs.has(val_type)) {
+            var ts_method: String = val_type + "__to_string"
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
+            return result
+        }
         // Class with to_string method
         if (this.class_fields.has(val_type)) {
             var ts_method: String = val_type + "__to_string"
