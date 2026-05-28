@@ -358,16 +358,8 @@
             return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
-        var left_type: String = this.get_expr_type(left)
         var lhs: String = this.gen_arg_value(left)
-        if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
-        var right_type: String = this.get_expr_type(right)
         var rhs: String = this.gen_arg_value(right)
-        if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
-
-        if (left_type == "Float" or right_type == "Float") {
-            return this.gen_binary_float(lhs, rhs, op)
-        }
         return this.gen_binary_nanboxed(lhs, rhs, op)
     }
 
@@ -439,9 +431,11 @@
             else if (op == "<=") { this.emit_indent(cmp_result + " = icmp sle i64 " + l_raw + ", " + r_raw) }
             else if (op == ">") { this.emit_indent(cmp_result + " = icmp sgt i64 " + l_raw + ", " + r_raw) }
             else if (op == ">=") { this.emit_indent(cmp_result + " = icmp sge i64 " + l_raw + ", " + r_raw) }
-            // Result is a NaN-boxed bool: select VAL_TRUE or VAL_FALSE
+            // Tag the boolean result via __val_tag_bool (safe for both identity and NaN-box modes)
+            var raw_bool: String = this.fresh_local()
+            this.emit_indent(raw_bool + " = zext i1 " + cmp_result + " to i64")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = select i1 " + cmp_result + ", i64 9222246136947933185, i64 9222246136947933184")
+            this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw_bool + ")")
             this.last_type = AST.Type.BoolType
             return local
         }
@@ -479,8 +473,10 @@
         else if (op == "<=") { this.emit_indent(cmp_result + " = fcmp ole double " + l_f + ", " + r_f) }
         else if (op == ">") { this.emit_indent(cmp_result + " = fcmp ogt double " + l_f + ", " + r_f) }
         else if (op == ">=") { this.emit_indent(cmp_result + " = fcmp oge double " + l_f + ", " + r_f) }
+        var raw_bool: String = this.fresh_local()
+        this.emit_indent(raw_bool + " = zext i1 " + cmp_result + " to i64")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = select i1 " + cmp_result + ", i64 9222246136947933185, i64 9222246136947933184")
+        this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw_bool + ")")
         this.last_type = AST.Type.BoolType
         return local
     }
