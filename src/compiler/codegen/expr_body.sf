@@ -168,10 +168,6 @@
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        if (this.nan_boxing) {
-            return this.gen_is_check_nanboxed(val, type_name)
-        }
-
         // Compile-time resolution (no runtime tags)
         var matches: String = "0"
         if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
@@ -359,10 +355,11 @@
         var lhs: String = this.gen_arg_value(left)
         var rhs: String = this.gen_arg_value(right)
 
-        if (this.nan_boxing) {
-            return this.gen_binary_nanboxed(lhs, rhs, op)
-        }
+        return this.gen_binary_nanboxed(lhs, rhs, op)
+    }
 
+    fun gen_binary_legacy(lhs: String, rhs: String, op: String): String {
+        // Legacy untagged path (kept for reference, no longer called)
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
