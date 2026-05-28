@@ -2551,6 +2551,13 @@ class Codegen {
                     ei = ei + 1
                 }
             }
+            ListLit(elements) => {
+                var li: Float = 0
+                while (li < elements.length()) {
+                    this.find_free_vars_expr(elements[li], bound, free)
+                    li = li + 1
+                }
+            }
             Lambda(p, r, b) => {
                 // Scan nested lambda body for free vars that propagate to this scope
                 var inner_bound: List<String> = []
