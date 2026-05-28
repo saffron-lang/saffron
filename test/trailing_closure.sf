@@ -1,0 +1,37 @@
+// Test trailing closure syntax
+// foo(args) { body } desugars to foo(args, fun () { body })
+
+fun run(name: String, block: Fun(): Nil) {
+    IO.println("running: " + name)
+    block()
+    IO.println("done: " + name)
+}
+
+run("test1") {
+    IO.println("  inside trailing closure")
+}
+
+// With other args too
+fun repeat(n: Float, block: Fun(): Nil) {
+    var i: Float = 0
+    while (i < n) {
+        block()
+        i = i + 1
+    }
+}
+
+repeat(3) {
+    IO.println("hello")
+}
+
+// Method call trailing closure
+class Builder {
+    fun with(block: Fun(): Nil) {
+        block()
+    }
+}
+
+var b = Builder()
+b.with() {
+    IO.println("in builder block")
+}

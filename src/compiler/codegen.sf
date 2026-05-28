@@ -1204,7 +1204,7 @@ class Codegen {
             }
 
             var arg_strs: List<String> = []
-            // If this is a nested function with captures, prepend captured vars as args
+            // If this is a nested function with captures, prepend capture POINTERS as args
             if (this.called_function_arity.has("__captures_" + resolved_callee)) {
                 var caps_str: String = this.func_prefix_map.get("__caps_" + resolved_callee)
                 if (caps_str.length() > 0) {
@@ -1212,7 +1212,7 @@ class Codegen {
                     var ci3: Float = 0
                     while (ci3 < cap_names.length()) {
                         var cap_val: String = this.fresh_local()
-                        this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(cap_names[ci3]))
+                        this.emit_indent(cap_val + " = ptrtoint i64* %" + this.sanitize_name(cap_names[ci3]) + " to i64")
                         arg_strs.push("i64 " + cap_val)
                         ci3 = ci3 + 1
                     }
@@ -1941,19 +1941,33 @@ class Codegen {
 
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
         var full_name: String = ext_class + "__" + name
-        var prefixed: String = this.current_prefix + full_name
+        // Use target class's prefix (not source file's prefix)
+        var class_prefix: String = this.current_prefix
+        var init_key: String = ext_class + "__init"
+        if (this.func_prefix_map.has(init_key)) {
+            var mapped: String = this.func_prefix_map.get(init_key)
+            class_prefix = mapped.slice(0, mapped.length() - init_key.length())
+        }
+        var prefixed: String = class_prefix + full_name
         this.known_functions.push(prefixed)
         this.known_functions.push(full_name)
         this.func_ret_types.set(prefixed, ret_type)
         this.func_ret_types.set(full_name, ret_type)
         this.func_prefix_map.set(full_name, prefixed)
+        if (this.class_methods.has(ext_class)) {
+            var methods: List = this.class_methods.get(ext_class)
+            methods.push(name)
+        }
         var params_str: String = this.params_to_string(params)
         var full_params: String = "self:Int"
         if (params_str.length() > 0) { full_params = full_params + "," + params_str }
         var saved_class: String = this.current_class
+        var saved_prefix: String = this.current_prefix
         this.current_class = ext_class
+        this.current_prefix = class_prefix
         this.gen_function(full_name, full_params, ret_type, body)
         this.current_class = saved_class
+        this.current_prefix = saved_prefix
     }
 
     fun emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
@@ -2948,7 +2962,12 @@ class Codegen {
                     }
                 }
             }
-            Assign(name, value) => { this.find_free_vars_expr(value, bound, free) }
+            Assign(name, value) => {
+                this.find_free_vars_expr(value, bound, free)
+                if (!bound.contains(name) and !free.contains(name)) {
+                    free.push(name)
+                }
+            }
             Logical(l, o, r) => {
                 this.find_free_vars_expr(l, bound, free)
                 this.find_free_vars_expr(r, bound, free)
@@ -4231,8 +4250,14 @@ class Codegen {
             pi3 = 0
             while (pi3 < all_params.length()) {
                 var pp2: List<String> = all_params[pi3].split(":")
-                this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
-                this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
+                if (pi3 < captures.length()) {
+                    // Capture params are POINTERS — reconstruct via inttoptr
+                    this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i64 %" + this.sanitize_name(pp2[0]) + ".arg to i64*")
+                } else {
+                    // Regular params — alloca and store
+                    this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
+                    this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
+                }
                 this.var_types.set(pp2[0], pp2[1])
                 pi3 = pi3 + 1
             }
