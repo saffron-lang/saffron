@@ -1,5 +1,5 @@
 var name = "Saffron"
 var version = "0.1.0"
 IO.println("Hello from ${name} ${version}!")
-IO.println("Bootstrapped through 3 generations.")
+IO.println("Bootstrapped successfully.")
 IO.println("The compiler compiled itself. We're self-hosting!")

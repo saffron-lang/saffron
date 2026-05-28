@@ -1,7 +1,0 @@
-fun apply(block: Any) {
-    block()
-}
-
-apply() {
-    IO.println("trailing closure works!")
-}
