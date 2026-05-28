@@ -120,6 +120,9 @@ class Codegen {
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
+        if (s.starts_with("Fun(")) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
         if (s == "List") return AST.Type.GenericType("List", [AST.Type.AnyType])
         if (s.starts_with("List<") and s.ends_with(">")) {
             var inner: String = s.slice(5, s.length() - 1)
@@ -534,24 +537,27 @@ class Codegen {
                         return this.gen_enum_construct(obj_name, field, [])
                     }
                     // Check if variable holds a class instance
-                    if (this.var_types.has(obj_name)) {
-                        var vtype: String = this.var_types.get(obj_name)
-                        if (this.class_fields.has(vtype)) {
-                            // It's a class instance — do field access
-                            var obj_val: String = this.gen_arg_value(object)
-                            var saved_class: String = this.current_class
-                            this.current_class = vtype
-                            var field_idx: Float = this.get_field_index(vtype, field)
-                            var obj_ptr: String = this.fresh_local()
-                            this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + vtype + "*")
-                            var field_ptr: String = this.fresh_local()
-                            this.emit_indent(field_ptr + " = getelementptr %" + vtype + ", %" + vtype + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
-                            var result: String = this.fresh_local()
-                            this.emit_indent(result + " = load i64, i64* " + field_ptr)
-                            this.last_type = this.str_to_type(this.get_field_type(vtype, field))
-                            this.current_class = saved_class
-                            return result
-                        }
+                    var vtype: String = ""
+                    if (this.typed_vars.has(obj_name)) {
+                        vtype = this.type_to_string(this.typed_vars.get(obj_name))
+                    } else if (this.var_types.has(obj_name)) {
+                        vtype = this.var_types.get(obj_name)
+                    }
+                    if (vtype.length() > 0 and this.class_fields.has(vtype)) {
+                        // It's a class instance — do field access
+                        var obj_val: String = this.gen_arg_value(object)
+                        var saved_class: String = this.current_class
+                        this.current_class = vtype
+                        var field_idx: Float = this.get_field_index(vtype, field)
+                        var obj_ptr: String = this.fresh_local()
+                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + vtype + "*")
+                        var field_ptr: String = this.fresh_local()
+                        this.emit_indent(field_ptr + " = getelementptr %" + vtype + ", %" + vtype + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                        var result: String = this.fresh_local()
+                        this.emit_indent(result + " = load i64, i64* " + field_ptr)
+                        this.last_type = this.str_to_type(this.get_field_type(vtype, field))
+                        this.current_class = saved_class
+                        return result
                     }
                 }
                 "0"
@@ -647,8 +653,13 @@ class Codegen {
         var method_name: String = this.op_to_method(op)
         if (method_name.length() > 0) {
             var left_name: String = this.get_variable_name(left)
-            if (left_name.length() > 0 and this.var_types.has(left_name)) {
-                var left_class: String = this.var_types.get(left_name)
+            var left_class: String = ""
+            if (left_name.length() > 0 and this.typed_vars.has(left_name)) {
+                left_class = this.type_to_string(this.typed_vars.get(left_name))
+            } else if (left_name.length() > 0 and this.var_types.has(left_name)) {
+                left_class = this.var_types.get(left_name)
+            }
+            if (left_class.length() > 0) {
                 if (this.class_methods.has(left_class)) {
                     var methods: List = this.class_methods.get(left_class)
                     if (methods.contains(method_name)) {
@@ -924,9 +935,13 @@ class Codegen {
             }
             // Handle as field access on class instance or enum
             var mn: String = this.get_variable_name(m_obj)
-            if (mn.length() > 0 and this.var_types.has(mn)) {
-                var vt: String = this.var_types.get(mn)
-                if (this.class_fields.has(vt)) {
+            var vt: String = ""
+            if (mn.length() > 0 and this.typed_vars.has(mn)) {
+                vt = this.type_to_string(this.typed_vars.get(mn))
+            } else if (mn.length() > 0 and this.var_types.has(mn)) {
+                vt = this.var_types.get(mn)
+            }
+            if (vt.length() > 0 and this.class_fields.has(vt)) {
                     var ov: String = this.gen_arg_value(m_obj)
                     var fi: Float = this.get_field_index(vt, m_field)
                     var op: String = this.fresh_local()
@@ -937,7 +952,6 @@ class Codegen {
                     this.emit_indent(result + " = load volatile i64, i64* " + fp)
                     this.last_type = this.str_to_type(this.get_field_type(vt, m_field))
                     return result
-                }
             }
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
                 return this.gen_enum_construct(mn, m_field, [])
@@ -959,7 +973,7 @@ class Codegen {
                         _ => AST.Expr.NilLit
                     }
                     var root_name: String = this.get_variable_name(inner_obj)
-                    if (root_name.length() > 0 and !this.var_types.has(root_name)) {
+                    if (root_name.length() > 0 and !this.typed_vars.has(root_name) and !this.var_types.has(root_name)) {
                         if (this.enum_variant_tags.has(inner_field + "." + m_field)) {
                             return this.gen_enum_construct(inner_field, m_field, [])
                         }
@@ -1243,8 +1257,7 @@ class Codegen {
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        // Closure env vars hold env pointers — treat as direct calls
-        if (!this.var_types.has(callee_name) and callee_name.length() > 0) {
+        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()
@@ -1840,6 +1853,9 @@ class Codegen {
         if (ek == "this") return this.current_class
         if (ek == "get_field" or ek == "member") {
             var obj_name: String = this.get_variable_name(expr)
+            if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+                return this.type_to_string(this.typed_vars.get(obj_name))
+            }
             if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
                 return this.var_types.get(obj_name)
             }
@@ -1860,11 +1876,14 @@ class Codegen {
                     _ => AST.Expr.NilLit
                 }
                 var mc_obj_name: String = this.get_variable_name(mc_obj)
-                if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
-                    var mc_map_type: String = this.var_types.get(mc_obj_name)
-                    if (mc_map_type.starts_with("Map<")) {
-                        return this.get_map_value_type(mc_map_type)
-                    }
+                var mc_map_type: String = ""
+                if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
+                    mc_map_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
+                } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
+                    mc_map_type = this.var_types.get(mc_obj_name)
+                }
+                if (mc_map_type.starts_with("Map<")) {
+                    return this.get_map_value_type(mc_map_type)
                 }
                 return "String"
             }
@@ -1927,6 +1946,12 @@ class Codegen {
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
         if (this.is_string_list_type(obj_type)) {
             this.last_type = AST.Type.StringType
+        } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            if (this.is_string_list_type(this.typed_vars.get(obj_name))) {
+                this.last_type = AST.Type.StringType
+            } else {
+                this.last_type = AST.Type.IntType
+            }
         } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             var vtype: String = this.var_types.get(obj_name)
             if (vtype == "List<String>") {
@@ -2078,7 +2103,10 @@ class Codegen {
         if (obj_name == "IO" or obj_name == "OS") { return obj_name }
         if (this.module_prefixes.has(obj_name)) { return obj_name }
         if (this.class_fields.has(obj_name)) { return obj_name }
-        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            var vtype: String = this.type_to_string(this.typed_vars.get(obj_name))
+            if (this.class_fields.has(vtype)) { return vtype }
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             var vtype: String = this.var_types.get(obj_name)
             if (this.class_fields.has(vtype)) { return vtype }
         }
@@ -2098,21 +2126,6 @@ class Codegen {
 
         // Check for OS module calls
         if (obj_name == "OS") {
-            if (method == "args") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_args()")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-                return local
-            }
-            if (method == "exec") {
-                var cmd: String = this.gen_arg_value(args[0])
-                var cmd_ptr: String = this.fresh_local()
-                this.emit_indent(cmd_ptr + " = inttoptr i64 " + cmd + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_exec(i8* " + cmd_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
             if (method == "exit") {
                 var code: String = this.gen_arg_value(args[0])
                 var code32: String = this.fresh_local()
@@ -2121,33 +2134,22 @@ class Codegen {
                 this.last_type = AST.Type.NilType
                 return "0"
             }
-            if (method == "cwd") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_cwd()")
-                this.last_type = AST.Type.StringType
-                return local
+            var os_func: String = "__os_" + method
+            this.called_functions.push(os_func)
+            var os_args: List<String> = []
+            var oi: Float = 0
+            while (oi < args.length()) {
+                os_args.push("i64 " + this.gen_arg_value(args[oi]))
+                oi = oi + 1
             }
-            if (method == "path_sep") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_path_sep()")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
+            if (method == "args") {
+                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
+            } else {
                 this.last_type = AST.Type.StringType
-                return local
             }
-            if (method == "platform") {
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_platform()")
-                this.last_type = AST.Type.StringType
-                return local
-            }
-            if (method == "env") {
-                var name_val: String = this.gen_arg_value(args[0])
-                var name_ptr: String = this.fresh_local()
-                this.emit_indent(name_ptr + " = inttoptr i64 " + name_val + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__os_env(i8* " + name_ptr + ")")
-                this.last_type = AST.Type.StringType
-                return local
-            }
+            return local
         }
 
         // Check for IO module calls
@@ -2182,65 +2184,24 @@ class Codegen {
                 this.last_type = AST.Type.NilType
                 return local
             }
-            if (method == "read_file") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
+            if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file") {
+                var io_func: String = "__io_" + method
+                if (method == "list_dir") { io_func = "__io_walk_dir" }
+                this.called_functions.push(io_func)
+                var io_args: List<String> = []
+                var ii: Float = 0
+                while (ii < args.length()) {
+                    io_args.push("i64 " + this.gen_arg_value(args[ii]))
+                    ii = ii + 1
+                }
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__io_read_file(i8* " + path_ptr + ")")
-                this.last_type = AST.Type.StringType
+                this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+                if (method == "file_exists") { this.last_type = AST.Type.BoolType }
+                else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
+                else if (method == "write_file" or method == "append_file") { this.last_type = AST.Type.NilType; return "0" }
+                else if (method == "walk_dir" or method == "list_dir") { this.last_type = AST.Type.GenericType("List", [AST.Type.StringType]) }
+                else { this.last_type = AST.Type.StringType }
                 return local
-            }
-            if (method == "write_file") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                var content: String = this.gen_arg_value(args[1])
-                var content_ptr: String = this.fresh_local()
-                this.emit_indent(content_ptr + " = inttoptr i64 " + content + " to i8*")
-                var discard_wf: String = this.fresh_local()
-                this.emit_indent(discard_wf + " = call i64 @__io_write_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "file_exists") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__io_file_exists(i8* " + path_ptr + ")")
-                this.last_type = AST.Type.BoolType
-                return local
-            }
-            if (method == "mkdir") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                var discard_mk: String = this.fresh_local()
-                this.emit_indent(discard_mk + " = call i64 @__io_mkdir(i8* " + path_ptr + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
-            }
-            if (method == "walk_dir" or method == "list_dir") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__io_walk_dir(i8* " + path_ptr + ")")
-                this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-                return local
-            }
-            if (method == "append_file") {
-                var path: String = this.gen_arg_value(args[0])
-                var path_ptr: String = this.fresh_local()
-                this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                var content: String = this.gen_arg_value(args[1])
-                var content_ptr: String = this.fresh_local()
-                this.emit_indent(content_ptr + " = inttoptr i64 " + content + " to i8*")
-                var discard_af: String = this.fresh_local()
-                this.emit_indent(discard_af + " = call i64 @__io_append_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
-                this.last_type = AST.Type.NilType
-                return "0"
             }
         }
 
@@ -2301,7 +2262,9 @@ class Codegen {
         // --- Builtin dispatch (only for non-class objects) ---
         var obj: String = this.gen_arg_value(object)
         var is_user_class: Bool = false
-        if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
+            is_user_class = true
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
             is_user_class = true
         }
 
@@ -2387,7 +2350,9 @@ class Codegen {
         // Prefer var_types annotation over last_type because the native binary's
         // last_type is unreliable when var_types.has() returns false mid-execution.
         var obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            obj_type = this.type_to_string(this.typed_vars.get(obj_name))
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             obj_type = this.var_types.get(obj_name)
         }
 
@@ -2473,7 +2438,7 @@ class Codegen {
         // (enum check moved above builtin dispatch)
 
         // Check for imported module function calls (module alias or unknown name)
-        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.var_types.has(obj_name)))) {
+        if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.var_types.has(obj_name)))) {
             var arg_strs: List<String> = []
             var ai: Float = 0
             while (ai < args.length()) {
@@ -2513,6 +2478,8 @@ class Codegen {
         var class_name: String = ""
         if (this.class_fields.has(obj_type)) {
             class_name = obj_type
+        } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
+            class_name = this.type_to_string(this.typed_vars.get(obj_name))
         } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
             class_name = this.var_types.get(obj_name)
         } else if (this.current_class.length() > 0) {
@@ -3207,7 +3174,7 @@ class Codegen {
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
         var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i8*, i8*)", "i64 @__str_split(i8*, i8*)", "i64 @__str_replace(i8*, i8*, i8*)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i8*)", "i64 @__join_append(i8**, i64*, i64*, i8*, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i8*)", "i64 @__io_write_file(i8*, i8*)", "i64 @__io_file_exists(i8*)", "i64 @__io_mkdir(i8*)", "i64 @__io_walk_dir(i8*)", "i64 @__io_append_file(i8*, i8*)", "i64 @__os_exec(i8*)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i8*)"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.defined_funcs.contains(names[di])) {
@@ -4433,7 +4400,7 @@ class Codegen {
             EnumDecl(n, v, d) => true
             ClassDecl(n, p, f, m, d) => true
             ExprStmt(e) => this.is_nil_expr(e)
-            VarDecl(n, t, i, d) => false
+            VarDecl(n, t, i, d) => d.starts_with("@import:")
             Return(v) => false
             If(c, t, e) => false
             While(c, b) => false

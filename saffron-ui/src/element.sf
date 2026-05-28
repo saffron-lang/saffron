@@ -1,0 +1,139 @@
+// Element tree representation
+// Each element is a node in a virtual DOM tree that will be rendered to real DOM
+
+enum Node {
+    Element(tag: String, attrs: Any, children: Any),
+    Text(content: String)
+}
+
+// Rendering context — collects children during a builder block
+class Context {
+    var children: List<Any>
+
+    fun init() {
+        this.children = []
+    }
+
+    fun add(node: Any) {
+        this.children.push(node)
+    }
+
+    fun text(content: String) {
+        this.children.push(Node.Text(content))
+    }
+}
+
+// Global context stack for nested element builders
+var _ctx_stack: List<Any> = []
+
+fun _push_ctx(): Context {
+    var ctx = Context()
+    _ctx_stack.push(ctx)
+    return ctx
+}
+
+fun _pop_ctx(): Context {
+    return _ctx_stack.pop()
+}
+
+fun _current_ctx(): Context {
+    return _ctx_stack[_ctx_stack.length() - 1]
+}
+
+// --- Element builder functions ---
+// Each takes attrs (Map or Nil) and a block that populates children
+
+fun _build_element(tag: String, attrs: Any, block: Any): Any {
+    var ctx: Context = _push_ctx()
+    if (block != nil) {
+        block()
+    }
+    _pop_ctx()
+    var node: Any = Node.Element(tag, attrs, ctx.children)
+    // If there's a parent context, add to it
+    if (_ctx_stack.length() > 0) {
+        _current_ctx().add(node)
+    }
+    return node
+}
+
+// --- HTML element functions ---
+
+fun div(block: Any): Any {
+    return _build_element("div", nil, block)
+}
+
+fun span(block: Any): Any {
+    return _build_element("span", nil, block)
+}
+
+fun p(block: Any): Any {
+    return _build_element("p", nil, block)
+}
+
+fun h1(block: Any): Any {
+    return _build_element("h1", nil, block)
+}
+
+fun h2(block: Any): Any {
+    return _build_element("h2", nil, block)
+}
+
+fun h3(block: Any): Any {
+    return _build_element("h3", nil, block)
+}
+
+fun button(block: Any): Any {
+    return _build_element("button", nil, block)
+}
+
+fun input(block: Any): Any {
+    return _build_element("input", nil, block)
+}
+
+fun ul(block: Any): Any {
+    return _build_element("ul", nil, block)
+}
+
+fun ol(block: Any): Any {
+    return _build_element("ol", nil, block)
+}
+
+fun li(block: Any): Any {
+    return _build_element("li", nil, block)
+}
+
+fun a(block: Any): Any {
+    return _build_element("a", nil, block)
+}
+
+fun img(block: Any): Any {
+    return _build_element("img", nil, block)
+}
+
+fun nav(block: Any): Any {
+    return _build_element("nav", nil, block)
+}
+
+fun header(block: Any): Any {
+    return _build_element("header", nil, block)
+}
+
+fun footer(block: Any): Any {
+    return _build_element("footer", nil, block)
+}
+
+fun section(block: Any): Any {
+    return _build_element("section", nil, block)
+}
+
+fun main(block: Any): Any {
+    return _build_element("main", nil, block)
+}
+
+// --- Text node helper ---
+// Inside a builder block, call text() to add text content
+
+fun text(content: String) {
+    _current_ctx().text(content)
+}

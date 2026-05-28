@@ -41,6 +41,25 @@ fun get_stmt_doc(stmt: AST.Stmt): String {
     }
 }
 
+fun get_stmt_name(stmt: AST.Stmt): String {
+    return match (stmt) {
+        VarDecl(n, t, init, d) => n
+        FunDecl(n, p, r, b, d) => n
+        _ => ""
+    }
+}
+
+fun is_import_stmt(stmt: AST.Stmt): Bool {
+    return match (stmt) {
+        VarDecl(n, t, init, d) => {
+            if (d.starts_with("@import:")) { return true }
+            if (n.starts_with("_import_")) { return true }
+            false
+        }
+        _ => false
+    }
+}
+
 fun extract_imports_from_ast(program: List<AST.Stmt>): List<String> {
     var imports: List<String> = []
     var i: Float = 0
@@ -192,8 +211,8 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
 
-    // Collect this module's import aliases from AST
-    var mod_aliases: Map<String, String> = extract_aliases_from_ast(program)
+    // Collect this module's import aliases from text (robust)
+    var mod_aliases: Map<String, String> = extract_import_aliases(source)
     var mak: List<String> = mod_aliases.keys()
     var mai: Float = 0
     while (mai < mak.length()) {
@@ -205,7 +224,7 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         mai = mai + 1
     }
 
-    var import_paths: List<String> = extract_imports_from_ast(program)
+    var import_paths: List<String> = extract_imports(source)
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
@@ -297,9 +316,9 @@ fun main(): Int {
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
 
-    // Extract imports from parsed AST
+    // Use text-based import extraction (robust — doesn't depend on AST field access)
     var resolved_aliases: Map<String, String> = {}
-    var alias_map: Map<String, String> = extract_aliases_from_ast(program)
+    var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
     var ak: Float = 0
     while (ak < alias_keys.length()) {
@@ -311,11 +330,11 @@ fun main(): Int {
         ak = ak + 1
     }
 
-    // Recursively collect modules
+    // Recursively collect modules (text-based extraction)
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
-    var import_paths: List<String> = extract_imports_from_ast(program)
+    var import_paths: List<String> = extract_imports(source)
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
