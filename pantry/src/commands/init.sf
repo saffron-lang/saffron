@@ -5,7 +5,7 @@ import "@os" as OS
 import "@path" as Path
 
 fun run(parsed: Args.ParsedArgs) {
-    var manifest_path = OS.cwd() + "/pantry.toml"
+    var manifest_path: String = OS.cwd() + "/pantry.toml"
 
     if (IO.file_exists(manifest_path)) {
         IO.println("pantry.toml already exists in this directory.")
@@ -13,10 +13,10 @@ fun run(parsed: Args.ParsedArgs) {
     }
 
     // Derive project name from directory name
-    var cwd = OS.cwd()
-    var project_name = Path.basename(cwd)
+    var cwd: String = OS.cwd()
+    var project_name: String = Path.basename(cwd)
 
-    var content = "[package]\n"
+    var content: String = "[package]\n"
     content = content + "name = \"${project_name}\"\n"
     content = content + "version = \"0.1.0\"\n"
     content = content + "description = \"\"\n"

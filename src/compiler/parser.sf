@@ -6,10 +6,12 @@ import "./lexer.sf" as Lexer
 class Parser {
     var tokens: List<Lexer.Token>
     var pos: Float
+    var had_error: Bool
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
         this.pos = 0
+        this.had_error = false
     }
 
     fun current(): Lexer.Token {
@@ -69,6 +71,7 @@ class Parser {
 
     fun parse_error(message: String) {
         IO.println("[line " + this.current_line() + "] Parse error: " + message)
+        this.had_error = true
     }
 
     fun consume(expected: String) {
@@ -512,18 +515,28 @@ class Parser {
         var params: List<AST.Param> = []
         if (!this.match_kind_check(")")) {
             var pname: String = this.expect_ident()
-            this.consume(":")
-            var ptype: String = this.parse_type()
-            var pdefault: AST.Expr = AST.Expr.NilLit
-            if (this.match_kind("=")) { pdefault = this.parse_expr() }
-            params.push(AST.Param.Param(pname, ptype, pdefault))
-            while (this.match_kind(",")) {
-                pname = this.expect_ident()
+            if (!this.match_kind_check(":")) {
+                this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+            } else {
                 this.consume(":")
-                ptype = this.parse_type()
-                pdefault = AST.Expr.NilLit
+                var ptype: String = this.parse_type()
+                var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
                 params.push(AST.Param.Param(pname, ptype, pdefault))
+            }
+            while (this.match_kind(",")) {
+                pname = this.expect_ident()
+                if (!this.match_kind_check(":")) {
+                    this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                    params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                } else {
+                    this.consume(":")
+                    var ptype: String = this.parse_type()
+                    var pdefault: AST.Expr = AST.Expr.NilLit
+                    if (this.match_kind("=")) { pdefault = this.parse_expr() }
+                    params.push(AST.Param.Param(pname, ptype, pdefault))
+                }
             }
         }
         this.consume(")")
@@ -725,14 +738,24 @@ class Parser {
             var ext_params: List<AST.Param> = []
             if (!this.match_kind_check(")")) {
                 var pname: String = this.expect_ident()
-                this.consume(":")
-                var ptype: String = this.parse_type()
-                ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                if (!this.match_kind_check(":")) {
+                    this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                    ext_params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                } else {
+                    this.consume(":")
+                    var ptype: String = this.parse_type()
+                    ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                }
                 while (this.match_kind(",")) {
                     pname = this.expect_ident()
-                    this.consume(":")
-                    ptype = this.parse_type()
-                    ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                    if (!this.match_kind_check(":")) {
+                        this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                        ext_params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                    } else {
+                        this.consume(":")
+                        var ptype: String = this.parse_type()
+                        ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                    }
                 }
             }
             this.consume(")")
@@ -899,18 +922,28 @@ class Parser {
         var params: List<AST.Param> = []
         if (!this.match_kind_check(")")) {
             var pname: String = this.expect_ident()
-            this.consume(":")
-            var ptype: String = this.parse_type()
-            var pdefault: AST.Expr = AST.Expr.NilLit
-            if (this.match_kind("=")) { pdefault = this.parse_expr() }
-            params.push(AST.Param.Param(pname, ptype, pdefault))
-            while (this.match_kind(",")) {
-                pname = this.expect_ident()
+            if (!this.match_kind_check(":")) {
+                this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+            } else {
                 this.consume(":")
-                ptype = this.parse_type()
-                pdefault = AST.Expr.NilLit
+                var ptype: String = this.parse_type()
+                var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
                 params.push(AST.Param.Param(pname, ptype, pdefault))
+            }
+            while (this.match_kind(",")) {
+                pname = this.expect_ident()
+                if (!this.match_kind_check(":")) {
+                    this.parse_error("Parameter '" + pname + "' requires a type annotation")
+                    params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                } else {
+                    this.consume(":")
+                    var ptype: String = this.parse_type()
+                    var pdefault: AST.Expr = AST.Expr.NilLit
+                    if (this.match_kind("=")) { pdefault = this.parse_expr() }
+                    params.push(AST.Param.Param(pname, ptype, pdefault))
+                }
             }
         }
         this.consume(")")
@@ -1425,7 +1458,15 @@ class Parser {
     }
 }
 
+var last_parse_had_error: Bool = false
+
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
-    return p.parse_program()
+    var result: List<AST.Stmt> = p.parse_program()
+    last_parse_had_error = p.had_error
+    return result
+}
+
+fun had_error(): Bool {
+    return last_parse_had_error
 }

@@ -6,11 +6,11 @@ import "@semver" as SemVer
 import "../config.sf" as Config
 
 fun run(package_name: String, parsed: Args.ParsedArgs) {
-    var manifest_path = Config.find_manifest()
+    var manifest_path: String = Config.find_manifest()
     var manifest = Config.load_from(manifest_path)
 
     // Determine version constraint
-    var version = "*"
+    var version: String = "*"
     if (parsed.has("version")) {
         version = parsed.get("version")
     } else if (parsed.has("v")) {
@@ -19,7 +19,7 @@ fun run(package_name: String, parsed: Args.ParsedArgs) {
 
     // Check if already present
     if (manifest.dependencies.has(package_name)) {
-        var existing = manifest.dependencies.get(package_name)
+        var existing: String = manifest.dependencies.get(package_name)
         IO.println("pantry: updating '${package_name}' from ${existing} to ${version}")
     } else {
         IO.println("pantry: adding '${package_name}' @ ${version}")

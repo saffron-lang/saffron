@@ -1007,6 +1007,7 @@
     }
 
     fun gen_enum_construct(enum_name: String, variant: String, args: List<AST.Expr>): String {
+        this.last_type = AST.Type.EnumType(enum_name)
         var key: String = enum_name + "." + variant
         var tag: Float = this.enum_variant_tags.get(key)
 

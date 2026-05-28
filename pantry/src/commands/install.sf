@@ -7,8 +7,8 @@ import "../resolver.sf" as Resolver
 
 fun _manifest_dir(): String {
     var path = Config.find_manifest()
-    var last_slash = -1
-    var i = 0
+    var last_slash: Int = -1
+    var i: Int = 0
     while (i < path.length()) {
         if (path.char_at(i) == "/") {
             last_slash = i
@@ -21,7 +21,7 @@ fun _manifest_dir(): String {
 
 fun run(parsed: Args.ParsedArgs) {
     var manifest = Config.load()
-    var dir = _manifest_dir()
+    var dir: String = _manifest_dir()
 
     if (manifest.dependencies.length() == 0) {
         IO.println("No dependencies to install.")
@@ -32,7 +32,7 @@ fun run(parsed: Args.ParsedArgs) {
 
     var resolved = Resolver.resolve_all(manifest.dependencies, dir)
 
-    var i = 0
+    var i: Int = 0
     while (i < resolved.length()) {
         var dep = resolved[i]
         IO.println("  ${dep.name} ${dep.version} (${dep.source_type}: ${dep.source_path})")
@@ -40,7 +40,7 @@ fun run(parsed: Args.ParsedArgs) {
     }
 
     // Write lockfile
-    var lock_path = dir + "/pantry.lock"
+    var lock_path: String = dir + "/pantry.lock"
     Resolver.write_lockfile(resolved, lock_path)
 
     IO.println("")

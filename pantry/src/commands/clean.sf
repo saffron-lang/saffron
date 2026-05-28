@@ -6,8 +6,8 @@ import "../config.sf" as Config
 
 fun _manifest_dir(): String {
     var path = Config.find_manifest()
-    var last_slash = -1
-    var i = 0
+    var last_slash: Int = -1
+    var i: Int = 0
     while (i < path.length()) {
         if (path.char_at(i) == "/") {
             last_slash = i
@@ -20,10 +20,10 @@ fun _manifest_dir(): String {
 
 fun run(parsed: Args.ParsedArgs) {
     var dir = _manifest_dir()
-    var removed = 0
+    var removed: Int = 0
 
     // Remove build/ directory
-    var build_dir = dir + "/build"
+    var build_dir: String = dir + "/build"
     if (IO.file_exists(build_dir)) {
         OS.exec("rm -rf ${build_dir}")
         IO.println("  removed build/")
@@ -31,7 +31,7 @@ fun run(parsed: Args.ParsedArgs) {
     }
 
     // Remove pantry.lock
-    var lock_file = dir + "/pantry.lock"
+    var lock_file: String = dir + "/pantry.lock"
     if (IO.file_exists(lock_file)) {
         OS.exec("rm ${lock_file}")
         IO.println("  removed pantry.lock")
@@ -39,7 +39,7 @@ fun run(parsed: Args.ParsedArgs) {
     }
 
     // Remove .pantry/ cache directory
-    var cache_dir = dir + "/.pantry"
+    var cache_dir: String = dir + "/.pantry"
     if (IO.file_exists(cache_dir)) {
         OS.exec("rm -rf ${cache_dir}")
         IO.println("  removed .pantry/")

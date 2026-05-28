@@ -262,6 +262,7 @@ fun main(): Int {
     // Parse flags
     var run_checker: Bool = false
     var stdlib_dir: String = ""
+    var target: String = "native"
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
@@ -272,6 +273,12 @@ fun main(): Int {
             if (i + 1 < args.length()) {
                 i = i + 1
                 stdlib_dir = args[i]
+            }
+        }
+        if (arg == "--target") {
+            if (i + 1 < args.length()) {
+                i = i + 1
+                target = args[i]
             }
         }
         i = i + 1
@@ -314,6 +321,10 @@ fun main(): Int {
     var source: String = IO.read_file(input_path)
     var tokens: List = Lexer.lex(source)
     var program: List = Parser.parse(tokens)
+
+    if (Parser.had_error()) {
+        return 1
+    }
 
     // Use text-based import extraction (robust — doesn't depend on AST field access)
     var resolved_aliases: Map<String, String> = {}
@@ -377,9 +388,9 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases)
+        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target)
     } else {
-        ir = Codegen.generate(program)
+        ir = Codegen.generate_with_target(program, target)
     }
 
     // Write LLVM IR output

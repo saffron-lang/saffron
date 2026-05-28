@@ -29,7 +29,7 @@ fun main() {
     // Skip leading non-command args (interpreter path, script path, etc.)
     // Find first arg that doesn't end in .sf and isn't a flag we don't own
     var user_args: List<String> = []
-    var ai = 1
+    var ai: Int = 1
     // Skip any args that look like the interpreter invoking us
     while (ai < raw_args.length()) {
         var a: String = raw_args[ai]

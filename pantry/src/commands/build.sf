@@ -9,22 +9,22 @@ fun run(parsed: Args.ParsedArgs) {
 
     // If there's a build script defined, use it
     if (manifest.scripts.has("build")) {
-        var cmd = manifest.scripts.get("build")
+        var cmd: String = manifest.scripts.get("build")
         IO.println("> ${cmd}")
-        var output = OS.exec(cmd)
+        var output: String = OS.exec(cmd)
         IO.print(output)
         return
     }
 
     // Default: compile the entry point
-    var entry = manifest.entry
+    var entry: String = manifest.entry
     if (!(IO.file_exists(entry))) {
         IO.println("pantry build: entry file '${entry}' not found")
         OS.exit(1)
     }
 
-    var cmd = "saffron ${entry}"
+    var cmd: String = "saffron ${entry}"
     IO.println("> ${cmd}")
-    var output = OS.exec(cmd)
+    var output: String = OS.exec(cmd)
     IO.print(output)
 }
