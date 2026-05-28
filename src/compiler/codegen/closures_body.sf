@@ -242,3 +242,151 @@
         this.block_terminated = false
     }
 
+
+    fun find_free_vars_stmts(stmts: List<AST.Stmt>, bound: List<String>, free: List<String>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.find_free_vars_stmt(stmts[i], bound, free)
+            i = i + 1
+        }
+    }
+
+    fun find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free: List<String>) {
+        match (stmt) {
+            VarDecl(name, typ, init) => {
+                this.find_free_vars_expr(init, bound, free)
+                bound.push(name)
+            }
+            ExprStmt(expr) => { this.find_free_vars_expr(expr, bound, free) }
+            Return(value) => { this.find_free_vars_expr(value, bound, free) }
+            If(cond, then_b, else_b) => {
+                this.find_free_vars_expr(cond, bound, free)
+                this.find_free_vars_stmts(then_b, bound, free)
+                this.find_free_vars_stmts(else_b, bound, free)
+            }
+            While(cond, body) => {
+                this.find_free_vars_expr(cond, bound, free)
+                this.find_free_vars_stmts(body, bound, free)
+            }
+            Block(stmts) => { this.find_free_vars_stmts(stmts, bound, free) }
+            FunDecl(n, p, r, b, d) => {}
+            EnumDecl(n, v, d) => {}
+            ClassDecl(n, p, f, m, d) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
+                this.find_free_vars_stmts(try_body, bound, free)
+                bound.push(catch_name)
+                this.find_free_vars_stmts(catch_body, bound, free)
+                this.find_free_vars_stmts(finally_body, bound, free)
+            }
+            Throw(value) => { this.find_free_vars_expr(value, bound, free) }
+        }
+    }
+
+    fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
+        match (expr) {
+            Variable(name) => {
+                var is_known: Bool = bound.contains(name) or free.contains(name) or this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name)
+                if (!is_known and name.length() > 0) {
+                    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    if (upper.index_of(name.char_at(0)) >= 0) {
+                        is_known = true
+                    }
+                }
+                if (!is_known) {
+                    free.push(name)
+                }
+            }
+            Binary(l, o, r) => {
+                this.find_free_vars_expr(l, bound, free)
+                this.find_free_vars_expr(r, bound, free)
+            }
+            Unary(o, r) => { this.find_free_vars_expr(r, bound, free) }
+            Call(c, args) => {
+                this.find_free_vars_expr(c, bound, free)
+                var i: Float = 0
+                while (i < args.length()) {
+                    this.find_free_vars_expr(args[i], bound, free)
+                    i = i + 1
+                }
+                // If calling a closure function, add its captures to our free vars
+                var call_name: String = match (c) { Variable(n) => n
+                    _ => ""
+                }
+                if (call_name.length() > 0) {
+                    var caps_key: String = "__caps_" + this.current_prefix + call_name
+                    if (this.func_prefix_map.has(caps_key)) {
+                        var caps_str: String = this.func_prefix_map.get(caps_key)
+                        if (caps_str.length() > 0) {
+                            var cap_list: List<String> = caps_str.split(",")
+                            var ci4: Float = 0
+                            while (ci4 < cap_list.length()) {
+                                var cn: String = cap_list[ci4]
+                                if (!bound.contains(cn) and !free.contains(cn)) {
+                                    free.push(cn)
+                                }
+                                ci4 = ci4 + 1
+                            }
+                        }
+                    }
+                }
+            }
+            Assign(name, value) => {
+                this.find_free_vars_expr(value, bound, free)
+                if (!bound.contains(name) and !free.contains(name)) {
+                    free.push(name)
+                }
+            }
+            Logical(l, o, r) => {
+                this.find_free_vars_expr(l, bound, free)
+                this.find_free_vars_expr(r, bound, free)
+            }
+            IntLit(v) => {}
+            FloatLit(v) => {}
+            BoolLit(v) => {}
+            StringLit(s) => {}
+            NilLit => {}
+            MemberAccess(o, f) => { this.find_free_vars_expr(o, bound, free) }
+            MethodCall(o, m, a) => {
+                this.find_free_vars_expr(o, bound, free)
+                var mi: Float = 0
+                while (mi < a.length()) {
+                    this.find_free_vars_expr(a[mi], bound, free)
+                    mi = mi + 1
+                }
+            }
+            GetField(o, f) => { this.find_free_vars_expr(o, bound, free) }
+            SetField(o, f, v) => {
+                this.find_free_vars_expr(o, bound, free)
+                this.find_free_vars_expr(v, bound, free)
+            }
+            IndexGet(o, idx) => {
+                this.find_free_vars_expr(o, bound, free)
+                this.find_free_vars_expr(idx, bound, free)
+            }
+            IndexSet(o, idx, v) => {
+                this.find_free_vars_expr(o, bound, free)
+                this.find_free_vars_expr(idx, bound, free)
+                this.find_free_vars_expr(v, bound, free)
+            }
+            Match(s, a) => { this.find_free_vars_expr(s, bound, free) }
+            EnumConstruct(e, v, a) => {
+                var ei: Float = 0
+                while (ei < a.length()) {
+                    this.find_free_vars_expr(a[ei], bound, free)
+                    ei = ei + 1
+                }
+            }
+            Lambda(p, r, b) => {}
+            BlockExpr(stmts, value) => {
+                this.find_free_vars_stmts(stmts, bound, free)
+                this.find_free_vars_expr(value, bound, free)
+            }
+            IsCheck(val, t) => {
+                this.find_free_vars_expr(val, bound, free)
+            }
+        }
+    }
+
+    // @codegen-split: intrinsics

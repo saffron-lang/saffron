@@ -1,0 +1,233 @@
+// Codegen: pattern matching and enum construction
+
+extend fun Codegen.gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
+        var subj: String = this.gen_arg_value(subject)
+        var result_ptr: String = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        // Determine which enum from first arm's pattern
+        var first_arm: AST.MatchArm = arms[0]
+        var first_pattern: AST.Pattern = match (first_arm) { Arm(p, b) => p
+            _ => AST.Pattern.VariantPattern("", [])
+        }
+        var first_variant: String = match (first_pattern) { VariantPattern(v, b) => v
+            _ => ""
+        }
+        var enum_name: String = this.find_enum_for_variant(first_variant)
+
+        // If enum not found, just generate the first arm's body as default
+        if (enum_name == "Unknown") {
+            // Unknown enum — extract bindings from subject
+            var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
+                _ => []
+            }
+            if (first_bindings.length() == 1) {
+                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
+                var bname: String = first_bindings[0]
+                var extracted: String = this.fresh_local()
+                this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+                this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+            } else if (first_bindings.length() > 1) {
+                // Multi-field variant: inttoptr → GEP for each binding
+                var num_slots: Float = first_bindings.length() + 1
+                var total_str: String = num_slots.floor().to_string()
+                var arr_ptr: String = this.fresh_local()
+                this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+                var bi: Float = 0
+                while (bi < first_bindings.length()) {
+                    var bname: String = first_bindings[bi]
+                    var field_idx: Float = bi + 1
+                    var field_slot: String = this.fresh_local()
+                    this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.floor().to_string())
+                    var extracted: String = this.fresh_local()
+                    this.emit_indent(extracted + " = load i64, i64* " + field_slot)
+                    this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+                    bi = bi + 1
+                }
+            }
+            var body_expr: AST.Expr = match (first_arm) { Arm(p, b) => b
+                _ => AST.Expr.NilLit
+            }
+            var val: String = this.gen_arg_value(body_expr)
+            this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = load i64, i64* " + result_ptr)
+            return result
+        }
+
+        // Determine max fields across variants to pick encoding
+        var max_fields: Float = this.get_max_fields(enum_name)
+
+        // Extract tag based on encoding
+        var tag_val: String = this.fresh_local()
+        if (max_fields <= 1) {
+            // Single-field or no-field: (tag << 56) | value encoding
+            var tag_shifted: String = this.fresh_local()
+            this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
+            this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
+        } else {
+            // Multi-field: ptrtoint encoding, tag at array[0]
+            var arr_ptr: String = this.fresh_local()
+            this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to i64*")
+            var tag_i64: String = this.fresh_local()
+            this.emit_indent(tag_i64 + " = load i64, i64* " + arr_ptr)
+            this.emit_indent(tag_val + " = trunc i64 " + tag_i64 + " to i8")
+        }
+
+        // Build switch
+        var end_label: String = this.fresh_label("match.end")
+        var arm_labels: List<String> = []
+        var i: Float = 0
+        while (i < arms.length()) {
+            arm_labels.push(this.fresh_label("match.arm"))
+            i = i + 1
+        }
+
+        var default_label: String = end_label
+        var switch_cases: String = ""
+        i = 0
+        while (i < arms.length()) {
+            var arm: AST.MatchArm = arms[i]
+            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p
+                _ => AST.Pattern.VariantPattern("", [])
+            }
+            if (this.is_wildcard_in_enum(pattern, enum_name)) {
+                default_label = arm_labels[i]
+            } else {
+                var variant_name: String = match (pattern) { VariantPattern(v, b) => v
+                    _ => ""
+                }
+                var lookup_key: String = enum_name + "." + variant_name
+                if (this.enum_variant_tags.has(lookup_key)) {
+                    var tag_idx: Float = this.enum_variant_tags.get(lookup_key)
+                    switch_cases = switch_cases + " i8 " + tag_idx.floor().to_string() + ", label %" + arm_labels[i]
+                }
+            }
+            i = i + 1
+        }
+        this.emit_terminator("switch i8 " + tag_val + ", label %" + default_label + " [" + switch_cases + " ]")
+
+        // Generate each arm
+        var match_result_type: AST.Type = AST.Type.IntType
+        i = 0
+        while (i < arms.length()) {
+            this.start_block(arm_labels[i])
+            var arm: AST.MatchArm = arms[i]
+            var pattern: AST.Pattern = match (arm) { Arm(p, b) => p
+                _ => AST.Pattern.VariantPattern("", [])
+            }
+            var body_expr: AST.Expr = match (arm) { Arm(p, b) => b
+                _ => AST.Expr.NilLit
+            }
+
+            // Extract bindings from payload and set their types
+            var arm_variant: String = match (pattern) { VariantPattern(v, b) => v
+                _ => ""
+            }
+            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b
+                _ => []
+            }
+            var bind_count: Float = bindings.length()
+            if (bind_count > 0) {
+                this.extract_arm_bindings(bindings, subj, max_fields)
+                var bi: Float = 0
+                while (bi < bind_count) {
+                    var btype: String = this.get_variant_field_type(enum_name, arm_variant, bi)
+                    this.var_types.set(bindings[bi], btype)
+                    this.typed_vars.set(bindings[bi], this.str_to_type(btype))
+                    if (btype == "String") {
+                        this.string_vars.push(bindings[bi])
+                    }
+                    bi = bi + 1
+                }
+            }
+            var val: String = this.gen_arg_value(body_expr)
+            if (i == 0) {
+                match_result_type = this.last_type
+            }
+            this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+            this.emit_terminator("br label %" + end_label)
+            i = i + 1
+        }
+
+        this.start_block(end_label)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        this.last_type = match_result_type
+        return result
+    }
+
+extend fun Codegen.extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
+        var bind_count: Float = bindings.length()
+        if (max_fields <= 1) {
+            // Simple encoding: extract value with AND mask
+            var bname: String = bindings[0]
+            var extracted: String = this.fresh_local()
+            this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+            this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+        } else {
+            // Array encoding: inttoptr and GEP to extract fields
+            var total: Float = bind_count + 1
+            var total_str: String = total.floor().to_string()
+            var arr_ptr: String = this.fresh_local()
+            this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+            // Extract each field individually to avoid VM loop variable bug
+            if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
+            if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
+            if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
+            if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
+            if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
+        }
+    }
+
+extend fun Codegen.extract_one_field(bname: String, arr_ptr: String, total_str: String, idx: Float) {
+        var field_slot: String = this.fresh_local()
+        this.emit_indent(field_slot + " = getelementptr [" + total_str + " x i64], [" + total_str + " x i64]* " + arr_ptr + ", i64 0, i64 " + idx.floor().to_string())
+        var extracted: String = this.fresh_local()
+        this.emit_indent(extracted + " = load i64, i64* " + field_slot)
+        this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
+    }
+
+extend fun Codegen.get_variant_field_type(enum_name: String, variant_name: String, field_idx: Float): String {
+        var key: String = enum_name + "." + variant_name
+        if (!this.enum_variant_fields.has(key)) return "Int"
+        var fields: String = this.enum_variant_fields.get(key)
+        if (fields.length() == 0) return "Int"
+        var parts: List<String> = this.split_respecting_generics(fields, ",")
+        if (field_idx >= parts.length()) return "Int"
+        var field_def: String = parts[field_idx.floor()]
+        var name_type: List<String> = field_def.split(":")
+        if (name_type.length() < 2) return "Int"
+        var ftype: String = name_type[1]
+        if (ftype == "String") return "String"
+        if (ftype == "Float" or ftype == "Number") return "Int"
+        if (ftype == "Bool") return "Int"
+        if (ftype.starts_with("List")) return "List<String>"
+        return "Int"
+    }
+
+extend fun Codegen.get_max_fields(enum_name: String): Float {
+        var max_f: Float = 0
+        if (!this.enum_defs.has(enum_name)) return 0
+        var variants: List = this.enum_defs.get(enum_name)
+        var i: Float = 0
+        while (i < variants.length()) {
+            var vname: AST.Variant = variants[i]
+            var key: String = enum_name + "." + vname
+            if (this.enum_variant_fields.has(key)) {
+                var fields: String = this.enum_variant_fields.get(key)
+                if (fields.length() > 0) {
+                    var parts: List<String> = this.split_respecting_generics(fields, ",")
+                    // Each part is "name:Type", count them
+                    var field_count: Float = parts.length()
+                    if (field_count > max_f) {
+                        max_f = field_count
+                    }
+                }
+            }
+            i = i + 1
+        }
+        return max_f
+    }
+
+

@@ -100,7 +100,9 @@ SOURCES=(lexer parser)
 
 # Assemble codegen from parts (insert extensions at markers)
 [[ "$VERBOSE" == true ]] && echo "  assemble: codegen"
-sed -e "/@codegen-split: closures/r $COMPILER_DIR/codegen/closures_body.sf" \
+sed -e "/@codegen-split: expr/r $COMPILER_DIR/codegen/expr_body.sf" \
+    -e "/@codegen-split: match/r $COMPILER_DIR/codegen/match_body.sf" \
+    -e "/@codegen-split: closures/r $COMPILER_DIR/codegen/closures_body.sf" \
     -e "/@codegen-split: intrinsics/r $COMPILER_DIR/codegen/intrinsics_body.sf" \
     -e "/@codegen-split: stmts/r $COMPILER_DIR/codegen/stmts_body.sf" \
     -e "/@codegen-split: methods/r $COMPILER_DIR/codegen/methods_body.sf" \

@@ -511,7 +511,7 @@ class Codegen {
     // --- Expression codegen ---
     // Returns the LLVM local name holding the result
     // Sets this.last_type to the Saffron type of the result
-
+    // @codegen-split: expr
     fun gen_expr(expr: AST.Expr): String {
         return match (expr) {
             IntLit(v) => {
@@ -1585,6 +1585,7 @@ class Codegen {
         return as_int
     }
 
+    // @codegen-split: match
     fun gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
         var subj: String = this.gen_arg_value(subject)
         var result_ptr: String = this.fresh_local()
@@ -2061,6 +2062,7 @@ class Codegen {
         this.block_terminated = false
     }
 
+
     fun find_free_vars_stmts(stmts: List<AST.Stmt>, bound: List<String>, free: List<String>) {
         var i: Float = 0
         while (i < stmts.length()) {
@@ -2207,6 +2209,7 @@ class Codegen {
         }
     }
 
+    // @codegen-split: intrinsics
     // @codegen-split: intrinsics
     fun gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
         if (name.ends_with("load64")) {
