@@ -2258,18 +2258,17 @@ class Codegen {
             }
         }
 
-        // --- Unambiguous builtin dispatch by method name ---
-        // Must come BEFORE module check so that builtin methods (push, get, set, length, etc.)
-        // are dispatched correctly even when var_types.has(obj_name) returns false in the
-        // native binary. No method overloading exists, so method name uniquely identifies builtins.
-        // If the method name does not match any builtin, execution falls through to the module
-        // check and class method dispatch below.
+        // --- Builtin dispatch (only for non-class objects) ---
         var obj: String = this.gen_arg_value(object)
+        var is_user_class: Bool = false
+        if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
+            is_user_class = true
+        }
 
-        if (this.builtin_methods.has(method)) {
+        if (!is_user_class and this.builtin_methods.has(method)) {
             return this.emit_builtin_dispatch(obj, method, args)
         }
-        if (method == "get") {
+        if (!is_user_class and method == "get") {
             var key: String = this.gen_arg_value(args[0])
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
@@ -2286,7 +2285,7 @@ class Codegen {
             }
             return local
         }
-        if (method == "starts_with") {
+        if (!is_user_class and method == "starts_with") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
             var prefix: String = this.gen_arg_value(args[0])
@@ -2303,7 +2302,7 @@ class Codegen {
             this.last_type = AST.Type.BoolType
             return result
         }
-        if (method == "char_at") {
+        if (!is_user_class and method == "char_at") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
             var idx: String = this.gen_arg_value(args[0])
@@ -2322,7 +2321,7 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return local
         }
-        if (method == "slice") {
+        if (!is_user_class and method == "slice") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
             var start: String = this.gen_arg_value(args[0])
@@ -2352,7 +2351,7 @@ class Codegen {
             obj_type = this.var_types.get(obj_name)
         }
 
-        if (method == "length") {
+        if (!is_user_class and method == "length") {
             if (obj_type == "String") {
                 var str_ptr: String = this.fresh_local()
                 this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
@@ -2367,7 +2366,7 @@ class Codegen {
                 return local
             }
         }
-        if (method == "contains") {
+        if (!is_user_class and method == "contains") {
             if (obj_type == "String") {
                 var str_ptr: String = this.fresh_local()
                 this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
@@ -2390,7 +2389,7 @@ class Codegen {
                 return local
             }
         }
-        if (method == "to_string") {
+        if (!is_user_class and method == "to_string") {
             if (obj_type == "StringBuilder" or obj_type == "SB") {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
@@ -2406,7 +2405,7 @@ class Codegen {
                 return local
             }
         }
-        if (method == "floor") {
+        if (!is_user_class and method == "floor") {
             this.last_type = AST.Type.IntType
             return obj
         }
