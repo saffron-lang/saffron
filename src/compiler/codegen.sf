@@ -2038,6 +2038,20 @@ class Codegen {
         return "0"
     }
 
+    fun resolve_namespace(obj_name: String, object: AST.Expr): String {
+        if (obj_name == "this" or this.classify_expr(object) == "this") {
+            return this.current_class
+        }
+        if (obj_name == "IO" or obj_name == "OS") { return obj_name }
+        if (this.module_prefixes.has(obj_name)) { return obj_name }
+        if (this.class_fields.has(obj_name)) { return obj_name }
+        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+            var vtype: String = this.var_types.get(obj_name)
+            if (this.class_fields.has(vtype)) { return vtype }
+        }
+        return ""
+    }
+
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
         var obj_name: String = this.get_variable_name(object)
 
