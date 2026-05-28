@@ -782,7 +782,7 @@ class Parser {
             return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class)
         }
 
-        // Check for decorator: @intrinsic or @extern("...")
+        // Check for decorator: @intrinsic, @extern("..."), or general @name / @name("...")
         if (this.is_ident_named("@")) {
             this.advance()
             var decorator: String = this.expect_ident()
@@ -796,6 +796,22 @@ class Parser {
                 this.advance()
                 this.consume(")")
                 annotation = "@extern:" + sig
+            } else {
+                // General decorator: @name or @name("args")
+                annotation = "@" + decorator
+                if (this.match_kind_check("(")) {
+                    this.advance()
+                    if (this.match_kind_check("string")) {
+                        var darg_kind: Lexer.TokenKind = this.current_kind()
+                        var darg: String = match (darg_kind) { TkString(s) => s }
+                        this.advance()
+                        annotation = annotation + ":" + darg
+                    }
+                    this.consume(")")
+                }
+            }
+            if (this.match_kind_check("class")) {
+                return this.parse_class_decl_with_doc(annotation)
             }
             return this.parse_fun_decl_with_doc(annotation)
         }
@@ -1281,12 +1297,35 @@ class Parser {
     fun parse_for(): AST.Stmt {
         this.advance() // consume for
         this.consume("(")
+        // C-style for with var keyword: for (var i: Float = 0; i < 10; i = i + 1)
+        if (this.match_kind_check("var")) {
+            this.advance() // consume var
+            var name: String = this.expect_ident()
+            this.consume(":")
+            var vtype: String = this.parse_type()
+            this.consume("=")
+            var init_expr: AST.Expr = this.parse_expr()
+            var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
+            this.consume(";")
+            var cond: AST.Expr = this.parse_expr()
+            this.consume(";")
+            var update_name: String = this.expect_ident()
+            this.consume("=")
+            var update_expr: AST.Expr = this.parse_expr()
+            this.consume(")")
+            var body: List<AST.Stmt> = this.parse_block_stmts()
+            body.push(AST.Stmt.ExprStmt(AST.Expr.Assign(update_name, update_expr)))
+            var stmts: List<AST.Stmt> = []
+            stmts.push(init)
+            stmts.push(AST.Stmt.While(cond, body))
+            return AST.Stmt.Block(stmts)
+        }
         // Check for for-in: for (name in expr)
         var name: String = this.expect_ident()
         if (this.match_kind("in")) {
             return this.parse_for_in(name)
         }
-        // C-style for: for (var name = init; cond; update)
+        // C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
         this.consume(":")
         var vtype: String = this.parse_type()
         this.consume("=")

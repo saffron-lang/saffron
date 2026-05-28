@@ -5441,6 +5441,48 @@ entry:
   ret i64 0
 }
 
+define i64 @Codegen__set_last_type(i64 %self.arg, i64 %t.arg) {
+entry:
+  %self = alloca i64
+  %t = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %t.arg, i64* %t
+  %t1 = load i64, i64* %self
+  %t2 = load i64, i64* %t
+  %t3 = inttoptr i64 %t1 to %Codegen*
+  %t4 = getelementptr %Codegen, %Codegen* %t3, i32 0, i32 17
+  store volatile i64 %t2, i64* %t4
+  ret i64 0
+}
+
+define i64 @Codegen__set_current_class(i64 %self.arg, i64 %c.arg) {
+entry:
+  %self = alloca i64
+  %c = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %c.arg, i64* %c
+  %t1 = load i64, i64* %self
+  %t2 = load i64, i64* %c
+  %t3 = inttoptr i64 %t1 to %Codegen*
+  %t4 = getelementptr %Codegen, %Codegen* %t3, i32 0, i32 14
+  store volatile i64 %t2, i64* %t4
+  ret i64 0
+}
+
+define i64 @Codegen__set_current_prefix(i64 %self.arg, i64 %p.arg) {
+entry:
+  %self = alloca i64
+  %p = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %p.arg, i64* %p
+  %t1 = load i64, i64* %self
+  %t2 = load i64, i64* %p
+  %t3 = inttoptr i64 %t1 to %Codegen*
+  %t4 = getelementptr %Codegen, %Codegen* %t3, i32 0, i32 28
+  store volatile i64 %t2, i64* %t4
+  ret i64 0
+}
+
 define i64 @Codegen__emit(i64 %self.arg, i64 %line.arg) {
 entry:
   %self = alloca i64
