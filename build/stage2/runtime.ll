@@ -28,6 +28,14 @@ declare i8* @fgets(i8*, i32, i8*)
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
 declare i32 @setjmp(i8*)
 declare void @longjmp(i8*, i32)
+declare void @__io_println_str(i64)
+declare void @__io_println_int(i64)
+declare void @__io_println_bool(i64)
+declare void @__io_println_nil()
+declare void @__io_print_str(i64)
+declare void @__io_print_int(i64)
+declare i64 @__bool_to_string(i64)
+declare i64 @__nil_to_string()
 
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"

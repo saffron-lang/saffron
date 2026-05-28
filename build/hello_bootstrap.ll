@@ -36,6 +36,14 @@ declare i8* @fgets(i8*, i32, i8*)
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
 declare i32 @setjmp(i8*)
 declare void @longjmp(i8*, i32)
+declare void @__io_println_str(i64)
+declare void @__io_println_int(i64)
+declare void @__io_println_bool(i64)
+declare void @__io_println_nil()
+declare void @__io_print_str(i64)
+declare void @__io_print_int(i64)
+declare i64 @__bool_to_string(i64)
+declare i64 @__nil_to_string()
 
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
@@ -148,16 +156,13 @@ entry:
   call i8* @strcpy(i8* %t43, i8* %t37)
   call i8* @strcat(i8* %t43, i8* %t38)
   %t44 = ptrtoint i8* %t43 to i64
-  %t46 = inttoptr i64 %t44 to i8*
-  %t45 = call i32 @puts(i8* %t46)
-  %t47 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
+  call void @__io_println_str(i64 %t44)
+  %t45 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
+  %t46 = ptrtoint i8* %t45 to i64
+  call void @__io_println_str(i64 %t46)
+  %t47 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
-  %t50 = inttoptr i64 %t48 to i8*
-  %t49 = call i32 @puts(i8* %t50)
-  %t51 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
-  %t52 = ptrtoint i8* %t51 to i64
-  %t54 = inttoptr i64 %t52 to i8*
-  %t53 = call i32 @puts(i8* %t54)
+  call void @__io_println_str(i64 %t48)
   ret i64 0
 }
 

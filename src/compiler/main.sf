@@ -330,10 +330,21 @@ fun main(): Int {
         ak = ak + 1
     }
 
-    // Recursively collect modules (text-based extraction)
+    // Auto-import prelude (interfaces available in all programs)
+    var prelude_path: String = stdlib_dir + "/prelude.sf"
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
+    if (IO.file_exists(prelude_path)) {
+        var prelude_src: String = IO.read_file(prelude_path)
+        var prelude_tokens: List = Lexer.lex(prelude_src)
+        var prelude_program: List = Parser.parse(prelude_tokens)
+        module_stmts.push(prelude_program)
+        module_prefixes_list.push("")
+        visited.set(prelude_path, true)
+    }
+
+    // Recursively collect modules (text-based extraction)
     var import_paths: List<String> = extract_imports(source)
     var pi: Float = 0
     while (pi < import_paths.length()) {
