@@ -334,10 +334,62 @@ class Codegen {
             ClassType(n) => n
             EnumType(n) => n
             GenericType(base, args) => this.generic_type_string(base, args)
-            UnionType(types) => "Union"
-            FuncType(p, r) => "Fun"
-            NullableType(inner) => this.type_to_string(inner)
+            UnionType(types) => this.union_type_string(types)
+            FuncType(p, r) => this.func_type_string(p, r)
+            NullableType(inner) => this.type_to_string(inner) + "|Nil"
         }
+    }
+
+    fun union_type_string(types: List<AST.Type>): String {
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < types.length()) {
+            if (i > 0) { sb.append("|") }
+            sb.append(this.type_to_string(types[i]))
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
+    fun func_type_string(params: List<AST.Type>, ret: AST.Type): String {
+        var sb: StringBuilder = StringBuilder()
+        sb.append("Fun(")
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            sb.append(this.type_to_string(params[i]))
+            i = i + 1
+        }
+        sb.append("):")
+        sb.append(this.type_to_string(ret))
+        return sb.to_string()
+    }
+
+    fun split_type_union(s: String): List<String> {
+        var result: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<" or ch == "(") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">" or ch == ")") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "|" and depth == 0) {
+                result.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            result.push(current)
+        }
+        return result
     }
 
     fun generic_type_string(base: String, args: List<AST.Type>): String {
