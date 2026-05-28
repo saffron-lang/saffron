@@ -189,10 +189,11 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     visited.set(file_path, true)
 
     var source: String = IO.read_file(file_path)
-    var import_paths: List<String> = extract_imports(source)
+    var tokens: List = Lexer.lex(source)
+    var program: List = Parser.parse(tokens)
 
-    // Collect this module's import aliases
-    var mod_aliases: Map<String, String> = extract_import_aliases(source)
+    // Collect this module's import aliases from AST
+    var mod_aliases: Map<String, String> = extract_aliases_from_ast(program)
     var mak: List<String> = mod_aliases.keys()
     var mai: Float = 0
     while (mai < mak.length()) {
@@ -204,6 +205,7 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         mai = mai + 1
     }
 
+    var import_paths: List<String> = extract_imports_from_ast(program)
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
@@ -213,9 +215,6 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         }
         pi = pi + 1
     }
-
-    var tokens: List = Lexer.lex(source)
-    var program: List = Parser.parse(tokens)
 
     var prefix: String = module_prefix_from_file(file_path)
     module_stmts.push(program)
@@ -293,15 +292,14 @@ fun main(): Int {
         stdlib_dir = exe_dir + "/../src/lib"
     }
 
-    // Recursively collect all imported modules with their prefixes and aliases
-    var visited: Map<String, Bool> = {}
-    var module_stmts: List<List<AST.Stmt>> = []
-    var module_prefixes_list: List<String> = []
-    var resolved_aliases: Map<String, String> = {}
+    // Lex and parse the main file
     var source: String = IO.read_file(input_path)
+    var tokens: List = Lexer.lex(source)
+    var program: List = Parser.parse(tokens)
 
-    // Main file's own aliases
-    var alias_map: Map<String, String> = extract_import_aliases(source)
+    // Extract imports from parsed AST
+    var resolved_aliases: Map<String, String> = {}
+    var alias_map: Map<String, String> = extract_aliases_from_ast(program)
     var alias_keys: List<String> = alias_map.keys()
     var ak: Float = 0
     while (ak < alias_keys.length()) {
@@ -313,8 +311,11 @@ fun main(): Int {
         ak = ak + 1
     }
 
-    // Recursively collect modules (also populates resolved_aliases from each module's imports)
-    var import_paths: List<String> = extract_imports(source)
+    // Recursively collect modules
+    var visited: Map<String, Bool> = {}
+    var module_stmts: List<List<AST.Stmt>> = []
+    var module_prefixes_list: List<String> = []
+    var import_paths: List<String> = extract_imports_from_ast(program)
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
@@ -324,11 +325,6 @@ fun main(): Int {
         }
         pi = pi + 1
     }
-
-
-    // Compile: lex → parse → [check] → generate with module awareness
-    var tokens: List = Lexer.lex(source)
-    var program: List = Parser.parse(tokens)
 
     // Flatten module_stmts into a single list with boundary markers
     // Encode prefixes as a single joined string to avoid native list issues

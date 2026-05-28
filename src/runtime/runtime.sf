@@ -336,7 +336,7 @@ fun __list_contains(list: Int, val: Int): Int {
     var i: Int = 0
     while (i < count) {
         var elem: Int = load64(data + i * 8)
-        if (__safe_strcmp(val, elem) == 0) {
+        if (rt_strcmp(val, elem) == 0) {
             return 1
         }
         i = i + 1
