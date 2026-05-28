@@ -14,8 +14,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SAFFRONC="${SAFFRONC:-$SCRIPT_DIR/build/saffronc}"
 RUNTIME="${SAFFRON_RUNTIME:-$SCRIPT_DIR/build/stage3/runtime.ll}"
-RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime_base.ll}"
-STUBS="${SAFFRON_STUBS:-$SCRIPT_DIR/src/runtime_stubs.ll}"
+RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base.ll}"
+STUBS="${SAFFRON_STUBS:-$SCRIPT_DIR/src/runtime/stubs.ll}"
 
 usage() {
     echo "saffron — The Saffron Programming Language"
