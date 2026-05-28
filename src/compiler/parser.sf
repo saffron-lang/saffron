@@ -323,6 +323,20 @@ class Parser {
                     args.push(AST.Expr.Lambda([], "Nil", tc_body))
                 }
                 expr = AST.Expr.Call(expr, args)
+            } else if (this.match_kind_check("{") and this.current_line_num() == this.prev_line_num()) {
+                // Paren-free trailing closure: ident { ... } → ident(fun () { ... })
+                var is_callable: String = match (expr) {
+                    Variable(n) => "yes"
+                    MemberAccess(o, f) => "yes"
+                    _ => "no"
+                }
+                if (is_callable == "yes") {
+                    var tc_body: List<AST.Stmt> = this.parse_block_stmts()
+                    var tc_args: List<AST.Expr> = [AST.Expr.Lambda([], "Nil", tc_body)]
+                    expr = AST.Expr.Call(expr, tc_args)
+                } else {
+                    break
+                }
             } else {
                 break
             }
