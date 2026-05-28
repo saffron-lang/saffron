@@ -1928,6 +1928,23 @@ class Codegen {
         return val
     }
 
+    fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
+        var full_name: String = ext_class + "__" + name
+        var prefixed: String = this.current_prefix + full_name
+        this.known_functions.push(prefixed)
+        this.known_functions.push(full_name)
+        this.func_ret_types.set(prefixed, ret_type)
+        this.func_ret_types.set(full_name, ret_type)
+        this.func_prefix_map.set(full_name, prefixed)
+        var params_str: String = this.params_to_string(params)
+        var full_params: String = "self:Int"
+        if (params_str.length() > 0) { full_params = full_params + "," + params_str }
+        var saved_class: String = this.current_class
+        this.current_class = ext_class
+        this.gen_function(full_name, full_params, ret_type, body)
+        this.current_class = saved_class
+    }
+
     fun emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
         var desc: String = this.builtin_methods.get(method)
         var parts: List<String> = desc.split("|")
@@ -3451,6 +3468,9 @@ class Codegen {
                     this.known_functions.push(emit_name)
                     this.func_ret_types.set(emit_name, ret_type)
                     this.extern_sigs.set(emit_name, c_sig)
+                } else if (doc.starts_with("@extend:")) {
+                    var ext_class: String = doc.slice(8, doc.length())
+                    this.gen_extend_method(ext_class, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
                     this.gen_function(name, params_str, ret_type, body)
