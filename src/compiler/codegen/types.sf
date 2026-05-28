@@ -47,7 +47,15 @@ extend fun Codegen.str_to_type(s: String): AST.Type {
             var inner: String = s.slice(5, s.length() - 1)
             return this.make_generic_type("List", [this.str_to_type(inner)])
         }
-        if (s == "Map" or s.starts_with("Map<")) return this.make_map_type()
+        if (s == "Map") return this.make_map_type()
+        if (s.starts_with("Map<") and s.ends_with(">")) {
+            var map_inner: String = s.slice(4, s.length() - 1)
+            var map_parts: List<String> = this.split_respecting_generics(map_inner, ",")
+            if (map_parts.length() >= 2) {
+                return this.make_generic_type("Map", [this.str_to_type(map_parts[0]), this.str_to_type(map_parts[1])])
+            }
+            return this.make_map_type()
+        }
         if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
         return AST.Type.ClassType(s)
     }
@@ -70,10 +78,45 @@ extend fun Codegen.type_to_string(t: AST.Type): String {
     }
 
 extend fun Codegen.generic_type_string(base: String, args: List<AST.Type>): String {
+        if (args.length() > 1) {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(base)
+            sb.append("<")
+            var gi: Float = 0
+            while (gi < args.length()) {
+                if (gi > 0) { sb.append(",") }
+                sb.append(this.type_to_string(args[gi]))
+                gi = gi + 1
+            }
+            sb.append(">")
+            return sb.to_string()
+        }
         if (args.length() > 0) {
             return base + "<" + this.type_to_string(args[0]) + ">"
         }
         return base
+    }
+
+extend fun Codegen.get_list_element_type(t: AST.Type): AST.Type {
+        return match (t) {
+            GenericType(base, args) => {
+                if (base == "List" and args.length() > 0) {
+                    return args[0]
+                }
+                return AST.Type.AnyType
+            }
+            IntType => AST.Type.AnyType
+            FloatType => AST.Type.AnyType
+            BoolType => AST.Type.AnyType
+            StringType => AST.Type.AnyType
+            NilType => AST.Type.AnyType
+            AnyType => AST.Type.AnyType
+            ClassType(n) => AST.Type.AnyType
+            EnumType(n) => AST.Type.AnyType
+            UnionType(types) => AST.Type.AnyType
+            FuncType(p, r) => AST.Type.AnyType
+            NullableType(inner) => AST.Type.AnyType
+        }
     }
 
 extend fun Codegen.coerce_to_string(val: String, val_type: String): String {

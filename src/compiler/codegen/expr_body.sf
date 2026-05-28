@@ -326,8 +326,10 @@
             var left_type: String = this.get_expr_type(left)
             var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
+            var left_actual: AST.Type = this.last_type
             if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
             var rhs: String = this.gen_arg_value(right)
+            var right_actual: AST.Type = this.last_type
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
@@ -354,12 +356,25 @@
                 return result
             }
 
+            // Float arithmetic when both operands are genuinely float-tagged
+            if (this.is_float_type(left_actual) and this.is_float_type(right_actual)) {
+                return this.gen_binary_float(lhs, rhs, "+")
+            }
+
             // Integer addition (NaN-boxed: untag, add, retag)
             return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
         var lhs: String = this.gen_arg_value(left)
+        var left_actual: AST.Type = this.last_type
         var rhs: String = this.gen_arg_value(right)
+        var right_actual: AST.Type = this.last_type
+
+        // Float arithmetic when both operands are genuinely float-tagged
+        if (this.is_float_type(left_actual) and this.is_float_type(right_actual)) {
+            return this.gen_binary_float(lhs, rhs, op)
+        }
+
         return this.gen_binary_nanboxed(lhs, rhs, op)
     }
 
