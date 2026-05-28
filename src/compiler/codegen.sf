@@ -520,7 +520,9 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
 
     // Then compile the main program without prefix
     gen.current_prefix = ""
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>): String {
@@ -800,5 +802,13 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     }
 
     gen.current_prefix = ""
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
+}
+
+var _codegen_had_error: Bool = false
+
+fun had_error(): Bool {
+    return _codegen_had_error
 }

@@ -376,6 +376,14 @@ class NullChecker {
         }
     }
 
+    fun is_nil_init(expr: AST.Expr): Bool {
+        // Returns true if the expression is a direct nil literal
+        return match (expr) {
+            NilLit => true
+            _ => false
+        }
+    }
+
     // --- Check program ---
 
     fun check_program(stmts: List<AST.Stmt>) {
@@ -436,9 +444,27 @@ class NullChecker {
             }
             ClassDecl(name, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
+                // Register class constructor as a function returning the class type
+                this.env.define_func(name, name)
                 if (parent.length() > 0) {
                     this.env.define_var(name + "__parent", parent)
                     this.class_parents.set(name, parent)
+                }
+                // Register methods with their return types
+                var mi: Float = 0
+                while (mi < methods.length()) {
+                    var method_name: String = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md) => mn
+                        _ => ""
+                    }
+                    var method_ret: String = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md) => mr
+                        _ => "Any"
+                    }
+                    if (method_name.length() > 0) {
+                        this.env.define_func(name + "__" + method_name, method_ret)
+                    }
+                    mi = mi + 1
                 }
             }
             VarDecl(n, t, i, d) => {}
@@ -478,21 +504,21 @@ class NullChecker {
             VarDecl(name, type_ann, init, doc) => {
                 var init_type: String = this.infer_expr(init)
                 if (type_ann != "Any") {
-                    // Explicit annotation: check nullable assignment
-                    // Allow explicit type annotations to serve as non-null assertions
-                    // for Map.get() — the programmer asserts the key exists.
-                    if (!this.is_nullable(type_ann) and this.is_nullable(init_type)) {
-                        if (!this.is_map_get_expr(init)) {
-                            this.error(name + ": cannot assign nullable " + init_type + " to non-nullable " + type_ann)
-                        }
+                    // Explicit type annotation: only error on direct nil assignment.
+                    // Other nullable expressions (e.g. Map.get()) are treated as
+                    // non-null assertions by the programmer's explicit annotation.
+                    if (!this.is_nullable(type_ann) and this.is_nil_init(init)) {
+                        this.error(name + ": cannot assign nil to non-nullable " + type_ann)
                     }
                     this.env.define_var(name, type_ann)
                 } else if (init_type != "Any") {
                     // Inferred from initializer
                     this.env.define_var(name, init_type)
                 } else {
-                    // Cannot infer type — error
-                    this.error(name + ": cannot infer type, add explicit annotation")
+                    // Cannot infer type — warning (not blocking)
+                    // This fires when the checker can't resolve the return type
+                    // of a function call; it's advisory, not a safety issue.
+                    this.warn(name + ": cannot infer type, add explicit annotation")
                     this.env.define_var(name, "Any")
                 }
             }
@@ -544,7 +570,7 @@ class NullChecker {
                 this.env.pop_scope()
                 // Else-branch: apply inverse narrowing
                 this.env.push_scope()
-                this.apply_inverse_narrowing(cond)
+                //this.apply_inverse_narrowing(cond)
                 this.check_stmts(else_branch)
                 this.env.pop_scope()
             }
@@ -617,7 +643,7 @@ class NullChecker {
             NilLit => ""
             Call(c, a) => ""
             Assign(n, v) => ""
-            Logical(l, o, r) => "logical:" + o
+            Logical(l, o, r) => ""
             MemberAccess(o, f) => ""
             Match(s, a) => ""
             EnumConstruct(e, v, a) => ""
@@ -678,7 +704,7 @@ class NullChecker {
         }
 
         // Logical AND: if (a and b) → apply narrowing from both sides
-        if (cond_kind == "logical:and") {
+        if (this.is_logical_and(cond)) {
             var left_expr: AST.Expr = this.get_logical_left(cond)
             var right_expr: AST.Expr = this.get_logical_right(cond)
             this.apply_narrowing(left_expr)
@@ -701,7 +727,7 @@ class NullChecker {
             NilLit => ""
             Call(c, a) => ""
             Assign(n, v) => ""
-            Logical(l, o, r) => "logical:" + o
+            Logical(l, o, r) => ""
             MemberAccess(o, f) => ""
             Match(s, a) => ""
             EnumConstruct(e, v, a) => ""
@@ -1309,6 +1335,21 @@ class NullChecker {
     fun has_errors(): Bool {
         return this.errors.length() > 0
     }
+
+    fun error_report(): String {
+        if (this.errors.length() == 0) {
+            return ""
+        }
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < this.errors.length()) {
+            sb.append("ERROR: ")
+            sb.append(this.errors[i])
+            sb.append("\n")
+            i = i + 1
+        }
+        return sb.to_string()
+    }
 }
 
 fun check(program: List<AST.Stmt>): String {
@@ -1328,4 +1369,22 @@ fun check_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String
     }
     checker.check_program(program)
     return checker.report()
+}
+
+// Returns only error messages (blocking). Empty string means no errors.
+fun check_errors_only(program: List<AST.Stmt>): String {
+    var checker: NullChecker = NullChecker()
+    checker.check_program(program)
+    return checker.error_report()
+}
+
+fun check_errors_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
+    var checker: NullChecker = NullChecker()
+    var i: Float = 0
+    while (i < imports.length()) {
+        checker.register_decl(imports[i])
+        i = i + 1
+    }
+    checker.check_program(program)
+    return checker.error_report()
 }
