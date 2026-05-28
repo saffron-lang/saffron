@@ -1907,7 +1907,7 @@ class Codegen {
             if (mc_method == "length") return "Float"
             if (mc_method == "to_string" or mc_method == "join") return "String"
             if (mc_method == "split" or mc_method == "keys") return "List<String>"
-            if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with") return "Bool"
+            if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
             if (mc_method == "get") {
                 // Infer return type from Map<K, V> annotation rather than always "String"
                 var mc_obj: AST.Expr = match (expr) {
@@ -2349,6 +2349,38 @@ class Codegen {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
             this.last_type = AST.Type.StringType
+            return local
+        }
+        if (!is_user_class and method == "is_upper") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var ch: String = this.fresh_local()
+            this.emit_indent(ch + " = load i8, i8* " + str_ptr)
+            var ge_a: String = this.fresh_local()
+            this.emit_indent(ge_a + " = icmp uge i8 " + ch + ", 65")
+            var le_z: String = this.fresh_local()
+            this.emit_indent(le_z + " = icmp ule i8 " + ch + ", 90")
+            var both: String = this.fresh_local()
+            this.emit_indent(both + " = and i1 " + ge_a + ", " + le_z)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = zext i1 " + both + " to i64")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+        if (!is_user_class and method == "is_lower") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var ch: String = this.fresh_local()
+            this.emit_indent(ch + " = load i8, i8* " + str_ptr)
+            var ge_a: String = this.fresh_local()
+            this.emit_indent(ge_a + " = icmp uge i8 " + ch + ", 97")
+            var le_z: String = this.fresh_local()
+            this.emit_indent(le_z + " = icmp ule i8 " + ch + ", 122")
+            var both: String = this.fresh_local()
+            this.emit_indent(both + " = and i1 " + ge_a + ", " + le_z)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = zext i1 " + both + " to i64")
+            this.last_type = AST.Type.BoolType
             return local
         }
         if (!is_user_class and method == "slice") {

@@ -1,0 +1,26 @@
+var x: String = "A"
+if (x.is_upper()) {
+    IO.println("A is upper: true")
+} else {
+    IO.println("A is upper: false")
+}
+
+var y: String = "a"
+if (y.is_upper()) {
+    IO.println("a is upper: true")
+} else {
+    IO.println("a is upper: false")
+}
+
+if (y.is_lower()) {
+    IO.println("a is lower: true")
+} else {
+    IO.println("a is lower: false")
+}
+
+var z: String = "5"
+if (z.is_upper()) {
+    IO.println("5 is upper: true")
+} else {
+    IO.println("5 is upper: false")
+}

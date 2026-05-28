@@ -10,3 +10,4 @@ authors = ["henry232323"]
 [scripts]
 build = "saffron build src/main.sf -o build/saffron-ui"
 run = "saffron run src/main.sf"
+generate = "saffron run tools/generate_types.sf"

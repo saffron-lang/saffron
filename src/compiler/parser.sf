@@ -1041,6 +1041,21 @@ class Parser {
     fun parse_class_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume class
         var name: String = this.expect_ident()
+        // Skip generic type parameters: class Foo<T> or interface Bar<K, V>
+        if (this.match_kind_check("<")) {
+            this.advance()
+            var depth: Float = 1
+            while (depth > 0 and !this.match_kind_check("eof")) {
+                if (this.match_kind_check("<")) {
+                    depth = depth + 1
+                } else if (this.match_kind_check(">")) {
+                    depth = depth - 1
+                } else if (this.match_kind_check(">>")) {
+                    depth = depth - 2
+                }
+                this.advance()
+            }
+        }
         var parent: String = ""
         if (this.is_ident_named("extends")) {
             this.advance() // consume extends
