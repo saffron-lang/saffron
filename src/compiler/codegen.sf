@@ -22,6 +22,7 @@ class Codegen {
     var string_vars: List<String>
     var last_type: AST.Type
     var var_types: Map<String, String>
+    var typed_vars: Map<String, AST.Type>
     var loop_end_label: String
     var current_ret_type: String
     var called_functions: List<String>
@@ -57,6 +58,7 @@ class Codegen {
         this.string_vars = []
         this.last_type = AST.Type.IntType
         this.var_types = {}
+        this.typed_vars = {}
         this.loop_end_label = ""
         this.current_ret_type = "i64"
         this.called_functions = []
@@ -1636,6 +1638,7 @@ class Codegen {
                 while (bi < bind_count) {
                     var btype: String = this.get_variant_field_type(enum_name, arm_variant, bi)
                     this.var_types.set(bindings[bi], btype)
+                    this.typed_vars.set(bindings[bi], this.str_to_type(btype))
                     if (btype == "String") {
                         this.string_vars.push(bindings[bi])
                     }
@@ -2670,6 +2673,7 @@ class Codegen {
         var saved_terminated: Bool = this.block_terminated
         var saved_counter: Float = this.local_counter
         var saved_var_types: Map<String, String> = this.var_types
+        var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
 
         // Generate the lambda function
         this.sb = StringBuilder()
@@ -2686,6 +2690,7 @@ class Codegen {
         this.block_terminated = saved_terminated
         this.local_counter = saved_counter
         this.var_types = saved_var_types
+        this.typed_vars = saved_typed_vars
         this.globals.push(lambda_ir)
 
         if (captures.length() > 0) {
@@ -3459,7 +3464,9 @@ class Codegen {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }
             VarDecl(name, type_ann, init, doc) => {
-                this.gen_var_decl(stmt)
+                if (!doc.starts_with("@import:")) {
+                    this.gen_var_decl(stmt)
+                }
             }
             Return(value) => { this.gen_return(stmt) }
             If(cond, then_branch, else_branch) => {
@@ -3530,6 +3537,12 @@ class Codegen {
         }
     }
 
+    fun get_var_doc(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => d
+            _ => ""
+        }
+    }
+
     fun gen_var_decl(stmt: AST.Stmt) {
         var name: String = this.get_var_name(stmt)
         this.gen_var_decl_with_name(name, this.get_var_type(stmt), this.get_var_init(stmt))
@@ -3545,6 +3558,7 @@ class Codegen {
             vtype = this.type_to_string(this.last_type)
         }
         this.var_types.set(name, vtype)
+        this.typed_vars.set(name, this.str_to_type(vtype))
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
         // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
@@ -3954,6 +3968,10 @@ class Codegen {
         var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
             _ => ""
         }
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d) => d
+            _ => ""
+        }
+        if (vdoc.starts_with("@import:")) { return }
         if (!this.var_types.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
@@ -4227,10 +4245,12 @@ class Codegen {
             var saved_terminated2: Bool = this.block_terminated
             var saved_counter2: Float = this.local_counter
             var saved_var_types2: Map<String, String> = this.var_types
+            var saved_typed_vars2: Map<String, AST.Type> = this.typed_vars
 
             this.sb = StringBuilder()
             this.in_function = true
             this.var_types = {}
+            this.typed_vars = {}
             this.string_vars = []
             this.reset_locals()
             var ret_llvm2: String = this.llvm_type(ret_type)
@@ -4263,6 +4283,7 @@ class Codegen {
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
                 this.var_types.set(pp2[0], pp2[1])
+                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -4294,6 +4315,7 @@ class Codegen {
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
+        this.typed_vars = {}
         var ret_llvm: String = this.llvm_type(ret_type)
 
         // Parse params string "name:type,name:type"
@@ -4351,6 +4373,7 @@ class Codegen {
             var pname: String = parts[0]
             var ptype: String = parts[1]
             this.var_types.set(pname, ptype)
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }
@@ -4733,8 +4756,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 var stmt_kind: String = gen.classify_stmt(stmts[si2])
                 if (stmt_kind == "var") {
                     var vname: String = match (stmts[si2]) { VarDecl(n, t, i, d) => n }
-                    gen.module_globals.set(prefix + vname, true)
-                    gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                    var vdoc2: String = gen.get_var_doc(stmts[si2])
+                    if (!vdoc2.starts_with("@import:")) {
+                        gen.module_globals.set(prefix + vname, true)
+                        gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                    }
                 }
             }
             si2 = si2 + 1
@@ -4883,8 +4909,11 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
                     var vname: String = match (all_stmts[si]) { VarDecl(n, t, i, d) => n
                         _ => ""
                     }
-                    gen.module_globals.set(prefix + vname, true)
-                    gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                    var vdoc3: String = gen.get_var_doc(all_stmts[si])
+                    if (!vdoc3.starts_with("@import:")) {
+                        gen.module_globals.set(prefix + vname, true)
+                        gen.globals.push("@__g_" + prefix + gen.sanitize_name(vname) + " = global i64 0\n")
+                    }
                 }
             }
             si = si + 1

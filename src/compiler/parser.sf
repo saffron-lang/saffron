@@ -1303,24 +1303,37 @@ class Parser {
     }
 
     fun parse_trailing_closure_with_params(): AST.Expr {
-        var params: List<AST.Param> = []
-        var pname: String = this.expect_ident()
-        params.push(AST.Param.Param(pname, "Any"))
+        // Collect param names before the =>
+        var param_names: List<String> = []
+        param_names.push(this.expect_ident())
         while (this.match_kind(",")) {
-            pname = this.expect_ident()
-            params.push(AST.Param.Param(pname, "Any"))
+            param_names.push(this.expect_ident())
         }
         this.consume("=>")
+        // Parse body
         var body: List<AST.Stmt> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) {
-                this.consume("}")
-                return AST.Expr.Lambda(params, "Any", body)
+                break
             }
             body.push(this.parse_stmt())
         }
         this.consume("}")
+        // Build the Lambda using the same pattern as parse_lambda
+        return this.build_lambda(param_names, body)
+    }
+
+    fun build_lambda(names: List<String>, body: List<AST.Stmt>): AST.Expr {
+        IO.println("[DEBUG build_lambda] names=" + names.length().to_string())
+        var params: List<AST.Param> = []
+        var i: Float = 0
+        while (i < names.length()) {
+            IO.println("[DEBUG build_lambda]   name: " + names[i])
+            params.push(AST.Param.Param(names[i], "Any"))
+            i = i + 1
+        }
+        IO.println("[DEBUG build_lambda] params.length=" + params.length().to_string())
         return AST.Expr.Lambda(params, "Any", body)
     }
 

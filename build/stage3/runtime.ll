@@ -1469,27 +1469,30 @@ while.body65:
   %t21 = load i64, i64* %t20
   store i64 %t21, i64* %elem
   %t22 = load i64, i64* %val
-  %t23 = load i64, i64* %elem
-  %t24 = call i64 @__safe_strcmp(i64 %t22, i64 %t23)
-  %t25 = add i64 0, 0
-  %t27 = icmp eq i64 %t24, %t25
-  %t26 = zext i1 %t27 to i64
-  %t28 = trunc i64 %t26 to i1
-  br i1 %t28, label %then68, label %else69
+  %t23 = inttoptr i64 %t22 to i8*
+  %t24 = load i64, i64* %elem
+  %t25 = inttoptr i64 %t24 to i8*
+  %t26 = call i32 @strcmp(i8* %t23, i8* %t25)
+  %t27 = sext i32 %t26 to i64
+  %t28 = add i64 0, 0
+  %t30 = icmp eq i64 %t27, %t28
+  %t29 = zext i1 %t30 to i64
+  %t31 = trunc i64 %t29 to i1
+  br i1 %t31, label %then68, label %else69
 then68:
-  %t29 = add i64 0, 1
-  ret i64 %t29
+  %t32 = add i64 0, 1
+  ret i64 %t32
 else69:
   br label %endif67
 endif67:
-  %t30 = load i64, i64* %i
-  %t31 = add i64 0, 1
-  %t32 = add i64 %t30, %t31
-  store i64 %t32, i64* %i
+  %t33 = load i64, i64* %i
+  %t34 = add i64 0, 1
+  %t35 = add i64 %t33, %t34
+  store i64 %t35, i64* %i
   br label %while.cond64
 while.end66:
-  %t33 = add i64 0, 0
-  ret i64 %t33
+  %t36 = add i64 0, 0
+  ret i64 %t36
 }
 
 define i64 @__io_read_file(i64 %path.arg) {
