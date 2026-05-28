@@ -15,7 +15,7 @@ enum Type {
 
 enum Expr {
     IntLit(value: Float),
-    FloatLit(value: Float),
+    FloatLit(value: String),
     BoolLit(value: Bool),
     StringLit(value: String),
     NilLit,

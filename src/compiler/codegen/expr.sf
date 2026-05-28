@@ -10,8 +10,9 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
+                // v is the float literal text (e.g. "3.14").
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = fadd double 0.0, " + v.to_string())
+                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v + ")")
                 local
             }
             BoolLit(v) => {
@@ -45,6 +46,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                 // Error check: undefined variable
                 if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
+                    this.has_errors = true
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
@@ -466,6 +468,7 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
             // Error check: undefined variable
             if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
+                this.has_errors = true
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -856,6 +859,7 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    this.has_errors = true
                 }
             }
             this.called_functions.push(emit_callee)

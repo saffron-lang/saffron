@@ -26,6 +26,17 @@ declare void @js_log_int(i64)
 declare void @js_log_bool(i64)
 declare void @js_log_nil()
 
+; --- DOM Operations (provided by JS glue) ---
+
+declare i64 @js_dom_create_element(i8*)
+declare void @js_dom_set_text(i64, i8*)
+declare void @js_dom_set_attribute(i64, i8*, i8*)
+declare void @js_dom_append_child(i64, i64)
+declare void @js_dom_remove_child(i64, i64)
+declare void @js_dom_set_inner_html(i64, i8*)
+declare i64 @js_dom_query_selector(i8*)
+declare void @js_dom_add_event_listener(i64, i8*, i64)
+
 ; --- Memory Allocator (bump allocator) ---
 ; Simple and fast. No free. Suitable for short-lived WASM modules.
 ; For long-running apps, replace with a proper allocator later.
