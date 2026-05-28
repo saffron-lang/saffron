@@ -1,21 +1,32 @@
-//! Mathematical constants and functions wrapping the native math module.
+//! Mathematical constants and functions using @extern for native compilation.
 
-import "math" as _Math
+@extern("double sin(double)") fun _sin(x: Float): Float
+@extern("double cos(double)") fun _cos(x: Float): Float
+@extern("double tan(double)") fun _tan(x: Float): Float
+@extern("double asin(double)") fun _asin(x: Float): Float
+@extern("double acos(double)") fun _acos(x: Float): Float
+@extern("double atan(double)") fun _atan(x: Float): Float
+@extern("double atan2(double, double)") fun _atan2(y: Float, x: Float): Float
+@extern("double sqrt(double)") fun _sqrt(x: Float): Float
+@extern("double pow(double, double)") fun _pow(x: Float, y: Float): Float
+@extern("double log(double)") fun _log(x: Float): Float
+@extern("double log2(double)") fun _log2(x: Float): Float
+@extern("double log10(double)") fun _log10(x: Float): Float
+@extern("double floor(double)") fun _floor(x: Float): Float
+@extern("double ceil(double)") fun _ceil(x: Float): Float
+@extern("double round(double)") fun _round(x: Float): Float
+@extern("double fabs(double)") fun _fabs(x: Float): Float
 
 /// The ratio of a circle's circumference to its diameter.
-var pi = _Math.pi
+var pi: Float = 3.14159265358979
 /// Euler's number.
-var e = _Math.e
-/// Positive infinity.
-var inf = _Math.inf
-/// Not-a-number sentinel value.
-var nan = _Math.nan
+var e: Float = 2.71828182845905
 /// Tau (2 * pi).
-var tau = _Math.pi * 2
+var tau: Float = 6.28318530717959
 /// Alias for pi.
-var PI = _Math.pi
+var PI: Float = 3.14159265358979
 /// Alias for e.
-var E = _Math.e
+var E: Float = 2.71828182845905
 
 /// Return the absolute value of x.
 ///
@@ -23,85 +34,118 @@ var E = _Math.e
 /// import "@math" as Math
 /// Math.abs(-5)  // 5
 /// ```
-fun abs(x: Number): Number { return _Math.abs(x) }
+fun abs(x: Float): Float { return _fabs(x) }
+
 /// Round x down to the nearest integer.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.floor(3.7)  // 3
 /// ```
-fun floor(x: Number): Number { return _Math.floor(x) }
+fun floor(x: Float): Float { return _floor(x) }
+
 /// Round x up to the nearest integer.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.ceil(3.2)  // 4
 /// ```
-fun ceil(x: Number): Number { return _Math.ceil(x) }
+fun ceil(x: Float): Float { return _ceil(x) }
+
 /// Round x to the nearest integer.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.round(3.5)  // 4
 /// ```
-fun round(x: Number): Number { return _Math.round(x) }
+fun round(x: Float): Float { return _round(x) }
+
 /// Return the smaller of two numbers.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.min(3, 7)  // 3
 /// ```
-fun min(a: Number, b: Number): Number { return _Math.min(a, b) }
+fun min(a: Float, b: Float): Float {
+    if (a < b) { return a }
+    return b
+}
+
 /// Return the larger of two numbers.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.max(3, 7)  // 7
 /// ```
-fun max(a: Number, b: Number): Number { return _Math.max(a, b) }
+fun max(a: Float, b: Float): Float {
+    if (a > b) { return a }
+    return b
+}
+
 /// Return the square root of x.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.sqrt(16)  // 4
 /// ```
-fun sqrt(x: Number): Number { return _Math.sqrt(x) }
+fun sqrt(x: Float): Float { return _sqrt(x) }
+
 /// Return x raised to the power y.
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.pow(2, 10)  // 1024
 /// ```
-fun pow(x: Number, y: Number): Number { return _Math.pow(x, y) }
+fun pow(x: Float, y: Float): Float { return _pow(x, y) }
+
 /// Return the sine of x (radians).
-fun sin(x: Number): Number { return _Math.sin(x) }
+fun sin(x: Float): Float { return _sin(x) }
+
 /// Return the cosine of x (radians).
-fun cos(x: Number): Number { return _Math.cos(x) }
+fun cos(x: Float): Float { return _cos(x) }
+
 /// Return the tangent of x (radians).
-fun tan(x: Number): Number { return _Math.tan(x) }
+fun tan(x: Float): Float { return _tan(x) }
+
 /// Return the arcsine of x.
-fun asin(x: Number): Number { return _Math.asin(x) }
+fun asin(x: Float): Float { return _asin(x) }
+
 /// Return the arccosine of x.
-fun acos(x: Number): Number { return _Math.acos(x) }
+fun acos(x: Float): Float { return _acos(x) }
+
 /// Return the arctangent of x.
-fun atan(x: Number): Number { return _Math.atan(x) }
+fun atan(x: Float): Float { return _atan(x) }
+
 /// Return the arctangent of y/x, using signs to determine the quadrant.
-fun atan2(y: Number, x: Number): Number { return _Math.atan2(y, x) }
+fun atan2(y: Float, x: Float): Float { return _atan2(y, x) }
+
 /// Return the natural logarithm of x.
-fun log(x: Number): Number { return _Math.log(x) }
+fun log(x: Float): Float { return _log(x) }
+
 /// Return the base-2 logarithm of x.
-fun log2(x: Number): Number { return _Math.log2(x) }
+fun log2(x: Float): Float { return _log2(x) }
+
 /// Return the base-10 logarithm of x.
-fun log10(x: Number): Number { return _Math.log10(x) }
+fun log10(x: Float): Float { return _log10(x) }
+
 /// Return -1, 0, or 1 indicating the sign of x.
-fun sign(x: Number): Number { return _Math.sign(x) }
+fun sign(x: Float): Float {
+    if (x > 0) { return 1 }
+    if (x < 0) { return 0 - 1 }
+    return 0
+}
+
 /// Clamp x to the range [lo, hi].
 ///
 /// ```saffron
 /// import "@math" as Math
 /// Math.clamp(15, 0, 10)  // 10
 /// ```
-fun clamp(x: Number, lo: Number, hi: Number): Number { return _Math.clamp(x, lo, hi) }
+fun clamp(x: Float, lo: Float, hi: Float): Float {
+    if (x < lo) { return lo }
+    if (x > hi) { return hi }
+    return x
+}
 
 /// Linearly interpolate between a and b by factor t.
 ///
@@ -109,7 +153,7 @@ fun clamp(x: Number, lo: Number, hi: Number): Number { return _Math.clamp(x, lo,
 /// import "@math" as Math
 /// Math.lerp(0, 100, 0.5)  // 50
 /// ```
-fun lerp(a: Number, b: Number, t: Number): Number {
+fun lerp(a: Float, b: Float, t: Float): Float {
     return a + (b - a) * t
 }
 
@@ -119,8 +163,8 @@ fun lerp(a: Number, b: Number, t: Number): Number {
 /// import "@math" as Math
 /// Math.deg_to_rad(180)  // 3.14159...
 /// ```
-fun deg_to_rad(degrees: Number): Number {
-    return degrees * _Math.pi / 180
+fun deg_to_rad(degrees: Float): Float {
+    return degrees * pi / 180
 }
 
 /// Convert radians to degrees.
@@ -129,8 +173,8 @@ fun deg_to_rad(degrees: Number): Number {
 /// import "@math" as Math
 /// Math.rad_to_deg(Math.pi)  // 180
 /// ```
-fun rad_to_deg(radians: Number): Number {
-    return radians * 180 / _Math.pi
+fun rad_to_deg(radians: Float): Float {
+    return radians * 180 / pi
 }
 
 /// Compute the hypotenuse length from sides x and y.
@@ -139,8 +183,8 @@ fun rad_to_deg(radians: Number): Number {
 /// import "@math" as Math
 /// Math.hypot(3, 4)  // 5
 /// ```
-fun hypot(x: Number, y: Number): Number {
-    return _Math.sqrt(x * x + y * y)
+fun hypot(x: Float, y: Float): Float {
+    return _sqrt(x * x + y * y)
 }
 
 /// Map a value from one range to another.
@@ -149,7 +193,7 @@ fun hypot(x: Number, y: Number): Number {
 /// import "@math" as Math
 /// Math.map_range(5, 0, 10, 0, 100)  // 50
 /// ```
-fun map_range(value: Number, in_min: Number, in_max: Number, out_min: Number, out_max: Number): Number {
+fun map_range(value: Float, in_min: Float, in_max: Float, out_min: Float, out_max: Float): Float {
     return (value - in_min) / (in_max - in_min) * (out_max - out_min) + out_min
 }
 
@@ -159,30 +203,6 @@ fun map_range(value: Number, in_min: Number, in_max: Number, out_min: Number, ou
 /// import "@math" as Math
 /// Math.is_close(Math.pi, 3.14159, 0.001)  // true
 /// ```
-fun is_close(a: Number, b: Number, tolerance: Number): Bool {
-    return _Math.abs(a - b) <= tolerance
-}
-
-/// Sum all numbers in the list.
-///
-/// ```saffron
-/// import "@math" as Math
-/// Math.sum([1, 2, 3, 4])  // 10
-/// ```
-fun sum(list: List<Number>): Number {
-    var total = 0
-    for (x in list) {
-        total = total + x
-    }
-    return total
-}
-
-/// Compute the arithmetic mean of a list of numbers.
-///
-/// ```saffron
-/// import "@math" as Math
-/// Math.avg([2, 4, 6])  // 4
-/// ```
-fun avg(list: List<Number>): Number {
-    return sum(list) / list.length()
+fun is_close(a: Float, b: Float, tolerance: Float): Bool {
+    return _fabs(a - b) <= tolerance
 }

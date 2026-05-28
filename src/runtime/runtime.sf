@@ -499,7 +499,8 @@ fun __os_args(): Int {
     var list: Int = __list_new()
     var i: Int = 0
     while (i < argc) {
-        var arg: Int = load64(argv + i * 8)
+        var raw_ptr: Int = load64(argv + i * 8)
+        var arg: Int = __rt_tag_ptr(raw_ptr)
         __list_push(list, arg)
         i = i + 1
     }

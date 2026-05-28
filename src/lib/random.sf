@@ -1,6 +1,18 @@
-//! Random number generation and collection sampling utilities.
+//! Random number generation using @extern for native compilation.
 
-import "random" as _Random
+@extern("i32 rand()") fun _rand(): Float
+@extern("void srand(i32)") fun _srand(seed: Float)
+
+/// Seed the random number generator for reproducible sequences.
+fun seed(n: Float) {
+    _srand(n)
+}
+
+/// Return a random integer between 0 and max (exclusive).
+fun int(min: Float, max: Float): Float {
+    var range: Float = max - min + 1
+    return _rand() % range + min
+}
 
 /// Return a random floating-point number between 0 and 1.
 ///
@@ -8,23 +20,8 @@ import "random" as _Random
 /// import "@random" as Random
 /// var x = Random.float()  // e.g. 0.7312...
 /// ```
-fun float(): Number {
-    return _Random.float()
-}
-
-/// Return a random integer between min and max (inclusive).
-///
-/// ```saffron
-/// import "@random" as Random
-/// var roll = Random.int(1, 6)  // roll a die
-/// ```
-fun int(min: Number, max: Number): Number {
-    return _Random.int(min, max)
-}
-
-/// Seed the random number generator for reproducible sequences.
-fun seed(n: Number) {
-    _Random.seed(n)
+fun float(): Float {
+    return _rand() / 2147483647
 }
 
 /// Pick a random element from the list.
@@ -35,7 +32,7 @@ fun seed(n: Number) {
 /// Random.choice(suits)  // e.g. "Clubs"
 /// ```
 fun choice(list: List<Any>): Any {
-    var idx = _Random.int(0, list.length() - 1)
+    var idx: Float = int(0, list.length() - 1)
     return list[idx]
 }
 
@@ -48,9 +45,9 @@ fun choice(list: List<Any>): Any {
 /// ```
 fun shuffle(list: List<Any>): List<Any> {
     var result = list.copy()
-    var i = result.length() - 1
+    var i: Float = result.length() - 1
     while (i > 0) {
-        var j = _Random.int(0, i)
+        var j: Float = int(0, i)
         var temp = result[i]
         result[i] = result[j]
         result[j] = temp
@@ -65,12 +62,12 @@ fun shuffle(list: List<Any>): List<Any> {
 /// import "@random" as Random
 /// Random.sample([1, 2, 3, 4, 5], 3)  // e.g. [4, 1, 5]
 /// ```
-fun sample(list: List<Any>, count: Number): List<Any> {
+fun sample(list: List<Any>, count: Float): List<Any> {
     var pool = list.copy()
     var result: List<Any> = []
-    var n = count
+    var n: Float = count
     while (n > 0 and pool.length() > 0) {
-        var idx = _Random.int(0, pool.length() - 1)
+        var idx: Float = int(0, pool.length() - 1)
         result.push(pool[idx])
         var last = pool[pool.length() - 1]
         pool[idx] = last

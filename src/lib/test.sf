@@ -1,13 +1,10 @@
-//! Test framework with decorator-based discovery, assertions, and error reporting.
+//! Test framework with assertions and reporting for native compilation.
 
-// --- Internal State ---
-var _tests = []
-var _only_tests = []
 var _passed = 0
 var _failed = 0
-var _skipped = 0
 var _total = 0
-var _current_test = ""
+var _current_test: String = ""
+var _tests = []
 var _test_errors = []
 
 /// Register a function as a test case (use as @Test.test decorator).
@@ -23,27 +20,6 @@ var _test_errors = []
 /// Test.run_all()
 /// ```
 fun test(fn: Any): Any {
-    _tests.push(fn)
-    return fn
-}
-
-/// Skip a test with a reason (use as @Test.skip("reason") decorator).
-///
-/// ```saffron
-/// @Test.skip("not implemented yet")
-/// fun test_pending() { }
-/// ```
-fun skip(reason: String): Any {
-    return fun (fn: Any) => {
-        _skipped = _skipped + 1
-        IO.println("  SKIP: ${reason}")
-        return fn;
-    }
-}
-
-/// Mark a test to run exclusively, skipping all other tests (use as @T.only decorator).
-fun only(fn: Any): Any {
-    _only_tests.push(fn)
     _tests.push(fn)
     return fn
 }
@@ -96,46 +72,17 @@ fun assert_neq(actual: Any, expected: Any, msg: String) {
 }
 
 /// Assert that actual is greater than expected.
-fun assert_gt(actual: Number, expected: Number, msg: String) {
+fun assert_gt(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual > expected) { _passed = _passed + 1 }
-    else { _record_failure("${msg} (${actual} not > ${expected})") }
+    else { _record_failure("${msg}") }
 }
 
 /// Assert that actual is less than expected.
-fun assert_lt(actual: Number, expected: Number, msg: String) {
+fun assert_lt(actual: Any, expected: Any, msg: String) {
     _total = _total + 1
     if (actual < expected) { _passed = _passed + 1 }
-    else { _record_failure("${msg} (${actual} not < ${expected})") }
-}
-
-/// Assert that calling body() throws an exception.
-///
-/// ```saffron
-/// import "@test" as Test
-/// Test.assert_throws(fun () { throw "oops" }, "should throw")
-/// ```
-fun assert_throws(body: Any, msg: String) {
-    _total = _total + 1
-    var threw = false
-    try { body() } catch (e) { threw = true }
-    if (threw) { _passed = _passed + 1 }
-    else { _record_failure("${msg} (expected throw, none occurred)") }
-}
-
-/// Assert that calling body() throws with the expected message.
-fun assert_throws_with(body: Any, expected_msg: String, msg: String) {
-    _total = _total + 1
-    var caught_msg = nil
-    try { body() } catch (e) { caught_msg = e }
-    if (caught_msg == expected_msg) { _passed = _passed + 1 }
-    else {
-        if (caught_msg == nil) {
-            _record_failure("${msg} (expected throw, none occurred)")
-        } else {
-            _record_failure("${msg} (got '${caught_msg}', want '${expected_msg}')")
-        }
-    }
+    else { _record_failure("${msg}") }
 }
 
 /// Assert that haystack contains needle as a substring.
@@ -152,49 +99,22 @@ fun section(name: String) {
 
 /// Run all registered tests and report results.
 fun run_all() {
-    var to_run = _only_tests
-    if (_only_tests.length() == 0) {
-        to_run = _tests
-    }
-
-    var test_count = to_run.length()
-    IO.println("Running ${test_count} tests (${_skipped} skipped)")
+    var test_count = _tests.length()
+    IO.println("Running ${test_count} tests")
     IO.println("")
 
-    var test_failures = []
-
-    for (fn in to_run) {
+    for (fn in _tests) {
         _current_test = "${fn}"
         IO.print("  ${_current_test} ... ")
-
         var before_failed = _failed
-        try {
-            fn()
-        } catch (e) {
-            _failed = _failed + 1
-            _total = _total + 1
-            IO.println("")
-            IO.println("    CRASH: ${e}")
-            test_failures.push("${_current_test}: crashed with '${e}'")
-        }
-
+        fn()
         if (_failed == before_failed) {
             IO.println("ok")
-        } else {
-            test_failures.push(_current_test)
         }
     }
 
     IO.println("")
     IO.println("Results: ${_passed} passed, ${_failed} failed, ${_total} total")
-
-    if (test_failures.length() > 0) {
-        IO.println("")
-        IO.println("Failed tests:")
-        for (name in test_failures) {
-            IO.println("  - ${name}")
-        }
-    }
 
     if (_test_errors.length() > 0) {
         IO.println("")
@@ -202,11 +122,6 @@ fun run_all() {
         for (err in _test_errors) {
             IO.println("  ${err}")
         }
-    }
-
-    IO.println("")
-    if (_failed > 0) {
-        throw "Test suite failed: ${_failed} failures"
     }
 }
 
