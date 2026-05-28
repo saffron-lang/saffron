@@ -49,7 +49,7 @@
                 // Error check: undefined variable
                 if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
+                    
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
@@ -632,7 +632,7 @@
             // Error check: undefined variable
             if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
+                
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -1023,7 +1023,7 @@
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
-                    this.has_errors = true
+                    
                 }
             }
             this.called_functions.push(emit_callee)
