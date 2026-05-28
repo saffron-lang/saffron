@@ -49,7 +49,7 @@ interface Stringable {
 /// Protocol for stateful iterators that produce elements one at a time.
 interface Iterator<T> {
     fun next(): T
-    fun next?(): Bool
+    fun has_next(): Bool
 }
 
 /// Protocol for types that can produce an iterator via .iter().
