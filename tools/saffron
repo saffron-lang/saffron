@@ -177,28 +177,15 @@ build_project() {
     local entry="$1"
     local output="$2"
 
-    local sources
-    sources=$(discover_sources "$entry")
+    local ll_path="$TMPDIR/output.ll"
+    [[ "$VERBOSE" == true ]] && echo "  compile: $entry"
+    "$SAFFRONC" "$entry" "$ll_path" || {
+        echo "saffron: compilation failed: $entry" >&2
+        exit 1
+    }
 
-    local ll_files=""
-    local count=0
-
-    while IFS= read -r src; do
-        local name
-        name=$(basename "$src" .sf)
-        # Avoid collisions: use a counter prefix
-        local ll_path="$TMPDIR/${count}_${name}.ll"
-        [[ "$VERBOSE" == true ]] && echo "  compile: $src"
-        "$SAFFRONC" "$src" "$ll_path" || {
-            echo "saffron: compilation failed: $src" >&2
-            exit 1
-        }
-        ll_files="$ll_files $ll_path"
-        count=$((count + 1))
-    done <<< "$sources"
-
-    [[ "$VERBOSE" == true ]] && echo "  link: $count files -> $output"
-    clang "$OPT" -w -o "$output" $ll_files "$RUNTIME" "$RUNTIME_BASE" || {
+    [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
+    clang "$OPT" -w -Wl,-stack_size,0x4000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
         echo "saffron: linking failed" >&2
         exit 1
     }
