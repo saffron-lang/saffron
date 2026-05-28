@@ -53,8 +53,12 @@ fun __list_push(list: Int, value: Int) {
     var cap: Int = load64(list + 8)
     if (count >= cap) {
         var new_cap: Int = cap * 2
-        store64(list + 8, new_cap)
-        store64(list + 16, rt_realloc(load64(list + 16), new_cap * 8))
+        var old_data: Int = load64(list + 16)
+        var new_data: Int = rt_realloc(old_data, new_cap * 8)
+        if (new_data != 0) {
+            store64(list + 8, new_cap)
+            store64(list + 16, new_data)
+        }
     }
     var data: Int = load64(list + 16)
     store64(data + count * 8, value)
@@ -105,9 +109,12 @@ fun __sb_append(sb: Int, str: Int) {
     var needed: Int = len + slen + 1
     if (needed >= cap) {
         var new_cap: Int = needed * 2
-        store64(sb + 8, new_cap)
-        buf = rt_realloc(buf, new_cap)
-        store64(sb + 16, buf)
+        var new_buf: Int = rt_realloc(buf, new_cap)
+        if (new_buf != 0) {
+            buf = new_buf
+            store64(sb + 8, new_cap)
+            store64(sb + 16, buf)
+        }
     }
     rt_memcpy(buf + len, str, slen)
     var new_len: Int = len + slen
@@ -154,12 +161,14 @@ fun __map_set(map: Int, key: Int, value: Int) {
     }
     if (count >= cap) {
         var new_cap: Int = cap * 2
-        store64(map + 8, new_cap)
         var new_bytes: Int = new_cap * 8
-        keys = rt_realloc(keys, new_bytes)
-        store64(map + 16, keys)
-        vals = rt_realloc(vals, new_bytes)
-        store64(map + 24, vals)
+        var new_keys: Int = rt_realloc(keys, new_bytes)
+        var new_vals: Int = rt_realloc(vals, new_bytes)
+        if (new_keys != 0 and new_vals != 0) {
+            store64(map + 8, new_cap)
+            store64(map + 16, new_keys)
+            store64(map + 24, new_vals)
+        }
     }
     var cur_keys: Int = load64(map + 16)
     var cur_vals: Int = load64(map + 24)
@@ -266,9 +275,11 @@ fun __join_append(buf_p: Int, len_p: Int, cap_p: Int, src: Int, src_len: Int) {
     var needed: Int = len + src_len + 1
     if (needed >= cap) {
         var new_cap: Int = needed * 2
-        store64(cap_p, new_cap)
-        buf = rt_realloc(buf, new_cap)
-        store64(buf_p, buf)
+        var new_buf: Int = rt_realloc(buf, new_cap)
+        if (new_buf != 0) {
+            store64(cap_p, new_cap)
+            store64(buf_p, new_buf)
+        }
     }
     var cur_buf: Int = load64(buf_p)
     rt_memcpy(cur_buf + len, src, src_len)
@@ -336,7 +347,7 @@ fun __list_contains(list: Int, val: Int): Int {
     var i: Int = 0
     while (i < count) {
         var elem: Int = load64(data + i * 8)
-        if (rt_strcmp(val, elem) == 0) {
+        if (__safe_strcmp(val, elem) == 0) {
             return 1
         }
         i = i + 1
