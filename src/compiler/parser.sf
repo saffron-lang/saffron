@@ -292,8 +292,7 @@ class Parser {
                     }
                     // Trailing closure: obj.method(args) { ... }
                     if (this.match_kind_check("{")) {
-                        var tc_body: List<AST.Stmt> = this.parse_block_stmts()
-                        args.push(AST.Expr.Lambda([], "Nil", tc_body))
+                        args.push(this.parse_trailing_closure())
                     }
                     expr = AST.Expr.MethodCall(expr, field, args)
                 } else {
@@ -319,8 +318,7 @@ class Parser {
                 }
                 // Trailing closure: func(args) { ... }
                 if (this.match_kind_check("{")) {
-                    var tc_body: List<AST.Stmt> = this.parse_block_stmts()
-                    args.push(AST.Expr.Lambda([], "Nil", tc_body))
+                    args.push(this.parse_trailing_closure())
                 }
                 expr = AST.Expr.Call(expr, args)
             } else if (this.match_kind_check("{") and this.current_line_num() == this.prev_line_num()) {
@@ -331,8 +329,7 @@ class Parser {
                     _ => "no"
                 }
                 if (is_callable == "yes") {
-                    var tc_body: List<AST.Stmt> = this.parse_block_stmts()
-                    var tc_args: List<AST.Expr> = [AST.Expr.Lambda([], "Nil", tc_body)]
+                    var tc_args: List<AST.Expr> = [this.parse_trailing_closure()]
                     expr = AST.Expr.Call(expr, tc_args)
                 } else {
                     break
@@ -1265,6 +1262,32 @@ class Parser {
         this.advance() // consume throw
         var value: AST.Expr = this.parse_expr()
         return AST.Stmt.Throw(value)
+    }
+
+    fun parse_trailing_closure(): AST.Expr {
+        this.consume("{")
+        var params: List<AST.Param> = []
+        // Check for param list: ident => or ident, ident => ...
+        if (this.match_kind_check("ident") and (this.peek_is("=>") or this.peek_is(","))) {
+            var pname: String = this.expect_ident()
+            params.push(AST.Param.Param(pname, "Any"))
+            while (this.match_kind(",")) {
+                pname = this.expect_ident()
+                params.push(AST.Param.Param(pname, "Any"))
+            }
+            this.consume("=>")
+        }
+        var stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                this.consume("}")
+                return AST.Expr.Lambda(params, "Nil", stmts)
+            }
+            stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        return AST.Expr.Lambda(params, "Nil", stmts)
     }
 
     fun parse_block(): AST.Stmt {

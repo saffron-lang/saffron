@@ -4201,12 +4201,16 @@ class Codegen {
             var captures: List<String> = []
             this.find_free_vars_stmts(body, param_names, captures)
 
-            // Build extended params: captures (as Int) + original params
+            // Build extended params: captures (with actual types from parent) + original params
             var full_params: String = ""
             var ci2: Float = 0
             while (ci2 < captures.length()) {
                 if (full_params.length() > 0) { full_params = full_params + "," }
-                full_params = full_params + captures[ci2] + ":Int"
+                var cap_type: String = "Int"
+                if (this.var_types.has(captures[ci2])) {
+                    cap_type = this.var_types.get(captures[ci2])
+                }
+                full_params = full_params + captures[ci2] + ":" + cap_type
                 ci2 = ci2 + 1
             }
             if (params.length() > 0) {
@@ -4716,7 +4720,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
+    gen.func_ret_types.set("StringBuilder", "StringBuilder")
 
     // Pre-scan: register module-level VarDecls as globals
     var mi2: Float = 0
@@ -4863,7 +4867,7 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
+    gen.func_ret_types.set("StringBuilder", "StringBuilder")
 
     // Pre-scan: register module-level VarDecls as globals
     var mi: Float = 0
