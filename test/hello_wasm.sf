@@ -1,0 +1,2 @@
+IO.println("Hello from Saffron WASM!")
+IO.println("1 + 2 = " + (1 + 2).to_string())
