@@ -22,12 +22,24 @@ import "./commands/add.sf" as Add
 import "./commands/remove.sf" as Remove
 import "./commands/install.sf" as Install
 import "./commands/list.sf" as ListCmd
+import "./commands/clean.sf" as Clean
 
 fun main() {
     var raw_args = OS.args()
-    // Skip argv[0] (binary name)
+    // Skip leading non-command args (interpreter path, script path, etc.)
+    // Find first arg that doesn't end in .sf and isn't a flag we don't own
     var user_args: List<String> = []
     var ai = 1
+    // Skip any args that look like the interpreter invoking us
+    while (ai < raw_args.length()) {
+        var a: String = raw_args[ai]
+        if (a.ends_with(".sf") or a == "--no-check" or a.starts_with("--stdlib")) {
+            ai = ai + 1
+            if (a == "--stdlib") { ai = ai + 1 }
+        } else {
+            break
+        }
+    }
     while (ai < raw_args.length()) {
         user_args.push(raw_args[ai])
         ai = ai + 1
@@ -73,6 +85,8 @@ fun main() {
         Install.run(parsed)
     } else if (command == "list") {
         ListCmd.run(parsed)
+    } else if (command == "clean") {
+        Clean.run(parsed)
     } else if (command == "script") {
         if (positional.length() < 2) {
             IO.println("pantry script: missing command")
@@ -102,6 +116,7 @@ fun print_usage() {
     IO.println("  remove <pkg>      Remove a dependency from pantry.toml")
     IO.println("  install           Install all dependencies from pantry.toml")
     IO.println("  list              List installed packages")
+    IO.println("  clean             Remove build artifacts and lockfile")
     IO.println("  script <cmd>      Run a shell command in the project context")
     IO.println("  version           Show pantry version")
     IO.println("")

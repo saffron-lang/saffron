@@ -1,0 +1,177 @@
+// Turmeric Styling — CSS utilities for Saffron
+// Provides helpers for inline styles, conditional classes, and scoped styles
+
+// =============================================================================
+// Style Map → Inline Style String
+// =============================================================================
+
+fun styles(pairs: Map<String, String>): String {
+    var sb = StringBuilder()
+    var keys: List<String> = pairs.keys()
+    var i: Float = 0
+    while (i < keys.length()) {
+        if (i > 0) { sb.append("; ") }
+        sb.append(keys[i])
+        sb.append(": ")
+        sb.append(pairs.get(keys[i]))
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+// =============================================================================
+// Conditional Classes
+// =============================================================================
+
+// Join class names conditionally
+// cx([["btn", true], ["active", is_active], ["disabled", is_disabled]])
+fun cx(classes: List<List<Any>>): String {
+    var result: List<String> = []
+    var i: Float = 0
+    while (i < classes.length()) {
+        var pair: List<Any> = classes[i]
+        var name: String = pair[0]
+        var cond: Bool = pair[1]
+        if (cond) {
+            result.push(name)
+        }
+        i = i + 1
+    }
+    return result.join(" ")
+}
+
+// Simple class join (all always applied)
+fun cls(names: List<String>): String {
+    return names.join(" ")
+}
+
+// =============================================================================
+// Scoped Styles
+// =============================================================================
+
+var _scope_counter: Float = 0
+
+fun _next_scope(): String {
+    _scope_counter = _scope_counter + 1
+    return "_s" + _scope_counter.to_string()
+}
+
+// Generate scoped class names from a style map
+// Returns a map of logical_name → generated_class_name
+// Also registers the CSS rules (via JS interop in browser)
+class ScopedStyles {
+    var class_map: Map<String, String>
+    var css_rules: List<String>
+    var scope_id: String
+
+    fun init(declarations: Map<String, String>) {
+        this.scope_id = _next_scope()
+        this.class_map = {}
+        this.css_rules = []
+
+        var keys: List<String> = declarations.keys()
+        var i: Float = 0
+        while (i < keys.length()) {
+            var logical_name: String = keys[i]
+            var css_body: String = declarations.get(logical_name)
+            var scoped_name: String = logical_name + this.scope_id
+            this.class_map.set(logical_name, scoped_name)
+            this.css_rules.push("." + scoped_name + " { " + css_body + " }")
+            i = i + 1
+        }
+    }
+
+    fun get(logical_name: String): String {
+        return this.class_map.get(logical_name)
+    }
+
+    fun to_css(): String {
+        return this.css_rules.join("\n")
+    }
+}
+
+fun scoped_styles(declarations: Map<String, String>): ScopedStyles {
+    return ScopedStyles(declarations)
+}
+
+// =============================================================================
+// CSS Variables (Custom Properties)
+// =============================================================================
+
+fun css_vars(vars: Map<String, String>): String {
+    var sb = StringBuilder()
+    var keys: List<String> = vars.keys()
+    var i: Float = 0
+    while (i < keys.length()) {
+        if (i > 0) { sb.append("; ") }
+        sb.append(keys[i])
+        sb.append(": ")
+        sb.append(vars.get(keys[i]))
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+// =============================================================================
+// Keyframe Animation Builder
+// =============================================================================
+
+class Keyframes {
+    var name: String
+    var frames: List<String>
+
+    fun init(name: String) {
+        this.name = name
+        this.frames = []
+    }
+
+    fun at(pct: String, css: String): Keyframes {
+        this.frames.push("  " + pct + " { " + css + " }")
+        return this
+    }
+
+    fun from(css: String): Keyframes {
+        return this.at("from", css)
+    }
+
+    fun to(css: String): Keyframes {
+        return this.at("to", css)
+    }
+
+    fun to_css(): String {
+        var sb = StringBuilder()
+        sb.append("@keyframes " + this.name + " {\n")
+        var i: Float = 0
+        while (i < this.frames.length()) {
+            sb.append(this.frames[i])
+            sb.append("\n")
+            i = i + 1
+        }
+        sb.append("}")
+        return sb.to_string()
+    }
+}
+
+fun keyframes(name: String): Keyframes {
+    return Keyframes(name)
+}
+
+// =============================================================================
+// Media Query Helper
+// =============================================================================
+
+class MediaQuery {
+    var query: String
+    var matches: Any  // Signal<Bool> — tracked reactively
+
+    fun init(query: String, initial: Bool) {
+        this.query = query
+        this.matches = initial
+    }
+}
+
+// In the browser, this creates a matchMedia listener that updates the signal.
+// For now, returns a static value for testing.
+fun media_query(query: String): MediaQuery {
+    return MediaQuery(query, false)
+}

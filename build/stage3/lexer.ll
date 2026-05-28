@@ -3109,7 +3109,7 @@ while.end227:
   ret i64 %t575
 }
 
-define i64 @Lexer() {
+define linkonce_odr i64 @Lexer() {
 entry:
   %t576 = call i8* @malloc(i64 40)
   %t577 = bitcast i8* %t576 to %Lexer*

@@ -1,13 +1,12 @@
 [package]
-name = "saffron-ui"
+name = "turmeric"
 version = "0.1.0"
 description = "Reactive web framework for Saffron targeting WASM"
-entry = "src/main.sf"
+type = "library"
+entry = "src/lib.sf"
 authors = ["henry232323"]
 
 [dependencies]
 
 [scripts]
-build = "saffron build src/main.sf -o build/saffron-ui"
-run = "saffron run src/main.sf"
 generate = "saffron run tools/generate_types.sf"

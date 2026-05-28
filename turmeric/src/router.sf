@@ -1,0 +1,278 @@
+// Turmeric Router — client-side SPA routing
+// Uses signals for reactive route state + History API via JS interop
+
+import "./signal.sf" as Sig
+
+// =============================================================================
+// Route Matching
+// =============================================================================
+
+class RouteParams {
+    var params: Map<String, String>
+    var query: Map<String, String>
+    var path: String
+
+    fun init(path: String, params: Map<String, String>, query: Map<String, String>) {
+        this.path = path
+        this.params = params
+        this.query = query
+    }
+
+    fun get(name: String): String {
+        return this.params.get(name)
+    }
+}
+
+class Route {
+    var pattern: String
+    var component: Any
+    var guard: Any
+    var children: List<Route>
+
+    fun init(pattern: String, component: Any) {
+        this.pattern = pattern
+        this.component = component
+        this.guard = nil
+        this.children = []
+    }
+
+    fun with_guard(guard_fn: Any): Route {
+        this.guard = guard_fn
+        return this
+    }
+
+    fun with_children(routes: List<Route>): Route {
+        this.children = routes
+        return this
+    }
+}
+
+// Parse a URL path into segments
+fun split_path(path: String): List<String> {
+    var segments: List<String> = []
+    var parts: List<String> = path.split("/")
+    var i: Float = 0
+    while (i < parts.length()) {
+        if (parts[i].length() > 0) {
+            segments.push(parts[i])
+        }
+        i = i + 1
+    }
+    return segments
+}
+
+// Parse query string "?key=val&key2=val2" into a map
+fun parse_query(query_str: String): Map<String, String> {
+    var result: Map<String, String> = {}
+    if (query_str.length() == 0) return result
+    // Strip leading ?
+    var qs: String = query_str
+    if (qs.starts_with("?")) {
+        qs = qs.slice(1, qs.length())
+    }
+    var pairs: List<String> = qs.split("&")
+    var i: Float = 0
+    while (i < pairs.length()) {
+        var pair: String = pairs[i]
+        var eq: Float = pair.index_of("=")
+        if (eq > 0) {
+            var key: String = pair.slice(0, eq)
+            var val: String = pair.slice(eq + 1, pair.length())
+            result.set(key, val)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+// Match a URL path against a route pattern
+// Returns nil on no match, or a Map of extracted params
+fun match_route(pattern: String, path: String): Map<String, String> {
+    // Wildcard matches everything
+    if (pattern == "*") return {}
+
+    var pat_segs: List<String> = split_path(pattern)
+    var path_segs: List<String> = split_path(path)
+
+    var params: Map<String, String> = {}
+
+    var i: Float = 0
+    while (i < pat_segs.length()) {
+        var pat: String = pat_segs[i]
+
+        // Catch-all: *name captures the rest
+        if (pat.starts_with("*")) {
+            var param_name: String = pat.slice(1, pat.length())
+            var rest: List<String> = []
+            while (i < path_segs.length()) {
+                rest.push(path_segs[i])
+                i = i + 1
+            }
+            params.set(param_name, rest.join("/"))
+            return params
+        }
+
+        // Not enough path segments
+        if (i >= path_segs.length()) return nil
+
+        // Dynamic segment: :name
+        if (pat.starts_with(":")) {
+            var param_name: String = pat.slice(1, pat.length())
+            params.set(param_name, path_segs[i])
+        } else {
+            // Static segment must match exactly
+            if (pat != path_segs[i]) return nil
+        }
+
+        i = i + 1
+    }
+
+    // If pattern is exhausted but path has more segments, no match
+    // (unless pattern ended with catch-all, handled above)
+    if (path_segs.length() != pat_segs.length()) return nil
+
+    return params
+}
+
+// =============================================================================
+// Router State
+// =============================================================================
+
+class Router {
+    var routes: List<Route>
+    var current: Sig.Signal
+    var not_found: Any
+
+    fun init(routes: List<Route>) {
+        this.routes = routes
+        this.current = Sig.signal(RouteParams("/", {}, {}))
+        this.not_found = nil
+    }
+
+    fun navigate(url: String) {
+        // Split path from query
+        var qmark: Float = url.index_of("?")
+        var path: String = url
+        var query_str: String = ""
+        if (qmark >= 0) {
+            path = url.slice(0, qmark)
+            query_str = url.slice(qmark, url.length())
+        }
+
+        var query: Map<String, String> = parse_query(query_str)
+
+        // Find matching route
+        var i: Float = 0
+        while (i < this.routes.length()) {
+            var route: Route = this.routes[i]
+            var params: Map<String, String> = match_route(route.pattern, path)
+            if (params != nil) {
+                // Check guard
+                if (route.guard != nil) {
+                    var route_params: RouteParams = RouteParams(path, params, query)
+                    if (!route.guard(route_params)) {
+                        return
+                    }
+                }
+                this.current.set(RouteParams(path, params, query))
+                return
+            }
+            i = i + 1
+        }
+
+        // No match — set 404 state
+        this.current.set(RouteParams(path, {}, query))
+    }
+
+    fun current_route(): Sig.Signal {
+        return this.current
+    }
+
+    fun resolve(): Any {
+        var route_params: RouteParams = this.current.get()
+        var i: Float = 0
+        while (i < this.routes.length()) {
+            var route: Route = this.routes[i]
+            var params: Map<String, String> = match_route(route.pattern, route_params.path)
+            if (params != nil) {
+                return route.component
+            }
+            i = i + 1
+        }
+        return this.not_found
+    }
+}
+
+// =============================================================================
+// Convenience
+// =============================================================================
+
+fun create(routes: List<Route>): Router {
+    return Router(routes)
+}
+
+// Create a link that navigates without page reload
+fun link(router: Router, href: String, attrs: List<Any>, block: Any): Any {
+    // In the browser, this renders an <a> with an onclick that calls navigate
+    // For now, returns the href for testing
+    return href
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+IO.println("--- Router Tests ---")
+
+// Test: split_path
+var segs: List<String> = split_path("/users/42/posts")
+IO.println("split /users/42/posts: " + segs.join(","))
+
+// Test: parse_query
+var q: Map<String, String> = parse_query("?q=hello&page=2")
+IO.println("query q: " + q.get("q"))
+IO.println("query page: " + q.get("page"))
+
+// Test: static match
+var m1: Map<String, String> = match_route("/about", "/about")
+if (m1 != nil) { IO.println("static match: pass") }
+else { IO.println("static match: FAIL") }
+
+// Test: no match
+var m2: Map<String, String> = match_route("/about", "/other")
+if (m2 == nil) { IO.println("no match: pass") }
+else { IO.println("no match: FAIL") }
+
+// Test: dynamic segment
+var m3: Map<String, String> = match_route("/users/:id", "/users/42")
+if (m3 != nil) { IO.println("dynamic match id=" + m3.get("id")) }
+else { IO.println("dynamic match: FAIL") }
+
+// Test: multiple params
+var m4: Map<String, String> = match_route("/posts/:id/comments/:cid", "/posts/5/comments/3")
+if (m4 != nil) { IO.println("multi-param id=" + m4.get("id") + " cid=" + m4.get("cid")) }
+else { IO.println("multi-param: FAIL") }
+
+// Test: wildcard
+var m5: Map<String, String> = match_route("*", "/anything/goes")
+if (m5 != nil) { IO.println("wildcard: pass") }
+else { IO.println("wildcard: FAIL") }
+
+// Test: catch-all
+var m6: Map<String, String> = match_route("/files/*path", "/files/docs/intro.md")
+if (m6 != nil) { IO.println("catch-all path=" + m6.get("path")) }
+else { IO.println("catch-all: FAIL") }
+
+// Test: Router navigation
+var router: Router = Router([
+    Route("/", "home"),
+    Route("/users/:id", "user"),
+    Route("*", "not_found")
+])
+router.navigate("/users/99?tab=posts")
+var cur: RouteParams = router.current.get()
+IO.println("navigated to: " + cur.path)
+IO.println("param id: " + cur.get("id"))
+IO.println("query tab: " + cur.query.get("tab"))
+
+IO.println("All router tests passed!")

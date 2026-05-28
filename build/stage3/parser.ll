@@ -4345,7 +4345,7 @@ while.end240:
   ret i64 %t575
 }
 
-define linkonce_odr i64 @lexer_Lexer() {
+define linkonce_odr i64 @Lexer() {
 entry:
   %t576 = call i8* @malloc(i64 40)
   %t577 = bitcast i8* %t576 to %Lexer*
@@ -4368,7 +4368,7 @@ entry:
   %source = alloca i64
   %lexer = alloca i64
   store i64 %source.arg, i64* %source
-  %t1 = call i64 @lexer_Lexer()
+  %t1 = call i64 @Lexer()
   %t2 = load i64, i64* %source
   %t3 = call i64 @lexer_Lexer__init(i64 %t1, i64 %t2)
   store i64 %t1, i64* %lexer
@@ -12656,7 +12656,7 @@ endif1130:
   ret i64 %t108
 }
 
-define i64 @Parser() {
+define linkonce_odr i64 @Parser() {
 entry:
   %t109 = call i8* @malloc(i64 16)
   %t110 = bitcast i8* %t109 to %Parser*

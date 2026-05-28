@@ -1,0 +1,15 @@
+import "turmeric" as UI
+
+var count = UI.signal(0)
+
+var app = UI.div([UI.class_("app")]) {
+    UI.h1 { UI.text("Turmeric Demo") }
+    UI.p { UI.text("Count: ${count.get()}") }
+    UI.button([UI.on_click(fun (e: UI.Event) {
+        count.update(fun (n: Float): Float => n + 1)
+    })]) {
+        UI.text("Increment")
+    }
+}
+
+IO.println(UI.render_to_html(app))
