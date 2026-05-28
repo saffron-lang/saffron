@@ -66,13 +66,29 @@ fun __list_push(list: Int, value: Int) {
 }
 
 fun __list_get(list: Int, index: Int): Int {
+    var count: Int = load64(list)
+    var actual_idx: Int = index
+    if (index < 0) {
+        actual_idx = count + index
+    }
+    if (actual_idx < 0 or actual_idx >= count) {
+        return 0
+    }
     var data: Int = load64(list + 16)
-    return load64(data + index * 8)
+    return load64(data + actual_idx * 8)
 }
 
 fun __list_set(list: Int, index: Int, value: Int) {
+    var count: Int = load64(list)
+    var actual_idx: Int = index
+    if (index < 0) {
+        actual_idx = count + index
+    }
+    if (actual_idx < 0 or actual_idx >= count) {
+        return
+    }
     var data: Int = load64(list + 16)
-    store64(data + index * 8, value)
+    store64(data + actual_idx * 8, value)
 }
 
 fun __list_length(list: Int): Int {
