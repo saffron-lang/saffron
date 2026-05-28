@@ -3,6 +3,10 @@
 import "./ast.sf" as AST
 import "./codegen/methods.sf" as Methods
 
+// Runtime function prefix — change this to avoid collisions with user code.
+// Currently "__" (e.g., __list_new, __map_get). Could become "__sf_" later.
+var RT_PREFIX: String = "__"
+
 class Codegen {
     var sb: StringBuilder
     var label_counter: Float
@@ -329,6 +333,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__io_mkdir")
     gen.known_functions.push("__io_walk_dir")
     gen.known_functions.push("__io_append_file")
+    gen.known_functions.push("__io_read_stdin")
+    gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
     gen.known_functions.push("__os_args")
     gen.known_functions.push("__os_cwd")
@@ -506,6 +512,8 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     gen.known_functions.push("__io_mkdir")
     gen.known_functions.push("__io_walk_dir")
     gen.known_functions.push("__io_append_file")
+    gen.known_functions.push("__io_read_stdin")
+    gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
     gen.known_functions.push("__os_args")
     gen.known_functions.push("__os_cwd")
