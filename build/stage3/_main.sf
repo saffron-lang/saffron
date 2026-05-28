@@ -1,6 +1,7 @@
 // Saffron LLVM Compiler — entry point
 // Usage (on VM): saffron --no-check src/compiler/main.sf <input.sf> [output.ll]
-// Usage (native): saffronc [--check] <input.sf> [output.ll]
+// Usage (native): saffronc [--no-check] <input.sf> [output.ll]
+// Type checking is enabled by default; --no-check disables it.
 
 import "os" as OS
 import "./lexer.sf" as Lexer
@@ -339,12 +340,15 @@ fun main(): Int {
     var args: List<String> = OS.args()
 
     // Parse flags
-    var run_checker: Bool = false
+    var run_checker: Bool = true
     var stdlib_dir: String = ""
     var target: String = "native"
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
+        if (arg == "--no-check") {
+            run_checker = false
+        }
         if (arg == "--check") {
             run_checker = true
         }
@@ -513,6 +517,20 @@ fun main(): Int {
             nni = nni + 1
         }
         npi = npi + 1
+    }
+
+    // Run type checker (blocking by default)
+    if (run_checker) {
+        var checker_report: String = ""
+        if (all_import_stmts.length() > 0) {
+            checker_report = Checker.check_with_imports(program, all_import_stmts)
+        } else {
+            checker_report = Checker.check(program)
+        }
+        if (checker_report.length() > 0) {
+            IO.println(checker_report)
+            c_exit(1)
+        }
     }
 
     var ir: String = ""

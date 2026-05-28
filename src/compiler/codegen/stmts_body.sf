@@ -121,8 +121,15 @@
         if (vtype == "Any") {
             vtype = this.type_to_string(this.last_type)
         }
+        // If annotation says Float but the init produced an Int-tagged value,
+        // store as Int so arithmetic uses the correct (integer) path.
+        // Only store as Float when the init genuinely produced a float-tagged value.
+        var effective_type: AST.Type = this.str_to_type(vtype)
+        if (vtype == "Float" and !this.is_float_type(this.last_type)) {
+            effective_type = AST.Type.IntType
+        }
         this.var_types.set(name, vtype)
-        this.typed_vars.set(name, this.str_to_type(vtype))
+        this.typed_vars.set(name, effective_type)
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
         // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {

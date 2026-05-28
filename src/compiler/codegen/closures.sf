@@ -171,6 +171,20 @@ extend fun Codegen.gen_lambda(params: List<AST.Param>, ret_type: String, body: L
 
 extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
         this.known_functions.push(name)
+        // Save outer-scope types for captured variables before resetting
+        var outer_var_types: Map<String, String> = {}
+        var outer_typed_vars: Map<String, AST.Type> = {}
+        var oci: Float = 0
+        while (oci < captures.length()) {
+            var ocn: String = captures[oci]
+            if (this.var_types.has(ocn)) {
+                outer_var_types.set(ocn, this.var_types.get(ocn))
+            }
+            if (this.typed_vars.has(ocn)) {
+                outer_typed_vars.set(ocn, this.typed_vars.get(ocn))
+            }
+            oci = oci + 1
+        }
         this.reset_locals()
         this.var_types = {}
         this.typed_vars = {}
@@ -233,8 +247,17 @@ extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: 
             this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
             this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
             // Register captured variable in var_types so body codegen can find it
-            this.var_types.set(cap_name, "Int")
-            this.typed_vars.set(cap_name, this.str_to_type("Int"))
+            // Use the outer scope's type if available (preserves generic class types)
+            if (outer_var_types.has(cap_name)) {
+                this.var_types.set(cap_name, outer_var_types.get(cap_name))
+            } else {
+                this.var_types.set(cap_name, "Int")
+            }
+            if (outer_typed_vars.has(cap_name)) {
+                this.typed_vars.set(cap_name, outer_typed_vars.get(cap_name))
+            } else {
+                this.typed_vars.set(cap_name, this.str_to_type("Int"))
+            }
             ci = ci + 1
         }
 

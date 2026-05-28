@@ -429,6 +429,7 @@
         out.append("declare i8* @popen(i8*, i8*)\n")
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
+        out.append("declare double @llvm.floor.f64(double)\n")
         out.append("declare i32 @setjmp(i8*)\n")
         out.append("declare void @longjmp(i8*, i32)\n")
         out.append("declare void @__io_println_str(i64)\n")

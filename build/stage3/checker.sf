@@ -1,6 +1,6 @@
 // Null-safety type checker for Saffron
 // Tracks nullable types and flags operations on potentially-nil values.
-// Reports errors but does not block compilation (advisory mode).
+// Blocks compilation on errors by default (use --no-check to bypass).
 
 import "./ast.sf" as AST
 
@@ -368,6 +368,14 @@ class NullChecker {
         return false
     }
 
+    fun is_map_get_expr(expr: AST.Expr): Bool {
+        // Returns true if expr is a MethodCall with method "get" on a map
+        return match (expr) {
+            MethodCall(obj, method, args) => method == "get"
+            _ => false
+        }
+    }
+
     // --- Check program ---
 
     fun check_program(stmts: List<AST.Stmt>) {
@@ -471,8 +479,12 @@ class NullChecker {
                 var init_type: String = this.infer_expr(init)
                 if (type_ann != "Any") {
                     // Explicit annotation: check nullable assignment
+                    // Allow explicit type annotations to serve as non-null assertions
+                    // for Map.get() — the programmer asserts the key exists.
                     if (!this.is_nullable(type_ann) and this.is_nullable(init_type)) {
-                        this.error(name + ": cannot assign nullable " + init_type + " to non-nullable " + type_ann)
+                        if (!this.is_map_get_expr(init)) {
+                            this.error(name + ": cannot assign nullable " + init_type + " to non-nullable " + type_ann)
+                        }
                     }
                     this.env.define_var(name, type_ann)
                 } else if (init_type != "Any") {
@@ -525,11 +537,14 @@ class NullChecker {
             }
             If(cond, then_branch, else_branch) => {
                 this.infer_expr(cond)
+                // Then-branch: apply narrowing from condition
                 this.env.push_scope()
                 this.apply_narrowing(cond)
                 this.check_stmts(then_branch)
                 this.env.pop_scope()
+                // Else-branch: apply inverse narrowing
                 this.env.push_scope()
+                this.apply_inverse_narrowing(cond)
                 this.check_stmts(else_branch)
                 this.env.pop_scope()
             }
@@ -587,6 +602,8 @@ class NullChecker {
         // Pattern 1: x.has(...) → map.get() is non-nullable in this scope
         // Pattern 2: x != nil → x is non-nullable in this scope
         // Pattern 3: x (truthy check on variable) → x is non-nullable
+        // Pattern 4: x == nil → x is Nil in then-branch
+        // Pattern 5: x != nil and ... → narrow from both sides (logical AND)
         var cond_kind: String = match (cond) {
             MethodCall(o, m, a) => "method:" + m
             Binary(l, o, r) => "binary:" + o
@@ -600,7 +617,7 @@ class NullChecker {
             NilLit => ""
             Call(c, a) => ""
             Assign(n, v) => ""
-            Logical(l, o, r) => ""
+            Logical(l, o, r) => "logical:" + o
             MemberAccess(o, f) => ""
             Match(s, a) => ""
             EnumConstruct(e, v, a) => ""
@@ -640,6 +657,17 @@ class NullChecker {
             }
         }
 
+        // x == nil → narrow x to Nil in then-branch
+        if (cond_kind == "binary:==") {
+            var lhs_name: String = this.get_eq_nil_var_name(cond)
+            if (lhs_name.length() > 0) {
+                var var_type: String = this.env.get_var(lhs_name)
+                if (this.is_nullable(var_type)) {
+                    this.env.narrow(lhs_name, "Nil")
+                }
+            }
+        }
+
         // IsCheck: if (x is Type) { ... } → narrow x to Type
         if (cond_kind.starts_with("is:")) {
             var narrow_type: String = cond_kind.slice(3, cond_kind.length())
@@ -648,6 +676,93 @@ class NullChecker {
                 this.env.narrow(is_var, narrow_type)
             }
         }
+
+        // Logical AND: if (a and b) → apply narrowing from both sides
+        if (cond_kind == "logical:and") {
+            var left_expr: AST.Expr = this.get_logical_left(cond)
+            var right_expr: AST.Expr = this.get_logical_right(cond)
+            this.apply_narrowing(left_expr)
+            this.apply_narrowing(right_expr)
+        }
+    }
+
+    fun apply_inverse_narrowing(cond: AST.Expr) {
+        // Inverse of apply_narrowing: what holds in the else-branch
+        var cond_kind: String = match (cond) {
+            MethodCall(o, m, a) => "method:" + m
+            Binary(l, o, r) => "binary:" + o
+            Variable(n) => "var:" + n
+            Unary(o, r) => "unary"
+            IsCheck(val, typ) => "is:" + typ
+            IntLit(v) => ""
+            FloatLit(v) => ""
+            BoolLit(v) => ""
+            StringLit(s) => ""
+            NilLit => ""
+            Call(c, a) => ""
+            Assign(n, v) => ""
+            Logical(l, o, r) => "logical:" + o
+            MemberAccess(o, f) => ""
+            Match(s, a) => ""
+            EnumConstruct(e, v, a) => ""
+            Lambda(p, r, b) => ""
+            GetField(o, f) => ""
+            SetField(o, f, v) => ""
+            This => ""
+            ListLit(e) => ""
+            IndexGet(o, i) => ""
+            IndexSet(o, i, v) => ""
+            MapLit => ""
+            BlockExpr(s, v) => ""
+        }
+
+        // Inverse of x != nil: in else branch, x is Nil
+        if (cond_kind == "binary:!=") {
+            var lhs_name: String = this.get_expr_var_name(cond)
+            if (lhs_name.length() > 0) {
+                var var_type: String = this.env.get_var(lhs_name)
+                if (this.is_nullable(var_type)) {
+                    this.env.narrow(lhs_name, "Nil")
+                }
+            }
+        }
+
+        // Inverse of x == nil: in else branch, x is non-nullable
+        if (cond_kind == "binary:==") {
+            var lhs_name: String = this.get_eq_nil_var_name(cond)
+            if (lhs_name.length() > 0) {
+                var var_type: String = this.env.get_var(lhs_name)
+                if (this.is_nullable(var_type)) {
+                    this.env.narrow(lhs_name, this.strip_nil(var_type))
+                }
+            }
+        }
+
+        // Inverse of logical AND: apply inverse of left side
+        // (De Morgan: not(a and b) = not a or not b — conservative: don't narrow)
+        // But for logical OR inversion: not(a or b) = not a and not b — apply inverse of both
+        if (cond_kind == "logical:or") {
+            var left_expr: AST.Expr = this.get_logical_left(cond)
+            var right_expr: AST.Expr = this.get_logical_right(cond)
+            this.apply_inverse_narrowing(left_expr)
+            this.apply_inverse_narrowing(right_expr)
+        }
+
+        // Inverse of truthy check: in else branch, variable might be nil
+        // (no narrowing — leave as-is, since we can't prove it's nil)
+
+        // Inverse of x is Type: no narrowing in else (can't determine remaining type)
+    }
+
+    fun get_eq_nil_var_name(expr: AST.Expr): String {
+        // For Binary(left, "==", right), extract variable name if one side is NilLit
+        var ek: String = this.classify_cond(expr)
+        if (ek != "binary") return ""
+        var left_expr: AST.Expr = this.get_binary_left(expr)
+        var right_expr: AST.Expr = this.get_binary_right(expr)
+        var left_name: String = this.extract_var_from_nil_check(left_expr, right_expr)
+        if (left_name.length() > 0) return left_name
+        return this.extract_var_from_nil_check(right_expr, left_expr)
     }
 
     fun extract_is_check_var(cond: AST.Expr): String {
@@ -709,6 +824,27 @@ class NullChecker {
         return match (expr) {
             NilLit => true
             _ => false
+        }
+    }
+
+    fun is_logical_and(expr: AST.Expr): Bool {
+        return match (expr) {
+            Logical(l, op, r) => op == "and"
+            _ => false
+        }
+    }
+
+    fun get_logical_left(expr: AST.Expr): AST.Expr {
+        return match (expr) {
+            Logical(l, op, r) => l
+            _ => AST.Expr.NilLit
+        }
+    }
+
+    fun get_logical_right(expr: AST.Expr): AST.Expr {
+        return match (expr) {
+            Logical(l, op, r) => r
+            _ => AST.Expr.NilLit
         }
     }
 
@@ -1000,7 +1136,12 @@ class NullChecker {
 
         // Check: calling method on nullable object
         if (this.is_nullable(obj_type) and this.requires_non_nil(method)) {
-            this.error("cannot call ." + method + "() on nullable type " + obj_type)
+            var obj_name: String = this.get_variable_name_from_expr(obj)
+            if (obj_name.length() > 0) {
+                this.error("cannot call ." + method + "() on nullable '" + obj_name + "' (type " + obj_type + "); add a nil check first")
+            } else {
+                this.error("cannot call ." + method + "() on nullable type " + obj_type + "; add a nil check first")
+            }
         }
 
         // String methods

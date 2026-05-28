@@ -98,9 +98,27 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
     if (ek == "map_lit") return "Map<String,String>"
     if (ek == "this") return this.current_class
     if (ek == "get_field" or ek == "member") {
-        var obj_name: String = this.get_variable_name(expr)
-        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
-            return this.type_to_string(this.typed_vars.get(obj_name))
+        var gf_inner_obj: AST.Expr = match (expr) {
+            GetField(o, f) => o
+            MemberAccess(o, f) => o
+            _ => AST.Expr.NilLit
+        }
+        var gf_field: String = match (expr) {
+            GetField(o, f) => f
+            MemberAccess(o, f) => f
+            _ => ""
+        }
+        var gf_obj_name: String = this.get_variable_name(gf_inner_obj)
+        var gf_class: String = ""
+        if (this.classify_expr(gf_inner_obj) == "this") {
+            gf_class = this.current_class
+        } else if (gf_obj_name.length() > 0 and this.typed_vars.has(gf_obj_name)) {
+            gf_class = this.type_to_string(this.typed_vars.get(gf_obj_name))
+        } else if (gf_obj_name.length() > 0 and this.var_types.has(gf_obj_name)) {
+            gf_class = this.var_types.get(gf_obj_name)
+        }
+        if (gf_class.length() > 0 and this.class_fields.has(gf_class)) {
+            return this.get_field_type(gf_class, gf_field)
         }
     }
     if (ek == "method_call") {
@@ -155,8 +173,15 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
                 return this.func_ret_types.get(full_mc)
             }
         }
-        if (mc_method == "length") return "Float"
-        if (mc_method == "to_string" or mc_method == "join") return "String"
+        // Also check with prefix for user class methods
+        if (mc_obj_type.length() > 0) {
+            var prefixed_mc: String = this.current_prefix + mc_obj_type + "__" + mc_method
+            if (this.func_ret_types.has(prefixed_mc)) {
+                return this.func_ret_types.get(prefixed_mc)
+            }
+        }
+        if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
+        if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "slice" or mc_method == "char_at") return "String"
         if (mc_method == "split" or mc_method == "keys") return "List<String>"
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
@@ -167,7 +192,6 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
             }
             return "String"
         }
-        if (mc_method == "to_string") return "String"
     }
     if (ek == "call") {
         var call_callee: AST.Expr = match (expr) {
@@ -197,14 +221,20 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
 extend fun Codegen.gen_list_lit(elements: List<AST.Expr>): String {
     var list_val: String = this.fresh_local()
     this.emit_indent(list_val + " = call i64 @__list_new()")
+    var elem_type: AST.Type = AST.Type.AnyType
     var i: Float = 0
     while (i < elements.length()) {
+        if (i == 0) {
+            var ft: String = this.get_expr_type(elements[0])
+            if (ft == "String") { elem_type = AST.Type.StringType }
+            else if (ft == "Int" or ft == "Float") { elem_type = AST.Type.IntType }
+        }
         var elem: String = this.gen_arg_value(elements[i])
         var discard_lp: String = this.fresh_local()
         this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
         i = i + 1
     }
-    this.set_last_type(this.make_list_type())
+    this.set_last_type(this.make_generic_type("List", [elem_type]))
     return list_val
     }
 
@@ -224,21 +254,20 @@ extend fun Codegen.gen_index_get(object: AST.Expr, index: AST.Expr): String {
     this.emit_indent(final_idx + " = select i1 " + is_neg + ", i64 " + adjusted + ", i64 " + idx)
     var local: String = this.fresh_local()
     this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
-    if (this.is_string_list_type(obj_type)) {
-        this.set_last_type(AST.Type.StringType)
-    } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
-        if (this.is_string_list_type(this.typed_vars.get(obj_name))) {
-            this.set_last_type(AST.Type.StringType)
-        } else {
-            this.set_last_type(AST.Type.IntType)
-        }
-    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+    // Extract element type from the list's generic type
+    var idx_elem_type: AST.Type = this.get_list_element_type(obj_type)
+    if (this.type_to_string(idx_elem_type) == "Any" and obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        idx_elem_type = this.get_list_element_type(this.typed_vars.get(obj_name))
+    }
+    if (this.type_to_string(idx_elem_type) == "Any" and obj_name.length() > 0 and this.var_types.has(obj_name)) {
         var vtype: String = this.var_types.get(obj_name)
-        if (vtype == "List<String>") {
-            this.set_last_type(AST.Type.StringType)
-        } else {
-            this.set_last_type(AST.Type.IntType)
+        if (vtype.starts_with("List<") and vtype.ends_with(">")) {
+            var inner: String = vtype.slice(5, vtype.length() - 1)
+            idx_elem_type = this.str_to_type(inner)
         }
+    }
+    if (this.type_to_string(idx_elem_type) != "Any") {
+        this.set_last_type(idx_elem_type)
     } else {
         this.set_last_type(AST.Type.IntType)
     }
@@ -547,11 +576,32 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
         is_user_class = true
     }
+    // Check with generic parameters stripped (Box<Float> → Box)
+    if (!is_user_class and obj_name.length() > 0) {
+        var uc_type: String = ""
+        if (this.typed_vars.has(obj_name)) {
+            uc_type = this.type_to_string(this.typed_vars.get(obj_name))
+        } else if (this.var_types.has(obj_name)) {
+            uc_type = this.var_types.get(obj_name)
+        }
+        if (uc_type.length() > 0 and uc_type.contains("<")) {
+            var uc_base: String = uc_type.slice(0, uc_type.index_of("<"))
+            if (this.class_fields.has(uc_base)) {
+                is_user_class = true
+            }
+        }
+    }
     // Also check last_type after evaluation (handles chained field access like this.field.method())
     if (!is_user_class) {
         var eval_type: String = this.type_to_string(this.last_type)
         if (this.class_fields.has(eval_type)) {
             is_user_class = true
+        }
+        if (!is_user_class and eval_type.contains("<")) {
+            var eval_base: String = eval_type.slice(0, eval_type.index_of("<"))
+            if (this.class_fields.has(eval_base)) {
+                is_user_class = true
+            }
         }
     }
 
@@ -767,7 +817,11 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         this.called_functions.push(parent_method)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
-        this.set_last_type(AST.Type.StringType)
+        if (this.func_ret_types.has(parent_method)) {
+            this.set_last_type(this.str_to_type(this.func_ret_types.get(parent_method)))
+        } else {
+            this.set_last_type(AST.Type.StringType)
+        }
         return local
     }
 
