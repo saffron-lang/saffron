@@ -118,7 +118,11 @@ class Codegen {
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
-        if (s == "List" or s.starts_with("List<")) return AST.Type.GenericType("List", [AST.Type.AnyType])
+        if (s == "List") return AST.Type.GenericType("List", [AST.Type.AnyType])
+        if (s.starts_with("List<") and s.ends_with(">")) {
+            var inner: String = s.slice(5, s.length() - 1)
+            return AST.Type.GenericType("List", [this.str_to_type(inner)])
+        }
         if (s == "Map" or s.starts_with("Map<")) return AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
         if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
         return AST.Type.ClassType(s)
@@ -134,11 +138,18 @@ class Codegen {
             AnyType => "Any"
             ClassType(n) => n
             EnumType(n) => n
-            GenericType(base, args) => base
+            GenericType(base, args) => this.generic_type_string(base, args)
             UnionType(types) => "Union"
             FuncType(p, r) => "Fun"
             NullableType(inner) => this.type_to_string(inner)
         }
+    }
+
+    fun generic_type_string(base: String, args: List<AST.Type>): String {
+        if (args.length() > 0) {
+            return base + "<" + this.type_to_string(args[0]) + ">"
+        }
+        return base
     }
 
     fun is_string_type(t: AST.Type): Bool {
@@ -2102,9 +2113,8 @@ class Codegen {
         // Check for IO module calls
         if (obj_name == "IO") {
             if (method == "println") {
-                var arg_type: String = this.get_expr_type(args[0])
                 var arg: String = this.gen_arg_value(args[0])
-                if (arg_type == "Any") { arg_type = this.type_to_string(this.last_type) }
+                var arg_type: String = this.type_to_string(this.last_type)
                 var local: String = this.fresh_local()
                 if (arg_type == "String") {
                     var str_ptr: String = this.fresh_local()
@@ -2118,9 +2128,8 @@ class Codegen {
                 return local
             }
             if (method == "print") {
-                var arg_type: String = this.get_expr_type(args[0])
                 var arg: String = this.gen_arg_value(args[0])
-                if (arg_type == "Any") { arg_type = this.type_to_string(this.last_type) }
+                var arg_type: String = this.type_to_string(this.last_type)
                 var local: String = this.fresh_local()
                 if (arg_type == "String") {
                     var str_ptr: String = this.fresh_local()
@@ -3576,11 +3585,23 @@ class Codegen {
                     var parent_full: String = parent + "__" + mname
                     this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
                     this.known_functions.push(child_full)
-                    // Emit a thin forwarder
+                    // Emit a thin forwarder with proper parameter forwarding
+                    var fwd_params_def: String = "i64 %self"
+                    var fwd_params_call: String = "i64 %self"
+                    var arity_key: String = this.current_prefix + parent_full
+                    if (this.called_function_arity.has(arity_key)) {
+                        var arity: Float = this.called_function_arity.get(arity_key)
+                        var pi2: Float = 1
+                        while (pi2 < arity) {
+                            fwd_params_def = fwd_params_def + ", i64 %p" + pi2.floor().to_string()
+                            fwd_params_call = fwd_params_call + ", i64 %p" + pi2.floor().to_string()
+                            pi2 = pi2 + 1
+                        }
+                    }
                     this.emit("")
-                    this.emit("define i64 @" + child_full + "(i64 %self) {")
+                    this.emit("define i64 @" + child_full + "(" + fwd_params_def + ") {")
                     this.emit("entry:")
-                    this.emit("  %r = call i64 @" + parent_full + "(i64 %self)")
+                    this.emit("  %r = call i64 @" + parent_full + "(" + fwd_params_call + ")")
                     this.emit("  ret i64 %r")
                     this.emit("}")
                 }
@@ -3707,6 +3728,11 @@ class Codegen {
         if (mparams_str.length() > 0) {
             full_params = full_params + "," + mparams_str
         }
+        var param_count: Float = 1
+        if (mparams_str.length() > 0) {
+            param_count = this.split_respecting_generics(mparams_str, ",").length() + 1
+        }
+        this.called_function_arity.set(this.current_prefix + full_name, param_count)
         this.gen_function(full_name, full_params, mret, mbody)
     }
 
