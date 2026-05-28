@@ -453,3 +453,12 @@
         return parts[1]
     }
 
+    // Get the type string for a variable from typed_vars (the single source of truth).
+    // Returns "" if the variable is not registered.
+    fun get_var_type_str(name: String): String {
+        if (this.typed_vars.has(name)) {
+            return this.type_to_string(this.typed_vars.get(name))
+        }
+        return ""
+    }
+

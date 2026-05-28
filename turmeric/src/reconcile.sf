@@ -1,0 +1,321 @@
+// Turmeric Reconciler — component lifecycle + keyed list diffing
+// Runs on C VM for testing (DOM ops are stubbed as prints)
+
+import "./signal.sf" as Sig
+
+// =============================================================================
+// DOM Stubs (replaced by real FFI in WASM builds)
+// =============================================================================
+
+var _dom_log: List<String> = []
+
+fun dom_create(tag: String): Float {
+    _dom_log.push("create:" + tag)
+    return _dom_log.length()
+}
+
+fun dom_set_text(handle: Float, text: String) {
+    _dom_log.push("text:" + handle.to_string() + "=" + text)
+}
+
+fun dom_append(parent: Float, child: Float) {
+    _dom_log.push("append:" + parent.to_string() + "<-" + child.to_string())
+}
+
+fun dom_remove(parent: Float, child: Float) {
+    _dom_log.push("remove:" + parent.to_string() + "x" + child.to_string())
+}
+
+// =============================================================================
+// Component — owns a DOM node + cleanup
+// =============================================================================
+
+class Component {
+    var handle: Float
+    var parent_handle: Float
+    var children: List<Component>
+    var cleanups: List<Any>
+    var mounted: Bool
+
+    fun init(handle: Float, parent_handle: Float) {
+        this.handle = handle
+        this.parent_handle = parent_handle
+        this.children = []
+        this.cleanups = []
+        this.mounted = false
+    }
+
+    fun mount() {
+        if (this.mounted) return
+        this.mounted = true
+        dom_append(this.parent_handle, this.handle)
+    }
+
+    fun unmount() {
+        if (!this.mounted) return
+        // Unmount children depth-first
+        var i: Float = 0
+        while (i < this.children.length()) {
+            this.children[i].unmount()
+            i = i + 1
+        }
+        // Run cleanups
+        i = 0
+        while (i < this.cleanups.length()) {
+            this.cleanups[i]()
+            i = i + 1
+        }
+        // Remove from DOM
+        dom_remove(this.parent_handle, this.handle)
+        this.mounted = false
+        this.children = []
+        this.cleanups = []
+    }
+
+    fun on_cleanup(fn: Any) {
+        this.cleanups.push(fn)
+    }
+
+    fun add_child(child: Component) {
+        this.children.push(child)
+    }
+}
+
+// =============================================================================
+// Managed Effect — auto-cleanup on component unmount
+// =============================================================================
+
+fun managed_effect(owner: Component, fn: Any) {
+    Sig.start_tracking()
+    fn()
+    var deps: List<Any> = Sig.stop_tracking()
+    var i: Float = 0
+    while (i < deps.length()) {
+        deps[i].subscribe(fn)
+        i = i + 1
+    }
+    // Register cleanup
+    owner.on_cleanup(fun () => {
+        var j: Float = 0
+        while (j < deps.length()) {
+            deps[j].unsubscribe(fn)
+            j = j + 1
+        }
+    })
+}
+
+// =============================================================================
+// Conditional Slot — mount/unmount based on signal
+// =============================================================================
+
+class ConditionalSlot {
+    var parent_handle: Float
+    var condition: Sig.Signal
+    var builder: Any
+    var current: Component
+
+    fun init(parent_handle: Float, condition: Sig.Signal, builder: Any) {
+        this.parent_handle = parent_handle
+        this.condition = condition
+        this.builder = builder
+        this.current = nil
+        this.sync()
+        this.condition.subscribe(fun () => {
+            this.sync()
+        })
+    }
+
+    fun sync() {
+        var should_show: Bool = this.condition.get()
+        if (should_show and this.current == nil) {
+            this.current = this.builder()
+            this.current.mount()
+        }
+        if (!should_show and this.current != nil) {
+            this.current.unmount()
+            this.current = nil
+        }
+    }
+}
+
+fun conditional(parent: Float, condition: Sig.Signal, builder: Any): ConditionalSlot {
+    return ConditionalSlot(parent, condition, builder)
+}
+
+// =============================================================================
+// Keyed List — reconcile a signal list with the DOM
+// =============================================================================
+
+class KeyedItem {
+    var key: String
+    var comp: Component
+    fun init(key: String, comp: Component) {
+        this.key = key
+        this.comp = comp
+    }
+}
+
+class KeyedList {
+    var parent_handle: Float
+    var items_signal: Sig.Signal
+    var key_fn: Any
+    var builder_fn: Any
+    var rendered: List<KeyedItem>
+
+    fun init(parent_handle: Float, items_signal: Sig.Signal, key_fn: Any, builder_fn: Any) {
+        this.parent_handle = parent_handle
+        this.items_signal = items_signal
+        this.key_fn = key_fn
+        this.builder_fn = builder_fn
+        this.rendered = []
+        this.sync()
+        this.items_signal.subscribe(fun () => {
+            this.sync()
+        })
+    }
+
+    fun sync() {
+        var new_items: List<Any> = this.items_signal.get()
+
+        // Build old key → index map
+        var old_map: Map<String, Float> = {}
+        var i: Float = 0
+        while (i < this.rendered.length()) {
+            old_map.set(this.rendered[i].key, i)
+            i = i + 1
+        }
+
+        // Build new keys
+        var new_keys: List<String> = []
+        i = 0
+        while (i < new_items.length()) {
+            new_keys.push(this.key_fn(new_items[i]))
+            i = i + 1
+        }
+
+        // Build set of new keys for removal check
+        var new_key_set: Map<String, Bool> = {}
+        i = 0
+        while (i < new_keys.length()) {
+            new_key_set.set(new_keys[i], true)
+            i = i + 1
+        }
+
+        // Unmount removed items
+        i = 0
+        while (i < this.rendered.length()) {
+            if (!new_key_set.has(this.rendered[i].key)) {
+                this.rendered[i].comp.unmount()
+            }
+            i = i + 1
+        }
+
+        // Build new rendered list
+        var new_rendered: List<KeyedItem> = []
+        i = 0
+        while (i < new_items.length()) {
+            var key: String = new_keys[i]
+            if (old_map.has(key)) {
+                // Reuse existing
+                var old_idx: Float = old_map.get(key)
+                new_rendered.push(this.rendered[old_idx])
+            } else {
+                // Create new
+                var comp: Component = this.builder_fn(new_items[i])
+                comp.mount()
+                new_rendered.push(KeyedItem(key, comp))
+            }
+            i = i + 1
+        }
+
+        // Re-append in order (moves items in DOM)
+        i = 0
+        while (i < new_rendered.length()) {
+            dom_append(this.parent_handle, new_rendered[i].comp.handle)
+            i = i + 1
+        }
+
+        this.rendered = new_rendered
+    }
+}
+
+fun keyed_list(parent: Float, items: Sig.Signal, key_fn: Any, builder_fn: Any): KeyedList {
+    return KeyedList(parent, items, key_fn, builder_fn)
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+IO.println("--- Test 1: Component mount/unmount ---")
+var root: Float = dom_create("div")
+var child: Component = Component(dom_create("p"), root)
+child.mount()
+IO.println("mounted: " + child.mounted.to_string())
+child.unmount()
+IO.println("after unmount: " + child.mounted.to_string())
+
+IO.println("--- Test 2: Managed effect + cleanup ---")
+var name: Sig.Signal = Sig.signal("Alice")
+var card: Component = Component(dom_create("div"), root)
+var effect_count: Float = 0
+managed_effect(card, fun () => {
+    effect_count = effect_count + 1
+    dom_set_text(card.handle, "Name: " + name.get())
+})
+IO.println("effect ran: " + effect_count.to_string())
+name.set("Bob")
+IO.println("after set: " + effect_count.to_string())
+card.unmount()
+name.set("Charlie")
+IO.println("after unmount+set (should not re-run): " + effect_count.to_string())
+
+IO.println("--- Test 3: Conditional slot ---")
+var show: Sig.Signal = Sig.signal(true)
+var slot_build_count: Float = 0
+var slot: ConditionalSlot = conditional(root, show, fun () => {
+    slot_build_count = slot_build_count + 1
+    var c: Component = Component(dom_create("span"), root)
+    c
+})
+IO.println("built: " + slot_build_count.to_string())
+show.set(false)
+IO.println("hidden, built: " + slot_build_count.to_string())
+show.set(true)
+IO.println("shown again, built: " + slot_build_count.to_string())
+
+IO.println("--- Test 4: Keyed list ---")
+var items: Sig.Signal = Sig.signal(["a", "b", "c"])
+var list_parent: Float = dom_create("ul")
+var build_log: List<String> = []
+var kl: KeyedList = keyed_list(list_parent, items,
+    fun (item: Any): String => item,
+    fun (item: Any): Component => {
+        build_log.push("build:" + item)
+        var li: Component = Component(dom_create("li"), list_parent)
+        dom_set_text(li.handle, item)
+        li
+    }
+)
+IO.println("initial builds: " + build_log.length().to_string())
+
+// Add item — only new one gets built
+items.set(["a", "b", "c", "d"])
+IO.println("after add d: " + build_log.length().to_string())
+
+// Remove item — b gets unmounted
+items.set(["a", "c", "d"])
+IO.println("after remove b: " + build_log.length().to_string())
+
+// Reorder — no new builds
+items.set(["d", "c", "a"])
+IO.println("after reorder: " + build_log.length().to_string())
+
+IO.println("--- DOM operation log ---")
+var di: Float = 0
+while (di < _dom_log.length()) {
+    IO.println("  " + _dom_log[di])
+    di = di + 1
+}
+
+IO.println("All reconciler tests passed!")
