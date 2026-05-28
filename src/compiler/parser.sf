@@ -1113,12 +1113,31 @@ class Parser {
     }
 
     fun parse_import(): AST.Stmt {
-        this.advance() // consume import
-        // Skip: "path" as Name  or  { names } from "path"
-        while (!this.match_kind_check("eof") and !this.match_kind_check("var") and !this.match_kind_check("fun") and !this.match_kind_check("class") and !this.match_kind_check("enum") and !this.match_kind_check("import")) {
+        this.advance()
+        if (this.match_kind_check("{")) {
             this.advance()
+            var names: List<String> = []
+            names.push(this.expect_ident())
+            while (this.match_kind(",")) {
+                if (this.match_kind_check("}")) { break }
+                names.push(this.expect_ident())
+            }
+            this.consume("}")
+            this.advance()
+            var kind: Lexer.TokenKind = this.current_kind()
+            var path: String = match (kind) { TkString(s) => s }
+            this.advance()
+            return AST.Stmt.VarDecl("_import_", "", AST.Expr.NilLit, "@import:" + path + "|names:" + names.join(","))
         }
-        return AST.Stmt.ExprStmt(AST.Expr.NilLit)
+        var kind: Lexer.TokenKind = this.current_kind()
+        var path: String = match (kind) { TkString(s) => s }
+        this.advance()
+        if (this.is_ident_named("as")) {
+            this.advance()
+            var alias: String = this.expect_ident()
+            return AST.Stmt.VarDecl("_import_" + alias, "", AST.Expr.NilLit, "@import:" + path + "|as:" + alias)
+        }
+        return AST.Stmt.VarDecl("_import_", "", AST.Expr.NilLit, "@import:" + path + "|as:")
     }
 
     fun parse_return(): AST.Stmt {
@@ -1266,28 +1285,43 @@ class Parser {
 
     fun parse_trailing_closure(): AST.Expr {
         this.consume("{")
-        var params: List<AST.Param> = []
         // Check for param list: ident => or ident, ident => ...
         if (this.match_kind_check("ident") and (this.peek_is("=>") or this.peek_is(","))) {
-            var pname: String = this.expect_ident()
-            params.push(AST.Param.Param(pname, "Any"))
-            while (this.match_kind(",")) {
-                pname = this.expect_ident()
-                params.push(AST.Param.Param(pname, "Any"))
-            }
-            this.consume("=>")
+            return this.parse_trailing_closure_with_params()
         }
-        var stmts: List<AST.Stmt> = []
+        var body: List<AST.Stmt> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) {
                 this.consume("}")
-                return AST.Expr.Lambda(params, "Nil", stmts)
+                return AST.Expr.Lambda([], "Nil", body)
             }
-            stmts.push(this.parse_stmt())
+            body.push(this.parse_stmt())
         }
         this.consume("}")
-        return AST.Expr.Lambda(params, "Nil", stmts)
+        return AST.Expr.Lambda([], "Nil", body)
+    }
+
+    fun parse_trailing_closure_with_params(): AST.Expr {
+        var params: List<AST.Param> = []
+        var pname: String = this.expect_ident()
+        params.push(AST.Param.Param(pname, "Any"))
+        while (this.match_kind(",")) {
+            pname = this.expect_ident()
+            params.push(AST.Param.Param(pname, "Any"))
+        }
+        this.consume("=>")
+        var body: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                this.consume("}")
+                return AST.Expr.Lambda(params, "Any", body)
+            }
+            body.push(this.parse_stmt())
+        }
+        this.consume("}")
+        return AST.Expr.Lambda(params, "Any", body)
     }
 
     fun parse_block(): AST.Stmt {
