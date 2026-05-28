@@ -521,7 +521,9 @@
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
-        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            obj_type_for_get = this.type_to_string(this.typed_vars.get(obj_name))
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
             obj_type_for_get = this.var_types.get(obj_name)
         }
         if (obj_type_for_get.length() == 0) {
@@ -532,7 +534,11 @@
         }
         if (obj_type_for_get.starts_with("Map<")) {
             var val_type_str: String = this.get_map_value_type(obj_type_for_get)
-            this.last_type = this.str_to_type(val_type_str)
+            if (val_type_str == "Any") {
+                this.last_type = AST.Type.StringType
+            } else {
+                this.last_type = this.str_to_type(val_type_str)
+            }
         } else {
             this.last_type = AST.Type.StringType
         }
