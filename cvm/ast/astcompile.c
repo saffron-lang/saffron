@@ -748,6 +748,72 @@ void compileNode(Node *node) {
         }
         case NODE_FUNCTION: {
             struct Function *casted = (struct Function *) node;
+
+            // Extension method: @extend:ClassName
+            if (casted->docstring.start != NULL && casted->docstring.length > 8 &&
+                memcmp(casted->docstring.start, "@extend:", 8) == 0) {
+                // Extract class name from docstring
+                const char *extClassName = casted->docstring.start + 8;
+                int extClassLen = casted->docstring.length - 8;
+                Token extClassToken = syntheticToken(extClassName);
+                extClassToken.length = extClassLen;
+
+                // Get the class onto the stack
+                getVariable(extClassToken);
+
+                // Set up class compiler context so 'this' works
+                ClassCompiler classCompiler;
+                classCompiler.enclosing = currentClass;
+                classCompiler.hasSuperclass = false;
+                currentClass = &classCompiler;
+
+                // Compile as a method (slot 0 = this)
+                Compiler compiler;
+                initCompiler(&compiler, TYPE_METHOD, &casted->name);
+                beginScope();
+
+                bool hasRestParam = false;
+                int restIndex = -1;
+                for (int i = 0; i < casted->params.count; i++) {
+                    if (casted->params.parameters[i]->self.type == NODE_VARIADIC) {
+                        hasRestParam = true;
+                        restIndex = i;
+                    }
+                    declareVariable(&casted->params.parameters[i]->name);
+                    uint16_t constant = identifierConstant(&casted->params.parameters[i]->name);
+                    defineVariable(constant);
+                }
+
+                if (hasRestParam) {
+                    emitBytes(OP_PACK_REST, (uint8_t) restIndex);
+                }
+
+                compileTree(&casted->body);
+
+                ObjFunction *function = endCompiler();
+                function->arity = casted->params.count;
+                function->hasRest = hasRestParam;
+
+                emitByte(OP_CLOSURE);
+                emitConstantIndex(makeConstant(OBJ_VAL(function)));
+
+                for (int i = 0; i < function->upvalueCount; i++) {
+                    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+                    emitByte(compiler.upvalues[i].index);
+                }
+
+                // Bind method to the class
+                uint16_t methodNameConst = identifierConstant(&casted->name);
+                emitByte(OP_METHOD);
+                emitConstantIndex(methodNameConst);
+
+                // Pop the class
+                emitByte(OP_POP);
+
+                currentClass = currentClass->enclosing;
+                break;
+            }
+
             if (current->scopeDepth > 0 && casted->functionType == TYPE_FUNCTION) {
                 declareVariable(&casted->name);
                 markInitialized();

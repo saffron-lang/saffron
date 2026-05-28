@@ -1806,9 +1806,42 @@ static Token collectModuleDocComments() {
     return result;
 }
 
+static Stmt *extendDeclaration(Token docstring) {
+    // extend fun ClassName.methodName(params): RetType { body }
+    consume(TOKEN_FUN, "Expect 'fun' after 'extend'.");
+    Token className = parseVariable("Expect class name after 'extend fun'.");
+    consume(TOKEN_DOT, "Expect '.' after class name in extend.");
+    Token methodName = parseVariable("Expect method name after '.' in extend.");
+
+    struct Function *func = function(TYPE_METHOD);
+    func->name = methodName;
+
+    // Build docstring "@extend:ClassName"
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "@extend:%.*s", className.length, className.start);
+    ObjString *str = copyString(buf, len);
+    Token extDocstring;
+    extDocstring.type = TOKEN_DOC_COMMENT;
+    extDocstring.start = str->chars;
+    extDocstring.length = len;
+    extDocstring.line = className.line;
+    extDocstring.column = 0;
+    func->docstring = extDocstring;
+
+    return (Stmt *) func;
+}
+
 static Stmt *declaration() {
     // Collect doc comments before the declaration
     Token docstring = collectDocComments();
+
+    // Extension methods: extend fun ClassName.method(params): RetType { body }
+    if (check(TOKEN_IDENTIFIER) &&
+        parser.current.length == 6 &&
+        memcmp(parser.current.start, "extend", 6) == 0) {
+        advance(); // consume 'extend'
+        return extendDeclaration(docstring);
+    }
 
     // Decorators: @expr applied to the next fun/class declaration
     if (match(TOKEN_AT)) {
