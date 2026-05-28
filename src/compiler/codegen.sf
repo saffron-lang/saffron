@@ -87,8 +87,6 @@ class Codegen {
         this.named_imports = {}
         this.target = "native"
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
-        this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
-        this.builtin_methods.set("set", "v3|__map_set|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
         this.builtin_methods.set("reverse", "r1|rt_list_reverse|List|1")

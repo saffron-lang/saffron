@@ -531,10 +531,67 @@
     if (!is_user_class and this.builtin_methods.has(method)) {
         return this.emit_builtin_dispatch(obj, method, args)
     }
-    if (!is_user_class and method == "get") {
-        var key: String = this.gen_arg_value(args[0])
+    if (!is_user_class and method == "append") {
+        var str_tagged: String = this.gen_arg_value(args[0])
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + str_tagged + ")")
+        var str_raw: String = this.fresh_local()
+        this.emit_indent(str_raw + " = ptrtoint i8* " + str_ptr + " to i64")
+        var discard: String = this.fresh_local()
+        this.emit_indent(discard + " = call i64 @__sb_append(i64 " + obj + ", i64 " + str_raw + ")")
+        this.last_type = AST.Type.NilType
+        return "0"
+    }
+    if (!is_user_class and method == "set" and args.length() == 2) {
+        // Determine if object is a List or Map to dispatch correctly
+        var set_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            set_obj_type = this.type_to_string(this.typed_vars.get(obj_name))
+        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+            set_obj_type = this.var_types.get(obj_name)
+        }
+        if (set_obj_type == "List" or set_obj_type.starts_with("List<")) {
+            // List.set(index, value) -> __list_set
+            var idx_tagged: String = this.gen_arg_value(args[0])
+            var idx: String = this.fresh_local()
+            this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
+            var val: String = this.gen_arg_value(args[1])
+            var discard: String = this.fresh_local()
+            this.emit_indent(discard + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        // Map.set(key, value) -> __map_set
+        var key_tagged: String = this.gen_arg_value(args[0])
+        var key_ptr: String = this.fresh_local()
+        this.emit_indent(key_ptr + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
+        var key_raw: String = this.fresh_local()
+        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+        var val: String = this.gen_arg_value(args[1])
+        var discard: String = this.fresh_local()
+        this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_raw + ", i64 " + val + ")")
+        this.last_type = AST.Type.NilType
+        return "0"
+    }
+    if (!is_user_class and method == "has") {
+        var key_tagged: String = this.gen_arg_value(args[0])
+        var key_ptr: String = this.fresh_local()
+        this.emit_indent(key_ptr + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
+        var key_raw: String = this.fresh_local()
+        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
+        this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_raw + ")")
+        this.last_type = AST.Type.BoolType
+        return local
+    }
+    if (!is_user_class and method == "get") {
+        var key_tagged: String = this.gen_arg_value(args[0])
+        var key: String = this.fresh_local()
+        this.emit_indent(key + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
+        var key_raw: String = this.fresh_local()
+        this.emit_indent(key_raw + " = ptrtoint i8* " + key + " to i64")
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_raw + ")")
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
         if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
@@ -548,6 +605,7 @@
         }
         if (obj_type_for_get.starts_with("Map<")) {
             var val_type_str: String = this.get_map_value_type(obj_type_for_get)
+            if (val_type_str == "Any") { val_type_str = "String" }
             this.last_type = this.str_to_type(val_type_str)
         } else {
             this.last_type = AST.Type.StringType

@@ -112,13 +112,17 @@
         // Re-generate with env param
         this.globals.pop() // remove the one we just generated
         // Remove from defined_funcs so re-generation isn't skipped
+        // Build a new list excluding the lambda_name (avoids List.set which
+        // the bootstrap compiler mis-compiles as __map_set)
+        var new_defined: List<String> = []
         var df_idx: Float = 0
         while (df_idx < this.defined_funcs.length()) {
-            if (this.defined_funcs[df_idx] == lambda_name) {
-                this.defined_funcs.set(df_idx, "__removed__")
+            if (this.defined_funcs[df_idx] != lambda_name) {
+                new_defined.push(this.defined_funcs[df_idx])
             }
             df_idx = df_idx + 1
         }
+        this.defined_funcs = new_defined
         var saved_sb2: StringBuilder = this.sb
         var saved_terminated2: Bool = this.block_terminated
         var saved_counter2: Float = this.local_counter
