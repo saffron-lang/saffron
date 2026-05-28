@@ -180,6 +180,11 @@ entry:
   ret i64 %v
 }
 
+define i64 @__val_nil() {
+entry:
+  ret i64 0
+}
+
 ; --- Type Checking ---
 
 define i1 @__val_is_float(i64 %v) {

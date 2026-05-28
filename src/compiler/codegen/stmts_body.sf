@@ -488,7 +488,7 @@
                 var gep: String = this.fresh_local()
                 this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var as_i64: String = this.fresh_local()
-                this.emit_indent(as_i64 + " = ptrtoint i8* " + gep + " to i64")
+                this.emit_indent(as_i64 + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
                 this.emit_terminator("ret i64 " + as_i64)
             } else {
                 // Has fields: build "VariantName(field0, field1, ...)"
@@ -502,7 +502,7 @@
                 var prefix_gep: String = this.fresh_local()
                 this.emit_indent(prefix_gep + " = getelementptr [" + prefix_len.to_string() + " x i8], [" + prefix_len.to_string() + " x i8]* " + prefix_const + ", i64 0, i64 0")
                 var prefix_i64: String = this.fresh_local()
-                this.emit_indent(prefix_i64 + " = ptrtoint i8* " + prefix_gep + " to i64")
+                this.emit_indent(prefix_i64 + " = call i64 @__val_tag_ptr(i8* " + prefix_gep + ")")
 
                 // Create a StringBuilder, append prefix
                 var sb: String = this.fresh_local()
@@ -561,7 +561,7 @@
                         var comma_gep: String = this.fresh_local()
                         this.emit_indent(comma_gep + " = getelementptr [" + comma_len.to_string() + " x i8], [" + comma_len.to_string() + " x i8]* " + comma_const + ", i64 0, i64 0")
                         var comma_i64: String = this.fresh_local()
-                        this.emit_indent(comma_i64 + " = ptrtoint i8* " + comma_gep + " to i64")
+                        this.emit_indent(comma_i64 + " = call i64 @__val_tag_ptr(i8* " + comma_gep + ")")
                         this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + comma_i64 + ")")
                     }
 
@@ -574,7 +574,7 @@
                 var close_gep: String = this.fresh_local()
                 this.emit_indent(close_gep + " = getelementptr [" + close_len.to_string() + " x i8], [" + close_len.to_string() + " x i8]* " + close_const + ", i64 0, i64 0")
                 var close_i64: String = this.fresh_local()
-                this.emit_indent(close_i64 + " = ptrtoint i8* " + close_gep + " to i64")
+                this.emit_indent(close_i64 + " = call i64 @__val_tag_ptr(i8* " + close_gep + ")")
                 this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + close_i64 + ")")
 
                 // Finalize
@@ -593,7 +593,7 @@
         var empty_gep: String = this.fresh_local()
         this.emit_indent(empty_gep + " = getelementptr [" + empty_len.to_string() + " x i8], [" + empty_len.to_string() + " x i8]* " + empty_const + ", i64 0, i64 0")
         var empty_i64: String = this.fresh_local()
-        this.emit_indent(empty_i64 + " = ptrtoint i8* " + empty_gep + " to i64")
+        this.emit_indent(empty_i64 + " = call i64 @__val_tag_ptr(i8* " + empty_gep + ")")
         this.emit_terminator("ret i64 " + empty_i64)
 
         this.emit("}")

@@ -20,7 +20,7 @@
         if (name.ends_with("load8")) {
             var addr: String = this.gen_arg_value(args[0])
             var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + addr + ")")
             var byte_val: String = this.fresh_local()
             this.emit_indent(byte_val + " = load i8, i8* " + ptr)
             var result: String = this.fresh_local()
@@ -34,7 +34,7 @@
             var truncated: String = this.fresh_local()
             this.emit_indent(truncated + " = trunc i64 " + val + " to i8")
             var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + addr + ")")
             this.emit_indent("store i8 " + truncated + ", i8* " + ptr)
             this.last_type = AST.Type.NilType
             return "0"
@@ -123,7 +123,7 @@
             var norm: String = this.normalize_c_type(ptype)
             if (norm == "i8*") {
                 var ptr: String = this.fresh_local()
-                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
                 call_args.push("i8* " + ptr)
             } else if (norm == "i8**") {
                 var ptr: String = this.fresh_local()
@@ -151,7 +151,7 @@
         }
         if (llvm_ret == "i8*") {
             var as_int: String = this.fresh_local()
-            this.emit_indent(as_int + " = ptrtoint i8* " + raw + " to i64")
+            this.emit_indent(as_int + " = call i64 @__val_tag_ptr(i8* " + raw + ")")
             this.last_type = AST.Type.IntType
             return as_int
         }
