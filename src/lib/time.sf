@@ -1,79 +1,36 @@
-//! Time utilities for clocks, timestamps, date components, and measurement.
+//! Time utilities using @extern for native compilation.
 
-import "time" as _Time
+@extern("double sf_time_now()") fun _time_now(): Float
 
 /// Return a high-resolution monotonic clock value in seconds.
-fun clock(): Number {
-    return _Time.clock()
+fun clock(): Float {
+    return _time_now()
 }
 
-/// Return the current Unix timestamp in seconds.
-fun timestamp(): Number {
-    return _Time.timestamp()
+/// Return the current time in seconds (monotonic).
+fun now(): Float {
+    return _time_now()
 }
 
-/// Block the current thread for the given number of seconds.
-fun sleep(seconds: Number) {
-    _Time.sleep(seconds)
+/// Return the current Unix timestamp in seconds (monotonic clock).
+fun timestamp(): Float {
+    return _time_now()
 }
 
-/// Convert a Unix timestamp to an ISO 8601 date string.
-fun to_iso(ts: Number): String {
-    return _Time.to_iso(ts)
-}
-
-/// Extract the year from a Unix timestamp.
-fun year(ts: Number): Number {
-    return _Time.year(ts)
-}
-
-/// Extract the month (1-12) from a Unix timestamp.
-fun month(ts: Number): Number {
-    return _Time.month(ts)
-}
-
-/// Extract the day of the month from a Unix timestamp.
-fun day(ts: Number): Number {
-    return _Time.day(ts)
-}
-
-/// Extract the hour (0-23) from a Unix timestamp.
-fun hour(ts: Number): Number {
-    return _Time.hour(ts)
-}
-
-/// Extract the minute (0-59) from a Unix timestamp.
-fun minute(ts: Number): Number {
-    return _Time.minute(ts)
-}
-
-/// Extract the second (0-59) from a Unix timestamp.
-fun second(ts: Number): Number {
-    return _Time.second(ts)
-}
-
-/// Return the current date and time as a map with year, month, day, hour, minute, second keys.
-fun now(): Map<String, Number> {
-    var ts = _Time.timestamp()
-    return {
-        "year": _Time.year(ts),
-        "month": _Time.month(ts),
-        "day": _Time.day(ts),
-        "hour": _Time.hour(ts),
-        "minute": _Time.minute(ts),
-        "second": _Time.second(ts),
-        "timestamp": ts
-    }
+/// Block the current thread for the given number of seconds (busy-wait).
+fun sleep(seconds: Float) {
+    var end: Float = _time_now() + seconds
+    while (_time_now() < end) {}
 }
 
 /// Return the elapsed time in seconds since the given clock start value.
-fun elapsed(start: Number): Number {
-    return _Time.clock() - start
+fun elapsed(start: Float): Float {
+    return _time_now() - start
 }
 
 /// Measure the execution time of a function and return elapsed seconds.
-fun measure(func: () => Any): Number {
-    var start = _Time.clock()
+fun measure(func: () => Any): Float {
+    var start: Float = _time_now()
     func()
-    return _Time.clock() - start
+    return _time_now() - start
 }

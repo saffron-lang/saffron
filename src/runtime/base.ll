@@ -94,6 +94,13 @@ no:
   ret i64 %r2
 }
 
+; Wrapper: tag a raw pointer as a Saffron string value (i64 → i64)
+define i64 @__rt_tag_ptr(i64 %raw) {
+entry:
+  %ptr = inttoptr i64 %raw to i8*
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  ret i64 %tagged
+}
 define i64 @__nil_to_string() {
 entry:
   %s = getelementptr [4 x i8], [4 x i8]* @.str.nil_nl, i64 0, i64 0

@@ -135,6 +135,10 @@ extend fun Codegen.gen_extern_call(name: String, args: List<AST.Expr>): String {
                 var trunc_val: String = this.fresh_local()
                 this.emit_indent(trunc_val + " = trunc i64 " + val + " to i32")
                 call_args.push("i32 " + trunc_val)
+            } else if (norm == "double") {
+                var dbl: String = this.fresh_local()
+                this.emit_indent(dbl + " = bitcast i64 " + val + " to double")
+                call_args.push("double " + dbl)
             } else {
                 call_args.push("i64 " + val)
             }
@@ -162,6 +166,12 @@ extend fun Codegen.gen_extern_call(name: String, args: List<AST.Expr>): String {
             this.emit_indent(ext + " = sext i32 " + raw + " to i64")
             this.last_type = AST.Type.IntType
             return ext
+        }
+        if (llvm_ret == "double") {
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = bitcast double " + raw + " to i64")
+            this.last_type = AST.Type.IntType
+            return as_int
         }
         this.last_type = AST.Type.IntType
         return raw

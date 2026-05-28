@@ -2779,6 +2779,7 @@ entry:
   %argv = alloca i64
   %list = alloca i64
   %i = alloca i64
+  %raw_ptr = alloca i64
   %arg = alloca i64
   %t1 = load i32, i32* @__argc
   %t2 = sext i32 %t1 to i64
@@ -2816,22 +2817,25 @@ while.body125:
   %t26 = call i64 @__val_tag_int(i64 %t25)
   %t27 = inttoptr i64 %t26 to i64*
   %t28 = load i64, i64* %t27
-  store i64 %t28, i64* %arg
-  %t29 = load i64, i64* %list
-  %t30 = load i64, i64* %arg
-  %t31 = call i64 @__list_push(i64 %t29, i64 %t30)
-  %t32 = load i64, i64* %i
-  %t33 = add i64 0, 1
-  %t34 = call i64 @__val_tag_int(i64 %t33)
-  %t35 = call i64 @__val_untag_int(i64 %t32)
-  %t36 = call i64 @__val_untag_int(i64 %t34)
-  %t37 = add i64 %t35, %t36
-  %t38 = call i64 @__val_tag_int(i64 %t37)
-  store i64 %t38, i64* %i
+  store i64 %t28, i64* %raw_ptr
+  %t29 = load i64, i64* %raw_ptr
+  %t30 = call i64 @__rt_tag_ptr(i64 %t29)
+  store i64 %t30, i64* %arg
+  %t31 = load i64, i64* %list
+  %t32 = load i64, i64* %arg
+  %t33 = call i64 @__list_push(i64 %t31, i64 %t32)
+  %t34 = load i64, i64* %i
+  %t35 = add i64 0, 1
+  %t36 = call i64 @__val_tag_int(i64 %t35)
+  %t37 = call i64 @__val_untag_int(i64 %t34)
+  %t38 = call i64 @__val_untag_int(i64 %t36)
+  %t39 = add i64 %t37, %t38
+  %t40 = call i64 @__val_tag_int(i64 %t39)
+  store i64 %t40, i64* %i
   br label %while.cond124
 while.end126:
-  %t39 = load i64, i64* %list
-  ret i64 %t39
+  %t41 = load i64, i64* %list
+  ret i64 %t41
 }
 
 define i64 @rt_str_trim(i64 %s.arg) {
@@ -3670,3 +3674,5 @@ while.end189:
   %t87 = load i64, i64* %copy
   ret i64 %t87
 }
+declare i64 @__rt_tag_ptr(i64)
+
