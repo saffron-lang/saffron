@@ -115,12 +115,8 @@ class Parser {
 
     fun parse_type(): String {
         var name: String = this.parse_single_type()
-        // Nullable shorthand: String? → String|Nil
-        // ? is part of identifiers in the lexer (for method names like next?),
-        // so check if the type name ends with ? and convert it.
-        if (name.ends_with("?")) {
-            name = name.slice(0, name.length() - 1) + "|Nil"
-        }
+        // Nullable shorthand: String? is preserved as-is (not desugared to String|Nil)
+        // The codegen/checker interprets ? suffix as nullable when needed.
         // Union types: String | Nil, Int | String | Nil
         while (this.match_kind("|")) {
             var next: String = this.parse_single_type()

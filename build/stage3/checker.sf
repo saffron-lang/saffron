@@ -238,6 +238,8 @@ class NullChecker {
     fun is_nullable(typ: String): Bool {
         if (typ == "Nil") return true
         if (typ == "Any") return false
+        // Shorthand: "String?" means nullable
+        if (typ.ends_with("?")) return true
         // Check for "Nil" component in union types
         if (typ.contains("|")) {
             var parts: List<String> = typ.split("|")
@@ -252,6 +254,10 @@ class NullChecker {
 
     fun strip_nil(typ: String): String {
         if (typ == "Nil") return "Nil"
+        // Shorthand: "String?" → "String"
+        if (typ.ends_with("?")) {
+            return typ.slice(0, typ.length() - 1)
+        }
         if (!typ.contains("|")) return typ
         var parts: List<String> = typ.split("|")
         var filtered: List<String> = []

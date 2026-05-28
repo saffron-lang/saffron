@@ -295,6 +295,13 @@ class Lexer {
         while (this.pos < this.source.length() and this.is_alnum(this.peek())) {
             this.advance()
         }
+        // Trailing ? or ! is part of the identifier (e.g. next?, empty!)
+        if (this.pos < this.source.length()) {
+            var trail: String = this.peek()
+            if (trail == "?" or trail == "!") {
+                this.advance()
+            }
+        }
         return this.source.slice(start, this.pos)
     }
 
@@ -396,7 +403,6 @@ class Lexer {
             else if (ch == "^") { this.emit(TokenKind.TkCaret) }
             else if (ch == "~") { this.emit(TokenKind.TkTilde) }
             else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
-            else if (ch == "?") { this.emit(TokenKind.TkQuestion) }
             else if (ch == "|") { this.emit(TokenKind.TkPipe) }
             else if (ch == "!") {
                 if (this.peek() == "=") {
