@@ -42,6 +42,7 @@ class Codegen {
     var extend_map: Map<String, String>
     var pending_extend_class: String
     var target: String
+    var nan_boxing: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -83,6 +84,7 @@ class Codegen {
         this.extend_map = {}
         this.pending_extend_class = ""
         this.target = "native"
+        this.nan_boxing = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
         this.builtin_methods.set("set", "v3|__map_set|Nil|0")
@@ -1531,7 +1533,6 @@ class Codegen {
     }
 
     fun gen_enum_construct(enum_name: String, variant: String, args: List<AST.Expr>): String {
-        this.last_type = AST.Type.EnumType(enum_name)
         var key: String = enum_name + "." + variant
         var tag: Float = this.enum_variant_tags.get(key)
 
@@ -1543,14 +1544,14 @@ class Codegen {
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
-                return local
+                this.last_type = AST.Type.EnumType(enum_name); return local
             }
             var val: String = this.gen_arg_value(args[0])
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined: String = this.fresh_local()
             this.emit_indent(combined + " = or i64 " + tag_shifted + ", " + val)
-            return combined
+            this.last_type = AST.Type.EnumType(enum_name); return combined
         }
 
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
@@ -1565,7 +1566,7 @@ class Codegen {
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
             var as_int: String = this.fresh_local()
             this.emit_indent(as_int + " = ptrtoint [1 x i64]* " + arr_ptr + " to i64")
-            return as_int
+            this.last_type = AST.Type.EnumType(enum_name); return as_int
         }
 
         // Multi-field: heap-allocate array [tag, field0, field1, ...]
@@ -1593,7 +1594,7 @@ class Codegen {
         // Cast pointer to i64 for storage
         var as_int: String = this.fresh_local()
         this.emit_indent(as_int + " = ptrtoint [" + num_slots.to_string() + " x i64]* " + arr_ptr + " to i64")
-        return as_int
+        this.last_type = AST.Type.EnumType(enum_name); return as_int
     }
 
     // @codegen-split: match
@@ -4116,10 +4117,12 @@ class Codegen {
             out.append("  store i8** %argv, i8*** @__argv\n")
             if (has_top_level) {
                 out.append("  call i64 @__saffron_entry()\n")
+                out.append("  ret i32 0\n")
             } else {
-                out.append("  call i64 @__saffron_main()\n")
+                out.append("  %main_ret = call i64 @__saffron_main()\n")
+                out.append("  %exit_code = trunc i64 %main_ret to i32\n")
+                out.append("  ret i32 %exit_code\n")
             }
-            out.append("  ret i32 0\n")
             out.append("}\n")
         }
 

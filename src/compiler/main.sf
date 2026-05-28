@@ -7,6 +7,9 @@ import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
 import "./codegen.sf" as Codegen
+
+@extern("void exit(i32)")
+fun c_exit(code: Int) {}
 fun dir_of(path: String): String {
     var last_slash: Float = -1
     var i: Float = 0
@@ -323,7 +326,7 @@ fun main(): Int {
     var program: List = Parser.parse(tokens)
 
     if (Parser.had_error()) {
-        return 1
+        c_exit(1)
     }
 
     // Use text-based import extraction (robust — doesn't depend on AST field access)
@@ -367,7 +370,7 @@ fun main(): Int {
     }
 
     if (Parser.had_error()) {
-        return 1
+        c_exit(1)
     }
 
     // Flatten module_stmts into a single list with boundary markers

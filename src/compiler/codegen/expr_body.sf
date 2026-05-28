@@ -3,42 +3,21 @@
             IntLit(v) => {
                 this.last_type = AST.Type.IntType
                 var local: String = this.fresh_local()
-                if (this.nan_boxing) {
-                    // NaN-box: TAG_INT | (value & PAYLOAD_MASK)
-                    var raw: String = this.fresh_local()
-                    this.emit_indent(raw + " = and i64 " + v.floor().to_string() + ", 281474976710655")
-                    this.emit_indent(local + " = or i64 " + raw + ", 9221120237041090560")
-                } else {
-                    this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
-                }
+                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
                 local
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
                 var local: String = this.fresh_local()
-                if (this.nan_boxing) {
-                    // NaN-box: float stored directly as bitcast (zero overhead)
-                    this.emit_indent(local + " = bitcast double " + v.to_string() + " to i64")
-                } else {
-                    this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
-                }
+                this.emit_indent(local + " = fadd double 0.0, " + v.to_string())
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.BoolType
+                this.last_type = AST.Type.IntType
                 var local: String = this.fresh_local()
-                if (this.nan_boxing) {
-                    // NaN-box: VAL_TRUE or VAL_FALSE
-                    if (v) {
-                        this.emit_indent(local + " = add i64 0, 9222246136947933185")
-                    } else {
-                        this.emit_indent(local + " = add i64 0, 9222246136947933184")
-                    }
-                } else {
-                    var val_str: String = "0"
-                    if (v) { val_str = "1" }
-                    this.emit_indent(local + " = add i64 0, " + val_str)
-                }
+                var val_str: String = "0"
+                if (v) { val_str = "1" }
+                this.emit_indent(local + " = add i64 0, " + val_str)
                 local
             }
             StringLit(s) => {
@@ -48,28 +27,12 @@
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.fresh_local()
-                if (this.nan_boxing) {
-                    // NaN-box: TAG_PTR | (ptr & PAYLOAD_MASK)
-                    var raw_ptr: String = this.fresh_local()
-                    this.emit_indent(raw_ptr + " = ptrtoint i8* " + gep + " to i64")
-                    var masked: String = this.fresh_local()
-                    this.emit_indent(masked + " = and i64 " + raw_ptr + ", 281474976710655")
-                    this.emit_indent(local + " = or i64 " + masked + ", 9218868437227405312")
-                } else {
-                    this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
-                }
+                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
                 local
             }
             NilLit => {
                 this.last_type = AST.Type.NilType
-                if (this.nan_boxing) {
-                    // NaN-box: VAL_NIL
-                    var local: String = this.fresh_local()
-                    this.emit_indent(local + " = add i64 0, 9222246136947933186")
-                    local
-                } else {
-                    "0"
-                }
+                "0"
             }
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
@@ -1044,7 +1007,6 @@
     }
 
     fun gen_enum_construct(enum_name: String, variant: String, args: List<AST.Expr>): String {
-        this.last_type = AST.Type.EnumType(enum_name)
         var key: String = enum_name + "." + variant
         var tag: Float = this.enum_variant_tags.get(key)
 
@@ -1056,14 +1018,14 @@
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
-                return local
+                this.last_type = AST.Type.EnumType(enum_name); return local
             }
             var val: String = this.gen_arg_value(args[0])
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined: String = this.fresh_local()
             this.emit_indent(combined + " = or i64 " + tag_shifted + ", " + val)
-            return combined
+            this.last_type = AST.Type.EnumType(enum_name); return combined
         }
 
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
@@ -1078,7 +1040,7 @@
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
             var as_int: String = this.fresh_local()
             this.emit_indent(as_int + " = ptrtoint [1 x i64]* " + arr_ptr + " to i64")
-            return as_int
+            this.last_type = AST.Type.EnumType(enum_name); return as_int
         }
 
         // Multi-field: heap-allocate array [tag, field0, field1, ...]
@@ -1106,6 +1068,6 @@
         // Cast pointer to i64 for storage
         var as_int: String = this.fresh_local()
         this.emit_indent(as_int + " = ptrtoint [" + num_slots.to_string() + " x i64]* " + arr_ptr + " to i64")
-        return as_int
+        this.last_type = AST.Type.EnumType(enum_name); return as_int
     }
 
