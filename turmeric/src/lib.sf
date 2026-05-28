@@ -112,10 +112,10 @@ class Tracker {
     }
 }
 
-var _tracking: Tracker = nil
+var _tracking: Tracker? = nil
 
 fun _with_tracking(fn: () => Nil, on_dep: (Any) => Nil) {
-    var prev: Tracker = _tracking
+    var prev: Tracker? = _tracking
     _tracking = Tracker(on_dep)
     fn()
     _tracking = prev
