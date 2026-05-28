@@ -644,159 +644,104 @@ class NullChecker {
     }
 
     fun apply_narrowing(cond: AST.Expr) {
-        // Pattern 1: x.has(...) → map.get() is non-nullable in this scope
-        // Pattern 2: x != nil → x is non-nullable in this scope
-        // Pattern 3: x (truthy check on variable) → x is non-nullable
-        // Pattern 4: x == nil → x is Nil in then-branch
-        // Pattern 5: x != nil and ... → narrow from both sides (logical AND)
-        var cond_kind: String = match (cond) {
-            MethodCall(o, m, a) => "method:" + m
-            Binary(l, o, r) => "binary:" + o
-            Variable(n) => "var:" + n
-            Unary(o, r) => "unary"
-            IsCheck(val, typ) => "is:" + typ
-            IntLit(v) => ""
-            FloatLit(v) => ""
-            BoolLit(v) => ""
-            StringLit(s) => ""
-            NilLit => ""
-            Call(c, a) => ""
-            Assign(n, v) => ""
-            Logical(l, o, r) => ""
-            MemberAccess(o, f) => ""
-            Match(s, a) => ""
-            EnumConstruct(e, v, a) => ""
-            Lambda(p, r, b) => ""
-            GetField(o, f) => ""
-            SetField(o, f, v) => ""
-            This => ""
-            ListLit(e) => ""
-            IndexGet(o, i) => ""
-            IndexSet(o, i, v) => ""
-            MapLit => ""
-            BlockExpr(s, v) => ""
-        }
-
-        // map.has() guard
-        if (cond_kind == "method:has") {
-            this.env.narrow("__has_guard", "active")
-        }
-
-        // v != nil or nil != v
-        if (cond_kind == "binary:!=") {
-            var lhs_name: String = this.get_expr_var_name(cond)
-            if (lhs_name.length() > 0) {
-                var var_type: String = this.env.get_var(lhs_name)
-                if (this.is_nullable(var_type)) {
-                    this.env.narrow(lhs_name, this.strip_nil(var_type))
+        // Single-match approach: extract all narrowing info in one pass
+        // to avoid re-matching the same expression (causes native segfault).
+        match (cond) {
+            MethodCall(o, m, a) => {
+                // map.has() guard
+                if (m == "has") {
+                    this.env.narrow("__has_guard", "active")
                 }
             }
-        }
-
-        // Truthy variable: if (v) { ... }
-        if (cond_kind.starts_with("var:")) {
-            var name: String = cond_kind.slice(4, cond_kind.length())
-            var var_type: String = this.env.get_var(name)
-            if (this.is_nullable(var_type)) {
-                this.env.narrow(name, this.strip_nil(var_type))
-            }
-        }
-
-        // x == nil → narrow x to Nil in then-branch
-        if (cond_kind == "binary:==") {
-            var lhs_name: String = this.get_eq_nil_var_name(cond)
-            if (lhs_name.length() > 0) {
-                var var_type: String = this.env.get_var(lhs_name)
-                if (this.is_nullable(var_type)) {
-                    this.env.narrow(lhs_name, "Nil")
+            Binary(l, op, r) => {
+                if (op == "!=") {
+                    // x != nil → narrow x to non-nullable
+                    var var_name: String = this.nil_check_var_from_binary(l, r)
+                    if (var_name.length() > 0) {
+                        var var_type: String = this.env.get_var(var_name)
+                        if (this.is_nullable(var_type)) {
+                            this.env.narrow(var_name, this.strip_nil(var_type))
+                        }
+                    }
+                }
+                if (op == "==") {
+                    // x == nil → narrow x to Nil in then-branch
+                    var var_name: String = this.nil_check_var_from_binary(l, r)
+                    if (var_name.length() > 0) {
+                        var var_type: String = this.env.get_var(var_name)
+                        if (this.is_nullable(var_type)) {
+                            this.env.narrow(var_name, "Nil")
+                        }
+                    }
                 }
             }
-        }
-
-        // IsCheck: if (x is Type) { ... } → narrow x to Type
-        if (cond_kind.starts_with("is:")) {
-            var narrow_type: String = cond_kind.slice(3, cond_kind.length())
-            var is_var: String = this.extract_is_check_var(cond)
-            if (is_var.length() > 0) {
-                this.env.narrow(is_var, narrow_type)
+            Variable(n) => {
+                // Truthy check: if (x) { ... } → x is non-nullable
+                var var_type: String = this.env.get_var(n)
+                if (this.is_nullable(var_type)) {
+                    this.env.narrow(n, this.strip_nil(var_type))
+                }
             }
-        }
-
-        // Logical AND: if (a and b) → apply narrowing from both sides
-        if (this.is_logical_and(cond)) {
-            var left_expr: AST.Expr = this.get_logical_left(cond)
-            var right_expr: AST.Expr = this.get_logical_right(cond)
-            this.apply_narrowing(left_expr)
-            this.apply_narrowing(right_expr)
+            IsCheck(val, typ) => {
+                // if (x is Type) → narrow x to Type
+                var is_var: String = this.get_variable_name_from_expr(val)
+                if (is_var.length() > 0) {
+                    this.env.narrow(is_var, typ)
+                }
+            }
+            Logical(l, op, r) => {
+                // if (a and b) → apply narrowing from both sides
+                if (op == "and") {
+                    this.apply_narrowing(l)
+                    this.apply_narrowing(r)
+                }
+            }
+            _ => {}
         }
     }
 
     fun apply_inverse_narrowing(cond: AST.Expr) {
-        // Inverse of apply_narrowing: what holds in the else-branch
-        var cond_kind: String = match (cond) {
-            MethodCall(o, m, a) => "method:" + m
-            Binary(l, o, r) => "binary:" + o
-            Variable(n) => "var:" + n
-            Unary(o, r) => "unary"
-            IsCheck(val, typ) => "is:" + typ
-            IntLit(v) => ""
-            FloatLit(v) => ""
-            BoolLit(v) => ""
-            StringLit(s) => ""
-            NilLit => ""
-            Call(c, a) => ""
-            Assign(n, v) => ""
-            Logical(l, o, r) => ""
-            MemberAccess(o, f) => ""
-            Match(s, a) => ""
-            EnumConstruct(e, v, a) => ""
-            Lambda(p, r, b) => ""
-            GetField(o, f) => ""
-            SetField(o, f, v) => ""
-            This => ""
-            ListLit(e) => ""
-            IndexGet(o, i) => ""
-            IndexSet(o, i, v) => ""
-            MapLit => ""
-            BlockExpr(s, v) => ""
-        }
-
-        // Inverse of x != nil: in else branch, x is Nil
-        if (cond_kind == "binary:!=") {
-            var lhs_name: String = this.get_expr_var_name(cond)
-            if (lhs_name.length() > 0) {
-                var var_type: String = this.env.get_var(lhs_name)
-                if (this.is_nullable(var_type)) {
-                    this.env.narrow(lhs_name, "Nil")
+        // Single-match approach for else-branch narrowing
+        match (cond) {
+            Binary(l, op, r) => {
+                if (op == "!=") {
+                    // Inverse of x != nil: in else branch, x is Nil
+                    var var_name: String = this.nil_check_var_from_binary(l, r)
+                    if (var_name.length() > 0) {
+                        var var_type: String = this.env.get_var(var_name)
+                        if (this.is_nullable(var_type)) {
+                            this.env.narrow(var_name, "Nil")
+                        }
+                    }
+                }
+                if (op == "==") {
+                    // Inverse of x == nil: in else branch, x is non-nullable
+                    var var_name: String = this.nil_check_var_from_binary(l, r)
+                    if (var_name.length() > 0) {
+                        var var_type: String = this.env.get_var(var_name)
+                        if (this.is_nullable(var_type)) {
+                            this.env.narrow(var_name, this.strip_nil(var_type))
+                        }
+                    }
                 }
             }
-        }
-
-        // Inverse of x == nil: in else branch, x is non-nullable
-        if (cond_kind == "binary:==") {
-            var lhs_name: String = this.get_eq_nil_var_name(cond)
-            if (lhs_name.length() > 0) {
-                var var_type: String = this.env.get_var(lhs_name)
-                if (this.is_nullable(var_type)) {
-                    this.env.narrow(lhs_name, this.strip_nil(var_type))
+            Logical(l, op, r) => {
+                // Inverse of (a or b): not(a or b) = not a and not b
+                if (op == "or") {
+                    this.apply_inverse_narrowing(l)
+                    this.apply_inverse_narrowing(r)
                 }
             }
+            _ => {}
         }
+    }
 
-        // Inverse of logical AND: apply inverse of left side
-        // (De Morgan: not(a and b) = not a or not b — conservative: don't narrow)
-        // But for logical OR inversion: not(a or b) = not a and not b — apply inverse of both
-        if (cond_kind == "logical:or") {
-            var left_expr: AST.Expr = this.get_logical_left(cond)
-            var right_expr: AST.Expr = this.get_logical_right(cond)
-            this.apply_inverse_narrowing(left_expr)
-            this.apply_inverse_narrowing(right_expr)
-        }
-
-        // Inverse of truthy check: in else branch, variable might be nil
-        // (no narrowing — leave as-is, since we can't prove it's nil)
-
-        // Inverse of x is Type: no narrowing in else (can't determine remaining type)
+    fun nil_check_var_from_binary(left: AST.Expr, right: AST.Expr): String {
+        // Given left and right sides of a binary ==|!= expression,
+        // return the variable name if one side is a Variable and the other is NilLit.
+        var left_name: String = this.extract_var_from_nil_check(left, right)
+        if (left_name.length() > 0) return left_name
+        return this.extract_var_from_nil_check(right, left)
     }
 
     fun get_eq_nil_var_name(expr: AST.Expr): String {
