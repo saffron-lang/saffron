@@ -120,8 +120,8 @@ class NullChecker {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t) => n }
-            var ptype: String = match (p) { Param(n, t) => t }
+            var pname: String = match (p) { Param(n, t, d) => n }
+            var ptype: String = match (p) { Param(n, t, d) => t }
             sb.append(pname)
             sb.append(":")
             sb.append(ptype)
@@ -506,8 +506,8 @@ class NullChecker {
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
-                    var pname: String = match (p) { Param(n, t) => n }
-                    var ptype: String = match (p) { Param(n, t) => t }
+                    var pname: String = match (p) { Param(n, t, d) => n }
+                    var ptype: String = match (p) { Param(n, t, d) => t }
                     this.env.define_var(pname, ptype)
                     j = j + 1
                 }
