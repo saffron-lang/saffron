@@ -570,7 +570,7 @@ class NullChecker {
                 this.env.pop_scope()
                 // Else-branch: apply inverse narrowing
                 this.env.push_scope()
-                //this.apply_inverse_narrowing(cond)
+                this.apply_inverse_narrowing(cond)
                 this.check_stmts(else_branch)
                 this.env.pop_scope()
             }

@@ -540,6 +540,11 @@ fun main(): Int {
         ir = Codegen.generate_with_target(program, target)
     }
 
+    if (Codegen.had_error()) {
+        IO.println("Compilation failed with codegen errors")
+        c_exit(1)
+    }
+
     // Write LLVM IR output
     IO.write_file(output_path, ir)
 

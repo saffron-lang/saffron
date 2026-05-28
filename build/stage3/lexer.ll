@@ -360,301 +360,300 @@ ets.v3:
   %t12 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t12, i64 %t11)
   %t13 = and i64 %self, 72057594037927935
-  %t14 = call i64 @__int_to_string(i64 %t13)
-  call i64 @__sb_append(i64 %t12, i64 %t14)
-  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
-  %t16 = call i64 @__val_tag_ptr(i8* %t15)
-  call i64 @__sb_append(i64 %t12, i64 %t16)
-  %t17 = call i64 @__sb_to_string(i64 %t12)
-  ret i64 %t17
+  call i64 @__sb_append(i64 %t12, i64 %t13)
+  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
+  %t15 = call i64 @__val_tag_ptr(i8* %t14)
+  call i64 @__sb_append(i64 %t12, i64 %t15)
+  %t16 = call i64 @__sb_to_string(i64 %t12)
+  ret i64 %t16
 ets.v4:
-  %t18 = getelementptr [10 x i8], [10 x i8]* @.str.4, i64 0, i64 0
-  %t19 = call i64 @__val_tag_ptr(i8* %t18)
-  %t20 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t20, i64 %t19)
-  %t21 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t20, i64 %t21)
-  %t22 = getelementptr [2 x i8], [2 x i8]* @.str.5, i64 0, i64 0
-  %t23 = call i64 @__val_tag_ptr(i8* %t22)
-  call i64 @__sb_append(i64 %t20, i64 %t23)
-  %t24 = call i64 @__sb_to_string(i64 %t20)
-  ret i64 %t24
+  %t17 = getelementptr [10 x i8], [10 x i8]* @.str.4, i64 0, i64 0
+  %t18 = call i64 @__val_tag_ptr(i8* %t17)
+  %t19 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t19, i64 %t18)
+  %t20 = and i64 %self, 72057594037927935
+  call i64 @__sb_append(i64 %t19, i64 %t20)
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.5, i64 0, i64 0
+  %t22 = call i64 @__val_tag_ptr(i8* %t21)
+  call i64 @__sb_append(i64 %t19, i64 %t22)
+  %t23 = call i64 @__sb_to_string(i64 %t19)
+  ret i64 %t23
 ets.v5:
-  %t25 = getelementptr [7 x i8], [7 x i8]* @.str.6, i64 0, i64 0
-  %t26 = call i64 @__val_tag_ptr(i8* %t25)
-  ret i64 %t26
+  %t24 = getelementptr [7 x i8], [7 x i8]* @.str.6, i64 0, i64 0
+  %t25 = call i64 @__val_tag_ptr(i8* %t24)
+  ret i64 %t25
 ets.v6:
-  %t27 = getelementptr [8 x i8], [8 x i8]* @.str.7, i64 0, i64 0
-  %t28 = call i64 @__val_tag_ptr(i8* %t27)
-  ret i64 %t28
+  %t26 = getelementptr [8 x i8], [8 x i8]* @.str.7, i64 0, i64 0
+  %t27 = call i64 @__val_tag_ptr(i8* %t26)
+  ret i64 %t27
 ets.v7:
-  %t29 = getelementptr [6 x i8], [6 x i8]* @.str.8, i64 0, i64 0
-  %t30 = call i64 @__val_tag_ptr(i8* %t29)
-  ret i64 %t30
+  %t28 = getelementptr [6 x i8], [6 x i8]* @.str.8, i64 0, i64 0
+  %t29 = call i64 @__val_tag_ptr(i8* %t28)
+  ret i64 %t29
 ets.v8:
-  %t31 = getelementptr [9 x i8], [9 x i8]* @.str.9, i64 0, i64 0
-  %t32 = call i64 @__val_tag_ptr(i8* %t31)
-  %t33 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t33, i64 %t32)
-  %t34 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t33, i64 %t34)
-  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.10, i64 0, i64 0
-  %t36 = call i64 @__val_tag_ptr(i8* %t35)
-  call i64 @__sb_append(i64 %t33, i64 %t36)
-  %t37 = call i64 @__sb_to_string(i64 %t33)
-  ret i64 %t37
+  %t30 = getelementptr [9 x i8], [9 x i8]* @.str.9, i64 0, i64 0
+  %t31 = call i64 @__val_tag_ptr(i8* %t30)
+  %t32 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t32, i64 %t31)
+  %t33 = and i64 %self, 72057594037927935
+  call i64 @__sb_append(i64 %t32, i64 %t33)
+  %t34 = getelementptr [2 x i8], [2 x i8]* @.str.10, i64 0, i64 0
+  %t35 = call i64 @__val_tag_ptr(i8* %t34)
+  call i64 @__sb_append(i64 %t32, i64 %t35)
+  %t36 = call i64 @__sb_to_string(i64 %t32)
+  ret i64 %t36
 ets.v9:
-  %t38 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
-  %t39 = call i64 @__val_tag_ptr(i8* %t38)
-  ret i64 %t39
+  %t37 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
+  %t38 = call i64 @__val_tag_ptr(i8* %t37)
+  ret i64 %t38
 ets.v10:
-  %t40 = getelementptr [6 x i8], [6 x i8]* @.str.12, i64 0, i64 0
-  %t41 = call i64 @__val_tag_ptr(i8* %t40)
-  ret i64 %t41
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.12, i64 0, i64 0
+  %t40 = call i64 @__val_tag_ptr(i8* %t39)
+  ret i64 %t40
 ets.v11:
-  %t42 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
-  %t43 = call i64 @__val_tag_ptr(i8* %t42)
-  ret i64 %t43
+  %t41 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
+  %t42 = call i64 @__val_tag_ptr(i8* %t41)
+  ret i64 %t42
 ets.v12:
-  %t44 = getelementptr [9 x i8], [9 x i8]* @.str.14, i64 0, i64 0
-  %t45 = call i64 @__val_tag_ptr(i8* %t44)
-  ret i64 %t45
+  %t43 = getelementptr [9 x i8], [9 x i8]* @.str.14, i64 0, i64 0
+  %t44 = call i64 @__val_tag_ptr(i8* %t43)
+  ret i64 %t44
 ets.v13:
-  %t46 = getelementptr [5 x i8], [5 x i8]* @.str.15, i64 0, i64 0
-  %t47 = call i64 @__val_tag_ptr(i8* %t46)
-  ret i64 %t47
+  %t45 = getelementptr [5 x i8], [5 x i8]* @.str.15, i64 0, i64 0
+  %t46 = call i64 @__val_tag_ptr(i8* %t45)
+  ret i64 %t46
 ets.v14:
-  %t48 = getelementptr [7 x i8], [7 x i8]* @.str.16, i64 0, i64 0
-  %t49 = call i64 @__val_tag_ptr(i8* %t48)
-  ret i64 %t49
+  %t47 = getelementptr [7 x i8], [7 x i8]* @.str.16, i64 0, i64 0
+  %t48 = call i64 @__val_tag_ptr(i8* %t47)
+  ret i64 %t48
 ets.v15:
-  %t50 = getelementptr [8 x i8], [8 x i8]* @.str.17, i64 0, i64 0
-  %t51 = call i64 @__val_tag_ptr(i8* %t50)
-  ret i64 %t51
+  %t49 = getelementptr [8 x i8], [8 x i8]* @.str.17, i64 0, i64 0
+  %t50 = call i64 @__val_tag_ptr(i8* %t49)
+  ret i64 %t50
 ets.v16:
-  %t52 = getelementptr [6 x i8], [6 x i8]* @.str.18, i64 0, i64 0
-  %t53 = call i64 @__val_tag_ptr(i8* %t52)
-  ret i64 %t53
+  %t51 = getelementptr [6 x i8], [6 x i8]* @.str.18, i64 0, i64 0
+  %t52 = call i64 @__val_tag_ptr(i8* %t51)
+  ret i64 %t52
 ets.v17:
-  %t54 = getelementptr [5 x i8], [5 x i8]* @.str.19, i64 0, i64 0
-  %t55 = call i64 @__val_tag_ptr(i8* %t54)
-  ret i64 %t55
+  %t53 = getelementptr [5 x i8], [5 x i8]* @.str.19, i64 0, i64 0
+  %t54 = call i64 @__val_tag_ptr(i8* %t53)
+  ret i64 %t54
 ets.v18:
-  %t56 = getelementptr [9 x i8], [9 x i8]* @.str.20, i64 0, i64 0
-  %t57 = call i64 @__val_tag_ptr(i8* %t56)
-  ret i64 %t57
+  %t55 = getelementptr [9 x i8], [9 x i8]* @.str.20, i64 0, i64 0
+  %t56 = call i64 @__val_tag_ptr(i8* %t55)
+  ret i64 %t56
 ets.v19:
-  %t58 = getelementptr [5 x i8], [5 x i8]* @.str.21, i64 0, i64 0
-  %t59 = call i64 @__val_tag_ptr(i8* %t58)
-  ret i64 %t59
+  %t57 = getelementptr [5 x i8], [5 x i8]* @.str.21, i64 0, i64 0
+  %t58 = call i64 @__val_tag_ptr(i8* %t57)
+  ret i64 %t58
 ets.v20:
-  %t60 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
-  %t61 = call i64 @__val_tag_ptr(i8* %t60)
-  ret i64 %t61
+  %t59 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
+  %t60 = call i64 @__val_tag_ptr(i8* %t59)
+  ret i64 %t60
 ets.v21:
-  %t62 = getelementptr [8 x i8], [8 x i8]* @.str.23, i64 0, i64 0
-  %t63 = call i64 @__val_tag_ptr(i8* %t62)
-  ret i64 %t63
+  %t61 = getelementptr [8 x i8], [8 x i8]* @.str.23, i64 0, i64 0
+  %t62 = call i64 @__val_tag_ptr(i8* %t61)
+  ret i64 %t62
 ets.v22:
-  %t64 = getelementptr [8 x i8], [8 x i8]* @.str.24, i64 0, i64 0
-  %t65 = call i64 @__val_tag_ptr(i8* %t64)
-  ret i64 %t65
+  %t63 = getelementptr [8 x i8], [8 x i8]* @.str.24, i64 0, i64 0
+  %t64 = call i64 @__val_tag_ptr(i8* %t63)
+  ret i64 %t64
 ets.v23:
-  %t66 = getelementptr [7 x i8], [7 x i8]* @.str.25, i64 0, i64 0
-  %t67 = call i64 @__val_tag_ptr(i8* %t66)
-  ret i64 %t67
+  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.25, i64 0, i64 0
+  %t66 = call i64 @__val_tag_ptr(i8* %t65)
+  ret i64 %t66
 ets.v24:
-  %t68 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
-  %t69 = call i64 @__val_tag_ptr(i8* %t68)
-  ret i64 %t69
+  %t67 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
+  %t68 = call i64 @__val_tag_ptr(i8* %t67)
+  ret i64 %t68
 ets.v25:
-  %t70 = getelementptr [5 x i8], [5 x i8]* @.str.27, i64 0, i64 0
-  %t71 = call i64 @__val_tag_ptr(i8* %t70)
-  ret i64 %t71
+  %t69 = getelementptr [5 x i8], [5 x i8]* @.str.27, i64 0, i64 0
+  %t70 = call i64 @__val_tag_ptr(i8* %t69)
+  ret i64 %t70
 ets.v26:
-  %t72 = getelementptr [6 x i8], [6 x i8]* @.str.28, i64 0, i64 0
-  %t73 = call i64 @__val_tag_ptr(i8* %t72)
-  ret i64 %t73
+  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.28, i64 0, i64 0
+  %t72 = call i64 @__val_tag_ptr(i8* %t71)
+  ret i64 %t72
 ets.v27:
-  %t74 = getelementptr [8 x i8], [8 x i8]* @.str.29, i64 0, i64 0
-  %t75 = call i64 @__val_tag_ptr(i8* %t74)
-  ret i64 %t75
+  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.29, i64 0, i64 0
+  %t74 = call i64 @__val_tag_ptr(i8* %t73)
+  ret i64 %t74
 ets.v28:
-  %t76 = getelementptr [8 x i8], [8 x i8]* @.str.30, i64 0, i64 0
-  %t77 = call i64 @__val_tag_ptr(i8* %t76)
-  ret i64 %t77
+  %t75 = getelementptr [8 x i8], [8 x i8]* @.str.30, i64 0, i64 0
+  %t76 = call i64 @__val_tag_ptr(i8* %t75)
+  ret i64 %t76
 ets.v29:
-  %t78 = getelementptr [10 x i8], [10 x i8]* @.str.31, i64 0, i64 0
-  %t79 = call i64 @__val_tag_ptr(i8* %t78)
-  ret i64 %t79
+  %t77 = getelementptr [10 x i8], [10 x i8]* @.str.31, i64 0, i64 0
+  %t78 = call i64 @__val_tag_ptr(i8* %t77)
+  ret i64 %t78
 ets.v30:
-  %t80 = getelementptr [5 x i8], [5 x i8]* @.str.32, i64 0, i64 0
-  %t81 = call i64 @__val_tag_ptr(i8* %t80)
-  ret i64 %t81
+  %t79 = getelementptr [5 x i8], [5 x i8]* @.str.32, i64 0, i64 0
+  %t80 = call i64 @__val_tag_ptr(i8* %t79)
+  ret i64 %t80
 ets.v31:
-  %t82 = getelementptr [7 x i8], [7 x i8]* @.str.33, i64 0, i64 0
-  %t83 = call i64 @__val_tag_ptr(i8* %t82)
-  ret i64 %t83
+  %t81 = getelementptr [7 x i8], [7 x i8]* @.str.33, i64 0, i64 0
+  %t82 = call i64 @__val_tag_ptr(i8* %t81)
+  ret i64 %t82
 ets.v32:
-  %t84 = getelementptr [8 x i8], [8 x i8]* @.str.34, i64 0, i64 0
-  %t85 = call i64 @__val_tag_ptr(i8* %t84)
-  ret i64 %t85
+  %t83 = getelementptr [8 x i8], [8 x i8]* @.str.34, i64 0, i64 0
+  %t84 = call i64 @__val_tag_ptr(i8* %t83)
+  ret i64 %t84
 ets.v33:
-  %t86 = getelementptr [7 x i8], [7 x i8]* @.str.35, i64 0, i64 0
-  %t87 = call i64 @__val_tag_ptr(i8* %t86)
-  ret i64 %t87
+  %t85 = getelementptr [7 x i8], [7 x i8]* @.str.35, i64 0, i64 0
+  %t86 = call i64 @__val_tag_ptr(i8* %t85)
+  ret i64 %t86
 ets.v34:
-  %t88 = getelementptr [8 x i8], [8 x i8]* @.str.36, i64 0, i64 0
-  %t89 = call i64 @__val_tag_ptr(i8* %t88)
-  ret i64 %t89
+  %t87 = getelementptr [8 x i8], [8 x i8]* @.str.36, i64 0, i64 0
+  %t88 = call i64 @__val_tag_ptr(i8* %t87)
+  ret i64 %t88
 ets.v35:
-  %t90 = getelementptr [10 x i8], [10 x i8]* @.str.37, i64 0, i64 0
-  %t91 = call i64 @__val_tag_ptr(i8* %t90)
-  ret i64 %t91
+  %t89 = getelementptr [10 x i8], [10 x i8]* @.str.37, i64 0, i64 0
+  %t90 = call i64 @__val_tag_ptr(i8* %t89)
+  ret i64 %t90
 ets.v36:
-  %t92 = getelementptr [12 x i8], [12 x i8]* @.str.38, i64 0, i64 0
-  %t93 = call i64 @__val_tag_ptr(i8* %t92)
-  ret i64 %t93
+  %t91 = getelementptr [12 x i8], [12 x i8]* @.str.38, i64 0, i64 0
+  %t92 = call i64 @__val_tag_ptr(i8* %t91)
+  ret i64 %t92
 ets.v37:
-  %t94 = getelementptr [7 x i8], [7 x i8]* @.str.39, i64 0, i64 0
-  %t95 = call i64 @__val_tag_ptr(i8* %t94)
-  ret i64 %t95
+  %t93 = getelementptr [7 x i8], [7 x i8]* @.str.39, i64 0, i64 0
+  %t94 = call i64 @__val_tag_ptr(i8* %t93)
+  ret i64 %t94
 ets.v38:
-  %t96 = getelementptr [8 x i8], [8 x i8]* @.str.40, i64 0, i64 0
-  %t97 = call i64 @__val_tag_ptr(i8* %t96)
-  ret i64 %t97
+  %t95 = getelementptr [8 x i8], [8 x i8]* @.str.40, i64 0, i64 0
+  %t96 = call i64 @__val_tag_ptr(i8* %t95)
+  ret i64 %t96
 ets.v39:
-  %t98 = getelementptr [8 x i8], [8 x i8]* @.str.41, i64 0, i64 0
-  %t99 = call i64 @__val_tag_ptr(i8* %t98)
-  ret i64 %t99
+  %t97 = getelementptr [8 x i8], [8 x i8]* @.str.41, i64 0, i64 0
+  %t98 = call i64 @__val_tag_ptr(i8* %t97)
+  ret i64 %t98
 ets.v40:
-  %t100 = getelementptr [12 x i8], [12 x i8]* @.str.42, i64 0, i64 0
-  %t101 = call i64 @__val_tag_ptr(i8* %t100)
-  ret i64 %t101
+  %t99 = getelementptr [12 x i8], [12 x i8]* @.str.42, i64 0, i64 0
+  %t100 = call i64 @__val_tag_ptr(i8* %t99)
+  ret i64 %t100
 ets.v41:
-  %t102 = getelementptr [13 x i8], [13 x i8]* @.str.43, i64 0, i64 0
-  %t103 = call i64 @__val_tag_ptr(i8* %t102)
-  ret i64 %t103
+  %t101 = getelementptr [13 x i8], [13 x i8]* @.str.43, i64 0, i64 0
+  %t102 = call i64 @__val_tag_ptr(i8* %t101)
+  ret i64 %t102
 ets.v42:
-  %t104 = getelementptr [7 x i8], [7 x i8]* @.str.44, i64 0, i64 0
-  %t105 = call i64 @__val_tag_ptr(i8* %t104)
-  ret i64 %t105
+  %t103 = getelementptr [7 x i8], [7 x i8]* @.str.44, i64 0, i64 0
+  %t104 = call i64 @__val_tag_ptr(i8* %t103)
+  ret i64 %t104
 ets.v43:
-  %t106 = getelementptr [9 x i8], [9 x i8]* @.str.45, i64 0, i64 0
-  %t107 = call i64 @__val_tag_ptr(i8* %t106)
-  ret i64 %t107
+  %t105 = getelementptr [9 x i8], [9 x i8]* @.str.45, i64 0, i64 0
+  %t106 = call i64 @__val_tag_ptr(i8* %t105)
+  ret i64 %t106
 ets.v44:
-  %t108 = getelementptr [5 x i8], [5 x i8]* @.str.46, i64 0, i64 0
-  %t109 = call i64 @__val_tag_ptr(i8* %t108)
-  ret i64 %t109
+  %t107 = getelementptr [5 x i8], [5 x i8]* @.str.46, i64 0, i64 0
+  %t108 = call i64 @__val_tag_ptr(i8* %t107)
+  ret i64 %t108
 ets.v45:
-  %t110 = getelementptr [7 x i8], [7 x i8]* @.str.47, i64 0, i64 0
-  %t111 = call i64 @__val_tag_ptr(i8* %t110)
-  ret i64 %t111
+  %t109 = getelementptr [7 x i8], [7 x i8]* @.str.47, i64 0, i64 0
+  %t110 = call i64 @__val_tag_ptr(i8* %t109)
+  ret i64 %t110
 ets.v46:
-  %t112 = getelementptr [5 x i8], [5 x i8]* @.str.48, i64 0, i64 0
-  %t113 = call i64 @__val_tag_ptr(i8* %t112)
-  ret i64 %t113
+  %t111 = getelementptr [5 x i8], [5 x i8]* @.str.48, i64 0, i64 0
+  %t112 = call i64 @__val_tag_ptr(i8* %t111)
+  ret i64 %t112
 ets.v47:
-  %t114 = getelementptr [7 x i8], [7 x i8]* @.str.49, i64 0, i64 0
-  %t115 = call i64 @__val_tag_ptr(i8* %t114)
-  ret i64 %t115
+  %t113 = getelementptr [7 x i8], [7 x i8]* @.str.49, i64 0, i64 0
+  %t114 = call i64 @__val_tag_ptr(i8* %t113)
+  ret i64 %t114
 ets.v48:
-  %t116 = getelementptr [5 x i8], [5 x i8]* @.str.50, i64 0, i64 0
-  %t117 = call i64 @__val_tag_ptr(i8* %t116)
-  ret i64 %t117
+  %t115 = getelementptr [5 x i8], [5 x i8]* @.str.50, i64 0, i64 0
+  %t116 = call i64 @__val_tag_ptr(i8* %t115)
+  ret i64 %t116
 ets.v49:
-  %t118 = getelementptr [7 x i8], [7 x i8]* @.str.51, i64 0, i64 0
-  %t119 = call i64 @__val_tag_ptr(i8* %t118)
-  ret i64 %t119
+  %t117 = getelementptr [7 x i8], [7 x i8]* @.str.51, i64 0, i64 0
+  %t118 = call i64 @__val_tag_ptr(i8* %t117)
+  ret i64 %t118
 ets.v50:
-  %t120 = getelementptr [9 x i8], [9 x i8]* @.str.52, i64 0, i64 0
-  %t121 = call i64 @__val_tag_ptr(i8* %t120)
-  ret i64 %t121
+  %t119 = getelementptr [9 x i8], [9 x i8]* @.str.52, i64 0, i64 0
+  %t120 = call i64 @__val_tag_ptr(i8* %t119)
+  ret i64 %t120
 ets.v51:
-  %t122 = getelementptr [9 x i8], [9 x i8]* @.str.53, i64 0, i64 0
-  %t123 = call i64 @__val_tag_ptr(i8* %t122)
-  ret i64 %t123
+  %t121 = getelementptr [9 x i8], [9 x i8]* @.str.53, i64 0, i64 0
+  %t122 = call i64 @__val_tag_ptr(i8* %t121)
+  ret i64 %t122
 ets.v52:
-  %t124 = getelementptr [9 x i8], [9 x i8]* @.str.54, i64 0, i64 0
-  %t125 = call i64 @__val_tag_ptr(i8* %t124)
-  ret i64 %t125
+  %t123 = getelementptr [9 x i8], [9 x i8]* @.str.54, i64 0, i64 0
+  %t124 = call i64 @__val_tag_ptr(i8* %t123)
+  ret i64 %t124
 ets.v53:
-  %t126 = getelementptr [9 x i8], [9 x i8]* @.str.55, i64 0, i64 0
-  %t127 = call i64 @__val_tag_ptr(i8* %t126)
-  ret i64 %t127
+  %t125 = getelementptr [9 x i8], [9 x i8]* @.str.55, i64 0, i64 0
+  %t126 = call i64 @__val_tag_ptr(i8* %t125)
+  ret i64 %t126
 ets.v54:
-  %t128 = getelementptr [11 x i8], [11 x i8]* @.str.56, i64 0, i64 0
-  %t129 = call i64 @__val_tag_ptr(i8* %t128)
-  ret i64 %t129
+  %t127 = getelementptr [11 x i8], [11 x i8]* @.str.56, i64 0, i64 0
+  %t128 = call i64 @__val_tag_ptr(i8* %t127)
+  ret i64 %t128
 ets.v55:
-  %t130 = getelementptr [11 x i8], [11 x i8]* @.str.57, i64 0, i64 0
-  %t131 = call i64 @__val_tag_ptr(i8* %t130)
-  ret i64 %t131
+  %t129 = getelementptr [11 x i8], [11 x i8]* @.str.57, i64 0, i64 0
+  %t130 = call i64 @__val_tag_ptr(i8* %t129)
+  ret i64 %t130
 ets.v56:
-  %t132 = getelementptr [8 x i8], [8 x i8]* @.str.58, i64 0, i64 0
-  %t133 = call i64 @__val_tag_ptr(i8* %t132)
-  ret i64 %t133
+  %t131 = getelementptr [8 x i8], [8 x i8]* @.str.58, i64 0, i64 0
+  %t132 = call i64 @__val_tag_ptr(i8* %t131)
+  ret i64 %t132
 ets.v57:
-  %t134 = getelementptr [6 x i8], [6 x i8]* @.str.59, i64 0, i64 0
-  %t135 = call i64 @__val_tag_ptr(i8* %t134)
-  ret i64 %t135
+  %t133 = getelementptr [6 x i8], [6 x i8]* @.str.59, i64 0, i64 0
+  %t134 = call i64 @__val_tag_ptr(i8* %t133)
+  ret i64 %t134
 ets.v58:
-  %t136 = getelementptr [8 x i8], [8 x i8]* @.str.60, i64 0, i64 0
-  %t137 = call i64 @__val_tag_ptr(i8* %t136)
-  ret i64 %t137
+  %t135 = getelementptr [8 x i8], [8 x i8]* @.str.60, i64 0, i64 0
+  %t136 = call i64 @__val_tag_ptr(i8* %t135)
+  ret i64 %t136
 ets.v59:
-  %t138 = getelementptr [12 x i8], [12 x i8]* @.str.61, i64 0, i64 0
-  %t139 = call i64 @__val_tag_ptr(i8* %t138)
-  ret i64 %t139
+  %t137 = getelementptr [12 x i8], [12 x i8]* @.str.61, i64 0, i64 0
+  %t138 = call i64 @__val_tag_ptr(i8* %t137)
+  ret i64 %t138
 ets.v60:
-  %t140 = getelementptr [8 x i8], [8 x i8]* @.str.62, i64 0, i64 0
-  %t141 = call i64 @__val_tag_ptr(i8* %t140)
-  ret i64 %t141
+  %t139 = getelementptr [8 x i8], [8 x i8]* @.str.62, i64 0, i64 0
+  %t140 = call i64 @__val_tag_ptr(i8* %t139)
+  ret i64 %t140
 ets.v61:
-  %t142 = getelementptr [11 x i8], [11 x i8]* @.str.63, i64 0, i64 0
-  %t143 = call i64 @__val_tag_ptr(i8* %t142)
-  ret i64 %t143
+  %t141 = getelementptr [11 x i8], [11 x i8]* @.str.63, i64 0, i64 0
+  %t142 = call i64 @__val_tag_ptr(i8* %t141)
+  ret i64 %t142
 ets.v62:
-  %t144 = getelementptr [11 x i8], [11 x i8]* @.str.64, i64 0, i64 0
-  %t145 = call i64 @__val_tag_ptr(i8* %t144)
-  ret i64 %t145
+  %t143 = getelementptr [11 x i8], [11 x i8]* @.str.64, i64 0, i64 0
+  %t144 = call i64 @__val_tag_ptr(i8* %t143)
+  ret i64 %t144
 ets.v63:
-  %t146 = getelementptr [14 x i8], [14 x i8]* @.str.65, i64 0, i64 0
-  %t147 = call i64 @__val_tag_ptr(i8* %t146)
-  %t148 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t148, i64 %t147)
-  %t149 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t148, i64 %t149)
-  %t150 = getelementptr [2 x i8], [2 x i8]* @.str.66, i64 0, i64 0
-  %t151 = call i64 @__val_tag_ptr(i8* %t150)
-  call i64 @__sb_append(i64 %t148, i64 %t151)
-  %t152 = call i64 @__sb_to_string(i64 %t148)
-  ret i64 %t152
+  %t145 = getelementptr [14 x i8], [14 x i8]* @.str.65, i64 0, i64 0
+  %t146 = call i64 @__val_tag_ptr(i8* %t145)
+  %t147 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t147, i64 %t146)
+  %t148 = and i64 %self, 72057594037927935
+  call i64 @__sb_append(i64 %t147, i64 %t148)
+  %t149 = getelementptr [2 x i8], [2 x i8]* @.str.66, i64 0, i64 0
+  %t150 = call i64 @__val_tag_ptr(i8* %t149)
+  call i64 @__sb_append(i64 %t147, i64 %t150)
+  %t151 = call i64 @__sb_to_string(i64 %t147)
+  ret i64 %t151
 ets.v64:
-  %t153 = getelementptr [13 x i8], [13 x i8]* @.str.67, i64 0, i64 0
-  %t154 = call i64 @__val_tag_ptr(i8* %t153)
-  %t155 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t155, i64 %t154)
-  %t156 = and i64 %self, 72057594037927935
-  call i64 @__sb_append(i64 %t155, i64 %t156)
-  %t157 = getelementptr [2 x i8], [2 x i8]* @.str.68, i64 0, i64 0
-  %t158 = call i64 @__val_tag_ptr(i8* %t157)
-  call i64 @__sb_append(i64 %t155, i64 %t158)
-  %t159 = call i64 @__sb_to_string(i64 %t155)
-  ret i64 %t159
+  %t152 = getelementptr [13 x i8], [13 x i8]* @.str.67, i64 0, i64 0
+  %t153 = call i64 @__val_tag_ptr(i8* %t152)
+  %t154 = call i64 @StringBuilder()
+  call i64 @__sb_append(i64 %t154, i64 %t153)
+  %t155 = and i64 %self, 72057594037927935
+  call i64 @__sb_append(i64 %t154, i64 %t155)
+  %t156 = getelementptr [2 x i8], [2 x i8]* @.str.68, i64 0, i64 0
+  %t157 = call i64 @__val_tag_ptr(i8* %t156)
+  call i64 @__sb_append(i64 %t154, i64 %t157)
+  %t158 = call i64 @__sb_to_string(i64 %t154)
+  ret i64 %t158
 ets.v65:
-  %t160 = getelementptr [10 x i8], [10 x i8]* @.str.69, i64 0, i64 0
-  %t161 = call i64 @__val_tag_ptr(i8* %t160)
-  ret i64 %t161
+  %t159 = getelementptr [10 x i8], [10 x i8]* @.str.69, i64 0, i64 0
+  %t160 = call i64 @__val_tag_ptr(i8* %t159)
+  ret i64 %t160
 ets.v66:
-  %t162 = getelementptr [6 x i8], [6 x i8]* @.str.70, i64 0, i64 0
-  %t163 = call i64 @__val_tag_ptr(i8* %t162)
-  ret i64 %t163
+  %t161 = getelementptr [6 x i8], [6 x i8]* @.str.70, i64 0, i64 0
+  %t162 = call i64 @__val_tag_ptr(i8* %t161)
+  ret i64 %t162
 ets.end1:
-  %t164 = getelementptr [8 x i8], [8 x i8]* @.str.71, i64 0, i64 0
-  %t165 = call i64 @__val_tag_ptr(i8* %t164)
-  ret i64 %t165
+  %t163 = getelementptr [8 x i8], [8 x i8]* @.str.71, i64 0, i64 0
+  %t164 = call i64 @__val_tag_ptr(i8* %t163)
+  ret i64 %t164
 }
 
 define linkonce_odr i64 @Token(i64 %f0, i64 %f1, i64 %f2) {
@@ -1330,7 +1329,6 @@ entry:
   %text = alloca i64
   %value = alloca i64
   %has_dot = alloca i64
-  %fvalue = alloca i64
   %ivalue = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
@@ -1651,26 +1649,24 @@ endif136:
   %t231 = trunc i64 %t230 to i1
   br i1 %t231, label %then149, label %else150
 then149:
-  %t232 = load i64, i64* %text
-  store i64 0, i64* %fvalue
-  %t233 = load i64, i64* %self
-  %t234 = load i64, i64* %fvalue
-  %t235 = call i64 @__val_untag_int(i64 %t234)
-  %t236 = shl i64 1, 56
-  %t237 = or i64 %t236, %t235
-  %t238 = call i64 @Lexer__emit(i64 %t233, i64 %t237)
+  %t232 = load i64, i64* %self
+  %t233 = load i64, i64* %text
+  %t234 = call i64 @__val_untag_int(i64 %t233)
+  %t235 = shl i64 1, 56
+  %t236 = or i64 %t235, %t234
+  %t237 = call i64 @Lexer__emit(i64 %t232, i64 %t236)
   br label %endif148
 else150:
-  %t239 = load i64, i64* %text
-  %t240 = call i8* @__val_untag_ptr(i64 %t239)
-  %t241 = call i64 @atol(i8* %t240)
-  store i64 %t241, i64* %ivalue
-  %t242 = load i64, i64* %self
-  %t243 = load i64, i64* %ivalue
-  %t244 = call i64 @__val_untag_int(i64 %t243)
-  %t245 = shl i64 0, 56
-  %t246 = or i64 %t245, %t244
-  %t247 = call i64 @Lexer__emit(i64 %t242, i64 %t246)
+  %t238 = load i64, i64* %text
+  %t239 = call i8* @__val_untag_ptr(i64 %t238)
+  %t240 = call i64 @atol(i8* %t239)
+  store i64 %t240, i64* %ivalue
+  %t241 = load i64, i64* %self
+  %t242 = load i64, i64* %ivalue
+  %t243 = call i64 @__val_untag_int(i64 %t242)
+  %t244 = shl i64 0, 56
+  %t245 = or i64 %t244, %t243
+  %t246 = call i64 @Lexer__emit(i64 %t241, i64 %t245)
   br label %endif148
 endif148:
   ret i64 0

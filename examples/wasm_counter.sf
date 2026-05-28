@@ -1,0 +1,52 @@
+// Reactive Counter — Saffron builds the DOM, JS handles events
+// Demonstrates: WASM → JS DOM creation via FFI
+
+@extern("i64 js_dom_create_element(void*)") fun create_element(tag: String): Float
+@extern("void js_dom_set_text(i64, void*)") fun set_text(handle: Float, text: String)
+@extern("void js_dom_set_attribute(i64, void*, void*)") fun set_attr(handle: Float, name: String, value: String)
+@extern("void js_dom_append_child(i64, i64)") fun append_child(parent: Float, child: Float)
+@extern("i64 js_dom_query_selector(void*)") fun query_selector(selector: String): Float
+@extern("void js_dom_add_event_listener(i64, void*, i64)") fun add_event_listener(handle: Float, event: String, callback_id: Float)
+
+// Build the full UI tree from Saffron
+var root: Float = query_selector("#app")
+
+var h1: Float = create_element("h1")
+set_text(h1, "Saffron WASM Counter")
+append_child(root, h1)
+
+var count_el: Float = create_element("p")
+set_attr(count_el, "id", "count-display")
+set_text(count_el, "Count: 0")
+set_attr(count_el, "style", "font-size: 2rem; font-weight: bold")
+append_child(root, count_el)
+
+var buttons: Float = create_element("div")
+set_attr(buttons, "style", "display: flex; gap: 0.5rem")
+
+var inc_btn: Float = create_element("button")
+set_text(inc_btn, "+")
+set_attr(inc_btn, "style", "font-size: 1.5rem; padding: 0.5rem 1rem")
+add_event_listener(inc_btn, "click", 1)
+append_child(buttons, inc_btn)
+
+var dec_btn: Float = create_element("button")
+set_text(dec_btn, "-")
+set_attr(dec_btn, "style", "font-size: 1.5rem; padding: 0.5rem 1rem")
+add_event_listener(dec_btn, "click", 2)
+append_child(buttons, dec_btn)
+
+var rst_btn: Float = create_element("button")
+set_text(rst_btn, "Reset")
+set_attr(rst_btn, "style", "font-size: 1.5rem; padding: 0.5rem 1rem")
+add_event_listener(rst_btn, "click", 3)
+append_child(buttons, rst_btn)
+
+append_child(root, buttons)
+
+var footer: Float = create_element("p")
+set_text(footer, "Built with Saffron, compiled to WASM")
+set_attr(footer, "style", "margin-top: 2rem; color: #888; font-size: 0.9rem")
+append_child(root, footer)
+
+IO.println("Counter built by Saffron WASM!")

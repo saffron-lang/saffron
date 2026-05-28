@@ -10,15 +10,10 @@
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
-                // In identity mode, v's raw i64 bits ARE the IEEE 754 double.
-                // Emit as bitcast from those bits directly.
-                var bits: String = v.to_string()
-                var raw: String = this.fresh_local()
-                this.emit_indent(raw + " = add i64 0, " + bits)
-                var dbl: String = this.fresh_local()
-                this.emit_indent(dbl + " = bitcast i64 " + raw + " to double")
+                // v is the float literal text (e.g. "3.14").
+                // Emit directly as an LLVM double constant.
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
+                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v + ")")
                 local
             }
             BoolLit(v) => {
@@ -54,6 +49,7 @@
                 // Error check: undefined variable
                 if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
+                    this.has_errors = true
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
@@ -427,6 +423,18 @@
         this.emit_indent(r_raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
 
         if (is_arith or is_bitwise) {
+            // Guard against division/modulo by zero
+            if (op == "/" or op == "%") {
+                var is_zero: String = this.fresh_local()
+                this.emit_indent(is_zero + " = icmp eq i64 " + r_raw + ", 0")
+                var lbl_err: String = this.fresh_label("div_err")
+                var lbl_ok: String = this.fresh_label("div_ok")
+                this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_err + ", label %" + lbl_ok)
+                this.start_block(lbl_err)
+                this.emit_indent("call i64 @__division_error()")
+                this.emit_terminator("unreachable")
+                this.start_block(lbl_ok)
+            }
             var result_raw: String = this.fresh_local()
             if (op == "+") { this.emit_indent(result_raw + " = add i64 " + l_raw + ", " + r_raw) }
             else if (op == "-") { this.emit_indent(result_raw + " = sub i64 " + l_raw + ", " + r_raw) }
@@ -624,6 +632,7 @@
             // Error check: undefined variable
             if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
+                this.has_errors = true
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -1014,6 +1023,7 @@
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    this.has_errors = true
                 }
             }
             this.called_functions.push(emit_callee)

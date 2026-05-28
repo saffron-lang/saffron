@@ -463,6 +463,12 @@
         out.append("declare i64 @__val_untag_bool(i64)\n")
         out.append("declare i64 @__val_nil()\n\n")
 
+        // Runtime error helpers (bodies in runtime.ll)
+        out.append("declare i64 @__division_error()\n")
+        out.append("declare i64 @__null_pointer_error()\n")
+        out.append("declare i64 @__runtime_error(i64)\n")
+        out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
+
         out.append("declare double @strtod(i8*, i8*)\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)

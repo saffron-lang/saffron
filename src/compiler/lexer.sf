@@ -3,7 +3,7 @@
 enum TokenKind {
     // Literals
     TkInt(value: Float),
-    TkFloat(value: Float),
+    TkFloat(value: String),
     TkString(value: String),
     TkTrue,
     TkFalse,
@@ -199,8 +199,7 @@ class Lexer {
         var text: String = this.source.slice(start, this.pos)
 
         if (has_dot) {
-            var fvalue: Float = text.to_float()
-            this.emit(TokenKind.TkFloat(fvalue))
+            this.emit(TokenKind.TkFloat(text))
         } else {
             var ivalue: Float = text.to_number()
             this.emit(TokenKind.TkInt(ivalue))
