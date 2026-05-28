@@ -4022,7 +4022,7 @@ class Codegen {
         i = 0
         while (i < var_names.length()) {
             var vn: String = var_names[i]
-            if (!this.module_globals.has(this.current_prefix + vn)) {
+            if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
