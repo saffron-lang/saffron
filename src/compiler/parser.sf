@@ -659,6 +659,39 @@ class Parser {
         // Collect /// doc comments before declarations
         var docstring: String = this.collect_doc_comments()
 
+        // Extension methods: extend fun ClassName.method(params): RetType { body }
+        if (this.is_ident_named("extend")) {
+            this.advance()
+            this.advance()
+            var ext_class: String = this.expect_ident()
+            this.consume(".")
+            var ext_method: String = this.expect_ident()
+            this.consume("(")
+            var ext_params: List<AST.Param> = []
+            if (!this.match_kind_check(")")) {
+                var pname: String = this.expect_ident()
+                this.consume(":")
+                var ptype: String = this.parse_type()
+                ext_params.push(AST.Param.Param(pname, ptype))
+                while (this.match_kind(",")) {
+                    pname = this.expect_ident()
+                    this.consume(":")
+                    ptype = this.parse_type()
+                    ext_params.push(AST.Param.Param(pname, ptype))
+                }
+            }
+            this.consume(")")
+            var ext_ret: String = "Nil"
+            if (this.match_kind(":")) {
+                ext_ret = this.parse_type()
+            }
+            var ext_body: List<AST.Stmt> = []
+            if (this.match_kind_check("{")) {
+                ext_body = this.parse_block_stmts()
+            }
+            return AST.Stmt.FunDecl(ext_method, ext_params, ext_ret, ext_body, "@extend:" + ext_class)
+        }
+
         // Check for decorator: @intrinsic or @extern("...")
         if (this.is_ident_named("@")) {
             this.advance()
