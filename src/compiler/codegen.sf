@@ -157,6 +157,45 @@ class Codegen {
         return base
     }
 
+    fun coerce_to_string(val: String, val_type: String): String {
+        if (val_type == "String") {
+            return val
+        }
+        if (val_type == "Int" or val_type == "Float") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+            return result
+        }
+        if (val_type == "Bool") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + val + ")")
+            return result
+        }
+        if (val_type == "Nil") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__nil_to_string()")
+            return result
+        }
+        // Class with to_string method
+        if (this.class_fields.has(val_type)) {
+            var ts_method: String = val_type + "__to_string"
+            if (this.func_prefix_map.has(ts_method)) {
+                ts_method = this.func_prefix_map.get(ts_method)
+            } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
+                ts_method = this.current_prefix + ts_method
+            }
+            if (this.known_functions.contains(ts_method)) {
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
+                return result
+            }
+        }
+        // Fallback: convert as int
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+        return result
+    }
+
     fun is_string_type(t: AST.Type): Bool {
         return match (t) {
             StringType => true
@@ -2155,34 +2194,22 @@ class Codegen {
         // Check for IO module calls
         if (obj_name == "IO") {
             if (method == "println") {
+                var pre_type: String = this.get_expr_type(args[0])
                 var arg: String = this.gen_arg_value(args[0])
                 var arg_type: String = this.type_to_string(this.last_type)
-                var local: String = this.fresh_local()
-                if (arg_type == "String") {
-                    var str_ptr: String = this.fresh_local()
-                    this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
-                    this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
-                } else {
-                    var fmt: String = this.get_format_ptr("%ld\n")
-                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
-                }
+                if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
+                var str_val: String = this.coerce_to_string(arg, arg_type)
+                this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
                 this.last_type = AST.Type.NilType
-                return local
+                return "0"
             }
             if (method == "print") {
                 var arg: String = this.gen_arg_value(args[0])
                 var arg_type: String = this.type_to_string(this.last_type)
-                var local: String = this.fresh_local()
-                if (arg_type == "String") {
-                    var str_ptr: String = this.fresh_local()
-                    this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
-                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + str_ptr + ")")
-                } else {
-                    var fmt: String = this.get_format_ptr("%ld")
-                    this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
-                }
+                var str_val: String = this.coerce_to_string(arg, arg_type)
+                this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
                 this.last_type = AST.Type.NilType
-                return local
+                return "0"
             }
             if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file") {
                 var io_func: String = "__io_" + method
@@ -4555,7 +4582,15 @@ class Codegen {
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
         out.append("declare i32 @setjmp(i8*)\n")
-        out.append("declare void @longjmp(i8*, i32)\n\n")
+        out.append("declare void @longjmp(i8*, i32)\n")
+        out.append("declare void @__io_println_str(i64)\n")
+        out.append("declare void @__io_println_int(i64)\n")
+        out.append("declare void @__io_println_bool(i64)\n")
+        out.append("declare void @__io_println_nil()\n")
+        out.append("declare void @__io_print_str(i64)\n")
+        out.append("declare void @__io_print_int(i64)\n")
+        out.append("declare i64 @__bool_to_string(i64)\n")
+        out.append("declare i64 @__nil_to_string()\n\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
