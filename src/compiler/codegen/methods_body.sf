@@ -765,11 +765,9 @@
     if (!is_user_class and method == "to_number") {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
-        var dbl: String = this.fresh_local()
-        this.emit_indent(dbl + " = call double @strtod(i8* " + str_ptr + ", i8* null)")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
-        this.last_type = AST.Type.FloatType
+        this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
+        this.last_type = AST.Type.IntType
         return local
     }
     if (!is_user_class and method == "to_string") {
@@ -809,17 +807,8 @@
         }
     }
     if (!is_user_class and method == "floor") {
-        // Untag float, floor it, convert to int
-        var dbl: String = this.fresh_local()
-        this.emit_indent(dbl + " = call double @__val_untag_float(i64 " + obj + ")")
-        var floored: String = this.fresh_local()
-        this.emit_indent(floored + " = call double @floor(double " + dbl + ")")
-        var int_val: String = this.fresh_local()
-        this.emit_indent(int_val + " = fptosi double " + floored + " to i64")
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + int_val + ")")
         this.last_type = AST.Type.IntType
-        return local
+        return obj
     }
 
     // Check for super.method() calls
