@@ -1816,6 +1816,7 @@ class Codegen {
     }
 
 
+    // @codegen-split: closures
     fun gen_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
         // Find captured variables (free variables in body not in params)
         var param_names: List<String> = []
@@ -2206,6 +2207,7 @@ class Codegen {
         }
     }
 
+    // @codegen-split: intrinsics
     fun gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
         if (name.ends_with("load64")) {
             var addr: String = this.gen_arg_value(args[0])
@@ -2642,6 +2644,7 @@ class Codegen {
 
     // --- Statement codegen ---
 
+    // @codegen-split: stmts
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
             ExprStmt(expr) => { this.gen_arg_value(expr) }

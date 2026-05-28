@@ -1,0 +1,185 @@
+// Codegen: intrinsic and extern function handling
+
+extend fun Codegen.gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
+        if (name.ends_with("load64")) {
+            var addr: String = this.gen_arg_value(args[0])
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i64*")
+            var val: String = this.fresh_local()
+            this.emit_indent(val + " = load i64, i64* " + ptr)
+            this.last_type = AST.Type.IntType
+            return val
+        }
+        if (name.ends_with("store64")) {
+            var addr: String = this.gen_arg_value(args[0])
+            var val: String = this.gen_arg_value(args[1])
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i64*")
+            this.emit_indent("store i64 " + val + ", i64* " + ptr)
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (name.ends_with("load8")) {
+            var addr: String = this.gen_arg_value(args[0])
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            var byte_val: String = this.fresh_local()
+            this.emit_indent(byte_val + " = load i8, i8* " + ptr)
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = zext i8 " + byte_val + " to i64")
+            this.last_type = AST.Type.IntType
+            return result
+        }
+        if (name.ends_with("store8")) {
+            var addr: String = this.gen_arg_value(args[0])
+            var val: String = this.gen_arg_value(args[1])
+            var truncated: String = this.fresh_local()
+            this.emit_indent(truncated + " = trunc i64 " + val + " to i8")
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            this.emit_indent("store i8 " + truncated + ", i8* " + ptr)
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (name.ends_with("load_argc")) {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = load i32, i32* @__argc")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = sext i32 " + raw + " to i64")
+            this.last_type = AST.Type.IntType
+            return result
+        }
+        if (name.ends_with("load_argv")) {
+            var argv: String = this.fresh_local()
+            this.emit_indent(argv + " = load i8**, i8*** @__argv")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = ptrtoint i8** " + argv + " to i64")
+            this.last_type = AST.Type.IntType
+            return result
+        }
+        return "0"
+    }
+
+extend fun Codegen.parse_extern_sig(sig: String): List<String> {
+        var paren_idx: Float = sig.index_of("(")
+        var left: String = sig.slice(0, paren_idx)
+        var params_str: String = sig.slice(paren_idx + 1, sig.length() - 1)
+        var space_idx: Float = left.index_of(" ")
+        var ret_type: String = left.slice(0, space_idx)
+        var c_name: String = left.slice(space_idx + 1, left.length())
+        var result: List<String> = []
+        result.push(c_name)
+        result.push(ret_type)
+        if (params_str.length() > 0) {
+            var params: List<String> = params_str.split(", ")
+            var i: Float = 0
+            while (i < params.length()) {
+                result.push(params[i].trim())
+                i = i + 1
+            }
+        }
+        return result
+    }
+
+extend fun Codegen.normalize_c_type(t: String): String {
+        if (t == "void*") { return "i8*" }
+        if (t == "void**") { return "i8**" }
+        return t
+    }
+
+extend fun Codegen.emit_extern_declare(sig: String): String {
+        var parsed: List<String> = this.parse_extern_sig(sig)
+        var c_name: String = parsed[0]
+        var ret_type: String = this.normalize_c_type(parsed[1])
+        var sb: StringBuilder = StringBuilder()
+        sb.append("declare " + ret_type + " @" + c_name + "(")
+        var i: Float = 2
+        while (i < parsed.length()) {
+            if (i > 2) { sb.append(", ") }
+            var ptype: String = this.normalize_c_type(parsed[i])
+            if (ptype == "...") {
+                sb.append("...")
+            } else {
+                sb.append(ptype)
+            }
+            i = i + 1
+        }
+        sb.append(")")
+        return sb.to_string()
+    }
+
+extend fun Codegen.gen_extern_call(name: String, args: List<AST.Expr>): String {
+        var sig: String = this.extern_sigs.get(name)
+        var parsed: List<String> = this.parse_extern_sig(sig)
+        var c_name: String = parsed[0]
+        var ret_c: String = parsed[1]
+        var llvm_ret: String = this.normalize_c_type(ret_c)
+        var call_args: List<String> = []
+        var i: Float = 0
+        while (i < args.length()) {
+            var val: String = this.gen_arg_value(args[i])
+            var ptype: String = "i64"
+            if (i + 2 < parsed.length()) {
+                ptype = parsed[i + 2]
+            }
+            var norm: String = this.normalize_c_type(ptype)
+            if (norm == "i8*") {
+                var ptr: String = this.fresh_local()
+                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+                call_args.push("i8* " + ptr)
+            } else if (norm == "i8**") {
+                var ptr: String = this.fresh_local()
+                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8**")
+                call_args.push("i8** " + ptr)
+            } else if (norm == "i32") {
+                var trunc_val: String = this.fresh_local()
+                this.emit_indent(trunc_val + " = trunc i64 " + val + " to i32")
+                call_args.push("i32 " + trunc_val)
+            } else {
+                call_args.push("i64 " + val)
+            }
+            i = i + 1
+        }
+        if (llvm_ret == "void") {
+            this.emit_indent("call void @" + c_name + "(" + call_args.join(", ") + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        var raw: String = this.fresh_local()
+        if (sig.contains("...")) {
+            this.emit_indent(raw + " = call " + llvm_ret + " (" + this.extern_param_types(parsed) + ") @" + c_name + "(" + call_args.join(", ") + ")")
+        } else {
+            this.emit_indent(raw + " = call " + llvm_ret + " @" + c_name + "(" + call_args.join(", ") + ")")
+        }
+        if (llvm_ret == "i8*") {
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = ptrtoint i8* " + raw + " to i64")
+            this.last_type = AST.Type.IntType
+            return as_int
+        }
+        if (llvm_ret == "i32") {
+            var ext: String = this.fresh_local()
+            this.emit_indent(ext + " = sext i32 " + raw + " to i64")
+            this.last_type = AST.Type.IntType
+            return ext
+        }
+        this.last_type = AST.Type.IntType
+        return raw
+    }
+
+extend fun Codegen.extern_param_types(parsed: List<String>): String {
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 2
+        while (i < parsed.length()) {
+            if (i > 2) { sb.append(", ") }
+            var ptype: String = this.normalize_c_type(parsed[i])
+            if (ptype == "...") {
+                sb.append("...")
+            } else {
+                sb.append(ptype)
+            }
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
