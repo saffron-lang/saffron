@@ -1633,6 +1633,7 @@ class Codegen {
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    this.has_errors = true
                 }
             }
             this.called_functions.push(emit_callee)
@@ -4458,6 +4459,12 @@ class Codegen {
         out.append("declare i64 @__val_untag_bool(i64)\n")
         out.append("declare i64 @__val_nil()\n\n")
 
+        // Runtime error helpers (bodies in runtime.ll)
+        out.append("declare i64 @__division_error()\n")
+        out.append("declare i64 @__null_pointer_error()\n")
+        out.append("declare i64 @__runtime_error(i64)\n")
+        out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
+
         out.append("declare double @strtod(i8*, i8*)\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
@@ -5711,13 +5718,17 @@ class Codegen {
 
 fun generate(program: List<AST.Stmt>): String {
     var gen: Codegen = Codegen()
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_target(program: List<AST.Stmt>, target: String): String {
     var gen: Codegen = Codegen()
     gen.target = target
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
@@ -5734,7 +5745,9 @@ fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): Str
         i = i + 1
     }
     var gen: Codegen = Codegen()
-    return gen.generate(all_stmts)
+    var result: String = gen.generate(all_stmts)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, alias_map: Map<String, String>): String {

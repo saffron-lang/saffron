@@ -2,38 +2,38 @@
 target triple = "wasm32-unknown-unknown"
 target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128-ni:1:10:20"
 
-@.str.0 = private unnamed_addr constant [8 x i8] c"Count: \00"
-@.str.1 = private unnamed_addr constant [5 x i8] c"#app\00"
-@.str.2 = private unnamed_addr constant [3 x i8] c"h1\00"
-@.str.3 = private unnamed_addr constant [21 x i8] c"Saffron WASM Counter\00"
-@.str.4 = private unnamed_addr constant [2 x i8] c"p\00"
-@.str.5 = private unnamed_addr constant [9 x i8] c"Count: 0\00"
-@.str.6 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.7 = private unnamed_addr constant [35 x i8] c"font-size: 2rem; font-weight: bold\00"
-@.str.8 = private unnamed_addr constant [4 x i8] c"div\00"
-@.str.9 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.10 = private unnamed_addr constant [27 x i8] c"display: flex; gap: 0.5rem\00"
-@.str.11 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.12 = private unnamed_addr constant [2 x i8] c"+\00"
-@.str.13 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.14 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
-@.str.15 = private unnamed_addr constant [6 x i8] c"click\00"
-@.str.16 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.17 = private unnamed_addr constant [2 x i8] c"-\00"
-@.str.18 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.19 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
-@.str.20 = private unnamed_addr constant [6 x i8] c"click\00"
-@.str.21 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.22 = private unnamed_addr constant [6 x i8] c"Reset\00"
-@.str.23 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.24 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
-@.str.25 = private unnamed_addr constant [6 x i8] c"click\00"
-@.str.26 = private unnamed_addr constant [2 x i8] c"p\00"
-@.str.27 = private unnamed_addr constant [37 x i8] c"Built with Saffron, compiled to WASM\00"
-@.str.28 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.29 = private unnamed_addr constant [49 x i8] c"margin-top: 2rem; color: #888; font-size: 0.9rem\00"
-
-%App = type { i64, i64 }
+@.str.0 = private unnamed_addr constant [5 x i8] c"#app\00"
+@.str.1 = private unnamed_addr constant [3 x i8] c"h1\00"
+@.str.2 = private unnamed_addr constant [21 x i8] c"Saffron WASM Counter\00"
+@.str.3 = private unnamed_addr constant [2 x i8] c"p\00"
+@.str.4 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.5 = private unnamed_addr constant [14 x i8] c"count-display\00"
+@.str.6 = private unnamed_addr constant [9 x i8] c"Count: 0\00"
+@.str.7 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.8 = private unnamed_addr constant [35 x i8] c"font-size: 2rem; font-weight: bold\00"
+@.str.9 = private unnamed_addr constant [4 x i8] c"div\00"
+@.str.10 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.11 = private unnamed_addr constant [27 x i8] c"display: flex; gap: 0.5rem\00"
+@.str.12 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.13 = private unnamed_addr constant [2 x i8] c"+\00"
+@.str.14 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.15 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
+@.str.16 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.17 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.18 = private unnamed_addr constant [2 x i8] c"-\00"
+@.str.19 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.20 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
+@.str.21 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.22 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.23 = private unnamed_addr constant [6 x i8] c"Reset\00"
+@.str.24 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.25 = private unnamed_addr constant [40 x i8] c"font-size: 1.5rem; padding: 0.5rem 1rem\00"
+@.str.26 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.27 = private unnamed_addr constant [2 x i8] c"p\00"
+@.str.28 = private unnamed_addr constant [37 x i8] c"Built with Saffron, compiled to WASM\00"
+@.str.29 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.30 = private unnamed_addr constant [49 x i8] c"margin-top: 2rem; color: #888; font-size: 0.9rem\00"
+@.str.31 = private unnamed_addr constant [31 x i8] c"Counter built by Saffron WASM!\00"
 
 declare i32 @puts(i8*)
 declare i32 @printf(i8*, ...)
@@ -143,371 +143,187 @@ declare void @js_dom_append_child(i64, i64)
 declare i64 @js_dom_query_selector(i8*)
 declare void @js_dom_add_event_listener(i64, i8*, i64)
 
-define i64 @App__init(i64 %self.arg) {
+define i64 @__saffron_entry() {
 entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = add i64 0, 0
-  %t3 = call i64 @__val_tag_int(i64 %t2)
-  %t4 = inttoptr i64 %t1 to %App*
-  %t5 = getelementptr %App, %App* %t4, i32 0, i32 0
-  store volatile i64 %t3, i64* %t5
-  %t6 = load i64, i64* %self
-  %t7 = add i64 0, 0
-  %t8 = call i64 @__val_tag_int(i64 %t7)
-  %t9 = inttoptr i64 %t6 to %App*
-  %t10 = getelementptr %App, %App* %t9, i32 0, i32 1
-  store volatile i64 %t8, i64* %t10
-  ret i64 0
-}
-
-define i64 @App__increment(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = load i64, i64* %self
-  %t3 = inttoptr i64 %t2 to %App*
-  %t4 = getelementptr %App, %App* %t3, i32 0, i32 0
-  %t5 = load volatile i64, i64* %t4
-  %t6 = add i64 0, 1
-  %t7 = call i64 @__val_tag_int(i64 %t6)
-  %t8 = call i64 @__val_untag_int(i64 %t5)
-  %t9 = call i64 @__val_untag_int(i64 %t7)
-  %t10 = add i64 %t8, %t9
-  %t11 = call i64 @__val_tag_int(i64 %t10)
-  %t12 = inttoptr i64 %t1 to %App*
-  %t13 = getelementptr %App, %App* %t12, i32 0, i32 0
-  store volatile i64 %t11, i64* %t13
-  %t14 = load i64, i64* %self
-  %t15 = call i64 @App__render_count(i64 %t14)
-  ret i64 0
-}
-
-define i64 @App__decrement(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = load i64, i64* %self
-  %t3 = inttoptr i64 %t2 to %App*
-  %t4 = getelementptr %App, %App* %t3, i32 0, i32 0
-  %t5 = load volatile i64, i64* %t4
-  %t6 = add i64 0, 1
-  %t7 = call i64 @__val_tag_int(i64 %t6)
-  %t8 = call i64 @__val_untag_int(i64 %t5)
-  %t9 = call i64 @__val_untag_int(i64 %t7)
-  %t10 = sub i64 %t8, %t9
-  %t11 = call i64 @__val_tag_int(i64 %t10)
-  %t12 = inttoptr i64 %t1 to %App*
-  %t13 = getelementptr %App, %App* %t12, i32 0, i32 0
-  store volatile i64 %t11, i64* %t13
-  %t14 = load i64, i64* %self
-  %t15 = call i64 @App__render_count(i64 %t14)
-  ret i64 0
-}
-
-define i64 @App__reset(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = add i64 0, 0
-  %t3 = call i64 @__val_tag_int(i64 %t2)
-  %t4 = inttoptr i64 %t1 to %App*
-  %t5 = getelementptr %App, %App* %t4, i32 0, i32 0
-  store volatile i64 %t3, i64* %t5
-  %t6 = load i64, i64* %self
-  %t7 = call i64 @App__render_count(i64 %t6)
-  ret i64 0
-}
-
-define i64 @App__render_count(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %App*
-  %t3 = getelementptr %App, %App* %t2, i32 0, i32 1
-  %t4 = load volatile i64, i64* %t3
-  %t5 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
-  %t6 = call i64 @__val_tag_ptr(i8* %t5)
-  %t7 = load i64, i64* %self
-  %t8 = inttoptr i64 %t7 to %App*
-  %t9 = getelementptr %App, %App* %t8, i32 0, i32 0
-  %t10 = load volatile i64, i64* %t9
-  %t11 = call i64 @__float_to_string(i64 %t10)
-  %t12 = call i8* @__val_untag_ptr(i64 %t6)
-  %t13 = call i8* @__val_untag_ptr(i64 %t11)
-  %t14 = call i64 @strlen(i8* %t12)
-  %t15 = call i64 @strlen(i8* %t13)
-  %t16 = add i64 %t14, %t15
-  %t17 = add i64 %t16, 1
-  %t18 = call i8* @malloc(i64 %t17)
-  call i8* @strcpy(i8* %t18, i8* %t12)
-  call i8* @strcat(i8* %t18, i8* %t13)
-  %t19 = call i64 @__val_tag_ptr(i8* %t18)
-  %t20 = call i8* @__val_untag_ptr(i64 %t19)
-  call void @js_dom_set_text(i64 %t4, i8* %t20)
-  ret i64 0
-}
-
-define i64 @App__build(i64 %self.arg) {
-entry:
-  %self = alloca i64
   %root = alloca i64
   %h1 = alloca i64
+  %count_el = alloca i64
   %buttons = alloca i64
-  %inc = alloca i64
-  %dec = alloca i64
-  %rst = alloca i64
+  %inc_btn = alloca i64
+  %dec_btn = alloca i64
+  %rst_btn = alloca i64
   %footer = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.1, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.0, i64 0, i64 0
   %t2 = call i64 @__val_tag_ptr(i8* %t1)
   %t3 = call i8* @__val_untag_ptr(i64 %t2)
   %t4 = call i64 @js_dom_query_selector(i8* %t3)
   store i64 %t4, i64* %root
-  %t5 = getelementptr [3 x i8], [3 x i8]* @.str.2, i64 0, i64 0
+  %t5 = getelementptr [3 x i8], [3 x i8]* @.str.1, i64 0, i64 0
   %t6 = call i64 @__val_tag_ptr(i8* %t5)
   %t7 = call i8* @__val_untag_ptr(i64 %t6)
   %t8 = call i64 @js_dom_create_element(i8* %t7)
   store i64 %t8, i64* %h1
   %t9 = load i64, i64* %h1
-  %t10 = getelementptr [21 x i8], [21 x i8]* @.str.3, i64 0, i64 0
+  %t10 = getelementptr [21 x i8], [21 x i8]* @.str.2, i64 0, i64 0
   %t11 = call i64 @__val_tag_ptr(i8* %t10)
   %t12 = call i8* @__val_untag_ptr(i64 %t11)
   call void @js_dom_set_text(i64 %t9, i8* %t12)
   %t13 = load i64, i64* %root
   %t14 = load i64, i64* %h1
   call void @js_dom_append_child(i64 %t13, i64 %t14)
-  %t15 = load i64, i64* %self
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
-  %t17 = call i64 @__val_tag_ptr(i8* %t16)
-  %t18 = call i8* @__val_untag_ptr(i64 %t17)
-  %t19 = call i64 @js_dom_create_element(i8* %t18)
-  %t20 = inttoptr i64 %t15 to %App*
-  %t21 = getelementptr %App, %App* %t20, i32 0, i32 1
-  store volatile i64 %t19, i64* %t21
-  %t22 = load i64, i64* %self
-  %t23 = inttoptr i64 %t22 to %App*
-  %t24 = getelementptr %App, %App* %t23, i32 0, i32 1
-  %t25 = load volatile i64, i64* %t24
-  %t26 = getelementptr [9 x i8], [9 x i8]* @.str.5, i64 0, i64 0
-  %t27 = call i64 @__val_tag_ptr(i8* %t26)
-  %t28 = call i8* @__val_untag_ptr(i64 %t27)
-  call void @js_dom_set_text(i64 %t25, i8* %t28)
-  %t29 = load i64, i64* %self
-  %t30 = inttoptr i64 %t29 to %App*
-  %t31 = getelementptr %App, %App* %t30, i32 0, i32 1
-  %t32 = load volatile i64, i64* %t31
-  %t33 = getelementptr [6 x i8], [6 x i8]* @.str.6, i64 0, i64 0
-  %t34 = call i64 @__val_tag_ptr(i8* %t33)
-  %t35 = call i8* @__val_untag_ptr(i64 %t34)
-  %t36 = getelementptr [35 x i8], [35 x i8]* @.str.7, i64 0, i64 0
-  %t37 = call i64 @__val_tag_ptr(i8* %t36)
-  %t38 = call i8* @__val_untag_ptr(i64 %t37)
-  call void @js_dom_set_attribute(i64 %t32, i8* %t35, i8* %t38)
-  %t39 = load i64, i64* %root
-  %t40 = load i64, i64* %self
-  %t41 = inttoptr i64 %t40 to %App*
-  %t42 = getelementptr %App, %App* %t41, i32 0, i32 1
-  %t43 = load volatile i64, i64* %t42
-  call void @js_dom_append_child(i64 %t39, i64 %t43)
-  %t44 = getelementptr [4 x i8], [4 x i8]* @.str.8, i64 0, i64 0
+  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
+  %t16 = call i64 @__val_tag_ptr(i8* %t15)
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = call i64 @js_dom_create_element(i8* %t17)
+  store i64 %t18, i64* %count_el
+  %t19 = load i64, i64* %count_el
+  %t20 = getelementptr [3 x i8], [3 x i8]* @.str.4, i64 0, i64 0
+  %t21 = call i64 @__val_tag_ptr(i8* %t20)
+  %t22 = call i8* @__val_untag_ptr(i64 %t21)
+  %t23 = getelementptr [14 x i8], [14 x i8]* @.str.5, i64 0, i64 0
+  %t24 = call i64 @__val_tag_ptr(i8* %t23)
+  %t25 = call i8* @__val_untag_ptr(i64 %t24)
+  call void @js_dom_set_attribute(i64 %t19, i8* %t22, i8* %t25)
+  %t26 = load i64, i64* %count_el
+  %t27 = getelementptr [9 x i8], [9 x i8]* @.str.6, i64 0, i64 0
+  %t28 = call i64 @__val_tag_ptr(i8* %t27)
+  %t29 = call i8* @__val_untag_ptr(i64 %t28)
+  call void @js_dom_set_text(i64 %t26, i8* %t29)
+  %t30 = load i64, i64* %count_el
+  %t31 = getelementptr [6 x i8], [6 x i8]* @.str.7, i64 0, i64 0
+  %t32 = call i64 @__val_tag_ptr(i8* %t31)
+  %t33 = call i8* @__val_untag_ptr(i64 %t32)
+  %t34 = getelementptr [35 x i8], [35 x i8]* @.str.8, i64 0, i64 0
+  %t35 = call i64 @__val_tag_ptr(i8* %t34)
+  %t36 = call i8* @__val_untag_ptr(i64 %t35)
+  call void @js_dom_set_attribute(i64 %t30, i8* %t33, i8* %t36)
+  %t37 = load i64, i64* %root
+  %t38 = load i64, i64* %count_el
+  call void @js_dom_append_child(i64 %t37, i64 %t38)
+  %t39 = getelementptr [4 x i8], [4 x i8]* @.str.9, i64 0, i64 0
+  %t40 = call i64 @__val_tag_ptr(i8* %t39)
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = call i64 @js_dom_create_element(i8* %t41)
+  store i64 %t42, i64* %buttons
+  %t43 = load i64, i64* %buttons
+  %t44 = getelementptr [6 x i8], [6 x i8]* @.str.10, i64 0, i64 0
   %t45 = call i64 @__val_tag_ptr(i8* %t44)
   %t46 = call i8* @__val_untag_ptr(i64 %t45)
-  %t47 = call i64 @js_dom_create_element(i8* %t46)
-  store i64 %t47, i64* %buttons
-  %t48 = load i64, i64* %buttons
-  %t49 = getelementptr [6 x i8], [6 x i8]* @.str.9, i64 0, i64 0
-  %t50 = call i64 @__val_tag_ptr(i8* %t49)
-  %t51 = call i8* @__val_untag_ptr(i64 %t50)
-  %t52 = getelementptr [27 x i8], [27 x i8]* @.str.10, i64 0, i64 0
-  %t53 = call i64 @__val_tag_ptr(i8* %t52)
-  %t54 = call i8* @__val_untag_ptr(i64 %t53)
-  call void @js_dom_set_attribute(i64 %t48, i8* %t51, i8* %t54)
-  %t55 = getelementptr [7 x i8], [7 x i8]* @.str.11, i64 0, i64 0
+  %t47 = getelementptr [27 x i8], [27 x i8]* @.str.11, i64 0, i64 0
+  %t48 = call i64 @__val_tag_ptr(i8* %t47)
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  call void @js_dom_set_attribute(i64 %t43, i8* %t46, i8* %t49)
+  %t50 = getelementptr [7 x i8], [7 x i8]* @.str.12, i64 0, i64 0
+  %t51 = call i64 @__val_tag_ptr(i8* %t50)
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = call i64 @js_dom_create_element(i8* %t52)
+  store i64 %t53, i64* %inc_btn
+  %t54 = load i64, i64* %inc_btn
+  %t55 = getelementptr [2 x i8], [2 x i8]* @.str.13, i64 0, i64 0
   %t56 = call i64 @__val_tag_ptr(i8* %t55)
   %t57 = call i8* @__val_untag_ptr(i64 %t56)
-  %t58 = call i64 @js_dom_create_element(i8* %t57)
-  store i64 %t58, i64* %inc
-  %t59 = load i64, i64* %inc
-  %t60 = getelementptr [2 x i8], [2 x i8]* @.str.12, i64 0, i64 0
-  %t61 = call i64 @__val_tag_ptr(i8* %t60)
-  %t62 = call i8* @__val_untag_ptr(i64 %t61)
-  call void @js_dom_set_text(i64 %t59, i8* %t62)
-  %t63 = load i64, i64* %inc
-  %t64 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
-  %t65 = call i64 @__val_tag_ptr(i8* %t64)
-  %t66 = call i8* @__val_untag_ptr(i64 %t65)
-  %t67 = getelementptr [40 x i8], [40 x i8]* @.str.14, i64 0, i64 0
-  %t68 = call i64 @__val_tag_ptr(i8* %t67)
-  %t69 = call i8* @__val_untag_ptr(i64 %t68)
-  call void @js_dom_set_attribute(i64 %t63, i8* %t66, i8* %t69)
-  %t70 = load i64, i64* %inc
-  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.15, i64 0, i64 0
-  %t72 = call i64 @__val_tag_ptr(i8* %t71)
-  %t73 = call i8* @__val_untag_ptr(i64 %t72)
-  %t74 = add i64 0, 1
-  %t75 = call i64 @__val_tag_int(i64 %t74)
-  call void @js_dom_add_event_listener(i64 %t70, i8* %t73, i64 %t75)
-  %t76 = load i64, i64* %buttons
-  %t77 = load i64, i64* %inc
-  call void @js_dom_append_child(i64 %t76, i64 %t77)
-  %t78 = getelementptr [7 x i8], [7 x i8]* @.str.16, i64 0, i64 0
+  call void @js_dom_set_text(i64 %t54, i8* %t57)
+  %t58 = load i64, i64* %inc_btn
+  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.14, i64 0, i64 0
+  %t60 = call i64 @__val_tag_ptr(i8* %t59)
+  %t61 = call i8* @__val_untag_ptr(i64 %t60)
+  %t62 = getelementptr [40 x i8], [40 x i8]* @.str.15, i64 0, i64 0
+  %t63 = call i64 @__val_tag_ptr(i8* %t62)
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  call void @js_dom_set_attribute(i64 %t58, i8* %t61, i8* %t64)
+  %t65 = load i64, i64* %inc_btn
+  %t66 = getelementptr [6 x i8], [6 x i8]* @.str.16, i64 0, i64 0
+  %t67 = call i64 @__val_tag_ptr(i8* %t66)
+  %t68 = call i8* @__val_untag_ptr(i64 %t67)
+  %t69 = add i64 0, 1
+  %t70 = call i64 @__val_tag_int(i64 %t69)
+  call void @js_dom_add_event_listener(i64 %t65, i8* %t68, i64 %t70)
+  %t71 = load i64, i64* %buttons
+  %t72 = load i64, i64* %inc_btn
+  call void @js_dom_append_child(i64 %t71, i64 %t72)
+  %t73 = getelementptr [7 x i8], [7 x i8]* @.str.17, i64 0, i64 0
+  %t74 = call i64 @__val_tag_ptr(i8* %t73)
+  %t75 = call i8* @__val_untag_ptr(i64 %t74)
+  %t76 = call i64 @js_dom_create_element(i8* %t75)
+  store i64 %t76, i64* %dec_btn
+  %t77 = load i64, i64* %dec_btn
+  %t78 = getelementptr [2 x i8], [2 x i8]* @.str.18, i64 0, i64 0
   %t79 = call i64 @__val_tag_ptr(i8* %t78)
   %t80 = call i8* @__val_untag_ptr(i64 %t79)
-  %t81 = call i64 @js_dom_create_element(i8* %t80)
-  store i64 %t81, i64* %dec
-  %t82 = load i64, i64* %dec
-  %t83 = getelementptr [2 x i8], [2 x i8]* @.str.17, i64 0, i64 0
-  %t84 = call i64 @__val_tag_ptr(i8* %t83)
-  %t85 = call i8* @__val_untag_ptr(i64 %t84)
-  call void @js_dom_set_text(i64 %t82, i8* %t85)
-  %t86 = load i64, i64* %dec
-  %t87 = getelementptr [6 x i8], [6 x i8]* @.str.18, i64 0, i64 0
-  %t88 = call i64 @__val_tag_ptr(i8* %t87)
-  %t89 = call i8* @__val_untag_ptr(i64 %t88)
-  %t90 = getelementptr [40 x i8], [40 x i8]* @.str.19, i64 0, i64 0
-  %t91 = call i64 @__val_tag_ptr(i8* %t90)
-  %t92 = call i8* @__val_untag_ptr(i64 %t91)
-  call void @js_dom_set_attribute(i64 %t86, i8* %t89, i8* %t92)
-  %t93 = load i64, i64* %dec
-  %t94 = getelementptr [6 x i8], [6 x i8]* @.str.20, i64 0, i64 0
-  %t95 = call i64 @__val_tag_ptr(i8* %t94)
-  %t96 = call i8* @__val_untag_ptr(i64 %t95)
-  %t97 = add i64 0, 2
-  %t98 = call i64 @__val_tag_int(i64 %t97)
-  call void @js_dom_add_event_listener(i64 %t93, i8* %t96, i64 %t98)
-  %t99 = load i64, i64* %buttons
-  %t100 = load i64, i64* %dec
-  call void @js_dom_append_child(i64 %t99, i64 %t100)
-  %t101 = getelementptr [7 x i8], [7 x i8]* @.str.21, i64 0, i64 0
+  call void @js_dom_set_text(i64 %t77, i8* %t80)
+  %t81 = load i64, i64* %dec_btn
+  %t82 = getelementptr [6 x i8], [6 x i8]* @.str.19, i64 0, i64 0
+  %t83 = call i64 @__val_tag_ptr(i8* %t82)
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = getelementptr [40 x i8], [40 x i8]* @.str.20, i64 0, i64 0
+  %t86 = call i64 @__val_tag_ptr(i8* %t85)
+  %t87 = call i8* @__val_untag_ptr(i64 %t86)
+  call void @js_dom_set_attribute(i64 %t81, i8* %t84, i8* %t87)
+  %t88 = load i64, i64* %dec_btn
+  %t89 = getelementptr [6 x i8], [6 x i8]* @.str.21, i64 0, i64 0
+  %t90 = call i64 @__val_tag_ptr(i8* %t89)
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = add i64 0, 2
+  %t93 = call i64 @__val_tag_int(i64 %t92)
+  call void @js_dom_add_event_listener(i64 %t88, i8* %t91, i64 %t93)
+  %t94 = load i64, i64* %buttons
+  %t95 = load i64, i64* %dec_btn
+  call void @js_dom_append_child(i64 %t94, i64 %t95)
+  %t96 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
+  %t97 = call i64 @__val_tag_ptr(i8* %t96)
+  %t98 = call i8* @__val_untag_ptr(i64 %t97)
+  %t99 = call i64 @js_dom_create_element(i8* %t98)
+  store i64 %t99, i64* %rst_btn
+  %t100 = load i64, i64* %rst_btn
+  %t101 = getelementptr [6 x i8], [6 x i8]* @.str.23, i64 0, i64 0
   %t102 = call i64 @__val_tag_ptr(i8* %t101)
   %t103 = call i8* @__val_untag_ptr(i64 %t102)
-  %t104 = call i64 @js_dom_create_element(i8* %t103)
-  store i64 %t104, i64* %rst
-  %t105 = load i64, i64* %rst
-  %t106 = getelementptr [6 x i8], [6 x i8]* @.str.22, i64 0, i64 0
-  %t107 = call i64 @__val_tag_ptr(i8* %t106)
-  %t108 = call i8* @__val_untag_ptr(i64 %t107)
-  call void @js_dom_set_text(i64 %t105, i8* %t108)
-  %t109 = load i64, i64* %rst
-  %t110 = getelementptr [6 x i8], [6 x i8]* @.str.23, i64 0, i64 0
-  %t111 = call i64 @__val_tag_ptr(i8* %t110)
-  %t112 = call i8* @__val_untag_ptr(i64 %t111)
-  %t113 = getelementptr [40 x i8], [40 x i8]* @.str.24, i64 0, i64 0
-  %t114 = call i64 @__val_tag_ptr(i8* %t113)
-  %t115 = call i8* @__val_untag_ptr(i64 %t114)
-  call void @js_dom_set_attribute(i64 %t109, i8* %t112, i8* %t115)
-  %t116 = load i64, i64* %rst
-  %t117 = getelementptr [6 x i8], [6 x i8]* @.str.25, i64 0, i64 0
-  %t118 = call i64 @__val_tag_ptr(i8* %t117)
-  %t119 = call i8* @__val_untag_ptr(i64 %t118)
-  %t120 = add i64 0, 3
-  %t121 = call i64 @__val_tag_int(i64 %t120)
-  call void @js_dom_add_event_listener(i64 %t116, i8* %t119, i64 %t121)
-  %t122 = load i64, i64* %buttons
-  %t123 = load i64, i64* %rst
-  call void @js_dom_append_child(i64 %t122, i64 %t123)
-  %t124 = load i64, i64* %root
-  %t125 = load i64, i64* %buttons
-  call void @js_dom_append_child(i64 %t124, i64 %t125)
-  %t126 = getelementptr [2 x i8], [2 x i8]* @.str.26, i64 0, i64 0
+  call void @js_dom_set_text(i64 %t100, i8* %t103)
+  %t104 = load i64, i64* %rst_btn
+  %t105 = getelementptr [6 x i8], [6 x i8]* @.str.24, i64 0, i64 0
+  %t106 = call i64 @__val_tag_ptr(i8* %t105)
+  %t107 = call i8* @__val_untag_ptr(i64 %t106)
+  %t108 = getelementptr [40 x i8], [40 x i8]* @.str.25, i64 0, i64 0
+  %t109 = call i64 @__val_tag_ptr(i8* %t108)
+  %t110 = call i8* @__val_untag_ptr(i64 %t109)
+  call void @js_dom_set_attribute(i64 %t104, i8* %t107, i8* %t110)
+  %t111 = load i64, i64* %rst_btn
+  %t112 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
+  %t113 = call i64 @__val_tag_ptr(i8* %t112)
+  %t114 = call i8* @__val_untag_ptr(i64 %t113)
+  %t115 = add i64 0, 3
+  %t116 = call i64 @__val_tag_int(i64 %t115)
+  call void @js_dom_add_event_listener(i64 %t111, i8* %t114, i64 %t116)
+  %t117 = load i64, i64* %buttons
+  %t118 = load i64, i64* %rst_btn
+  call void @js_dom_append_child(i64 %t117, i64 %t118)
+  %t119 = load i64, i64* %root
+  %t120 = load i64, i64* %buttons
+  call void @js_dom_append_child(i64 %t119, i64 %t120)
+  %t121 = getelementptr [2 x i8], [2 x i8]* @.str.27, i64 0, i64 0
+  %t122 = call i64 @__val_tag_ptr(i8* %t121)
+  %t123 = call i8* @__val_untag_ptr(i64 %t122)
+  %t124 = call i64 @js_dom_create_element(i8* %t123)
+  store i64 %t124, i64* %footer
+  %t125 = load i64, i64* %footer
+  %t126 = getelementptr [37 x i8], [37 x i8]* @.str.28, i64 0, i64 0
   %t127 = call i64 @__val_tag_ptr(i8* %t126)
   %t128 = call i8* @__val_untag_ptr(i64 %t127)
-  %t129 = call i64 @js_dom_create_element(i8* %t128)
-  store i64 %t129, i64* %footer
-  %t130 = load i64, i64* %footer
-  %t131 = getelementptr [37 x i8], [37 x i8]* @.str.27, i64 0, i64 0
-  %t132 = call i64 @__val_tag_ptr(i8* %t131)
-  %t133 = call i8* @__val_untag_ptr(i64 %t132)
-  call void @js_dom_set_text(i64 %t130, i8* %t133)
-  %t134 = load i64, i64* %footer
-  %t135 = getelementptr [6 x i8], [6 x i8]* @.str.28, i64 0, i64 0
-  %t136 = call i64 @__val_tag_ptr(i8* %t135)
-  %t137 = call i8* @__val_untag_ptr(i64 %t136)
-  %t138 = getelementptr [49 x i8], [49 x i8]* @.str.29, i64 0, i64 0
+  call void @js_dom_set_text(i64 %t125, i8* %t128)
+  %t129 = load i64, i64* %footer
+  %t130 = getelementptr [6 x i8], [6 x i8]* @.str.29, i64 0, i64 0
+  %t131 = call i64 @__val_tag_ptr(i8* %t130)
+  %t132 = call i8* @__val_untag_ptr(i64 %t131)
+  %t133 = getelementptr [49 x i8], [49 x i8]* @.str.30, i64 0, i64 0
+  %t134 = call i64 @__val_tag_ptr(i8* %t133)
+  %t135 = call i8* @__val_untag_ptr(i64 %t134)
+  call void @js_dom_set_attribute(i64 %t129, i8* %t132, i8* %t135)
+  %t136 = load i64, i64* %root
+  %t137 = load i64, i64* %footer
+  call void @js_dom_append_child(i64 %t136, i64 %t137)
+  %t138 = getelementptr [31 x i8], [31 x i8]* @.str.31, i64 0, i64 0
   %t139 = call i64 @__val_tag_ptr(i8* %t138)
-  %t140 = call i8* @__val_untag_ptr(i64 %t139)
-  call void @js_dom_set_attribute(i64 %t134, i8* %t137, i8* %t140)
-  %t141 = load i64, i64* %root
-  %t142 = load i64, i64* %footer
-  call void @js_dom_append_child(i64 %t141, i64 %t142)
-  ret i64 0
-}
-
-define linkonce_odr i64 @App() {
-entry:
-  %t143 = call i8* @malloc(i64 16)
-  %t144 = bitcast i8* %t143 to %App*
-  %t145 = getelementptr %App, %App* %t144, i32 0, i32 0
-  store i64 0, i64* %t145
-  %t146 = getelementptr %App, %App* %t144, i32 0, i32 1
-  store i64 0, i64* %t146
-  %t147 = ptrtoint %App* %t144 to i64
-  ret i64 %t147
-}
-
-define i64 @__dispatch_event(i64 %callback_id.arg) {
-entry:
-  %callback_id = alloca i64
-  store i64 %callback_id.arg, i64* %callback_id
-  %t1 = load i64, i64* %callback_id
-  %t2 = add i64 0, 1
-  %t3 = call i64 @__val_tag_int(i64 %t2)
-  %t5 = icmp eq i64 %t1, %t3
-  %t4 = zext i1 %t5 to i64
-  %t6 = trunc i64 %t4 to i1
-  br i1 %t6, label %then2, label %else3
-then2:
-  %t7 = load i64, i64* %app
-  %t8 = call i64 @App__increment(i64 %t7)
-  br label %endif1
-else3:
-  br label %endif1
-endif1:
-  %t9 = load i64, i64* %callback_id
-  %t10 = add i64 0, 2
-  %t11 = call i64 @__val_tag_int(i64 %t10)
-  %t13 = icmp eq i64 %t9, %t11
-  %t12 = zext i1 %t13 to i64
-  %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %then5, label %else6
-then5:
-  %t15 = load i64, i64* %app
-  %t16 = call i64 @App__decrement(i64 %t15)
-  br label %endif4
-else6:
-  br label %endif4
-endif4:
-  %t17 = load i64, i64* %callback_id
-  %t18 = add i64 0, 3
-  %t19 = call i64 @__val_tag_int(i64 %t18)
-  %t21 = icmp eq i64 %t17, %t19
-  %t20 = zext i1 %t21 to i64
-  %t22 = trunc i64 %t20 to i1
-  br i1 %t22, label %then8, label %else9
-then8:
-  %t23 = load i64, i64* %app
-  %t24 = call i64 @App__reset(i64 %t23)
-  br label %endif7
-else9:
-  br label %endif7
-endif7:
-  ret i64 0
-}
-
-define i64 @__saffron_entry() {
-entry:
-  %app = alloca i64
-  %t1 = call i64 @App()
-  %t2 = call i64 @App__init(i64 %t1)
-  store i64 %t1, i64* %app
-  %t3 = load i64, i64* %app
-  %t4 = call i64 @App__build(i64 %t3)
+  call void @__io_println_str(i64 %t139)
   ret i64 0
 }
 

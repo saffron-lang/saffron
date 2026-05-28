@@ -274,13 +274,17 @@ class Codegen {
 
 fun generate(program: List<AST.Stmt>): String {
     var gen: Codegen = Codegen()
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_target(program: List<AST.Stmt>, target: String): String {
     var gen: Codegen = Codegen()
     gen.target = target
-    return gen.generate(program)
+    var result: String = gen.generate(program)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): String {
@@ -297,7 +301,9 @@ fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): Str
         i = i + 1
     }
     var gen: Codegen = Codegen()
-    return gen.generate(all_stmts)
+    var result: String = gen.generate(all_stmts)
+    _codegen_had_error = gen.has_errors
+    return result
 }
 
 fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, alias_map: Map<String, String>): String {

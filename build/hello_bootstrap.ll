@@ -57,6 +57,11 @@ declare i64 @__val_tag_bool(i64)
 declare i64 @__val_untag_bool(i64)
 declare i64 @__val_nil()
 
+declare i64 @__division_error()
+declare i64 @__null_pointer_error()
+declare i64 @__runtime_error(i64)
+declare i64 @__runtime_error_fatal(i64)
+
 declare double @strtod(i8*, i8*)
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
