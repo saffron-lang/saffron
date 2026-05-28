@@ -1,5 +1,6 @@
-// Turmeric Styling — CSS utilities for Saffron
-// Provides helpers for inline styles, conditional classes, and scoped styles
+// Turmeric Styling — CSS utilities, fully typed
+
+import "./signal.sf" as Sig
 
 // =============================================================================
 // Style Map → Inline Style String
@@ -23,24 +24,27 @@ fun styles(pairs: Map<String, String>): String {
 // Conditional Classes
 // =============================================================================
 
-// Join class names conditionally
-// cx([["btn", true], ["active", is_active], ["disabled", is_disabled]])
-fun cx(classes: List<List<Any>>): String {
+class ClassEntry {
+    var name: String
+    var active: Bool
+    fun init(name: String, active: Bool) {
+        this.name = name
+        this.active = active
+    }
+}
+
+fun cx(classes: List<ClassEntry>): String {
     var result: List<String> = []
     var i: Float = 0
     while (i < classes.length()) {
-        var pair: List<Any> = classes[i]
-        var name: String = pair[0]
-        var cond: Bool = pair[1]
-        if (cond) {
-            result.push(name)
+        if (classes[i].active) {
+            result.push(classes[i].name)
         }
         i = i + 1
     }
     return result.join(" ")
 }
 
-// Simple class join (all always applied)
 fun cls(names: List<String>): String {
     return names.join(" ")
 }
@@ -56,9 +60,6 @@ fun _next_scope(): String {
     return "_s" + _scope_counter.to_string()
 }
 
-// Generate scoped class names from a style map
-// Returns a map of logical_name → generated_class_name
-// Also registers the CSS rules (via JS interop in browser)
 class ScopedStyles {
     var class_map: Map<String, String>
     var css_rules: List<String>
@@ -95,7 +96,7 @@ fun scoped_styles(declarations: Map<String, String>): ScopedStyles {
 }
 
 // =============================================================================
-// CSS Variables (Custom Properties)
+// CSS Variables
 // =============================================================================
 
 fun css_vars(vars: Map<String, String>): String {
@@ -157,21 +158,19 @@ fun keyframes(name: String): Keyframes {
 }
 
 // =============================================================================
-// Media Query Helper
+// Media Query — reactive viewport tracking
 // =============================================================================
 
 class MediaQuery {
     var query: String
-    var matches: Any  // Signal<Bool> — tracked reactively
+    var matches: Sig.Signal<Bool>
 
     fun init(query: String, initial: Bool) {
         this.query = query
-        this.matches = initial
+        this.matches = Sig.signal(initial)
     }
 }
 
-// In the browser, this creates a matchMedia listener that updates the signal.
-// For now, returns a static value for testing.
 fun media_query(query: String): MediaQuery {
     return MediaQuery(query, false)
 }

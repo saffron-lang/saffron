@@ -721,7 +721,7 @@ extend fun Codegen.emit_block_alloca_for(stmt: AST.Stmt) {
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
-        if (!this.var_types.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
+        if (!this.typed_vars.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
         }
