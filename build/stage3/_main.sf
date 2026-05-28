@@ -145,9 +145,73 @@ fun extract_imports(source: String): List<String> {
                 end = end + 1
             }
         }
+        // Named imports: import { X, Y } from "path"
+        if (line.starts_with("import {")) {
+            var from_idx: Float = line.index_of("from ")
+            if (from_idx >= 0) {
+                var path_start: Float = from_idx + 6
+                var path_end: Float = path_start + 1
+                while (path_end < line.length()) {
+                    if (line.char_at(path_end) == "\"") {
+                        break
+                    }
+                    path_end = path_end + 1
+                }
+                var imp_path: String = line.slice(path_start, path_end)
+                if (imp_path.starts_with("./") or imp_path.starts_with("@")) {
+                    imports.push(imp_path)
+                }
+            }
+        }
         i = i + 1
     }
     return imports
+}
+
+fun extract_named_imports(source: String): Map<String, List<String>> {
+    var result: Map<String, List<String>> = {}
+    var lines: List<String> = source.split("\n")
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        if (line.starts_with("import {")) {
+            // Extract names between { and }
+            var brace_start: Float = line.index_of("{")
+            var brace_end: Float = line.index_of("}")
+            if (brace_start >= 0 and brace_end > brace_start) {
+                var names_str: String = line.slice(brace_start + 1, brace_end)
+                var names: List<String> = names_str.split(",")
+                // Extract path after "from"
+                var from_idx: Float = line.index_of("from ")
+                if (from_idx >= 0) {
+                    var path_start: Float = from_idx + 6
+                    var path_end: Float = path_start + 1
+                    while (path_end < line.length()) {
+                        if (line.char_at(path_end) == "\"") {
+                            break
+                        }
+                        path_end = path_end + 1
+                    }
+                    var imp_path: String = line.slice(path_start, path_end)
+                    // Trim each name and collect
+                    var trimmed_names: List<String> = []
+                    var ni: Float = 0
+                    while (ni < names.length()) {
+                        var name: String = names[ni].trim()
+                        if (name.length() > 0) {
+                            trimmed_names.push(name)
+                        }
+                        ni = ni + 1
+                    }
+                    if (trimmed_names.length() > 0) {
+                        result.set(imp_path, trimmed_names)
+                    }
+                }
+            }
+        }
+        i = i + 1
+    }
+    return result
 }
 
 fun extract_import_aliases(source: String): Map<String, String> {
@@ -205,7 +269,7 @@ fun is_builtin_module(imp_path: String): Bool {
     return false
 }
 
-fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>) {
+fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
 
@@ -221,7 +285,11 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         var ma: String = mak[mai]
         var ma_path: String = mod_aliases.get(ma)
         if (!is_builtin_module(ma_path) and !all_aliases.has(ma)) {
-            all_aliases.set(ma, module_prefix_from_path(ma_path))
+            all_aliases.set(ma, ma + "_")
+            var ma_full: String = resolve_import_path(file_path, ma_path, stdlib_dir)
+            if (!path_to_prefix.has(ma_full)) {
+                path_to_prefix.set(ma_full, ma + "_")
+            }
         }
         mai = mai + 1
     }
@@ -232,12 +300,18 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, all_aliases)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, all_aliases, path_to_prefix)
         }
         pi = pi + 1
     }
 
-    var prefix: String = module_prefix_from_file(file_path)
+    // Use alias-based prefix if available, fall back to filename-based
+    var prefix: String = ""
+    if (path_to_prefix.has(file_path)) {
+        prefix = path_to_prefix.get(file_path)
+    } else {
+        prefix = module_prefix_from_file(file_path)
+    }
     module_stmts.push(program)
     module_prefixes_list.push(prefix)
 }
@@ -330,7 +404,9 @@ fun main(): Int {
     }
 
     // Use text-based import extraction (robust — doesn't depend on AST field access)
+    // Map alias names directly to alias-based prefixes (e.g., "Parser" → "Parser_")
     var resolved_aliases: Map<String, String> = {}
+    var path_to_prefix: Map<String, String> = {}
     var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
     var ak: Float = 0
@@ -338,9 +414,28 @@ fun main(): Int {
         var alias: String = alias_keys[ak]
         var imp_path: String = alias_map.get(alias)
         if (!is_builtin_module(imp_path)) {
-            resolved_aliases.set(alias, module_prefix_from_path(imp_path))
+            resolved_aliases.set(alias, alias + "_")
+            var full_imp_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
+            if (!path_to_prefix.has(full_imp_path)) {
+                path_to_prefix.set(full_imp_path, alias + "_")
+            }
         }
         ak = ak + 1
+    }
+
+    // Register named import module paths so they get correct prefixes
+    var named_imports_raw_early: Map<String, List<String>> = extract_named_imports(source)
+    var ni_paths_early: List<String> = named_imports_raw_early.keys()
+    var npe: Float = 0
+    while (npe < ni_paths_early.length()) {
+        var ni_path_e: String = ni_paths_early[npe]
+        if (!is_builtin_module(ni_path_e)) {
+            var ni_full_e: String = resolve_import_path(input_path, ni_path_e, stdlib_dir)
+            if (!path_to_prefix.has(ni_full_e)) {
+                path_to_prefix.set(ni_full_e, module_prefix_from_path(ni_path_e))
+            }
+        }
+        npe = npe + 1
     }
 
     // Auto-import prelude (interfaces available in all programs)
@@ -364,7 +459,7 @@ fun main(): Int {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
-            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases)
+            collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
         }
         pi = pi + 1
     }
@@ -393,9 +488,34 @@ fun main(): Int {
     }
     module_boundaries.push(all_import_stmts.length())
 
+    // Build named imports map: bare_name → prefixed_name
+    var named_imports_raw: Map<String, List<String>> = extract_named_imports(source)
+    var named_imports: Map<String, String> = {}
+    var ni_paths: List<String> = named_imports_raw.keys()
+    var npi: Float = 0
+    while (npi < ni_paths.length()) {
+        var ni_path: String = ni_paths[npi]
+        var ni_full_path: String = resolve_import_path(input_path, ni_path, stdlib_dir)
+        // Determine prefix for this module
+        var ni_prefix: String = ""
+        if (path_to_prefix.has(ni_full_path)) {
+            ni_prefix = path_to_prefix.get(ni_full_path)
+        } else {
+            ni_prefix = module_prefix_from_path(ni_path)
+        }
+        var ni_names: List<String> = named_imports_raw.get(ni_path)
+        var nni: Float = 0
+        while (nni < ni_names.length()) {
+            var ni_name: String = ni_names[nni]
+            named_imports.set(ni_name, ni_prefix + ni_name)
+            nni = nni + 1
+        }
+        npi = npi + 1
+    }
+
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target)
+        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports)
     } else {
         ir = Codegen.generate_with_target(program, target)
     }

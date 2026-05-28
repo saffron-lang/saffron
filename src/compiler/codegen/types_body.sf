@@ -79,13 +79,17 @@
             return val
         }
         if (val_type == "Int" or val_type == "Float") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + val + ")")
             var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
             return result
         }
         if (val_type == "Bool") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + val + ")")
             var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + val + ")")
+            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + raw + ")")
             return result
         }
         if (val_type == "Nil") {

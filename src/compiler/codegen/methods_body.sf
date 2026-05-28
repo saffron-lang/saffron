@@ -173,7 +173,10 @@
     var obj_name: String = this.get_variable_name(object)
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
-    var idx: String = this.gen_arg_value(index)
+    var idx_tagged: String = this.gen_arg_value(index)
+    // Untag the index for arithmetic and runtime call
+    var idx: String = this.fresh_local()
+    this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
     // Negative indexing: if idx < 0, use length + idx
     var is_neg: String = this.fresh_local()
     this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
@@ -208,7 +211,9 @@
 
     fun gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
     var obj: String = this.gen_arg_value(object)
-    var idx: String = this.gen_arg_value(index)
+    var idx_tagged: String = this.gen_arg_value(index)
+    var idx: String = this.fresh_local()
+    this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
     var val: String = this.gen_arg_value(value)
     var discard_ls: String = this.fresh_local()
     this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
@@ -683,8 +688,10 @@
             this.last_type = AST.Type.StringType
             return obj
         } else if (obj_type == "Bool") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + obj + ")")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + obj + ")")
+            this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + raw + ")")
             this.last_type = AST.Type.StringType
             return local
         } else if (this.enum_defs.has(obj_type)) {
@@ -694,8 +701,10 @@
             this.last_type = AST.Type.StringType
             return local
         } else {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + obj + ")")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
+            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + raw + ")")
             this.last_type = AST.Type.StringType
             return local
         }

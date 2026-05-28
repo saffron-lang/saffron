@@ -347,11 +347,8 @@
                 return result
             }
 
-            // Integer addition
-            this.last_type = AST.Type.IntType
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
-            return local
+            // Integer addition (NaN-boxed: untag, add, retag)
+            return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
         var lhs: String = this.gen_arg_value(left)
@@ -811,6 +808,13 @@
                 resolved_callee = this.current_prefix + callee_name
             }
         }
+        // Named imports: resolve bare name to prefixed module function
+        if (!this.known_functions.contains(resolved_callee) and this.named_imports.has(callee_name)) {
+            var ni_target: String = this.named_imports.get(callee_name)
+            if (this.known_functions.contains(ni_target)) {
+                resolved_callee = ni_target
+            }
+        }
         if (this.intrinsic_funcs.contains(resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
         }
@@ -941,6 +945,8 @@
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
+                } else if (this.named_imports.has(callee_name)) {
+                    emit_callee = this.named_imports.get(callee_name)
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
