@@ -118,10 +118,8 @@
         var gf_class: String = ""
         if (this.classify_expr(gf_inner_obj) == "this") {
             gf_class = this.current_class
-        } else if (gf_obj_name.length() > 0 and this.typed_vars.has(gf_obj_name)) {
-            gf_class = this.type_to_string(this.typed_vars.get(gf_obj_name))
-        } else if (gf_obj_name.length() > 0 and this.var_types.has(gf_obj_name)) {
-            gf_class = this.var_types.get(gf_obj_name)
+        } else if (gf_obj_name.length() > 0) {
+            gf_class = this.get_var_type_str(gf_obj_name)
         }
         if (gf_class.length() > 0 and this.class_fields.has(gf_class)) {
             return this.get_field_type(gf_class, gf_field)
@@ -139,11 +137,10 @@
         // Check if method call is on a user class (resolve obj type)
         var mc_obj_name: String = this.get_variable_name(mc_obj)
         var mc_obj_type: String = ""
-        if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
-            mc_obj_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
-        } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
-            mc_obj_type = this.var_types.get(mc_obj_name)
-        } else if (this.classify_expr(mc_obj) == "this") {
+        if (mc_obj_name.length() > 0) {
+            mc_obj_type = this.get_var_type_str(mc_obj_name)
+        }
+        if (mc_obj_type.length() == 0 and this.classify_expr(mc_obj) == "this") {
             mc_obj_type = this.current_class
         } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
             // Handle chained field access: this.field.method()
@@ -162,10 +159,8 @@
                 inner_class = this.current_class
             } else {
                 var in_name: String = this.get_variable_name(inner_obj)
-                if (in_name.length() > 0 and this.typed_vars.has(in_name)) {
-                    inner_class = this.type_to_string(this.typed_vars.get(in_name))
-                } else if (in_name.length() > 0 and this.var_types.has(in_name)) {
-                    inner_class = this.var_types.get(in_name)
+                if (in_name.length() > 0) {
+                    inner_class = this.get_var_type_str(in_name)
                 }
             }
             if (inner_class.length() > 0 and this.class_fields.has(inner_class)) {
@@ -263,9 +258,8 @@
             if (this.type_to_string(ig_elem) != "Any") {
                 return this.type_to_string(ig_elem)
             }
-        }
-        if (ig_obj_name.length() > 0 and this.var_types.has(ig_obj_name)) {
-            var ig_vtype: String = this.var_types.get(ig_obj_name)
+            // Fallback: parse type string for List<X> pattern
+            var ig_vtype: String = this.type_to_string(ig_list_type)
             if (ig_vtype.starts_with("List<") and ig_vtype.ends_with(">")) {
                 return ig_vtype.slice(5, ig_vtype.length() - 1)
             }
@@ -320,12 +314,12 @@
     var idx_elem_type: AST.Type = this.get_list_element_type(obj_type)
     if (this.type_to_string(idx_elem_type) == "Any" and obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         idx_elem_type = this.get_list_element_type(this.typed_vars.get(obj_name))
-    }
-    if (this.type_to_string(idx_elem_type) == "Any" and obj_name.length() > 0 and this.var_types.has(obj_name)) {
-        var vtype: String = this.var_types.get(obj_name)
-        if (vtype.starts_with("List<") and vtype.ends_with(">")) {
-            var inner: String = vtype.slice(5, vtype.length() - 1)
-            idx_elem_type = this.str_to_type(inner)
+        if (this.type_to_string(idx_elem_type) == "Any") {
+            var vtype: String = this.type_to_string(this.typed_vars.get(obj_name))
+            if (vtype.starts_with("List<") and vtype.ends_with(">")) {
+                var inner: String = vtype.slice(5, vtype.length() - 1)
+                idx_elem_type = this.str_to_type(inner)
+            }
         }
     }
     if (this.type_to_string(idx_elem_type) != "Any") {
@@ -491,12 +485,9 @@
     if (obj_name == "IO" or obj_name == "OS") { return obj_name }
     if (this.module_prefixes.has(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
-    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
-        var vtype: String = this.type_to_string(this.typed_vars.get(obj_name))
-        if (this.class_fields.has(vtype)) { return vtype }
-    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-        var vtype: String = this.var_types.get(obj_name)
-        if (this.class_fields.has(vtype)) { return vtype }
+    if (obj_name.length() > 0) {
+        var vtype: String = this.get_var_type_str(obj_name)
+        if (vtype.length() > 0 and this.class_fields.has(vtype)) { return vtype }
     }
     return ""
     }
@@ -635,20 +626,13 @@
     // --- Builtin dispatch (only for non-class objects) ---
     var obj: String = this.gen_arg_value(object)
     var is_user_class: Bool = false
-    if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
-        is_user_class = true
-    } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
-        is_user_class = true
-    }
-    // Check with generic parameters stripped (Box<Float> → Box)
-    if (!is_user_class and obj_name.length() > 0) {
-        var uc_type: String = ""
-        if (this.typed_vars.has(obj_name)) {
-            uc_type = this.type_to_string(this.typed_vars.get(obj_name))
-        } else if (this.var_types.has(obj_name)) {
-            uc_type = this.var_types.get(obj_name)
+    if (obj_name.length() > 0) {
+        var uc_type: String = this.get_var_type_str(obj_name)
+        if (uc_type.length() > 0 and this.class_fields.has(uc_type)) {
+            is_user_class = true
         }
-        if (uc_type.length() > 0 and uc_type.contains("<")) {
+        // Check with generic parameters stripped (Box<Float> → Box)
+        if (!is_user_class and uc_type.length() > 0 and uc_type.contains("<")) {
             var uc_base: String = uc_type.slice(0, uc_type.index_of("<"))
             if (this.class_fields.has(uc_base)) {
                 is_user_class = true
@@ -698,10 +682,9 @@
     if (!is_user_class and method == "set" and args.length() == 2) {
         // Determine if object is a List or Map to dispatch correctly
         var set_obj_type: String = this.type_to_string(this.last_type)
-        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
-            set_obj_type = this.type_to_string(this.typed_vars.get(obj_name))
-        } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-            set_obj_type = this.var_types.get(obj_name)
+        if (obj_name.length() > 0) {
+            var sot: String = this.get_var_type_str(obj_name)
+            if (sot.length() > 0) { set_obj_type = sot }
         }
         if (set_obj_type == "List" or set_obj_type.starts_with("List<")) {
             // List.set(index, value) -> __list_set
@@ -749,8 +732,8 @@
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_raw + ")")
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
-        if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-            obj_type_for_get = this.var_types.get(obj_name)
+        if (obj_name.length() > 0) {
+            obj_type_for_get = this.get_var_type_str(obj_name)
         }
         if (obj_type_for_get.length() == 0) {
             obj_type_for_get = this.get_expr_type(object)
@@ -866,13 +849,11 @@
         return local
     }
     // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
-    // Prefer var_types annotation over last_type because the native binary's
-    // last_type is unreliable when var_types.has() returns false mid-execution.
+    // Prefer typed_vars annotation over last_type (source of truth for variable types).
     var obj_type: String = this.type_to_string(this.last_type)
-    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
-        obj_type = this.type_to_string(this.typed_vars.get(obj_name))
-    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-        obj_type = this.var_types.get(obj_name)
+    if (obj_name.length() > 0) {
+        var ot: String = this.get_var_type_str(obj_name)
+        if (ot.length() > 0) { obj_type = ot }
     }
 
     if (!is_user_class and method == "length") {
@@ -961,6 +942,20 @@
             this.emit_indent(local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
             this.last_type = AST.Type.StringType
             return local
+        } else if (obj_type.starts_with("List")) {
+            this.called_functions.push("__list_to_string")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        } else if (obj_type.starts_with("Map")) {
+            var const_name: String = this.add_string_constant("[Map]")
+            var gep: String = this.fresh_local()
+            this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            this.last_type = AST.Type.StringType
+            return local
         } else {
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + obj + ")")
@@ -1015,7 +1010,7 @@
     // (enum check moved above builtin dispatch)
 
     // Check for imported module function calls (module alias or unknown name)
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.var_types.has(obj_name)))) {
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -1050,16 +1045,17 @@
 
     // Fall back to class method call (inside or outside class)
     // (must come BEFORE universal methods so class .to_string() is found)
-    // Also check obj_name directly in case obj_type was not updated from var_types
-    // (workaround for native binary where var_types.has may return false)
+    // typed_vars is the single source of truth for variable types.
     var class_name: String = ""
     if (this.class_fields.has(obj_type)) {
         class_name = obj_type
-    } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
-        class_name = this.type_to_string(this.typed_vars.get(obj_name))
-    } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
-        class_name = this.var_types.get(obj_name)
-    } else if (this.current_class.length() > 0) {
+    } else if (obj_name.length() > 0) {
+        var cn_type: String = this.get_var_type_str(obj_name)
+        if (cn_type.length() > 0 and this.class_fields.has(cn_type)) {
+            class_name = cn_type
+        }
+    }
+    if (class_name.length() == 0 and this.current_class.length() > 0) {
         class_name = this.find_class_for_method(method)
     }
     // Last resort: check if any known class has this method (for gen.method() in standalone fns)

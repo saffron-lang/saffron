@@ -40,8 +40,22 @@ extend fun Codegen.str_to_type(s: String): AST.Type {
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
+        // Union types: check for "|" at top level (not inside <> or ())
+        if (s.contains("|")) {
+            var union_parts: List<String> = this.split_type_union(s)
+            if (union_parts.length() > 1) {
+                var types: List<AST.Type> = []
+                var ui: Float = 0
+                while (ui < union_parts.length()) {
+                    types.push(this.str_to_type(union_parts[ui]))
+                    ui = ui + 1
+                }
+                return AST.Type.UnionType(types)
+            }
+        }
+        // Function types: Fun(Int,String):Bool
         if (s.starts_with("Fun(")) {
-            return AST.Type.FuncType([], AST.Type.AnyType)
+            return this.parse_func_type_str(s)
         }
         if (s == "List") return this.make_list_type()
         if (s.starts_with("List<") and s.ends_with(">")) {
@@ -59,6 +73,48 @@ extend fun Codegen.str_to_type(s: String): AST.Type {
         }
         if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
         return AST.Type.ClassType(s)
+    }
+
+extend fun Codegen.parse_func_type_str(s: String): AST.Type {
+        // Format: Fun(param1,param2):RetType
+        // Find the closing paren that matches the opening one
+        var depth: Float = 0
+        var close_paren: Float = -1
+        var i: Float = 4  // skip "Fun("
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "(") {
+                depth = depth + 1
+            } else if (ch == ")") {
+                if (depth == 0) {
+                    close_paren = i
+                    i = s.length()
+                } else {
+                    depth = depth - 1
+                }
+            }
+            i = i + 1
+        }
+        if (close_paren < 0) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
+        var params_str: String = s.slice(4, close_paren)
+        var param_types: List<AST.Type> = []
+        if (params_str.length() > 0) {
+            var param_parts: List<String> = this.split_respecting_generics(params_str, ",")
+            var pi: Float = 0
+            while (pi < param_parts.length()) {
+                param_types.push(this.str_to_type(param_parts[pi]))
+                pi = pi + 1
+            }
+        }
+        var ret_type: AST.Type = AST.Type.AnyType
+        // After ")" there should be ":RetType"
+        if (close_paren + 1 < s.length() and s.char_at(close_paren + 1) == ":") {
+            var ret_str: String = s.slice(close_paren + 2, s.length())
+            ret_type = this.str_to_type(ret_str)
+        }
+        return AST.Type.FuncType(param_types, ret_type)
     }
 
 extend fun Codegen.type_to_string(t: AST.Type): String {
@@ -214,6 +270,7 @@ extend fun Codegen.coerce_to_string(val: String, val_type: String): String {
         }
         // List type: call __list_to_string runtime function
         if (val_type.starts_with("List")) {
+            this.called_functions.push("__list_to_string")
             var result: String = this.fresh_local()
             this.emit_indent(result + " = call i64 @__list_to_string(i64 " + val + ")")
             return result
@@ -388,5 +445,14 @@ extend fun Codegen.get_map_value_type(map_type: String): String {
         var parts: List<String> = this.split_respecting_generics(inner, ",")
         if (parts.length() < 2) return "Any"
         return parts[1]
+    }
+
+    // Get the type string for a variable from typed_vars (the single source of truth).
+    // Returns "" if the variable is not registered.
+extend fun Codegen.get_var_type_str(name: String): String {
+        if (this.typed_vars.has(name)) {
+            return this.type_to_string(this.typed_vars.get(name))
+        }
+        return ""
     }
 

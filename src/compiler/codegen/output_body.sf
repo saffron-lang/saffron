@@ -35,11 +35,9 @@
             var ci2: Float = 0
             while (ci2 < captures.length()) {
                 if (full_params.length() > 0) { full_params = full_params + "," }
-                var cap_type: String = "Int"
-                if (this.typed_vars.has(captures[ci2])) {
-                    cap_type = this.type_to_string(this.typed_vars.get(captures[ci2]))
-                } else if (this.var_types.has(captures[ci2])) {
-                    cap_type = this.var_types.get(captures[ci2])
+                var cap_type: String = this.get_var_type_str(captures[ci2])
+                if (cap_type.length() == 0) {
+                    cap_type = "Int"
                 }
                 full_params = full_params + captures[ci2] + ":" + cap_type
                 ci2 = ci2 + 1

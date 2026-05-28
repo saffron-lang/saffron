@@ -834,6 +834,20 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             this.emit_indent(local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
             this.set_last_type(AST.Type.StringType)
             return local
+        } else if (obj_type.starts_with("List")) {
+            this.called_functions.push("__list_to_string")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_to_string(i64 " + obj + ")")
+            this.set_last_type(AST.Type.StringType)
+            return local
+        } else if (obj_type.starts_with("Map")) {
+            var const_name: String = this.add_string_constant("[Map]")
+            var gep: String = this.fresh_local()
+            this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            this.set_last_type(AST.Type.StringType)
+            return local
         } else {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")

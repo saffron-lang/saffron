@@ -332,15 +332,22 @@ extend fun Codegen.find_free_vars_stmt(stmt: AST.Stmt, bound: List<String>, free
 extend fun Codegen.find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
             Variable(name) => {
-                var is_known: Bool = bound.contains(name) or free.contains(name) or this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name)
-                if (!is_known and name.length() > 0) {
-                    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    if (upper.index_of(name.char_at(0)) >= 0) {
-                        is_known = true
-                    }
-                }
-                if (!is_known) {
+                if (bound.contains(name) or free.contains(name)) {
+                    // Already bound or already free — skip
+                } else if (this.var_types.has(name)) {
+                    // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
+                } else {
+                    var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name)
+                    if (!is_known and name.length() > 0) {
+                        var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                        if (upper.index_of(name.char_at(0)) >= 0) {
+                            is_known = true
+                        }
+                    }
+                    if (!is_known) {
+                        free.push(name)
+                    }
                 }
             }
             Binary(l, o, r) => {

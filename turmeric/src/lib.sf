@@ -3,7 +3,7 @@
 
 import "./element.sf" as Element
 
-class Event {
+class SfEvent {
     var type: String
     var target_value: String
     fun init(type: String, target_value: String = "") {
@@ -220,16 +220,16 @@ fun style(value: String): Attr { return Attr.Prop("style", value) }
 
 // --- Event helpers ---
 
-fun on_click(handler: (Event) => Nil): Attr { return Attr.Event("click", handler) }
-fun on_input(handler: (Event) => Nil): Attr { return Attr.Event("input", handler) }
-fun on_submit(handler: (Event) => Nil): Attr { return Attr.Event("submit", handler) }
-fun on_change(handler: (Event) => Nil): Attr { return Attr.Event("change", handler) }
-fun on_keydown(handler: (Event) => Nil): Attr { return Attr.Event("keydown", handler) }
-fun on_keyup(handler: (Event) => Nil): Attr { return Attr.Event("keyup", handler) }
-fun on_focus(handler: (Event) => Nil): Attr { return Attr.Event("focus", handler) }
-fun on_blur(handler: (Event) => Nil): Attr { return Attr.Event("blur", handler) }
-fun on_mouse_enter(handler: (Event) => Nil): Attr { return Attr.Event("mouseenter", handler) }
-fun on_mouse_leave(handler: (Event) => Nil): Attr { return Attr.Event("mouseleave", handler) }
+fun on_click(handler: (SfEvent) => Nil): Attr { return Attr.Event("click", handler) }
+fun on_input(handler: (SfEvent) => Nil): Attr { return Attr.Event("input", handler) }
+fun on_submit(handler: (SfEvent) => Nil): Attr { return Attr.Event("submit", handler) }
+fun on_change(handler: (SfEvent) => Nil): Attr { return Attr.Event("change", handler) }
+fun on_keydown(handler: (SfEvent) => Nil): Attr { return Attr.Event("keydown", handler) }
+fun on_keyup(handler: (SfEvent) => Nil): Attr { return Attr.Event("keyup", handler) }
+fun on_focus(handler: (SfEvent) => Nil): Attr { return Attr.Event("focus", handler) }
+fun on_blur(handler: (SfEvent) => Nil): Attr { return Attr.Event("blur", handler) }
+fun on_mouse_enter(handler: (SfEvent) => Nil): Attr { return Attr.Event("mouseenter", handler) }
+fun on_mouse_leave(handler: (SfEvent) => Nil): Attr { return Attr.Event("mouseleave", handler) }
 
 // --- Signal binding ---
 

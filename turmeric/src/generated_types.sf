@@ -7,7 +7,7 @@ import "./element.sf" as Element
 // Event Types
 // =============================================================================
 
-class Event {
+class DomEvent {
     var bubbles: Bool
     var cancelable: Bool
     var composed: Bool
