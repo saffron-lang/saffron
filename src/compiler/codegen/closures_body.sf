@@ -63,16 +63,15 @@
             this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
-            // Store pointers to captured variables in env.
-            // Uses stack pointers — valid as long as enclosing function is on stack.
-            // For escaping closures, captured vars would need heap allocation.
+            // Store VALUES of captured variables in env (copy semantics).
+            // This allows closures to escape the enclosing stack frame safely.
             var ci: Float = 0
             while (ci < captures.length()) {
-                var cap_ptr: String = this.fresh_local()
-                this.emit_indent(cap_ptr + " = ptrtoint i64* %" + this.sanitize_name(captures[ci]) + " to i64")
+                var cap_val: String = this.fresh_local()
+                this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(captures[ci]))
                 var slot: String = this.fresh_local()
                 this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-                this.emit_indent("store i64 " + cap_ptr + ", i64* " + slot)
+                this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
                 ci = ci + 1
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
@@ -171,6 +170,9 @@
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
         this.known_functions.push(name)
         this.reset_locals()
+        this.var_types = {}
+        this.typed_vars = {}
+        this.string_vars = []
         var ret_llvm: String = this.llvm_type(ret_type)
         this.current_ret_type = ret_llvm
 
@@ -198,7 +200,7 @@
         this.emit("entry:")
         this.block_terminated = false
 
-        // Alloca all params
+        // Alloca all params and register in var_types/typed_vars
         i = 0
         while (i < param_list.length()) {
             var parts: List<String> = param_list[i].split(":")
@@ -206,11 +208,13 @@
             var ptype: String = parts[1]
             this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
+            this.var_types.set(pname, ptype)
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             i = i + 1
         }
 
-        // Extract capture POINTERS from __env
-        // Env stores ptrtoint'd pointers to the captured variables (heap-allocated)
+        // Extract capture VALUES from __env
+        // Env stores the actual i64 values of captured variables (copy semantics)
         var env_size: Float = captures.length()
         var env_int: String = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
@@ -221,10 +225,14 @@
             var cap_name: String = captures[ci]
             var cap_slot: String = this.fresh_local()
             this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-            var cap_ptr_int: String = this.fresh_local()
-            this.emit_indent(cap_ptr_int + " = load i64, i64* " + cap_slot)
-            // cap_name becomes the POINTER (i64*) to the shared variable
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = inttoptr i64 " + cap_ptr_int + " to i64*")
+            var cap_val: String = this.fresh_local()
+            this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
+            // Allocate local storage for captured variable and initialize with env value
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
+            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
+            // Register captured variable in var_types so body codegen can find it
+            this.var_types.set(cap_name, "Int")
+            this.typed_vars.set(cap_name, this.str_to_type("Int"))
             ci = ci + 1
         }
 

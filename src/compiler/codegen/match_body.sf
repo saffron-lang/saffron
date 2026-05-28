@@ -20,10 +20,12 @@
                 _ => []
             }
             if (first_bindings.length() == 1) {
-                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
+                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF, retag
                 var bname: String = first_bindings[0]
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
                 var extracted: String = this.fresh_local()
-                this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+                this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
                 this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
             } else if (first_bindings.length() > 1) {
                 // Multi-field variant: inttoptr → GEP for each binding
@@ -158,10 +160,12 @@
     fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
         var bind_count: Float = bindings.length()
         if (max_fields <= 1) {
-            // Simple encoding: extract value with AND mask
+            // Simple encoding: extract raw value with AND mask, then retag as int
             var bname: String = bindings[0]
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
             var extracted: String = this.fresh_local()
-            this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+            this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
             this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
         } else {
             // Array encoding: inttoptr and GEP to extract fields

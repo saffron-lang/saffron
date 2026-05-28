@@ -44,6 +44,7 @@ declare void @__io_print_str(i64)
 declare void @__io_print_int(i64)
 declare i64 @__bool_to_string(i64)
 declare i64 @__nil_to_string()
+declare i64 @__float_to_string(i64)
 ; --- NaN-boxing value helpers ---
 declare i64 @__val_tag_int(i64)
 declare i64 @__val_untag_int(i64)
@@ -55,6 +56,7 @@ declare i64 @__val_tag_bool(i64)
 declare i64 @__val_untag_bool(i64)
 declare i64 @__val_nil()
 
+declare double @strtod(i8*, i8*)
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
 @.str.rb = linkonce_odr unnamed_addr constant [2 x i8] c"r\00"

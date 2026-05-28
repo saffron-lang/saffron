@@ -94,10 +94,8 @@ class Codegen {
         this.builtin_methods.set("trim", "r1|rt_str_trim|String|1")
         this.builtin_methods.set("to_upper", "r1|rt_str_to_upper|String|1")
         this.builtin_methods.set("to_lower", "r1|rt_str_to_lower|String|1")
-        this.builtin_methods.set("has", "r2|__map_has|Bool|0")
         this.builtin_methods.set("index_of", "r2|rt_str_index_of|Int|1")
         this.builtin_methods.set("repeat", "r2|rt_str_repeat|String|1")
-        this.builtin_methods.set("to_number", "p1|atol|Int|0")
         this.builtin_methods.set("split", "p2|__str_split|ListStr|0")
         this.builtin_methods.set("ends_with", "p2|__str_ends_with|Bool|0")
         this.builtin_methods.set("replace", "p3|__str_replace|String|0")
@@ -325,11 +323,16 @@ class Codegen {
         if (val_type == "String") {
             return val
         }
-        if (val_type == "Int" or val_type == "Float") {
+        if (val_type == "Int") {
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + val + ")")
             var result: String = this.fresh_local()
             this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
+            return result
+        }
+        if (val_type == "Float") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__float_to_string(i64 " + val + ")")
             return result
         }
         if (val_type == "Bool") {
@@ -538,8 +541,15 @@ class Codegen {
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
+                // In identity mode, v's raw i64 bits ARE the IEEE 754 double.
+                // Emit as bitcast from those bits directly.
+                var bits: String = v.to_string()
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = add i64 0, " + bits)
+                var dbl: String = this.fresh_local()
+                this.emit_indent(dbl + " = bitcast i64 " + raw + " to double")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v.to_string() + ")")
+                this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
                 local
             }
             BoolLit(v) => {
@@ -879,9 +889,16 @@ class Codegen {
             return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
+        var left_type: String = this.get_expr_type(left)
         var lhs: String = this.gen_arg_value(left)
+        if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
+        var right_type: String = this.get_expr_type(right)
         var rhs: String = this.gen_arg_value(right)
+        if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
+        if (left_type == "Float" or right_type == "Float") {
+            return this.gen_binary_float(lhs, rhs, op)
+        }
         return this.gen_binary_nanboxed(lhs, rhs, op)
     }
 
@@ -964,6 +981,38 @@ class Codegen {
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + l_raw + ")")
         this.last_type = AST.Type.IntType
+        return local
+    }
+
+    fun gen_binary_float(lhs: String, rhs: String, op: String): String {
+        // Float arithmetic: untag as double → operate → retag
+        var is_cmp: Bool = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+        var l_f: String = this.fresh_local()
+        this.emit_indent(l_f + " = call double @__val_untag_float(i64 " + lhs + ")")
+        var r_f: String = this.fresh_local()
+        this.emit_indent(r_f + " = call double @__val_untag_float(i64 " + rhs + ")")
+        if (!is_cmp) {
+            var result_f: String = this.fresh_local()
+            if (op == "+") { this.emit_indent(result_f + " = fadd double " + l_f + ", " + r_f) }
+            else if (op == "-") { this.emit_indent(result_f + " = fsub double " + l_f + ", " + r_f) }
+            else if (op == "*") { this.emit_indent(result_f + " = fmul double " + l_f + ", " + r_f) }
+            else if (op == "/") { this.emit_indent(result_f + " = fdiv double " + l_f + ", " + r_f) }
+            else if (op == "%") { this.emit_indent(result_f + " = frem double " + l_f + ", " + r_f) }
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_float(double " + result_f + ")")
+            this.last_type = AST.Type.FloatType
+            return local
+        }
+        var cmp_result: String = this.fresh_local()
+        if (op == "==") { this.emit_indent(cmp_result + " = fcmp oeq double " + l_f + ", " + r_f) }
+        else if (op == "!=") { this.emit_indent(cmp_result + " = fcmp one double " + l_f + ", " + r_f) }
+        else if (op == "<") { this.emit_indent(cmp_result + " = fcmp olt double " + l_f + ", " + r_f) }
+        else if (op == "<=") { this.emit_indent(cmp_result + " = fcmp ole double " + l_f + ", " + r_f) }
+        else if (op == ">") { this.emit_indent(cmp_result + " = fcmp ogt double " + l_f + ", " + r_f) }
+        else if (op == ">=") { this.emit_indent(cmp_result + " = fcmp oge double " + l_f + ", " + r_f) }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = select i1 " + cmp_result + ", i64 9222246136947933185, i64 9222246136947933184")
+        this.last_type = AST.Type.BoolType
         return local
     }
 
@@ -1671,13 +1720,16 @@ class Codegen {
         var max_fields: Float = this.get_max_fields(enum_name)
 
         if (max_fields <= 1) {
-            // Simple encoding: (tag << 56) | value
+            // Simple encoding: (tag << 56) | raw_value
+            // Untag value before storing to avoid NaN-box tag collision
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 this.last_type = AST.Type.EnumType(enum_name); return local
             }
-            var val: String = this.gen_arg_value(args[0])
+            var val_tagged: String = this.gen_arg_value(args[0])
+            var val: String = this.fresh_local()
+            this.emit_indent(val + " = call i64 @__val_untag_int(i64 " + val_tagged + ")")
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined: String = this.fresh_local()
@@ -1751,10 +1803,12 @@ class Codegen {
                 _ => []
             }
             if (first_bindings.length() == 1) {
-                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
+                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF, retag
                 var bname: String = first_bindings[0]
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
                 var extracted: String = this.fresh_local()
-                this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+                this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
                 this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
             } else if (first_bindings.length() > 1) {
                 // Multi-field variant: inttoptr → GEP for each binding
@@ -1889,10 +1943,12 @@ class Codegen {
     fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
         var bind_count: Float = bindings.length()
         if (max_fields <= 1) {
-            // Simple encoding: extract value with AND mask
+            // Simple encoding: extract raw value with AND mask, then retag as int
             var bname: String = bindings[0]
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
             var extracted: String = this.fresh_local()
-            this.emit_indent(extracted + " = and i64 " + subj + ", 72057594037927935")
+            this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
             this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
         } else {
             // Array encoding: inttoptr and GEP to extract fields
@@ -2026,16 +2082,15 @@ class Codegen {
             this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
-            // Store pointers to captured variables in env.
-            // Uses stack pointers — valid as long as enclosing function is on stack.
-            // For escaping closures, captured vars would need heap allocation.
+            // Store VALUES of captured variables in env (copy semantics).
+            // This allows closures to escape the enclosing stack frame safely.
             var ci: Float = 0
             while (ci < captures.length()) {
-                var cap_ptr: String = this.fresh_local()
-                this.emit_indent(cap_ptr + " = ptrtoint i64* %" + this.sanitize_name(captures[ci]) + " to i64")
+                var cap_val: String = this.fresh_local()
+                this.emit_indent(cap_val + " = load i64, i64* %" + this.sanitize_name(captures[ci]))
                 var slot: String = this.fresh_local()
                 this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-                this.emit_indent("store i64 " + cap_ptr + ", i64* " + slot)
+                this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
                 ci = ci + 1
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
@@ -2134,6 +2189,9 @@ class Codegen {
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
         this.known_functions.push(name)
         this.reset_locals()
+        this.var_types = {}
+        this.typed_vars = {}
+        this.string_vars = []
         var ret_llvm: String = this.llvm_type(ret_type)
         this.current_ret_type = ret_llvm
 
@@ -2161,7 +2219,7 @@ class Codegen {
         this.emit("entry:")
         this.block_terminated = false
 
-        // Alloca all params
+        // Alloca all params and register in var_types/typed_vars
         i = 0
         while (i < param_list.length()) {
             var parts: List<String> = param_list[i].split(":")
@@ -2169,11 +2227,13 @@ class Codegen {
             var ptype: String = parts[1]
             this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
+            this.var_types.set(pname, ptype)
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             i = i + 1
         }
 
-        // Extract capture POINTERS from __env
-        // Env stores ptrtoint'd pointers to the captured variables (heap-allocated)
+        // Extract capture VALUES from __env
+        // Env stores the actual i64 values of captured variables (copy semantics)
         var env_size: Float = captures.length()
         var env_int: String = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
@@ -2184,10 +2244,14 @@ class Codegen {
             var cap_name: String = captures[ci]
             var cap_slot: String = this.fresh_local()
             this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-            var cap_ptr_int: String = this.fresh_local()
-            this.emit_indent(cap_ptr_int + " = load i64, i64* " + cap_slot)
-            // cap_name becomes the POINTER (i64*) to the shared variable
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = inttoptr i64 " + cap_ptr_int + " to i64*")
+            var cap_val: String = this.fresh_local()
+            this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
+            // Allocate local storage for captured variable and initialize with env value
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
+            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
+            // Register captured variable in var_types so body codegen can find it
+            this.var_types.set(cap_name, "Int")
+            this.typed_vars.set(cap_name, this.str_to_type("Int"))
             ci = ci + 1
         }
 
@@ -4182,6 +4246,7 @@ class Codegen {
         out.append("declare void @__io_print_int(i64)\n")
         out.append("declare i64 @__bool_to_string(i64)\n")
         out.append("declare i64 @__nil_to_string()\n")
+        out.append("declare i64 @__float_to_string(i64)\n")
         out.append("; --- NaN-boxing value helpers ---\n")
         out.append("declare i64 @__val_tag_int(i64)\n")
         out.append("declare i64 @__val_untag_int(i64)\n")
@@ -4192,6 +4257,8 @@ class Codegen {
         out.append("declare i64 @__val_tag_bool(i64)\n")
         out.append("declare i64 @__val_untag_bool(i64)\n")
         out.append("declare i64 @__val_nil()\n\n")
+
+        out.append("declare double @strtod(i8*, i8*)\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
@@ -4865,8 +4932,10 @@ class Codegen {
         this.emit_indent(key_ptr + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
         var key_raw: String = this.fresh_local()
         this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_raw + ")")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_raw + ")")
+        this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw + ")")
         this.last_type = AST.Type.BoolType
         return local
     }
@@ -4900,25 +4969,29 @@ class Codegen {
     }
     if (!is_user_class and method == "starts_with") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var prefix: String = this.gen_arg_value(args[0])
         var prefix_ptr: String = this.fresh_local()
-        this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
+        this.emit_indent(prefix_ptr + " = call i8* @__val_untag_ptr(i64 " + prefix + ")")
         var plen: String = this.fresh_local()
         this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
         var cmp: String = this.fresh_local()
         this.emit_indent(cmp + " = call i32 @strncmp(i8* " + str_ptr + ", i8* " + prefix_ptr + ", i64 " + plen + ")")
         var is_eq: String = this.fresh_local()
         this.emit_indent(is_eq + " = icmp eq i32 " + cmp + ", 0")
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = zext i1 " + is_eq + " to i64")
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
+        this.emit_indent(result + " = call i64 @__val_tag_bool(i64 " + raw + ")")
         this.last_type = AST.Type.BoolType
         return result
     }
     if (!is_user_class and method == "char_at") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-        var idx: String = this.gen_arg_value(args[0])
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
+        var idx_tagged: String = this.gen_arg_value(args[0])
+        var idx: String = this.fresh_local()
+        this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
         var char_ptr: String = this.fresh_local()
         this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
         var buf: String = this.fresh_local()
@@ -4930,13 +5003,13 @@ class Codegen {
         this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
         this.emit_indent("store i8 0, i8* " + null_ptr)
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         this.last_type = AST.Type.StringType
         return local
     }
     if (!is_user_class and method == "is_upper") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + str_ptr)
         var ge_a: String = this.fresh_local()
@@ -4952,7 +5025,7 @@ class Codegen {
     }
     if (!is_user_class and method == "is_lower") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + str_ptr)
         var ge_a: String = this.fresh_local()
@@ -4968,9 +5041,13 @@ class Codegen {
     }
     if (!is_user_class and method == "slice") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-        var start: String = this.gen_arg_value(args[0])
-        var end: String = this.gen_arg_value(args[1])
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
+        var start_tagged: String = this.gen_arg_value(args[0])
+        var start: String = this.fresh_local()
+        this.emit_indent(start + " = call i64 @__val_untag_int(i64 " + start_tagged + ")")
+        var end_tagged: String = this.gen_arg_value(args[1])
+        var end: String = this.fresh_local()
+        this.emit_indent(end + " = call i64 @__val_untag_int(i64 " + end_tagged + ")")
         var slice_len: String = this.fresh_local()
         this.emit_indent(slice_len + " = sub i64 " + end + ", " + start)
         var buf_size: String = this.fresh_local()
@@ -4984,7 +5061,7 @@ class Codegen {
         this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
         this.emit_indent("store i8 0, i8* " + null_pos)
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         this.last_type = AST.Type.StringType
         return local
     }
@@ -5001,7 +5078,7 @@ class Codegen {
     if (!is_user_class and method == "length") {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
             this.last_type = AST.Type.IntType
@@ -5016,16 +5093,18 @@ class Codegen {
     if (!is_user_class and method == "contains") {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
             var needle: String = this.gen_arg_value(args[0])
             var needle_ptr: String = this.fresh_local()
-            this.emit_indent(needle_ptr + " = inttoptr i64 " + needle + " to i8*")
+            this.emit_indent(needle_ptr + " = call i8* @__val_untag_ptr(i64 " + needle + ")")
             var found: String = this.fresh_local()
             this.emit_indent(found + " = call i8* @strstr(i8* " + str_ptr + ", i8* " + needle_ptr + ")")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = icmp ne i8* " + found + ", null")
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = zext i1 " + local + " to i64")
             var result: String = this.fresh_local()
-            this.emit_indent(result + " = zext i1 " + local + " to i64")
+            this.emit_indent(result + " = call i64 @__val_tag_bool(i64 " + raw + ")")
             this.last_type = AST.Type.BoolType
             return result
         } else {
@@ -5036,6 +5115,16 @@ class Codegen {
             return local
         }
     }
+    if (!is_user_class and method == "to_number") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
+        var dbl: String = this.fresh_local()
+        this.emit_indent(dbl + " = call double @strtod(i8* " + str_ptr + ", i8* null)")
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
+        this.last_type = AST.Type.FloatType
+        return local
+    }
     if (!is_user_class and method == "to_string") {
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
@@ -5045,6 +5134,11 @@ class Codegen {
         } else if (obj_type == "String") {
             this.last_type = AST.Type.StringType
             return obj
+        } else if (obj_type == "Float") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__float_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
         } else if (obj_type == "Bool") {
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + obj + ")")

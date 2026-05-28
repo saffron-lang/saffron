@@ -78,11 +78,16 @@
         if (val_type == "String") {
             return val
         }
-        if (val_type == "Int" or val_type == "Float") {
+        if (val_type == "Int") {
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + val + ")")
             var result: String = this.fresh_local()
             this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
+            return result
+        }
+        if (val_type == "Float") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__float_to_string(i64 " + val + ")")
             return result
         }
         if (val_type == "Bool") {

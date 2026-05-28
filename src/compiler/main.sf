@@ -57,14 +57,11 @@ fun get_stmt_name(stmt: AST.Stmt): String {
 }
 
 fun is_import_stmt(stmt: AST.Stmt): Bool {
-    return match (stmt) {
-        VarDecl(n, t, init, d) => {
-            if (d.starts_with("@import:")) { return true }
-            if (n.starts_with("_import_")) { return true }
-            false
-        }
-        _ => false
-    }
+    var doc: String = get_stmt_doc(stmt)
+    if (doc.starts_with("@import:")) { return true }
+    var name: String = get_stmt_name(stmt)
+    if (name.starts_with("_import_")) { return true }
+    return false
 }
 
 fun extract_imports_from_ast(program: List<AST.Stmt>): List<String> {
