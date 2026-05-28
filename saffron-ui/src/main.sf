@@ -1,0 +1,492 @@
+// Saffron UI - Full API prototype (ideal syntax)
+// Assumes: trailing closure params, optional/default params, generics, Fun types
+
+// =============================================================================
+// Core Types
+// =============================================================================
+
+enum Node {
+    Element(tag: String, attrs: List<Attr>, children: List<Node>),
+    Text(content: String),
+    Fragment(children: List<Node>)
+}
+
+enum Attr {
+    Prop(name: String, value: String),
+    Event(name: String, handler: Fun(Event): Nil),
+    Bind(name: String, signal: Signal<String>)
+}
+
+class Event {
+    var type: String
+    var target_value: String
+    fun init(type: String, target_value: String = "") {
+        this.type = type
+        this.target_value = target_value
+    }
+    fun prevent_default() {}
+}
+
+// =============================================================================
+// Reactivity
+// =============================================================================
+
+class Signal<T> {
+    var value: T
+    var subscribers: List<Fun(): Nil>
+
+    fun init(initial: T) {
+        this.value = initial
+        this.subscribers = []
+    }
+
+    fun get(): T {
+        if (_tracking != nil) {
+            _tracking.track(this)
+        }
+        return this.value
+    }
+
+    fun set(next: T) {
+        if (next == this.value) return
+        this.value = next
+        var i: Float = 0
+        while (i < this.subscribers.length()) {
+            this.subscribers[i]()
+            i = i + 1
+        }
+    }
+
+    fun update(fn: Fun(T): T) {
+        this.set(fn(this.value))
+    }
+
+    fun subscribe(fn: Fun(): Nil) {
+        this.subscribers.push(fn)
+    }
+}
+
+fun signal<T>(initial: T): Signal<T> {
+    return Signal(initial)
+}
+
+class Computed<T> {
+    var value: T
+    var compute: Fun(): T
+    var subscribers: List<Fun(): Nil>
+
+    fun init(compute: Fun(): T) {
+        this.compute = compute
+        this.subscribers = []
+        this.value = this.run()
+    }
+
+    fun get(): T {
+        if (_tracking != nil) {
+            _tracking.track(this)
+        }
+        return this.value
+    }
+
+    fun run(): T {
+        _with_tracking(fun () {
+            this.value = this.compute()
+        }, fun (dep: Any) {
+            dep.subscribe(fun () {
+                this.value = this.compute()
+                for (sub in this.subscribers) { sub() }
+            })
+        })
+        return this.value
+    }
+
+    fun subscribe(fn: Fun(): Nil) {
+        this.subscribers.push(fn)
+    }
+}
+
+fun computed<T>(fn: Fun(): T): Computed<T> {
+    return Computed(fn)
+}
+
+class Tracker {
+    var deps: List<Any>
+    var on_track: Fun(Any): Nil
+
+    fun init(on_track: Fun(Any): Nil) {
+        this.deps = []
+        this.on_track = on_track
+    }
+
+    fun track(dep: Any) {
+        if (!this.deps.contains(dep)) {
+            this.deps.push(dep)
+            this.on_track(dep)
+        }
+    }
+}
+
+var _tracking: Tracker = nil
+
+fun _with_tracking(fn: Fun(): Nil, on_dep: Fun(Any): Nil) {
+    var prev: Tracker = _tracking
+    _tracking = Tracker(on_dep)
+    fn()
+    _tracking = prev
+}
+
+fun effect(fn: Fun(): Nil) {
+    _with_tracking(fn, fun (dep: Any) {
+        dep.subscribe(fn)
+    })
+}
+
+// =============================================================================
+// Element Builders
+// =============================================================================
+
+class Context {
+    var children: List<Node>
+    fun init() {
+        this.children = []
+    }
+    fun add(node: Node) {
+        this.children.push(node)
+    }
+}
+
+var _ctx_stack: List<Context> = []
+
+fun _push_ctx(): Context {
+    var ctx = Context()
+    _ctx_stack.push(ctx)
+    return ctx
+}
+
+fun _pop_ctx(): Context {
+    return _ctx_stack.pop()
+}
+
+fun _current_ctx(): Context {
+    return _ctx_stack[_ctx_stack.length() - 1]
+}
+
+fun _el(tag: String, attrs: List<Attr>, block: Fun(): Nil): Node {
+    var ctx: Context = _push_ctx()
+    block()
+    _pop_ctx()
+    var node: Node = Node.Element(tag, attrs, ctx.children)
+    if (_ctx_stack.length() > 0) {
+        _current_ctx().add(node)
+    }
+    return node
+}
+
+fun text(content: String) {
+    _current_ctx().add(Node.Text(content))
+}
+
+// --- Standard HTML elements (attrs default to []) ---
+
+fun div(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("div", attrs, block) }
+fun span(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("span", attrs, block) }
+fun p(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("p", attrs, block) }
+fun h1(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h1", attrs, block) }
+fun h2(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h2", attrs, block) }
+fun h3(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h3", attrs, block) }
+fun h4(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h4", attrs, block) }
+fun button(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("button", attrs, block) }
+fun input(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("input", attrs, block) }
+fun ul(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("ul", attrs, block) }
+fun ol(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("ol", attrs, block) }
+fun li(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("li", attrs, block) }
+fun a(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("a", attrs, block) }
+fun img(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("img", attrs, block) }
+fun nav(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("nav", attrs, block) }
+fun header(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("header", attrs, block) }
+fun footer(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("footer", attrs, block) }
+fun section(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("section", attrs, block) }
+fun form(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("form", attrs, block) }
+fun label(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("label", attrs, block) }
+fun table(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("table", attrs, block) }
+fun tr(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("tr", attrs, block) }
+fun td(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("td", attrs, block) }
+fun th(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("th", attrs, block) }
+fun textarea(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("textarea", attrs, block) }
+fun select(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("select", attrs, block) }
+fun option(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("option", attrs, block) }
+fun pre(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("pre", attrs, block) }
+fun code(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("code", attrs, block) }
+fun br(): Node { return Node.Element("br", [], []) }
+fun hr(): Node { return Node.Element("hr", [], []) }
+
+// --- Attribute helpers ---
+
+fun class_(value: String): Attr { return Attr.Prop("class", value) }
+fun id(value: String): Attr { return Attr.Prop("id", value) }
+fun href(value: String): Attr { return Attr.Prop("href", value) }
+fun src(value: String): Attr { return Attr.Prop("src", value) }
+fun alt(value: String): Attr { return Attr.Prop("alt", value) }
+fun placeholder(value: String): Attr { return Attr.Prop("placeholder", value) }
+fun type_(value: String): Attr { return Attr.Prop("type", value) }
+fun name(value: String): Attr { return Attr.Prop("name", value) }
+fun style(value: String): Attr { return Attr.Prop("style", value) }
+
+// --- Event helpers ---
+
+fun on_click(handler: Fun(Event): Nil): Attr { return Attr.Event("click", handler) }
+fun on_input(handler: Fun(Event): Nil): Attr { return Attr.Event("input", handler) }
+fun on_submit(handler: Fun(Event): Nil): Attr { return Attr.Event("submit", handler) }
+fun on_change(handler: Fun(Event): Nil): Attr { return Attr.Event("change", handler) }
+fun on_keydown(handler: Fun(Event): Nil): Attr { return Attr.Event("keydown", handler) }
+fun on_keyup(handler: Fun(Event): Nil): Attr { return Attr.Event("keyup", handler) }
+fun on_focus(handler: Fun(Event): Nil): Attr { return Attr.Event("focus", handler) }
+fun on_blur(handler: Fun(Event): Nil): Attr { return Attr.Event("blur", handler) }
+fun on_mouse_enter(handler: Fun(Event): Nil): Attr { return Attr.Event("mouseenter", handler) }
+fun on_mouse_leave(handler: Fun(Event): Nil): Attr { return Attr.Event("mouseleave", handler) }
+
+// --- Signal binding ---
+
+fun bind_value(sig: Signal<String>): Attr { return Attr.Bind("value", sig) }
+
+// =============================================================================
+// Control Flow
+// =============================================================================
+
+fun each<T>(items: List<T>, key: Fun(T): String = fun (t: T): String => t.to_string(), render: Fun(T): Nil) {
+    var i: Float = 0
+    while (i < items.length()) {
+        render(items[i])
+        i = i + 1
+    }
+}
+
+fun show(condition: Bool, block: Fun(): Nil) {
+    if (condition) {
+        block()
+    }
+}
+
+fun show_signal(condition: Signal<Bool>, block: Fun(): Nil) {
+    if (condition.get()) {
+        block()
+    }
+}
+
+// =============================================================================
+// Resource (async data)
+// =============================================================================
+
+enum ResourceState<T> {
+    Loading,
+    Ready(value: T),
+    Error(message: String)
+}
+
+class Resource<T> {
+    var state: Signal<ResourceState<T>>
+    var fetcher: Fun(): T
+
+    fun init(fetcher: Fun(): T) {
+        this.fetcher = fetcher
+        this.state = signal(ResourceState.Loading)
+        this.load()
+    }
+
+    fun load() {
+        try {
+            var result: T = this.fetcher()
+            this.state.set(ResourceState.Ready(result))
+        } catch (e) {
+            this.state.set(ResourceState.Error(e))
+        }
+    }
+
+    fun get(): ResourceState<T> {
+        return this.state.get()
+    }
+
+    fun reload() {
+        this.state.set(ResourceState.Loading)
+        this.load()
+    }
+}
+
+fun resource<T>(fetcher: Fun(): T): Resource<T> {
+    return Resource(fetcher)
+}
+
+// =============================================================================
+// Rendering
+// =============================================================================
+
+fun render_to_html(node: Node): String {
+    return match (node) {
+        Text(content) => content
+        Fragment(children) => {
+            var html: String = ""
+            for (child in children) { html = html + render_to_html(child) }
+            html
+        }
+        Element(tag, attrs, children) => {
+            var html: String = "<" + tag
+            for (attr in attrs) {
+                match (attr) {
+                    Prop(n, v) => { html = html + " " + n + "=\"" + v + "\"" }
+                    Event(n, h) => {}
+                    Bind(n, sig) => { html = html + " " + n + "=\"" + sig.get() + "\"" }
+                }
+            }
+            if (tag == "br" or tag == "hr" or tag == "img" or tag == "input") {
+                return html + " />"
+            }
+            html = html + ">"
+            for (child in children) { html = html + render_to_html(child) }
+            html + "</" + tag + ">"
+        }
+    }
+}
+
+// =============================================================================
+// Example: Todo App
+// =============================================================================
+
+fun TodoApp(): Node {
+    var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+    var input_text = signal("")
+
+    return div([class_("todo-app")]) {
+        h1 { text("Todo App") }
+
+        form([on_submit(fun (e: Event) {
+            e.prevent_default()
+            todos.update(fun (list: List<String>): List<String> {
+                list.push(input_text.get())
+                return list
+            })
+            input_text.set("")
+        })]) {
+            input([placeholder("What needs doing?"), bind_value(input_text)]) {}
+            button([type_("submit")]) { text("Add") }
+        }
+
+        ul([class_("todo-list")]) {
+            each(todos.get()) { todo =>
+                li { text(todo) }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Example: Counter with computed
+// =============================================================================
+
+fun Counter(): Node {
+    var count = signal(0)
+    var doubled = computed(fun (): Float => count.get() * 2)
+    var label = computed(fun (): String => match (count.get()) {
+        0 => "zero"
+        1 => "one"
+        _ => "many"
+    })
+
+    return div([class_("counter")]) {
+        h2 { text("Counter: ${count.get()}") }
+        p { text("Doubled: ${doubled.get()}") }
+        p { text("Label: ${label.get()}") }
+
+        div([class_("buttons")]) {
+            button([on_click(fun (e: Event) => count.update(fun (n: Float): Float => n + 1))]) {
+                text("+")
+            }
+            button([on_click(fun (e: Event) => count.update(fun (n: Float): Float => n - 1))]) {
+                text("-")
+            }
+            button([on_click(fun (e: Event) => count.set(0))]) {
+                text("Reset")
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Example: Conditional rendering + resource
+// =============================================================================
+
+class User {
+    var name: String
+    var email: String
+    fun init(name: String, email: String) {
+        this.name = name
+        this.email = email
+    }
+}
+
+fun UserProfile(user_id: Float): Node {
+    var user = resource(fun (): User => fetch_user(user_id))
+
+    return div([class_("profile")]) {
+        match (user.get()) {
+            Loading => div([class_("skeleton")]) {
+                p { text("Loading...") }
+            }
+            is Ready(u) => div {
+                h2 { text(u.name) }
+                p { text(u.email) }
+            }
+            is Error(msg) => div([class_("error")]) {
+                p { text("Failed to load: ${msg}") }
+                button([on_click(fun (e: Event) => user.reload())]) {
+                    text("Retry")
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Example: Component composition
+// =============================================================================
+
+fun NavBar(links: List<List<String>>): Node {
+    return nav([class_("navbar")]) {
+        ul {
+            each(links) { link =>
+                li {
+                    a([href(link[1])]) { text(link[0]) }
+                }
+            }
+        }
+    }
+}
+
+fun App(): Node {
+    var page = signal("home")
+    var links = [["Home", "/"], ["About", "/about"], ["Contact", "/contact"]]
+
+    return div([id("app")]) {
+        NavBar(links)
+
+        section([class_("content")]) {
+            match (page.get()) {
+                "home" => div {
+                    h1 { text("Welcome") }
+                    Counter()
+                    TodoApp()
+                }
+                "about" => div {
+                    h1 { text("About") }
+                    p { text("Built with Saffron UI") }
+                }
+                _ => div {
+                    h1 { text("404") }
+                }
+            }
+        }
+    }
+}
+
+// --- Entry ---
+var app: Node = App()
+IO.println(render_to_html(app))

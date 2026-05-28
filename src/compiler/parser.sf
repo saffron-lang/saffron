@@ -90,6 +90,22 @@ class Parser {
     }
 
     fun parse_single_type(): String {
+        // Function types: (ParamType, ...) => ReturnType
+        if (this.match_kind_check("(")) {
+            this.advance()
+            var fun_type: String = "Fun("
+            if (!this.match_kind_check(")")) {
+                fun_type = fun_type + this.parse_type()
+                while (this.match_kind(",")) {
+                    fun_type = fun_type + "," + this.parse_type()
+                }
+            }
+            this.consume(")")
+            fun_type = fun_type + ")"
+            this.consume("=>")
+            fun_type = fun_type + ":" + this.parse_type()
+            return fun_type
+        }
         var name: String = this.expect_ident()
         // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
         while (this.match_kind(".")) {
@@ -1127,7 +1143,8 @@ class Parser {
             var kind: Lexer.TokenKind = this.current_kind()
             var path: String = match (kind) { TkString(s) => s }
             this.advance()
-            return AST.Stmt.VarDecl("_import_", "", AST.Expr.NilLit, "@import:" + path + "|names:" + names.join(","))
+            // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
+            return AST.Stmt.ExprStmt(AST.Expr.NilLit)
         }
         var kind: Lexer.TokenKind = this.current_kind()
         var path: String = match (kind) { TkString(s) => s }
@@ -1135,9 +1152,11 @@ class Parser {
         if (this.is_ident_named("as")) {
             this.advance()
             var alias: String = this.expect_ident()
-            return AST.Stmt.VarDecl("_import_" + alias, "", AST.Expr.NilLit, "@import:" + path + "|as:" + alias)
+            // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
+            return AST.Stmt.ExprStmt(AST.Expr.NilLit)
         }
-        return AST.Stmt.VarDecl("_import_", "", AST.Expr.NilLit, "@import:" + path + "|as:")
+        // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
+        return AST.Stmt.ExprStmt(AST.Expr.NilLit)
     }
 
     fun parse_return(): AST.Stmt {

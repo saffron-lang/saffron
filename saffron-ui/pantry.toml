@@ -1,0 +1,12 @@
+[package]
+name = "saffron-ui"
+version = "0.1.0"
+description = "Reactive web framework for Saffron targeting WASM"
+entry = "src/main.sf"
+authors = ["henry232323"]
+
+[dependencies]
+
+[scripts]
+build = "saffron build src/main.sf -o build/saffron-ui"
+run = "saffron run src/main.sf"
