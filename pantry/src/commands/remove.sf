@@ -5,7 +5,7 @@ import "@os" as OS
 import "../config.sf" as Config
 
 fun run(package_name: String, parsed: Args.ParsedArgs) {
-    var manifest_path = Config.find_manifest()
+    var manifest_path: String = Config.find_manifest()
     var manifest = Config.load_from(manifest_path)
 
     if (!(manifest.dependencies.has(package_name))) {

@@ -14,11 +14,11 @@ fun run(parsed: Args.ParsedArgs) {
 
     if (manifest.dependencies.length() > 0) {
         IO.println("Dependencies:")
-        var keys = manifest.dependencies.keys()
-        var i = 0
+        var keys: List<String> = manifest.dependencies.keys()
+        var i: Int = 0
         while (i < keys.length()) {
-            var name = keys[i]
-            var version = manifest.dependencies.get(name)
+            var name: String = keys[i]
+            var version: String = manifest.dependencies.get(name)
             IO.println("  ${name} @ ${version}")
             i = i + 1
         }
@@ -27,11 +27,11 @@ fun run(parsed: Args.ParsedArgs) {
     if (manifest.dev_dependencies.length() > 0) {
         IO.println("")
         IO.println("Dev dependencies:")
-        var keys = manifest.dev_dependencies.keys()
-        var i = 0
+        var keys: List<String> = manifest.dev_dependencies.keys()
+        var i: Int = 0
         while (i < keys.length()) {
-            var name = keys[i]
-            var version = manifest.dev_dependencies.get(name)
+            var name: String = keys[i]
+            var version: String = manifest.dev_dependencies.get(name)
             IO.println("  ${name} @ ${version}")
             i = i + 1
         }

@@ -17,8 +17,8 @@ fun run(parsed: Args.ParsedArgs) {
     }
 
     // Default: find test files via shell
-    var ls_output = OS.exec("ls test/test_*.sf 2>/dev/null")
-    var sf_tests = ls_output.trim().split("\n")
+    var ls_output: String = OS.exec("ls test/test_*.sf 2>/dev/null")
+    var sf_tests: List<String> = ls_output.trim().split("\n")
 
     if (sf_tests.length() == 0) {
         IO.println("pantry test: no test files found in test/")
@@ -26,14 +26,14 @@ fun run(parsed: Args.ParsedArgs) {
         OS.exit(1)
     }
 
-    var passed = 0
-    var failed = 0
+    var passed: Int = 0
+    var failed: Int = 0
 
-    var i = 0
+    var i: Int = 0
     while (i < sf_tests.length()) {
-        var file = sf_tests[i]
+        var file: String = sf_tests[i]
         IO.print("  ${file} ... ")
-        var output = OS.exec("saffron run ${file}")
+        var output: String = OS.exec("saffron run ${file}")
         if (output.contains("passed") and !(output.contains("failed"))) {
             IO.println("ok")
             passed = passed + 1

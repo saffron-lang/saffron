@@ -12,13 +12,13 @@ class Manifest {
     var name: String
     var version: String
     var description: String
-    var authors: List
+    var authors: List<String>
     var license: String
     var entry: String
-    var dependencies: Map
-    var dev_dependencies: Map
-    var scripts: Map
-    var raw: Map
+    var dependencies: Map<String, Any>
+    var dev_dependencies: Map<String, Any>
+    var scripts: Map<String, String>
+    var raw: Map<String, Any>
 
     fun init() {
         this.name = ""
@@ -35,8 +35,8 @@ class Manifest {
 }
 
 fun _parent_dir(path: String): String {
-    var last_slash = -1
-    var i = 0
+    var last_slash: Int = -1
+    var i: Int = 0
     while (i < path.length()) {
         if (path.char_at(i) == "/") {
             last_slash = i
@@ -103,9 +103,9 @@ fun load(): Manifest {
 
 /// Serialize a manifest back to TOML and write to disk.
 fun save(manifest: Manifest, path: String) {
-    var toml_data = {}
+    var toml_data: Map<String, Any> = {}
 
-    var pkg = {}
+    var pkg: Map<String, Any> = {}
     pkg.set("name", manifest.name)
     pkg.set("version", manifest.version)
     if (manifest.description != "") { pkg.set("description", manifest.description) }

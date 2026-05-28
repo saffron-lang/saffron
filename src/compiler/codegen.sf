@@ -42,6 +42,7 @@ class Codegen {
     var builtin_methods: Map<String, String>
     var extend_map: Map<String, String>
     var pending_extend_class: String
+    var target: String
 
     fun init() {
         this.sb = StringBuilder()
@@ -82,6 +83,7 @@ class Codegen {
         this.builtin_methods = {}
         this.extend_map = {}
         this.pending_extend_class = ""
+        this.target = "native"
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
         this.builtin_methods.set("set", "v3|__map_set|Nil|0")
@@ -256,6 +258,12 @@ class Codegen {
 
 fun generate(program: List<AST.Stmt>): String {
     var gen: Codegen = Codegen()
+    return gen.generate(program)
+}
+
+fun generate_with_target(program: List<AST.Stmt>, target: String): String {
+    var gen: Codegen = Codegen()
+    gen.target = target
     return gen.generate(program)
 }
 
@@ -447,8 +455,9 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     return gen.generate(program)
 }
 
-fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>): String {
+fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String): String {
     var gen: Codegen = Codegen()
+    gen.target = target
     gen.module_prefixes = alias_map
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")

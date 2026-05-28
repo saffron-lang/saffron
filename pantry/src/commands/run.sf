@@ -6,7 +6,7 @@ import "../config.sf" as Config
 
 fun _exec(cmd: String) {
     IO.println("> ${cmd}")
-    var output = OS.exec(cmd)
+    var output: String = OS.exec(cmd)
     IO.print(output)
 }
 
@@ -19,7 +19,7 @@ fun run(script_name: String, parsed: Args.ParsedArgs) {
         IO.println("")
         if (manifest.scripts.length() > 0) {
             IO.println("Available scripts:")
-            var keys = manifest.scripts.keys()
+            var keys: List<String> = manifest.scripts.keys()
             var i = 0
             while (i < keys.length()) {
                 IO.println("  ${keys[i]} = ${manifest.scripts.get(keys[i])}")
@@ -31,7 +31,7 @@ fun run(script_name: String, parsed: Args.ParsedArgs) {
         OS.exit(1)
     }
 
-    var cmd = manifest.scripts.get(script_name)
+    var cmd: String = manifest.scripts.get(script_name)
     _exec(cmd)
 }
 
