@@ -108,23 +108,60 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
             MethodCall(o, m, a) => m
             _ => ""
         }
+        var mc_obj: AST.Expr = match (expr) {
+            MethodCall(o, m, a) => o
+            _ => AST.Expr.NilLit
+        }
+        // Check if method call is on a user class (resolve obj type)
+        var mc_obj_name: String = this.get_variable_name(mc_obj)
+        var mc_obj_type: String = ""
+        if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
+            mc_obj_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
+        } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
+            mc_obj_type = this.var_types.get(mc_obj_name)
+        } else if (this.classify_expr(mc_obj) == "this") {
+            mc_obj_type = this.current_class
+        } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
+            // Handle chained field access: this.field.method()
+            var inner_obj: AST.Expr = match (mc_obj) {
+                GetField(o, f) => o
+                MemberAccess(o, f) => o
+                _ => AST.Expr.NilLit
+            }
+            var inner_field: String = match (mc_obj) {
+                GetField(o, f) => f
+                MemberAccess(o, f) => f
+                _ => ""
+            }
+            var inner_class: String = ""
+            if (this.classify_expr(inner_obj) == "this") {
+                inner_class = this.current_class
+            } else {
+                var in_name: String = this.get_variable_name(inner_obj)
+                if (in_name.length() > 0 and this.typed_vars.has(in_name)) {
+                    inner_class = this.type_to_string(this.typed_vars.get(in_name))
+                } else if (in_name.length() > 0 and this.var_types.has(in_name)) {
+                    inner_class = this.var_types.get(in_name)
+                }
+            }
+            if (inner_class.length() > 0 and this.class_fields.has(inner_class)) {
+                mc_obj_type = this.get_field_type(inner_class, inner_field)
+            }
+        }
+        // If object is a user class, look up method return type
+        if (mc_obj_type.length() > 0 and this.class_fields.has(mc_obj_type)) {
+            var full_mc: String = mc_obj_type + "__" + mc_method
+            if (this.func_ret_types.has(full_mc)) {
+                return this.func_ret_types.get(full_mc)
+            }
+        }
         if (mc_method == "length") return "Float"
         if (mc_method == "to_string" or mc_method == "join") return "String"
         if (mc_method == "split" or mc_method == "keys") return "List<String>"
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
             // Infer return type from Map<K, V> annotation rather than always "String"
-            var mc_obj: AST.Expr = match (expr) {
-                MethodCall(o, m, a) => o
-                _ => AST.Expr.NilLit
-            }
-            var mc_obj_name: String = this.get_variable_name(mc_obj)
-            var mc_map_type: String = ""
-            if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
-                mc_map_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
-            } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
-                mc_map_type = this.var_types.get(mc_obj_name)
-            }
+            var mc_map_type: String = mc_obj_type
             if (mc_map_type.starts_with("Map<")) {
                 return this.get_map_value_type(mc_map_type)
             }
@@ -509,6 +546,13 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         is_user_class = true
     } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
         is_user_class = true
+    }
+    // Also check last_type after evaluation (handles chained field access like this.field.method())
+    if (!is_user_class) {
+        var eval_type: String = this.type_to_string(this.last_type)
+        if (this.class_fields.has(eval_type)) {
+            is_user_class = true
+        }
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {

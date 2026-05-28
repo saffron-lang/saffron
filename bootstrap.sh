@@ -75,7 +75,7 @@ if [[ "$FULL" == true ]]; then
         || fail "FULL" "Failed to compile runtime.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  linking gen2..."
-    clang -O2 -w -Wl,-stack_size,0x4000000 -o "$GEN2" \
+    clang -O2 -w -Wl,-stack_size,0x10000000 -o "$GEN2" \
         "$BUILD_DIR/stage2/main.ll" \
         "$BUILD_DIR/stage2/lexer.ll" \
         "$BUILD_DIR/stage2/parser.ll" \
@@ -141,7 +141,7 @@ sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
     || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
-clang -O2 -w -Wl,-stack_size,0x4000000 -o "$BUILD_DIR/saffronc" \
+clang -O2 -w -Wl,-stack_size,0x10000000 -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/main.ll" \
     "$BUILD_DIR/stage3/runtime.ll" \
     "$RUNTIME_BASE" \
