@@ -431,6 +431,11 @@ extend fun Codegen.find_free_vars_expr(expr: AST.Expr, bound: List<String>, free
             IsCheck(val, t) => {
                 this.find_free_vars_expr(val, bound, free)
             }
+            This => {
+                if (!bound.contains("self") and !free.contains("self")) {
+                    free.push("self")
+                }
+            }
         }
     }
 

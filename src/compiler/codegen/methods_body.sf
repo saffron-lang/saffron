@@ -642,9 +642,21 @@
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
-        return this.emit_builtin_dispatch(obj, method, args)
+        var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
+        // Override result type for pop() based on list element type
+        if (method == "pop" and obj_name.length() > 0) {
+            var pop_list_type: AST.Type = AST.Type.AnyType
+            if (this.typed_vars.has(obj_name)) {
+                pop_list_type = this.typed_vars.get(obj_name)
+            }
+            var pop_elem: AST.Type = this.get_list_element_type(pop_list_type)
+            if (this.type_to_string(pop_elem) != "Any") {
+                this.last_type = pop_elem
+            }
+        }
+        return bd_result
     }
-    if (!is_user_class and method == "append") {
+    if (!is_user_class and method == "append" and args.length() > 0) {
         var str_tagged: String = this.gen_arg_value(args[0])
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + str_tagged + ")")
@@ -686,7 +698,7 @@
         this.last_type = AST.Type.NilType
         return "0"
     }
-    if (!is_user_class and method == "has") {
+    if (!is_user_class and method == "has" and args.length() > 0) {
         var key_tagged: String = this.gen_arg_value(args[0])
         var key_ptr: String = this.fresh_local()
         this.emit_indent(key_ptr + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
@@ -699,7 +711,7 @@
         this.last_type = AST.Type.BoolType
         return local
     }
-    if (!is_user_class and method == "get") {
+    if (!is_user_class and method == "get" and args.length() > 0) {
         var key_tagged: String = this.gen_arg_value(args[0])
         var key: String = this.fresh_local()
         this.emit_indent(key + " = call i8* @__val_untag_ptr(i64 " + key_tagged + ")")
@@ -727,7 +739,7 @@
         }
         return local
     }
-    if (!is_user_class and method == "starts_with") {
+    if (!is_user_class and method == "starts_with" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var prefix: String = this.gen_arg_value(args[0])
@@ -746,7 +758,7 @@
         this.last_type = AST.Type.BoolType
         return result
     }
-    if (!is_user_class and method == "char_at") {
+    if (!is_user_class and method == "char_at" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var idx_tagged: String = this.gen_arg_value(args[0])
@@ -799,7 +811,7 @@
         this.last_type = AST.Type.BoolType
         return local
     }
-    if (!is_user_class and method == "slice") {
+    if (!is_user_class and method == "slice" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var start_tagged: String = this.gen_arg_value(args[0])
@@ -850,7 +862,7 @@
             return local
         }
     }
-    if (!is_user_class and method == "contains") {
+    if (!is_user_class and method == "contains" and args.length() > 0) {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
@@ -881,6 +893,17 @@
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
         this.last_type = AST.Type.IntType
+        return local
+    }
+    if (!is_user_class and method == "to_float") {
+        // Parse string as float using strtod, return tagged float value
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
+        var dbl: String = this.fresh_local()
+        this.emit_indent(dbl + " = call double @strtod(i8* " + str_ptr + ", i8* null)")
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_float(double " + dbl + ")")
+        this.last_type = AST.Type.FloatType
         return local
     }
     if (!is_user_class and method == "to_string") {

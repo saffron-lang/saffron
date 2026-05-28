@@ -48,6 +48,7 @@ class Codegen {
     var pending_extend_class: String
     var named_imports: Map<String, String>
     var target: String
+    var has_errors: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -90,6 +91,7 @@ class Codegen {
         this.pending_extend_class = ""
         this.named_imports = {}
         this.target = "native"
+        this.has_errors = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")

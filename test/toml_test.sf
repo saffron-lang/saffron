@@ -33,7 +33,7 @@ T.assert_eq(dotted.get("package").get("version"), "0.1.0", "dotted key 2")
 
 // Test arrays
 var arrays = TOML.parse("tags = [\"lang\", \"typed\", \"fast\"]")
-var tags = arrays.get("tags")
+var tags: List = arrays.get("tags")
 T.assert_eq(tags.length(), 3, "array length")
 T.assert_eq(tags[0], "lang", "array element 0")
 T.assert_eq(tags[2], "fast", "array element 2")
@@ -54,7 +54,7 @@ T.assert_eq(inline.get("point").get("y"), 2, "inline table y")
 
 // Test array of tables
 var aot = TOML.parse("[[deps]]\nname = \"foo\"\nversion = \"1.0\"\n\n[[deps]]\nname = \"bar\"\nversion = \"2.0\"")
-var deps = aot.get("deps")
+var deps: List = aot.get("deps")
 T.assert_eq(deps.length(), 2, "array of tables length")
 T.assert_eq(deps[0].get("name"), "foo", "aot first name")
 T.assert_eq(deps[1].get("name"), "bar", "aot second name")

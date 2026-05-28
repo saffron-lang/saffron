@@ -96,7 +96,11 @@
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
                 this.var_types.set(pp2[0], pp2[1])
-                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
+                if (pp2[1] == "Float") {
+                    this.typed_vars.set(pp2[0], AST.Type.IntType)
+                } else {
+                    this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
+                }
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -188,7 +192,14 @@
             var pname: String = parts[0]
             var ptype: String = parts[1]
             this.var_types.set(pname, ptype)
-            this.typed_vars.set(pname, this.str_to_type(ptype))
+            // Function parameters typed "Float" are stored as IntType because
+            // we cannot guarantee the caller passes float-tagged values.
+            // Only FloatLit assignments produce genuinely float-tagged values.
+            if (ptype == "Float") {
+                this.typed_vars.set(pname, AST.Type.IntType)
+            } else {
+                this.typed_vars.set(pname, this.str_to_type(ptype))
+            }
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }

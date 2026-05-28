@@ -288,8 +288,10 @@
             var left_type: String = this.get_expr_type(left)
             var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
+            var left_actual_eq: AST.Type = this.last_type
             if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
             var rhs: String = this.gen_arg_value(right)
+            var right_actual_eq: AST.Type = this.last_type
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
@@ -309,6 +311,11 @@
                 this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
                 this.last_type = AST.Type.IntType
                 return local
+            }
+
+            // Float comparison when both operands are genuinely float-tagged
+            if (this.is_float_type(left_actual_eq) and this.is_float_type(right_actual_eq)) {
+                return this.gen_binary_float(lhs, rhs, op)
             }
 
             // Integer comparison

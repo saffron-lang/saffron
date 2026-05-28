@@ -108,6 +108,21 @@ entry:
   ret i64 %r
 }
 
+@.fmt.float = private unnamed_addr constant [3 x i8] c"%g\00"
+
+define i64 @__float_to_string(i64 %v) {
+entry:
+  %f = bitcast i64 %v to double
+  %buf = call i8* @malloc(i64 32)
+  %fmt = getelementptr [3 x i8], [3 x i8]* @.fmt.float, i64 0, i64 0
+  call i32 (i8*, i64, i8*, ...) @snprintf(i8* %buf, i64 32, i8* %fmt, double %f)
+  %r = ptrtoint i8* %buf to i64
+  ret i64 %r
+}
+
+declare i8* @malloc(i64)
+declare i32 @snprintf(i8*, i64, i8*, ...)
+
 ; =============================================================================
 ; NaN-Boxing Infrastructure
 ; =============================================================================
