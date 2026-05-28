@@ -75,6 +75,7 @@ declare i32 @access(i8*, i32)
 declare i32 @mkdir(i8*, i32)
 declare i8* @getcwd(i8*, i64)
 declare i8* @getenv(i8*)
+declare i64 @write(i32, i8*, i64)
 
 define i64 @__list_new() {
 entry:

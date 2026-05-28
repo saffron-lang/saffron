@@ -2,19 +2,19 @@
 // This file should compile WITHOUT checker errors because all
 // nullable accesses are guarded by nil checks.
 
-fun find(name: String): String? {
+fun find(name: String): String|Nil {
     if (name == "found") { return "yes" }
     return nil
 }
 
 // Case 1: Guarded with != nil — should be fine
-var result: String? = find("found")
+var result: String|Nil = find("found")
 if (result != nil) {
     IO.println(result.length().to_string())
 }
 
 // Case 2: Guarded with == nil in else — should be fine
-var result2: String? = find("test")
+var result2: String|Nil = find("test")
 if (result2 == nil) {
     IO.println("not found")
 } else {
@@ -22,13 +22,13 @@ if (result2 == nil) {
 }
 
 // Case 3: Truthy check — should be fine
-var result3: String? = find("found")
+var result3: String|Nil = find("found")
 if (result3) {
     IO.println(result3.length().to_string())
 }
 
 // Case 4: is check — should be fine
-var result4: String? = find("found")
+var result4: String|Nil = find("found")
 if (result4 is String) {
     IO.println(result4.length().to_string())
 }

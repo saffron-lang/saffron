@@ -28,6 +28,8 @@
 @extern("i32 mkdir(void*, i32)") fun rt_mkdir(path: Int, mode: Int): Int
 @extern("void* getcwd(void*, i64)") fun rt_getcwd(buf: Int, size: Int): Int
 @extern("void* getenv(void*)") fun rt_getenv(name: Int): Int
+@extern("i64 write(i32, void*, i64)") fun rt_write(fd: Int, buf: Int, len: Int): Int
+@extern("void exit(i32)") fun rt_exit(code: Int)
 
 // --- Intrinsics ---
 
@@ -72,6 +74,7 @@ fun __list_get(list: Int, index: Int): Int {
         actual_idx = count + index
     }
     if (actual_idx < 0 or actual_idx >= count) {
+        __index_error(index, count)
         return 0
     }
     var data: Int = load64(list + 16)
@@ -85,6 +88,7 @@ fun __list_set(list: Int, index: Int, value: Int) {
         actual_idx = count + index
     }
     if (actual_idx < 0 or actual_idx >= count) {
+        __index_error(index, count)
         return
     }
     var data: Int = load64(list + 16)
@@ -97,6 +101,10 @@ fun __list_length(list: Int): Int {
 
 fun __list_pop(list: Int): Int {
     var count: Int = load64(list)
+    if (count <= 0) {
+        __index_error(0, 0)
+        return 0
+    }
     var new_count: Int = count - 1
     store64(list, new_count)
     var data: Int = load64(list + 16)
@@ -248,6 +256,193 @@ fun __int_to_string(val: Int): Int {
     rt_snprintf(buf, 32, fmt, val)
     rt_free(fmt)
     return buf
+}
+
+// =============================================================================
+// Runtime Error Handling
+// =============================================================================
+// Error type constants for future typed error values
+// IndexError = 1, TypeError = 2, DivisionError = 3, NullError = 4
+
+fun __runtime_error(msg: Int) {
+    // Write error message to stderr (fd 2)
+    var prefix: Int = rt_malloc(16)
+    // "Runtime Error: "
+    store8(prefix, 82)       // R
+    store8(prefix + 1, 117)  // u
+    store8(prefix + 2, 110)  // n
+    store8(prefix + 3, 116)  // t
+    store8(prefix + 4, 105)  // i
+    store8(prefix + 5, 109)  // m
+    store8(prefix + 6, 101)  // e
+    store8(prefix + 7, 32)   // (space)
+    store8(prefix + 8, 69)   // E
+    store8(prefix + 9, 114)  // r
+    store8(prefix + 10, 114) // r
+    store8(prefix + 11, 111) // o
+    store8(prefix + 12, 114) // r
+    store8(prefix + 13, 58)  // :
+    store8(prefix + 14, 32)  // (space)
+    store8(prefix + 15, 0)   // null terminator
+    var prefix_len: Int = rt_strlen(prefix)
+    rt_write(2, prefix, prefix_len)
+    var msg_len: Int = rt_strlen(msg)
+    rt_write(2, msg, msg_len)
+    var newline: Int = rt_malloc(2)
+    store8(newline, 10)      // \n
+    store8(newline + 1, 0)
+    rt_write(2, newline, 1)
+    rt_free(prefix)
+    rt_free(newline)
+}
+
+fun __runtime_error_fatal(msg: Int) {
+    __runtime_error(msg)
+    rt_exit(1)
+}
+
+fun __index_error(index: Int, count: Int) {
+    var sb: Int = StringBuilder()
+    // "IndexError: index "
+    var p1: Int = rt_malloc(32)
+    store8(p1, 73)       // I
+    store8(p1 + 1, 110)  // n
+    store8(p1 + 2, 100)  // d
+    store8(p1 + 3, 101)  // e
+    store8(p1 + 4, 120)  // x
+    store8(p1 + 5, 69)   // E
+    store8(p1 + 6, 114)  // r
+    store8(p1 + 7, 114)  // r
+    store8(p1 + 8, 111)  // o
+    store8(p1 + 9, 114)  // r
+    store8(p1 + 10, 58)  // :
+    store8(p1 + 11, 32)  // (space)
+    store8(p1 + 12, 105) // i
+    store8(p1 + 13, 110) // n
+    store8(p1 + 14, 100) // d
+    store8(p1 + 15, 101) // e
+    store8(p1 + 16, 120) // x
+    store8(p1 + 17, 32)  // (space)
+    store8(p1 + 18, 0)
+    __sb_append(sb, p1)
+    __sb_append(sb, __int_to_string(index))
+    // " out of bounds (length "
+    var p2: Int = rt_malloc(32)
+    store8(p2, 32)       // (space)
+    store8(p2 + 1, 111)  // o
+    store8(p2 + 2, 117)  // u
+    store8(p2 + 3, 116)  // t
+    store8(p2 + 4, 32)   // (space)
+    store8(p2 + 5, 111)  // o
+    store8(p2 + 6, 102)  // f
+    store8(p2 + 7, 32)   // (space)
+    store8(p2 + 8, 98)   // b
+    store8(p2 + 9, 111)  // o
+    store8(p2 + 10, 117) // u
+    store8(p2 + 11, 110) // n
+    store8(p2 + 12, 100) // d
+    store8(p2 + 13, 115) // s
+    store8(p2 + 14, 32)  // (space)
+    store8(p2 + 15, 40)  // (
+    store8(p2 + 16, 108) // l
+    store8(p2 + 17, 101) // e
+    store8(p2 + 18, 110) // n
+    store8(p2 + 19, 103) // g
+    store8(p2 + 20, 116) // t
+    store8(p2 + 21, 104) // h
+    store8(p2 + 22, 32)  // (space)
+    store8(p2 + 23, 0)
+    __sb_append(sb, p2)
+    __sb_append(sb, __int_to_string(count))
+    // ")"
+    var p3: Int = rt_malloc(2)
+    store8(p3, 41)       // )
+    store8(p3 + 1, 0)
+    __sb_append(sb, p3)
+    __runtime_error(__sb_to_string(sb))
+    rt_free(p1)
+    rt_free(p2)
+    rt_free(p3)
+}
+
+fun __division_error() {
+    // "DivisionError: division by zero"
+    var msg: Int = rt_malloc(32)
+    store8(msg, 68)       // D
+    store8(msg + 1, 105)  // i
+    store8(msg + 2, 118)  // v
+    store8(msg + 3, 105)  // i
+    store8(msg + 4, 115)  // s
+    store8(msg + 5, 105)  // i
+    store8(msg + 6, 111)  // o
+    store8(msg + 7, 110)  // n
+    store8(msg + 8, 69)   // E
+    store8(msg + 9, 114)  // r
+    store8(msg + 10, 114) // r
+    store8(msg + 11, 111) // o
+    store8(msg + 12, 114) // r
+    store8(msg + 13, 58)  // :
+    store8(msg + 14, 32)  // (space)
+    store8(msg + 15, 100) // d
+    store8(msg + 16, 105) // i
+    store8(msg + 17, 118) // v
+    store8(msg + 18, 105) // i
+    store8(msg + 19, 115) // s
+    store8(msg + 20, 105) // i
+    store8(msg + 21, 111) // o
+    store8(msg + 22, 110) // n
+    store8(msg + 23, 32)  // (space)
+    store8(msg + 24, 98)  // b
+    store8(msg + 25, 121) // y
+    store8(msg + 26, 32)  // (space)
+    store8(msg + 27, 122) // z
+    store8(msg + 28, 101) // e
+    store8(msg + 29, 114) // r
+    store8(msg + 30, 111) // o
+    store8(msg + 31, 0)
+    __runtime_error_fatal(msg)
+}
+
+fun __null_pointer_error() {
+    // "NullError: null pointer dereference"
+    var msg: Int = rt_malloc(36)
+    store8(msg, 78)       // N
+    store8(msg + 1, 117)  // u
+    store8(msg + 2, 108)  // l
+    store8(msg + 3, 108)  // l
+    store8(msg + 4, 69)   // E
+    store8(msg + 5, 114)  // r
+    store8(msg + 6, 114)  // r
+    store8(msg + 7, 111)  // o
+    store8(msg + 8, 114)  // r
+    store8(msg + 9, 58)   // :
+    store8(msg + 10, 32)  // (space)
+    store8(msg + 11, 110) // n
+    store8(msg + 12, 117) // u
+    store8(msg + 13, 108) // l
+    store8(msg + 14, 108) // l
+    store8(msg + 15, 32)  // (space)
+    store8(msg + 16, 112) // p
+    store8(msg + 17, 111) // o
+    store8(msg + 18, 105) // i
+    store8(msg + 19, 110) // n
+    store8(msg + 20, 116) // t
+    store8(msg + 21, 101) // e
+    store8(msg + 22, 114) // r
+    store8(msg + 23, 32)  // (space)
+    store8(msg + 24, 100) // d
+    store8(msg + 25, 101) // e
+    store8(msg + 26, 114) // r
+    store8(msg + 27, 101) // e
+    store8(msg + 28, 102) // f
+    store8(msg + 29, 101) // e
+    store8(msg + 30, 114) // r
+    store8(msg + 31, 101) // e
+    store8(msg + 32, 110) // n
+    store8(msg + 33, 99)  // c
+    store8(msg + 34, 101) // e
+    store8(msg + 35, 0)
+    __runtime_error_fatal(msg)
 }
 
 fun __str_ends_with(str: Int, suffix: Int): Int {

@@ -126,7 +126,7 @@ fun format_json(record: Record): String {
     var i = 0
     while (i < keys.length()) {
         var k = keys[i]
-        var v = record.fields.get(k)
+        var v: String = record.fields.get(k)
         parts.push("\"${_escape_json(k)}\":\"${_escape_json(v)}\"")
         i = i + 1
     }
@@ -467,7 +467,7 @@ fun _format_fields(fields: Map<String, String>): String {
     var i = 0
     while (i < keys.length()) {
         var k = keys[i]
-        var v = fields.get(k)
+        var v: String = fields.get(k)
         parts.push("${k}=${v}")
         i = i + 1
     }

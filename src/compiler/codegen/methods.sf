@@ -94,7 +94,15 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
     if (ek == "float") return "Float"
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
-    if (ek == "list_lit") return "List<String>"
+    if (ek == "list_lit") {
+        var list_elems: List<AST.Expr> = match (expr) { ListLit(e) => e   _ => [] }
+        if (list_elems.length() > 0) {
+            var first_type: String = this.get_expr_type(list_elems[0])
+            if (first_type == "String") return "List<String>"
+            if (first_type == "Int" or first_type == "Float") return "List<Int>"
+        }
+        return "List<Any>"
+    }
     if (ek == "map_lit") return "Map<String,String>"
     if (ek == "this") return this.current_class
     if (ek == "get_field" or ek == "member") {
@@ -192,6 +200,14 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
             }
             return "String"
         }
+        if (mc_method == "pop") {
+            // Infer return type from List<T> element type
+            if (mc_obj_type.starts_with("List<") and mc_obj_type.ends_with(">")) {
+                var pop_inner: String = mc_obj_type.slice(5, mc_obj_type.length() - 1)
+                return pop_inner
+            }
+            return "Int"
+        }
     }
     if (ek == "call") {
         var call_callee: AST.Expr = match (expr) {
@@ -212,7 +228,24 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
     if (ek == "enum") return "Any"
     if (ek == "match_expr") return "Any"
     if (ek == "block_expr") return "Any"
-    if (ek == "index_get") return "Any"
+    if (ek == "index_get") {
+        var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o   _ => AST.Expr.NilLit }
+        var ig_obj_name: String = this.get_variable_name(ig_obj)
+        if (ig_obj_name.length() > 0 and this.typed_vars.has(ig_obj_name)) {
+            var ig_list_type: AST.Type = this.typed_vars.get(ig_obj_name)
+            var ig_elem: AST.Type = this.get_list_element_type(ig_list_type)
+            if (this.type_to_string(ig_elem) != "Any") {
+                return this.type_to_string(ig_elem)
+            }
+        }
+        if (ig_obj_name.length() > 0 and this.var_types.has(ig_obj_name)) {
+            var ig_vtype: String = this.var_types.get(ig_obj_name)
+            if (ig_vtype.starts_with("List<") and ig_vtype.ends_with(">")) {
+                return ig_vtype.slice(5, ig_vtype.length() - 1)
+            }
+        }
+        return "Any"
+    }
     if (ek == "index_set") return "Any"
     if (ek == "set_field") return "Any"
     return "Any"
@@ -606,9 +639,21 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
-        return this.emit_builtin_dispatch(obj, method, args)
+        var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
+        // Override result type for pop() based on list element type
+        if (method == "pop" and obj_name.length() > 0) {
+            var pop_list_type: AST.Type = AST.Type.AnyType
+            if (this.typed_vars.has(obj_name)) {
+                pop_list_type = this.typed_vars.get(obj_name)
+            }
+            var pop_elem: AST.Type = this.get_list_element_type(pop_list_type)
+            if (this.type_to_string(pop_elem) != "Any") {
+                this.set_last_type(pop_elem)
+            }
+        }
+        return bd_result
     }
-    if (!is_user_class and method == "get") {
+    if (!is_user_class and method == "get" and args.length() > 0) {
         var key: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
@@ -631,7 +676,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
         return local
     }
-    if (!is_user_class and method == "starts_with") {
+    if (!is_user_class and method == "starts_with" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
         var prefix: String = this.gen_arg_value(args[0])
@@ -648,7 +693,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         this.set_last_type(AST.Type.BoolType)
         return result
     }
-    if (!is_user_class and method == "char_at") {
+    if (!is_user_class and method == "char_at" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
         var idx: String = this.gen_arg_value(args[0])
@@ -699,7 +744,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         this.set_last_type(AST.Type.BoolType)
         return local
     }
-    if (!is_user_class and method == "slice") {
+    if (!is_user_class and method == "slice" and args.length() > 0) {
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
         var start: String = this.gen_arg_value(args[0])
@@ -746,7 +791,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             return local
         }
     }
-    if (!is_user_class and method == "contains") {
+    if (!is_user_class and method == "contains" and args.length() > 0) {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
