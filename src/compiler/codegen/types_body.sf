@@ -1,0 +1,269 @@
+    fun make_list_type(): AST.Type {
+        return AST.Type.GenericType("List", [AST.Type.AnyType])
+    }
+    fun make_list_str_type(): AST.Type {
+        return AST.Type.GenericType("List", [AST.Type.StringType])
+    }
+    fun make_map_type(): AST.Type {
+        return AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+    }
+    fun make_generic_type(base: String, args: List<AST.Type>): AST.Type {
+        return AST.Type.GenericType(base, args)
+    }
+
+    fun params_to_string(params: List<AST.Param>): String {
+        if (!(params is List)) {
+            return ""
+        }
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < params.length()) {
+            if (i > 0) { sb.append(",") }
+            var p: AST.Param = params[i]
+            var pname: String = match (p) { Param(n, t, d) => n }
+            var ptype: String = match (p) { Param(n, t, d) => t }
+            sb.append(pname)
+            sb.append(":")
+            sb.append(ptype)
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
+    fun str_to_type(s: String): AST.Type {
+        if (!(s is String)) return AST.Type.AnyType
+        if (s == "String") return AST.Type.StringType
+        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Bool") return AST.Type.BoolType
+        if (s == "Nil") return AST.Type.NilType
+        if (s == "Any") return AST.Type.AnyType
+        if (s.starts_with("Fun(")) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
+        if (s == "List") return this.make_list_type()
+        if (s.starts_with("List<") and s.ends_with(">")) {
+            var inner: String = s.slice(5, s.length() - 1)
+            return this.make_generic_type("List", [this.str_to_type(inner)])
+        }
+        if (s == "Map" or s.starts_with("Map<")) return this.make_map_type()
+        if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
+        return AST.Type.ClassType(s)
+    }
+
+    fun type_to_string(t: AST.Type): String {
+        return match (t) {
+            IntType => "Int"
+            FloatType => "Float"
+            BoolType => "Bool"
+            StringType => "String"
+            NilType => "Nil"
+            AnyType => "Any"
+            ClassType(n) => n
+            EnumType(n) => n
+            GenericType(base, args) => this.generic_type_string(base, args)
+            UnionType(types) => "Union"
+            FuncType(p, r) => "Fun"
+            NullableType(inner) => this.type_to_string(inner)
+        }
+    }
+
+    fun generic_type_string(base: String, args: List<AST.Type>): String {
+        if (args.length() > 0) {
+            return base + "<" + this.type_to_string(args[0]) + ">"
+        }
+        return base
+    }
+
+    fun coerce_to_string(val: String, val_type: String): String {
+        if (val_type == "String") {
+            return val
+        }
+        if (val_type == "Int" or val_type == "Float") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+            return result
+        }
+        if (val_type == "Bool") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + val + ")")
+            return result
+        }
+        if (val_type == "Nil") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__nil_to_string()")
+            return result
+        }
+        // Class with to_string method
+        if (this.class_fields.has(val_type)) {
+            var ts_method: String = val_type + "__to_string"
+            if (this.func_prefix_map.has(ts_method)) {
+                ts_method = this.func_prefix_map.get(ts_method)
+            } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
+                ts_method = this.current_prefix + ts_method
+            }
+            if (this.known_functions.contains(ts_method)) {
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
+                return result
+            }
+        }
+        // Fallback: convert as int
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+        return result
+    }
+
+    fun is_string_type(t: AST.Type): Bool {
+        return match (t) {
+            StringType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_int_type(t: AST.Type): Bool {
+        return match (t) {
+            IntType => true
+            FloatType => true
+            StringType => false
+            BoolType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_bool_type(t: AST.Type): Bool {
+        return match (t) {
+            BoolType => true
+            IntType => false
+            FloatType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_nil_type(t: AST.Type): Bool {
+        return match (t) {
+            NilType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_list_type(t: AST.Type): Bool {
+        return match (t) {
+            GenericType(base, args) => base == "List"
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_string_list_type(t: AST.Type): Bool {
+        return match (t) {
+            GenericType(base, args) => {
+                if (base != "List") return false
+                if (args.length() == 0) return false
+                return this.is_string_type(args[0])
+            }
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_map_type(t: AST.Type): Bool {
+        return match (t) {
+            GenericType(base, args) => base == "Map"
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    fun is_class_type(t: AST.Type, name: String): Bool {
+        return match (t) {
+            ClassType(n) => n == name
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            AnyType => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            UnionType(types) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
+    // Extract the value type string from a Map<K, V> type annotation.
+    // e.g. "Map<String,AST.Type>" → "AST.Type"
+    //      "Map<String,String>"   → "String"
+    //      "Map" or unknown       → "Any"
+    fun get_map_value_type(map_type: String): String {
+        if (!map_type.starts_with("Map<")) return "Any"
+        // Strip "Map<" prefix and trailing ">"
+        var inner: String = map_type.slice(4, map_type.length() - 1)
+        // Split on first comma respecting nested generics
+        var parts: List<String> = this.split_respecting_generics(inner, ",")
+        if (parts.length() < 2) return "Any"
+        return parts[1]
+    }
+

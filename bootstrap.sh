@@ -100,11 +100,14 @@ SOURCES=(lexer parser)
 
 # Assemble codegen from parts (insert extensions at markers)
 [[ "$VERBOSE" == true ]] && echo "  assemble: codegen"
-sed -e "/@codegen-split: expr/r $COMPILER_DIR/codegen/expr_body.sf" \
+sed -e "/@codegen-split: types/r $COMPILER_DIR/codegen/types_body.sf" \
+    -e "/@codegen-split: expr/r $COMPILER_DIR/codegen/expr_body.sf" \
     -e "/@codegen-split: match/r $COMPILER_DIR/codegen/match_body.sf" \
     -e "/@codegen-split: closures/r $COMPILER_DIR/codegen/closures_body.sf" \
     -e "/@codegen-split: intrinsics/r $COMPILER_DIR/codegen/intrinsics_body.sf" \
     -e "/@codegen-split: stmts/r $COMPILER_DIR/codegen/stmts_body.sf" \
+    -e "/@codegen-split: utils/r $COMPILER_DIR/codegen/utils_body.sf" \
+    -e "/@codegen-split: output/r $COMPILER_DIR/codegen/output_body.sf" \
     -e "/@codegen-split: methods/r $COMPILER_DIR/codegen/methods_body.sf" \
     "$COMPILER_DIR/codegen.sf" > "$BUILD_DIR/stage3/_codegen.sf"
 sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf"
