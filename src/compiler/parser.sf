@@ -718,9 +718,6 @@ class Parser {
         }
         // Default: expression statement (may be field assignment if followed by =)
         var expr: AST.Expr = this.parse_expr()
-        if (this.match_kind_check("=")) {
-            IO.println("PARSER_DEBUG: found = after expr, next will consume")
-        }
         if (this.match_kind("=")) {
             var value: AST.Expr = this.parse_expr()
             var ek: String = this.classify_expr_for_assign(expr)

@@ -13,9 +13,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
-RUNTIME_SRC="$ROOT/src/runtime.sf"
-RUNTIME_BASE="$ROOT/src/runtime_base.ll"
-STUBS="$ROOT/src/runtime_stubs.ll"
+RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
+RUNTIME_BASE="$ROOT/src/runtime/base.ll"
+STUBS="$ROOT/src/runtime/stubs.ll"
 BUILD_DIR="$ROOT/build"
 
 SKIP_CMAKE=false
