@@ -132,9 +132,8 @@ entry:
 @__TYPE_FLOAT_BOXED = constant i64 4
 
 ; --- Tag/Untag Helpers ---
-; Currently IDENTITY (no-op) for backward compatibility.
-; When NaN-boxing is activated, replace with real tagging implementations.
-; The optimizer inlines these away at -O1+.
+; IDENTITY mode (backward compatible). Real NaN-boxing implementations
+; are ready below in comments — swap when runtime is also NaN-box aware.
 
 define i64 @__val_tag_int(i64 %n) {
 entry:
