@@ -1995,19 +1995,8 @@ class Codegen {
 
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
-    // Use target class's prefix (not source file's prefix)
-    var class_prefix: String = this.current_prefix
-    var init_key: String = ext_class + "__init"
-    if (this.func_prefix_map.has(init_key)) {
-        var mapped: String = this.func_prefix_map.get(init_key)
-        class_prefix = mapped.slice(0, mapped.length() - init_key.length())
-    }
-    var prefixed: String = class_prefix + full_name
-    this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
-    this.func_ret_types.set(prefixed, ret_type)
     this.func_ret_types.set(full_name, ret_type)
-    this.func_prefix_map.set(full_name, prefixed)
     if (this.class_methods.has(ext_class)) {
         var methods: List = this.class_methods.get(ext_class)
         methods.push(name)
@@ -2018,7 +2007,7 @@ class Codegen {
     var saved_class: String = this.current_class
     var saved_prefix: String = this.current_prefix
     this.current_class = ext_class
-    this.current_prefix = class_prefix
+    this.current_prefix = ""
     this.gen_function(full_name, full_params, ret_type, body)
     this.current_class = saved_class
     this.current_prefix = saved_prefix
@@ -2099,11 +2088,6 @@ class Codegen {
         i = i + 1
     }
     var full_method: String = ns + "__" + method
-    if (this.func_prefix_map.has(full_method)) {
-        full_method = this.func_prefix_map.get(full_method)
-    } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
-        full_method = this.current_prefix + full_method
-    }
     this.called_functions.push(full_method)
     var local: String = this.fresh_local()
     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
@@ -3724,15 +3708,18 @@ class Codegen {
             var full_name: String = name + "__" + mname
             var prefixed_full: String = this.current_prefix + full_name
             this.func_ret_types.set(prefixed_full, mret)
+            this.func_ret_types.set(full_name, mret)
             this.known_functions.push(prefixed_full)
+            this.known_functions.push(full_name)
             this.func_prefix_map.set(full_name, prefixed_full)
             i = i + 1
         }
 
         // Pre-register constructor so methods can call ClassName(args)
-        var prefixed_ctor: String = this.current_prefix + name
-        this.known_functions.push(prefixed_ctor)
-        this.func_ret_types.set(prefixed_ctor, name)
+        this.known_functions.push(name)
+        if (this.current_prefix.length() > 0) {
+            this.known_functions.push(this.current_prefix + name)
+        }
         this.func_ret_types.set(name, name)
 
         // Generate methods as functions with name prefix: ClassName__method
@@ -3787,26 +3774,32 @@ class Codegen {
         if (mparams_str.length() > 0) {
             param_count = this.split_respecting_generics(mparams_str, ",").length() + 1
         }
-        this.called_function_arity.set(this.current_prefix + full_name, param_count)
+        this.called_function_arity.set(full_name, param_count)
+        if (this.current_prefix.length() > 0) {
+            this.called_function_arity.set(this.current_prefix + full_name, param_count)
+        }
+        var saved_prefix: String = this.current_prefix
+        this.current_prefix = ""
         this.gen_function(full_name, full_params, mret, mbody)
+        this.current_prefix = saved_prefix
     }
 
     fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
-        var emit_name: String = this.current_prefix + name
-        this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, name)
-        this.func_ret_types.set(name, name)
-        if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) { return }
-        this.defined_funcs.push(emit_name)
-        this.emit("")
-        var ctor_linkage: String = "define"
+        this.known_functions.push(name)
         if (this.current_prefix.length() > 0) {
-            ctor_linkage = "define linkonce_odr"
+            this.known_functions.push(this.current_prefix + name)
         }
-        this.emit(ctor_linkage + " i64 @" + emit_name + "() {")
+        this.func_ret_types.set(name, name)
+        if (this.current_prefix.length() > 0) {
+            this.func_ret_types.set(this.current_prefix + name, name)
+        }
+        if (this.register_only) { return }
+        if (this.defined_funcs.contains(name)) { return }
+        this.defined_funcs.push(name)
+        this.emit("")
+        this.emit("define linkonce_odr i64 @" + name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
