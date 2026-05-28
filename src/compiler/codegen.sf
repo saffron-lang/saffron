@@ -3071,6 +3071,22 @@ class Codegen {
             this.last_type = AST.Type.NilType
             return "0"
         }
+        if (name.ends_with("load_argc")) {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = load i32, i32* @__argc")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = sext i32 " + raw + " to i64")
+            this.last_type = AST.Type.IntType
+            return result
+        }
+        if (name.ends_with("load_argv")) {
+            var argv: String = this.fresh_local()
+            this.emit_indent(argv + " = load i8**, i8*** @__argv")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = ptrtoint i8** " + argv + " to i64")
+            this.last_type = AST.Type.IntType
+            return result
+        }
         return "0"
     }
 

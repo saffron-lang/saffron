@@ -463,8 +463,20 @@ fun __os_exec(cmd: Int): Int {
     return load64(buf_p)
 }
 
+@intrinsic fun load_argc(): Int
+@intrinsic fun load_argv(): Int
+
 fun __os_args(): Int {
-    return __list_new()
+    var argc: Int = load_argc()
+    var argv: Int = load_argv()
+    var list: Int = __list_new()
+    var i: Int = 0
+    while (i < argc) {
+        var arg: Int = load64(argv + i * 8)
+        __list_push(list, arg)
+        i = i + 1
+    }
+    return list
 }
 
 // =============================================================================

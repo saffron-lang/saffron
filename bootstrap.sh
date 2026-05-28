@@ -13,7 +13,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
-RUNTIME="$ROOT/src/runtime.ll"
+RUNTIME_SRC="$ROOT/src/runtime.sf"
+RUNTIME_BASE="$ROOT/src/runtime_base.ll"
 STUBS="$ROOT/src/runtime_stubs.ll"
 BUILD_DIR="$ROOT/build"
 
@@ -82,13 +83,19 @@ for src in "${SOURCES[@]}"; do
         || fail "STAGE 2" "Failed to compile $src.sf"
 done
 
+# Compile runtime.sf → LLVM IR
+[[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
+"$VM" --no-check "$COMPILER_DIR/main.sf" "$RUNTIME_SRC" "$BUILD_DIR/stage2/runtime.ll" \
+    || fail "STAGE 2" "Failed to compile runtime.sf"
+
 [[ "$VERBOSE" == true ]] && echo "  linking gen2..."
 clang -O2 -w -o "$BUILD_DIR/stage2/saffronc" \
     "$BUILD_DIR/stage2/main.ll" \
     "$BUILD_DIR/stage2/lexer.ll" \
     "$BUILD_DIR/stage2/parser.ll" \
     "$BUILD_DIR/stage2/codegen.ll" \
-    "$RUNTIME" \
+    "$BUILD_DIR/stage2/runtime.ll" \
+    "$RUNTIME_BASE" \
     "$STUBS" \
     || fail "STAGE 2" "Linking failed"
 
@@ -109,13 +116,19 @@ for src in "${SOURCES[@]}"; do
         || fail "STAGE 3" "gen2 failed to compile $src.sf"
 done
 
+# Compile runtime.sf with gen2
+[[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
+"$GEN2" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+    || fail "STAGE 3" "gen2 failed to compile runtime.sf"
+
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
 if clang -O2 -w -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/main.ll" \
     "$BUILD_DIR/stage3/lexer.ll" \
     "$BUILD_DIR/stage3/parser.ll" \
     "$BUILD_DIR/stage3/codegen.ll" \
-    "$RUNTIME" \
+    "$BUILD_DIR/stage3/runtime.ll" \
+    "$RUNTIME_BASE" \
     "$STUBS" 2>/dev/null; then
     pass "STAGE 3" "gen3 saffronc built: $BUILD_DIR/saffronc"
 else
@@ -144,7 +157,7 @@ EOF
 "$BUILD_DIR/saffronc" "$EXAMPLE" "$BUILD_DIR/hello_bootstrap.ll" \
     || fail "TEST" "gen3 failed to compile example"
 
-clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$RUNTIME" "$STUBS" \
+clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$BUILD_DIR/stage3/runtime.ll" "$RUNTIME_BASE" "$STUBS" \
     || fail "TEST" "Linking example failed"
 
 echo ""
