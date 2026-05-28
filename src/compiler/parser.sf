@@ -560,6 +560,83 @@ class Parser {
         return AST.Pattern.VariantPattern(name, [])
     }
 
+    // --- Type string to AST.Type conversion ---
+
+    fun parse_type_ast(s: String): AST.Type {
+        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Float") return AST.Type.FloatType
+        if (s == "Bool") return AST.Type.BoolType
+        if (s == "String") return AST.Type.StringType
+        if (s == "Nil") return AST.Type.NilType
+        if (s == "Any") return AST.Type.AnyType
+        // Union: "String|Nil" or "Int|String"
+        if (s.contains("|")) {
+            var parts: List<String> = s.split("|")
+            var types: List<AST.Type> = []
+            var i: Float = 0
+            while (i < parts.length()) {
+                types.push(this.parse_type_ast(parts[i]))
+                i = i + 1
+            }
+            return AST.Type.UnionType(types)
+        }
+        // Generic: "List<String>" or "Map<String,Number>"
+        if (s.contains("<")) {
+            var lt_pos: Float = 0
+            var i: Float = 0
+            while (i < s.length()) {
+                if (s.char_at(i) == "<") {
+                    lt_pos = i
+                    i = s.length()
+                }
+                i = i + 1
+            }
+            var base: String = s.slice(0, lt_pos)
+            var args_str: String = s.slice(lt_pos + 1, s.length() - 1)
+            var arg_strs: List<String> = this.split_type_args(args_str)
+            var args: List<AST.Type> = []
+            var j: Float = 0
+            while (j < arg_strs.length()) {
+                args.push(this.parse_type_ast(arg_strs[j]))
+                j = j + 1
+            }
+            return AST.Type.GenericType(base, args)
+        }
+        // Function type: "Fun(...):Ret"
+        if (s.starts_with("Fun(")) {
+            return AST.Type.FuncType([], AST.Type.AnyType)
+        }
+        // Class/Enum type
+        return AST.Type.ClassType(s)
+    }
+
+    fun split_type_args(s: String): List<String> {
+        var args: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "," and depth == 0) {
+                args.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            args.push(current)
+        }
+        return args
+    }
+
     // --- Helpers for operator precedence ---
 
     fun parse_lambda(): AST.Expr {
@@ -570,25 +647,25 @@ class Parser {
             var pname: String = this.expect_ident()
             if (!this.match_kind_check(":")) {
                 this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
             } else {
                 this.consume(":")
                 var ptype: String = this.parse_type()
                 var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                params.push(AST.Param.Param(pname, ptype, pdefault))
+                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
             }
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
                     var pdefault: AST.Expr = AST.Expr.NilLit
                     if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                    params.push(AST.Param.Param(pname, ptype, pdefault))
+                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
                 }
             }
         }
@@ -794,21 +871,21 @@ class Parser {
                 var pname: String = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    ext_params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
-                    ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                    ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
                 }
                 while (this.match_kind(",")) {
                     pname = this.expect_ident()
                     if (!this.match_kind_check(":")) {
                         this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                        ext_params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
                     } else {
                         this.consume(":")
                         var ptype: String = this.parse_type()
-                        ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
+                        ext_params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), AST.Expr.NilLit))
                     }
                 }
             }
@@ -1009,25 +1086,25 @@ class Parser {
             var pname: String = this.expect_ident()
             if (!this.match_kind_check(":")) {
                 this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
             } else {
                 this.consume(":")
                 var ptype: String = this.parse_type()
                 var pdefault: AST.Expr = AST.Expr.NilLit
                 if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                params.push(AST.Param.Param(pname, ptype, pdefault))
+                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
             }
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 if (!this.match_kind_check(":")) {
                     this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    params.push(AST.Param.Param(pname, "Any", AST.Expr.NilLit))
+                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
                 } else {
                     this.consume(":")
                     var ptype: String = this.parse_type()
                     var pdefault: AST.Expr = AST.Expr.NilLit
                     if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                    params.push(AST.Param.Param(pname, ptype, pdefault))
+                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
                 }
             }
         }
@@ -1244,7 +1321,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                fields.push(AST.Param.Param(fname, ftype, AST.Expr.NilLit))
+                fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit))
             } else if (this.match_kind_check("fun")) {
                 // Method declaration
                 methods.push(this.parse_fun_decl())
@@ -1532,7 +1609,7 @@ class Parser {
         var i: Float = 0
         while (i < names.length()) {
             IO.println("[DEBUG build_lambda]   name: " + names[i])
-            params.push(AST.Param.Param(names[i], "Any", AST.Expr.NilLit))
+            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
             i = i + 1
         }
         IO.println("[DEBUG build_lambda] params.length=" + params.length().to_string())

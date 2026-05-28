@@ -1,0 +1,170 @@
+// Reactive Counter — Saffron signals driving DOM updates via WASM
+// Demonstrates: signals + effects + DOM mutations, all from Saffron
+
+// --- DOM FFI ---
+@extern("i64 js_dom_create_element(void*)") fun create_element(tag: String): Float
+@extern("void js_dom_set_text(i64, void*)") fun set_text(handle: Float, text: String)
+@extern("void js_dom_set_attribute(i64, void*, void*)") fun set_attr(handle: Float, name: String, value: String)
+@extern("void js_dom_append_child(i64, i64)") fun append_child(parent: Float, child: Float)
+@extern("i64 js_dom_query_selector(void*)") fun query_selector(selector: String): Float
+@extern("void js_dom_add_event_listener(i64, void*, i64)") fun add_event_listener(handle: Float, event: String, callback_id: Float)
+
+// --- Signal Primitives (inline, no imports) ---
+
+var _tracking: Bool = false
+var _tracker_deps: List<Any> = []
+
+fun start_tracking() {
+    _tracking = true
+    _tracker_deps = []
+}
+
+fun stop_tracking(): List<Any> {
+    _tracking = false
+    var deps: List<Any> = _tracker_deps
+    _tracker_deps = []
+    return deps
+}
+
+fun record_dep(sig: Any) {
+    if (_tracking) {
+        _tracker_deps.push(sig)
+    }
+}
+
+class Signal {
+    var value: Any
+    var subs: List<Any>
+
+    fun init(initial: Any) {
+        this.value = initial
+        this.subs = []
+    }
+
+    fun get(): Any {
+        record_dep(this)
+        return this.value
+    }
+
+    fun set(next: Any) {
+        this.value = next
+        var i: Float = 0
+        while (i < this.subs.length()) {
+            this.subs[i]()
+            i = i + 1
+        }
+    }
+
+    fun subscribe(fn: Any) {
+        this.subs.push(fn)
+    }
+}
+
+fun signal(initial: Any): Signal {
+    return Signal(initial)
+}
+
+fun effect(fn: Any) {
+    start_tracking()
+    fn()
+    var deps: List<Any> = stop_tracking()
+    var i: Float = 0
+    while (i < deps.length()) {
+        deps[i].subscribe(fn)
+        i = i + 1
+    }
+}
+
+// --- App State ---
+
+var count: Signal = signal(0)
+var count_el: Float = 0
+
+// --- Event Dispatch (called from JS on click events) ---
+
+fun __dispatch_event(callback_id: Float) {
+    if (callback_id == 1) {
+        count.set(count.get() + 1)
+    }
+    if (callback_id == 2) {
+        count.set(count.get() - 1)
+    }
+    if (callback_id == 3) {
+        count.set(0)
+    }
+}
+
+// --- Build UI ---
+
+fun main() {
+    var root: Float = query_selector("#app")
+
+    // Title
+    var h1: Float = create_element("h1")
+    set_text(h1, "Saffron Reactive Counter")
+    append_child(root, h1)
+
+    // Count display — updated by effect
+    count_el = create_element("p")
+    set_attr(count_el, "style", "font-size: 2rem; font-weight: bold")
+    append_child(root, count_el)
+
+    // Reactive effect: when count changes, update the DOM text
+    effect(fun () => {
+        set_text(count_el, "Count: " + count.get().to_string())
+    })
+
+    // Doubled display — derived from count
+    var doubled_el: Float = create_element("p")
+    set_attr(doubled_el, "style", "font-size: 1.2rem; color: #4fc3f7")
+    append_child(root, doubled_el)
+
+    effect(fun () => {
+        var d: Float = count.get() * 2
+        set_text(doubled_el, "Doubled: " + d.to_string())
+    })
+
+    // Parity display
+    var parity_el: Float = create_element("p")
+    set_attr(parity_el, "style", "font-size: 1rem; color: #aaa")
+    append_child(root, parity_el)
+
+    effect(fun () => {
+        var n: Float = count.get()
+        if (n % 2 == 0) {
+            set_text(parity_el, "Even")
+        } else {
+            set_text(parity_el, "Odd")
+        }
+    })
+
+    // Buttons
+    var buttons: Float = create_element("div")
+    set_attr(buttons, "style", "display: flex; gap: 0.5rem; margin-top: 1rem")
+
+    var inc: Float = create_element("button")
+    set_text(inc, "+ Increment")
+    set_attr(inc, "style", "font-size: 1.2rem; padding: 0.5rem 1rem")
+    add_event_listener(inc, "click", 1)
+    append_child(buttons, inc)
+
+    var dec: Float = create_element("button")
+    set_text(dec, "- Decrement")
+    set_attr(dec, "style", "font-size: 1.2rem; padding: 0.5rem 1rem")
+    add_event_listener(dec, "click", 2)
+    append_child(buttons, dec)
+
+    var rst: Float = create_element("button")
+    set_text(rst, "Reset")
+    set_attr(rst, "style", "font-size: 1.2rem; padding: 0.5rem 1rem")
+    add_event_listener(rst, "click", 3)
+    append_child(buttons, rst)
+
+    append_child(root, buttons)
+
+    // Footer
+    var footer: Float = create_element("p")
+    set_text(footer, "Signals → Effects → DOM. All in WASM.")
+    set_attr(footer, "style", "margin-top: 2rem; color: #666; font-size: 0.85rem")
+    append_child(root, footer)
+}

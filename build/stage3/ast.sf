@@ -52,7 +52,7 @@ enum Pattern {
 }
 
 enum Param {
-    Param(name: String, type_ann: String, default_val: Expr)
+    Param(name: String, type_ann: Type, default_val: Expr)
 }
 
 enum Stmt {
