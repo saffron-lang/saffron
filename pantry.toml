@@ -10,6 +10,6 @@ entry = "src/compiler/main.sf"
 [scripts]
 bootstrap = "./bootstrap.sh"
 bootstrap-full = "./bootstrap.sh --verbose"
-build = "saffron build src/compiler/main.sf -o build/saffronc"
+build = "./bootstrap.sh"
 test = "saffron run tools/run_tests.sf"
 docs = "cd docs && mdbook build"
