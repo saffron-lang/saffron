@@ -809,8 +809,17 @@
         }
     }
     if (!is_user_class and method == "floor") {
+        // Untag float, floor it, convert to int
+        var dbl: String = this.fresh_local()
+        this.emit_indent(dbl + " = call double @__val_untag_float(i64 " + obj + ")")
+        var floored: String = this.fresh_local()
+        this.emit_indent(floored + " = call double @floor(double " + dbl + ")")
+        var int_val: String = this.fresh_local()
+        this.emit_indent(int_val + " = fptosi double " + floored + " to i64")
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + int_val + ")")
         this.last_type = AST.Type.IntType
-        return obj
+        return local
     }
 
     // Check for super.method() calls
