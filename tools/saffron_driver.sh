@@ -15,7 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SAFFRONC="${SAFFRONC:-$SCRIPT_DIR/build/saffronc}"
 RUNTIME="${SAFFRON_RUNTIME:-$SCRIPT_DIR/build/stage3/runtime.ll}"
 RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base.ll}"
-STUBS="${SAFFRON_STUBS:-$SCRIPT_DIR/src/runtime/stubs.ll}"
 
 usage() {
     echo "saffron — The Saffron Programming Language"
@@ -130,7 +129,7 @@ link_binary() {
     local ir="$1"
     local output="$2"
     [[ "$VERBOSE" == true ]] && echo "  link: $ir + runtime -> $output"
-    clang "$OPT" -o "$output" "$ir" "$RUNTIME" "$RUNTIME_BASE" "$STUBS" 2>&1
+    clang "$OPT" -o "$output" "$ir" "$RUNTIME" "$RUNTIME_BASE" 2>&1
 }
 
 case "$COMMAND" in
