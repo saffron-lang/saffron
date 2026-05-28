@@ -1,5 +1,14 @@
 //! AST node types and utilities for working with Saffron syntax trees.
-//! Re-exports the internal AST definitions and adds traversal helpers.
+//! Re-exports the internal AST definitions and adds traversal/inspection helpers.
+//!
+//! ```saffron
+//! import "@ast" as AST
+//! import "@parser" as Parser
+//!
+//! var stmts = Parser.parse("fun hello() { IO.println(\"hi\") }")
+//! var fns = AST.find_functions(stmts)
+//! IO.println(AST.stmt_name(fns[0]))  // "hello"
+//! ```
 
 import "../compiler/ast.sf" as Internal
 
@@ -10,92 +19,168 @@ var Pattern = Internal.Pattern
 var MatchArm = Internal.MatchArm
 var Variant = Internal.Variant
 var Type = Internal.Type
+var Param = Internal.Param
+
+// =============================================================================
+// AST Traversal
+// =============================================================================
 
 /// Walk all statements in a program, calling `visitor` on each.
-fun walk_stmts(stmts: List<Internal.Stmt>, visitor: (Internal.Stmt) => Nil) {
-    for (stmt in stmts) {
-        visitor(stmt)
-        walk_children(stmt, visitor)
+fun walk_stmts(stmts: List<Any>, visitor: Any) {
+    var i: Float = 0
+    while (i < stmts.length()) {
+        visitor(stmts[i])
+        walk_children(stmts[i], visitor)
+        i = i + 1
     }
 }
 
 /// Recursively visit child statements within a statement.
-fun walk_children(stmt: Internal.Stmt, visitor: (Internal.Stmt) => Nil) {
+fun walk_children(stmt: Any, visitor: Any) {
     match (stmt) {
         FunDecl(name, params, ret_type, body, docstring) => {
             walk_stmts(body, visitor)
-        },
-        ClassDecl(name, fields, methods, docstring) => {
+        }
+        ClassDecl(name, parent, fields, methods, docstring) => {
             walk_stmts(methods, visitor)
-        },
+        }
         If(condition, then_branch, else_branch) => {
             walk_stmts(then_branch, visitor)
             walk_stmts(else_branch, visitor)
-        },
+        }
         While(condition, body) => {
             walk_stmts(body, visitor)
-        },
+        }
         Block(stmts) => {
             walk_stmts(stmts, visitor)
         }
+        TryCatch(try_body, catch_name, catch_body, finally_body) => {
+            walk_stmts(try_body, visitor)
+            walk_stmts(catch_body, visitor)
+            walk_stmts(finally_body, visitor)
+        }
+        _ => {}
     }
 }
 
+// =============================================================================
+// AST Queries
+// =============================================================================
+
 /// Extract all function declarations from a list of statements.
-fun find_functions(stmts: List<Internal.Stmt>): List<Internal.Stmt> {
-    var results: List<Internal.Stmt> = []
-    walk_stmts(stmts, fun (stmt: Internal.Stmt) {
-        match (stmt) {
+fun find_functions(stmts: List<Any>): List<Any> {
+    var results: List<Any> = []
+    var i: Float = 0
+    while (i < stmts.length()) {
+        match (stmts[i]) {
             FunDecl(name, params, ret_type, body, docstring) => {
-                results.push(stmt)
+                results.push(stmts[i])
             }
+            _ => {}
         }
-    })
+        i = i + 1
+    }
     return results
 }
 
 /// Extract all class declarations from a list of statements.
-fun find_classes(stmts: List<Internal.Stmt>): List<Internal.Stmt> {
-    var results: List<Internal.Stmt> = []
-    walk_stmts(stmts, fun (stmt: Internal.Stmt) {
-        match (stmt) {
-            ClassDecl(name, fields, methods, docstring) => {
-                results.push(stmt)
+fun find_classes(stmts: List<Any>): List<Any> {
+    var results: List<Any> = []
+    var i: Float = 0
+    while (i < stmts.length()) {
+        match (stmts[i]) {
+            ClassDecl(name, parent, fields, methods, docstring) => {
+                results.push(stmts[i])
             }
+            _ => {}
         }
-    })
+        i = i + 1
+    }
     return results
 }
 
 /// Extract all enum declarations from a list of statements.
-fun find_enums(stmts: List<Internal.Stmt>): List<Internal.Stmt> {
-    var results: List<Internal.Stmt> = []
-    walk_stmts(stmts, fun (stmt: Internal.Stmt) {
-        match (stmt) {
+fun find_enums(stmts: List<Any>): List<Any> {
+    var results: List<Any> = []
+    var i: Float = 0
+    while (i < stmts.length()) {
+        match (stmts[i]) {
             EnumDecl(name, variants, docstring) => {
-                results.push(stmt)
+                results.push(stmts[i])
             }
+            _ => {}
         }
-    })
+        i = i + 1
+    }
     return results
 }
 
-/// Get the name of a statement (for declarations that have names).
-fun stmt_name(stmt: Internal.Stmt): String {
+/// Get the name of a declaration statement.
+fun stmt_name(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => name,
-        ClassDecl(name, fields, methods, docstring) => name,
-        EnumDecl(name, variants, docstring) => name,
+        FunDecl(name, params, ret_type, body, docstring) => name
+        ClassDecl(name, parent, fields, methods, docstring) => name
+        EnumDecl(name, variants, docstring) => name
         VarDecl(name, type_ann, initializer, docstring) => name
+        _ => ""
     }
 }
 
-/// Get the docstring of a statement (for declarations that have them).
-fun stmt_doc(stmt: Internal.Stmt): String {
+/// Get the docstring of a declaration statement.
+fun stmt_doc(stmt: Any): String {
     return match (stmt) {
-        FunDecl(name, params, ret_type, body, docstring) => docstring,
-        ClassDecl(name, fields, methods, docstring) => docstring,
-        EnumDecl(name, variants, docstring) => docstring,
+        FunDecl(name, params, ret_type, body, docstring) => docstring
+        ClassDecl(name, parent, fields, methods, docstring) => docstring
+        EnumDecl(name, variants, docstring) => docstring
         VarDecl(name, type_ann, initializer, docstring) => docstring
+        _ => ""
+    }
+}
+
+/// Get the return type of a function declaration.
+fun fun_ret_type(stmt: Any): String {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring) => ret_type
+        _ => ""
+    }
+}
+
+/// Get the params of a function declaration.
+fun fun_params(stmt: Any): List<Any> {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring) => params
+        _ => []
+    }
+}
+
+/// Get the body of a function declaration.
+fun fun_body(stmt: Any): List<Any> {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring) => body
+        _ => []
+    }
+}
+
+/// Check if a statement is a function declaration.
+fun is_fun(stmt: Any): Bool {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, docstring) => true
+        _ => false
+    }
+}
+
+/// Check if a statement is a class declaration.
+fun is_class(stmt: Any): Bool {
+    return match (stmt) {
+        ClassDecl(name, parent, fields, methods, docstring) => true
+        _ => false
+    }
+}
+
+/// Check if a statement is an enum declaration.
+fun is_enum(stmt: Any): Bool {
+    return match (stmt) {
+        EnumDecl(name, variants, docstring) => true
+        _ => false
     }
 }

@@ -1,5 +1,10 @@
 //! Parse Saffron source code into an AST.
 //! Provides a public API wrapping the internal compiler parser.
+//!
+//! ```saffron
+//! import "@parser" as Parser
+//! var ast = Parser.parse("fun hello() { IO.println(\"hi\") }")
+//! ```
 
 import "../compiler/lexer.sf" as Lexer
 import "../compiler/parser.sf" as Internal

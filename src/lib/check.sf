@@ -1,0 +1,34 @@
+//! Type check Saffron source code.
+//! Provides a public API wrapping the internal compiler type checker.
+
+import "../compiler/lexer.sf" as Lexer
+import "../compiler/parser.sf" as Parser
+import "../compiler/checker.sf" as Checker
+import "../compiler/ast.sf" as AST
+
+/// Type check a source string. Returns error/warning report as a string.
+/// Empty string means no issues found.
+fun check(source: String): String {
+    var lexer = Lexer.Lexer(source)
+    var tokens = lexer.tokenize()
+    var parser = Parser.Parser(tokens)
+    var program = parser.parse_program()
+    return Checker.check(program)
+}
+
+/// Type check an already-parsed AST. Returns error/warning report.
+fun check_ast(program: List<AST.Stmt>): String {
+    return Checker.check(program)
+}
+
+/// Type check a file by path. Returns error/warning report.
+fun check_file(path: String): String {
+    var source = IO.read_file(path)
+    return check(source)
+}
+
+/// Check if source has type errors (returns true if errors exist).
+fun has_errors(source: String): Bool {
+    var report = check(source)
+    return report.length() > 0
+}

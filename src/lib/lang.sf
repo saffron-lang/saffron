@@ -1,0 +1,164 @@
+//! Saffron Language Tools — full access to the compiler pipeline.
+//!
+//! Provides lexing, parsing, type checking, code generation, and AST manipulation.
+//!
+//! ```saffron
+//! import "@lang" as Lang
+//!
+//! var ast = Lang.parse("var x = 42")
+//! var ir = Lang.compile("IO.println(\"hello\")")
+//! var errors = Lang.check(source)
+//! ```
+
+import "@ast" as AST
+import "@lexer" as Lex
+import "@parser" as Parse
+
+// Re-export core types for convenience
+var Expr = AST.Expr
+var Stmt = AST.Stmt
+var Type = AST.Type
+var Token = Lex.Token
+var TokenKind = Lex.TokenKind
+
+// =============================================================================
+// Pipeline Functions
+// =============================================================================
+
+/// Tokenize source code into a list of tokens.
+fun lex(source: String): List<Any> {
+    return Lex.tokenize(source)
+}
+
+/// Parse source code into an AST (list of statements).
+fun parse(source: String): List<Any> {
+    return Parse.parse(source)
+}
+
+/// Parse a single expression from source.
+fun parse_expr(source: String): Any {
+    return Parse.parse_expr(source)
+}
+
+/// Parse a file by path into an AST.
+fun parse_file(path: String): List<Any> {
+    return Parse.parse_file(path)
+}
+
+// =============================================================================
+// AST Helpers
+// =============================================================================
+
+/// Get the name of a declaration (function, class, enum, var).
+fun name_of(stmt: Any): String {
+    return AST.stmt_name(stmt)
+}
+
+/// Get the docstring of a declaration.
+fun doc_of(stmt: Any): String {
+    return AST.stmt_doc(stmt)
+}
+
+/// Find all function declarations in an AST.
+fun functions(stmts: List<Any>): List<Any> {
+    return AST.find_functions(stmts)
+}
+
+/// Find all class declarations in an AST.
+fun classes(stmts: List<Any>): List<Any> {
+    return AST.find_classes(stmts)
+}
+
+/// Find all enum declarations in an AST.
+fun enums(stmts: List<Any>): List<Any> {
+    return AST.find_enums(stmts)
+}
+
+/// Walk all statements recursively, calling visitor on each.
+fun walk(stmts: List<Any>, visitor: Any) {
+    AST.walk_stmts(stmts, visitor)
+}
+
+// =============================================================================
+// AST Construction
+// =============================================================================
+
+/// Create a string literal expression.
+fun string_lit(value: String): Any {
+    return AST.Expr.StringLit(value)
+}
+
+/// Create an integer literal expression.
+fun int_lit(value: Number): Any {
+    return AST.Expr.IntLit(value)
+}
+
+/// Create a boolean literal expression.
+fun bool_lit(value: Bool): Any {
+    return AST.Expr.BoolLit(value)
+}
+
+/// Create a variable reference expression.
+fun variable(name: String): Any {
+    return AST.Expr.Variable(name)
+}
+
+/// Create a binary operation expression.
+fun binary(left: Any, op: String, right: Any): Any {
+    return AST.Expr.Binary(left, op, right)
+}
+
+/// Create a function call expression.
+fun call(callee: Any, args: List<Any>): Any {
+    return AST.Expr.Call(callee, args)
+}
+
+/// Create a method call expression.
+fun method_call(object: Any, method: String, args: List<Any>): Any {
+    return AST.Expr.MethodCall(object, method, args)
+}
+
+// =============================================================================
+// Source Generation (AST → String)
+// =============================================================================
+
+/// Convert an expression back to source code.
+fun expr_to_source(expr: Any): String {
+    return match (expr) {
+        StringLit(s) => "\"" + s + "\""
+        IntLit(n) => n.to_string()
+        FloatLit(n) => n.to_string()
+        BoolLit(b) => b.to_string()
+        NilLit => "nil"
+        Variable(name) => name
+        Binary(l, op, r) => expr_to_source(l) + " " + op + " " + expr_to_source(r)
+        Unary(op, right) => op + expr_to_source(right)
+        Call(callee, args) => expr_to_source(callee) + "(" + _join_exprs(args) + ")"
+        MethodCall(obj, method, args) => expr_to_source(obj) + "." + method + "(" + _join_exprs(args) + ")"
+        Assign(name, value) => name + " = " + expr_to_source(value)
+        x => "<expr>"
+    }
+}
+
+/// Convert a statement back to source code.
+fun stmt_to_source(stmt: Any): String {
+    return match (stmt) {
+        VarDecl(name, type_ann, init, doc) => "var " + name + ": " + type_ann + " = " + expr_to_source(init)
+        FunDecl(name, params, ret, body, doc) => "fun " + name + "(...) { ... }"
+        ClassDecl(name, parent, fields, methods, doc) => "class " + name + " { ... }"
+        EnumDecl(name, variants, doc) => "enum " + name + " { ... }"
+        ExprStmt(expr) => expr_to_source(expr)
+        Return(value) => "return " + expr_to_source(value)
+        x => "<stmt>"
+    }
+}
+
+fun _join_exprs(exprs: List<Any>): String {
+    var parts: List<String> = []
+    var i = 0
+    while (i < exprs.length()) {
+        parts.push(expr_to_source(exprs[i]))
+        i = i + 1
+    }
+    return parts.join(", ")
+}
