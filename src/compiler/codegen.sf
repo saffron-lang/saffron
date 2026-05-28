@@ -484,7 +484,9 @@ class Codegen {
                 "0"
             }
             Variable(name) => {
-                if (this.var_types.has(name)) {
+                if (this.typed_vars.has(name)) {
+                    this.last_type = this.typed_vars.get(name)
+                } else if (this.var_types.has(name)) {
                     this.last_type = this.str_to_type(this.var_types.get(name))
                 } else {
                     this.last_type = AST.Type.IntType
@@ -893,7 +895,9 @@ class Codegen {
             var vname: String = match (expr) { Variable(n) => n
                 _ => ""
             }
-            if (this.var_types.has(vname)) {
+            if (this.typed_vars.has(vname)) {
+                this.last_type = this.typed_vars.get(vname)
+            } else if (this.var_types.has(vname)) {
                 this.last_type = this.str_to_type(this.var_types.get(vname))
             } else {
                 this.last_type = AST.Type.IntType
@@ -1818,6 +1822,9 @@ class Codegen {
         var ek: String = this.classify_expr(expr)
         if (ek == "variable") {
             var vname: String = this.get_variable_name(expr)
+            if (vname.length() > 0 and this.typed_vars.has(vname)) {
+                return this.type_to_string(this.typed_vars.get(vname))
+            }
             if (vname.length() > 0 and this.var_types.has(vname)) {
                 return this.var_types.get(vname)
             }
@@ -2081,36 +2088,12 @@ class Codegen {
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
         var obj_name: String = this.get_variable_name(object)
 
-        // Self method calls: this.method(args) — must come first before any other dispatch
-        // so that `this.tokenize()` emits `Lexer__tokenize(i64 %self)` and not bare `@tokenize()`.
+        // Self method calls: this.method(args)
         var obj_kind_early: String = this.classify_expr(object)
         if (obj_kind_early == "this" and this.current_class.length() > 0) {
             var self_val: String = this.fresh_local()
             this.emit_indent(self_val + " = load i64, i64* %self")
-            var arg_strs: List<String> = []
-            arg_strs.push("i64 " + self_val)
-            var ai: Float = 0
-            while (ai < args.length()) {
-                var val: String = this.gen_arg_value(args[ai])
-                arg_strs.push("i64 " + val)
-                ai = ai + 1
-            }
-            var full_method: String = this.current_class + "__" + method
-            if (this.func_prefix_map.has(full_method)) {
-                full_method = this.func_prefix_map.get(full_method)
-            } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
-                full_method = this.current_prefix + full_method
-            }
-            this.called_functions.push(full_method)
-            this.called_function_arity.set(full_method, args.length() + 1)
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
-            if (this.func_ret_types.has(full_method)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
-            } else {
-                this.last_type = AST.Type.IntType
-            }
-            return local
+            return this.gen_namespace_call(this.current_class, method, self_val, args, true)
         }
 
         // Check for OS module calls
@@ -2539,38 +2522,8 @@ class Codegen {
         if (class_name.length() == 0) {
             class_name = this.find_class_for_method(method)
         }
-        if (true) {
-            if (class_name.length() > 0) {
-                var arg_strs: List<String> = []
-                arg_strs.push("i64 " + obj)
-                var i: Float = 0
-                while (i < args.length()) {
-                    var val: String = this.gen_arg_value(args[i])
-                    arg_strs.push("i64 " + val)
-                    i = i + 1
-                }
-                var full_method: String = class_name + "__" + method
-                if (this.func_prefix_map.has(full_method)) {
-                    full_method = this.func_prefix_map.get(full_method)
-                } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
-                    full_method = this.current_prefix + full_method
-                }
-                this.called_functions.push(full_method)
-                if (this.get_method_ret(class_name, method) == "void") {
-                    var discard: String = this.fresh_local()
-                    this.emit_indent(discard + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
-                    this.last_type = AST.Type.NilType
-                    return "0"
-                }
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
-                if (this.func_ret_types.has(full_method)) {
-                    this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
-                } else {
-                    this.last_type = AST.Type.IntType
-                }
-                return local
-            }
+        if (class_name.length() > 0) {
+            return this.gen_namespace_call(class_name, method, obj, args, true)
         }
 
         // Universal methods (last resort, after class methods checked)
@@ -2793,6 +2746,7 @@ class Codegen {
         var saved_terminated2: Bool = this.block_terminated
         var saved_counter2: Float = this.local_counter
         var saved_var_types2: Map<String, String> = this.var_types
+        var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
         if (params_str.length() > 0) {
@@ -2804,6 +2758,7 @@ class Codegen {
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
         this.var_types = saved_var_types2
+        this.typed_vars = saved_typed_vars2b
 
         // Heap-allocate closure pair: [fn_ptr, 0]
         var closure_raw: String = this.fresh_local()
@@ -4353,6 +4308,7 @@ class Codegen {
 
         this.in_function = true
         var saved_vt: Map<String, String> = this.var_types
+        var saved_tv: Map<String, AST.Type> = this.typed_vars
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -4460,6 +4416,7 @@ class Codegen {
         this.emit("}")
         this.block_terminated = false
         this.var_types = saved_vt
+        this.typed_vars = saved_tv
         this.in_function = false
     }
 

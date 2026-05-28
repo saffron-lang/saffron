@@ -1,14 +1,34 @@
 # Saffron TODO
 
+## Unified Dispatch (in progress)
+- [x] gen_namespace_call helper for unified obj.method() dispatch
+- [x] resolve_namespace for determining obj's namespace
+- [x] Class method fallback uses gen_namespace_call
+- [ ] IO/OS as proper modules (src/lib/io.sf, os.sf) — need println to call .to_string() on arg
+- [ ] Remove hardcoded IO/OS dispatch from gen_method_call
+- [ ] Remove module prefix mangling (use import alias as namespace name)
+- [ ] Migrate this-dispatch to use gen_namespace_call
+
+## Import System (in progress)
+- [x] Parser produces @import: VarDecl metadata
+- [x] AST-based import extraction in main.sf
+- [ ] Named imports: `import { X, Y } from "path"` activates specific symbols
+- [ ] Import-scoped extension methods (only visible where imported)
+- [ ] Fix gen2 promotion crash (signal 137 when new gen3 used as gen2)
+
+## Codegen Split (blocked on imports)
+- [ ] Split gen_method_call into codegen/methods.sf via extend fun
+- [ ] Split expr codegen into codegen/expr.sf
+- [ ] Split stmt codegen into codegen/stmt.sf
+
 ## Type System
-- [ ] Disallow bare generics: `List`, `Map` must be `List<T>`, `Map<K,V>` — type error otherwise
+- [ ] Disallow bare generics: `List`, `Map` must be `List<T>`, `Map<K,V>`
 - [ ] obj_type in codegen dispatch should be AST.Type nodes, not strings
 - [ ] All type comparisons should use pattern matching on AST.Type, not string == / starts_with
-- [ ] runtime.ll should eventually be a .sf file compiled by the compiler itself
 
 ## Parser
-- [ ] Refactor match_kind_check/match_kind to compare TokenKind enum values directly instead of string conversion (130 call sites)
+- [ ] Refactor match_kind_check/match_kind to compare TokenKind enum values directly (130 call sites)
 
 ## Native Binary Fixes
-- [ ] `this.field = value` crashes in gen2-compiled user programs (field GET works, field SET segfaults)
-- [ ] Root cause under investigation: struct layout or GEP index mismatch in gen2 output vs C VM output
+- [x] Field-set crash was actually method name collision (get/set hijacked by builtins) — FIXED
+- [ ] Gen2 promotion crash: new gen3 binary crashes with signal 137 when used as gen2
