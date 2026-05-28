@@ -540,10 +540,10 @@
     }
     if (!is_user_class and method == "starts_with") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var prefix: String = this.gen_arg_value(args[0])
         var prefix_ptr: String = this.fresh_local()
-        this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
+        this.emit_indent(prefix_ptr + " = call i8* @__val_untag_ptr(i64 " + prefix + ")")
         var plen: String = this.fresh_local()
         this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
         var cmp: String = this.fresh_local()
@@ -557,7 +557,7 @@
     }
     if (!is_user_class and method == "char_at") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var idx: String = this.gen_arg_value(args[0])
         var char_ptr: String = this.fresh_local()
         this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
@@ -570,13 +570,13 @@
         this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
         this.emit_indent("store i8 0, i8* " + null_ptr)
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         this.last_type = AST.Type.StringType
         return local
     }
     if (!is_user_class and method == "is_upper") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + str_ptr)
         var ge_a: String = this.fresh_local()
@@ -592,7 +592,7 @@
     }
     if (!is_user_class and method == "is_lower") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + str_ptr)
         var ge_a: String = this.fresh_local()
@@ -608,7 +608,7 @@
     }
     if (!is_user_class and method == "slice") {
         var str_ptr: String = this.fresh_local()
-        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
         var start: String = this.gen_arg_value(args[0])
         var end: String = this.gen_arg_value(args[1])
         var slice_len: String = this.fresh_local()
@@ -624,7 +624,7 @@
         this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
         this.emit_indent("store i8 0, i8* " + null_pos)
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         this.last_type = AST.Type.StringType
         return local
     }
@@ -641,7 +641,7 @@
     if (!is_user_class and method == "length") {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
             this.last_type = AST.Type.IntType
@@ -656,10 +656,10 @@
     if (!is_user_class and method == "contains") {
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            this.emit_indent(str_ptr + " = call i8* @__val_untag_ptr(i64 " + obj + ")")
             var needle: String = this.gen_arg_value(args[0])
             var needle_ptr: String = this.fresh_local()
-            this.emit_indent(needle_ptr + " = inttoptr i64 " + needle + " to i8*")
+            this.emit_indent(needle_ptr + " = call i8* @__val_untag_ptr(i64 " + needle + ")")
             var found: String = this.fresh_local()
             this.emit_indent(found + " = call i8* @strstr(i8* " + str_ptr + ", i8* " + needle_ptr + ")")
             var local: String = this.fresh_local()

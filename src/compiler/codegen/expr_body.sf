@@ -31,12 +31,14 @@
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
                 local
             }
             NilLit => {
                 this.last_type = AST.Type.NilType
-                "0"
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__val_nil()")
+                local
             }
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
@@ -287,9 +289,9 @@
 
             if (left_type == "String" or right_type == "String") {
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
+                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
                 var cmp: String = this.fresh_local()
                 this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
                 var cmp_result: String = this.fresh_local()
@@ -327,9 +329,9 @@
                 // String concatenation
                 this.last_type = AST.Type.StringType
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
+                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -343,7 +345,7 @@
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
                 var result: String = this.fresh_local()
-                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+                this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
                 return result
             }
 
@@ -449,7 +451,7 @@
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
         return local
     }
 
@@ -654,7 +656,7 @@
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
             return local
         }
         return this.gen_expr(expr)
@@ -673,7 +675,7 @@
         // Variable or expression: gen_expr gives i64, convert to i8*
         var val: String = this.gen_arg_value(expr)
         var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+        this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
         return ptr
     }
 
@@ -698,7 +700,7 @@
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
         // Return as i64
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         return result
     }
 
