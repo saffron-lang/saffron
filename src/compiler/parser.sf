@@ -81,6 +81,10 @@ class Parser {
 
     fun parse_type(): String {
         var name: String = this.parse_single_type()
+        // Nullable shorthand: String? → String|Nil
+        if (this.match_kind("?")) {
+            name = name + "|Nil"
+        }
         // Union types: String | Nil, Int | String | Nil
         while (this.match_kind("|")) {
             var next: String = this.parse_single_type()
@@ -510,12 +514,16 @@ class Parser {
             var pname: String = this.expect_ident()
             this.consume(":")
             var ptype: String = this.parse_type()
-            params.push(AST.Param.Param(pname, ptype))
+            var pdefault: AST.Expr = AST.Expr.NilLit
+            if (this.match_kind("=")) { pdefault = this.parse_expr() }
+            params.push(AST.Param.Param(pname, ptype, pdefault))
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 this.consume(":")
                 ptype = this.parse_type()
-                params.push(AST.Param.Param(pname, ptype))
+                pdefault = AST.Expr.NilLit
+                if (this.match_kind("=")) { pdefault = this.parse_expr() }
+                params.push(AST.Param.Param(pname, ptype, pdefault))
             }
         }
         this.consume(")")
@@ -719,12 +727,12 @@ class Parser {
                 var pname: String = this.expect_ident()
                 this.consume(":")
                 var ptype: String = this.parse_type()
-                ext_params.push(AST.Param.Param(pname, ptype))
+                ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
                 while (this.match_kind(",")) {
                     pname = this.expect_ident()
                     this.consume(":")
                     ptype = this.parse_type()
-                    ext_params.push(AST.Param.Param(pname, ptype))
+                    ext_params.push(AST.Param.Param(pname, ptype, AST.Expr.NilLit))
                 }
             }
             this.consume(")")
@@ -893,12 +901,16 @@ class Parser {
             var pname: String = this.expect_ident()
             this.consume(":")
             var ptype: String = this.parse_type()
-            params.push(AST.Param.Param(pname, ptype))
+            var pdefault: AST.Expr = AST.Expr.NilLit
+            if (this.match_kind("=")) { pdefault = this.parse_expr() }
+            params.push(AST.Param.Param(pname, ptype, pdefault))
             while (this.match_kind(",")) {
                 pname = this.expect_ident()
                 this.consume(":")
                 ptype = this.parse_type()
-                params.push(AST.Param.Param(pname, ptype))
+                pdefault = AST.Expr.NilLit
+                if (this.match_kind("=")) { pdefault = this.parse_expr() }
+                params.push(AST.Param.Param(pname, ptype, pdefault))
             }
         }
         this.consume(")")
@@ -1099,7 +1111,7 @@ class Parser {
                     field_defaults.push(AST.Stmt.ExprStmt(
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
-                fields.push(AST.Param.Param(fname, ftype))
+                fields.push(AST.Param.Param(fname, ftype, AST.Expr.NilLit))
             } else if (this.match_kind_check("fun")) {
                 // Method declaration
                 methods.push(this.parse_fun_decl())
@@ -1364,7 +1376,7 @@ class Parser {
         var i: Float = 0
         while (i < names.length()) {
             IO.println("[DEBUG build_lambda]   name: " + names[i])
-            params.push(AST.Param.Param(names[i], "Any"))
+            params.push(AST.Param.Param(names[i], "Any", AST.Expr.NilLit))
             i = i + 1
         }
         IO.println("[DEBUG build_lambda] params.length=" + params.length().to_string())

@@ -29,6 +29,8 @@ class Codegen {
     var called_function_arity: Map<String, Float>
     var module_prefixes: Map<String, String>
     var func_prefix_map: Map<String, String>
+    var func_defaults: Map<String, List<AST.Expr>>
+    var func_param_count: Map<String, Float>
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var register_only: Bool
@@ -67,6 +69,8 @@ class Codegen {
         this.called_function_arity = {}
         this.module_prefixes = {}
         this.func_prefix_map = {}
+        this.func_defaults = {}
+        this.func_param_count = {}
         this.current_prefix = ""
         this.module_globals = {}
         this.register_only = false
@@ -107,8 +111,8 @@ class Codegen {
         while (i < params.length()) {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
-            var pname: String = match (p) { Param(n, t) => n }
-            var ptype: String = match (p) { Param(n, t) => t }
+            var pname: String = match (p) { Param(n, t, d) => n }
+            var ptype: String = match (p) { Param(n, t, d) => t }
             sb.append(pname)
             sb.append(":")
             sb.append(ptype)
@@ -1231,6 +1235,12 @@ class Codegen {
                 if (!this.known_functions.contains(init_name)) {
                     init_name = callee_name + "__init"
                 }
+                // Resolve via func_prefix_map (class methods are emitted with module prefix)
+                if (this.func_prefix_map.has(init_name)) {
+                    init_name = this.func_prefix_map.get(init_name)
+                } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + init_name)) {
+                    init_name = this.current_prefix + init_name
+                }
                 if (this.known_functions.contains(init_name)) {
                     var init_args: List<String> = []
                     init_args.push("i64 " + instance)
@@ -1268,6 +1278,20 @@ class Codegen {
                 var val: String = this.gen_arg_value(args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
+            }
+            // Fill missing args with default values
+            if (this.func_defaults.has(resolved_callee)) {
+                var defaults: List<AST.Expr> = this.func_defaults.get(resolved_callee)
+                var param_count: Float = defaults.length()
+                while (i < param_count) {
+                    var def_expr: AST.Expr = defaults[i]
+                    var is_nil: Bool = this.classify_expr(def_expr) == "nil"
+                    if (!is_nil) {
+                        var def_val: String = this.gen_arg_value(def_expr)
+                        arg_strs.push("i64 " + def_val)
+                    }
+                    i = i + 1
+                }
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
@@ -1995,8 +2019,19 @@ class Codegen {
 
     fun gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
     var full_name: String = ext_class + "__" + name
+    // Use target class's prefix (not source file's prefix)
+    var class_prefix: String = this.current_prefix
+    var init_key: String = ext_class + "__init"
+    if (this.func_prefix_map.has(init_key)) {
+        var mapped: String = this.func_prefix_map.get(init_key)
+        class_prefix = mapped.slice(0, mapped.length() - init_key.length())
+    }
+    var prefixed: String = class_prefix + full_name
+    this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
+    this.func_ret_types.set(prefixed, ret_type)
     this.func_ret_types.set(full_name, ret_type)
+    this.func_prefix_map.set(full_name, prefixed)
     if (this.class_methods.has(ext_class)) {
         var methods: List = this.class_methods.get(ext_class)
         methods.push(name)
@@ -2007,7 +2042,7 @@ class Codegen {
     var saved_class: String = this.current_class
     var saved_prefix: String = this.current_prefix
     this.current_class = ext_class
-    this.current_prefix = ""
+    this.current_prefix = class_prefix
     this.gen_function(full_name, full_params, ret_type, body)
     this.current_class = saved_class
     this.current_prefix = saved_prefix
@@ -2088,6 +2123,11 @@ class Codegen {
         i = i + 1
     }
     var full_method: String = ns + "__" + method
+    if (this.func_prefix_map.has(full_method)) {
+        full_method = this.func_prefix_map.get(full_method)
+    } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+        full_method = this.current_prefix + full_method
+    }
     this.called_functions.push(full_method)
     var local: String = this.fresh_local()
     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
@@ -2633,7 +2673,7 @@ class Codegen {
         var pi: Float = 0
         while (pi < params.length()) {
             var p: AST.Param = params[pi]
-            var pname: String = match (p) { Param(n, t) => n }
+            var pname: String = match (p) { Param(n, t, d) => n }
             param_names.push(pname)
             pi = pi + 1
         }
@@ -3508,6 +3548,18 @@ class Codegen {
                     this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
+                    // Register default values for optional params
+                    var emit_name: String = this.current_prefix + name
+                    var defaults: List<AST.Expr> = []
+                    var pi: Float = 0
+                    while (pi < params.length()) {
+                        var p: AST.Param = params[pi]
+                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
+                        defaults.push(dval)
+                        pi = pi + 1
+                    }
+                    this.func_defaults.set(emit_name, defaults)
+                    this.func_param_count.set(emit_name, params.length())
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
@@ -3778,10 +3830,7 @@ class Codegen {
         if (this.current_prefix.length() > 0) {
             this.called_function_arity.set(this.current_prefix + full_name, param_count)
         }
-        var saved_prefix: String = this.current_prefix
-        this.current_prefix = ""
         this.gen_function(full_name, full_params, mret, mbody)
-        this.current_prefix = saved_prefix
     }
 
     fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
