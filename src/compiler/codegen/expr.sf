@@ -44,7 +44,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                     this.last_type = AST.Type.IntType
                 }
                 // Error check: undefined variable
-                if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                 }
@@ -91,12 +91,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                         return this.gen_enum_construct(obj_name, field, [])
                     }
                     // Check if variable holds a class instance
-                    var vtype: String = ""
-                    if (this.typed_vars.has(obj_name)) {
-                        vtype = this.type_to_string(this.typed_vars.get(obj_name))
-                    } else if (this.var_types.has(obj_name)) {
-                        vtype = this.var_types.get(obj_name)
-                    }
+                    var vtype: String = this.get_var_type_str(obj_name)
                     if (vtype.length() > 0 and this.class_fields.has(vtype)) {
                         // It's a class instance — do field access
                         var obj_val: String = this.gen_arg_value(object)
@@ -208,10 +203,8 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
         if (method_name.length() > 0) {
             var left_name: String = this.get_variable_name(left)
             var left_class: String = ""
-            if (left_name.length() > 0 and this.typed_vars.has(left_name)) {
-                left_class = this.type_to_string(this.typed_vars.get(left_name))
-            } else if (left_name.length() > 0 and this.var_types.has(left_name)) {
-                left_class = this.var_types.get(left_name)
+            if (left_name.length() > 0) {
+                left_class = this.get_var_type_str(left_name)
             }
             if (left_class.length() > 0) {
                 if (this.class_methods.has(left_class)) {
@@ -478,7 +471,7 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
                 this.last_type = AST.Type.IntType
             }
             // Error check: undefined variable
-            if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
             }
@@ -505,10 +498,8 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
             // Handle as field access on class instance or enum
             var mn: String = this.get_variable_name(m_obj)
             var vt: String = ""
-            if (mn.length() > 0 and this.typed_vars.has(mn)) {
-                vt = this.type_to_string(this.typed_vars.get(mn))
-            } else if (mn.length() > 0 and this.var_types.has(mn)) {
-                vt = this.var_types.get(mn)
+            if (mn.length() > 0) {
+                vt = this.get_var_type_str(mn)
             }
             if (vt.length() > 0 and this.class_fields.has(vt)) {
                     var ov: String = this.gen_arg_value(m_obj)
@@ -542,7 +533,7 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
                         _ => AST.Expr.NilLit
                     }
                     var root_name: String = this.get_variable_name(inner_obj)
-                    if (root_name.length() > 0 and !this.typed_vars.has(root_name) and !this.var_types.has(root_name)) {
+                    if (root_name.length() > 0 and !this.typed_vars.has(root_name)) {
                         if (this.enum_variant_tags.has(inner_field + "." + m_field)) {
                             return this.gen_enum_construct(inner_field, m_field, [])
                         }
@@ -627,13 +618,42 @@ extend fun Codegen.gen_runtime_string_concat(left: AST.Expr, right: AST.Expr): S
 
 extend fun Codegen.gen_unary(op: String, right: AST.Expr): String {
         var rhs: String = this.gen_arg_value(right)
-        var local: String = this.fresh_local()
 
-        if (op == "-") { this.emit_indent(local + " = sub i64 0, " + rhs) }
-        else if (op == "!") { this.emit_indent(local + " = xor i64 " + rhs + ", 1") }
-        else if (op == "~") { this.emit_indent(local + " = xor i64 " + rhs + ", -1") }
+        if (op == "-") {
+            // NaN-boxed negation: untag → negate → retag
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
+            var negated: String = this.fresh_local()
+            this.emit_indent(negated + " = sub i64 0, " + raw)
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + negated + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (op == "!") {
+            // Logical not: untag bool, flip, retag as bool
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + rhs + ")")
+            var flipped: String = this.fresh_local()
+            this.emit_indent(flipped + " = xor i64 " + raw + ", 1")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + flipped + ")")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+        if (op == "~") {
+            // Bitwise not: untag int, flip all bits, retag
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
+            var flipped: String = this.fresh_local()
+            this.emit_indent(flipped + " = xor i64 " + raw + ", -1")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + flipped + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
 
-        return local
+        return rhs
     }
 
 extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
@@ -852,7 +872,7 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
+        if (!this.typed_vars.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()

@@ -258,6 +258,34 @@ fun __int_to_string(val: Int): Int {
     return buf
 }
 
+fun __list_to_string(list: Int): Int {
+    var count: Int = load64(list)
+    var data: Int = load64(list + 16)
+    // Estimate buffer size: each element up to 20 chars + ", " + "[]"
+    var buf_size: Int = count * 22 + 3
+    var buf: Int = rt_malloc(buf_size)
+    store8(buf, 91)
+    var pos: Int = 1
+    var i: Int = 0
+    while (i < count) {
+        if (i > 0) {
+            store8(buf + pos, 44)
+            pos = pos + 1
+            store8(buf + pos, 32)
+            pos = pos + 1
+        }
+        var elem: Int = load64(data + i * 8)
+        var elem_str: Int = __int_to_string(elem)
+        var elen: Int = rt_strlen(elem_str)
+        rt_memcpy(buf + pos, elem_str, elen)
+        pos = pos + elen
+        i = i + 1
+    }
+    store8(buf + pos, 93)
+    store8(buf + pos + 1, 0)
+    return buf
+}
+
 // =============================================================================
 // Runtime Error Handling
 // =============================================================================

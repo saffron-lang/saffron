@@ -1,28 +1,49 @@
-// Saffron UI — Reactive Signals (C VM compatible)
-// Flat function-based approach to avoid closure-over-this issues
+// Turmeric Signals — reactive primitives with proper types
 
 // =============================================================================
 // Dependency Tracking
 // =============================================================================
 
-var _tracker_deps: List<Any> = []
+var _tracker_deps: List<Signal> = []
 var _tracking: Bool = false
+var _sub_id_counter: Float = 0
 
 fun start_tracking() {
     _tracking = true
     _tracker_deps = []
 }
 
-fun stop_tracking(): List<Any> {
+fun stop_tracking(): List<Signal> {
     _tracking = false
-    var deps: List<Any> = _tracker_deps
+    var deps: List<Signal> = _tracker_deps
     _tracker_deps = []
     return deps
 }
 
-fun record_dep(sig: Any) {
+fun record_dep(sig: Signal) {
     if (_tracking) {
         _tracker_deps.push(sig)
+    }
+}
+
+fun next_sub_id(): Float {
+    _sub_id_counter = _sub_id_counter + 1
+    return _sub_id_counter
+}
+
+// =============================================================================
+// Subscription — trackable by ID for cleanup
+// =============================================================================
+
+class Subscription {
+    var id: Float
+    var fn: () => Nil
+    var active: Bool
+
+    fun init(id: Float, fn: () => Nil) {
+        this.id = id
+        this.fn = fn
+        this.active = true
     }
 }
 
@@ -32,7 +53,7 @@ fun record_dep(sig: Any) {
 
 class Signal {
     var value: Any
-    var subs: List<Any>
+    var subs: List<Subscription>
 
     fun init(initial: Any) {
         this.value = initial
@@ -46,19 +67,37 @@ class Signal {
 
     fun set(next: Any) {
         this.value = next
-        notify_subs(this.subs)
+        this.notify()
     }
 
-    fun subscribe(fn: Any) {
-        this.subs.push(fn)
+    fun update(fn: (Any) => Any) {
+        this.set(fn(this.value))
     }
-}
 
-fun notify_subs(subs: List<Any>) {
-    var i: Float = 0
-    while (i < subs.length()) {
-        subs[i]()
-        i = i + 1
+    fun notify() {
+        var i: Float = 0
+        while (i < this.subs.length()) {
+            if (this.subs[i].active) {
+                this.subs[i].fn()
+            }
+            i = i + 1
+        }
+    }
+
+    fun subscribe(fn: () => Nil): Float {
+        var id: Float = next_sub_id()
+        this.subs.push(Subscription(id, fn))
+        return id
+    }
+
+    fun unsubscribe(id: Float) {
+        var i: Float = 0
+        while (i < this.subs.length()) {
+            if (this.subs[i].id == id) {
+                this.subs[i].active = false
+            }
+            i = i + 1
+        }
     }
 }
 
@@ -72,10 +111,10 @@ fun signal(initial: Any): Signal {
 
 class Computed {
     var value: Any
-    var compute: Any
-    var subs: List<Any>
+    var compute: () => Any
+    var subs: List<Subscription>
 
-    fun init(compute: Any) {
+    fun init(compute: () => Any) {
         this.compute = compute
         this.subs = []
         this.recompute()
@@ -89,54 +128,96 @@ class Computed {
     fun recompute() {
         start_tracking()
         this.value = this.compute()
-        var deps: List<Any> = stop_tracking()
+        var deps: List<Signal> = stop_tracking()
         var i: Float = 0
         while (i < deps.length()) {
             deps[i].subscribe(fun () => {
                 this.value = this.compute()
-                notify_subs(this.subs)
+                this.notify()
             })
             i = i + 1
         }
     }
 
-    fun subscribe(fn: Any) {
-        this.subs.push(fn)
+    fun notify() {
+        var i: Float = 0
+        while (i < this.subs.length()) {
+            if (this.subs[i].active) {
+                this.subs[i].fn()
+            }
+            i = i + 1
+        }
+    }
+
+    fun subscribe(fn: () => Nil): Float {
+        var id: Float = next_sub_id()
+        this.subs.push(Subscription(id, fn))
+        return id
+    }
+
+    fun unsubscribe(id: Float) {
+        var i: Float = 0
+        while (i < this.subs.length()) {
+            if (this.subs[i].id == id) {
+                this.subs[i].active = false
+            }
+            i = i + 1
+        }
     }
 }
 
-fun computed(compute: Any): Computed {
+fun computed(compute: () => Any): Computed {
     return Computed(compute)
 }
 
 // =============================================================================
-// Effect — reactive side effect
+// Effect — reactive side effect, returns cleanup handle
 // =============================================================================
 
-fun effect(fn: Any) {
-    start_tracking()
-    fn()
-    var deps: List<Any> = stop_tracking()
-    var i: Float = 0
-    while (i < deps.length()) {
-        deps[i].subscribe(fn)
-        i = i + 1
+class EffectHandle {
+    var sub_ids: List<Float>
+    var deps: List<Signal>
+
+    fun init(sub_ids: List<Float>, deps: List<Signal>) {
+        this.sub_ids = sub_ids
+        this.deps = deps
+    }
+
+    fun dispose() {
+        var i: Float = 0
+        while (i < this.deps.length()) {
+            this.deps[i].unsubscribe(this.sub_ids[i])
+            i = i + 1
+        }
     }
 }
 
+fun effect(fn: () => Nil): EffectHandle {
+    start_tracking()
+    fn()
+    var deps: List<Signal> = stop_tracking()
+    var sub_ids: List<Float> = []
+    var i: Float = 0
+    while (i < deps.length()) {
+        sub_ids.push(deps[i].subscribe(fn))
+        i = i + 1
+    }
+    return EffectHandle(sub_ids, deps)
+}
+
 // =============================================================================
-// Batch — defer notifications until block completes
+// Batch — defer notifications
 // =============================================================================
 
 var _batch_depth: Float = 0
-var _batch_pending: List<Any> = []
+var _batch_pending: List<() => Nil> = []
 
-fun batch(fn: Any) {
+fun batch(fn: () => Nil) {
     _batch_depth = _batch_depth + 1
     fn()
     _batch_depth = _batch_depth - 1
     if (_batch_depth == 0) {
-        var pending: List<Any> = _batch_pending
+        var pending: List<() => Nil> = _batch_pending
         _batch_pending = []
         var i: Float = 0
         while (i < pending.length()) {
@@ -147,88 +228,13 @@ fun batch(fn: Any) {
 }
 
 // =============================================================================
-// Untrack — read signals without creating dependencies
+// Untrack — read without tracking
 // =============================================================================
 
-fun untrack(fn: Any): Any {
+fun untrack(fn: () => Any): Any {
     var was_tracking: Bool = _tracking
     _tracking = false
     var result: Any = fn()
     _tracking = was_tracking
     return result
 }
-
-// =============================================================================
-// Tests
-// =============================================================================
-
-IO.println("--- Test 1: Basic signal ---")
-var count: Signal = signal(0)
-IO.println("initial: " + count.get().to_string())
-count.set(5)
-IO.println("after set(5): " + count.get().to_string())
-
-IO.println("--- Test 2: Subscribe ---")
-var log: List<String> = []
-count.subscribe(fun () => {
-    log.push("notified: " + count.get().to_string())
-})
-count.set(10)
-count.set(20)
-IO.println("log[0]: " + log[0])
-IO.println("log[1]: " + log[1])
-
-IO.println("--- Test 3: Effect ---")
-var effect_log: List<String> = []
-var name: Signal = signal("world")
-effect(fun () => {
-    effect_log.push("hello " + name.get())
-})
-IO.println("effect ran: " + effect_log[0])
-name.set("saffron")
-IO.println("effect re-ran: " + effect_log[1])
-
-IO.println("--- Test 4: Multiple signals in one effect ---")
-var a: Signal = signal(3)
-var b: Signal = signal(4)
-var sum_log: List<String> = []
-effect(fun () => {
-    var total: Any = a.get() + b.get()
-    sum_log.push("sum=" + total.to_string())
-})
-IO.println("initial: " + sum_log[0])
-a.set(10)
-IO.println("after a=10: " + sum_log[1])
-b.set(20)
-IO.println("after b=20: " + sum_log[2])
-
-IO.println("--- Test 5: Computed ---")
-var x: Signal = signal(3)
-var y: Signal = signal(4)
-var sum: Computed = computed(fun () => x.get() + y.get())
-IO.println("sum(3+4): " + sum.get().to_string())
-x.set(10)
-IO.println("sum(10+4): " + sum.get().to_string())
-y.set(20)
-IO.println("sum(10+20): " + sum.get().to_string())
-
-IO.println("--- Test 6: Computed chain ---")
-var base: Signal = signal(2)
-var doubled: Computed = computed(fun () => base.get() * 2)
-var quadrupled: Computed = computed(fun () => doubled.get() * 2)
-IO.println("base=2, doubled=" + doubled.get().to_string() + ", quad=" + quadrupled.get().to_string())
-base.set(5)
-IO.println("base=5, doubled=" + doubled.get().to_string() + ", quad=" + quadrupled.get().to_string())
-
-IO.println("--- Test 7: Effect on computed ---")
-var c: Signal = signal(1)
-var tripled: Computed = computed(fun () => c.get() * 3)
-var effect_results: List<String> = []
-effect(fun () => {
-    effect_results.push("tripled=" + tripled.get().to_string())
-})
-IO.println("initial: " + effect_results[0])
-c.set(7)
-IO.println("after c=7: " + effect_results[1])
-
-IO.println("All signal tests passed!")
