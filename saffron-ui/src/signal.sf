@@ -1,0 +1,128 @@
+// Saffron UI — Reactive Signals (C VM compatible)
+// Flat function-based approach to avoid closure-over-this issues
+
+// =============================================================================
+// Dependency Tracking
+// =============================================================================
+
+var _tracker_deps: List<Any> = []
+var _tracking: Bool = false
+
+fun start_tracking() {
+    _tracking = true
+    _tracker_deps = []
+}
+
+fun stop_tracking(): List<Any> {
+    _tracking = false
+    var deps: List<Any> = _tracker_deps
+    _tracker_deps = []
+    return deps
+}
+
+fun record_dep(sig: Any) {
+    if (_tracking) {
+        _tracker_deps.push(sig)
+    }
+}
+
+// =============================================================================
+// Signal — mutable reactive state
+// =============================================================================
+
+class Signal {
+    var value: Any
+    var subs: List<Any>
+
+    fun init(initial: Any) {
+        this.value = initial
+        this.subs = []
+    }
+
+    fun get(): Any {
+        record_dep(this)
+        return this.value
+    }
+
+    fun set(next: Any) {
+        this.value = next
+        notify_subs(this.subs)
+    }
+
+    fun subscribe(fn: Any) {
+        this.subs.push(fn)
+    }
+}
+
+fun notify_subs(subs: List<Any>) {
+    var i: Float = 0
+    while (i < subs.length()) {
+        subs[i]()
+        i = i + 1
+    }
+}
+
+fun signal(initial: Any): Signal {
+    return Signal(initial)
+}
+
+// =============================================================================
+// Effect — reactive side effect
+// =============================================================================
+
+fun effect(fn: Any) {
+    start_tracking()
+    fn()
+    var deps: List<Any> = stop_tracking()
+    var i: Float = 0
+    while (i < deps.length()) {
+        deps[i].subscribe(fn)
+        i = i + 1
+    }
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+IO.println("--- Test 1: Basic signal ---")
+var count: Signal = signal(0)
+IO.println("initial: " + count.get().to_string())
+count.set(5)
+IO.println("after set(5): " + count.get().to_string())
+
+IO.println("--- Test 2: Subscribe ---")
+var log: List<String> = []
+count.subscribe(fun () => {
+    log.push("notified: " + count.get().to_string())
+})
+count.set(10)
+count.set(20)
+IO.println("log[0]: " + log[0])
+IO.println("log[1]: " + log[1])
+
+IO.println("--- Test 3: Effect ---")
+var effect_log: List<String> = []
+var name: Signal = signal("world")
+effect(fun () => {
+    effect_log.push("hello " + name.get())
+})
+IO.println("effect ran: " + effect_log[0])
+name.set("saffron")
+IO.println("effect re-ran: " + effect_log[1])
+
+IO.println("--- Test 4: Multiple signals in one effect ---")
+var a: Signal = signal(3)
+var b: Signal = signal(4)
+var sum_log: List<String> = []
+effect(fun () => {
+    var total: Any = a.get() + b.get()
+    sum_log.push("sum=" + total.to_string())
+})
+IO.println("initial: " + sum_log[0])
+a.set(10)
+IO.println("after a=10: " + sum_log[1])
+b.set(20)
+IO.println("after b=20: " + sum_log[2])
+
+IO.println("All signal tests passed!")

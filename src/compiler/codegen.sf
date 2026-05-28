@@ -37,6 +37,8 @@ class Codegen {
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
     var builtin_methods: Map<String, String>
+    var extend_map: Map<String, String>
+    var pending_extend_class: String
 
     fun init() {
         this.sb = StringBuilder()
@@ -73,6 +75,8 @@ class Codegen {
         this.extern_sigs = {}
         this.defined_funcs = []
         this.builtin_methods = {}
+        this.extend_map = {}
+        this.pending_extend_class = ""
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
         this.builtin_methods.set("set", "v3|__map_set|Nil|0")
@@ -528,8 +532,6 @@ class Codegen {
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
                     this.last_type = this.typed_vars.get(name)
-                } else if (this.var_types.has(name)) {
-                    this.last_type = this.str_to_type(this.var_types.get(name))
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -947,8 +949,6 @@ class Codegen {
             }
             if (this.typed_vars.has(vname)) {
                 this.last_type = this.typed_vars.get(vname)
-            } else if (this.var_types.has(vname)) {
-                this.last_type = this.str_to_type(this.var_types.get(vname))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -1863,9 +1863,6 @@ class Codegen {
             if (vname.length() > 0 and this.typed_vars.has(vname)) {
                 return this.type_to_string(this.typed_vars.get(vname))
             }
-            if (vname.length() > 0 and this.var_types.has(vname)) {
-                return this.var_types.get(vname)
-            }
             return "Any"
         }
         if (ek == "string") return "String"
@@ -1880,9 +1877,6 @@ class Codegen {
             var obj_name: String = this.get_variable_name(expr)
             if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
                 return this.type_to_string(this.typed_vars.get(obj_name))
-            }
-            if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
-                return this.var_types.get(obj_name)
             }
         }
         if (ek == "method_call") {
@@ -2448,6 +2442,11 @@ class Codegen {
             } else if (obj_type == "String") {
                 this.last_type = AST.Type.StringType
                 return obj
+            } else if (obj_type == "Bool") {
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + obj + ")")
+                this.last_type = AST.Type.StringType
+                return local
             } else {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
@@ -2680,7 +2679,9 @@ class Codegen {
         var saved_var_types: Map<String, String> = this.var_types
         var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
 
-        // Generate the lambda function
+        // Generate the lambda function (disable nested detection to avoid interception)
+        var saved_in_fn: Bool = this.in_function
+        this.in_function = false
         this.sb = StringBuilder()
         if (captures.length() > 0) {
             // Custom gen: emit function header, extract captures from env, then body
@@ -2688,6 +2689,7 @@ class Codegen {
         } else {
             this.gen_function(lambda_name, params_str, ret_type, body)
         }
+        this.in_function = saved_in_fn
         var lambda_ir: String = this.sb.to_string()
 
         // Restore state
@@ -3498,6 +3500,10 @@ class Codegen {
                 this.gen_throw(value)
             }
             FunDecl(name, params, ret_type, body, doc) => {
+                // Capture and clear pending_extend_class to prevent stale state
+                // in nested gen_stmt calls
+                var saved_extend: String = this.pending_extend_class
+                this.pending_extend_class = ""
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
@@ -3512,6 +3518,10 @@ class Codegen {
                 } else if (doc.starts_with("@extend:")) {
                     var ext_class: String = doc.slice(8, doc.length())
                     this.gen_extend_method(ext_class, name, params, ret_type, body)
+                } else if (saved_extend.length() > 0) {
+                    // Fallback: doc field was unreadable for cross-module FunDecl
+                    // but pre-scan identified this as an extension method
+                    this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
                     this.gen_function(name, params_str, ret_type, body)
@@ -3546,6 +3556,12 @@ class Codegen {
 
     fun get_var_doc(stmt: AST.Stmt): String {
         return match (stmt) { VarDecl(n, t, i, d) => d
+            _ => ""
+        }
+    }
+
+    fun get_fun_doc(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => d
             _ => ""
         }
     }
@@ -4235,7 +4251,9 @@ class Codegen {
             while (ci2 < captures.length()) {
                 if (full_params.length() > 0) { full_params = full_params + "," }
                 var cap_type: String = "Int"
-                if (this.var_types.has(captures[ci2])) {
+                if (this.typed_vars.has(captures[ci2])) {
+                    cap_type = this.type_to_string(this.typed_vars.get(captures[ci2]))
+                } else if (this.var_types.has(captures[ci2])) {
                     cap_type = this.var_types.get(captures[ci2])
                 }
                 full_params = full_params + captures[ci2] + ":" + cap_type
@@ -4496,11 +4514,30 @@ class Codegen {
         this.known_functions.push("__os_env")
         this.func_ret_types.set("StringBuilder", "StringBuilder")
 
+        // Pre-scan: register extension methods before compilation
+        var ei: Float = 0
+        while (ei < program.length()) {
+            var edoc: String = this.get_fun_doc(program[ei])
+            if (edoc.starts_with("@extend:")) {
+                var ename: String = this.get_fun_name(program[ei])
+                var ecls: String = edoc.slice(8, edoc.length())
+                this.extend_map.set(this.current_prefix + ename, ecls)
+            }
+            ei = ei + 1
+        }
+
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {
             var stmt: AST.Stmt = program[i]
             if (this.is_decl(stmt)) {
+                // Set pending_extend_class from pre-scanned map before gen_stmt
+                var fn_name: String = this.get_fun_name(stmt)
+                if (fn_name.length() > 0 and this.extend_map.has(this.current_prefix + fn_name)) {
+                    this.pending_extend_class = this.extend_map.get(this.current_prefix + fn_name)
+                } else {
+                    this.pending_extend_class = ""
+                }
                 this.gen_stmt(stmt)
             }
             i = i + 1
@@ -4789,6 +4826,24 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         mi2 = mi2 + 1
     }
 
+    // Pre-scan: register extension methods from all modules
+    mi2 = 0
+    while (mi2 < module_stmts.length()) {
+        var stmts: List<AST.Stmt> = module_stmts[mi2]
+        var prefix: String = module_prefixes_list[mi2]
+        var si2: Float = 0
+        while (si2 < stmts.length()) {
+            var fdoc: String = gen.get_fun_doc(stmts[si2])
+            if (fdoc.starts_with("@extend:")) {
+                var fname: String = gen.get_fun_name(stmts[si2])
+                var ext_cls: String = fdoc.slice(8, fdoc.length())
+                gen.extend_map.set(prefix + fname, ext_cls)
+            }
+            si2 = si2 + 1
+        }
+        mi2 = mi2 + 1
+    }
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -4802,6 +4857,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var si: Float = 0
         while (si < stmts.length()) {
             if (gen.is_decl(stmts[si])) {
+                // Set pending_extend_class from pre-scanned map before gen_stmt
+                var fn_name: String = gen.get_fun_name(stmts[si])
+                if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
+                    gen.pending_extend_class = gen.extend_map.get(prefix + fn_name)
+                } else {
+                    gen.pending_extend_class = ""
+                }
                 gen.gen_stmt(stmts[si])
             }
             si = si + 1
@@ -4942,6 +5004,26 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
         mi = mi + 1
     }
 
+    // Pre-scan: register extension methods from all modules
+    // This reads FunDecl doc fields early before potential memory issues
+    mi = 0
+    while (mi < prefixes.length()) {
+        prefix = prefixes[mi]
+        start = boundaries[mi]
+        end = boundaries[mi + 1]
+        si = start
+        while (si < end) {
+            var fdoc: String = gen.get_fun_doc(all_stmts[si])
+            if (fdoc.starts_with("@extend:")) {
+                var fname: String = gen.get_fun_name(all_stmts[si])
+                var ext_cls: String = fdoc.slice(8, fdoc.length())
+                gen.extend_map.set(prefix + fname, ext_cls)
+            }
+            si = si + 1
+        }
+        mi = mi + 1
+    }
+
     // Compile each module's declarations
     var module_init_names: List<String> = []
     mi = 0
@@ -4954,6 +5036,13 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
         var si: Float = start
         while (si < end) {
             if (gen.is_decl(all_stmts[si])) {
+                // Set pending_extend_class from pre-scanned map before gen_stmt
+                var fn_name: String = gen.get_fun_name(all_stmts[si])
+                if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
+                    gen.pending_extend_class = gen.extend_map.get(prefix + fn_name)
+                } else {
+                    gen.pending_extend_class = ""
+                }
                 gen.gen_stmt(all_stmts[si])
             }
             si = si + 1
