@@ -43,7 +43,6 @@ class Codegen {
     var extend_map: Map<String, String>
     var pending_extend_class: String
     var target: String
-    var nan_boxing: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -85,7 +84,6 @@ class Codegen {
         this.extend_map = {}
         this.pending_extend_class = ""
         this.target = "native"
-        this.nan_boxing = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
         this.builtin_methods.set("set", "v3|__map_set|Nil|0")
