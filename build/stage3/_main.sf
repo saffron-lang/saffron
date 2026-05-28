@@ -6,7 +6,7 @@ import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
-import "./codegen.sf" as Codegen
+import "./_codegen.sf" as Codegen
 fun dir_of(path: String): String {
     var last_slash: Float = -1
     var i: Float = 0

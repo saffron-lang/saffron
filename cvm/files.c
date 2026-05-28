@@ -29,6 +29,7 @@ static char *getExecutableDir() {
 
 char *findModule(const char *relPath, const char *importingFilePath) {
     static char resolved[PATH_MAX];
+    static char canonical[PATH_MAX];
 
     // 1. Stdlib prefix: "@name" resolves to <exe_dir>/../src/lib/<name>.sf
     if (relPath[0] == '@') {
@@ -36,6 +37,7 @@ char *findModule(const char *relPath, const char *importingFilePath) {
         char *exeDir = getExecutableDir();
         snprintf(resolved, PATH_MAX, "%s/../src/lib/%s.sf", exeDir, name);
         if (access(resolved, F_OK) == 0) {
+            if (realpath(resolved, canonical)) return canonical;
             return resolved;
         }
     }
@@ -53,6 +55,7 @@ char *findModule(const char *relPath, const char *importingFilePath) {
 
         snprintf(resolved, PATH_MAX, "%s/%s", importingDir, relPath);
         if (access(resolved, F_OK) == 0) {
+            if (realpath(resolved, canonical)) return canonical;
             return resolved;
         }
     }
@@ -61,6 +64,7 @@ char *findModule(const char *relPath, const char *importingFilePath) {
     char *exeDir = getExecutableDir();
     snprintf(resolved, PATH_MAX, "%s/../src/%s", exeDir, relPath);
     if (access(resolved, F_OK) == 0) {
+        if (realpath(resolved, canonical)) return canonical;
         return resolved;
     }
 

@@ -1,0 +1,224 @@
+//! Dependency resolution — resolves dependencies from various sources.
+//! Designed to be extensible: path deps now, registry + git later.
+
+import "@os" as OS
+import "@path" as Path
+import "@toml" as TOML
+import "@semver" as SemVer
+
+/// A resolved dependency — everything needed to use a package.
+class ResolvedDep {
+    var name: String
+    var version: String
+    var source_type: String
+    var source_path: String
+    var entry: String
+
+    fun init(name: String, version: String, source_type: String, source_path: String, entry: String) {
+        this.name = name
+        this.version = version
+        this.source_type = source_type
+        this.source_path = source_path
+        this.entry = entry
+    }
+}
+
+/// Dependency source types.
+/// Each source knows how to fetch/locate a package and return its path.
+///
+/// Supported formats in pantry.toml [dependencies]:
+///   path dep:     mylib = { path = "../mylib" }
+///   git dep:      mylib = { git = "https://github.com/user/mylib", tag = "v1.0" }
+///                 mylib = { git = "https://...", branch = "main" }
+///                 mylib = { git = "https://...", rev = "abc123" }
+///   registry:     mylib = "^1.0.0"           (future)
+
+var _git_available = -1
+
+/// Check if git is installed and available on PATH.
+fun has_git(): Bool {
+    if (_git_available == -1) {
+        var output = OS.exec("git --version 2>/dev/null")
+        if (output.contains("git version")) {
+            _git_available = 1
+        } else {
+            _git_available = 0
+        }
+    }
+    return _git_available == 1
+}
+
+/// Get the pantry cache directory for git clones.
+fun _cache_dir(manifest_dir: String): String {
+    return manifest_dir + "/.pantry/git"
+}
+
+/// Parse a dependency value from pantry.toml into source type + location.
+/// The value may be a String (version constraint) or a Map (inline table, already parsed by TOML).
+/// Returns a map with "type" and relevant keys.
+fun parse_dep_spec(name: String, value) {
+    var spec = {}
+
+    // TOML parser returns a Map for inline tables, String for plain values
+    if (value is String) {
+        // Plain string — version constraint for registry
+        spec.set("type", "registry")
+        spec.set("version", value)
+    } else {
+        // Already a parsed Map (inline table from TOML)
+        if (value.has("path")) {
+            spec.set("type", "path")
+            spec.set("path", value.get("path"))
+        } else if (value.has("git")) {
+            spec.set("type", "git")
+            spec.set("url", value.get("git"))
+            if (value.has("tag")) { spec.set("tag", value.get("tag")) }
+            if (value.has("branch")) { spec.set("branch", value.get("branch")) }
+            if (value.has("rev")) { spec.set("rev", value.get("rev")) }
+        } else {
+            spec.set("type", "registry")
+            spec.set("version", "*")
+        }
+    }
+
+    return spec
+}
+
+/// Resolve a single path dependency.
+/// Reads its pantry.toml and returns a ResolvedDep.
+fun resolve_path_dep(name: String, dep_path: String, from_dir: String): ResolvedDep {
+    // Resolve relative path from the manifest's directory
+    var abs_path = dep_path
+    if (!(Path.is_absolute(dep_path))) {
+        abs_path = Path.resolve([from_dir, dep_path])
+    }
+
+    // Check the path exists
+    if (!(IO.file_exists(abs_path))) {
+        throw "pantry: path dependency '${name}' not found at: ${abs_path}"
+    }
+
+    // Look for pantry.toml in the dependency
+    var dep_manifest_path = abs_path + "/pantry.toml"
+    if (!(IO.file_exists(dep_manifest_path))) {
+        throw "pantry: path dependency '${name}' has no pantry.toml at: ${abs_path}"
+    }
+
+    var dep_toml = TOML.parse_file(dep_manifest_path)
+    var dep_version = "0.0.0"
+    var dep_entry = "src/main.sf"
+
+    if (dep_toml.has("package")) {
+        var pkg = dep_toml.get("package")
+        if (pkg.has("version")) { dep_version = pkg.get("version") }
+        if (pkg.has("entry")) { dep_entry = pkg.get("entry") }
+    }
+
+    return ResolvedDep(name, dep_version, "path", abs_path, dep_entry)
+}
+
+/// Resolve a git dependency.
+/// Clones or updates the repo in .pantry/git/<name>, checks out the right ref.
+fun resolve_git_dep(name: String, spec: Map<String, String>, manifest_dir: String): ResolvedDep {
+    if (!(has_git())) {
+        throw "pantry: git dependency '${name}' requires git, but git is not installed"
+    }
+
+    var url = spec.get("url")
+    var cache = _cache_dir(manifest_dir)
+    var clone_dir = cache + "/" + name
+
+    // Ensure cache directory exists
+    OS.exec("mkdir -p ${cache}")
+
+    // Clone or fetch
+    if (IO.file_exists(clone_dir + "/.git")) {
+        // Already cloned — fetch latest
+        OS.exec("cd ${clone_dir} && git fetch --quiet 2>/dev/null")
+    } else {
+        // Fresh clone
+        IO.println("    cloning ${url}...")
+        var result = OS.exec("git clone --quiet ${url} ${clone_dir} 2>&1")
+        if (!(IO.file_exists(clone_dir + "/.git"))) {
+            throw "pantry: failed to clone '${name}' from ${url}: ${result}"
+        }
+    }
+
+    // Checkout the right ref
+    var ref = "HEAD"
+    if (spec.has("tag")) {
+        ref = spec.get("tag")
+    } else if (spec.has("branch")) {
+        ref = "origin/" + spec.get("branch")
+    } else if (spec.has("rev")) {
+        ref = spec.get("rev")
+    }
+
+    OS.exec("cd ${clone_dir} && git checkout --quiet ${ref} 2>/dev/null")
+
+    // Read the dep's pantry.toml
+    var dep_manifest_path = clone_dir + "/pantry.toml"
+    var dep_version = "0.0.0"
+    var dep_entry = "src/main.sf"
+
+    if (IO.file_exists(dep_manifest_path)) {
+        var dep_toml = TOML.parse_file(dep_manifest_path)
+        if (dep_toml.has("package")) {
+            var pkg = dep_toml.get("package")
+            if (pkg.has("version")) { dep_version = pkg.get("version") }
+            if (pkg.has("entry")) { dep_entry = pkg.get("entry") }
+        }
+    }
+
+    return ResolvedDep(name, dep_version, "git", clone_dir, dep_entry)
+}
+
+/// Resolve all dependencies from a manifest.
+/// Returns a list of ResolvedDeps in dependency order.
+fun resolve_all(dependencies: Map<String, String>, manifest_dir: String): List<ResolvedDep> {
+    var resolved: List<ResolvedDep> = []
+    var keys = dependencies.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var name = keys[i]
+        var value = dependencies.get(name)
+        var spec = parse_dep_spec(name, value)
+        var source_type = spec.get("type")
+
+        if (source_type == "path") {
+            var dep = resolve_path_dep(name, spec.get("path"), manifest_dir)
+            resolved.push(dep)
+        } else if (source_type == "git") {
+            var dep = resolve_git_dep(name, spec, manifest_dir)
+            resolved.push(dep)
+        } else if (source_type == "registry") {
+            throw "pantry: registry dependencies not yet supported (${name} @ ${spec.get("version")})"
+        } else {
+            throw "pantry: unknown dependency source type '${source_type}' for ${name}"
+        }
+
+        i = i + 1
+    }
+    return resolved
+}
+
+/// Generate a lockfile from resolved dependencies.
+fun write_lockfile(resolved: List<ResolvedDep>, lock_path: String) {
+    var content = "# pantry.lock — auto-generated, do not edit\n\n"
+
+    var i = 0
+    while (i < resolved.length()) {
+        var dep = resolved[i]
+        content = content + "[[package]]\n"
+        content = content + "name = \"${dep.name}\"\n"
+        content = content + "version = \"${dep.version}\"\n"
+        content = content + "source = \"${dep.source_type}\"\n"
+        if (dep.source_type == "path") {
+            content = content + "path = \"${dep.source_path}\"\n"
+        }
+        content = content + "\n"
+        i = i + 1
+    }
+
+    IO.write_file(lock_path, content)
+}

@@ -1,0 +1,868 @@
+// Codegen: method dispatch, field access, and extension method handling
+
+extend fun Codegen.find_class_for_method(method: String): String {
+    var keys: List<String> = this.class_methods.keys()
+    var i: Float = 0
+    while (i < keys.length()) {
+        var class_name: String = keys[i]
+        var methods: List = this.class_methods.get(class_name)
+        if (methods.contains(method)) {
+            return class_name
+        }
+        i = i + 1
+    }
+    return ""
+    }
+
+extend fun Codegen.get_method_ret(class_name: String, method: String): String {
+    // All functions return i64 (no void) to avoid call type mismatches
+    return "i64"
+    }
+
+extend fun Codegen.classify_expr(expr: AST.Expr): String {
+    return match (expr) {
+        MethodCall(o, m, a) => "method_call"
+        ListLit(e) => "list_lit"
+        IndexGet(o, i) => "index_get"
+        IndexSet(o, i, v) => "index_set"
+        MapLit => "map_lit"
+        StringLit(s) => "string"
+        IntLit(v) => "int"
+        FloatLit(v) => "float"
+        BoolLit(v) => "bool"
+        Variable(n) => "variable"
+        Binary(l, o, r) => "binary"
+        Unary(o, r) => "unary"
+        Call(c, a) => "call"
+        Assign(n, v) => "assign"
+        Logical(l, o, r) => "logical"
+        MemberAccess(o, f) => "member"
+        NilLit => "nil"
+        Match(s, a) => "match_expr"
+        EnumConstruct(e, v, a) => "enum"
+        Lambda(p, r, b) => "lambda"
+        GetField(o, f) => "get_field"
+        SetField(o, f, v) => "set_field"
+        This => "this"
+        BlockExpr(s, v) => "block_expr"
+        IsCheck(val, t) => "is_check"
+    }
+    }
+
+extend fun Codegen.get_variable_name(expr: AST.Expr): String {
+    var name: Any = match (expr) {
+        Variable(n) => n
+        IntLit(v) => ""
+        FloatLit(v) => ""
+        BoolLit(v) => ""
+        StringLit(s) => ""
+        NilLit => ""
+        Binary(l, o, r) => ""
+        Unary(o, r) => ""
+        Call(c, a) => ""
+        Assign(n, v) => ""
+        Logical(l, o, r) => ""
+        MemberAccess(o, f) => ""
+        Match(s, a) => ""
+        EnumConstruct(e, v, a) => ""
+        Lambda(p, r, b) => ""
+        GetField(o, f) => ""
+        SetField(o, f, v) => ""
+        This => ""
+        ListLit(e) => ""
+        IndexGet(o, i) => ""
+        IndexSet(o, i, v) => ""
+        MethodCall(o, m, a) => ""
+        MapLit => ""
+        BlockExpr(s, v) => ""
+        IsCheck(val, t) => ""
+    }
+    return name
+    }
+
+extend fun Codegen.get_expr_type(expr: AST.Expr): String {
+    var ek: String = this.classify_expr(expr)
+    if (ek == "variable") {
+        var vname: String = this.get_variable_name(expr)
+        if (vname.length() > 0 and this.typed_vars.has(vname)) {
+            return this.type_to_string(this.typed_vars.get(vname))
+        }
+        return "Any"
+    }
+    if (ek == "string") return "String"
+    if (ek == "int") return "Int"
+    if (ek == "float") return "Float"
+    if (ek == "bool") return "Bool"
+    if (ek == "nil") return "Nil"
+    if (ek == "list_lit") return "List<String>"
+    if (ek == "map_lit") return "Map<String,String>"
+    if (ek == "this") return this.current_class
+    if (ek == "get_field" or ek == "member") {
+        var obj_name: String = this.get_variable_name(expr)
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            return this.type_to_string(this.typed_vars.get(obj_name))
+        }
+    }
+    if (ek == "method_call") {
+        var mc_method: String = match (expr) {
+            MethodCall(o, m, a) => m
+            _ => ""
+        }
+        if (mc_method == "length") return "Float"
+        if (mc_method == "to_string" or mc_method == "join") return "String"
+        if (mc_method == "split" or mc_method == "keys") return "List<String>"
+        if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
+        if (mc_method == "get") {
+            // Infer return type from Map<K, V> annotation rather than always "String"
+            var mc_obj: AST.Expr = match (expr) {
+                MethodCall(o, m, a) => o
+                _ => AST.Expr.NilLit
+            }
+            var mc_obj_name: String = this.get_variable_name(mc_obj)
+            var mc_map_type: String = ""
+            if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
+                mc_map_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
+            } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
+                mc_map_type = this.var_types.get(mc_obj_name)
+            }
+            if (mc_map_type.starts_with("Map<")) {
+                return this.get_map_value_type(mc_map_type)
+            }
+            return "String"
+        }
+        if (mc_method == "to_string") return "String"
+    }
+    if (ek == "call") {
+        var call_callee: AST.Expr = match (expr) {
+            Call(c, a) => c
+            x => AST.Expr.NilLit
+        }
+        var callee_name: String = this.resolve_callee(call_callee)
+        if (this.func_ret_types.has(callee_name)) {
+            return this.func_ret_types.get(callee_name)
+        }
+    }
+    if (ek == "is_check") return "Bool"
+    if (ek == "binary") return "Any"
+    if (ek == "logical") return "Bool"
+    if (ek == "unary") return "Any"
+    if (ek == "assign") return "Any"
+    if (ek == "lambda") return "Fun"
+    if (ek == "enum") return "Any"
+    if (ek == "match_expr") return "Any"
+    if (ek == "block_expr") return "Any"
+    if (ek == "index_get") return "Any"
+    if (ek == "index_set") return "Any"
+    if (ek == "set_field") return "Any"
+    return "Any"
+    }
+
+extend fun Codegen.gen_list_lit(elements: List<AST.Expr>): String {
+    var list_val: String = this.fresh_local()
+    this.emit_indent(list_val + " = call i64 @__list_new()")
+    var i: Float = 0
+    while (i < elements.length()) {
+        var elem: String = this.gen_arg_value(elements[i])
+        var discard_lp: String = this.fresh_local()
+        this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
+        i = i + 1
+    }
+    this.last_type = this.make_list_type()
+    return list_val
+    }
+
+extend fun Codegen.gen_index_get(object: AST.Expr, index: AST.Expr): String {
+    var obj_name: String = this.get_variable_name(object)
+    var obj: String = this.gen_arg_value(object)
+    var obj_type: AST.Type = this.last_type
+    var idx: String = this.gen_arg_value(index)
+    // Negative indexing: if idx < 0, use length + idx
+    var is_neg: String = this.fresh_local()
+    this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
+    var len: String = this.fresh_local()
+    this.emit_indent(len + " = call i64 @__list_length(i64 " + obj + ")")
+    var adjusted: String = this.fresh_local()
+    this.emit_indent(adjusted + " = add i64 " + len + ", " + idx)
+    var final_idx: String = this.fresh_local()
+    this.emit_indent(final_idx + " = select i1 " + is_neg + ", i64 " + adjusted + ", i64 " + idx)
+    var local: String = this.fresh_local()
+    this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
+    if (this.is_string_list_type(obj_type)) {
+        this.last_type = AST.Type.StringType
+    } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        if (this.is_string_list_type(this.typed_vars.get(obj_name))) {
+            this.last_type = AST.Type.StringType
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        var vtype: String = this.var_types.get(obj_name)
+        if (vtype == "List<String>") {
+            this.last_type = AST.Type.StringType
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+    } else {
+        this.last_type = AST.Type.IntType
+    }
+    return local
+    }
+
+extend fun Codegen.gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
+    var obj: String = this.gen_arg_value(object)
+    var idx: String = this.gen_arg_value(index)
+    var val: String = this.gen_arg_value(value)
+    var discard_ls: String = this.fresh_local()
+    this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+    return val
+    }
+
+extend fun Codegen.gen_extend_method(ext_class: String, name: String, params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>) {
+    var full_name: String = ext_class + "__" + name
+    // Use target class's prefix (not source file's prefix)
+    var class_prefix: String = this.current_prefix
+    var init_key: String = ext_class + "__init"
+    if (this.func_prefix_map.has(init_key)) {
+        var mapped: String = this.func_prefix_map.get(init_key)
+        class_prefix = mapped.slice(0, mapped.length() - init_key.length())
+    }
+    var prefixed: String = class_prefix + full_name
+    this.known_functions.push(prefixed)
+    this.known_functions.push(full_name)
+    this.func_ret_types.set(prefixed, ret_type)
+    this.func_ret_types.set(full_name, ret_type)
+    this.func_prefix_map.set(full_name, prefixed)
+    if (this.class_methods.has(ext_class)) {
+        var methods: List = this.class_methods.get(ext_class)
+        methods.push(name)
+    }
+    var params_str: String = this.params_to_string(params)
+    var full_params: String = "self:Int"
+    if (params_str.length() > 0) { full_params = full_params + "," + params_str }
+    var saved_class: String = this.current_class
+    var saved_prefix: String = this.current_prefix
+    this.current_class = ext_class
+    this.current_prefix = class_prefix
+    this.gen_function(full_name, full_params, ret_type, body)
+    this.current_class = saved_class
+    this.current_prefix = saved_prefix
+    }
+
+extend fun Codegen.emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
+    var desc: String = this.builtin_methods.get(method)
+    var parts: List<String> = desc.split("|")
+    var pattern: String = parts[0]
+    var func_name: String = parts[1]
+    var result_type: String = parts[2]
+    var needs_push: String = parts[3]
+    if (needs_push == "1") { this.called_functions.push(func_name) }
+    if (result_type == "Nil") { this.last_type = AST.Type.NilType }
+    else if (result_type == "Int") { this.last_type = AST.Type.IntType }
+    else if (result_type == "Bool") { this.last_type = AST.Type.BoolType }
+    else if (result_type == "String") { this.last_type = AST.Type.StringType }
+    else if (result_type == "List") { this.last_type = this.make_list_type() }
+    else if (result_type == "ListStr") { this.last_type = this.make_list_str_type() }
+    if (pattern == "v2") {
+        var val: String = this.gen_arg_value(args[0])
+        var discard: String = this.fresh_local()
+        this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        return "0"
+    }
+    if (pattern == "v3") {
+        var a1: String = this.gen_arg_value(args[0])
+        var a2: String = this.gen_arg_value(args[1])
+        var discard: String = this.fresh_local()
+        this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        return "0"
+    }
+    if (pattern == "r1") {
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        return local
+    }
+    if (pattern == "r2") {
+        var val: String = this.gen_arg_value(args[0])
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        return local
+    }
+    if (pattern == "p1") {
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        return local
+    }
+    if (pattern == "p2") {
+        var a1: String = this.gen_arg_value(args[0])
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        return local
+    }
+    if (pattern == "p3") {
+        var a1: String = this.gen_arg_value(args[0])
+        var a2: String = this.gen_arg_value(args[1])
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        return local
+    }
+    if (pattern == "m2") {
+        var a1: String = this.gen_arg_value(args[0])
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        return local
+    }
+    return "0"
+    }
+
+extend fun Codegen.gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
+    var arg_strs: List<String> = []
+    if (has_self) { arg_strs.push("i64 " + obj) }
+    var i: Float = 0
+    while (i < args.length()) {
+        var val: String = this.gen_arg_value(args[i])
+        arg_strs.push("i64 " + val)
+        i = i + 1
+    }
+    var full_method: String = ns + "__" + method
+    if (this.func_prefix_map.has(full_method)) {
+        full_method = this.func_prefix_map.get(full_method)
+    } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+        full_method = this.current_prefix + full_method
+    }
+    this.called_functions.push(full_method)
+    var local: String = this.fresh_local()
+    this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+    if (this.func_ret_types.has(full_method)) {
+        this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+    } else {
+        this.last_type = AST.Type.IntType
+    }
+    return local
+    }
+
+extend fun Codegen.resolve_namespace(obj_name: String, object: AST.Expr): String {
+    if (obj_name == "this" or this.classify_expr(object) == "this") {
+        return this.current_class
+    }
+    if (obj_name == "IO" or obj_name == "OS") { return obj_name }
+    if (this.module_prefixes.has(obj_name)) { return obj_name }
+    if (this.class_fields.has(obj_name)) { return obj_name }
+    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        var vtype: String = this.type_to_string(this.typed_vars.get(obj_name))
+        if (this.class_fields.has(vtype)) { return vtype }
+    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        var vtype: String = this.var_types.get(obj_name)
+        if (this.class_fields.has(vtype)) { return vtype }
+    }
+    return ""
+    }
+
+extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
+    var obj_name: String = this.get_variable_name(object)
+
+    // Self method calls: this.method(args)
+    var obj_kind_early: String = this.classify_expr(object)
+    if (obj_kind_early == "this" and this.current_class.length() > 0) {
+        var self_val: String = this.fresh_local()
+        this.emit_indent(self_val + " = load i64, i64* %self")
+        return this.gen_namespace_call(this.current_class, method, self_val, args, true)
+    }
+
+    // Check for OS module calls
+    if (obj_name == "OS") {
+        if (method == "exit") {
+            var code: String = this.gen_arg_value(args[0])
+            var code32: String = this.fresh_local()
+            this.emit_indent(code32 + " = trunc i64 " + code + " to i32")
+            this.emit_indent("call void @exit(i32 " + code32 + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        var os_func: String = "__os_" + method
+        this.called_functions.push(os_func)
+        var os_args: List<String> = []
+        var oi: Float = 0
+        while (oi < args.length()) {
+            os_args.push("i64 " + this.gen_arg_value(args[oi]))
+            oi = oi + 1
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
+        if (method == "args") {
+            this.last_type = this.make_list_str_type()
+        } else {
+            this.last_type = AST.Type.StringType
+        }
+        return local
+    }
+
+    // Check for IO module calls
+    if (obj_name == "IO") {
+        if (method == "println") {
+            var pre_type: String = this.get_expr_type(args[0])
+            var arg: String = this.gen_arg_value(args[0])
+            var arg_type: String = this.type_to_string(this.last_type)
+            if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
+            var str_val: String = this.coerce_to_string(arg, arg_type)
+            this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "print") {
+            var arg: String = this.gen_arg_value(args[0])
+            var arg_type: String = this.type_to_string(this.last_type)
+            var str_val: String = this.coerce_to_string(arg, arg_type)
+            this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file") {
+            var io_func: String = "__io_" + method
+            if (method == "list_dir") { io_func = "__io_walk_dir" }
+            this.called_functions.push(io_func)
+            var io_args: List<String> = []
+            var ii: Float = 0
+            while (ii < args.length()) {
+                io_args.push("i64 " + this.gen_arg_value(args[ii]))
+                ii = ii + 1
+            }
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            if (method == "file_exists") { this.last_type = AST.Type.BoolType }
+            else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
+            else if (method == "write_file" or method == "append_file") { this.last_type = AST.Type.NilType; return "0" }
+            else if (method == "walk_dir" or method == "list_dir") { this.last_type = this.make_list_str_type() }
+            else { this.last_type = AST.Type.StringType }
+            return local
+        }
+    }
+
+    // Check for module-qualified function calls BEFORE loading the object.
+    // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
+    // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and this.module_prefixes.has(obj_name)) {
+        var arg_strs: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
+        }
+        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+        this.called_functions.push(prefixed_name)
+        this.called_function_arity.set(prefixed_name, args.length())
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        if (this.func_ret_types.has(prefixed_name)) {
+            this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+        } else if (this.func_ret_types.has(method)) {
+            this.last_type = this.str_to_type(this.func_ret_types.get(method))
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return local
+    }
+
+    // Check for enum constructor: EnumName.Variant(args) — MUST come before builtin dispatch
+    if (obj_name.length() > 0) {
+        var enum_key: String = obj_name + "." + method
+        if (this.enum_variant_tags.has(enum_key)) {
+            return this.gen_enum_construct(obj_name, method, args)
+        }
+        // Fallback: check enum_defs in case enum_variant_tags lookup misses
+        // (e.g. when enum name == variant name: enum Token { Token(...) })
+        if (this.enum_defs.has(obj_name)) {
+            var variants: List = this.enum_defs.get(obj_name)
+            if (variants.contains(method)) {
+                return this.gen_enum_construct(obj_name, method, args)
+            }
+        }
+    }
+    if (obj_name.length() == 0) {
+        var obj_kind: String = this.classify_expr(object)
+        if (obj_kind == "member") {
+            var inner_field: String = match (object) { MemberAccess(o, f) => f
+                _ => ""
+            }
+            var enum_key2: String = inner_field + "." + method
+            if (this.enum_variant_tags.has(enum_key2)) {
+                return this.gen_enum_construct(inner_field, method, args)
+            }
+        }
+    }
+
+    // --- Builtin dispatch (only for non-class objects) ---
+    var obj: String = this.gen_arg_value(object)
+    var is_user_class: Bool = false
+    if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
+        is_user_class = true
+    } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
+        is_user_class = true
+    }
+
+    if (!is_user_class and this.builtin_methods.has(method)) {
+        return this.emit_builtin_dispatch(obj, method, args)
+    }
+    if (!is_user_class and method == "get") {
+        var key: String = this.gen_arg_value(args[0])
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
+        // Try to infer value type from type annotations
+        var obj_type_for_get: String = this.get_expr_type(object)
+        if (obj_type_for_get == "Any") {
+            obj_type_for_get = this.type_to_string(this.last_type)
+        }
+        if (obj_type_for_get.starts_with("Map<")) {
+            var val_type_str: String = this.get_map_value_type(obj_type_for_get)
+            this.last_type = this.str_to_type(val_type_str)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return local
+    }
+    if (!is_user_class and method == "starts_with") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        var prefix: String = this.gen_arg_value(args[0])
+        var prefix_ptr: String = this.fresh_local()
+        this.emit_indent(prefix_ptr + " = inttoptr i64 " + prefix + " to i8*")
+        var plen: String = this.fresh_local()
+        this.emit_indent(plen + " = call i64 @strlen(i8* " + prefix_ptr + ")")
+        var cmp: String = this.fresh_local()
+        this.emit_indent(cmp + " = call i32 @strncmp(i8* " + str_ptr + ", i8* " + prefix_ptr + ", i64 " + plen + ")")
+        var is_eq: String = this.fresh_local()
+        this.emit_indent(is_eq + " = icmp eq i32 " + cmp + ", 0")
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
+        this.last_type = AST.Type.BoolType
+        return result
+    }
+    if (!is_user_class and method == "char_at") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        var idx: String = this.gen_arg_value(args[0])
+        var char_ptr: String = this.fresh_local()
+        this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
+        var buf: String = this.fresh_local()
+        this.emit_indent(buf + " = call i8* @malloc(i64 2)")
+        var ch: String = this.fresh_local()
+        this.emit_indent(ch + " = load i8, i8* " + char_ptr)
+        this.emit_indent("store i8 " + ch + ", i8* " + buf)
+        var null_ptr: String = this.fresh_local()
+        this.emit_indent(null_ptr + " = getelementptr i8, i8* " + buf + ", i64 1")
+        this.emit_indent("store i8 0, i8* " + null_ptr)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.last_type = AST.Type.StringType
+        return local
+    }
+    if (!is_user_class and method == "is_upper") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        var ch: String = this.fresh_local()
+        this.emit_indent(ch + " = load i8, i8* " + str_ptr)
+        var ge_a: String = this.fresh_local()
+        this.emit_indent(ge_a + " = icmp uge i8 " + ch + ", 65")
+        var le_z: String = this.fresh_local()
+        this.emit_indent(le_z + " = icmp ule i8 " + ch + ", 90")
+        var both: String = this.fresh_local()
+        this.emit_indent(both + " = and i1 " + ge_a + ", " + le_z)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = zext i1 " + both + " to i64")
+        this.last_type = AST.Type.BoolType
+        return local
+    }
+    if (!is_user_class and method == "is_lower") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        var ch: String = this.fresh_local()
+        this.emit_indent(ch + " = load i8, i8* " + str_ptr)
+        var ge_a: String = this.fresh_local()
+        this.emit_indent(ge_a + " = icmp uge i8 " + ch + ", 97")
+        var le_z: String = this.fresh_local()
+        this.emit_indent(le_z + " = icmp ule i8 " + ch + ", 122")
+        var both: String = this.fresh_local()
+        this.emit_indent(both + " = and i1 " + ge_a + ", " + le_z)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = zext i1 " + both + " to i64")
+        this.last_type = AST.Type.BoolType
+        return local
+    }
+    if (!is_user_class and method == "slice") {
+        var str_ptr: String = this.fresh_local()
+        this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+        var start: String = this.gen_arg_value(args[0])
+        var end: String = this.gen_arg_value(args[1])
+        var slice_len: String = this.fresh_local()
+        this.emit_indent(slice_len + " = sub i64 " + end + ", " + start)
+        var buf_size: String = this.fresh_local()
+        this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
+        var buf: String = this.fresh_local()
+        this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
+        var src: String = this.fresh_local()
+        this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
+        this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")
+        var null_pos: String = this.fresh_local()
+        this.emit_indent(null_pos + " = getelementptr i8, i8* " + buf + ", i64 " + slice_len)
+        this.emit_indent("store i8 0, i8* " + null_pos)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint i8* " + buf + " to i64")
+        this.last_type = AST.Type.StringType
+        return local
+    }
+    // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
+    // Prefer var_types annotation over last_type because the native binary's
+    // last_type is unreliable when var_types.has() returns false mid-execution.
+    var obj_type: String = this.type_to_string(this.last_type)
+    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        obj_type = this.type_to_string(this.typed_vars.get(obj_name))
+    } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
+        obj_type = this.var_types.get(obj_name)
+    }
+
+    if (!is_user_class and method == "length") {
+        if (obj_type == "String") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        } else {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_length(i64 " + obj + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+    }
+    if (!is_user_class and method == "contains") {
+        if (obj_type == "String") {
+            var str_ptr: String = this.fresh_local()
+            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
+            var needle: String = this.gen_arg_value(args[0])
+            var needle_ptr: String = this.fresh_local()
+            this.emit_indent(needle_ptr + " = inttoptr i64 " + needle + " to i8*")
+            var found: String = this.fresh_local()
+            this.emit_indent(found + " = call i8* @strstr(i8* " + str_ptr + ", i8* " + needle_ptr + ")")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = icmp ne i8* " + found + ", null")
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = zext i1 " + local + " to i64")
+            this.last_type = AST.Type.BoolType
+            return result
+        } else {
+            var val: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_contains(i64 " + obj + ", i64 " + val + ")")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+    }
+    if (!is_user_class and method == "to_string") {
+        if (obj_type == "StringBuilder" or obj_type == "SB") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        } else if (obj_type == "String") {
+            this.last_type = AST.Type.StringType
+            return obj
+        } else if (obj_type == "Bool") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        } else {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return local
+        }
+    }
+    if (!is_user_class and method == "floor") {
+        this.last_type = AST.Type.IntType
+        return obj
+    }
+
+    // Check for super.method() calls
+    if (obj_name == "super" and this.current_parent.length() > 0) {
+        var self_val: String = this.fresh_local()
+        this.emit_indent(self_val + " = load i64, i64* %self")
+        var arg_strs: List<String> = []
+        arg_strs.push("i64 " + self_val)
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
+        }
+        var parent_method: String = this.current_parent + "__" + method
+        this.called_functions.push(parent_method)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
+        this.last_type = AST.Type.StringType
+        return local
+    }
+
+    // (enum check moved above builtin dispatch)
+
+    // Check for imported module function calls (module alias or unknown name)
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.var_types.has(obj_name)))) {
+        var arg_strs: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
+        }
+        var prefixed_name: String = method
+        if (this.module_prefixes.has(obj_name)) {
+            prefixed_name = this.module_prefixes.get(obj_name) + method
+        } else if (this.func_prefix_map.has(method)) {
+            prefixed_name = this.func_prefix_map.get(method)
+        } else {
+            var guessed: String = obj_name.to_lower() + "_" + method
+            if (this.known_functions.contains(guessed)) {
+                prefixed_name = guessed
+            }
+        }
+        this.called_functions.push(prefixed_name)
+        this.called_function_arity.set(prefixed_name, args.length())
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        if (this.func_ret_types.has(prefixed_name)) {
+            this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+        } else if (this.func_ret_types.has(method)) {
+            this.last_type = this.str_to_type(this.func_ret_types.get(method))
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return local
+    }
+
+    // Fall back to class method call (inside or outside class)
+    // (must come BEFORE universal methods so class .to_string() is found)
+    // Also check obj_name directly in case obj_type was not updated from var_types
+    // (workaround for native binary where var_types.has may return false)
+    var class_name: String = ""
+    if (this.class_fields.has(obj_type)) {
+        class_name = obj_type
+    } else if (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.class_fields.has(this.type_to_string(this.typed_vars.get(obj_name)))) {
+        class_name = this.type_to_string(this.typed_vars.get(obj_name))
+    } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
+        class_name = this.var_types.get(obj_name)
+    } else if (this.current_class.length() > 0) {
+        class_name = this.find_class_for_method(method)
+    }
+    // Last resort: check if any known class has this method (for gen.method() in standalone fns)
+    if (class_name.length() == 0) {
+        class_name = this.find_class_for_method(method)
+    }
+    if (class_name.length() > 0) {
+        return this.gen_namespace_call(class_name, method, obj, args, true)
+    }
+
+    // Universal methods (last resort, after class methods checked)
+    if (method == "floor") {
+        this.last_type = AST.Type.IntType
+        return obj
+    }
+    if (method == "to_string") {
+        if (obj_type == "String") {
+            this.last_type = AST.Type.StringType
+            return obj
+        }
+        var ts_local: String = this.fresh_local()
+        this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + obj + ")")
+        this.last_type = AST.Type.StringType
+        return ts_local
+    }
+    this.last_type = AST.Type.IntType
+    return "0"
+    }
+
+extend fun Codegen.is_this_expr(expr: AST.Expr): Bool {
+    var kind: Any = match (expr) {
+        This => "this"
+        IntLit(v) => "other"
+        FloatLit(v) => "other"
+        BoolLit(v) => "other"
+        StringLit(s) => "other"
+        NilLit => "other"
+        Variable(n) => "other"
+        Binary(l, o, r) => "other"
+        Unary(o, r) => "other"
+        Call(c, a) => "other"
+        Assign(n, v) => "other"
+        Logical(l, o, r) => "other"
+        MemberAccess(o, f) => "other"
+        Match(s, a) => "other"
+        EnumConstruct(e, v, a) => "other"
+        Lambda(p, r, b) => "other"
+        GetField(o, f) => "other"
+        SetField(o, f, v) => "other"
+        BlockExpr(s, v) => "other"
+        IsCheck(val, t) => "other"
+    }
+    return kind == "this"
+    }
+
+extend fun Codegen.gen_get_field(object: AST.Expr, field: String): String {
+    var obj_val: String = this.gen_arg_value(object)
+    var class_name: String = this.type_to_string(this.last_type)
+    if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
+        class_name = this.current_class
+    }
+    var field_idx: Float = this.get_field_index(class_name, field)
+    var obj_ptr: String = this.fresh_local()
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    var field_ptr: String = this.fresh_local()
+    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    var result: String = this.fresh_local()
+    this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
+    // Infer field type from class declaration
+    this.last_type = this.str_to_type(this.get_field_type(class_name, field))
+    return result
+    }
+
+extend fun Codegen.get_field_type(class_name: String, field: String): String {
+    if (!this.class_fields.has(class_name)) return "Int"
+    var fields: String = this.class_fields.get(class_name)
+    if (fields.length() == 0) return "Int"
+    var parts: List<String> = this.split_respecting_generics(fields, ",")
+    var i: Float = 0
+    while (i < parts.length()) {
+        var fp: List<String> = parts[i].split(":")
+        if (fp[0] == field) return fp[1]
+        i = i + 1
+    }
+    return "Int"
+    }
+
+extend fun Codegen.gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
+    var obj_val: String = this.gen_arg_value(object)
+    var class_name: String = this.type_to_string(this.last_type)
+    if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
+        class_name = this.current_class
+    }
+    var val: String = this.gen_arg_value(value)
+    var field_idx: Float = this.get_field_index(class_name, field)
+    var obj_ptr: String = this.fresh_local()
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    var field_ptr: String = this.fresh_local()
+    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)
+    return val
+    }
+
+extend fun Codegen.get_field_index(class_name: String, field: String): Float {
+    var fields: String = this.class_fields.get(class_name)
+    if (fields.length() == 0) return 0
+    var parts: List<String> = this.split_respecting_generics(fields, ",")
+    var i: Float = 0
+    while (i < parts.length()) {
+        var fp: List<String> = parts[i].split(":")
+        if (fp[0] == field) return i
+        i = i + 1
+    }
+    return 0
+}

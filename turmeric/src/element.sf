@@ -6,6 +6,12 @@ enum Node {
     Text(content: String)
 }
 
+enum Attr {
+    Prop(name: String, value: String),
+    Event(name: String, handler: Any),
+    Bind(name: String, signal: Any)
+}
+
 // Rendering context — collects children during a builder block
 class Context {
     var children: List<Any>

@@ -1,21 +1,7 @@
 // Saffron UI - Full API prototype (ideal syntax)
 // Assumes: trailing closure params, optional/default params, generics, () => T types
 
-// =============================================================================
-// Core Types
-// =============================================================================
-
-enum Node {
-    Element(tag: String, attrs: List<Attr>, children: List<Node>),
-    Text(content: String),
-    Fragment(children: List<Node>)
-}
-
-enum Attr {
-    Prop(name: String, value: String),
-    Event(name: String, handler: (Event) => Nil),
-    Bind(name: String, signal: Signal<String>)
-}
+import "./element.sf" as Element
 
 class Event {
     var type: String

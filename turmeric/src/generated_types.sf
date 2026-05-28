@@ -1,6 +1,8 @@
 // AUTO-GENERATED from dom.generated.d.ts
 // Run: saffron run tools/generate_types.sf
 
+import "./element.sf" as Element
+
 // =============================================================================
 // Event Types
 // =============================================================================

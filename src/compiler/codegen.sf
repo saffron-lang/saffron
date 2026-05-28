@@ -1,6 +1,7 @@
 // LLVM IR code generator for Saffron-mini
 
 import "./ast.sf" as AST
+import "./codegen/methods.sf" as Methods
 
 class Codegen {
     var sb: StringBuilder
@@ -102,6 +103,21 @@ class Codegen {
         this.builtin_methods.set("join", "m2|__list_join|String|0")
     }
 
+    // Helpers to construct AST.Type nodes — avoids cross-module enum resolution
+    // issues where AST.Type.GenericType inside a class method gets misresolved.
+    fun make_list_type(): AST.Type {
+        return AST.Type.GenericType("List", [AST.Type.AnyType])
+    }
+    fun make_list_str_type(): AST.Type {
+        return AST.Type.GenericType("List", [AST.Type.StringType])
+    }
+    fun make_map_type(): AST.Type {
+        return AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+    }
+    fun make_generic_type(base: String, args: List<AST.Type>): AST.Type {
+        return AST.Type.GenericType(base, args)
+    }
+
     fun params_to_string(params: List<AST.Param>): String {
         if (!(params is List)) {
             return ""
@@ -131,12 +147,12 @@ class Codegen {
         if (s.starts_with("Fun(")) {
             return AST.Type.FuncType([], AST.Type.AnyType)
         }
-        if (s == "List") return AST.Type.GenericType("List", [AST.Type.AnyType])
+        if (s == "List") return this.make_list_type()
         if (s.starts_with("List<") and s.ends_with(">")) {
             var inner: String = s.slice(5, s.length() - 1)
-            return AST.Type.GenericType("List", [this.str_to_type(inner)])
+            return this.make_generic_type("List", [this.str_to_type(inner)])
         }
-        if (s == "Map" or s.starts_with("Map<")) return AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+        if (s == "Map" or s.starts_with("Map<")) return this.make_map_type()
         if (s == "StringBuilder") return AST.Type.ClassType("StringBuilder")
         return AST.Type.ClassType(s)
     }
@@ -641,7 +657,7 @@ class Codegen {
                 this.gen_method_call(object, method, args)
             }
             MapLit => {
-                this.last_type = AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+                this.last_type = this.make_map_type()
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_new()")
                 local
@@ -889,7 +905,7 @@ class Codegen {
             return this.gen_index_get(ig_obj, ig_idx)
         }
         if (expr_kind == "map_lit") {
-            this.last_type = AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+            this.last_type = this.make_map_type()
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_new()")
             return local
@@ -1311,7 +1327,7 @@ class Codegen {
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__map_new()")
-                this.last_type = AST.Type.GenericType("Map", [AST.Type.StringType, AST.Type.AnyType])
+                this.last_type = this.make_map_type()
                 return local
             }
             var emit_callee: String = this.current_prefix + callee_name
@@ -3912,6 +3928,8 @@ class Codegen {
 
         return out.to_string()
     }
+
+    // @codegen-split: methods
 }
 
 fun generate(program: List<AST.Stmt>): String {

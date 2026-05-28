@@ -1,0 +1,55 @@
+//! `pantry clean` — remove build artifacts and cache.
+import "@args" as Args
+
+import "@os" as OS
+import "../config.sf" as Config
+
+fun _manifest_dir(): String {
+    var path = Config.find_manifest()
+    var last_slash = -1
+    var i = 0
+    while (i < path.length()) {
+        if (path.char_at(i) == "/") {
+            last_slash = i
+        }
+        i = i + 1
+    }
+    if (last_slash <= 0) { return "." }
+    return path.slice(0, last_slash)
+}
+
+fun run(parsed: Args.ParsedArgs) {
+    var dir = _manifest_dir()
+    var removed = 0
+
+    // Remove build/ directory
+    var build_dir = dir + "/build"
+    if (IO.file_exists(build_dir)) {
+        OS.exec("rm -rf ${build_dir}")
+        IO.println("  removed build/")
+        removed = removed + 1
+    }
+
+    // Remove pantry.lock
+    var lock_file = dir + "/pantry.lock"
+    if (IO.file_exists(lock_file)) {
+        OS.exec("rm ${lock_file}")
+        IO.println("  removed pantry.lock")
+        removed = removed + 1
+    }
+
+    // Remove .pantry/ cache directory
+    var cache_dir = dir + "/.pantry"
+    if (IO.file_exists(cache_dir)) {
+        OS.exec("rm -rf ${cache_dir}")
+        IO.println("  removed .pantry/")
+        removed = removed + 1
+    }
+
+    if (removed == 0) {
+        IO.println("Nothing to clean.")
+    } else {
+        IO.println("")
+        IO.println("Cleaned ${removed} items.")
+    }
+}

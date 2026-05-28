@@ -1,0 +1,8 @@
+# pantry.lock — auto-generated, do not edit
+
+[[package]]
+name = "turmeric"
+version = "0.1.0"
+source = "path"
+path = "../../turmeric"
+

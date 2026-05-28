@@ -75,7 +75,7 @@ if [[ "$FULL" == true ]]; then
         || fail "FULL" "Failed to compile runtime.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  linking gen2..."
-    clang -O2 -w -o "$GEN2" \
+    clang -O2 -w -Wl,-stack_size,0x4000000 -o "$GEN2" \
         "$BUILD_DIR/stage2/main.ll" \
         "$BUILD_DIR/stage2/lexer.ll" \
         "$BUILD_DIR/stage2/parser.ll" \
@@ -96,7 +96,14 @@ fi
 
 info "STAGE 1" "Compiling saffronc via gen2..."
 
-SOURCES=(lexer parser codegen main)
+SOURCES=(lexer parser)
+
+# Assemble codegen from parts (insert extension methods at marker)
+[[ "$VERBOSE" == true ]] && echo "  assemble: codegen"
+sed "/@codegen-split: methods/r $COMPILER_DIR/codegen/methods_body.sf" \
+    "$COMPILER_DIR/codegen.sf" > "$BUILD_DIR/stage3/_codegen.sf"
+# Strip the methods.sf import (gen2 can't handle it; methods are inlined via sed)
+sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf"
 
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
@@ -104,17 +111,31 @@ for src in "${SOURCES[@]}"; do
         || fail "STAGE 1" "gen2 failed to compile $src.sf"
 done
 
+[[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
+"$GEN2" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+    || fail "STAGE 1" "gen2 failed to compile codegen.sf"
+
+# Compile main.sf with a modified copy that imports the assembled codegen
+[[ "$VERBOSE" == true ]] && echo "  compile: main.sf"
+cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
+cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
+cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
+cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
+cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+# Rewrite the codegen import to use the assembled file and strip methods import
+sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
+sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
+"$GEN2" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+    || fail "STAGE 1" "gen2 failed to compile main.sf"
+
 # Compile runtime.sf
 [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
 "$GEN2" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
     || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
-clang -O2 -w -o "$BUILD_DIR/saffronc" \
+clang -O2 -w -Wl,-stack_size,0x4000000 -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/main.ll" \
-    "$BUILD_DIR/stage3/lexer.ll" \
-    "$BUILD_DIR/stage3/parser.ll" \
-    "$BUILD_DIR/stage3/codegen.ll" \
     "$BUILD_DIR/stage3/runtime.ll" \
     "$RUNTIME_BASE" \
     || fail "STAGE 1" "Linking gen3 failed"

@@ -1,0 +1,10 @@
+[package]
+name = "turmeric-demo"
+version = "0.1.0"
+entry = "src/main.sf"
+
+[dependencies]
+turmeric = { path = "../../turmeric" }
+
+[scripts]
+build = "saffron build src/main.sf -o build/demo"

@@ -528,9 +528,18 @@ static void defineField(ObjString *name) {
     pop();
 }
 
+static bool findMethodInHierarchy(ObjClass *klass, ObjString *name, Value *method) {
+    if (tableGet(&klass->methods, name, method)) return true;
+    // Walk superclass chain (handles methods added after OP_INHERIT, e.g. extensions)
+    for (int i = 0; i < klass->superclassCount; i++) {
+        if (findMethodInHierarchy(klass->superclasses[i], name, method)) return true;
+    }
+    return false;
+}
+
 static bool bindMethod(ObjClass *klass, ObjString *name) {
     Value method;
-    if (!tableGet(&klass->methods, name, &method)) {
+    if (!findMethodInHierarchy(klass, name, &method)) {
         printValue(peek(0));
         runtimeError("Undefined property '%s'.", name->chars);
         return false;
@@ -553,7 +562,7 @@ static bool bindMethod(ObjClass *klass, ObjString *name) {
 static bool invokeFromClass(ObjClass *klass, ObjString *name,
                             int argCount) {
     Value method;
-    if (!tableGet(&klass->methods, name, &method)) {
+    if (!findMethodInHierarchy(klass, name, &method)) {
         runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
