@@ -6,12 +6,29 @@ var OUTPUT: String = "src/generated_types.sf"
 
 // --- Helpers ---
 
+// Known acronyms to keep as single units
+fun replace_acronyms(name: String): String {
+    var result: String = name
+    result = result.replace("URI", "Uri")
+    result = result.replace("URL", "Url")
+    result = result.replace("HTML", "Html")
+    result = result.replace("CSS", "Css")
+    result = result.replace("DOM", "Dom")
+    result = result.replace("API", "Api")
+    result = result.replace("HTTP", "Http")
+    result = result.replace("XML", "Xml")
+    result = result.replace("JSON", "Json")
+    result = result.replace("SVG", "Svg")
+    return result
+}
+
 fun to_snake_case(name: String): String {
     var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var fixed: String = replace_acronyms(name)
     var result: String = ""
     var i: Float = 0
-    while (i < name.length()) {
-        var ch: String = name.char_at(i)
+    while (i < fixed.length()) {
+        var ch: String = fixed.char_at(i)
         if (upper.contains(ch)) {
             if (i > 0) {
                 result = result + "_"
@@ -25,17 +42,11 @@ fun to_snake_case(name: String): String {
     return result
 }
 
-fun is_upper(ch: String): Bool {
-    var uppers: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    return uppers.contains(ch)
-}
-
 fun is_all_upper(s: String): Bool {
     var lower: String = "abcdefghijklmnopqrstuvwxyz"
     var i: Float = 0
     while (i < s.length()) {
-        var ch: String = s.char_at(i)
-        if (lower.contains(ch)) return false
+        if (lower.contains(s.char_at(i))) return false
         i = i + 1
     }
     return true
