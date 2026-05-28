@@ -1,0 +1,8 @@
+fun apply_to(x: Float, block: Any) {
+    return block(x)
+}
+
+var result: Float = apply_to(5) { n =>
+    return n * 2
+}
+IO.println(result.to_string())

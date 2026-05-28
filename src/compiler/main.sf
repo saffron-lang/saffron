@@ -33,6 +33,80 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
     return import_path
 }
 
+fun get_stmt_doc(stmt: AST.Stmt): String {
+    return match (stmt) {
+        VarDecl(n, t, init, d) => d
+        FunDecl(n, p, r, b, d) => d
+        _ => ""
+    }
+}
+
+fun extract_imports_from_ast(program: List<AST.Stmt>): List<String> {
+    var imports: List<String> = []
+    var i: Float = 0
+    while (i < program.length()) {
+        var doc: String = get_stmt_doc(program[i])
+        if (doc.starts_with("@import:")) {
+            var info: String = doc.slice(8, doc.length())
+            var pipe_idx: Float = info.index_of("|")
+            if (pipe_idx >= 0) {
+                var path: String = info.slice(0, pipe_idx)
+                if (path.starts_with("./") or path.starts_with("@")) {
+                    imports.push(path)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return imports
+}
+
+fun extract_aliases_from_ast(program: List<AST.Stmt>): Map<String, String> {
+    var aliases: Map<String, String> = {}
+    var i: Float = 0
+    while (i < program.length()) {
+        var doc: String = get_stmt_doc(program[i])
+        if (doc.starts_with("@import:")) {
+            var info: String = doc.slice(8, doc.length())
+            var pipe_idx: Float = info.index_of("|")
+            if (pipe_idx >= 0) {
+                var path: String = info.slice(0, pipe_idx)
+                var meta: String = info.slice(pipe_idx + 1, info.length())
+                if (meta.starts_with("as:")) {
+                    var alias: String = meta.slice(3, meta.length())
+                    if (alias.length() > 0) {
+                        aliases.set(alias, path)
+                    }
+                }
+            }
+        }
+        i = i + 1
+    }
+    return aliases
+}
+
+fun extract_named_imports_from_ast(program: List<AST.Stmt>): Map<String, String> {
+    var named: Map<String, String> = {}
+    var i: Float = 0
+    while (i < program.length()) {
+        var doc: String = get_stmt_doc(program[i])
+        if (doc.starts_with("@import:")) {
+            var info: String = doc.slice(8, doc.length())
+            var pipe_idx: Float = info.index_of("|")
+            if (pipe_idx >= 0) {
+                var path: String = info.slice(0, pipe_idx)
+                var meta: String = info.slice(pipe_idx + 1, info.length())
+                if (meta.starts_with("names:")) {
+                    var names_str: String = meta.slice(6, meta.length())
+                    named.set(path, names_str)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return named
+}
+
 fun extract_imports(source: String): List<String> {
     var imports: List<String> = []
     var lines: List<String> = source.split("\n")
