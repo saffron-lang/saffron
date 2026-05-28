@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Saffron WASM Counter</title>
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            padding: 3rem;
+        }
+        #app { text-align: center; }
+        h1 { color: #ffb347; }
+        button {
+            background: #2d2d44;
+            color: #fff;
+            border: 1px solid #4fc3f7;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background: #3d3d55; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        const decoder = new TextDecoder();
+        const handles = [null];
+        let instance;
+        let count = 0;
+
+        function allocHandle(el) { handles.push(el); return handles.length - 1; }
+        function getHandle(id) { return handles[id]; }
+        function readCString(ptr) {
+            const bytes = new Uint8Array(instance.exports.memory.buffer);
+            let end = ptr;
+            while (end < bytes.length && bytes[end] !== 0) end++;
+            return decoder.decode(bytes.slice(ptr, end));
+        }
+
+        function updateCount() {
+            const el = document.getElementById('count-display');
+            if (el) el.textContent = `Count: ${count}`;
+        }
+
+        const imports = {
+            env: {
+                js_log_str: (ptr) => console.log(readCString(ptr)),
+                js_log_int: (n) => console.log(Number(n)),
+                js_log_bool: (b) => console.log(b ? "true" : "false"),
+                js_log_nil: () => console.log("nil"),
+                __builtin_trap: () => { throw new Error("trap"); },
+
+                js_dom_create_element: (tagPtr) => allocHandle(document.createElement(readCString(tagPtr))),
+                js_dom_set_text: (handle, textPtr) => { getHandle(handle).textContent = readCString(textPtr); },
+                js_dom_set_attribute: (handle, namePtr, valuePtr) => {
+                    const el = getHandle(handle);
+                    const name = readCString(namePtr);
+                    const value = readCString(valuePtr);
+                    name === 'style' ? el.style.cssText = value : el.setAttribute(name, value);
+                },
+                js_dom_append_child: (parent, child) => { getHandle(parent).appendChild(getHandle(child)); },
+                js_dom_remove_child: (parent, child) => { getHandle(parent).removeChild(getHandle(child)); },
+                js_dom_set_inner_html: (handle, htmlPtr) => { getHandle(handle).innerHTML = readCString(htmlPtr); },
+                js_dom_query_selector: (selectorPtr) => {
+                    const el = document.querySelector(readCString(selectorPtr));
+                    return el ? allocHandle(el) : 0;
+                },
+                js_dom_add_event_listener: (handle, eventPtr, callbackId) => {
+                    const el = getHandle(handle);
+                    el.addEventListener(readCString(eventPtr), () => {
+                        if (callbackId === 1) { count++; updateCount(); }
+                        if (callbackId === 2) { count--; updateCount(); }
+                        if (callbackId === 3) { count = 0; updateCount(); }
+                    });
+                },
+                js_set_global: () => {},
+                js_get_global: () => 0,
+                js_register_callback: () => {},
+            },
+        };
+
+        const response = await fetch('./app.wasm');
+        const wasmBytes = await response.arrayBuffer();
+        const result = await WebAssembly.instantiate(wasmBytes, imports);
+        instance = result.instance;
+        instance.exports._start();
+    </script>
+</body>
+</html>
