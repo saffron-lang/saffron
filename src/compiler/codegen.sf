@@ -1166,35 +1166,21 @@ class Codegen {
         }
 
         if (callee_name == "IO.println") {
-            var arg_expr: AST.Expr = args[0]
-            var arg_type: String = this.get_expr_type(arg_expr)
-            var arg: String = this.gen_arg_value(arg_expr)
-            if (arg_type == "Any") { arg_type = this.type_to_string(this.last_type) }
-            var local: String = this.fresh_local()
-            if (arg_type == "String") {
-                var str_ptr: String = this.fresh_local()
-                this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
-                this.emit_indent(local + " = call i32 @puts(i8* " + str_ptr + ")")
-            } else {
-                var fmt: String = this.get_format_ptr("%ld\n")
-                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
-            }
-            return local
+            var pre_type: String = this.get_expr_type(args[0])
+            var arg: String = this.gen_arg_value(args[0])
+            var arg_type: String = this.type_to_string(this.last_type)
+            if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
+            var str_val: String = this.coerce_to_string(arg, arg_type)
+            this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
         }
         if (callee_name == "IO.print") {
-            var arg_expr: AST.Expr = args[0]
-            var arg_type: String = this.get_expr_type(arg_expr)
-            var arg: String = this.gen_arg_value(arg_expr)
-            if (arg_type == "Any") { arg_type = this.type_to_string(this.last_type) }
-            var local: String = this.fresh_local()
-            if (arg_type == "String") {
-                var str_ptr: String = this.fresh_local()
-                this.emit_indent(str_ptr + " = inttoptr i64 " + arg + " to i8*")
-                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + str_ptr + ")")
-            } else {
-                var fmt: String = this.get_format_ptr("%ld")
-                this.emit_indent(local + " = call i32 (i8*, ...) @printf(i8* " + fmt + ", i64 " + arg + ")")
-            }
+            var arg: String = this.gen_arg_value(args[0])
+            var arg_type: String = this.type_to_string(this.last_type)
+            var str_val: String = this.coerce_to_string(arg, arg_type)
+            this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
+            this.last_type = AST.Type.NilType
             return local
         }
 
