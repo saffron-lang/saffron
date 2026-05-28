@@ -1,0 +1,475 @@
+//! Code formatter for Saffron — takes a parsed AST and emits consistently styled source.
+//!
+//! Usage:
+//!   import "@formatter" as Fmt
+//!   import "./lexer.sf" as Lexer
+//!   import "./parser.sf" as Parser
+//!   var tokens = Lexer.lex(source)
+//!   var ast = Parser.parse(tokens)
+//!   var formatted = Fmt.format_program(ast)
+
+import "../compiler/ast.sf" as AST
+
+// --- Helpers ---
+
+fun make_indent(level: Float): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < level) {
+        sb.append("    ")
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun escape_string(s: String): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < s.length()) {
+        var ch: String = s.char_at(i)
+        if (ch == "\"") {
+            sb.append("\\\"")
+        } else if (ch == "\\") {
+            sb.append("\\\\")
+        } else if (ch == "\n") {
+            sb.append("\\n")
+        } else if (ch == "\t") {
+            sb.append("\\t")
+        } else if (ch == "\r") {
+            sb.append("\\r")
+        } else {
+            sb.append(ch)
+        }
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun is_top_level_decl(stmt: AST.Stmt): Bool {
+    return match (stmt) {
+        FunDecl(name, params, ret_type, body, doc) => true
+        ClassDecl(name, parent, fields, methods, doc) => true
+        EnumDecl(name, variants, doc) => true
+        ExprStmt(expr) => false
+        VarDecl(name, type_ann, init, doc) => false
+        Return(value) => false
+        If(cond, then_b, else_b) => false
+        While(cond, body) => false
+        Block(stmts) => false
+        Break => false
+        Continue => false
+        TryCatch(tb, cn, cb, fb) => false
+        Throw(value) => false
+    }
+}
+
+// --- Expression Formatting ---
+
+fun format_expr(expr: AST.Expr): String {
+    return match (expr) {
+        IntLit(v) => v.floor().to_string()
+        FloatLit(v) => v
+        BoolLit(v) => {
+            var r: String = "false"
+            if (v) { r = "true" }
+            r
+        }
+        StringLit(s) => "\"" + escape_string(s) + "\""
+        NilLit => "nil"
+        Variable(name) => name
+        Binary(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
+        Unary(op, right) => op + format_expr(right)
+        Call(callee, args) => format_expr(callee) + "(" + format_exprs(args) + ")"
+        Assign(name, value) => name + " = " + format_expr(value)
+        Logical(left, op, right) => format_expr(left) + " " + op + " " + format_expr(right)
+        MemberAccess(obj, field) => format_expr(obj) + "." + field
+        Match(subject, arms) => format_match(subject, arms)
+        EnumConstruct(enum_name, variant, args) => {
+            var s: String = enum_name + "." + variant
+            if (args.length() > 0) {
+                s = s + "(" + format_exprs(args) + ")"
+            }
+            s
+        }
+        Lambda(params, ret_type, body) => format_lambda(params, ret_type, body)
+        GetField(obj, field) => format_expr(obj) + "." + field
+        SetField(obj, field, value) => format_expr(obj) + "." + field + " = " + format_expr(value)
+        This => "this"
+        ListLit(elements) => "[" + format_exprs(elements) + "]"
+        IndexGet(obj, index) => format_expr(obj) + "[" + format_expr(index) + "]"
+        IndexSet(obj, index, value) => format_expr(obj) + "[" + format_expr(index) + "] = " + format_expr(value)
+        MethodCall(obj, method, args) => format_expr(obj) + "." + method + "(" + format_exprs(args) + ")"
+        MapLit => "{}"
+        BlockExpr(stmts, value) => format_block_expr(stmts, value)
+        IsCheck(value, type_name) => format_expr(value) + " is " + type_name
+    }
+}
+
+fun format_exprs(exprs: List<AST.Expr>): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < exprs.length()) {
+        if (i > 0) { sb.append(", ") }
+        sb.append(format_expr(exprs[i]))
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun format_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
+    var sb: StringBuilder = StringBuilder()
+    sb.append("match (")
+    sb.append(format_expr(subject))
+    sb.append(") {\n")
+    var i: Float = 0
+    while (i < arms.length()) {
+        var arm: AST.MatchArm = arms[i]
+        var pat_str: String = match (arm) { Arm(pattern, body) => format_pattern(pattern) }
+        var body_str: String = match (arm) { Arm(pattern, body) => format_expr(body) }
+        sb.append("        ")
+        sb.append(pat_str)
+        sb.append(" => ")
+        sb.append(body_str)
+        sb.append("\n")
+        i = i + 1
+    }
+    sb.append("    }")
+    return sb.to_string()
+}
+
+fun format_pattern(pat: AST.Pattern): String {
+    return match (pat) {
+        VariantPattern(variant, bindings) => {
+            var s: String = variant
+            if (bindings.length() > 0) {
+                s = s + "(" + join_strings(bindings) + ")"
+            }
+            s
+        }
+        WildcardPattern => "_"
+        LiteralPattern(value) => format_expr(value)
+    }
+}
+
+fun join_strings(strs: List<String>): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < strs.length()) {
+        if (i > 0) { sb.append(", ") }
+        sb.append(strs[i])
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+fun format_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
+    var sb: StringBuilder = StringBuilder()
+    sb.append("fun (")
+    sb.append(format_params(params))
+    sb.append(")")
+    if (ret_type != "Nil" and ret_type.length() > 0) {
+        sb.append(": ")
+        sb.append(ret_type)
+    }
+    if (body.length() == 1) {
+        // Single-expression lambda: fun (x) => expr
+        var single: AST.Stmt = body[0]
+        var expr_str: String = match (single) {
+            Return(value) => " => " + format_expr(value)
+            ExprStmt(expr) => " => " + format_expr(expr)
+            VarDecl(n, t, i, d) => " {\n    " + format_stmt(single, 1) + "}"
+            FunDecl(n, p, r, b, d) => " {\n    " + format_stmt(single, 1) + "}"
+            EnumDecl(n, v, d) => " {\n    " + format_stmt(single, 1) + "}"
+            ClassDecl(n, p, f, m, d) => " {\n    " + format_stmt(single, 1) + "}"
+            If(c, t, e) => " {\n    " + format_stmt(single, 1) + "}"
+            While(c, b) => " {\n    " + format_stmt(single, 1) + "}"
+            Block(s) => " {\n    " + format_stmt(single, 1) + "}"
+            Break => " {\n    break\n}"
+            Continue => " {\n    continue\n}"
+            TryCatch(tb, cn, cb, fb) => " {\n    " + format_stmt(single, 1) + "}"
+            Throw(v) => " {\n    " + format_stmt(single, 1) + "}"
+        }
+        sb.append(expr_str)
+    } else {
+        sb.append(" {\n")
+        sb.append(format_stmts(body, 1))
+        sb.append("}")
+    }
+    return sb.to_string()
+}
+
+fun format_block_expr(stmts: List<AST.Stmt>, value: AST.Expr): String {
+    var sb: StringBuilder = StringBuilder()
+    sb.append("{\n")
+    sb.append(format_stmts(stmts, 1))
+    sb.append("    ")
+    sb.append(format_expr(value))
+    sb.append("\n}")
+    return sb.to_string()
+}
+
+// --- Parameter Formatting ---
+
+fun format_params(params: List<AST.Param>): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < params.length()) {
+        if (i > 0) { sb.append(", ") }
+        var p: AST.Param = params[i]
+        var pname: String = match (p) { Param(n, t, d) => n }
+        var ptype: String = match (p) { Param(n, t, d) => t }
+        var pdefault: AST.Expr = match (p) { Param(n, t, d) => d }
+        sb.append(pname)
+        if (ptype.length() > 0 and ptype != "Any") {
+            sb.append(": ")
+            sb.append(ptype)
+        }
+        // Check if default value is not nil
+        var default_str: String = format_expr(pdefault)
+        if (default_str != "nil") {
+            sb.append(" = ")
+            sb.append(default_str)
+        }
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+// --- Statement Formatting ---
+
+fun format_stmt(stmt: AST.Stmt, indent: Float): String {
+    var pad: String = make_indent(indent)
+    return match (stmt) {
+        ExprStmt(expr) => pad + format_expr(expr) + "\n"
+        VarDecl(name, type_ann, init, doc) => {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(pad)
+            sb.append("var ")
+            sb.append(name)
+            if (type_ann.length() > 0 and type_ann != "Any") {
+                sb.append(": ")
+                sb.append(type_ann)
+            }
+            var init_str: String = format_expr(init)
+            if (init_str != "nil") {
+                sb.append(" = ")
+                sb.append(init_str)
+            }
+            sb.append("\n")
+            sb.to_string()
+        }
+        FunDecl(name, params, ret_type, body, doc) => {
+            var sb: StringBuilder = StringBuilder()
+            // Docstring
+            if (doc.length() > 0 and !doc.starts_with("@")) {
+                sb.append(pad)
+                sb.append("/// ")
+                sb.append(doc)
+                sb.append("\n")
+            }
+            sb.append(pad)
+            sb.append("fun ")
+            sb.append(name)
+            sb.append("(")
+            sb.append(format_params(params))
+            sb.append(")")
+            if (ret_type != "Nil" and ret_type.length() > 0) {
+                sb.append(": ")
+                sb.append(ret_type)
+            }
+            sb.append(" {\n")
+            sb.append(format_stmts(body, indent + 1))
+            sb.append(pad)
+            sb.append("}\n")
+            sb.to_string()
+        }
+        EnumDecl(name, variants, doc) => {
+            var sb: StringBuilder = StringBuilder()
+            if (doc.length() > 0 and !doc.starts_with("@")) {
+                sb.append(pad)
+                sb.append("/// ")
+                sb.append(doc)
+                sb.append("\n")
+            }
+            sb.append(pad)
+            sb.append("enum ")
+            sb.append(name)
+            sb.append(" {\n")
+            var i: Float = 0
+            while (i < variants.length()) {
+                var v: AST.Variant = variants[i]
+                var vname: String = match (v) { Variant(n, f) => n }
+                var vfields: String = match (v) { Variant(n, f) => f }
+                sb.append(make_indent(indent + 1))
+                sb.append(vname)
+                if (vfields.length() > 0) {
+                    sb.append("(")
+                    sb.append(vfields)
+                    sb.append(")")
+                }
+                if (i < variants.length() - 1) {
+                    sb.append(",")
+                }
+                sb.append("\n")
+                i = i + 1
+            }
+            sb.append(pad)
+            sb.append("}\n")
+            sb.to_string()
+        }
+        ClassDecl(name, parent, fields, methods, doc) => {
+            var sb: StringBuilder = StringBuilder()
+            if (doc.length() > 0 and !doc.starts_with("@")) {
+                sb.append(pad)
+                sb.append("/// ")
+                sb.append(doc)
+                sb.append("\n")
+            }
+            sb.append(pad)
+            sb.append("class ")
+            sb.append(name)
+            if (parent.length() > 0) {
+                sb.append(" extends ")
+                sb.append(parent)
+            }
+            sb.append(" {\n")
+            // Fields
+            var fi: Float = 0
+            while (fi < fields.length()) {
+                var f: AST.Param = fields[fi]
+                var fname: String = match (f) { Param(n, t, d) => n }
+                var ftype: String = match (f) { Param(n, t, d) => t }
+                sb.append(make_indent(indent + 1))
+                sb.append("var ")
+                sb.append(fname)
+                if (ftype.length() > 0 and ftype != "Any") {
+                    sb.append(": ")
+                    sb.append(ftype)
+                }
+                sb.append("\n")
+                fi = fi + 1
+            }
+            // Blank line between fields and methods if both exist
+            if (fields.length() > 0 and methods.length() > 0) {
+                sb.append("\n")
+            }
+            // Methods
+            var mi: Float = 0
+            while (mi < methods.length()) {
+                sb.append(format_stmt(methods[mi], indent + 1))
+                if (mi < methods.length() - 1) {
+                    sb.append("\n")
+                }
+                mi = mi + 1
+            }
+            sb.append(pad)
+            sb.append("}\n")
+            sb.to_string()
+        }
+        Return(value) => {
+            var val_str: String = format_expr(value)
+            if (val_str == "nil") {
+                pad + "return\n"
+            } else {
+                pad + "return " + val_str + "\n"
+            }
+        }
+        If(cond, then_branch, else_branch) => {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(pad)
+            sb.append("if (")
+            sb.append(format_expr(cond))
+            sb.append(") {\n")
+            sb.append(format_stmts(then_branch, indent + 1))
+            sb.append(pad)
+            sb.append("}")
+            if (else_branch.length() > 0) {
+                sb.append(" else {\n")
+                sb.append(format_stmts(else_branch, indent + 1))
+                sb.append(pad)
+                sb.append("}")
+            }
+            sb.append("\n")
+            sb.to_string()
+        }
+        While(cond, body) => {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(pad)
+            sb.append("while (")
+            sb.append(format_expr(cond))
+            sb.append(") {\n")
+            sb.append(format_stmts(body, indent + 1))
+            sb.append(pad)
+            sb.append("}\n")
+            sb.to_string()
+        }
+        Block(stmts) => {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(pad)
+            sb.append("{\n")
+            sb.append(format_stmts(stmts, indent + 1))
+            sb.append(pad)
+            sb.append("}\n")
+            sb.to_string()
+        }
+        Break => pad + "break\n"
+        Continue => pad + "continue\n"
+        TryCatch(try_body, catch_name, catch_body, finally_body) => {
+            var sb: StringBuilder = StringBuilder()
+            sb.append(pad)
+            sb.append("try {\n")
+            sb.append(format_stmts(try_body, indent + 1))
+            sb.append(pad)
+            sb.append("} catch (")
+            sb.append(catch_name)
+            sb.append(") {\n")
+            sb.append(format_stmts(catch_body, indent + 1))
+            sb.append(pad)
+            sb.append("}")
+            if (finally_body.length() > 0) {
+                sb.append(" finally {\n")
+                sb.append(format_stmts(finally_body, indent + 1))
+                sb.append(pad)
+                sb.append("}")
+            }
+            sb.append("\n")
+            sb.to_string()
+        }
+        Throw(value) => pad + "throw " + format_expr(value) + "\n"
+    }
+}
+
+fun format_stmts(stmts: List<AST.Stmt>, indent: Float): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < stmts.length()) {
+        sb.append(format_stmt(stmts[i], indent))
+        i = i + 1
+    }
+    return sb.to_string()
+}
+
+// --- Top-Level Entry Point ---
+
+/// Format a list of parsed statements into consistently styled source code.
+///
+/// Style rules:
+///   - 4 spaces per indent level
+///   - Opening brace on same line
+///   - Closing brace on own line
+///   - Space around operators, after commas, after colons in type annotations
+///   - One statement per line
+///   - Blank line between top-level declarations
+fun format_program(stmts: List<AST.Stmt>): String {
+    var sb: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < stmts.length()) {
+        sb.append(format_stmt(stmts[i], 0))
+        // Add blank line after top-level declarations
+        if (is_top_level_decl(stmts[i]) and i < stmts.length() - 1) {
+            sb.append("\n")
+        }
+        i = i + 1
+    }
+    return sb.to_string()
+}
