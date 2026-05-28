@@ -3,21 +3,42 @@
             IntLit(v) => {
                 this.last_type = AST.Type.IntType
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                if (this.nan_boxing) {
+                    // NaN-box: TAG_INT | (value & PAYLOAD_MASK)
+                    var raw: String = this.fresh_local()
+                    this.emit_indent(raw + " = and i64 " + v.floor().to_string() + ", 281474976710655")
+                    this.emit_indent(local + " = or i64 " + raw + ", 9221120237041090560")
+                } else {
+                    this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                }
                 local
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = fadd double 0.0, " + v.to_string())
+                if (this.nan_boxing) {
+                    // NaN-box: float stored directly as bitcast (zero overhead)
+                    this.emit_indent(local + " = bitcast double " + v.to_string() + " to i64")
+                } else {
+                    this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                }
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.IntType
+                this.last_type = AST.Type.BoolType
                 var local: String = this.fresh_local()
-                var val_str: String = "0"
-                if (v) { val_str = "1" }
-                this.emit_indent(local + " = add i64 0, " + val_str)
+                if (this.nan_boxing) {
+                    // NaN-box: VAL_TRUE or VAL_FALSE
+                    if (v) {
+                        this.emit_indent(local + " = add i64 0, 9222246136947933185")
+                    } else {
+                        this.emit_indent(local + " = add i64 0, 9222246136947933184")
+                    }
+                } else {
+                    var val_str: String = "0"
+                    if (v) { val_str = "1" }
+                    this.emit_indent(local + " = add i64 0, " + val_str)
+                }
                 local
             }
             StringLit(s) => {
@@ -27,12 +48,28 @@
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                if (this.nan_boxing) {
+                    // NaN-box: TAG_PTR | (ptr & PAYLOAD_MASK)
+                    var raw_ptr: String = this.fresh_local()
+                    this.emit_indent(raw_ptr + " = ptrtoint i8* " + gep + " to i64")
+                    var masked: String = this.fresh_local()
+                    this.emit_indent(masked + " = and i64 " + raw_ptr + ", 281474976710655")
+                    this.emit_indent(local + " = or i64 " + masked + ", 9218868437227405312")
+                } else {
+                    this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                }
                 local
             }
             NilLit => {
                 this.last_type = AST.Type.NilType
-                "0"
+                if (this.nan_boxing) {
+                    // NaN-box: VAL_NIL
+                    var local: String = this.fresh_local()
+                    this.emit_indent(local + " = add i64 0, 9222246136947933186")
+                    local
+                } else {
+                    "0"
+                }
             }
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
