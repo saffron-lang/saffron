@@ -35,6 +35,7 @@ class Codegen {
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
+    var builtin_methods: Map<String, String>
 
     fun init() {
         this.sb = StringBuilder()
@@ -69,6 +70,26 @@ class Codegen {
         this.intrinsic_funcs = []
         this.extern_sigs = {}
         this.defined_funcs = []
+        this.builtin_methods = {}
+        this.builtin_methods.set("push", "v2|__list_push|Nil|0")
+        this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
+        this.builtin_methods.set("set", "v3|__map_set|Nil|0")
+        this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
+        this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
+        this.builtin_methods.set("reverse", "r1|rt_list_reverse|List|1")
+        this.builtin_methods.set("copy", "r1|rt_list_copy|List|1")
+        this.builtin_methods.set("sort", "r1|rt_list_sort|List|1")
+        this.builtin_methods.set("trim", "r1|rt_str_trim|String|1")
+        this.builtin_methods.set("to_upper", "r1|rt_str_to_upper|String|1")
+        this.builtin_methods.set("to_lower", "r1|rt_str_to_lower|String|1")
+        this.builtin_methods.set("has", "r2|__map_has|Bool|0")
+        this.builtin_methods.set("index_of", "r2|rt_str_index_of|Int|1")
+        this.builtin_methods.set("repeat", "r2|rt_str_repeat|String|1")
+        this.builtin_methods.set("to_number", "p1|atol|Int|0")
+        this.builtin_methods.set("split", "p2|__str_split|ListStr|0")
+        this.builtin_methods.set("ends_with", "p2|__str_ends_with|Bool|0")
+        this.builtin_methods.set("replace", "p3|__str_replace|String|0")
+        this.builtin_methods.set("join", "m2|__list_join|String|0")
     }
 
     fun params_to_string(params: List<AST.Param>): String {
@@ -1164,7 +1185,8 @@ class Codegen {
                         i = i + 1
                     }
                     this.called_functions.push(init_name)
-                    this.emit_indent("call i64 @" + init_name + "(" + init_args.join(", ") + ")")
+                    var discard_init: String = this.fresh_local()
+                    this.emit_indent(discard_init + " = call i64 @" + init_name + "(" + init_args.join(", ") + ")")
                 }
                 this.last_type = this.str_to_type(callee_name)
                 return instance
@@ -1858,7 +1880,8 @@ class Codegen {
         var i: Float = 0
         while (i < elements.length()) {
             var elem: String = this.gen_arg_value(elements[i])
-            this.emit_indent("call void @__list_push(i64 " + list_val + ", i64 " + elem + ")")
+            var discard_lp: String = this.fresh_local()
+            this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
             i = i + 1
         }
         this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
@@ -1900,8 +1923,74 @@ class Codegen {
         var obj: String = this.gen_arg_value(object)
         var idx: String = this.gen_arg_value(index)
         var val: String = this.gen_arg_value(value)
-        this.emit_indent("call void @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+        var discard_ls: String = this.fresh_local()
+        this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
         return val
+    }
+
+    fun emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
+        var desc: String = this.builtin_methods.get(method)
+        var parts: List<String> = desc.split("|")
+        var pattern: String = parts[0]
+        var func_name: String = parts[1]
+        var result_type: String = parts[2]
+        var needs_push: String = parts[3]
+        if (needs_push == "1") { this.called_functions.push(func_name) }
+        if (result_type == "Nil") { this.last_type = AST.Type.NilType }
+        else if (result_type == "Int") { this.last_type = AST.Type.IntType }
+        else if (result_type == "Bool") { this.last_type = AST.Type.BoolType }
+        else if (result_type == "String") { this.last_type = AST.Type.StringType }
+        else if (result_type == "List") { this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType]) }
+        else if (result_type == "ListStr") { this.last_type = AST.Type.GenericType("List", [AST.Type.StringType]) }
+        if (pattern == "v2") {
+            var val: String = this.gen_arg_value(args[0])
+            var discard: String = this.fresh_local()
+            this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+            return "0"
+        }
+        if (pattern == "v3") {
+            var a1: String = this.gen_arg_value(args[0])
+            var a2: String = this.gen_arg_value(args[1])
+            var discard: String = this.fresh_local()
+            this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+            return "0"
+        }
+        if (pattern == "r1") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+            return local
+        }
+        if (pattern == "r2") {
+            var val: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+            return local
+        }
+        if (pattern == "p1") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+            return local
+        }
+        if (pattern == "p2") {
+            var a1: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+            return local
+        }
+        if (pattern == "p3") {
+            var a1: String = this.gen_arg_value(args[0])
+            var a2: String = this.gen_arg_value(args[1])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+            return local
+        }
+        if (pattern == "m2") {
+            var a1: String = this.gen_arg_value(args[0])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+            return local
+        }
+        return "0"
     }
 
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
@@ -2043,7 +2132,8 @@ class Codegen {
                 var content: String = this.gen_arg_value(args[1])
                 var content_ptr: String = this.fresh_local()
                 this.emit_indent(content_ptr + " = inttoptr i64 " + content + " to i8*")
-                this.emit_indent("call void @__io_write_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
+                var discard_wf: String = this.fresh_local()
+                this.emit_indent(discard_wf + " = call i64 @__io_write_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
                 this.last_type = AST.Type.NilType
                 return "0"
             }
@@ -2060,7 +2150,8 @@ class Codegen {
                 var path: String = this.gen_arg_value(args[0])
                 var path_ptr: String = this.fresh_local()
                 this.emit_indent(path_ptr + " = inttoptr i64 " + path + " to i8*")
-                this.emit_indent("call void @__io_mkdir(i8* " + path_ptr + ")")
+                var discard_mk: String = this.fresh_local()
+                this.emit_indent(discard_mk + " = call i64 @__io_mkdir(i8* " + path_ptr + ")")
                 this.last_type = AST.Type.NilType
                 return "0"
             }
@@ -2080,7 +2171,8 @@ class Codegen {
                 var content: String = this.gen_arg_value(args[1])
                 var content_ptr: String = this.fresh_local()
                 this.emit_indent(content_ptr + " = inttoptr i64 " + content + " to i8*")
-                this.emit_indent("call void @__io_append_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
+                var discard_af: String = this.fresh_local()
+                this.emit_indent(discard_af + " = call i64 @__io_append_file(i8* " + path_ptr + ", i8* " + content_ptr + ")")
                 this.last_type = AST.Type.NilType
                 return "0"
             }
@@ -2148,32 +2240,8 @@ class Codegen {
         // check and class method dispatch below.
         var obj: String = this.gen_arg_value(object)
 
-        if (method == "push") {
-            var val: String = this.gen_arg_value(args[0])
-            this.emit_indent("call void @__list_push(i64 " + obj + ", i64 " + val + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "pop") {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__list_pop(i64 " + obj + ")")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "join") {
-            var sep: String = this.gen_arg_value(args[0])
-            var sep_ptr: String = this.fresh_local()
-            this.emit_indent(sep_ptr + " = inttoptr i64 " + sep + " to i8*")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__list_join(i64 " + obj + ", i8* " + sep_ptr + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-        if (method == "append") {
-            var val: String = this.gen_arg_value(args[0])
-            this.emit_indent("call void @__sb_append(i64 " + obj + ", i64 " + val + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
+        if (this.builtin_methods.has(method)) {
+            return this.emit_builtin_dispatch(obj, method, args)
         }
         if (method == "get") {
             var key: String = this.gen_arg_value(args[0])
@@ -2192,51 +2260,6 @@ class Codegen {
             }
             return local
         }
-        if (method == "set") {
-            var key: String = this.gen_arg_value(args[0])
-            var val: String = this.gen_arg_value(args[1])
-            this.emit_indent("call void @__map_set(i64 " + obj + ", i64 " + key + ", i64 " + val + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "has") {
-            var key: String = this.gen_arg_value(args[0])
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__map_has(i64 " + obj + ", i64 " + key + ")")
-            this.last_type = AST.Type.BoolType
-            return local
-        }
-        if (method == "keys") {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__map_keys(i64 " + obj + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-            return local
-        }
-        if (method == "split") {
-            var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-            var delim: String = this.gen_arg_value(args[0])
-            var delim_ptr: String = this.fresh_local()
-            this.emit_indent(delim_ptr + " = inttoptr i64 " + delim + " to i8*")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__str_split(i8* " + str_ptr + ", i8* " + delim_ptr + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.StringType])
-            return local
-        }
-        if (method == "replace") {
-            var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-            var old_str: String = this.gen_arg_value(args[0])
-            var old_ptr: String = this.fresh_local()
-            this.emit_indent(old_ptr + " = inttoptr i64 " + old_str + " to i8*")
-            var new_str: String = this.gen_arg_value(args[1])
-            var new_ptr: String = this.fresh_local()
-            this.emit_indent(new_ptr + " = inttoptr i64 " + new_str + " to i8*")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__str_replace(i8* " + str_ptr + ", i8* " + old_ptr + ", i8* " + new_ptr + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
         if (method == "starts_with") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
@@ -2253,17 +2276,6 @@ class Codegen {
             this.emit_indent(result + " = zext i1 " + is_eq + " to i64")
             this.last_type = AST.Type.BoolType
             return result
-        }
-        if (method == "ends_with") {
-            var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-            var suffix: String = this.gen_arg_value(args[0])
-            var suffix_ptr: String = this.fresh_local()
-            this.emit_indent(suffix_ptr + " = inttoptr i64 " + suffix + " to i8*")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__str_ends_with(i8* " + str_ptr + ", i8* " + suffix_ptr + ")")
-            this.last_type = AST.Type.BoolType
-            return local
         }
         if (method == "char_at") {
             var str_ptr: String = this.fresh_local()
@@ -2306,73 +2318,6 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return local
         }
-        if (method == "to_number") {
-            var str_ptr: String = this.fresh_local()
-            this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "reverse") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_list_reverse")
-            this.emit_indent(local + " = call i64 @rt_list_reverse(i64 " + obj + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-            return local
-        }
-        if (method == "copy") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_list_copy")
-            this.emit_indent(local + " = call i64 @rt_list_copy(i64 " + obj + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-            return local
-        }
-        if (method == "sort") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_list_sort")
-            this.emit_indent(local + " = call i64 @rt_list_sort(i64 " + obj + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
-            return local
-        }
-        if (method == "trim") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_str_trim")
-            this.emit_indent(local + " = call i64 @rt_str_trim(i64 " + obj + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-        if (method == "to_upper") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_str_to_upper")
-            this.emit_indent(local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-        if (method == "to_lower") {
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_str_to_lower")
-            this.emit_indent(local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-        if (method == "index_of") {
-            var needle: String = this.gen_arg_value(args[0])
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_str_index_of")
-            this.emit_indent(local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + needle + ")")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "repeat") {
-            var count: String = this.gen_arg_value(args[0])
-            var local: String = this.fresh_local()
-            this.called_functions.push("rt_str_repeat")
-            this.emit_indent(local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + count + ")")
-            this.last_type = AST.Type.StringType
-            return local
-        }
-
         // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
         // Prefer var_types annotation over last_type because the native binary's
         // last_type is unreliable when var_types.has() returns false mid-execution.
@@ -3218,7 +3163,7 @@ class Codegen {
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
         var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
-        var sigs: List<String> = ["i64 @__list_new()", "void @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "void @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "void @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i32 @__safe_strcmp(i8*, i8*)", "i64 @__map_new()", "void @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i8*, i8*)", "i64 @__str_split(i8*, i8*)", "i64 @__str_replace(i8*, i8*, i8*)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i8*)", "void @__join_append(i8**, i64*, i64*, i8*, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i8*)", "void @__io_write_file(i8*, i8*)", "i64 @__io_file_exists(i8*)", "void @__io_mkdir(i8*)", "i64 @__io_walk_dir(i8*)", "void @__io_append_file(i8*, i8*)", "i64 @__os_exec(i8*)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i8*)"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i8*, i8*)", "i64 @__str_split(i8*, i8*)", "i64 @__str_replace(i8*, i8*, i8*)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i8*)", "i64 @__join_append(i8**, i64*, i64*, i8*, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i8*)", "i64 @__io_write_file(i8*, i8*)", "i64 @__io_file_exists(i8*)", "i64 @__io_mkdir(i8*)", "i64 @__io_walk_dir(i8*)", "i64 @__io_append_file(i8*, i8*)", "i64 @__os_exec(i8*)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i8*)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.defined_funcs.contains(names[di])) {

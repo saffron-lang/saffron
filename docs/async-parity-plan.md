@@ -25,18 +25,36 @@ The VM's approach saves/restores the *entire* value stack per task switch. This 
 
 We use LLVM's built-in coroutine intrinsics (`llvm.coro.*`). LLVM automatically transforms yielding functions into state machines — no assembly, no manual stacks, no platform-specific code. The scheduler is pure Saffron.
 
-**Why LLVM coro over stackful coroutines:**
+**Strategy comparison:**
 
-| | LLVM Coro | Stackful (setjmp + mmap) |
+| | LLVM Coro (stackless) | Stackful (setjmp + mmap) |
 |-|-----------|--------------------------|
-| Platform code | None | arm64 asm + x86_64 asm |
-| Stack management | LLVM handles it | Manual mmap + guard pages |
-| Memory per task | Only what's needed (state struct) | Fixed 64KB per task |
-| Debugging | Normal stack frames | Opaque swapped stacks |
-| Yield restrictions | Must be in coroutine function | None (yield anywhere) |
-| Scheduler | Pure Saffron | Needs C or asm |
+| Platform code | None | arm64 asm + x86_64 asm (~40 lines each) |
+| Stack management | LLVM handles it (heap-allocated state struct) | Manual mmap + guard pages |
+| Memory per task | Proportional to live-across-yield locals (tens of bytes–few KB) | Fixed 64KB per task regardless of usage |
+| Non-async function overhead | Zero — unaffected functions compile normally | Zero — context switch only on yield |
+| Yield-point overhead | Indirect branch (state machine switch) | ~20 register saves + SP swap (~5ns on arm64) |
+| Spawn overhead | malloc(coro_frame_size) — typically 64-256 bytes | mmap(64KB) + init_context (~1μs, TLB pressure) |
+| Deep recursion in tasks | Each recursion level adds to coro frame OR splits into nested coro | Natural — the mmap'd stack handles it transparently |
+| Yield from nested callee | Only if callee is also a coroutine (yield is "colored") | Works from any depth (yield anywhere) |
+| Call graph coloring | Transitive: every function between spawn and yield must be a coro | Not needed — all functions are normal |
+| Scheduler | Pure Saffron (zero native code) | Needs native context switch |
+| Debugging | Normal stack traces; state visible in debugger | Opaque swapped stacks; debugger can't unwind across contexts |
+| 1000 concurrent tasks | ~64-256KB total (just the live state) | ~64MB committed (1000 × 64KB stacks) |
+| CoroElide optimization | LLVM can inline coro frame on stack (zero heap alloc) when handle doesn't escape | N/A |
 
-The only restriction: yield must appear inside a function marked as a coroutine (not from a deeply nested callee). This matches our existing Saffron patterns — `yield` is always written directly in the task function or in thin wrappers like `Async.sleep()`.
+**Prior art:**
+
+| Language | Strategy | Yield depth | Overhead model |
+|----------|----------|-------------|----------------|
+| Lua | Stackful (VM stacks) | Anywhere | Per-coroutine VM stack (~1KB initial, grows) |
+| Elixir/BEAM | Preemptive (reduction count) | Transparent | Per-process heap+stack (~300B initial, grows) |
+| Go | Stackful (growable OS stacks + signal preemption) | Anywhere | Per-goroutine stack (2-8KB initial, grows via stack copy) |
+| Rust/C++ | Stackless (state machine / LLVM coro) | Colored (async fn only) | Zero for non-async; state struct alloc for async |
+| Kotlin | Stackless (CPS transform) | Colored (suspend fn only) | Zero for non-suspend; continuation object alloc |
+| Python | Stackless (generator protocol) | Colored (async def only) | Frame object per coroutine |
+
+**Conclusion:** LLVM coro is the right choice. The "colored" restriction matches Saffron's actual usage (yield always in task functions or thin wrappers), costs nothing for non-async code, and avoids platform-specific assembly. The 64KB-per-task cost of stackful makes it impractical for high task counts.
 
 ---
 

@@ -48,7 +48,7 @@ declare void @longjmp(i8*, i32)
 %SB = type { i64, i64, i8* }
 
 declare i64 @__io_walk_dir(i8*)
-declare void @__io_append_file(i8*, i8*)
+declare i64 @__io_append_file(i8*, i8*)
 declare i32 @access(i8*, i32)
 declare i8* @getcwd(i8*, i64)
 declare i8* @memcpy(i8*, i8*, i64)
