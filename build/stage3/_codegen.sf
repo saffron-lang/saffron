@@ -104,6 +104,145 @@ class Codegen {
 
     // Helpers to construct AST.Type nodes — avoids cross-module enum resolution
     // issues where AST.Type.GenericType inside a class method gets misresolved.
+    fun split_respecting_generics(s: String, delim: String): List<String> {
+        var result: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == delim and depth == 0) {
+                result.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            result.push(current)
+        }
+        return result
+    }
+
+    fun sanitize_name(name: String): String {
+        // Prefix reserved LLVM names to avoid collisions with labels
+        if (name == "entry" or name == "end" or name == "loop" or name == "body") {
+            return "v_" + name
+        }
+        var sb: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < name.length()) {
+            var ch: String = name.char_at(i)
+            if (ch == "." or ch == "(" or ch == ")") {
+                sb.append("_")
+            } else {
+                sb.append(ch)
+            }
+            i = i + 1
+        }
+        return sb.to_string()
+    }
+
+    fun fresh_label(prefix: String): String {
+        this.label_counter = this.label_counter + 1
+        return prefix + this.label_counter.floor().to_string()
+    }
+
+    fun fresh_local(): String {
+        this.local_counter = this.local_counter + 1
+        return "%t" + this.local_counter.floor().to_string()
+    }
+
+    fun reset_locals() {
+        this.local_counter = 0
+    }
+
+    fun emit(line: String) {
+        this.sb.append(line)
+        this.sb.append("\n")
+    }
+
+    fun emit_indent(line: String) {
+        if (this.block_terminated) return nil
+        this.sb.append("  ")
+        this.sb.append(line)
+        this.sb.append("\n")
+    }
+
+    fun emit_terminator(line: String) {
+        if (this.block_terminated) return nil
+        this.sb.append("  ")
+        this.sb.append(line)
+        this.sb.append("\n")
+        this.block_terminated = true
+    }
+
+    fun start_block(label: String) {
+        this.emit(label + ":")
+        this.block_terminated = false
+    }
+
+    // --- Type mapping ---
+
+    fun llvm_type(t: String): String {
+        if (t == "Int") return "i64"
+        if (t == "Float") return "i64"
+        if (t == "Bool") return "i64"
+        if (t == "String") return "i64"
+        if (t == "Nil") return "i64"
+        if (t == "Any") return "i64"
+        if (t == "List") return "i64"
+        if (t == "Map") return "i64"
+        return "i64"
+    }
+
+    // --- String constants ---
+
+    fun add_string_constant(s: String): String {
+        var idx: Float = this.string_constants.length()
+        var name: String = "@.str." + idx.floor().to_string()
+        this.string_constants.push(s)
+        return name
+    }
+
+    fun emit_string_constants() {
+        var i: Float = 0
+        while (i < this.string_constants.length()) {
+            var s: String = this.string_constants[i]
+            var name: String = "@.str." + i.floor().to_string()
+            var len: Float = s.length() + 1
+            this.emit(name + " = private unnamed_addr constant [" + len.to_string() + " x i8] c\"" + this.escape_llvm_string(s) + "\\00\"")
+            i = i + 1
+        }
+    }
+
+    fun escape_llvm_string(s: String): String {
+        var result: StringBuilder = StringBuilder()
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "\n") { result.append("\\0A") }
+            else if (ch == "\r") { result.append("\\0D") }
+            else if (ch == "\t") { result.append("\\09") }
+            else if (ch == "\\") { result.append("\\5C") }
+            else if (ch == "\"") { result.append("\\22") }
+            else { result.append(ch) }
+            i = i + 1
+        }
+        return result.to_string()
+    }
+
+    // --- Expression codegen ---
+    // Returns the LLVM local name holding the result
+    // Sets this.last_type to the Saffron type of the result
+    // @codegen-split: types
     fun make_list_type(): AST.Type {
         return AST.Type.GenericType("List", [AST.Type.AnyType])
     }
@@ -373,144 +512,6 @@ class Codegen {
         return parts[1]
     }
 
-    fun split_respecting_generics(s: String, delim: String): List<String> {
-        var result: List<String> = []
-        var current: String = ""
-        var depth: Float = 0
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "<") {
-                depth = depth + 1
-                current = current + ch
-            } else if (ch == ">") {
-                depth = depth - 1
-                current = current + ch
-            } else if (ch == delim and depth == 0) {
-                result.push(current)
-                current = ""
-            } else {
-                current = current + ch
-            }
-            i = i + 1
-        }
-        if (current.length() > 0) {
-            result.push(current)
-        }
-        return result
-    }
-
-    fun sanitize_name(name: String): String {
-        // Prefix reserved LLVM names to avoid collisions with labels
-        if (name == "entry" or name == "end" or name == "loop" or name == "body") {
-            return "v_" + name
-        }
-        var sb: StringBuilder = StringBuilder()
-        var i: Float = 0
-        while (i < name.length()) {
-            var ch: String = name.char_at(i)
-            if (ch == "." or ch == "(" or ch == ")") {
-                sb.append("_")
-            } else {
-                sb.append(ch)
-            }
-            i = i + 1
-        }
-        return sb.to_string()
-    }
-
-    fun fresh_label(prefix: String): String {
-        this.label_counter = this.label_counter + 1
-        return prefix + this.label_counter.floor().to_string()
-    }
-
-    fun fresh_local(): String {
-        this.local_counter = this.local_counter + 1
-        return "%t" + this.local_counter.floor().to_string()
-    }
-
-    fun reset_locals() {
-        this.local_counter = 0
-    }
-
-    fun emit(line: String) {
-        this.sb.append(line)
-        this.sb.append("\n")
-    }
-
-    fun emit_indent(line: String) {
-        if (this.block_terminated) return nil
-        this.sb.append("  ")
-        this.sb.append(line)
-        this.sb.append("\n")
-    }
-
-    fun emit_terminator(line: String) {
-        if (this.block_terminated) return nil
-        this.sb.append("  ")
-        this.sb.append(line)
-        this.sb.append("\n")
-        this.block_terminated = true
-    }
-
-    fun start_block(label: String) {
-        this.emit(label + ":")
-        this.block_terminated = false
-    }
-
-    // --- Type mapping ---
-
-    fun llvm_type(t: String): String {
-        if (t == "Int") return "i64"
-        if (t == "Float") return "i64"
-        if (t == "Bool") return "i64"
-        if (t == "String") return "i64"
-        if (t == "Nil") return "i64"
-        if (t == "Any") return "i64"
-        if (t == "List") return "i64"
-        if (t == "Map") return "i64"
-        return "i64"
-    }
-
-    // --- String constants ---
-
-    fun add_string_constant(s: String): String {
-        var idx: Float = this.string_constants.length()
-        var name: String = "@.str." + idx.floor().to_string()
-        this.string_constants.push(s)
-        return name
-    }
-
-    fun emit_string_constants() {
-        var i: Float = 0
-        while (i < this.string_constants.length()) {
-            var s: String = this.string_constants[i]
-            var name: String = "@.str." + i.floor().to_string()
-            var len: Float = s.length() + 1
-            this.emit(name + " = private unnamed_addr constant [" + len.to_string() + " x i8] c\"" + this.escape_llvm_string(s) + "\\00\"")
-            i = i + 1
-        }
-    }
-
-    fun escape_llvm_string(s: String): String {
-        var result: StringBuilder = StringBuilder()
-        var i: Float = 0
-        while (i < s.length()) {
-            var ch: String = s.char_at(i)
-            if (ch == "\n") { result.append("\\0A") }
-            else if (ch == "\r") { result.append("\\0D") }
-            else if (ch == "\t") { result.append("\\09") }
-            else if (ch == "\\") { result.append("\\5C") }
-            else if (ch == "\"") { result.append("\\22") }
-            else { result.append(ch) }
-            i = i + 1
-        }
-        return result.to_string()
-    }
-
-    // --- Expression codegen ---
-    // Returns the LLVM local name holding the result
-    // Sets this.last_type to the Saffron type of the result
     // @codegen-split: expr
     fun gen_expr(expr: AST.Expr): String {
         return match (expr) {
@@ -2394,259 +2395,6 @@ class Codegen {
         return sb.to_string()
     }
 
-    fun runtime_declares(): String {
-        var rt: StringBuilder = StringBuilder()
-        rt.append("; --- Runtime declarations ---\n")
-        rt.append("%SB = type { i64, i64, i8* }\n\n")
-        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
-        var di: Float = 0
-        while (di < names.length()) {
-            if (!this.defined_funcs.contains(names[di])) {
-                rt.append("declare " + sigs[di] + "\n")
-            }
-            di = di + 1
-        }
-        return rt.to_string()
-    }
-    fun find_enum_for_variant(variant: String): String {
-        var keys: List<String> = this.enum_variant_tags.keys()
-        var i: Float = 0
-        while (i < keys.length()) {
-            var key: String = keys[i]
-            if (key.ends_with("." + variant)) {
-                return key.split(".")[0]
-            }
-            i = i + 1
-        }
-        return "Unknown"
-    }
-
-    fun resolve_callee(expr: AST.Expr): String {
-        return match (expr) {
-            Variable(n) => n
-            MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
-            x => ""
-        }
-    }
-
-    fun gen_logical(left: AST.Expr, op: String, right: AST.Expr): String {
-        var lhs_raw: String = this.gen_arg_value(left)
-        var lhs: String = this.to_i1(lhs_raw)
-        var current_block: String = this.fresh_label("logic.entry")
-        var rhs_label: String = this.fresh_label("rhs")
-        var end_label: String = this.fresh_label("end")
-
-        // We need a label for the current block for phi
-        this.emit_terminator("br label %" + current_block)
-        this.start_block(current_block)
-
-        if (op == "or") {
-            this.emit_terminator("br i1 " + lhs + ", label %" + end_label + ", label %" + rhs_label)
-        } else {
-            this.emit_terminator("br i1 " + lhs + ", label %" + rhs_label + ", label %" + end_label)
-        }
-
-        this.start_block(rhs_label)
-        var rhs_raw: String = this.gen_arg_value(right)
-        var rhs: String = this.to_i1(rhs_raw)
-        this.emit_terminator("br label %" + end_label)
-
-        this.start_block(end_label)
-        var phi_result: String = this.fresh_local()
-        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
-        // Extend back to i64 for uniform value type
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
-        this.last_type = AST.Type.IntType
-        return result
-    }
-
-    // --- Variable collection (for hoisting allocas to entry block) ---
-
-    fun collect_vars(stmts: List<AST.Stmt>, names: List<String>, types: List<String>) {
-        var i: Float = 0
-        while (i < stmts.length()) {
-            this.collect_vars_stmt(stmts[i], names, types)
-            i = i + 1
-        }
-    }
-
-    fun add_var_unique(names: List<String>, types: List<String>, name: String, typ: String) {
-        if (!names.contains(name)) {
-            names.push(name)
-            types.push(typ)
-        }
-    }
-
-    fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
-        match (stmt) {
-            VarDecl(name, type_ann, init, doc) => {
-                this.add_var_unique(names, types, name, type_ann)
-                this.collect_vars_expr(init, names, types)
-            }
-            If(cond, then_branch, else_branch) => {
-                this.collect_vars(then_branch, names, types)
-                this.collect_vars(else_branch, names, types)
-            }
-            While(cond, body) => {
-                this.collect_vars(body, names, types)
-            }
-            Block(stmts) => {
-                this.collect_vars(stmts, names, types)
-            }
-            ExprStmt(expr) => {
-                this.collect_vars_expr(expr, names, types)
-            }
-            Return(value) => {
-                this.collect_vars_expr(value, names, types)
-            }
-            FunDecl(n, p, r, b, d) => {}
-            EnumDecl(n, v, d) => {}
-            ClassDecl(n, p, f, m, d) => {}
-            Break => {}
-            Continue => {}
-            TryCatch(try_body, catch_name, catch_body, finally_body) => {
-                this.collect_vars(try_body, names, types)
-                this.add_var_unique(names, types, catch_name, "String")
-                this.collect_vars(catch_body, names, types)
-                this.collect_vars(finally_body, names, types)
-            }
-            Throw(value) => {
-                this.collect_vars_expr(value, names, types)
-            }
-        }
-    }
-
-    fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
-        match (expr) {
-            Match(s, a) => { this.collect_vars_match(expr, names, types) }
-            BlockExpr(stmts, value) => {
-                this.collect_vars(stmts, names, types)
-                this.collect_vars_expr(value, names, types)
-            }
-            Binary(left, op, right) => {
-                this.collect_vars_expr(left, names, types)
-                this.collect_vars_expr(right, names, types)
-            }
-            Logical(left, op, right) => {
-                this.collect_vars_expr(left, names, types)
-                this.collect_vars_expr(right, names, types)
-            }
-            Unary(op, right) => { this.collect_vars_expr(right, names, types) }
-            Assign(name, value) => { this.collect_vars_expr(value, names, types) }
-            Call(callee, args) => { this.collect_vars_expr(callee, names, types) }
-            MethodCall(obj, method, args) => { this.collect_vars_expr(obj, names, types) }
-            SetField(obj, field, value) => {
-                this.collect_vars_expr(obj, names, types)
-                this.collect_vars_expr(value, names, types)
-            }
-            GetField(obj, field) => { this.collect_vars_expr(obj, names, types) }
-            IndexGet(obj, idx) => {
-                this.collect_vars_expr(obj, names, types)
-                this.collect_vars_expr(idx, names, types)
-            }
-            IndexSet(obj, idx, value) => {
-                this.collect_vars_expr(obj, names, types)
-                this.collect_vars_expr(idx, names, types)
-                this.collect_vars_expr(value, names, types)
-            }
-            MemberAccess(obj, field) => { this.collect_vars_expr(obj, names, types) }
-            IntLit(v) => {}
-            FloatLit(v) => {}
-            BoolLit(v) => {}
-            StringLit(s) => {}
-            NilLit => {}
-            Variable(n) => {}
-            This => {}
-            MapLit => {}
-            ListLit(e) => {}
-            EnumConstruct(e, v, a) => {}
-            Lambda(p, r, b) => {}
-            IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
-        }
-    }
-
-    fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
-        var name: String = match (pattern) { VariantPattern(v, b) => v
-            _ => ""
-        }
-        return !this.enum_variant_tags.has(enum_name + "." + name)
-    }
-
-    fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
-        return match (arm) { Arm(p, b) => p
-            _ => ""
-        }
-    }
-
-    fun get_arm_body(arm: AST.MatchArm): AST.Expr {
-        return match (arm) { Arm(p, b) => b
-            _ => ""
-        }
-    }
-
-    fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
-        return match (pattern) { VariantPattern(v, b) => b
-            _ => ""
-        }
-    }
-
-    fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
-        var arms: List<AST.MatchArm> = this.get_match_arms(expr)
-        var i: Float = 0
-        while (i < arms.length()) {
-            var arm: AST.MatchArm = arms[i]
-            var bindings: List<String> = this.get_pattern_bindings(this.get_arm_pattern(arm))
-            var j: Float = 0
-            while (j < bindings.length()) {
-                this.add_var_unique(names, types, bindings[j], "Int")
-                j = j + 1
-            }
-            this.collect_vars_expr(this.get_arm_body(arm), names, types)
-            i = i + 1
-        }
-    }
-
-    fun is_match_expr(expr: AST.Expr): Bool {
-        var kind: Any = match (expr) {
-            Match(s, a) => "match"
-            IntLit(v) => "other"
-            FloatLit(v) => "other"
-            BoolLit(v) => "other"
-            StringLit(s) => "other"
-            NilLit => "other"
-            Variable(n) => "other"
-            Binary(l, o, r) => "other"
-            Unary(o, r) => "other"
-            Call(c, a) => "other"
-            Assign(n, v) => "other"
-            Logical(l, o, r) => "other"
-            MemberAccess(o, f) => "other"
-            EnumConstruct(e, v, a) => "other"
-            Lambda(p, r, b) => "other"
-            GetField(o, f) => "other"
-            SetField(o, f, v) => "other"
-            This => "other"
-            ListLit(e) => "other"
-            IndexGet(o, i) => "other"
-            IndexSet(o, i, v) => "other"
-            MethodCall(o, m, a) => "other"
-            MapLit => "other"
-            BlockExpr(s, v) => "other"
-            IsCheck(val, t) => "other"
-        }
-        return kind == "match"
-    }
-
-    fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
-        return match (expr) { Match(s, a) => a
-            _ => ""
-        }
-    }
-
-    // --- Statement codegen ---
-
     // @codegen-split: stmts
     fun gen_stmt(stmt: AST.Stmt) {
         match (stmt) {
@@ -3410,6 +3158,261 @@ class Codegen {
         this.start_block(end_label)
     }
 
+    // @codegen-split: utils
+    fun runtime_declares(): String {
+        var rt: StringBuilder = StringBuilder()
+        rt.append("; --- Runtime declarations ---\n")
+        rt.append("%SB = type { i64, i64, i8* }\n\n")
+        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
+        var di: Float = 0
+        while (di < names.length()) {
+            if (!this.defined_funcs.contains(names[di])) {
+                rt.append("declare " + sigs[di] + "\n")
+            }
+            di = di + 1
+        }
+        return rt.to_string()
+    }
+    fun find_enum_for_variant(variant: String): String {
+        var keys: List<String> = this.enum_variant_tags.keys()
+        var i: Float = 0
+        while (i < keys.length()) {
+            var key: String = keys[i]
+            if (key.ends_with("." + variant)) {
+                return key.split(".")[0]
+            }
+            i = i + 1
+        }
+        return "Unknown"
+    }
+
+    fun resolve_callee(expr: AST.Expr): String {
+        return match (expr) {
+            Variable(n) => n
+            MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
+            x => ""
+        }
+    }
+
+    fun gen_logical(left: AST.Expr, op: String, right: AST.Expr): String {
+        var lhs_raw: String = this.gen_arg_value(left)
+        var lhs: String = this.to_i1(lhs_raw)
+        var current_block: String = this.fresh_label("logic.entry")
+        var rhs_label: String = this.fresh_label("rhs")
+        var end_label: String = this.fresh_label("end")
+
+        // We need a label for the current block for phi
+        this.emit_terminator("br label %" + current_block)
+        this.start_block(current_block)
+
+        if (op == "or") {
+            this.emit_terminator("br i1 " + lhs + ", label %" + end_label + ", label %" + rhs_label)
+        } else {
+            this.emit_terminator("br i1 " + lhs + ", label %" + rhs_label + ", label %" + end_label)
+        }
+
+        this.start_block(rhs_label)
+        var rhs_raw: String = this.gen_arg_value(right)
+        var rhs: String = this.to_i1(rhs_raw)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+        var phi_result: String = this.fresh_local()
+        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
+        // Extend back to i64 for uniform value type
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
+        this.last_type = AST.Type.IntType
+        return result
+    }
+
+    // --- Variable collection (for hoisting allocas to entry block) ---
+
+    fun collect_vars(stmts: List<AST.Stmt>, names: List<String>, types: List<String>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.collect_vars_stmt(stmts[i], names, types)
+            i = i + 1
+        }
+    }
+
+    fun add_var_unique(names: List<String>, types: List<String>, name: String, typ: String) {
+        if (!names.contains(name)) {
+            names.push(name)
+            types.push(typ)
+        }
+    }
+
+    fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        match (stmt) {
+            VarDecl(name, type_ann, init, doc) => {
+                this.add_var_unique(names, types, name, type_ann)
+                this.collect_vars_expr(init, names, types)
+            }
+            If(cond, then_branch, else_branch) => {
+                this.collect_vars(then_branch, names, types)
+                this.collect_vars(else_branch, names, types)
+            }
+            While(cond, body) => {
+                this.collect_vars(body, names, types)
+            }
+            Block(stmts) => {
+                this.collect_vars(stmts, names, types)
+            }
+            ExprStmt(expr) => {
+                this.collect_vars_expr(expr, names, types)
+            }
+            Return(value) => {
+                this.collect_vars_expr(value, names, types)
+            }
+            FunDecl(n, p, r, b, d) => {}
+            EnumDecl(n, v, d) => {}
+            ClassDecl(n, p, f, m, d) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
+                this.collect_vars(try_body, names, types)
+                this.add_var_unique(names, types, catch_name, "String")
+                this.collect_vars(catch_body, names, types)
+                this.collect_vars(finally_body, names, types)
+            }
+            Throw(value) => {
+                this.collect_vars_expr(value, names, types)
+            }
+        }
+    }
+
+    fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
+        match (expr) {
+            Match(s, a) => { this.collect_vars_match(expr, names, types) }
+            BlockExpr(stmts, value) => {
+                this.collect_vars(stmts, names, types)
+                this.collect_vars_expr(value, names, types)
+            }
+            Binary(left, op, right) => {
+                this.collect_vars_expr(left, names, types)
+                this.collect_vars_expr(right, names, types)
+            }
+            Logical(left, op, right) => {
+                this.collect_vars_expr(left, names, types)
+                this.collect_vars_expr(right, names, types)
+            }
+            Unary(op, right) => { this.collect_vars_expr(right, names, types) }
+            Assign(name, value) => { this.collect_vars_expr(value, names, types) }
+            Call(callee, args) => { this.collect_vars_expr(callee, names, types) }
+            MethodCall(obj, method, args) => { this.collect_vars_expr(obj, names, types) }
+            SetField(obj, field, value) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(value, names, types)
+            }
+            GetField(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            IndexGet(obj, idx) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(idx, names, types)
+            }
+            IndexSet(obj, idx, value) => {
+                this.collect_vars_expr(obj, names, types)
+                this.collect_vars_expr(idx, names, types)
+                this.collect_vars_expr(value, names, types)
+            }
+            MemberAccess(obj, field) => { this.collect_vars_expr(obj, names, types) }
+            IntLit(v) => {}
+            FloatLit(v) => {}
+            BoolLit(v) => {}
+            StringLit(s) => {}
+            NilLit => {}
+            Variable(n) => {}
+            This => {}
+            MapLit => {}
+            ListLit(e) => {}
+            EnumConstruct(e, v, a) => {}
+            Lambda(p, r, b) => {}
+            IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
+        }
+    }
+
+    fun is_wildcard_in_enum(pattern: AST.Pattern, enum_name: String): Bool {
+        var name: String = match (pattern) { VariantPattern(v, b) => v
+            _ => ""
+        }
+        return !this.enum_variant_tags.has(enum_name + "." + name)
+    }
+
+    fun get_arm_pattern(arm: AST.MatchArm): AST.Pattern {
+        return match (arm) { Arm(p, b) => p
+            _ => ""
+        }
+    }
+
+    fun get_arm_body(arm: AST.MatchArm): AST.Expr {
+        return match (arm) { Arm(p, b) => b
+            _ => ""
+        }
+    }
+
+    fun get_pattern_bindings(pattern: AST.Pattern): List<String> {
+        return match (pattern) { VariantPattern(v, b) => b
+            _ => ""
+        }
+    }
+
+    fun collect_vars_match(expr: AST.Expr, names: List<String>, types: List<String>) {
+        var arms: List<AST.MatchArm> = this.get_match_arms(expr)
+        var i: Float = 0
+        while (i < arms.length()) {
+            var arm: AST.MatchArm = arms[i]
+            var bindings: List<String> = this.get_pattern_bindings(this.get_arm_pattern(arm))
+            var j: Float = 0
+            while (j < bindings.length()) {
+                this.add_var_unique(names, types, bindings[j], "Int")
+                j = j + 1
+            }
+            this.collect_vars_expr(this.get_arm_body(arm), names, types)
+            i = i + 1
+        }
+    }
+
+    fun is_match_expr(expr: AST.Expr): Bool {
+        var kind: Any = match (expr) {
+            Match(s, a) => "match"
+            IntLit(v) => "other"
+            FloatLit(v) => "other"
+            BoolLit(v) => "other"
+            StringLit(s) => "other"
+            NilLit => "other"
+            Variable(n) => "other"
+            Binary(l, o, r) => "other"
+            Unary(o, r) => "other"
+            Call(c, a) => "other"
+            Assign(n, v) => "other"
+            Logical(l, o, r) => "other"
+            MemberAccess(o, f) => "other"
+            EnumConstruct(e, v, a) => "other"
+            Lambda(p, r, b) => "other"
+            GetField(o, f) => "other"
+            SetField(o, f, v) => "other"
+            This => "other"
+            ListLit(e) => "other"
+            IndexGet(o, i) => "other"
+            IndexSet(o, i, v) => "other"
+            MethodCall(o, m, a) => "other"
+            MapLit => "other"
+            BlockExpr(s, v) => "other"
+            IsCheck(val, t) => "other"
+        }
+        return kind == "match"
+    }
+
+    fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
+        return match (expr) { Match(s, a) => a
+            _ => ""
+        }
+    }
+
+    // --- Statement codegen ---
+
+    // @codegen-split: output
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
         var emit_name: String = this.current_prefix + name
         if (name == "main") {
@@ -3934,6 +3937,7 @@ class Codegen {
         return out.to_string()
     }
 
+    // @codegen-split: methods
     // @codegen-split: methods
     fun find_class_for_method(method: String): String {
     var keys: List<String> = this.class_methods.keys()
