@@ -69,14 +69,26 @@ class Parser {
         return match (tok) { Token(kind, line, col) => line }
     }
 
+    fun current_col(): String {
+        var tok: Lexer.Token = this.current()
+        var col: Float = match (tok) { Token(kind, line, col) => col }
+        return col.floor().to_string()
+    }
+
+    fun current_token_str(): String {
+        var kind: Lexer.TokenKind = this.current_kind()
+        return this.kind_name(kind)
+    }
+
     fun parse_error(message: String) {
-        IO.println("[line " + this.current_line() + "] Parse error: " + message)
+        IO.println("[line " + this.current_line() + ", col " + this.current_col() + "] Error: " + message)
         this.had_error = true
     }
 
     fun consume(expected: String) {
         if (!this.match_kind(expected)) {
-            this.parse_error("expected " + expected)
+            var found: String = this.current_token_str()
+            this.parse_error("expected '" + expected + "' but found '" + found + "'")
         }
     }
 

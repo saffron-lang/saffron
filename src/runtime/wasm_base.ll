@@ -339,12 +339,12 @@ entry:
 }
 
 ; --- Entry point wrapper ---
-; WASM doesn't have main() — export __saffron_main for JS to call
+; WASM entry point — calls the program's __saffron_entry function
 
-declare i64 @__saffron_main()
+declare i64 @__saffron_entry()
 
 define void @_start() {
 entry:
-  call i64 @__saffron_main()
+  call i64 @__saffron_entry()
   ret void
 }

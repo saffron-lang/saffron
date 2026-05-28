@@ -44,6 +44,15 @@ declare void @__io_print_str(i64)
 declare void @__io_print_int(i64)
 declare i64 @__bool_to_string(i64)
 declare i64 @__nil_to_string()
+; --- NaN-boxing value helpers ---
+declare i64 @__val_tag_int(i64)
+declare i64 @__val_untag_int(i64)
+declare i64 @__val_tag_ptr(i8*)
+declare i8* @__val_untag_ptr(i64)
+declare i64 @__val_tag_float(double)
+declare double @__val_untag_float(i64)
+declare i64 @__val_tag_bool(i64)
+declare i64 @__val_nil()
 
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
@@ -103,16 +112,16 @@ entry:
   %name = alloca i64
   %version = alloca i64
   %t1 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
+  %t2 = call i64 @__val_tag_ptr(i8* %t1)
   store i64 %t2, i64* %name
   %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
-  %t4 = ptrtoint i8* %t3 to i64
+  %t4 = call i64 @__val_tag_ptr(i8* %t3)
   store i64 %t4, i64* %version
   %t5 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
-  %t6 = ptrtoint i8* %t5 to i64
+  %t6 = call i64 @__val_tag_ptr(i8* %t5)
   %t7 = load i64, i64* %name
-  %t8 = inttoptr i64 %t6 to i8*
-  %t9 = inttoptr i64 %t7 to i8*
+  %t8 = call i8* @__val_untag_ptr(i64 %t6)
+  %t9 = call i8* @__val_untag_ptr(i64 %t7)
   %t10 = call i64 @strlen(i8* %t8)
   %t11 = call i64 @strlen(i8* %t9)
   %t12 = add i64 %t10, %t11
@@ -120,11 +129,11 @@ entry:
   %t14 = call i8* @malloc(i64 %t13)
   call i8* @strcpy(i8* %t14, i8* %t8)
   call i8* @strcat(i8* %t14, i8* %t9)
-  %t15 = ptrtoint i8* %t14 to i64
+  %t15 = call i64 @__val_tag_ptr(i8* %t14)
   %t16 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
-  %t17 = ptrtoint i8* %t16 to i64
-  %t18 = inttoptr i64 %t15 to i8*
-  %t19 = inttoptr i64 %t17 to i8*
+  %t17 = call i64 @__val_tag_ptr(i8* %t16)
+  %t18 = call i8* @__val_untag_ptr(i64 %t15)
+  %t19 = call i8* @__val_untag_ptr(i64 %t17)
   %t20 = call i64 @strlen(i8* %t18)
   %t21 = call i64 @strlen(i8* %t19)
   %t22 = add i64 %t20, %t21
@@ -132,10 +141,10 @@ entry:
   %t24 = call i8* @malloc(i64 %t23)
   call i8* @strcpy(i8* %t24, i8* %t18)
   call i8* @strcat(i8* %t24, i8* %t19)
-  %t25 = ptrtoint i8* %t24 to i64
+  %t25 = call i64 @__val_tag_ptr(i8* %t24)
   %t26 = load i64, i64* %version
-  %t27 = inttoptr i64 %t25 to i8*
-  %t28 = inttoptr i64 %t26 to i8*
+  %t27 = call i8* @__val_untag_ptr(i64 %t25)
+  %t28 = call i8* @__val_untag_ptr(i64 %t26)
   %t29 = call i64 @strlen(i8* %t27)
   %t30 = call i64 @strlen(i8* %t28)
   %t31 = add i64 %t29, %t30
@@ -143,11 +152,11 @@ entry:
   %t33 = call i8* @malloc(i64 %t32)
   call i8* @strcpy(i8* %t33, i8* %t27)
   call i8* @strcat(i8* %t33, i8* %t28)
-  %t34 = ptrtoint i8* %t33 to i64
+  %t34 = call i64 @__val_tag_ptr(i8* %t33)
   %t35 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
-  %t36 = ptrtoint i8* %t35 to i64
-  %t37 = inttoptr i64 %t34 to i8*
-  %t38 = inttoptr i64 %t36 to i8*
+  %t36 = call i64 @__val_tag_ptr(i8* %t35)
+  %t37 = call i8* @__val_untag_ptr(i64 %t34)
+  %t38 = call i8* @__val_untag_ptr(i64 %t36)
   %t39 = call i64 @strlen(i8* %t37)
   %t40 = call i64 @strlen(i8* %t38)
   %t41 = add i64 %t39, %t40
@@ -155,13 +164,13 @@ entry:
   %t43 = call i8* @malloc(i64 %t42)
   call i8* @strcpy(i8* %t43, i8* %t37)
   call i8* @strcat(i8* %t43, i8* %t38)
-  %t44 = ptrtoint i8* %t43 to i64
+  %t44 = call i64 @__val_tag_ptr(i8* %t43)
   call void @__io_println_str(i64 %t44)
   %t45 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
-  %t46 = ptrtoint i8* %t45 to i64
+  %t46 = call i64 @__val_tag_ptr(i8* %t45)
   call void @__io_println_str(i64 %t46)
   %t47 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
-  %t48 = ptrtoint i8* %t47 to i64
+  %t48 = call i64 @__val_tag_ptr(i8* %t47)
   call void @__io_println_str(i64 %t48)
   ret i64 0
 }
