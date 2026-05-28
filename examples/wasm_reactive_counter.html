@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Saffron Reactive Counter</title>
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            padding: 3rem;
+        }
+        #app { text-align: center; }
+        h1 { color: #ffb347; }
+        button {
+            background: #2d2d44;
+            color: #fff;
+            border: 1px solid #4fc3f7;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        button:hover { background: #3d3d55; }
+        button:active { background: #4d4d66; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        const decoder = new TextDecoder();
+        const handles = [null];
+        let instance;
+
+        function allocHandle(el) { handles.push(el); return handles.length - 1; }
+        function getHandle(id) { return handles[Number(id)]; }
+        function n(v) { return Number(v); }
+        function readCString(ptr) {
+            const p = n(ptr);
+            const bytes = new Uint8Array(instance.exports.memory.buffer);
+            let end = p;
+            while (end < bytes.length && bytes[end] !== 0) end++;
+            return decoder.decode(bytes.slice(p, end));
+        }
+
+        const imports = {
+            env: {
+                // --- I/O ---
+                js_log_str: (ptr) => console.log(readCString(ptr)),
+                js_log_int: (num) => console.log(n(num)),
+                js_log_bool: (b) => console.log(n(b) ? "true" : "false"),
+                js_log_nil: () => console.log("nil"),
+                __builtin_trap: () => { throw new Error("trap"); },
+
+                // --- DOM ---
+                js_dom_create_element: (tagPtr) => BigInt(allocHandle(document.createElement(readCString(tagPtr)))),
+                js_dom_set_text: (handle, textPtr) => { getHandle(handle).textContent = readCString(textPtr); },
+                js_dom_set_attribute: (handle, namePtr, valuePtr) => {
+                    const el = getHandle(handle);
+                    const name = readCString(namePtr);
+                    const value = readCString(valuePtr);
+                    name === 'style' ? el.style.cssText = value : el.setAttribute(name, value);
+                },
+                js_dom_append_child: (parent, child) => { getHandle(parent).appendChild(getHandle(child)); },
+                js_dom_remove_child: (parent, child) => { getHandle(parent).removeChild(getHandle(child)); },
+                js_dom_set_inner_html: (handle, htmlPtr) => { getHandle(handle).innerHTML = readCString(htmlPtr); },
+                js_dom_query_selector: (selectorPtr) => {
+                    const el = document.querySelector(readCString(selectorPtr));
+                    return el ? BigInt(allocHandle(el)) : 0n;
+                },
+                js_dom_add_event_listener: (handle, eventPtr, callbackId) => {
+                    const el = getHandle(handle);
+                    const event = readCString(eventPtr);
+                    el.addEventListener(event, () => {
+                        // Call back into WASM — Saffron's __dispatch_event handles the signal update
+                        instance.exports.__dispatch_event(callbackId);
+                    });
+                },
+            },
+        };
+
+        const response = await fetch('./app.wasm');
+        const wasmBytes = await response.arrayBuffer();
+        const result = await WebAssembly.instantiate(wasmBytes, imports);
+        instance = result.instance;
+
+        // Run — Saffron builds the DOM and sets up reactive effects
+        instance.exports._start();
+    </script>
+</body>
+</html>
