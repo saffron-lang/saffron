@@ -823,6 +823,11 @@
             if (args.length() != expected and expected > 0) {
                 IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
             }
+        } else if (this.func_param_count.has(resolved_callee)) {
+            var expected: Float = this.func_param_count.get(resolved_callee)
+            if (args.length() != expected and expected > 0) {
+                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+            }
         }
 
         if (this.known_functions.contains(resolved_callee)) {

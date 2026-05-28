@@ -42,6 +42,10 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                 } else {
                     this.last_type = AST.Type.IntType
                 }
+                // Error check: undefined variable
+                if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
+                    IO.println("[codegen] Error: undefined variable '" + name + "'")
+                }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
@@ -459,6 +463,10 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
             } else {
                 this.last_type = AST.Type.IntType
             }
+            // Error check: undefined variable
+            if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
+                IO.println("[codegen] Error: undefined variable '" + vname + "'")
+            }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
@@ -712,6 +720,19 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
+        // Error check: argument count validation
+        if (this.called_function_arity.has(resolved_callee)) {
+            var expected: Float = this.called_function_arity.get(resolved_callee)
+            if (args.length() != expected and expected > 0) {
+                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+            }
+        } else if (this.func_param_count.has(resolved_callee)) {
+            var expected: Float = this.func_param_count.get(resolved_callee)
+            if (args.length() != expected and expected > 0) {
+                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+            }
+        }
+
         if (this.known_functions.contains(resolved_callee)) {
             // Direct call to known function
             var call_target: String = resolved_callee
@@ -823,6 +844,9 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
+                } else {
+                    // Warning: calling undefined function
+                    IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
                 }
             }
             this.called_functions.push(emit_callee)
