@@ -52,6 +52,7 @@ declare i8* @__val_untag_ptr(i64)
 declare i64 @__val_tag_float(double)
 declare double @__val_untag_float(i64)
 declare i64 @__val_tag_bool(i64)
+declare i64 @__val_untag_bool(i64)
 declare i64 @__val_nil()
 
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"

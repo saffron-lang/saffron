@@ -225,15 +225,88 @@ entry:
   ret i32 0
 }
 
-; --- snprintf stub ---
+; --- snprintf stub (handles %ld only) ---
 
 define i32 @snprintf(i8* %buf, i64 %size, i8* %fmt, ...) {
 entry:
-  ; Stub: copy fmt to buf
   call i8* @strcpy(i8* %buf, i8* %fmt)
   %len = call i64 @strlen(i8* %fmt)
   %len32 = trunc i64 %len to i32
   ret i32 %len32
+}
+
+; --- Override __int_to_string for WASM (avoids snprintf) ---
+
+define i64 @__int_to_string(i64 %val) {
+entry:
+  %buf = call i8* @malloc(i64 24)
+  call void @__wasm_int_to_str(i64 %val, i8* %buf)
+  %result = ptrtoint i8* %buf to i64
+  ret i64 %result
+}
+
+; --- Integer to string implementation ---
+
+define void @__wasm_int_to_str(i64 %n, i8* %buf) {
+entry:
+  %is_neg = icmp slt i64 %n, 0
+  br i1 %is_neg, label %neg, label %pos
+neg:
+  store i8 45, i8* %buf
+  %abs_n = sub i64 0, %n
+  %buf1 = getelementptr i8, i8* %buf, i64 1
+  call void @__wasm_uint_to_str(i64 %abs_n, i8* %buf1)
+  ret void
+pos:
+  call void @__wasm_uint_to_str(i64 %n, i8* %buf)
+  ret void
+}
+
+define void @__wasm_uint_to_str(i64 %n, i8* %buf) {
+entry:
+  %is_zero = icmp eq i64 %n, 0
+  br i1 %is_zero, label %zero, label %nonzero
+zero:
+  store i8 48, i8* %buf
+  %term0 = getelementptr i8, i8* %buf, i64 1
+  store i8 0, i8* %term0
+  ret void
+nonzero:
+  ; Write digits in reverse into temp buffer
+  %tmp = alloca [21 x i8]
+  %tmp_ptr = getelementptr [21 x i8], [21 x i8]* %tmp, i64 0, i64 0
+  br label %loop
+loop:
+  %val = phi i64 [%n, %nonzero], [%next_val, %loop]
+  %idx = phi i64 [0, %nonzero], [%next_idx, %loop]
+  %rem = urem i64 %val, 10
+  %digit = add i64 %rem, 48
+  %digit8 = trunc i64 %digit to i8
+  %slot = getelementptr i8, i8* %tmp_ptr, i64 %idx
+  store i8 %digit8, i8* %slot
+  %next_val = udiv i64 %val, 10
+  %next_idx = add i64 %idx, 1
+  %done = icmp eq i64 %next_val, 0
+  br i1 %done, label %reverse, label %loop
+reverse:
+  ; Copy reversed digits to output buf
+  %len = phi i64 [%next_idx, %loop]
+  br label %rev_loop
+rev_loop:
+  %ri = phi i64 [0, %reverse], [%next_ri, %rev_loop]
+  %src_idx = sub i64 %len, %ri
+  %src_idx2 = sub i64 %src_idx, 1
+  %src_ptr = getelementptr i8, i8* %tmp_ptr, i64 %src_idx2
+  %ch = load i8, i8* %src_ptr
+  %dst_ptr = getelementptr i8, i8* %buf, i64 %ri
+  store i8 %ch, i8* %dst_ptr
+  %next_ri = add i64 %ri, 1
+  %rev_done = icmp uge i64 %next_ri, %len
+  br i1 %rev_done, label %terminate, label %rev_loop
+terminate:
+  %term = getelementptr i8, i8* %buf, i64 %len
+  store i8 0, i8* %term
+  ret void
 }
 
 ; --- atol ---
@@ -336,6 +409,85 @@ define void @exit(i32 %code) {
 entry:
   call void @__builtin_trap()
   unreachable
+}
+
+; =============================================================================
+; NaN-Boxing Value Helpers (identity mode — matches base.ll)
+; =============================================================================
+
+define i64 @__val_tag_int(i64 %n) {
+entry:
+  ret i64 %n
+}
+
+define i64 @__val_untag_int(i64 %v) {
+entry:
+  ret i64 %v
+}
+
+define i64 @__val_tag_ptr(i8* %ptr) {
+entry:
+  %r = ptrtoint i8* %ptr to i64
+  ret i64 %r
+}
+
+define i8* @__val_untag_ptr(i64 %v) {
+entry:
+  %ptr = inttoptr i64 %v to i8*
+  ret i8* %ptr
+}
+
+define i64 @__val_tag_float(double %f) {
+entry:
+  %bits = bitcast double %f to i64
+  ret i64 %bits
+}
+
+define double @__val_untag_float(i64 %v) {
+entry:
+  %f = bitcast i64 %v to double
+  ret double %f
+}
+
+define i64 @__val_tag_bool(i64 %b) {
+entry:
+  ret i64 %b
+}
+
+define i64 @__val_untag_bool(i64 %v) {
+entry:
+  ret i64 %v
+}
+
+define i64 @__val_nil() {
+entry:
+  ret i64 0
+}
+
+define i1 @__val_is_float(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %tagged1 = or i1 %is_ptr, %is_int
+  %tagged = or i1 %tagged1, %is_spec
+  %is_float = xor i1 %tagged, true
+  ret i1 %is_float
+}
+
+define i1 @__val_is_int(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %r = icmp eq i64 %upper, 32761
+  ret i1 %r
+}
+
+define i1 @__val_is_ptr(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %r = icmp eq i64 %upper, 32760
+  ret i1 %r
 }
 
 ; --- Entry point wrapper ---

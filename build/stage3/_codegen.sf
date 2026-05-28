@@ -41,6 +41,7 @@ class Codegen {
     var builtin_methods: Map<String, String>
     var extend_map: Map<String, String>
     var pending_extend_class: String
+    var named_imports: Map<String, String>
     var target: String
 
     fun init() {
@@ -82,6 +83,7 @@ class Codegen {
         this.builtin_methods = {}
         this.extend_map = {}
         this.pending_extend_class = ""
+        this.named_imports = {}
         this.target = "native"
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
@@ -326,13 +328,17 @@ class Codegen {
             return val
         }
         if (val_type == "Int" or val_type == "Float") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + val + ")")
             var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + val + ")")
+            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
             return result
         }
         if (val_type == "Bool") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + val + ")")
             var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + val + ")")
+            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + raw + ")")
             return result
         }
         if (val_type == "Nil") {
@@ -871,11 +877,8 @@ class Codegen {
                 return result
             }
 
-            // Integer addition
-            this.last_type = AST.Type.IntType
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
-            return local
+            // Integer addition (NaN-boxed: untag, add, retag)
+            return this.gen_binary_nanboxed(lhs, rhs, "+")
         }
 
         var lhs: String = this.gen_arg_value(left)
@@ -1335,6 +1338,13 @@ class Codegen {
                 resolved_callee = this.current_prefix + callee_name
             }
         }
+        // Named imports: resolve bare name to prefixed module function
+        if (!this.known_functions.contains(resolved_callee) and this.named_imports.has(callee_name)) {
+            var ni_target: String = this.named_imports.get(callee_name)
+            if (this.known_functions.contains(ni_target)) {
+                resolved_callee = ni_target
+            }
+        }
         if (this.intrinsic_funcs.contains(resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
         }
@@ -1465,6 +1475,8 @@ class Codegen {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
+                } else if (this.named_imports.has(callee_name)) {
+                    emit_callee = this.named_imports.get(callee_name)
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
@@ -2240,7 +2252,7 @@ class Codegen {
     fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
             Variable(name) => {
-                var is_known: Bool = bound.contains(name) or free.contains(name) or this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name)
+                var is_known: Bool = bound.contains(name) or free.contains(name) or this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name)
                 if (!is_known and name.length() > 0) {
                     var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                     if (upper.index_of(name.char_at(0)) >= 0) {
@@ -4168,6 +4180,7 @@ class Codegen {
         out.append("declare i64 @__val_tag_float(double)\n")
         out.append("declare double @__val_untag_float(i64)\n")
         out.append("declare i64 @__val_tag_bool(i64)\n")
+        out.append("declare i64 @__val_untag_bool(i64)\n")
         out.append("declare i64 @__val_nil()\n\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
@@ -4436,7 +4449,10 @@ class Codegen {
     var obj_name: String = this.get_variable_name(object)
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
-    var idx: String = this.gen_arg_value(index)
+    var idx_tagged: String = this.gen_arg_value(index)
+    // Untag the index for arithmetic and runtime call
+    var idx: String = this.fresh_local()
+    this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
     // Negative indexing: if idx < 0, use length + idx
     var is_neg: String = this.fresh_local()
     this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
@@ -4471,7 +4487,9 @@ class Codegen {
 
     fun gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
     var obj: String = this.gen_arg_value(object)
-    var idx: String = this.gen_arg_value(index)
+    var idx_tagged: String = this.gen_arg_value(index)
+    var idx: String = this.fresh_local()
+    this.emit_indent(idx + " = call i64 @__val_untag_int(i64 " + idx_tagged + ")")
     var val: String = this.gen_arg_value(value)
     var discard_ls: String = this.fresh_local()
     this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
@@ -4946,8 +4964,10 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return obj
         } else if (obj_type == "Bool") {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + obj + ")")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + obj + ")")
+            this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + raw + ")")
             this.last_type = AST.Type.StringType
             return local
         } else if (this.enum_defs.has(obj_type)) {
@@ -4957,8 +4977,10 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return local
         } else {
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + obj + ")")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
+            this.emit_indent(local + " = call i64 @__int_to_string(i64 " + raw + ")")
             this.last_type = AST.Type.StringType
             return local
         }
@@ -5359,10 +5381,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     return gen.generate(program)
 }
 
-fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String): String {
+fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>): String {
     var gen: Codegen = Codegen()
     gen.target = target
     gen.module_prefixes = alias_map
+    gen.named_imports = named_imports
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
