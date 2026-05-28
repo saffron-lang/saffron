@@ -23,7 +23,8 @@ extend fun Codegen.params_to_string(params: List<AST.Param>): String {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
             var pname: String = match (p) { Param(n, t, d) => n }
-            var ptype: String = match (p) { Param(n, t, d) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var ptype: String = this.type_to_string(pt)
             sb.append(pname)
             sb.append(":")
             sb.append(ptype)
