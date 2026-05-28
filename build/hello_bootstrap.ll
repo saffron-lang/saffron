@@ -6,7 +6,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.2 = private unnamed_addr constant [12 x i8] c"Hello from \00"
 @.str.3 = private unnamed_addr constant [2 x i8] c" \00"
 @.str.4 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.5 = private unnamed_addr constant [36 x i8] c"Bootstrapped through 3 generations.\00"
+@.str.5 = private unnamed_addr constant [27 x i8] c"Bootstrapped successfully.\00"
 @.str.6 = private unnamed_addr constant [50 x i8] c"The compiler compiled itself. We're self-hosting!\00"
 
 declare i32 @puts(i8*)
@@ -150,7 +150,7 @@ entry:
   %t44 = ptrtoint i8* %t43 to i64
   %t46 = inttoptr i64 %t44 to i8*
   %t45 = call i32 @puts(i8* %t46)
-  %t47 = getelementptr [36 x i8], [36 x i8]* @.str.5, i64 0, i64 0
+  %t47 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
   %t50 = inttoptr i64 %t48 to i8*
   %t49 = call i32 @puts(i8* %t50)

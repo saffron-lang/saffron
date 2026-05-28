@@ -57,6 +57,16 @@ class Parser {
         return line.floor().to_string()
     }
 
+    fun current_line_num(): Float {
+        var tok: Lexer.Token = this.current()
+        return match (tok) { Token(kind, line, col) => line }
+    }
+
+    fun prev_line_num(): Float {
+        var tok: Lexer.Token = this.tokens[this.pos - 1]
+        return match (tok) { Token(kind, line, col) => line }
+    }
+
     fun parse_error(message: String) {
         IO.println("[line " + this.current_line() + "] Parse error: " + message)
     }

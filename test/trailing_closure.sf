@@ -1,18 +1,14 @@
-// Test trailing closure syntax
-// foo(args) { body } desugars to foo(args, fun () { body })
-
-fun run(name: String, block: Fun(): Nil) {
-    IO.println("running: " + name)
+// Test: trailing closure with no other args
+fun apply(block: Any) {
     block()
-    IO.println("done: " + name)
 }
 
-run("test1") {
-    IO.println("  inside trailing closure")
+apply() {
+    IO.println("1: basic trailing closure")
 }
 
-// With other args too
-fun repeat(n: Float, block: Fun(): Nil) {
+// Test: trailing closure with args before it
+fun repeat(n: Float, block: Any) {
     var i: Float = 0
     while (i < n) {
         block()
@@ -21,17 +17,22 @@ fun repeat(n: Float, block: Fun(): Nil) {
 }
 
 repeat(3) {
-    IO.println("hello")
+    IO.println("2: repeated")
 }
 
-// Method call trailing closure
+// Test: method call trailing closure
 class Builder {
-    fun with(block: Fun(): Nil) {
+    var name: String
+    fun init(name: String) {
+        this.name = name
+    }
+    fun with(block: Any) {
+        IO.println("3: builder " + this.name)
         block()
     }
 }
 
-var b = Builder()
+var b = Builder("test")
 b.with() {
-    IO.println("in builder block")
+    IO.println("3: in builder block")
 }

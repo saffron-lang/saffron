@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Full 3-stage bootstrap of the Saffron compiler + test run
+# bootstrap.sh — Bootstrap the Saffron compiler
 #
-# Stage 1: Build the C VM (cmake)
-# Stage 2: C VM compiles saffronc source → LLVM IR → native binary (gen2)
-# Stage 3: gen2 saffronc compiles itself → LLVM IR → native binary (gen3)
-# Test:    gen3 compiles and runs an example program
+# Normal:  gen2 (checked-in) compiles gen3 from source
+# Full:    C VM → gen2 → gen3 (rebuilds gen2 from scratch)
 #
-# Usage: ./bootstrap.sh [--skip-cmake] [--verbose]
+# Usage: ./bootstrap.sh [--full] [--verbose]
 
 set -euo pipefail
 
@@ -16,13 +14,14 @@ COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
 RUNTIME_BASE="$ROOT/src/runtime/base.ll"
 BUILD_DIR="$ROOT/build"
+GEN2="$BUILD_DIR/stage2/saffronc"
 
-SKIP_CMAKE=false
+FULL=false
 VERBOSE=false
 
 for arg in "$@"; do
     case "$arg" in
-        --skip-cmake) SKIP_CMAKE=true ;;
+        --full) FULL=true ;;
         --verbose) VERBOSE=true ;;
     esac
 done
@@ -48,93 +47,79 @@ mkdir -p "$BUILD_DIR/stage2" "$BUILD_DIR/stage3"
 
 echo ""
 echo "╔══════════════════════════════════════╗"
-echo "║   Saffron Bootstrap (3-stage)        ║"
+echo "║   Saffron Bootstrap                  ║"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
 # =============================================================================
-# Stage 1: Build the C VM
+# Full rebuild: C VM → gen2 (only with --full)
 # =============================================================================
 
-if [[ "$SKIP_CMAKE" == true && -x "$VM" ]]; then
-    info "STAGE 1" "Skipping cmake (--skip-cmake, VM exists)"
-else
-    info "STAGE 1" "Building C VM..."
+if [[ "$FULL" == true ]]; then
+    info "FULL" "Rebuilding gen2 from C VM..."
+
+    # Build C VM
     cmake -B "$ROOT/cvm/cmake-build-debug" -DCMAKE_BUILD_TYPE=Debug -S "$ROOT/cvm" > /dev/null 2>&1
     cmake --build "$ROOT/cvm/cmake-build-debug" > /dev/null 2>&1
-    [[ -x "$VM" ]] || fail "STAGE 1" "Failed to build C VM"
-    pass "STAGE 1" "C VM built: $VM"
+    [[ -x "$VM" ]] || fail "FULL" "Failed to build C VM"
+
+    SOURCES=(lexer parser codegen main)
+    for src in "${SOURCES[@]}"; do
+        [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
+        "$VM" --no-check "$COMPILER_DIR/main.sf" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage2/${src}.ll" \
+            || fail "FULL" "Failed to compile $src.sf"
+    done
+
+    [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
+    "$VM" --no-check "$COMPILER_DIR/main.sf" "$RUNTIME_SRC" "$BUILD_DIR/stage2/runtime.ll" \
+        || fail "FULL" "Failed to compile runtime.sf"
+
+    [[ "$VERBOSE" == true ]] && echo "  linking gen2..."
+    clang -O2 -w -o "$GEN2" \
+        "$BUILD_DIR/stage2/main.ll" \
+        "$BUILD_DIR/stage2/lexer.ll" \
+        "$BUILD_DIR/stage2/parser.ll" \
+        "$BUILD_DIR/stage2/codegen.ll" \
+        "$BUILD_DIR/stage2/runtime.ll" \
+        "$RUNTIME_BASE" \
+        || fail "FULL" "Linking gen2 failed"
+
+    pass "FULL" "gen2 rebuilt: $GEN2"
+    echo ""
 fi
 
-echo ""
-
 # =============================================================================
-# Stage 2: C VM → saffronc (gen2)
+# Stage 1: gen2 (checked-in) → gen3
 # =============================================================================
 
-info "STAGE 2" "Compiling saffronc via C VM..."
+[[ -x "$GEN2" ]] || fail "STAGE 1" "gen2 not found at $GEN2. Run with --full to rebuild."
+
+info "STAGE 1" "Compiling saffronc via gen2..."
 
 SOURCES=(lexer parser codegen main)
 
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    "$VM" --no-check "$COMPILER_DIR/main.sf" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage2/${src}.ll" \
-        || fail "STAGE 2" "Failed to compile $src.sf"
-done
-
-# Compile runtime.sf → LLVM IR
-[[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-"$VM" --no-check "$COMPILER_DIR/main.sf" "$RUNTIME_SRC" "$BUILD_DIR/stage2/runtime.ll" \
-    || fail "STAGE 2" "Failed to compile runtime.sf"
-
-[[ "$VERBOSE" == true ]] && echo "  linking gen2..."
-clang -O2 -w -o "$BUILD_DIR/stage2/saffronc" \
-    "$BUILD_DIR/stage2/main.ll" \
-    "$BUILD_DIR/stage2/lexer.ll" \
-    "$BUILD_DIR/stage2/parser.ll" \
-    "$BUILD_DIR/stage2/codegen.ll" \
-    "$BUILD_DIR/stage2/runtime.ll" \
-    "$RUNTIME_BASE" \
-    \
-    || fail "STAGE 2" "Linking failed"
-
-pass "STAGE 2" "gen2 saffronc built: $BUILD_DIR/stage2/saffronc"
-echo ""
-
-# =============================================================================
-# Stage 3: gen2 saffronc → saffronc (gen3)
-# =============================================================================
-
-info "STAGE 3" "Compiling saffronc via gen2 (self-hosted)..."
-
-GEN2="$BUILD_DIR/stage2/saffronc"
-
-for src in "${SOURCES[@]}"; do
-    [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
     "$GEN2" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
-        || fail "STAGE 3" "gen2 failed to compile $src.sf"
+        || fail "STAGE 1" "gen2 failed to compile $src.sf"
 done
 
-# Compile runtime.sf with gen2
+# Compile runtime.sf
 [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
 "$GEN2" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
-    || fail "STAGE 3" "gen2 failed to compile runtime.sf"
+    || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
-if clang -O2 -w -o "$BUILD_DIR/saffronc" \
+clang -O2 -w -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/main.ll" \
     "$BUILD_DIR/stage3/lexer.ll" \
     "$BUILD_DIR/stage3/parser.ll" \
     "$BUILD_DIR/stage3/codegen.ll" \
     "$BUILD_DIR/stage3/runtime.ll" \
     "$RUNTIME_BASE" \
-    2>/dev/null; then
-    pass "STAGE 3" "gen3 saffronc built: $BUILD_DIR/saffronc"
-else
-    info "STAGE 3" "gen3 linking failed (known codegen issue) — using gen2"
-    cp "$BUILD_DIR/stage2/saffronc" "$BUILD_DIR/saffronc"
-    pass "STAGE 3" "Installed gen2 as: $BUILD_DIR/saffronc"
-fi
+    || fail "STAGE 1" "Linking gen3 failed"
+
+pass "STAGE 1" "gen3 saffronc built: $BUILD_DIR/saffronc"
 echo ""
 
 # =============================================================================
@@ -149,7 +134,7 @@ cat > "$EXAMPLE" << 'EOF'
 var name = "Saffron"
 var version = "0.1.0"
 IO.println("Hello from ${name} ${version}!")
-IO.println("Bootstrapped through 3 generations.")
+IO.println("Bootstrapped successfully.")
 IO.println("The compiler compiled itself. We're self-hosting!")
 EOF
 

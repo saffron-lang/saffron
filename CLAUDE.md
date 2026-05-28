@@ -9,19 +9,26 @@ Saffron is a statically typed scripting language implemented in C17. It compiles
 ## Build
 
 ```bash
-# Build the C VM (stage 0 bootstrap)
-cmake -B cvm/cmake-build-debug -DCMAKE_BUILD_TYPE=Debug -S cvm
-cmake --build cvm/cmake-build-debug
-
-# Full 3-stage bootstrap (C VM → Gen2 → Gen3)
+# Bootstrap: gen2 (checked-in) compiles gen3 from source
 ./bootstrap.sh
+
+# Full rebuild from scratch (only if gen2 is broken)
+./bootstrap.sh --full
 ```
 
-The C VM is at `cvm/cmake-build-debug/saffron`. The native compiler is at `build/saffronc`. Run a file with:
+The native compiler is at `build/saffronc`. The checked-in gen2 bootstrap binary is at `build/stage2/saffronc`. Run a file with:
 
 ```bash
-./cvm/cmake-build-debug/saffron test/functions.sf   # via C VM
-build/saffronc input.sf output.ll                    # native compiler
+build/saffronc input.sf output.ll                    # compile to LLVM IR
+tools/saffron run program.sf                         # compile + link + run
+tools/saffron build program.sf -o app                # compile to native binary
+```
+
+Launch the REPL (C VM, for interactive use):
+
+```bash
+cmake -B cvm/cmake-build-debug -S cvm && cmake --build cvm/cmake-build-debug
+cvm/cmake-build-debug/saffron
 ```
 
 Launch the REPL (no arguments):
