@@ -42,7 +42,6 @@ class Codegen {
     var extend_map: Map<String, String>
     var pending_extend_class: String
     var target: String
-    var nan_boxing: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -84,7 +83,6 @@ class Codegen {
         this.extend_map = {}
         this.pending_extend_class = ""
         this.target = "native"
-        this.nan_boxing = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("append", "v2|__sb_append|Nil|0")
         this.builtin_methods.set("set", "v3|__map_set|Nil|0")
@@ -528,22 +526,26 @@ class Codegen {
         return match (expr) {
             IntLit(v) => {
                 this.last_type = AST.Type.IntType
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = add i64 0, " + v.floor().to_string())
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + raw + ")")
                 local
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = fadd double 0.0, " + v.to_string())
+                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v.to_string() + ")")
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.IntType
-                var local: String = this.fresh_local()
+                this.last_type = AST.Type.BoolType
+                var raw: String = this.fresh_local()
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
-                this.emit_indent(local + " = add i64 0, " + val_str)
+                this.emit_indent(raw + " = add i64 0, " + val_str)
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw + ")")
                 local
             }
             StringLit(s) => {
@@ -553,7 +555,7 @@ class Codegen {
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
                 local
             }
             NilLit => {
@@ -565,6 +567,10 @@ class Codegen {
                     this.last_type = this.typed_vars.get(name)
                 } else {
                     this.last_type = AST.Type.IntType
+                }
+                // Error check: undefined variable
+                if (!this.typed_vars.has(name) and !this.var_types.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
+                    IO.println("[codegen] Error: undefined variable '" + name + "'")
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
@@ -688,10 +694,6 @@ class Codegen {
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        if (this.nan_boxing) {
-            return this.gen_is_check_nanboxed(val, type_name)
-        }
-
         // Compile-time resolution (no runtime tags)
         var matches: String = "0"
         if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
@@ -809,9 +811,9 @@ class Codegen {
 
             if (left_type == "String" or right_type == "String") {
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
+                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
                 var cmp: String = this.fresh_local()
                 this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
                 var cmp_result: String = this.fresh_local()
@@ -849,9 +851,9 @@ class Codegen {
                 // String concatenation
                 this.last_type = AST.Type.StringType
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
+                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -865,7 +867,7 @@ class Codegen {
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
                 var result: String = this.fresh_local()
-                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+                this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
                 return result
             }
 
@@ -879,10 +881,11 @@ class Codegen {
         var lhs: String = this.gen_arg_value(left)
         var rhs: String = this.gen_arg_value(right)
 
-        if (this.nan_boxing) {
-            return this.gen_binary_nanboxed(lhs, rhs, op)
-        }
+        return this.gen_binary_nanboxed(lhs, rhs, op)
+    }
 
+    fun gen_binary_legacy(lhs: String, rhs: String, op: String): String {
+        // Legacy untagged path (kept for reference, no longer called)
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
@@ -971,7 +974,7 @@ class Codegen {
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
         return local
     }
 
@@ -1081,6 +1084,10 @@ class Codegen {
             } else {
                 this.last_type = AST.Type.IntType
             }
+            // Error check: undefined variable
+            if (!this.typed_vars.has(vname) and !this.var_types.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
+                IO.println("[codegen] Error: undefined variable '" + vname + "'")
+            }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
@@ -1176,7 +1183,7 @@ class Codegen {
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
             return local
         }
         return this.gen_expr(expr)
@@ -1195,7 +1202,7 @@ class Codegen {
         // Variable or expression: gen_expr gives i64, convert to i8*
         var val: String = this.gen_arg_value(expr)
         var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+        this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
         return ptr
     }
 
@@ -1220,7 +1227,7 @@ class Codegen {
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
         // Return as i64
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
         return result
     }
 
@@ -1334,6 +1341,19 @@ class Codegen {
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
+        // Error check: argument count validation
+        if (this.called_function_arity.has(resolved_callee)) {
+            var expected: Float = this.called_function_arity.get(resolved_callee)
+            if (args.length() != expected and expected > 0) {
+                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+            }
+        } else if (this.func_param_count.has(resolved_callee)) {
+            var expected: Float = this.func_param_count.get(resolved_callee)
+            if (args.length() != expected and expected > 0) {
+                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+            }
+        }
+
         if (this.known_functions.contains(resolved_callee)) {
             // Direct call to known function
             var call_target: String = resolved_callee
@@ -1445,6 +1465,9 @@ class Codegen {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
+                } else {
+                    // Warning: calling undefined function
+                    IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
                 }
             }
             this.called_functions.push(emit_callee)
@@ -2343,7 +2366,7 @@ class Codegen {
         if (name.ends_with("load8")) {
             var addr: String = this.gen_arg_value(args[0])
             var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + addr + ")")
             var byte_val: String = this.fresh_local()
             this.emit_indent(byte_val + " = load i8, i8* " + ptr)
             var result: String = this.fresh_local()
@@ -2357,7 +2380,7 @@ class Codegen {
             var truncated: String = this.fresh_local()
             this.emit_indent(truncated + " = trunc i64 " + val + " to i8")
             var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i8*")
+            this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + addr + ")")
             this.emit_indent("store i8 " + truncated + ", i8* " + ptr)
             this.last_type = AST.Type.NilType
             return "0"
@@ -2446,7 +2469,7 @@ class Codegen {
             var norm: String = this.normalize_c_type(ptype)
             if (norm == "i8*") {
                 var ptr: String = this.fresh_local()
-                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
                 call_args.push("i8* " + ptr)
             } else if (norm == "i8**") {
                 var ptr: String = this.fresh_local()
@@ -2474,7 +2497,7 @@ class Codegen {
         }
         if (llvm_ret == "i8*") {
             var as_int: String = this.fresh_local()
-            this.emit_indent(as_int + " = ptrtoint i8* " + raw + " to i64")
+            this.emit_indent(as_int + " = call i64 @__val_tag_ptr(i8* " + raw + ")")
             this.last_type = AST.Type.IntType
             return as_int
         }
@@ -2995,7 +3018,7 @@ class Codegen {
                 var gep: String = this.fresh_local()
                 this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var as_i64: String = this.fresh_local()
-                this.emit_indent(as_i64 + " = ptrtoint i8* " + gep + " to i64")
+                this.emit_indent(as_i64 + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
                 this.emit_terminator("ret i64 " + as_i64)
             } else {
                 // Has fields: build "VariantName(field0, field1, ...)"
@@ -3009,7 +3032,7 @@ class Codegen {
                 var prefix_gep: String = this.fresh_local()
                 this.emit_indent(prefix_gep + " = getelementptr [" + prefix_len.to_string() + " x i8], [" + prefix_len.to_string() + " x i8]* " + prefix_const + ", i64 0, i64 0")
                 var prefix_i64: String = this.fresh_local()
-                this.emit_indent(prefix_i64 + " = ptrtoint i8* " + prefix_gep + " to i64")
+                this.emit_indent(prefix_i64 + " = call i64 @__val_tag_ptr(i8* " + prefix_gep + ")")
 
                 // Create a StringBuilder, append prefix
                 var sb: String = this.fresh_local()
@@ -3068,7 +3091,7 @@ class Codegen {
                         var comma_gep: String = this.fresh_local()
                         this.emit_indent(comma_gep + " = getelementptr [" + comma_len.to_string() + " x i8], [" + comma_len.to_string() + " x i8]* " + comma_const + ", i64 0, i64 0")
                         var comma_i64: String = this.fresh_local()
-                        this.emit_indent(comma_i64 + " = ptrtoint i8* " + comma_gep + " to i64")
+                        this.emit_indent(comma_i64 + " = call i64 @__val_tag_ptr(i8* " + comma_gep + ")")
                         this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + comma_i64 + ")")
                     }
 
@@ -3081,7 +3104,7 @@ class Codegen {
                 var close_gep: String = this.fresh_local()
                 this.emit_indent(close_gep + " = getelementptr [" + close_len.to_string() + " x i8], [" + close_len.to_string() + " x i8]* " + close_const + ", i64 0, i64 0")
                 var close_i64: String = this.fresh_local()
-                this.emit_indent(close_i64 + " = ptrtoint i8* " + close_gep + " to i64")
+                this.emit_indent(close_i64 + " = call i64 @__val_tag_ptr(i8* " + close_gep + ")")
                 this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + close_i64 + ")")
 
                 // Finalize
@@ -3100,7 +3123,7 @@ class Codegen {
         var empty_gep: String = this.fresh_local()
         this.emit_indent(empty_gep + " = getelementptr [" + empty_len.to_string() + " x i8], [" + empty_len.to_string() + " x i8]* " + empty_const + ", i64 0, i64 0")
         var empty_i64: String = this.fresh_local()
-        this.emit_indent(empty_i64 + " = ptrtoint i8* " + empty_gep + " to i64")
+        this.emit_indent(empty_i64 + " = call i64 @__val_tag_ptr(i8* " + empty_gep + ")")
         this.emit_terminator("ret i64 " + empty_i64)
 
         this.emit("}")
@@ -4136,7 +4159,16 @@ class Codegen {
         out.append("declare void @__io_print_str(i64)\n")
         out.append("declare void @__io_print_int(i64)\n")
         out.append("declare i64 @__bool_to_string(i64)\n")
-        out.append("declare i64 @__nil_to_string()\n\n")
+        out.append("declare i64 @__nil_to_string()\n")
+        out.append("; --- NaN-boxing value helpers ---\n")
+        out.append("declare i64 @__val_tag_int(i64)\n")
+        out.append("declare i64 @__val_untag_int(i64)\n")
+        out.append("declare i64 @__val_tag_ptr(i8*)\n")
+        out.append("declare i8* @__val_untag_ptr(i64)\n")
+        out.append("declare i64 @__val_tag_float(double)\n")
+        out.append("declare double @__val_untag_float(i64)\n")
+        out.append("declare i64 @__val_tag_bool(i64)\n")
+        out.append("declare i64 @__val_nil()\n\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
@@ -4631,11 +4663,8 @@ class Codegen {
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
-        if (method == "args") {
-            this.last_type = this.make_list_str_type()
-        } else {
-            this.last_type = AST.Type.StringType
-        }
+        if (method == "args") { this.last_type = this.make_list_str_type() }
+        else { this.last_type = AST.Type.StringType }
         return local
     }
 

@@ -402,11 +402,8 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
-        if (method == "args") {
-            this.last_type = this.make_list_str_type()
-        } else {
-            this.last_type = AST.Type.StringType
-        }
+        if (method == "args") { this.last_type = this.make_list_str_type() }
+        else { this.last_type = AST.Type.StringType }
         return local
     }
 

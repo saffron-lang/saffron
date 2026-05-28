@@ -1,0 +1,38 @@
+// IO module — standard input/output operations
+// These functions are available as IO.println(), IO.read_file(), etc.
+
+fun println(value: String) {
+    __io_println_str(value)
+}
+
+fun print(value: String) {
+    __io_print_str(value)
+}
+
+fun read_file(path: String): String {
+    return __io_read_file(path)
+}
+
+fun write_file(path: String, content: String) {
+    __io_write_file(path, content)
+}
+
+fun append_file(path: String, content: String) {
+    __io_append_file(path, content)
+}
+
+fun file_exists(path: String): Bool {
+    return __io_file_exists(path) == 1
+}
+
+fun mkdir(path: String) {
+    __io_mkdir(path)
+}
+
+fun walk_dir(path: String): List<String> {
+    return __io_walk_dir(path)
+}
+
+fun list_dir(path: String): List<String> {
+    return __io_walk_dir(path)
+}
