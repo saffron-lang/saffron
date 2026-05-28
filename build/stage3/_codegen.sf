@@ -4507,23 +4507,60 @@ class Codegen {
             MethodCall(o, m, a) => m
             _ => ""
         }
+        var mc_obj: AST.Expr = match (expr) {
+            MethodCall(o, m, a) => o
+            _ => AST.Expr.NilLit
+        }
+        // Check if method call is on a user class (resolve obj type)
+        var mc_obj_name: String = this.get_variable_name(mc_obj)
+        var mc_obj_type: String = ""
+        if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
+            mc_obj_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
+        } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
+            mc_obj_type = this.var_types.get(mc_obj_name)
+        } else if (this.classify_expr(mc_obj) == "this") {
+            mc_obj_type = this.current_class
+        } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
+            // Handle chained field access: this.field.method()
+            var inner_obj: AST.Expr = match (mc_obj) {
+                GetField(o, f) => o
+                MemberAccess(o, f) => o
+                _ => AST.Expr.NilLit
+            }
+            var inner_field: String = match (mc_obj) {
+                GetField(o, f) => f
+                MemberAccess(o, f) => f
+                _ => ""
+            }
+            var inner_class: String = ""
+            if (this.classify_expr(inner_obj) == "this") {
+                inner_class = this.current_class
+            } else {
+                var in_name: String = this.get_variable_name(inner_obj)
+                if (in_name.length() > 0 and this.typed_vars.has(in_name)) {
+                    inner_class = this.type_to_string(this.typed_vars.get(in_name))
+                } else if (in_name.length() > 0 and this.var_types.has(in_name)) {
+                    inner_class = this.var_types.get(in_name)
+                }
+            }
+            if (inner_class.length() > 0 and this.class_fields.has(inner_class)) {
+                mc_obj_type = this.get_field_type(inner_class, inner_field)
+            }
+        }
+        // If object is a user class, look up method return type
+        if (mc_obj_type.length() > 0 and this.class_fields.has(mc_obj_type)) {
+            var full_mc: String = mc_obj_type + "__" + mc_method
+            if (this.func_ret_types.has(full_mc)) {
+                return this.func_ret_types.get(full_mc)
+            }
+        }
         if (mc_method == "length") return "Float"
         if (mc_method == "to_string" or mc_method == "join") return "String"
         if (mc_method == "split" or mc_method == "keys") return "List<String>"
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
             // Infer return type from Map<K, V> annotation rather than always "String"
-            var mc_obj: AST.Expr = match (expr) {
-                MethodCall(o, m, a) => o
-                _ => AST.Expr.NilLit
-            }
-            var mc_obj_name: String = this.get_variable_name(mc_obj)
-            var mc_map_type: String = ""
-            if (mc_obj_name.length() > 0 and this.typed_vars.has(mc_obj_name)) {
-                mc_map_type = this.type_to_string(this.typed_vars.get(mc_obj_name))
-            } else if (mc_obj_name.length() > 0 and this.var_types.has(mc_obj_name)) {
-                mc_map_type = this.var_types.get(mc_obj_name)
-            }
+            var mc_map_type: String = mc_obj_type
             if (mc_map_type.starts_with("Map<")) {
                 return this.get_map_value_type(mc_map_type)
             }
@@ -4919,6 +4956,13 @@ class Codegen {
         is_user_class = true
     } else if (obj_name.length() > 0 and this.var_types.has(obj_name) and this.class_fields.has(this.var_types.get(obj_name))) {
         is_user_class = true
+    }
+    // Also check last_type after evaluation (handles chained field access like this.field.method())
+    if (!is_user_class) {
+        var eval_type: String = this.type_to_string(this.last_type)
+        if (this.class_fields.has(eval_type)) {
+            is_user_class = true
+        }
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
@@ -5510,6 +5554,56 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         mi2 = mi2 + 1
     }
 
+    // Pre-register class declarations from all modules so extend funs
+    // can reference class fields without null map lookups.
+    mi2 = 0
+    while (mi2 < module_stmts.length()) {
+        var stmts3: List<AST.Stmt> = module_stmts[mi2]
+        var si3: Float = 0
+        while (si3 < stmts3.length()) {
+            var sk3: String = gen.classify_stmt(stmts3[si3])
+            if (sk3 == "class") {
+                var cn3: String = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                var cp3: String = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => p
+                    _ => ""
+                }
+                var cf3: List<AST.Param> = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => f
+                    _ => []
+                }
+                var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => m
+                    _ => []
+                }
+                if (cn3.length() > 0 and !gen.class_fields.has(cn3)) {
+                    var cf3_str: String = gen.params_to_string(cf3)
+                    var cf3_all: String = cf3_str
+                    if (cp3.length() > 0 and gen.class_fields.has(cp3)) {
+                        var cpf3: String = gen.class_fields.get(cp3)
+                        if (cpf3.length() > 0) {
+                            if (cf3_all.length() > 0) {
+                                cf3_all = cpf3 + "," + cf3_all
+                            } else {
+                                cf3_all = cpf3
+                            }
+                        }
+                    }
+                    gen.class_fields.set(cn3, cf3_all)
+                    var cm3_names: List<String> = []
+                    var cm3i: Float = 0
+                    while (cm3i < cm3.length()) {
+                        var mn3: String = gen.get_fun_name(cm3[cm3i])
+                        if (mn3.length() > 0) { cm3_names.push(mn3) }
+                        cm3i = cm3i + 1
+                    }
+                    gen.class_methods.set(cn3, cm3_names)
+                }
+            }
+            si3 = si3 + 1
+        }
+        mi2 = mi2 + 1
+    }
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -5688,6 +5782,61 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
                 var fname: String = gen.get_fun_name(all_stmts[si])
                 var ext_cls: String = fdoc.slice(8, fdoc.length())
                 gen.extend_map.set(prefix + fname, ext_cls)
+            }
+            si = si + 1
+        }
+        mi = mi + 1
+    }
+
+    // Pre-register class declarations from ALL modules so extend funs in
+    // imported modules can reference class fields without null map lookups.
+    mi = 0
+    while (mi < prefixes.length()) {
+        prefix = prefixes[mi]
+        start = boundaries[mi]
+        end = boundaries[mi + 1]
+        si = start
+        while (si < end) {
+            var mod_kind: String = gen.classify_stmt(all_stmts[si])
+            if (mod_kind == "class") {
+                var mod_name: String = match (all_stmts[si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                var mod_parent: String = match (all_stmts[si]) { ClassDecl(n, p, f, m, d) => p
+                    _ => ""
+                }
+                var mod_fields: List<AST.Param> = match (all_stmts[si]) { ClassDecl(n, p, f, m, d) => f
+                    _ => []
+                }
+                var mod_methods: List<AST.Stmt> = match (all_stmts[si]) { ClassDecl(n, p, f, m, d) => m
+                    _ => []
+                }
+                if (mod_name.length() > 0) {
+                    var mod_fields_str: String = gen.params_to_string(mod_fields)
+                    var mod_all_fields: String = mod_fields_str
+                    if (mod_parent.length() > 0 and gen.class_fields.has(mod_parent)) {
+                        var mod_parent_fields: String = gen.class_fields.get(mod_parent)
+                        if (mod_parent_fields.length() > 0) {
+                            if (mod_all_fields.length() > 0) {
+                                mod_all_fields = mod_parent_fields + "," + mod_all_fields
+                            } else {
+                                mod_all_fields = mod_parent_fields
+                            }
+                        }
+                    }
+                    gen.class_fields.set(mod_name, mod_all_fields)
+                    // Register class methods list
+                    var mod_method_names: List<String> = []
+                    var mod_mi2: Float = 0
+                    while (mod_mi2 < mod_methods.length()) {
+                        var mname: String = gen.get_fun_name(mod_methods[mod_mi2])
+                        if (mname.length() > 0) {
+                            mod_method_names.push(mname)
+                        }
+                        mod_mi2 = mod_mi2 + 1
+                    }
+                    gen.class_methods.set(mod_name, mod_method_names)
+                }
             }
             si = si + 1
         }

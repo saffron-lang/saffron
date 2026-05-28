@@ -185,7 +185,7 @@ build_project() {
     }
 
     [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
-    clang "$OPT" -w -Wl,-stack_size,0x4000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
+    clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
         echo "saffron: linking failed" >&2
         exit 1
     }
