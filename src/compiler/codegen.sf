@@ -3797,6 +3797,8 @@ class Codegen {
         this.func_ret_types.set(emit_name, name)
         this.func_ret_types.set(name, name)
         if (this.register_only) { return }
+        if (this.defined_funcs.contains(emit_name)) { return }
+        this.defined_funcs.push(emit_name)
         this.emit("")
         var ctor_linkage: String = "define"
         if (this.current_prefix.length() > 0) {
@@ -4216,13 +4218,14 @@ class Codegen {
             this.known_functions.push("main")
         }
         this.known_functions.push(emit_name)
-        this.defined_funcs.push(emit_name)
         this.func_ret_types.set(emit_name, ret_type)
         if (this.current_prefix.length() > 0) {
             this.func_ret_types.set(name, ret_type)
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
+        if (this.defined_funcs.contains(emit_name)) { return }
+        this.defined_funcs.push(emit_name)
         var is_nested: Bool = this.in_function
 
         // For nested functions: hoist as regular function with captures as extra params
