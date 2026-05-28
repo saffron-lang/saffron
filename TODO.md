@@ -6,8 +6,9 @@
 - [ ] All type comparisons should use pattern matching on AST.Type, not string == / starts_with
 - [ ] runtime.ll should eventually be a .sf file compiled by the compiler itself
 
-## Native Binary (Gen1) Fixes
-- [ ] Multi-param functions show params.length=0 in native binary
-- [ ] Class method dispatch fails (var_types lookup returns wrong type for class instances)
-- [ ] Root cause: native binary's var_types map doesn't reliably store/retrieve type strings
-- [ ] Method-name-first dispatch (no overloading in compiler) would bypass var_types issue
+## Parser
+- [ ] Refactor match_kind_check/match_kind to compare TokenKind enum values directly instead of string conversion (130 call sites)
+
+## Native Binary Fixes
+- [ ] `this.field = value` crashes in gen2-compiled user programs (field GET works, field SET segfaults)
+- [ ] Root cause under investigation: struct layout or GEP index mismatch in gen2 output vs C VM output
