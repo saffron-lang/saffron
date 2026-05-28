@@ -1507,12 +1507,16 @@ class Codegen {
         // Error check: argument count validation
         if (this.called_function_arity.has(resolved_callee)) {
             var expected: Float = this.called_function_arity.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
+            var min_args: Float = expected
+            if (this.func_defaults.has(resolved_callee)) { min_args = expected - this.func_defaults.get(resolved_callee).length() }
+            if (args.length() < min_args or args.length() > expected) {
                 IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
             }
         } else if (this.func_param_count.has(resolved_callee)) {
             var expected: Float = this.func_param_count.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
+            var min_args: Float = expected
+            if (this.func_defaults.has(resolved_callee)) { min_args = expected - this.func_defaults.get(resolved_callee).length() }
+            if (args.length() < min_args or args.length() > expected) {
                 IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
             }
         }
