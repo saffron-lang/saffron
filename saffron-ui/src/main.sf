@@ -1,5 +1,5 @@
 // Saffron UI - Full API prototype (ideal syntax)
-// Assumes: trailing closure params, optional/default params, generics, Fun types
+// Assumes: trailing closure params, optional/default params, generics, () => T types
 
 // =============================================================================
 // Core Types
@@ -13,7 +13,7 @@ enum Node {
 
 enum Attr {
     Prop(name: String, value: String),
-    Event(name: String, handler: Fun(Event): Nil),
+    Event(name: String, handler: (Event) => Nil),
     Bind(name: String, signal: Signal<String>)
 }
 
@@ -33,7 +33,7 @@ class Event {
 
 class Signal<T> {
     var value: T
-    var subscribers: List<Fun(): Nil>
+    var subscribers: List<() => Nil>
 
     fun init(initial: T) {
         this.value = initial
@@ -57,11 +57,11 @@ class Signal<T> {
         }
     }
 
-    fun update(fn: Fun(T): T) {
+    fun update(fn: (T) => T) {
         this.set(fn(this.value))
     }
 
-    fun subscribe(fn: Fun(): Nil) {
+    fun subscribe(fn: () => Nil) {
         this.subscribers.push(fn)
     }
 }
@@ -72,10 +72,10 @@ fun signal<T>(initial: T): Signal<T> {
 
 class Computed<T> {
     var value: T
-    var compute: Fun(): T
-    var subscribers: List<Fun(): Nil>
+    var compute: () => T
+    var subscribers: List<() => Nil>
 
-    fun init(compute: Fun(): T) {
+    fun init(compute: () => T) {
         this.compute = compute
         this.subscribers = []
         this.value = this.run()
@@ -100,20 +100,20 @@ class Computed<T> {
         return this.value
     }
 
-    fun subscribe(fn: Fun(): Nil) {
+    fun subscribe(fn: () => Nil) {
         this.subscribers.push(fn)
     }
 }
 
-fun computed<T>(fn: Fun(): T): Computed<T> {
+fun computed<T>(fn: () => T): Computed<T> {
     return Computed(fn)
 }
 
 class Tracker {
     var deps: List<Any>
-    var on_track: Fun(Any): Nil
+    var on_track: (Any) => Nil
 
-    fun init(on_track: Fun(Any): Nil) {
+    fun init(on_track: (Any) => Nil) {
         this.deps = []
         this.on_track = on_track
     }
@@ -128,14 +128,14 @@ class Tracker {
 
 var _tracking: Tracker = nil
 
-fun _with_tracking(fn: Fun(): Nil, on_dep: Fun(Any): Nil) {
+fun _with_tracking(fn: () => Nil, on_dep: (Any) => Nil) {
     var prev: Tracker = _tracking
     _tracking = Tracker(on_dep)
     fn()
     _tracking = prev
 }
 
-fun effect(fn: Fun(): Nil) {
+fun effect(fn: () => Nil) {
     _with_tracking(fn, fun (dep: Any) {
         dep.subscribe(fn)
     })
@@ -171,7 +171,7 @@ fun _current_ctx(): Context {
     return _ctx_stack[_ctx_stack.length() - 1]
 }
 
-fun _el(tag: String, attrs: List<Attr>, block: Fun(): Nil): Node {
+fun _el(tag: String, attrs: List<Attr>, block: () => Nil): Node {
     var ctx: Context = _push_ctx()
     block()
     _pop_ctx()
@@ -188,35 +188,35 @@ fun text(content: String) {
 
 // --- Standard HTML elements (attrs default to []) ---
 
-fun div(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("div", attrs, block) }
-fun span(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("span", attrs, block) }
-fun p(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("p", attrs, block) }
-fun h1(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h1", attrs, block) }
-fun h2(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h2", attrs, block) }
-fun h3(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h3", attrs, block) }
-fun h4(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("h4", attrs, block) }
-fun button(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("button", attrs, block) }
-fun input(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("input", attrs, block) }
-fun ul(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("ul", attrs, block) }
-fun ol(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("ol", attrs, block) }
-fun li(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("li", attrs, block) }
-fun a(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("a", attrs, block) }
-fun img(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("img", attrs, block) }
-fun nav(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("nav", attrs, block) }
-fun header(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("header", attrs, block) }
-fun footer(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("footer", attrs, block) }
-fun section(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("section", attrs, block) }
-fun form(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("form", attrs, block) }
-fun label(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("label", attrs, block) }
-fun table(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("table", attrs, block) }
-fun tr(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("tr", attrs, block) }
-fun td(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("td", attrs, block) }
-fun th(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("th", attrs, block) }
-fun textarea(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("textarea", attrs, block) }
-fun select(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("select", attrs, block) }
-fun option(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("option", attrs, block) }
-fun pre(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("pre", attrs, block) }
-fun code(attrs: List<Attr> = [], block: Fun(): Nil): Node { return _el("code", attrs, block) }
+fun div(attrs: List<Attr> = [], block: () => Nil): Node { return _el("div", attrs, block) }
+fun span(attrs: List<Attr> = [], block: () => Nil): Node { return _el("span", attrs, block) }
+fun p(attrs: List<Attr> = [], block: () => Nil): Node { return _el("p", attrs, block) }
+fun h1(attrs: List<Attr> = [], block: () => Nil): Node { return _el("h1", attrs, block) }
+fun h2(attrs: List<Attr> = [], block: () => Nil): Node { return _el("h2", attrs, block) }
+fun h3(attrs: List<Attr> = [], block: () => Nil): Node { return _el("h3", attrs, block) }
+fun h4(attrs: List<Attr> = [], block: () => Nil): Node { return _el("h4", attrs, block) }
+fun button(attrs: List<Attr> = [], block: () => Nil): Node { return _el("button", attrs, block) }
+fun input(attrs: List<Attr> = [], block: () => Nil): Node { return _el("input", attrs, block) }
+fun ul(attrs: List<Attr> = [], block: () => Nil): Node { return _el("ul", attrs, block) }
+fun ol(attrs: List<Attr> = [], block: () => Nil): Node { return _el("ol", attrs, block) }
+fun li(attrs: List<Attr> = [], block: () => Nil): Node { return _el("li", attrs, block) }
+fun a(attrs: List<Attr> = [], block: () => Nil): Node { return _el("a", attrs, block) }
+fun img(attrs: List<Attr> = [], block: () => Nil): Node { return _el("img", attrs, block) }
+fun nav(attrs: List<Attr> = [], block: () => Nil): Node { return _el("nav", attrs, block) }
+fun header(attrs: List<Attr> = [], block: () => Nil): Node { return _el("header", attrs, block) }
+fun footer(attrs: List<Attr> = [], block: () => Nil): Node { return _el("footer", attrs, block) }
+fun section(attrs: List<Attr> = [], block: () => Nil): Node { return _el("section", attrs, block) }
+fun form(attrs: List<Attr> = [], block: () => Nil): Node { return _el("form", attrs, block) }
+fun label(attrs: List<Attr> = [], block: () => Nil): Node { return _el("label", attrs, block) }
+fun table(attrs: List<Attr> = [], block: () => Nil): Node { return _el("table", attrs, block) }
+fun tr(attrs: List<Attr> = [], block: () => Nil): Node { return _el("tr", attrs, block) }
+fun td(attrs: List<Attr> = [], block: () => Nil): Node { return _el("td", attrs, block) }
+fun th(attrs: List<Attr> = [], block: () => Nil): Node { return _el("th", attrs, block) }
+fun textarea(attrs: List<Attr> = [], block: () => Nil): Node { return _el("textarea", attrs, block) }
+fun select(attrs: List<Attr> = [], block: () => Nil): Node { return _el("select", attrs, block) }
+fun option(attrs: List<Attr> = [], block: () => Nil): Node { return _el("option", attrs, block) }
+fun pre(attrs: List<Attr> = [], block: () => Nil): Node { return _el("pre", attrs, block) }
+fun code(attrs: List<Attr> = [], block: () => Nil): Node { return _el("code", attrs, block) }
 fun br(): Node { return Node.Element("br", [], []) }
 fun hr(): Node { return Node.Element("hr", [], []) }
 
@@ -234,16 +234,16 @@ fun style(value: String): Attr { return Attr.Prop("style", value) }
 
 // --- Event helpers ---
 
-fun on_click(handler: Fun(Event): Nil): Attr { return Attr.Event("click", handler) }
-fun on_input(handler: Fun(Event): Nil): Attr { return Attr.Event("input", handler) }
-fun on_submit(handler: Fun(Event): Nil): Attr { return Attr.Event("submit", handler) }
-fun on_change(handler: Fun(Event): Nil): Attr { return Attr.Event("change", handler) }
-fun on_keydown(handler: Fun(Event): Nil): Attr { return Attr.Event("keydown", handler) }
-fun on_keyup(handler: Fun(Event): Nil): Attr { return Attr.Event("keyup", handler) }
-fun on_focus(handler: Fun(Event): Nil): Attr { return Attr.Event("focus", handler) }
-fun on_blur(handler: Fun(Event): Nil): Attr { return Attr.Event("blur", handler) }
-fun on_mouse_enter(handler: Fun(Event): Nil): Attr { return Attr.Event("mouseenter", handler) }
-fun on_mouse_leave(handler: Fun(Event): Nil): Attr { return Attr.Event("mouseleave", handler) }
+fun on_click(handler: (Event) => Nil): Attr { return Attr.Event("click", handler) }
+fun on_input(handler: (Event) => Nil): Attr { return Attr.Event("input", handler) }
+fun on_submit(handler: (Event) => Nil): Attr { return Attr.Event("submit", handler) }
+fun on_change(handler: (Event) => Nil): Attr { return Attr.Event("change", handler) }
+fun on_keydown(handler: (Event) => Nil): Attr { return Attr.Event("keydown", handler) }
+fun on_keyup(handler: (Event) => Nil): Attr { return Attr.Event("keyup", handler) }
+fun on_focus(handler: (Event) => Nil): Attr { return Attr.Event("focus", handler) }
+fun on_blur(handler: (Event) => Nil): Attr { return Attr.Event("blur", handler) }
+fun on_mouse_enter(handler: (Event) => Nil): Attr { return Attr.Event("mouseenter", handler) }
+fun on_mouse_leave(handler: (Event) => Nil): Attr { return Attr.Event("mouseleave", handler) }
 
 // --- Signal binding ---
 
@@ -253,7 +253,7 @@ fun bind_value(sig: Signal<String>): Attr { return Attr.Bind("value", sig) }
 // Control Flow
 // =============================================================================
 
-fun each<T>(items: List<T>, key: Fun(T): String = fun (t: T): String => t.to_string(), render: Fun(T): Nil) {
+fun each<T>(items: List<T>, key: (T) => String = fun (t: T): String => t.to_string(), render: (T) => Nil) {
     var i: Float = 0
     while (i < items.length()) {
         render(items[i])
@@ -261,13 +261,13 @@ fun each<T>(items: List<T>, key: Fun(T): String = fun (t: T): String => t.to_str
     }
 }
 
-fun show(condition: Bool, block: Fun(): Nil) {
+fun show(condition: Bool, block: () => Nil) {
     if (condition) {
         block()
     }
 }
 
-fun show_signal(condition: Signal<Bool>, block: Fun(): Nil) {
+fun show_signal(condition: Signal<Bool>, block: () => Nil) {
     if (condition.get()) {
         block()
     }
@@ -285,9 +285,9 @@ enum ResourceState<T> {
 
 class Resource<T> {
     var state: Signal<ResourceState<T>>
-    var fetcher: Fun(): T
+    var fetcher: () => T
 
-    fun init(fetcher: Fun(): T) {
+    fun init(fetcher: () => T) {
         this.fetcher = fetcher
         this.state = signal(ResourceState.Loading)
         this.load()
@@ -312,7 +312,7 @@ class Resource<T> {
     }
 }
 
-fun resource<T>(fetcher: Fun(): T): Resource<T> {
+fun resource<T>(fetcher: () => T): Resource<T> {
     return Resource(fetcher)
 }
 

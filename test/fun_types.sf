@@ -1,0 +1,23 @@
+// Test function type annotations
+
+fun apply(x: Float, f: (Float) => Float): Float {
+    return f(x)
+}
+
+var result: Float = apply(5, fun (n: Float): Float => n * 2)
+IO.println(result.to_string())
+
+// No params
+fun run(block: () => Nil) {
+    block()
+}
+
+run(fun (): Nil { IO.println("ran!") })
+
+// Multiple params
+fun combine(a: Float, b: Float, op: (Float, Float) => Float): Float {
+    return op(a, b)
+}
+
+var sum: Float = combine(3, 4, fun (x: Float, y: Float): Float => x + y)
+IO.println(sum.to_string())

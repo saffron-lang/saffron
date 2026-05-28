@@ -1149,7 +1149,7 @@ class Parser {
         var kind: Lexer.TokenKind = this.current_kind()
         var path: String = match (kind) { TkString(s) => s }
         this.advance()
-        if (this.is_ident_named("as")) {
+        if (this.match_kind_check("as") or this.is_ident_named("as")) {
             this.advance()
             var alias: String = this.expect_ident()
             // Return NilLit ExprStmt — treated as declaration by is_decl, invisible to codegen
