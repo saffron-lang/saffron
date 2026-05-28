@@ -168,10 +168,10 @@ class KeyboardEvent {
 }
 
 class SecurityPolicyViolationEvent {
-    var blocked_u_r_i: String
+    var blocked_uri: String
     var column_number: Float
     var disposition: String
-    var document_u_r_i: String
+    var document_uri: String
     var effective_directive: String
     var line_number: Float
     var original_policy: String
