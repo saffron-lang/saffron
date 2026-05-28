@@ -15,7 +15,6 @@ VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
 RUNTIME_BASE="$ROOT/src/runtime/base.ll"
-STUBS="$ROOT/src/runtime/stubs.ll"
 BUILD_DIR="$ROOT/build"
 
 SKIP_CMAKE=false
@@ -96,7 +95,7 @@ clang -O2 -w -o "$BUILD_DIR/stage2/saffronc" \
     "$BUILD_DIR/stage2/codegen.ll" \
     "$BUILD_DIR/stage2/runtime.ll" \
     "$RUNTIME_BASE" \
-    "$STUBS" \
+    \
     || fail "STAGE 2" "Linking failed"
 
 pass "STAGE 2" "gen2 saffronc built: $BUILD_DIR/stage2/saffronc"
@@ -129,7 +128,7 @@ if clang -O2 -w -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/codegen.ll" \
     "$BUILD_DIR/stage3/runtime.ll" \
     "$RUNTIME_BASE" \
-    "$STUBS" 2>/dev/null; then
+    2>/dev/null; then
     pass "STAGE 3" "gen3 saffronc built: $BUILD_DIR/saffronc"
 else
     info "STAGE 3" "gen3 linking failed (known codegen issue) — using gen2"
@@ -157,7 +156,7 @@ EOF
 "$BUILD_DIR/saffronc" "$EXAMPLE" "$BUILD_DIR/hello_bootstrap.ll" \
     || fail "TEST" "gen3 failed to compile example"
 
-clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$BUILD_DIR/stage3/runtime.ll" "$RUNTIME_BASE" "$STUBS" \
+clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$BUILD_DIR/stage3/runtime.ll" "$RUNTIME_BASE" \
     || fail "TEST" "Linking example failed"
 
 echo ""
