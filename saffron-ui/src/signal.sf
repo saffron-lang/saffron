@@ -67,6 +67,49 @@ fun signal(initial: Any): Signal {
 }
 
 // =============================================================================
+// Computed — derived reactive value
+// =============================================================================
+
+class Computed {
+    var value: Any
+    var compute: Any
+    var subs: List<Any>
+
+    fun init(compute: Any) {
+        this.compute = compute
+        this.subs = []
+        this.recompute()
+    }
+
+    fun get(): Any {
+        record_dep(this)
+        return this.value
+    }
+
+    fun recompute() {
+        start_tracking()
+        this.value = this.compute()
+        var deps: List<Any> = stop_tracking()
+        var i: Float = 0
+        while (i < deps.length()) {
+            deps[i].subscribe(fun () => {
+                this.value = this.compute()
+                notify_subs(this.subs)
+            })
+            i = i + 1
+        }
+    }
+
+    fun subscribe(fn: Any) {
+        this.subs.push(fn)
+    }
+}
+
+fun computed(compute: Any): Computed {
+    return Computed(compute)
+}
+
+// =============================================================================
 // Effect — reactive side effect
 // =============================================================================
 
@@ -79,6 +122,40 @@ fun effect(fn: Any) {
         deps[i].subscribe(fn)
         i = i + 1
     }
+}
+
+// =============================================================================
+// Batch — defer notifications until block completes
+// =============================================================================
+
+var _batch_depth: Float = 0
+var _batch_pending: List<Any> = []
+
+fun batch(fn: Any) {
+    _batch_depth = _batch_depth + 1
+    fn()
+    _batch_depth = _batch_depth - 1
+    if (_batch_depth == 0) {
+        var pending: List<Any> = _batch_pending
+        _batch_pending = []
+        var i: Float = 0
+        while (i < pending.length()) {
+            pending[i]()
+            i = i + 1
+        }
+    }
+}
+
+// =============================================================================
+// Untrack — read signals without creating dependencies
+// =============================================================================
+
+fun untrack(fn: Any): Any {
+    var was_tracking: Bool = _tracking
+    _tracking = false
+    var result: Any = fn()
+    _tracking = was_tracking
+    return result
 }
 
 // =============================================================================
@@ -124,5 +201,34 @@ a.set(10)
 IO.println("after a=10: " + sum_log[1])
 b.set(20)
 IO.println("after b=20: " + sum_log[2])
+
+IO.println("--- Test 5: Computed ---")
+var x: Signal = signal(3)
+var y: Signal = signal(4)
+var sum: Computed = computed(fun () => x.get() + y.get())
+IO.println("sum(3+4): " + sum.get().to_string())
+x.set(10)
+IO.println("sum(10+4): " + sum.get().to_string())
+y.set(20)
+IO.println("sum(10+20): " + sum.get().to_string())
+
+IO.println("--- Test 6: Computed chain ---")
+var base: Signal = signal(2)
+var doubled: Computed = computed(fun () => base.get() * 2)
+var quadrupled: Computed = computed(fun () => doubled.get() * 2)
+IO.println("base=2, doubled=" + doubled.get().to_string() + ", quad=" + quadrupled.get().to_string())
+base.set(5)
+IO.println("base=5, doubled=" + doubled.get().to_string() + ", quad=" + quadrupled.get().to_string())
+
+IO.println("--- Test 7: Effect on computed ---")
+var c: Signal = signal(1)
+var tripled: Computed = computed(fun () => c.get() * 3)
+var effect_results: List<String> = []
+effect(fun () => {
+    effect_results.push("tripled=" + tripled.get().to_string())
+})
+IO.println("initial: " + effect_results[0])
+c.set(7)
+IO.println("after c=7: " + effect_results[1])
 
 IO.println("All signal tests passed!")
