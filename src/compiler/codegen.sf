@@ -2038,6 +2038,32 @@ class Codegen {
         return "0"
     }
 
+    fun gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
+        var arg_strs: List<String> = []
+        if (has_self) { arg_strs.push("i64 " + obj) }
+        var i: Float = 0
+        while (i < args.length()) {
+            var val: String = this.gen_arg_value(args[i])
+            arg_strs.push("i64 " + val)
+            i = i + 1
+        }
+        var full_method: String = ns + "__" + method
+        if (this.func_prefix_map.has(full_method)) {
+            full_method = this.func_prefix_map.get(full_method)
+        } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+            full_method = this.current_prefix + full_method
+        }
+        this.called_functions.push(full_method)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return local
+    }
+
     fun resolve_namespace(obj_name: String, object: AST.Expr): String {
         if (obj_name == "this" or this.classify_expr(object) == "this") {
             return this.current_class
@@ -4320,6 +4346,7 @@ class Codegen {
             this.block_terminated = saved_terminated2
             this.local_counter = saved_counter2
             this.var_types = saved_var_types2
+            this.typed_vars = saved_typed_vars2
             this.globals.push(nested_ir)
             return
         }
