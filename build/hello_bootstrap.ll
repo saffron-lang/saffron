@@ -57,6 +57,7 @@ declare i64 @__val_untag_bool(i64)
 declare i64 @__val_nil()
 
 declare double @strtod(i8*, i8*)
+declare double @floor(double)
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
 @.str.rb = linkonce_odr unnamed_addr constant [2 x i8] c"r\00"

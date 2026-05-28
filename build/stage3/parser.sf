@@ -508,6 +508,26 @@ class Parser {
     fun parse_pattern(): AST.Pattern {
         // Optional 'is' prefix: is Ready(u) => ...
         this.match_kind("is")
+        // Handle literal patterns: 0, 1, "hello", etc.
+        if (this.match_kind_check("int") or this.match_kind_check("float")) {
+            var kind: Lexer.TokenKind = this.current_kind()
+            this.advance()
+            var lit_val: String = match (kind) {
+                TkInt(v) => v.floor().to_string()
+                TkFloat(v) => v.to_string()
+                _ => "0"
+            }
+            return AST.Pattern.VariantPattern(lit_val, [])
+        }
+        if (this.match_kind_check("string")) {
+            var kind: Lexer.TokenKind = this.current_kind()
+            this.advance()
+            var str_val: String = match (kind) {
+                TkString(s) => s
+                _ => ""
+            }
+            return AST.Pattern.VariantPattern(str_val, [])
+        }
         var name: String = this.expect_ident()
         if (this.match_kind("(")) {
             var bindings: List<String> = []
