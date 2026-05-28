@@ -121,7 +121,8 @@ class NullChecker {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
             var pname: String = match (p) { Param(n, t, d) => n }
-            var ptype: String = match (p) { Param(n, t, d) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var ptype: String = this.type_node_to_string(pt)
             sb.append(pname)
             sb.append(":")
             sb.append(ptype)
@@ -356,9 +357,10 @@ class NullChecker {
         if (cs == ps) return true
         if (ps == "Any") return true
         if (cs == "Any") return true
-        // Nullable is subtype of its nullable variant
+        // T is subtype of T|Nil (nullable) only when T is subtype of the non-Nil part
         if (this.is_nullable_type(parent) and !this.is_nullable_type(child)) {
-            return true
+            var inner: AST.Type = this.strip_nil_from_node(parent)
+            return this.is_subtype_node(child, inner)
         }
         // Check inheritance chain
         var current: String = cs
@@ -570,7 +572,8 @@ class NullChecker {
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
                     var pname: String = match (p) { Param(n, t, d) => n }
-                    var ptype: String = match (p) { Param(n, t, d) => t }
+                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var ptype: String = this.type_node_to_string(pt)
                     this.env.define_var(pname, ptype)
                     j = j + 1
                 }

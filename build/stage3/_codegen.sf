@@ -284,7 +284,8 @@ class Codegen {
             if (i > 0) { sb.append(",") }
             var p: AST.Param = params[i]
             var pname: String = match (p) { Param(n, t, d) => n }
-            var ptype: String = match (p) { Param(n, t, d) => t }
+            var pt: AST.Type = match (p) { Param(n, t, d) => t }
+            var ptype: String = this.type_to_string(pt)
             sb.append(pname)
             sb.append(":")
             sb.append(ptype)
@@ -4790,14 +4791,42 @@ class Codegen {
         }
     }
     if (ek == "is_check") return "Bool"
-    if (ek == "binary") return "Any"
+    if (ek == "binary") {
+        var bin_op: String = match (expr) { Binary(l, o, r) => o   _ => "" }
+        if (bin_op == "<" or bin_op == ">" or bin_op == "<=" or bin_op == ">=" or bin_op == "==" or bin_op == "!=") return "Bool"
+        if (bin_op == "and" or bin_op == "or") return "Bool"
+        if (bin_op == "&" or bin_op == "|" or bin_op == "^" or bin_op == "<<" or bin_op == ">>") return "Int"
+        var bin_left: AST.Expr = match (expr) { Binary(l, o, r) => l   _ => AST.Expr.NilLit }
+        var bin_right: AST.Expr = match (expr) { Binary(l, o, r) => r   _ => AST.Expr.NilLit }
+        var left_t: String = this.get_expr_type(bin_left)
+        var right_t: String = this.get_expr_type(bin_right)
+        if (bin_op == "+" and (left_t == "String" or right_t == "String")) return "String"
+        if (left_t == "Float" or right_t == "Float") return "Float"
+        return "Int"
+    }
     if (ek == "logical") return "Bool"
-    if (ek == "unary") return "Any"
+    if (ek == "unary") {
+        var unary_op: String = match (expr) { Unary(o, r) => o   _ => "" }
+        if (unary_op == "!") return "Bool"
+        var unary_inner: AST.Expr = match (expr) { Unary(o, r) => r   _ => AST.Expr.NilLit }
+        return this.get_expr_type(unary_inner)
+    }
     if (ek == "assign") return "Any"
     if (ek == "lambda") return "Fun"
     if (ek == "enum") return "Any"
-    if (ek == "match_expr") return "Any"
-    if (ek == "block_expr") return "Any"
+    if (ek == "match_expr") {
+        var match_arms: List<AST.MatchArm> = match (expr) { Match(s, a) => a   _ => [] }
+        if (match_arms.length() > 0) {
+            var first_arm: AST.MatchArm = match_arms[0]
+            var arm_body: AST.Expr = match (first_arm) { Arm(p, b) => b   _ => AST.Expr.NilLit }
+            return this.get_expr_type(arm_body)
+        }
+        return "Any"
+    }
+    if (ek == "block_expr") {
+        var block_value: AST.Expr = match (expr) { BlockExpr(s, v) => v   _ => AST.Expr.NilLit }
+        return this.get_expr_type(block_value)
+    }
     if (ek == "index_get") {
         var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o   _ => AST.Expr.NilLit }
         var ig_obj_name: String = this.get_variable_name(ig_obj)
