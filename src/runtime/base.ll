@@ -132,45 +132,34 @@ entry:
 @__TYPE_FLOAT_BOXED = constant i64 4
 
 ; --- Tag/Untag Helpers ---
+; Currently IDENTITY (no-op) for backward compatibility.
+; When NaN-boxing is activated, replace with real tagging implementations.
+; The optimizer inlines these away at -O1+.
 
 define i64 @__val_tag_int(i64 %n) {
 entry:
-  ; Tag integer: (n & 0x0000FFFFFFFFFFFF) | 0x7FF9000000000000
-  %masked = and i64 %n, 281474976710655       ; 0x0000FFFFFFFFFFFF
-  %tagged = or i64 %masked, 9221120237041090560  ; 0x7FF9000000000000
-  ret i64 %tagged
+  ret i64 %n
 }
 
 define i64 @__val_untag_int(i64 %v) {
 entry:
-  ; Extract 48-bit payload and sign-extend to 64 bits
-  %payload = and i64 %v, 281474976710655      ; 0x0000FFFFFFFFFFFF
-  ; Sign extend: if bit 47 is set, fill upper 16 bits with 1s
-  %shift_left = shl i64 %payload, 16
-  %sign_ext = ashr i64 %shift_left, 16
-  ret i64 %sign_ext
+  ret i64 %v
 }
 
 define i64 @__val_tag_ptr(i8* %ptr) {
 entry:
-  ; Tag pointer: (ptr & 0x0000FFFFFFFFFFFF) | 0x7FF8000000000000
-  %int_ptr = ptrtoint i8* %ptr to i64
-  %masked = and i64 %int_ptr, 281474976710655  ; 0x0000FFFFFFFFFFFF
-  %tagged = or i64 %masked, 9218868437227405312  ; 0x7FF8000000000000
-  ret i64 %tagged
+  %r = ptrtoint i8* %ptr to i64
+  ret i64 %r
 }
 
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
-  ; Extract 48-bit pointer
-  %ptr_int = and i64 %v, 281474976710655      ; 0x0000FFFFFFFFFFFF
-  %ptr = inttoptr i64 %ptr_int to i8*
+  %ptr = inttoptr i64 %v to i8*
   ret i8* %ptr
 }
 
 define i64 @__val_tag_float(double %f) {
 entry:
-  ; Float is stored directly as its IEEE 754 bit pattern (no tagging needed)
   %bits = bitcast double %f to i64
   ret i64 %bits
 }
@@ -179,6 +168,16 @@ define double @__val_untag_float(i64 %v) {
 entry:
   %f = bitcast i64 %v to double
   ret double %f
+}
+
+define i64 @__val_tag_bool(i64 %b) {
+entry:
+  ret i64 %b
+}
+
+define i64 @__val_untag_bool(i64 %v) {
+entry:
+  ret i64 %v
 }
 
 ; --- Type Checking ---
