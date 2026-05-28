@@ -92,7 +92,15 @@
     if (ek == "float") return "Float"
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
-    if (ek == "list_lit") return "List<String>"
+    if (ek == "list_lit") {
+        var list_elems: List<AST.Expr> = match (expr) { ListLit(e) => e   _ => [] }
+        if (list_elems.length() > 0) {
+            var first_type: String = this.get_expr_type(list_elems[0])
+            if (first_type == "String") return "List<String>"
+            if (first_type == "Int" or first_type == "Float") return "List<Int>"
+        }
+        return "List<Any>"
+    }
     if (ek == "map_lit") return "Map<String,String>"
     if (ek == "this") return this.current_class
     if (ek == "get_field" or ek == "member") {
@@ -158,14 +166,20 @@
     fun gen_list_lit(elements: List<AST.Expr>): String {
     var list_val: String = this.fresh_local()
     this.emit_indent(list_val + " = call i64 @__list_new()")
+    var elem_type: AST.Type = AST.Type.AnyType
     var i: Float = 0
     while (i < elements.length()) {
+        if (i == 0) {
+            var ft: String = this.get_expr_type(elements[0])
+            if (ft == "String") { elem_type = AST.Type.StringType }
+            else if (ft == "Int" or ft == "Float") { elem_type = AST.Type.IntType }
+        }
         var elem: String = this.gen_arg_value(elements[i])
         var discard_lp: String = this.fresh_local()
         this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
         i = i + 1
     }
-    this.last_type = this.make_list_type()
+    this.last_type = this.make_generic_type("List", [elem_type])
     return list_val
     }
 
@@ -194,17 +208,17 @@
         if (this.is_string_list_type(this.typed_vars.get(obj_name))) {
             this.last_type = AST.Type.StringType
         } else {
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.AnyType
         }
     } else if (obj_name.length() > 0 and this.var_types.has(obj_name)) {
         var vtype: String = this.var_types.get(obj_name)
         if (vtype == "List<String>") {
             this.last_type = AST.Type.StringType
         } else {
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.AnyType
         }
     } else {
-        this.last_type = AST.Type.IntType
+        this.last_type = AST.Type.AnyType
     }
     return local
     }
