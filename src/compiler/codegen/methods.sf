@@ -335,6 +335,7 @@ extend fun Codegen.gen_namespace_call(ns: String, method: String, obj: String, a
         i = i + 1
     }
     var full_method: String = ns + "__" + method
+    var canonical: String = full_method
     if (this.func_prefix_map.has(full_method)) {
         full_method = this.func_prefix_map.get(full_method)
     } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
@@ -345,6 +346,8 @@ extend fun Codegen.gen_namespace_call(ns: String, method: String, obj: String, a
     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
     if (this.func_ret_types.has(full_method)) {
         this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+    } else if (this.func_ret_types.has(canonical)) {
+        this.last_type = this.str_to_type(this.func_ret_types.get(canonical))
     } else {
         this.last_type = AST.Type.IntType
     }

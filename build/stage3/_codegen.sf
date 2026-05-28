@@ -687,6 +687,12 @@ class Codegen {
         var val: String = this.gen_arg_value(value)
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
+
+        if (this.nan_boxing) {
+            return this.gen_is_check_nanboxed(val, type_name)
+        }
+
+        // Compile-time resolution (no runtime tags)
         var matches: String = "0"
         if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
             if (this.is_int_type(val_type)) { matches = "1" }
@@ -705,6 +711,40 @@ class Codegen {
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
+        return local
+    }
+
+    fun gen_is_check_nanboxed(val: String, type_name: String): String {
+        // Runtime type check using NaN-boxing tag bits
+        var check_result: String = this.fresh_local()
+
+        if (type_name == "Int" or type_name == "Number") {
+            this.emit_indent(check_result + " = call i1 @__val_is_int(i64 " + val + ")")
+        } else if (type_name == "Float") {
+            this.emit_indent(check_result + " = call i1 @__val_is_float(i64 " + val + ")")
+        } else if (type_name == "String") {
+            this.emit_indent(check_result + " = call i1 @__val_is_string(i64 " + val + ")")
+        } else if (type_name == "Bool") {
+            this.emit_indent(check_result + " = call i1 @__val_is_bool(i64 " + val + ")")
+        } else if (type_name == "Nil") {
+            this.emit_indent(check_result + " = call i1 @__val_is_nil(i64 " + val + ")")
+        } else if (type_name == "List") {
+            this.emit_indent(check_result + " = call i1 @__val_is_list(i64 " + val + ")")
+        } else if (type_name == "Map") {
+            this.emit_indent(check_result + " = call i1 @__val_is_map(i64 " + val + ")")
+        } else {
+            // Class type check: is_ptr && type_id matches
+            var is_ptr: String = this.fresh_local()
+            this.emit_indent(is_ptr + " = call i1 @__val_is_ptr(i64 " + val + ")")
+            var tid: String = this.fresh_local()
+            this.emit_indent(tid + " = call i64 @__val_type_id(i64 " + val + ")")
+            // TODO: look up class type ID from class registry
+            this.emit_indent(check_result + " = and i1 " + is_ptr + ", true")
+        }
+
+        // Convert i1 result to NaN-boxed bool (VAL_TRUE or VAL_FALSE)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = select i1 " + check_result + ", i64 9222246136947933185, i64 9222246136947933184")
         return local
     }
 
@@ -838,6 +878,11 @@ class Codegen {
 
         var lhs: String = this.gen_arg_value(left)
         var rhs: String = this.gen_arg_value(right)
+
+        if (this.nan_boxing) {
+            return this.gen_binary_nanboxed(lhs, rhs, op)
+        }
+
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
@@ -862,6 +907,59 @@ class Codegen {
             this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
         }
 
+        return local
+    }
+
+    fun gen_binary_nanboxed(lhs: String, rhs: String, op: String): String {
+        // NaN-boxed arithmetic: untag → operate → retag
+        var is_cmp: Bool = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
+        var is_arith: Bool = op == "+" or op == "-" or op == "*" or op == "/" or op == "%"
+        var is_bitwise: Bool = op == "&" or op == "|" or op == "^" or op == "<<" or op == ">>"
+
+        // Untag both operands as integers
+        var l_raw: String = this.fresh_local()
+        this.emit_indent(l_raw + " = call i64 @__val_untag_int(i64 " + lhs + ")")
+        var r_raw: String = this.fresh_local()
+        this.emit_indent(r_raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
+
+        if (is_arith or is_bitwise) {
+            var result_raw: String = this.fresh_local()
+            if (op == "+") { this.emit_indent(result_raw + " = add i64 " + l_raw + ", " + r_raw) }
+            else if (op == "-") { this.emit_indent(result_raw + " = sub i64 " + l_raw + ", " + r_raw) }
+            else if (op == "*") { this.emit_indent(result_raw + " = mul i64 " + l_raw + ", " + r_raw) }
+            else if (op == "/") { this.emit_indent(result_raw + " = sdiv i64 " + l_raw + ", " + r_raw) }
+            else if (op == "%") { this.emit_indent(result_raw + " = srem i64 " + l_raw + ", " + r_raw) }
+            else if (op == "&") { this.emit_indent(result_raw + " = and i64 " + l_raw + ", " + r_raw) }
+            else if (op == "|") { this.emit_indent(result_raw + " = or i64 " + l_raw + ", " + r_raw) }
+            else if (op == "^") { this.emit_indent(result_raw + " = xor i64 " + l_raw + ", " + r_raw) }
+            else if (op == "<<") { this.emit_indent(result_raw + " = shl i64 " + l_raw + ", " + r_raw) }
+            else if (op == ">>") { this.emit_indent(result_raw + " = ashr i64 " + l_raw + ", " + r_raw) }
+            // Retag as integer
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + result_raw + ")")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+
+        if (is_cmp) {
+            var cmp_result: String = this.fresh_local()
+            if (op == "==") { this.emit_indent(cmp_result + " = icmp eq i64 " + l_raw + ", " + r_raw) }
+            else if (op == "!=") { this.emit_indent(cmp_result + " = icmp ne i64 " + l_raw + ", " + r_raw) }
+            else if (op == "<") { this.emit_indent(cmp_result + " = icmp slt i64 " + l_raw + ", " + r_raw) }
+            else if (op == "<=") { this.emit_indent(cmp_result + " = icmp sle i64 " + l_raw + ", " + r_raw) }
+            else if (op == ">") { this.emit_indent(cmp_result + " = icmp sgt i64 " + l_raw + ", " + r_raw) }
+            else if (op == ">=") { this.emit_indent(cmp_result + " = icmp sge i64 " + l_raw + ", " + r_raw) }
+            // Result is a NaN-boxed bool: select VAL_TRUE or VAL_FALSE
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = select i1 " + cmp_result + ", i64 9222246136947933185, i64 9222246136947933184")
+            this.last_type = AST.Type.BoolType
+            return local
+        }
+
+        // Fallback: just use raw addition (for + which might be string concat elsewhere)
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + l_raw + ")")
+        this.last_type = AST.Type.IntType
         return local
     }
 
@@ -4466,6 +4564,7 @@ class Codegen {
         i = i + 1
     }
     var full_method: String = ns + "__" + method
+    var canonical: String = full_method
     if (this.func_prefix_map.has(full_method)) {
         full_method = this.func_prefix_map.get(full_method)
     } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
@@ -4476,6 +4575,8 @@ class Codegen {
     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
     if (this.func_ret_types.has(full_method)) {
         this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+    } else if (this.func_ret_types.has(canonical)) {
+        this.last_type = this.str_to_type(this.func_ret_types.get(canonical))
     } else {
         this.last_type = AST.Type.IntType
     }
