@@ -1,10 +1,10 @@
 // Turmeric Reconciler — component lifecycle + keyed list diffing
-// Proper types throughout, no Any where avoidable
+// Fully generic, no Any
 
 import "./signal.sf" as Sig
 
 // =============================================================================
-// DOM Operations (FFI — provided by wasm_base.ll / JS glue)
+// DOM Operations (FFI)
 // =============================================================================
 
 @extern("i64 js_dom_create_element(void*)") fun dom_create(tag: String): Float
@@ -16,7 +16,7 @@ import "./signal.sf" as Sig
 @extern("void js_dom_add_event_listener(i64, void*, i64)") fun dom_on(handle: Float, event: String, callback_id: Float)
 
 // =============================================================================
-// Component — owns a DOM subtree + manages effect cleanup
+// Component — owns DOM subtree + effect cleanup
 // =============================================================================
 
 class Component {
@@ -42,19 +42,16 @@ class Component {
 
     fun unmount() {
         if (!this.mounted) { return }
-        // Depth-first: unmount children
         var i: Float = 0
         while (i < this.children.length()) {
             this.children[i].unmount()
             i = i + 1
         }
-        // Dispose all owned effects
         i = 0
         while (i < this.effects.length()) {
             this.effects[i].dispose()
             i = i + 1
         }
-        // Remove from DOM
         dom_remove(this.parent_handle, this.handle)
         this.mounted = false
         this.children = []
@@ -71,7 +68,7 @@ class Component {
 }
 
 // =============================================================================
-// Managed Effect — tied to component lifetime
+// Managed Effect
 // =============================================================================
 
 fun managed_effect(owner: Component, fn: () => Nil) {
@@ -80,17 +77,17 @@ fun managed_effect(owner: Component, fn: () => Nil) {
 }
 
 // =============================================================================
-// Conditional Slot — mount/unmount based on boolean signal
+// Conditional Slot
 // =============================================================================
 
 class ConditionalSlot {
     var parent_handle: Float
-    var condition: Sig.Signal
+    var condition: Sig.Signal<Bool>
     var builder: () => Component
     var current: Component
     var sub_id: Float
 
-    fun init(parent_handle: Float, condition: Sig.Signal, builder: () => Component) {
+    fun init(parent_handle: Float, condition: Sig.Signal<Bool>, builder: () => Component) {
         this.parent_handle = parent_handle
         this.condition = condition
         this.builder = builder
@@ -122,23 +119,23 @@ class ConditionalSlot {
     }
 }
 
-fun conditional(parent: Float, condition: Sig.Signal, builder: () => Component): ConditionalSlot {
+fun conditional(parent: Float, condition: Sig.Signal<Bool>, builder: () => Component): ConditionalSlot {
     return ConditionalSlot(parent, condition, builder)
 }
 
 // =============================================================================
-// Match Slot — switch between branches based on signal value
+// Match Slot
 // =============================================================================
 
 class MatchSlot {
     var parent_handle: Float
-    var discriminator: Sig.Signal
+    var discriminator: Sig.Signal<String>
     var builders: Map<String, () => Component>
     var current_key: String
     var current: Component
     var sub_id: Float
 
-    fun init(parent_handle: Float, discriminator: Sig.Signal, builders: Map<String, () => Component>) {
+    fun init(parent_handle: Float, discriminator: Sig.Signal<String>, builders: Map<String, () => Component>) {
         this.parent_handle = parent_handle
         this.discriminator = discriminator
         this.builders = builders
@@ -151,13 +148,11 @@ class MatchSlot {
     }
 
     fun sync() {
-        var key: String = this.discriminator.get().to_string()
+        var key: String = this.discriminator.get()
         if (key == this.current_key) { return }
-        // Unmount old
         if (this.current != nil) {
             this.current.unmount()
         }
-        // Mount new
         this.current_key = key
         if (this.builders.has(key)) {
             this.current = this.builders.get(key)()
@@ -176,12 +171,12 @@ class MatchSlot {
     }
 }
 
-fun match_slot(parent: Float, discriminator: Sig.Signal, builders: Map<String, () => Component>): MatchSlot {
+fun match_slot(parent: Float, discriminator: Sig.Signal<String>, builders: Map<String, () => Component>): MatchSlot {
     return MatchSlot(parent, discriminator, builders)
 }
 
 // =============================================================================
-// Keyed List — O(n) reconciliation with reuse
+// Keyed List<T>
 // =============================================================================
 
 class KeyedItem {
@@ -194,15 +189,15 @@ class KeyedItem {
     }
 }
 
-class KeyedList {
+class KeyedList<T> {
     var parent_handle: Float
-    var items_signal: Sig.Signal
-    var key_fn: (Any) => String
-    var builder_fn: (Any) => Component
+    var items_signal: Sig.Signal<List<T>>
+    var key_fn: (T) => String
+    var builder_fn: (T) => Component
     var rendered: List<KeyedItem>
     var sub_id: Float
 
-    fun init(parent_handle: Float, items_signal: Sig.Signal, key_fn: (Any) => String, builder_fn: (Any) => Component) {
+    fun init(parent_handle: Float, items_signal: Sig.Signal<List<T>>, key_fn: (T) => String, builder_fn: (T) => Component) {
         this.parent_handle = parent_handle
         this.items_signal = items_signal
         this.key_fn = key_fn
@@ -215,7 +210,7 @@ class KeyedList {
     }
 
     fun sync() {
-        var new_items: List<Any> = this.items_signal.get()
+        var new_items: List<T> = this.items_signal.get()
 
         // Old key → index
         var old_map: Map<String, Float> = {}
@@ -233,7 +228,7 @@ class KeyedList {
             i = i + 1
         }
 
-        // Set of new keys for removal
+        // Set of new keys
         var new_key_set: Map<String, Bool> = {}
         i = 0
         while (i < new_keys.length()) {
@@ -250,7 +245,7 @@ class KeyedList {
             i = i + 1
         }
 
-        // Build new list — reuse or create
+        // Reuse or create
         var new_rendered: List<KeyedItem> = []
         i = 0
         while (i < new_items.length()) {
@@ -266,7 +261,7 @@ class KeyedList {
             i = i + 1
         }
 
-        // Re-append in correct order
+        // Re-append in order
         i = 0
         while (i < new_rendered.length()) {
             dom_append(this.parent_handle, new_rendered[i].comp.handle)
@@ -287,6 +282,6 @@ class KeyedList {
     }
 }
 
-fun keyed_list(parent: Float, items: Sig.Signal, key_fn: (Any) => String, builder_fn: (Any) => Component): KeyedList {
+fun keyed_list<T>(parent: Float, items: Sig.Signal<List<T>>, key_fn: (T) => String, builder_fn: (T) => Component): KeyedList<T> {
     return KeyedList(parent, items, key_fn, builder_fn)
 }

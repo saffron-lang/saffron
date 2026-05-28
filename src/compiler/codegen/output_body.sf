@@ -320,6 +320,23 @@
             ei = ei + 1
         }
 
+        // Pre-scan: register top-level VarDecls as module globals
+        var gi: Float = 0
+        while (gi < program.length()) {
+            if (!this.is_decl(program[gi])) {
+                var gk: String = this.classify_stmt(program[gi])
+                if (gk == "var") {
+                    var gname: String = match (program[gi]) { VarDecl(n, t, i, d) => n }
+                    var gdoc: String = this.get_var_doc(program[gi])
+                    if (!gdoc.starts_with("@import:")) {
+                        this.module_globals.set(this.current_prefix + gname, true)
+                        this.globals.push("@__g_" + this.current_prefix + this.sanitize_name(gname) + " = global i64 0\n")
+                    }
+                }
+            }
+            gi = gi + 1
+        }
+
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {

@@ -115,6 +115,8 @@ declare i64 @__os_cwd()
 declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
+@__g_name = global i64 0
+@__g_version = global i64 0
 
 define i64 @__saffron_entry() {
 entry:
@@ -122,13 +124,13 @@ entry:
   %version = alloca i64
   %t1 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
   %t2 = call i64 @__val_tag_ptr(i8* %t1)
-  store i64 %t2, i64* %name
+  store i64 %t2, i64* @__g_name
   %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
   %t4 = call i64 @__val_tag_ptr(i8* %t3)
-  store i64 %t4, i64* %version
+  store i64 %t4, i64* @__g_version
   %t5 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
   %t6 = call i64 @__val_tag_ptr(i8* %t5)
-  %t7 = load i64, i64* %name
+  %t7 = load i64, i64* @__g_name
   %t8 = call i8* @__val_untag_ptr(i64 %t6)
   %t9 = call i8* @__val_untag_ptr(i64 %t7)
   %t10 = call i64 @strlen(i8* %t8)
@@ -151,7 +153,7 @@ entry:
   call i8* @strcpy(i8* %t24, i8* %t18)
   call i8* @strcat(i8* %t24, i8* %t19)
   %t25 = call i64 @__val_tag_ptr(i8* %t24)
-  %t26 = load i64, i64* %version
+  %t26 = load i64, i64* @__g_version
   %t27 = call i8* @__val_untag_ptr(i64 %t25)
   %t28 = call i8* @__val_untag_ptr(i64 %t26)
   %t29 = call i64 @strlen(i8* %t27)
