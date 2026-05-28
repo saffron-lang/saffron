@@ -1,0 +1,764 @@
+// Codegen: statement compilation, control flow, variable declarations
+
+extend fun Codegen.gen_stmt(stmt: AST.Stmt) {
+        match (stmt) {
+            ExprStmt(expr) => { this.gen_arg_value(expr) }
+            VarDecl(name, type_ann, init, doc) => {
+                if (!doc.starts_with("@import:")) {
+                    this.gen_var_decl(stmt)
+                }
+            }
+            Return(value) => { this.gen_return(stmt) }
+            If(cond, then_branch, else_branch) => {
+                this.gen_if(cond, then_branch, else_branch)
+            }
+            While(cond, body) => { this.gen_while(cond, body) }
+            Block(stmts) => { this.gen_stmts(stmts) }
+            Break => {
+                if (this.loop_end_label.contains(":")) {
+                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[0])
+                }
+            }
+            Continue => {
+                if (this.loop_end_label.contains(":")) {
+                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[1])
+                }
+            }
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
+                this.gen_try_catch(try_body, catch_name, catch_body, finally_body)
+            }
+            Throw(value) => {
+                this.gen_throw(value)
+            }
+            FunDecl(name, params, ret_type, body, doc) => {
+                // Capture and clear pending_extend_class to prevent stale state
+                // in nested gen_stmt calls
+                var saved_extend: String = this.pending_extend_class
+                this.pending_extend_class = ""
+                if (doc.starts_with("@intrinsic")) {
+                    var emit_name: String = this.current_prefix + name
+                    this.known_functions.push(emit_name)
+                    this.func_ret_types.set(emit_name, ret_type)
+                    this.intrinsic_funcs.push(emit_name)
+                } else if (doc.starts_with("@extern:")) {
+                    var c_sig: String = doc.slice(8, doc.length())
+                    var emit_name: String = this.current_prefix + name
+                    this.known_functions.push(emit_name)
+                    this.func_ret_types.set(emit_name, ret_type)
+                    this.extern_sigs.set(emit_name, c_sig)
+                } else if (doc.starts_with("@extend:")) {
+                    var ext_class: String = doc.slice(8, doc.length())
+                    this.gen_extend_method(ext_class, name, params, ret_type, body)
+                } else if (saved_extend.length() > 0) {
+                    // Fallback: doc field was unreadable for cross-module FunDecl
+                    // but pre-scan identified this as an extension method
+                    this.gen_extend_method(saved_extend, name, params, ret_type, body)
+                } else {
+                    var params_str: String = this.params_to_string(params)
+                    // Register default values for optional params
+                    var emit_name: String = this.current_prefix + name
+                    var defaults: List<AST.Expr> = []
+                    var pi: Float = 0
+                    while (pi < params.length()) {
+                        var p: AST.Param = params[pi]
+                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
+                        defaults.push(dval)
+                        pi = pi + 1
+                    }
+                    this.func_defaults.set(emit_name, defaults)
+                    this.func_param_count.set(emit_name, params.length())
+                    this.gen_function(name, params_str, ret_type, body)
+                }
+            }
+            EnumDecl(name, variants, doc) => {
+                this.gen_enum_decl(name, variants)
+            }
+            ClassDecl(name, parent, fields, methods, doc) => {
+                this.gen_class_decl_with_parent(name, parent, fields, methods)
+            }
+        }
+    }
+
+extend fun Codegen.get_var_name(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => n
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_var_type(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => t
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_var_init(stmt: AST.Stmt): AST.Expr {
+        return match (stmt) { VarDecl(n, t, i, d) => i
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_var_doc(stmt: AST.Stmt): String {
+        return match (stmt) { VarDecl(n, t, i, d) => d
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_fun_doc(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => d
+            _ => ""
+        }
+    }
+
+extend fun Codegen.gen_var_decl(stmt: AST.Stmt) {
+        var name: String = this.get_var_name(stmt)
+        this.gen_var_decl_with_name(name, this.get_var_type(stmt), this.get_var_init(stmt))
+    }
+
+extend fun Codegen.gen_var_decl_with_name(name: String, type_ann: String, init: AST.Expr) {
+        var vtype: String = type_ann
+        if (vtype == "Any") {
+            vtype = this.get_expr_type(init)
+        }
+        var val: String = this.gen_arg_value(init)
+        if (vtype == "Any") {
+            vtype = this.type_to_string(this.last_type)
+        }
+        this.var_types.set(name, vtype)
+        this.typed_vars.set(name, this.str_to_type(vtype))
+        // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
+        // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
+        if (vtype == "String") {
+            this.string_vars.push(name)
+        }
+        var var_ref: String = "%" + this.sanitize_name(name)
+        if (this.module_globals.has(this.current_prefix + name)) {
+            var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+        }
+        this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+    }
+
+extend fun Codegen.gen_return(stmt: AST.Stmt) {
+        var value: AST.Expr = match (stmt) { Return(v) => v
+            _ => AST.Expr.NilLit
+        }
+        if (this.current_ret_type == "void") {
+            this.emit_terminator("ret void")
+        } else {
+            var val: String = this.gen_arg_value(value)
+            this.emit_terminator("ret i64 " + val)
+        }
+    }
+
+extend fun Codegen.gen_class_decl_with_parent(name: String, parent: String, fields: List<AST.Param>, methods: List<AST.Stmt>) {
+        // Convert fields to string format for internal use
+        var fields_str: String = this.params_to_string(fields)
+        // Inherit parent fields (prepend parent fields before child's own)
+        var all_fields: String = fields_str
+        if (parent.length() > 0 and this.class_fields.has(parent)) {
+            var parent_fields: String = this.class_fields.get(parent)
+            if (parent_fields.length() > 0) {
+                if (all_fields.length() > 0) {
+                    all_fields = parent_fields + "," + all_fields
+                } else {
+                    all_fields = parent_fields
+                }
+            }
+        }
+        // Generate the class with inherited fields
+        this.current_parent = parent
+        this.gen_class_decl(name, all_fields, methods)
+        this.current_parent = ""
+        // Register inherited methods: if child doesn't define a method, map it to parent's
+        if (parent.length() > 0 and this.class_methods.has(parent)) {
+            var parent_methods: List = this.class_methods.get(parent)
+            var child_methods: List = this.class_methods.get(name)
+            var i: Int = 0
+            while (i < parent_methods.length()) {
+                var mname: String = parent_methods[i]
+                if (!child_methods.contains(mname) and mname != "init") {
+                    // Register parent method as callable on child
+                    child_methods.push(mname)
+                    // Map ChildClass__method to ParentClass__method
+                    var child_full: String = name + "__" + mname
+                    var parent_full: String = parent + "__" + mname
+                    this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
+                    this.known_functions.push(child_full)
+                    // Emit a thin forwarder with proper parameter forwarding
+                    var fwd_params_def: String = "i64 %self"
+                    var fwd_params_call: String = "i64 %self"
+                    var arity_key: String = this.current_prefix + parent_full
+                    if (this.called_function_arity.has(arity_key)) {
+                        var arity: Float = this.called_function_arity.get(arity_key)
+                        var pi2: Float = 1
+                        while (pi2 < arity) {
+                            fwd_params_def = fwd_params_def + ", i64 %p" + pi2.floor().to_string()
+                            fwd_params_call = fwd_params_call + ", i64 %p" + pi2.floor().to_string()
+                            pi2 = pi2 + 1
+                        }
+                    }
+                    this.emit("")
+                    this.emit("define i64 @" + child_full + "(" + fwd_params_def + ") {")
+                    this.emit("entry:")
+                    this.emit("  %r = call i64 @" + parent_full + "(" + fwd_params_call + ")")
+                    this.emit("  ret i64 %r")
+                    this.emit("}")
+                }
+                i = i + 1
+            }
+            // Interface conformance: if parent has no fields, check all methods are implemented
+            var parent_fields_str: String = this.class_fields.get(parent)
+            if (parent_fields_str.length() == 0) {
+                // This is an interface — check conformance
+                var pi: Int = 0
+                while (pi < parent_methods.length()) {
+                    var required: String = parent_methods[pi]
+                    if (required != "init" and !child_methods.contains(required)) {
+                        IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
+                    }
+                    pi = pi + 1
+                }
+            }
+        }
+    }
+
+extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        this.class_fields.set(name, fields)
+
+        // Parse field names for struct layout
+        var field_list: List<String> = []
+        var i: Float = 0
+        if (fields.length() > 0) {
+            var parts: List<String> = this.split_respecting_generics(fields, ",")
+            while (i < parts.length()) {
+                var fp: List<String> = parts[i].split(":")
+                field_list.push(fp[0])
+                i = i + 1
+            }
+        }
+
+        // Emit struct type: { i64 field0, i64 field1, ... }
+        var num_fields: Float = field_list.length()
+        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+            this.known_functions.push("__type_" + name)
+            var field_types_str: String = ""
+            var fi: Float = 0
+            while (fi < num_fields) {
+                if (fi > 0) { field_types_str = field_types_str + ", " }
+                field_types_str = field_types_str + "i64"
+                fi = fi + 1
+            }
+            this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
+        }
+
+        // Register method names
+        var method_names: List<String> = []
+        i = 0
+        while (i < methods.length()) {
+            method_names.push(this.get_fun_name(methods[i]))
+            i = i + 1
+        }
+        this.class_methods.set(name, method_names)
+
+        // Pre-register all method return types so forward references resolve correctly
+        i = 0
+        while (i < methods.length()) {
+            var mname: String = this.get_fun_name(methods[i])
+            var mret: String = this.get_fun_ret(methods[i])
+            var full_name: String = name + "__" + mname
+            var prefixed_full: String = this.current_prefix + full_name
+            this.func_ret_types.set(prefixed_full, mret)
+            this.func_ret_types.set(full_name, mret)
+            this.known_functions.push(prefixed_full)
+            this.known_functions.push(full_name)
+            this.func_prefix_map.set(full_name, prefixed_full)
+            i = i + 1
+        }
+
+        // Pre-register constructor so methods can call ClassName(args)
+        this.known_functions.push(name)
+        if (this.current_prefix.length() > 0) {
+            this.known_functions.push(this.current_prefix + name)
+        }
+        this.func_ret_types.set(name, name)
+
+        // Generate methods as functions with name prefix: ClassName__method
+        // Methods get 'self' (i64 pointer to instance) as first param
+        this.current_class = name
+        i = 0
+        while (i < methods.length()) {
+            this.gen_class_method(name, methods[i])
+            i = i + 1
+        }
+
+        // Generate constructor function: ClassName(args...) -> instance ptr
+        this.gen_class_constructor(name, fields, field_list)
+    }
+
+extend fun Codegen.get_fun_name(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => n
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_fun_params(stmt: AST.Stmt): List<AST.Param> {
+        return match (stmt) { FunDecl(n, p, r, b, d) => p
+            _ => []
+        }
+    }
+
+extend fun Codegen.get_fun_ret(stmt: AST.Stmt): String {
+        return match (stmt) { FunDecl(n, p, r, b, d) => r
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_fun_body(stmt: AST.Stmt): List<AST.Stmt> {
+        return match (stmt) { FunDecl(n, p, r, b, d) => b
+            _ => ""
+        }
+    }
+
+extend fun Codegen.gen_class_method(class_name: String, method: AST.Stmt) {
+        var mname: String = this.get_fun_name(method)
+        var mparams: List<AST.Param> = this.get_fun_params(method)
+        var mret: String = this.get_fun_ret(method)
+        var mbody: List<AST.Stmt> = this.get_fun_body(method)
+        var full_name: String = class_name + "__" + mname
+        var mparams_str: String = this.params_to_string(mparams)
+        var full_params: String = "self:Int"
+        if (mparams_str.length() > 0) {
+            full_params = full_params + "," + mparams_str
+        }
+        var param_count: Float = 1
+        if (mparams_str.length() > 0) {
+            param_count = this.split_respecting_generics(mparams_str, ",").length() + 1
+        }
+        this.called_function_arity.set(full_name, param_count)
+        if (this.current_prefix.length() > 0) {
+            this.called_function_arity.set(this.current_prefix + full_name, param_count)
+        }
+        this.gen_function(full_name, full_params, mret, mbody)
+    }
+
+extend fun Codegen.gen_class_constructor(name: String, fields: String, field_list: List<String>) {
+        var num_fields: Float = field_list.length()
+        var struct_size: Float = num_fields * 8
+        this.known_functions.push(name)
+        if (this.current_prefix.length() > 0) {
+            this.known_functions.push(this.current_prefix + name)
+        }
+        this.func_ret_types.set(name, name)
+        if (this.current_prefix.length() > 0) {
+            this.func_ret_types.set(this.current_prefix + name, name)
+        }
+        if (this.register_only) { return }
+        if (this.defined_funcs.contains(name)) { return }
+        this.defined_funcs.push(name)
+        this.emit("")
+        this.emit("define linkonce_odr i64 @" + name + "() {")
+        this.emit("entry:")
+        this.block_terminated = false
+        // Allocate instance on heap
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+        var ptr: String = this.fresh_local()
+        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + name + "*")
+        // Zero-initialize fields
+        var i: Float = 0
+        while (i < num_fields) {
+            var field_ptr: String = this.fresh_local()
+            this.emit_indent(field_ptr + " = getelementptr %" + name + ", %" + name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
+            this.emit_indent("store i64 0, i64* " + field_ptr)
+            i = i + 1
+        }
+        // Return as i64
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint %" + name + "* " + ptr + " to i64")
+        this.emit_terminator("ret i64 " + result)
+        this.emit("}")
+        this.block_terminated = false
+    }
+
+extend fun Codegen.get_variant_name(v: AST.Variant): String {
+        return match (v) { Variant(n, f) => n
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_variant_fields(v: AST.Variant): String {
+        return match (v) { Variant(n, f) => f
+            _ => ""
+        }
+    }
+
+extend fun Codegen.register_variant(name: String, variant_names: List<String>, v: AST.Variant, idx: Float) {
+        var vname: String = this.get_variant_name(v)
+        var vfields: String = this.get_variant_fields(v)
+        variant_names.push(vname)
+        this.enum_variant_tags.set(name + "." + vname, idx)
+        this.enum_variant_fields.set(name + "." + vname, vfields)
+    }
+
+extend fun Codegen.gen_enum_decl(name: String, variants: List<AST.Variant>) {
+        var variant_names: List<String> = []
+        var i: Float = 0
+        while (i < variants.length()) {
+            this.register_variant(name, variant_names, variants[i], i)
+            i = i + 1
+        }
+        this.enum_defs.set(name, variant_names)
+        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+            this.known_functions.push("__type_" + name)
+            this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
+        }
+
+        // Emit constructor functions for variants with fields
+        var max_fields: Float = this.get_max_fields(name)
+        i = 0
+        while (i < variants.length()) {
+            var v: AST.Variant = variants[i]
+            var vname: String = match (v) { Variant(n, f) => n
+                _ => ""
+            }
+            var vfields: String = match (v) { Variant(n, f) => f
+                _ => ""
+            }
+            if (vfields.length() > 0) {
+                this.emit_enum_constructor(vname, i, vfields, max_fields)
+            }
+            i = i + 1
+        }
+    }
+
+extend fun Codegen.emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
+        if (this.register_only) { return }
+        var parts: List<String> = this.split_respecting_generics(fields_str, ",")
+        var num_fields: Float = parts.length()
+
+        // Build param list: (i64 %f0, i64 %f1, ...)
+        var params: String = ""
+        var pi: Float = 0
+        while (pi < num_fields) {
+            if (pi > 0) { params = params + ", " }
+            params = params + "i64 %f" + pi.floor().to_string()
+            pi = pi + 1
+        }
+
+        this.emit("")
+        this.emit("define linkonce_odr i64 @" + vname + "(" + params + ") {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+
+        if (max_fields <= 1) {
+            // Simple encoding: (tag << 56) | value
+            var t: String = this.fresh_local()
+            this.emit_indent(t + " = shl i64 " + tag.floor().to_string() + ", 56")
+            var r: String = this.fresh_local()
+            this.emit_indent(r + " = or i64 " + t + ", %f0")
+            this.emit_terminator("ret i64 " + r)
+        } else {
+            // Array encoding: malloc [tag, f0, f1, ...]
+            var num_slots: Float = num_fields + 1
+            var arr_bytes: Float = num_slots * 8
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+            var arr: String = this.fresh_local()
+            this.emit_indent(arr + " = bitcast i8* " + raw + " to [" + num_slots.floor().to_string() + " x i64]*")
+            // Store tag
+            var ts: String = this.fresh_local()
+            this.emit_indent(ts + " = getelementptr [" + num_slots.floor().to_string() + " x i64], [" + num_slots.floor().to_string() + " x i64]* " + arr + ", i64 0, i64 0")
+            this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + ts)
+            // Store fields
+            var fi: Float = 0
+            while (fi < num_fields) {
+                var slot: String = this.fresh_local()
+                var slot_idx: Float = fi + 1
+                this.emit_indent(slot + " = getelementptr [" + num_slots.floor().to_string() + " x i64], [" + num_slots.floor().to_string() + " x i64]* " + arr + ", i64 0, i64 " + slot_idx.floor().to_string())
+                this.emit_indent("store i64 %f" + fi.floor().to_string() + ", i64* " + slot)
+                fi = fi + 1
+            }
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = ptrtoint [" + num_slots.floor().to_string() + " x i64]* " + arr + " to i64")
+            this.emit_terminator("ret i64 " + result)
+        }
+
+        this.emit("}")
+        this.block_terminated = false
+        this.known_functions.push(vname)
+    }
+
+extend fun Codegen.get_enum_decl_name(stmt: AST.Stmt): String {
+        return match (stmt) { EnumDecl(n, v, d) => n
+            _ => ""
+        }
+    }
+
+extend fun Codegen.get_enum_decl_variants(stmt: AST.Stmt): List<AST.Variant> {
+        return match (stmt) { EnumDecl(n, v, d) => v
+            _ => ""
+        }
+    }
+
+extend fun Codegen.register_external_enums(decls: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < decls.length()) {
+            this.try_register_enum(decls[i])
+            i = i + 1
+        }
+    }
+
+extend fun Codegen.try_register_enum(decl: AST.Stmt) {
+        match (decl) {
+            EnumDecl(name, variants, doc) => {
+                this.register_enum_variants(name, variants)
+            }
+            VarDecl(n, t, i, d) => {}
+            FunDecl(n, p, r, b, d) => {}
+            ClassDecl(n, p, f, m, d) => {}
+            If(c, t, e) => {}
+            While(c, b) => {}
+            Block(s) => {}
+            ExprStmt(e) => {}
+            Return(v) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(t, n, c, f) => {}
+            Throw(v) => {}
+        }
+    }
+
+extend fun Codegen.register_enum_variants(name: String, variants: List<AST.Variant>) {
+        var variant_names: List<String> = []
+        var j: Float = 0
+        while (j < variants.length()) {
+            this.register_variant(name, variant_names, variants[j], j)
+            j = j + 1
+        }
+        this.enum_defs.set(name, variant_names)
+    }
+
+extend fun Codegen.emit_block_alloca_for(stmt: AST.Stmt) {
+        var vname: String = match (stmt) { VarDecl(n, t, init, d) => n
+            _ => ""
+        }
+        var vdoc: String = match (stmt) { VarDecl(n, t, init, d) => d
+            _ => ""
+        }
+        if (vdoc.starts_with("@import:")) { return }
+        if (!this.var_types.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
+            this.known_functions.push("__alloc_" + vname)
+            this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
+        }
+    }
+
+extend fun Codegen.emit_block_allocas(stmts: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            var kind: String = this.classify_stmt(stmts[i])
+            if (kind == "var") {
+                this.emit_block_alloca_for(stmts[i])
+            }
+            i = i + 1
+        }
+    }
+
+extend fun Codegen.gen_stmts(stmts: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.gen_stmt(stmts[i])
+            i = i + 1
+        }
+    }
+
+extend fun Codegen.to_i1(val: String): String {
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = trunc i64 " + val + " to i1")
+        return local
+    }
+
+extend fun Codegen.gen_if(cond: AST.Expr, then_branch: List<AST.Stmt>, else_branch: List<AST.Stmt>) {
+        var end_label: String = this.fresh_label("endif")
+        var current_cond: AST.Expr = cond
+        var current_then: List<AST.Stmt> = then_branch
+        var current_else: List<AST.Stmt> = else_branch
+
+        // Iterative else-if chain to avoid deep C stack recursion
+        while (true) {
+            var cond_val: String = this.to_i1(this.gen_arg_value(current_cond))
+            var then_label: String = this.fresh_label("then")
+            var else_label: String = this.fresh_label("else")
+
+            this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+
+            this.start_block(then_label)
+            this.gen_stmts(current_then)
+            this.emit_terminator("br label %" + end_label)
+
+            this.start_block(else_label)
+
+            // Check if else is a single If (else-if chain)
+            var is_elseif: Bool = false
+            if (current_else.length() == 1) {
+                if (this.classify_stmt(current_else[0]) == "if") {
+                    is_elseif = true
+                }
+            }
+            if (is_elseif) {
+                var nested: Any = current_else[0]
+                current_cond = match (nested) { If(c, t, e) => c }
+                current_then = match (nested) { If(c, t, e) => t }
+                current_else = match (nested) { If(c, t, e) => e }
+                // Continue loop instead of recursing
+            } else {
+                // Final else or no else
+                if (current_else.length() > 0) {
+                    this.gen_stmts(current_else)
+                }
+                this.emit_terminator("br label %" + end_label)
+                break
+            }
+        }
+
+        this.start_block(end_label)
+    }
+
+        fun classify_stmt(stmt: AST.Stmt): String {
+        return match (stmt) {
+            If(c, t, e) => "if"
+            ExprStmt(expr) => "expr"
+            VarDecl(n, t, i, d) => "var"
+            FunDecl(n, p, r, b, d) => "fun"
+            EnumDecl(n, v, d) => "enum"
+            ClassDecl(n, p, f, m, d) => "class"
+            Return(v) => "return"
+            While(c, b) => "while"
+            Block(s) => "block"
+            Break => "break"
+            Continue => "continue"
+            TryCatch(t, n, c, f) => "try"
+            Throw(v) => "throw"
+        }
+    }
+
+extend fun Codegen.is_if_stmt(stmt: AST.Stmt): Bool {
+        var kind: Any = match (stmt) {
+            If(c, t, e) => "if"
+            ExprStmt(expr) => "other"
+            VarDecl(n, t, i, d) => "other"
+            FunDecl(n, p, r, b, d) => "other"
+            EnumDecl(n, v, d) => "other"
+            ClassDecl(n, p, f, m, d) => "other"
+            Return(v) => "other"
+            While(c, b) => "other"
+            Block(s) => "other"
+            Break => "other"
+            Continue => "other"
+            TryCatch(t, n, c, f) => "other"
+            Throw(v) => "other"
+        }
+        return kind == "if"
+    }
+
+extend fun Codegen.gen_throw(value: AST.Expr) {
+        var val: String = this.gen_arg_value(value)
+        this.emit_indent("store i64 " + val + ", i64* @__exception_value")
+        // Load the current jmp_buf pointer and longjmp to it
+        var jmp_ptr: String = this.fresh_local()
+        this.emit_indent(jmp_ptr + " = load i8*, i8** @__jmp_buf_current")
+        this.emit_indent("call void @longjmp(i8* " + jmp_ptr + ", i32 1)")
+        this.emit_terminator("unreachable")
+    }
+
+extend fun Codegen.gen_try_catch(try_body: List<AST.Stmt>, catch_name: String, catch_body: List<AST.Stmt>, finally_body: List<AST.Stmt>) {
+        var try_label: String = this.fresh_label("try")
+        var catch_label: String = this.fresh_label("catch")
+        var finally_label: String = this.fresh_label("finally")
+        var end_label: String = this.fresh_label("tryend")
+
+        var has_finally: Float = finally_body.length() > 0
+
+        // Allocate a local jmp_buf on the stack (512 bytes, enough for any platform)
+        var jmp_buf: String = this.fresh_local()
+        this.emit_indent(jmp_buf + " = alloca [512 x i8], align 16")
+        var jmp_buf_ptr: String = this.fresh_local()
+        this.emit_indent(jmp_buf_ptr + " = getelementptr [512 x i8], [512 x i8]* " + jmp_buf + ", i64 0, i64 0")
+
+        // Save the previous jmp_buf pointer (for nested try/catch)
+        var saved_jmp: String = this.fresh_local()
+        this.emit_indent(saved_jmp + " = load i8*, i8** @__jmp_buf_current")
+        // Set current jmp_buf to our local buffer
+        this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
+
+        // setjmp returns 0 on first call, non-zero on longjmp
+        var setjmp_result: String = this.fresh_local()
+        this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
+        var is_throw: String = this.fresh_local()
+        this.emit_indent(is_throw + " = icmp ne i32 " + setjmp_result + ", 0")
+        this.emit_terminator("br i1 " + is_throw + ", label %" + catch_label + ", label %" + try_label)
+
+        // Try body
+        this.start_block(try_label)
+        this.gen_stmts(try_body)
+        if (!this.block_terminated) {
+            // Restore previous jmp_buf before leaving try
+            this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+            if (has_finally) {
+                this.emit_terminator("br label %" + finally_label)
+            } else {
+                this.emit_terminator("br label %" + end_label)
+            }
+        }
+
+        // Catch body
+        this.start_block(catch_label)
+        // Restore previous jmp_buf before running catch (so re-throws use outer handler)
+        this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        // Load exception value into catch variable
+        var exc_val: String = this.fresh_local()
+        this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
+        this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.gen_stmts(catch_body)
+        if (!this.block_terminated) {
+            if (has_finally) {
+                this.emit_terminator("br label %" + finally_label)
+            } else {
+                this.emit_terminator("br label %" + end_label)
+            }
+        }
+
+        // Finally body (runs after both try and catch paths)
+        if (has_finally) {
+            this.start_block(finally_label)
+            this.gen_stmts(finally_body)
+            if (!this.block_terminated) {
+                this.emit_terminator("br label %" + end_label)
+            }
+        }
+
+        this.start_block(end_label)
+    }
+
+extend fun Codegen.gen_while(cond: AST.Expr, body: List<AST.Stmt>) {
+        var cond_label: String = this.fresh_label("while.cond")
+        var body_label: String = this.fresh_label("while.body")
+        var end_label: String = this.fresh_label("while.end")
+
+        var saved_loop_end: String = this.loop_end_label
+        this.loop_end_label = end_label + ":" + cond_label
+
+        this.emit_terminator("br label %" + cond_label)
+
+        this.start_block(cond_label)
+        var cond_val: String = this.to_i1(this.gen_arg_value(cond))
+        this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
+
+        this.start_block(body_label)
+        this.gen_stmts(body)
+        this.emit_terminator("br label %" + cond_label)
+
+        this.loop_end_label = saved_loop_end
+
+        this.start_block(end_label)
+    }
+

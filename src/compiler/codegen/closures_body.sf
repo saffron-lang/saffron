@@ -1,0 +1,244 @@
+    fun gen_lambda(params: List<AST.Param>, ret_type: String, body: List<AST.Stmt>): String {
+        // Find captured variables (free variables in body not in params)
+        var param_names: List<String> = []
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p: AST.Param = params[pi]
+            var pname: String = match (p) { Param(n, t, d) => n }
+            param_names.push(pname)
+            pi = pi + 1
+        }
+        var captures: List<String> = []
+        this.find_free_vars_stmts(body, param_names, captures)
+
+        // Generate a unique name for this lambda
+        this.label_counter = this.label_counter + 1
+        var lambda_name: String = "__lambda_" + this.label_counter.floor().to_string()
+
+        // Build the lambda's params: env pointer (if captures) + original params
+        var params_str: String = this.params_to_string(params)
+        var lambda_params: String = ""
+        if (captures.length() > 0) {
+            lambda_params = "__env:Int"
+            if (params_str.length() > 0) {
+                lambda_params = lambda_params + "," + params_str
+            }
+        } else {
+            lambda_params = params_str
+        }
+
+        // Save current state
+        var saved_sb: StringBuilder = this.sb
+        var saved_terminated: Bool = this.block_terminated
+        var saved_counter: Float = this.local_counter
+        var saved_var_types: Map<String, String> = this.var_types
+        var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
+
+        // Generate the lambda function (disable nested detection to avoid interception)
+        var saved_in_fn: Bool = this.in_function
+        this.in_function = false
+        this.sb = StringBuilder()
+        if (captures.length() > 0) {
+            // Custom gen: emit function header, extract captures from env, then body
+            this.gen_closure_function(lambda_name, lambda_params, ret_type, body, captures)
+        } else {
+            this.gen_function(lambda_name, params_str, ret_type, body)
+        }
+        this.in_function = saved_in_fn
+        var lambda_ir: String = this.sb.to_string()
+
+        // Restore state
+        this.sb = saved_sb
+        this.block_terminated = saved_terminated
+        this.local_counter = saved_counter
+        this.var_types = saved_var_types
+        this.typed_vars = saved_typed_vars
+        this.globals.push(lambda_ir)
+
+        if (captures.length() > 0) {
+            // Heap-allocate environment: [cap0, cap1, ...]
+            var env_size: Float = captures.length()
+            var env_bytes: Float = env_size * 8
+            var env_raw: String = this.fresh_local()
+            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            var env_ptr: String = this.fresh_local()
+            this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
+            // Store pointers to captured variables in env.
+            // Uses stack pointers — valid as long as enclosing function is on stack.
+            // For escaping closures, captured vars would need heap allocation.
+            var ci: Float = 0
+            while (ci < captures.length()) {
+                var cap_ptr: String = this.fresh_local()
+                this.emit_indent(cap_ptr + " = ptrtoint i64* %" + this.sanitize_name(captures[ci]) + " to i64")
+                var slot: String = this.fresh_local()
+                this.emit_indent(slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+                this.emit_indent("store i64 " + cap_ptr + ", i64* " + slot)
+                ci = ci + 1
+            }
+            // Heap-allocate closure pair: [fn_ptr, env_ptr]
+            var closure_raw: String = this.fresh_local()
+            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            var closure_ptr: String = this.fresh_local()
+            this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+            // Store fn ptr
+            var fn_as_int: String = this.fresh_local()
+            var num_params: Float = param_names.length() + 1
+            var fn_type_str: String = "i64 ("
+            var ti: Float = 0
+            while (ti < num_params) {
+                if (ti > 0) { fn_type_str = fn_type_str + ", " }
+                fn_type_str = fn_type_str + "i64"
+                ti = ti + 1
+            }
+            fn_type_str = fn_type_str + ")*"
+            this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+            var fn_slot: String = this.fresh_local()
+            this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+            this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
+            // Store env ptr
+            var env_as_int: String = this.fresh_local()
+            this.emit_indent(env_as_int + " = ptrtoint [" + env_size.floor().to_string() + " x i64]* " + env_ptr + " to i64")
+            var env_slot: String = this.fresh_local()
+            this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+            this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
+            // Return closure pointer as i64
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+            return result
+        }
+
+        // No captures: create closure pair with env=0
+        // Lambda needs env param too for uniform calling convention
+        // Re-generate with env param
+        this.globals.pop() // remove the one we just generated
+        var saved_sb2: StringBuilder = this.sb
+        var saved_terminated2: Bool = this.block_terminated
+        var saved_counter2: Float = this.local_counter
+        var saved_var_types2: Map<String, String> = this.var_types
+        var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
+        this.sb = StringBuilder()
+        var full_params: String = "__env:Int"
+        if (params_str.length() > 0) {
+            full_params = full_params + "," + params_str
+        }
+        this.gen_function(lambda_name, full_params, ret_type, body)
+        this.globals.push(this.sb.to_string())
+        this.sb = saved_sb2
+        this.block_terminated = saved_terminated2
+        this.local_counter = saved_counter2
+        this.var_types = saved_var_types2
+        this.typed_vars = saved_typed_vars2b
+
+        // Heap-allocate closure pair: [fn_ptr, 0]
+        var closure_raw: String = this.fresh_local()
+        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        var closure_ptr: String = this.fresh_local()
+        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        var num_total_params: Float = param_names.length() + 1
+        var fn_type_str: String = "i64 ("
+        var tti: Float = 0
+        while (tti < num_total_params) {
+            if (tti > 0) { fn_type_str = fn_type_str + ", " }
+            fn_type_str = fn_type_str + "i64"
+            tti = tti + 1
+        }
+        fn_type_str = fn_type_str + ")*"
+        var fn_as_int: String = this.fresh_local()
+        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+        var fn_slot: String = this.fresh_local()
+        this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+        this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
+        var env_slot: String = this.fresh_local()
+        this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+        this.emit_indent("store i64 0, i64* " + env_slot)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        return result
+    }
+
+    fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
+        this.known_functions.push(name)
+        this.reset_locals()
+        var ret_llvm: String = this.llvm_type(ret_type)
+        this.current_ret_type = ret_llvm
+
+        var param_list: List<String> = []
+        if (params.length() > 0) {
+            param_list = this.split_respecting_generics(params, ",")
+        }
+
+        var param_strs: List<String> = []
+        var i: Float = 0
+        while (i < param_list.length()) {
+            var parts: List<String> = param_list[i].split(":")
+            var pname: String = parts[0]
+            var ptype: String = parts[1]
+            param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
+            i = i + 1
+        }
+
+        this.emit("")
+        var closure_linkage: String = "define"
+        if (this.current_prefix.length() > 0) {
+            closure_linkage = "define linkonce_odr"
+        }
+        this.emit(closure_linkage + " " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
+        this.emit("entry:")
+        this.block_terminated = false
+
+        // Alloca all params
+        i = 0
+        while (i < param_list.length()) {
+            var parts: List<String> = param_list[i].split(":")
+            var pname: String = parts[0]
+            var ptype: String = parts[1]
+            this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
+            this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
+            i = i + 1
+        }
+
+        // Extract capture POINTERS from __env
+        // Env stores ptrtoint'd pointers to the captured variables (heap-allocated)
+        var env_size: Float = captures.length()
+        var env_int: String = this.fresh_local()
+        this.emit_indent(env_int + " = load i64, i64* %__env")
+        var env_ptr: String = this.fresh_local()
+        this.emit_indent(env_ptr + " = inttoptr i64 " + env_int + " to [" + env_size.floor().to_string() + " x i64]*")
+        var ci: Float = 0
+        while (ci < captures.length()) {
+            var cap_name: String = captures[ci]
+            var cap_slot: String = this.fresh_local()
+            this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+            var cap_ptr_int: String = this.fresh_local()
+            this.emit_indent(cap_ptr_int + " = load i64, i64* " + cap_slot)
+            // cap_name becomes the POINTER (i64*) to the shared variable
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = inttoptr i64 " + cap_ptr_int + " to i64*")
+            ci = ci + 1
+        }
+
+        // Collect and emit remaining var allocas
+        var var_names: List<String> = []
+        var var_types: List<String> = []
+        this.collect_vars(body, var_names, var_types)
+        i = 0
+        while (i < var_names.length()) {
+            var vname: String = var_names[i]
+            if (!captures.contains(vname)) {
+                this.emit_indent("%" + this.sanitize_name(vname) + " = alloca " + this.llvm_type(var_types[i]))
+            }
+            i = i + 1
+        }
+
+        this.gen_stmts(body)
+
+        if (!this.block_terminated) {
+            if (ret_llvm == "void") {
+                this.emit_terminator("ret void")
+            } else {
+                this.emit_terminator("unreachable")
+            }
+        }
+        this.emit("}")
+        this.block_terminated = false
+    }
+
