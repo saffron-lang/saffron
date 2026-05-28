@@ -7,11 +7,13 @@ class Parser {
     var tokens: List<Lexer.Token>
     var pos: Float
     var had_error: Bool
+    var source: String
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
         this.pos = 0
         this.had_error = false
+        this.source = ""
     }
 
     fun current(): Lexer.Token {
@@ -82,6 +84,23 @@ class Parser {
 
     fun parse_error(message: String) {
         IO.println("[line " + this.current_line() + ", col " + this.current_col() + "] Error: " + message)
+        if (this.source.length() > 0) {
+            var line_num: Float = this.current_line_num()
+            var lines: List<String> = this.source.split("\n")
+            if (line_num > 0 and line_num <= lines.length()) {
+                var src_line: String = lines[line_num - 1]
+                var prefix: String = "  " + line_num.floor().to_string() + " | "
+                IO.println(prefix + src_line)
+                var col: Float = match (this.current()) { Token(kind, line, col) => col }
+                var padding: String = ""
+                var pi: Float = 0
+                while (pi < prefix.length() + col - 1) {
+                    padding = padding + " "
+                    pi = pi + 1
+                }
+                IO.println(padding + "^")
+            }
+        }
         this.had_error = true
     }
 
@@ -636,6 +655,7 @@ class Parser {
             TkEq => "="
             TkArrow => "->"
             TkFatArrow => "=>"
+            TkQuestion => "?"
             TkVar => "var"
             TkLet => "let"
             TkFun => "fun"
@@ -1567,6 +1587,14 @@ var last_parse_had_error: Bool = false
 
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
+    var result: List<AST.Stmt> = p.parse_program()
+    last_parse_had_error = p.had_error
+    return result
+}
+
+fun parse_with_source(tokens: List<Lexer.Token>, source: String): List<AST.Stmt> {
+    var p: Parser = Parser(tokens)
+    p.source = source
     var result: List<AST.Stmt> = p.parse_program()
     last_parse_had_error = p.had_error
     return result

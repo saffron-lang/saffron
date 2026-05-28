@@ -68,6 +68,7 @@ enum TokenKind {
     TkSemicolon,
     TkArrow,
     TkFatArrow,
+    TkQuestion,
 
     // Documentation
     TkDocComment(text: String),
@@ -196,12 +197,13 @@ class Lexer {
         }
 
         var text: String = this.source.slice(start, this.pos)
-        var value: Float = text.to_number()
 
         if (has_dot) {
-            this.emit(TokenKind.TkFloat(value))
+            var fvalue: Float = text.to_float()
+            this.emit(TokenKind.TkFloat(fvalue))
         } else {
-            this.emit(TokenKind.TkInt(value))
+            var ivalue: Float = text.to_number()
+            this.emit(TokenKind.TkInt(ivalue))
         }
     }
 
@@ -395,6 +397,7 @@ class Lexer {
             else if (ch == "^") { this.emit(TokenKind.TkCaret) }
             else if (ch == "~") { this.emit(TokenKind.TkTilde) }
             else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
+            else if (ch == "?") { this.emit(TokenKind.TkQuestion) }
             else if (ch == "|") { this.emit(TokenKind.TkPipe) }
             else if (ch == "!") {
                 if (this.peek() == "=") {
