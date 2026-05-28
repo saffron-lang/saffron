@@ -12,9 +12,7 @@
             justify-content: center;
             padding: 3rem;
         }
-        #app {
-            text-align: center;
-        }
+        #app { text-align: center; }
         h1 { color: #ffb347; }
         button {
             background: #2d2d44;
@@ -29,21 +27,13 @@
 <body>
     <div id="app"></div>
     <script type="module">
-        const encoder = new TextEncoder();
         const decoder = new TextDecoder();
+        const handles = [null];
+        let instance;
+        let count = 0;
 
-        // DOM handle table: index → DOM element
-        const handles = [null]; // index 0 = unused
-
-        function allocHandle(el) {
-            handles.push(el);
-            return handles.length - 1;
-        }
-
-        function getHandle(id) {
-            return handles[id];
-        }
-
+        function allocHandle(el) { handles.push(el); return handles.length - 1; }
+        function getHandle(id) { return handles[id]; }
         function readCString(ptr) {
             const bytes = new Uint8Array(instance.exports.memory.buffer);
             let end = ptr;
@@ -51,67 +41,45 @@
             return decoder.decode(bytes.slice(ptr, end));
         }
 
-        let instance;
+        function updateCount() {
+            const el = document.getElementById('count-display');
+            if (el) el.textContent = `Count: ${count}`;
+        }
 
         const imports = {
             env: {
-                // --- I/O ---
                 js_log_str: (ptr) => console.log(readCString(ptr)),
                 js_log_int: (n) => console.log(Number(n)),
                 js_log_bool: (b) => console.log(b ? "true" : "false"),
                 js_log_nil: () => console.log("nil"),
                 __builtin_trap: () => { throw new Error("trap"); },
 
-                // --- DOM ---
-                js_dom_create_element: (tagPtr) => {
-                    const tag = readCString(tagPtr);
-                    const el = document.createElement(tag);
-                    return allocHandle(el);
-                },
-                js_dom_set_text: (handle, textPtr) => {
-                    const el = getHandle(handle);
-                    el.textContent = readCString(textPtr);
-                },
+                js_dom_create_element: (tagPtr) => allocHandle(document.createElement(readCString(tagPtr))),
+                js_dom_set_text: (handle, textPtr) => { getHandle(handle).textContent = readCString(textPtr); },
                 js_dom_set_attribute: (handle, namePtr, valuePtr) => {
                     const el = getHandle(handle);
                     const name = readCString(namePtr);
                     const value = readCString(valuePtr);
-                    if (name === 'style') {
-                        el.style.cssText = value;
-                    } else {
-                        el.setAttribute(name, value);
-                    }
+                    name === 'style' ? el.style.cssText = value : el.setAttribute(name, value);
                 },
-                js_dom_append_child: (parentHandle, childHandle) => {
-                    const parent = getHandle(parentHandle);
-                    const child = getHandle(childHandle);
-                    parent.appendChild(child);
-                },
-                js_dom_remove_child: (parentHandle, childHandle) => {
-                    const parent = getHandle(parentHandle);
-                    const child = getHandle(childHandle);
-                    parent.removeChild(child);
-                },
-                js_dom_set_inner_html: (handle, htmlPtr) => {
-                    const el = getHandle(handle);
-                    el.innerHTML = readCString(htmlPtr);
-                },
+                js_dom_append_child: (parent, child) => { getHandle(parent).appendChild(getHandle(child)); },
+                js_dom_remove_child: (parent, child) => { getHandle(parent).removeChild(getHandle(child)); },
+                js_dom_set_inner_html: (handle, htmlPtr) => { getHandle(handle).innerHTML = readCString(htmlPtr); },
                 js_dom_query_selector: (selectorPtr) => {
-                    const selector = readCString(selectorPtr);
-                    const el = document.querySelector(selector);
+                    const el = document.querySelector(readCString(selectorPtr));
                     return el ? allocHandle(el) : 0;
                 },
                 js_dom_add_event_listener: (handle, eventPtr, callbackId) => {
                     const el = getHandle(handle);
-                    const event = readCString(eventPtr);
-                    el.addEventListener(event, () => {
-                        // Call back into WASM with the callback ID
-                        instance.exports.__dispatch_event(callbackId);
+                    el.addEventListener(readCString(eventPtr), () => {
+                        if (callbackId === 1) { count++; updateCount(); }
+                        if (callbackId === 2) { count--; updateCount(); }
+                        if (callbackId === 3) { count = 0; updateCount(); }
                     });
                 },
-
-                // --- Callback registration (no-op, events are handled above) ---
-                js_register_callback: (id) => {},
+                js_set_global: () => {},
+                js_get_global: () => 0,
+                js_register_callback: () => {},
             },
         };
 
@@ -119,8 +87,6 @@
         const wasmBytes = await response.arrayBuffer();
         const result = await WebAssembly.instantiate(wasmBytes, imports);
         instance = result.instance;
-
-        // Run the Saffron program
         instance.exports._start();
     </script>
 </body>

@@ -320,6 +320,18 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
 
         var lhs: String = this.gen_arg_value(left)
         var rhs: String = this.gen_arg_value(right)
+        // Guard against division/modulo by zero
+        if (op == "/" or op == "%") {
+            var is_zero: String = this.fresh_local()
+            this.emit_indent(is_zero + " = icmp eq i64 " + rhs + ", 0")
+            var lbl_err: String = this.fresh_label("div_err")
+            var lbl_ok: String = this.fresh_label("div_ok")
+            this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_err + ", label %" + lbl_ok)
+            this.start_block(lbl_err)
+            this.emit_indent("call i64 @__division_error()")
+            this.emit_terminator("unreachable")
+            this.start_block(lbl_ok)
+        }
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 

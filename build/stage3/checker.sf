@@ -233,19 +233,38 @@ class NullChecker {
         }
     }
 
-    // --- Type analysis (uses Type nodes internally) ---
+    // --- Type analysis (string-based to avoid native codegen crash) ---
 
     fun is_nullable(typ: String): Bool {
-        var node: AST.Type = this.parse_type_node(typ)
-        return this.is_nullable_type(node)
+        if (typ == "Nil") return true
+        if (typ == "Any") return false
+        // Check for "Nil" component in union types
+        if (typ.contains("|")) {
+            var parts: List<String> = typ.split("|")
+            var i: Float = 0
+            while (i < parts.length()) {
+                if (parts[i] == "Nil") return true
+                i = i + 1
+            }
+        }
+        return false
     }
 
     fun strip_nil(typ: String): String {
         if (typ == "Nil") return "Nil"
         if (!typ.contains("|")) return typ
-        var node: AST.Type = this.parse_type_node(typ)
-        var stripped: AST.Type = this.strip_nil_from_node(node)
-        return this.type_to_str(stripped)
+        var parts: List<String> = typ.split("|")
+        var filtered: List<String> = []
+        var i: Float = 0
+        while (i < parts.length()) {
+            if (parts[i] != "Nil") {
+                filtered.push(parts[i])
+            }
+            i = i + 1
+        }
+        if (filtered.length() == 0) return "Nil"
+        if (filtered.length() == 1) return filtered[0]
+        return filtered.join("|")
     }
 
     fun strip_nil_from_node(t: AST.Type): AST.Type {
