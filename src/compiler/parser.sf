@@ -497,6 +497,7 @@ class Parser {
         if (!this.match_kind_check("]")) {
             elements.push(this.parse_expr())
             while (this.match_kind(",")) {
+                if (this.match_kind_check("]")) { break }
                 elements.push(this.parse_expr())
             }
         }

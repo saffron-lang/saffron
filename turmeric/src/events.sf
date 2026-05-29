@@ -1,0 +1,440 @@
+// Turmeric Events — full typed event system
+// Bridges JS DOM events to Saffron via WASM callback dispatch
+
+import "./signal.sf" as Sig
+
+// =============================================================================
+// Event Data Types (passed from JS into WASM)
+// =============================================================================
+
+class MouseEventData {
+    var client_x: Float
+    var client_y: Float
+    var offset_x: Float
+    var offset_y: Float
+    var button: Float
+    var buttons: Float
+    var alt_key: Bool
+    var ctrl_key: Bool
+    var shift_key: Bool
+    var meta_key: Bool
+
+    fun init() {
+        this.client_x = 0
+        this.client_y = 0
+        this.offset_x = 0
+        this.offset_y = 0
+        this.button = 0
+        this.buttons = 0
+        this.alt_key = false
+        this.ctrl_key = false
+        this.shift_key = false
+        this.meta_key = false
+    }
+}
+
+class KeyboardEventData {
+    var key: String
+    var code: String
+    var location: Float
+    var repeat: Bool
+    var alt_key: Bool
+    var ctrl_key: Bool
+    var shift_key: Bool
+    var meta_key: Bool
+
+    fun init() {
+        this.key = ""
+        this.code = ""
+        this.location = 0
+        this.repeat = false
+        this.alt_key = false
+        this.ctrl_key = false
+        this.shift_key = false
+        this.meta_key = false
+    }
+}
+
+class InputEventData {
+    var value: String
+    var input_type: String
+    var data: String
+
+    fun init() {
+        this.value = ""
+        this.input_type = ""
+        this.data = ""
+    }
+}
+
+class FocusEventData {
+    var related_target: Float
+
+    fun init() {
+        this.related_target = 0
+    }
+}
+
+class SubmitEventData {
+    var submitter: Float
+
+    fun init() {
+        this.submitter = 0
+    }
+}
+
+class DragEventData {
+    var client_x: Float
+    var client_y: Float
+    var data_transfer_text: String
+
+    fun init() {
+        this.client_x = 0
+        this.client_y = 0
+        this.data_transfer_text = ""
+    }
+}
+
+class TouchPoint {
+    var identifier: Float
+    var client_x: Float
+    var client_y: Float
+
+    fun init(identifier: Float, client_x: Float, client_y: Float) {
+        this.identifier = identifier
+        this.client_x = client_x
+        this.client_y = client_y
+    }
+}
+
+class TouchEventData {
+    var touches: List<TouchPoint>
+    var changed_touches: List<TouchPoint>
+
+    fun init() {
+        this.touches = []
+        this.changed_touches = []
+    }
+}
+
+class WheelEventData {
+    var delta_x: Float
+    var delta_y: Float
+    var delta_z: Float
+    var delta_mode: Float
+
+    fun init() {
+        this.delta_x = 0
+        this.delta_y = 0
+        this.delta_z = 0
+        this.delta_mode = 0
+    }
+}
+
+// =============================================================================
+// Event Enum — discriminated union of all event types
+// =============================================================================
+
+enum Event {
+    Click(data: MouseEventData),
+    DblClick(data: MouseEventData),
+    MouseDown(data: MouseEventData),
+    MouseUp(data: MouseEventData),
+    MouseMove(data: MouseEventData),
+    MouseEnter(data: MouseEventData),
+    MouseLeave(data: MouseEventData),
+    KeyDown(data: KeyboardEventData),
+    KeyUp(data: KeyboardEventData),
+    Input(data: InputEventData),
+    Change(data: InputEventData),
+    Focus(data: FocusEventData),
+    Blur(data: FocusEventData),
+    Submit(data: SubmitEventData),
+    Wheel(data: WheelEventData),
+    TouchStart(data: TouchEventData),
+    TouchMove(data: TouchEventData),
+    TouchEnd(data: TouchEventData),
+    DragStart(data: DragEventData),
+    DragEnd(data: DragEventData),
+    Drop(data: DragEventData),
+    Scroll,
+    Resize
+}
+
+// =============================================================================
+// Callback Registry — maps IDs to typed handlers
+// =============================================================================
+
+var _next_callback_id: Float = 0
+var _callbacks: Map<Float, (Event) => Nil> = {}
+var _prevent_defaults: Map<Float, Bool> = {}
+var _stop_propagations: Map<Float, Bool> = {}
+
+fun register_handler(handler: (Event) => Nil): Float {
+    _next_callback_id = _next_callback_id + 1
+    var id: Float = _next_callback_id
+    _callbacks.set(id, handler)
+    return id
+}
+
+fun register_handler_with_options(handler: (Event) => Nil, prevent_default: Bool, stop_propagation: Bool): Float {
+    var id: Float = register_handler(handler)
+    if (prevent_default) { _prevent_defaults.set(id, true) }
+    if (stop_propagation) { _stop_propagations.set(id, true) }
+    return id
+}
+
+fun unregister_handler(id: Float) {
+    _callbacks.set(id, nil)
+    _prevent_defaults.set(id, false)
+    _stop_propagations.set(id, false)
+}
+
+// =============================================================================
+// Dispatch (called from JS with serialized event data)
+// =============================================================================
+
+// JS calls these exported functions when DOM events fire
+
+@extern("i64 js_event_get_float(i64, void*)") fun _js_get_float(event_ptr: Float, field: String): Float
+@extern("i64 js_event_get_string(i64, void*)") fun _js_get_string(event_ptr: Float, field: String): String
+@extern("i64 js_event_get_bool(i64, void*)") fun _js_get_bool(event_ptr: Float, field: String): Bool
+@extern("void js_event_prevent_default(i64)") fun _js_prevent_default(event_ptr: Float)
+@extern("void js_event_stop_propagation(i64)") fun _js_stop_propagation(event_ptr: Float)
+
+fun __dispatch_click(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    if (_prevent_defaults.has(callback_id)) { _js_prevent_default(event_ptr) }
+    if (_stop_propagations.has(callback_id)) { _js_stop_propagation(event_ptr) }
+
+    var data: MouseEventData = MouseEventData()
+    data.client_x = _js_get_float(event_ptr, "clientX")
+    data.client_y = _js_get_float(event_ptr, "clientY")
+    data.offset_x = _js_get_float(event_ptr, "offsetX")
+    data.offset_y = _js_get_float(event_ptr, "offsetY")
+    data.button = _js_get_float(event_ptr, "button")
+    data.alt_key = _js_get_bool(event_ptr, "altKey")
+    data.ctrl_key = _js_get_bool(event_ptr, "ctrlKey")
+    data.shift_key = _js_get_bool(event_ptr, "shiftKey")
+    data.meta_key = _js_get_bool(event_ptr, "metaKey")
+
+    _callbacks.get(callback_id)(Event.Click(data))
+}
+
+fun __dispatch_keydown(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    if (_prevent_defaults.has(callback_id)) { _js_prevent_default(event_ptr) }
+    if (_stop_propagations.has(callback_id)) { _js_stop_propagation(event_ptr) }
+
+    var data: KeyboardEventData = KeyboardEventData()
+    data.key = _js_get_string(event_ptr, "key")
+    data.code = _js_get_string(event_ptr, "code")
+    data.repeat = _js_get_bool(event_ptr, "repeat")
+    data.alt_key = _js_get_bool(event_ptr, "altKey")
+    data.ctrl_key = _js_get_bool(event_ptr, "ctrlKey")
+    data.shift_key = _js_get_bool(event_ptr, "shiftKey")
+    data.meta_key = _js_get_bool(event_ptr, "metaKey")
+
+    _callbacks.get(callback_id)(Event.KeyDown(data))
+}
+
+fun __dispatch_keyup(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+
+    var data: KeyboardEventData = KeyboardEventData()
+    data.key = _js_get_string(event_ptr, "key")
+    data.code = _js_get_string(event_ptr, "code")
+
+    _callbacks.get(callback_id)(Event.KeyUp(data))
+}
+
+fun __dispatch_input(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+
+    var data: InputEventData = InputEventData()
+    data.value = _js_get_string(event_ptr, "target.value")
+    data.input_type = _js_get_string(event_ptr, "inputType")
+    data.data = _js_get_string(event_ptr, "data")
+
+    _callbacks.get(callback_id)(Event.Input(data))
+}
+
+fun __dispatch_change(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+
+    var data: InputEventData = InputEventData()
+    data.value = _js_get_string(event_ptr, "target.value")
+
+    _callbacks.get(callback_id)(Event.Change(data))
+}
+
+fun __dispatch_submit(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    _js_prevent_default(event_ptr)  // Always prevent default on submit
+
+    var data: SubmitEventData = SubmitEventData()
+    _callbacks.get(callback_id)(Event.Submit(data))
+}
+
+fun __dispatch_focus(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    var data: FocusEventData = FocusEventData()
+    _callbacks.get(callback_id)(Event.Focus(data))
+}
+
+fun __dispatch_blur(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    var data: FocusEventData = FocusEventData()
+    _callbacks.get(callback_id)(Event.Blur(data))
+}
+
+fun __dispatch_wheel(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+
+    var data: WheelEventData = WheelEventData()
+    data.delta_x = _js_get_float(event_ptr, "deltaX")
+    data.delta_y = _js_get_float(event_ptr, "deltaY")
+    data.delta_z = _js_get_float(event_ptr, "deltaZ")
+    data.delta_mode = _js_get_float(event_ptr, "deltaMode")
+
+    _callbacks.get(callback_id)(Event.Wheel(data))
+}
+
+fun __dispatch_scroll(callback_id: Float, event_ptr: Float) {
+    if (!_callbacks.has(callback_id)) { return }
+    _callbacks.get(callback_id)(Event.Scroll)
+}
+
+// =============================================================================
+// High-level Event Binding API
+// =============================================================================
+
+// Register an event listener on a DOM handle, returns the callback ID for cleanup
+@extern("void js_dom_add_typed_event_listener(i64, void*, i64)") fun _js_listen(handle: Float, event: String, callback_id: Float)
+
+fun on(handle: Float, event_name: String, handler: (Event) => Nil): Float {
+    var id: Float = register_handler(handler)
+    _js_listen(handle, event_name, id)
+    return id
+}
+
+fun on_prevent(handle: Float, event_name: String, handler: (Event) => Nil): Float {
+    var id: Float = register_handler_with_options(handler, true, false)
+    _js_listen(handle, event_name, id)
+    return id
+}
+
+fun off(handle: Float, id: Float) {
+    unregister_handler(id)
+}
+
+// =============================================================================
+// Convenience Binders (return callback IDs for cleanup)
+// =============================================================================
+
+fun on_click(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "click", handler)
+}
+
+fun on_dblclick(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "dblclick", handler)
+}
+
+fun on_mousedown(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "mousedown", handler)
+}
+
+fun on_mouseup(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "mouseup", handler)
+}
+
+fun on_mousemove(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "mousemove", handler)
+}
+
+fun on_mouseenter(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "mouseenter", handler)
+}
+
+fun on_mouseleave(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "mouseleave", handler)
+}
+
+fun on_keydown(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "keydown", handler)
+}
+
+fun on_keyup(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "keyup", handler)
+}
+
+fun on_input(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "input", handler)
+}
+
+fun on_change(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "change", handler)
+}
+
+fun on_focus(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "focus", handler)
+}
+
+fun on_blur(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "blur", handler)
+}
+
+fun on_submit(handle: Float, handler: (Event) => Nil): Float {
+    return on_prevent(handle, "submit", handler)
+}
+
+fun on_wheel(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "wheel", handler)
+}
+
+fun on_scroll(handle: Float, handler: (Event) => Nil): Float {
+    return on(handle, "scroll", handler)
+}
+
+// =============================================================================
+// Two-way Binding — syncs input value with a signal
+// =============================================================================
+
+fun bind_value(handle: Float, sig: Sig.Signal<String>): Float {
+    // Set initial value
+    @extern("void js_dom_set_property(i64, void*, void*)") fun _js_set_prop(h: Float, prop: String, val: String)
+    _js_set_prop(handle, "value", sig.get())
+
+    // Input → signal
+    var input_id: Float = on_input(handle, fun (e: Event) => {
+        match (e) {
+            Input(data) => sig.set(data.value)
+            _ => {}
+        }
+    })
+
+    // Signal → DOM (for programmatic updates)
+    var sub_id: Float = sig.subscribe(fun () => {
+        _js_set_prop(handle, "value", sig.get())
+    })
+
+    return input_id
+}
+
+fun bind_checked(handle: Float, sig: Sig.Signal<Bool>): Float {
+    @extern("void js_dom_set_bool_property(i64, void*, i64)") fun _js_set_bool_prop(h: Float, prop: String, val: Bool)
+    _js_set_bool_prop(handle, "checked", sig.get())
+
+    var change_id: Float = on_change(handle, fun (e: Event) => {
+        match (e) {
+            Change(data) => sig.set(data.value == "true")
+            _ => {}
+        }
+    })
+
+    sig.subscribe(fun () => {
+        _js_set_bool_prop(handle, "checked", sig.get())
+    })
+
+    return change_id
+}

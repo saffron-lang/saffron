@@ -5,7 +5,7 @@ import "@os" as OS
 import "../config.sf" as Config
 
 fun run(parsed: Args.ParsedArgs) {
-    var manifest = Config.load()
+    var manifest: Config.Manifest = Config.load()
 
     // If there's a build script defined, use it
     if (manifest.scripts.has("build")) {
@@ -16,14 +16,30 @@ fun run(parsed: Args.ParsedArgs) {
         return
     }
 
-    // Default: compile the entry point
+    // Default: compile the entry point with lib-path for installed packages
     var entry: String = manifest.entry
     if (!(IO.file_exists(entry))) {
         IO.println("pantry build: entry file '${entry}' not found")
         OS.exit(1)
     }
 
-    var cmd: String = "saffron ${entry}"
+    var output_name: String = manifest.name
+    if (output_name == "") {
+        output_name = "a.out"
+    }
+    var output_path: String = "build/" + output_name
+
+    // Ensure build/ dir exists
+    OS.exec("mkdir -p build")
+
+    // Build the saffron compile command with lib paths
+    var cmd: String = "saffron build ${entry} -o ${output_path}"
+
+    // Add .pantry/packages as a lib path if it exists
+    if (IO.file_exists(".pantry/packages")) {
+        cmd = cmd + " --lib-path .pantry/packages"
+    }
+
     IO.println("> ${cmd}")
     var output: String = OS.exec(cmd)
     IO.print(output)

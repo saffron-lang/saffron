@@ -1,0 +1,312 @@
+// Turmeric Suspense + Error Boundaries
+// Handles async loading states and runtime error isolation
+
+import "./signal.sf" as Sig
+import "./reconcile.sf" as R
+
+// =============================================================================
+// Resource<T> — async data with Loading/Ready/Error states
+// =============================================================================
+
+enum ResourceState<T> {
+    Loading,
+    Ready(value: T),
+    Error(message: String)
+}
+
+class Resource<T> {
+    var state: Sig.Signal<ResourceState<T>>
+    var fetcher: () => T
+
+    fun init(fetcher: () => T) {
+        this.fetcher = fetcher
+        this.state = Sig.signal(ResourceState.Loading)
+    }
+
+    fun load() {
+        this.state.set(ResourceState.Loading)
+        try {
+            var result: T = this.fetcher()
+            this.state.set(ResourceState.Ready(result))
+        } catch (e) {
+            this.state.set(ResourceState.Error(e))
+        }
+    }
+
+    fun reload() {
+        this.load()
+    }
+
+    fun get(): ResourceState<T> {
+        return this.state.get()
+    }
+
+    fun is_loading(): Bool {
+        return match (this.state.get()) {
+            Loading => true
+            _ => false
+        }
+    }
+
+    fun is_ready(): Bool {
+        return match (this.state.get()) {
+            Ready(v) => true
+            _ => false
+        }
+    }
+
+    fun is_error(): Bool {
+        return match (this.state.get()) {
+            Error(m) => true
+            _ => false
+        }
+    }
+
+    fun unwrap(): T {
+        return match (this.state.get()) {
+            Ready(v) => v
+            _ => { throw "Resource not ready" }
+        }
+    }
+}
+
+fun resource<T>(fetcher: () => T): Resource<T> {
+    var r: Resource<T> = Resource(fetcher)
+    r.load()
+    return r
+}
+
+// Lazy resource — doesn't fetch until first .get()
+fun lazy_resource<T>(fetcher: () => T): Resource<T> {
+    return Resource(fetcher)
+}
+
+// =============================================================================
+// Suspense Boundary — shows fallback while children are loading
+// =============================================================================
+
+class SuspenseBoundary {
+    var parent_handle: Float
+    var resources: List<Resource<Any>>
+    var content_builder: () => R.Component
+    var fallback_builder: () => R.Component
+    var current: R.Component
+    var showing_fallback: Bool
+    var sub_ids: List<Float>
+
+    fun init(parent_handle: Float, resources: List<Resource<Any>>, content_builder: () => R.Component, fallback_builder: () => R.Component) {
+        this.parent_handle = parent_handle
+        this.resources = resources
+        this.content_builder = content_builder
+        this.fallback_builder = fallback_builder
+        this.current = nil
+        this.showing_fallback = false
+        this.sub_ids = []
+        this.sync()
+
+        // Subscribe to all resource state changes
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            var id: Float = this.resources[i].state.subscribe(fun () => {
+                this.sync()
+            })
+            this.sub_ids.push(id)
+            i = i + 1
+        }
+    }
+
+    fun any_loading(): Bool {
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            if (this.resources[i].is_loading()) { return true }
+            i = i + 1
+        }
+        return false
+    }
+
+    fun sync() {
+        var loading: Bool = this.any_loading()
+
+        if (loading and !this.showing_fallback) {
+            // Switch to fallback
+            if (this.current != nil) { this.current.unmount() }
+            this.current = this.fallback_builder()
+            this.current.mount()
+            this.showing_fallback = true
+        }
+
+        if (!loading and this.showing_fallback) {
+            // Switch to content
+            if (this.current != nil) { this.current.unmount() }
+            this.current = this.content_builder()
+            this.current.mount()
+            this.showing_fallback = false
+        }
+
+        if (!loading and this.current == nil) {
+            // Initial render — not loading
+            this.current = this.content_builder()
+            this.current.mount()
+        }
+    }
+
+    fun destroy() {
+        if (this.current != nil) { this.current.unmount() }
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            this.resources[i].state.unsubscribe(this.sub_ids[i])
+            i = i + 1
+        }
+    }
+}
+
+fun suspense(parent: Float, resources: List<Resource<Any>>, content: () => R.Component, fallback: () => R.Component): SuspenseBoundary {
+    return SuspenseBoundary(parent, resources, content, fallback)
+}
+
+// =============================================================================
+// Error Boundary — catches errors in child component trees
+// =============================================================================
+
+class ErrorBoundary {
+    var parent_handle: Float
+    var content_builder: () => R.Component
+    var error_builder: (String) => R.Component
+    var current: R.Component
+    var error_signal: Sig.Signal<String>
+
+    fun init(parent_handle: Float, content_builder: () => R.Component, error_builder: (String) => R.Component) {
+        this.parent_handle = parent_handle
+        this.content_builder = content_builder
+        this.error_builder = error_builder
+        this.error_signal = Sig.signal("")
+        this.current = nil
+        this.render()
+    }
+
+    fun render() {
+        try {
+            this.current = this.content_builder()
+            this.current.mount()
+        } catch (e) {
+            this.catch_error(e)
+        }
+    }
+
+    fun catch_error(message: String) {
+        this.error_signal.set(message)
+        if (this.current != nil) { this.current.unmount() }
+        this.current = this.error_builder(message)
+        this.current.mount()
+    }
+
+    fun reset() {
+        this.error_signal.set("")
+        if (this.current != nil) { this.current.unmount() }
+        this.render()
+    }
+
+    fun has_error(): Bool {
+        return this.error_signal.get().length() > 0
+    }
+
+    fun destroy() {
+        if (this.current != nil) { this.current.unmount() }
+    }
+}
+
+fun error_boundary(parent: Float, content: () => R.Component, fallback: (String) => R.Component): ErrorBoundary {
+    return ErrorBoundary(parent, content, fallback)
+}
+
+// =============================================================================
+// Combined: Suspense + Error in one boundary
+// =============================================================================
+
+class AsyncBoundary {
+    var parent_handle: Float
+    var resources: List<Resource<Any>>
+    var content_builder: () => R.Component
+    var loading_builder: () => R.Component
+    var error_builder: (String) => R.Component
+    var current: R.Component
+    var state: String
+    var sub_ids: List<Float>
+
+    fun init(parent_handle: Float, resources: List<Resource<Any>>, content: () => R.Component, loading: () => R.Component, error: (String) => R.Component) {
+        this.parent_handle = parent_handle
+        this.resources = resources
+        this.content_builder = content
+        this.loading_builder = loading
+        this.error_builder = error
+        this.current = nil
+        this.state = "idle"
+        this.sub_ids = []
+        this.sync()
+
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            var id: Float = this.resources[i].state.subscribe(fun () => {
+                this.sync()
+            })
+            this.sub_ids.push(id)
+            i = i + 1
+        }
+    }
+
+    fun sync() {
+        var new_state: String = "ready"
+        var error_msg: String = ""
+
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            match (this.resources[i].get()) {
+                Loading => { new_state = "loading" }
+                Error(msg) => { new_state = "error"; error_msg = msg }
+                Ready(v) => {}
+            }
+            i = i + 1
+        }
+
+        if (new_state == this.state) { return }
+        this.state = new_state
+
+        if (this.current != nil) { this.current.unmount() }
+
+        if (new_state == "loading") {
+            this.current = this.loading_builder()
+        }
+        if (new_state == "error") {
+            this.current = this.error_builder(error_msg)
+        }
+        if (new_state == "ready") {
+            try {
+                this.current = this.content_builder()
+            } catch (e) {
+                this.current = this.error_builder(e)
+            }
+        }
+        this.current.mount()
+    }
+
+    fun retry() {
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            this.resources[i].reload()
+            i = i + 1
+        }
+    }
+
+    fun destroy() {
+        if (this.current != nil) { this.current.unmount() }
+        var i: Float = 0
+        while (i < this.resources.length()) {
+            this.resources[i].state.unsubscribe(this.sub_ids[i])
+            i = i + 1
+        }
+    }
+}
+
+fun async_boundary(parent: Float, resources: List<Resource<Any>>, content: () => R.Component, loading: () => R.Component, error: (String) => R.Component): AsyncBoundary {
+    return AsyncBoundary(parent, resources, content, loading, error)
+}
