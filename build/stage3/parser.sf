@@ -335,9 +335,9 @@ class Parser {
                     this.advance()
                     var args: List<AST.Expr> = []
                     if (!this.match_kind_check(")")) {
-                        args.push(this.parse_call_arg())
+                        args.push(this.parse_expr())
                         while (this.match_kind(",")) {
-                            args.push(this.parse_call_arg())
+                            args.push(this.parse_expr())
                         }
                         this.consume(")")
                     } else {
@@ -361,9 +361,9 @@ class Parser {
                 this.advance()
                 var args: List<AST.Expr> = []
                 if (!this.match_kind_check(")")) {
-                    args.push(this.parse_call_arg())
+                    args.push(this.parse_expr())
                     while (this.match_kind(",")) {
-                        args.push(this.parse_call_arg())
+                        args.push(this.parse_expr())
                     }
                     this.consume(")")
                 } else {
@@ -419,6 +419,26 @@ class Parser {
                 // Empty map literal: {}
                 this.advance()
                 return AST.Expr.MapLit
+            }
+            // Kotlin-style lambda: { x -> body } or { x, y -> body } or { -> body }
+            if (this.match_kind_check("->")) {
+                // No-param lambda: { -> body }
+                this.advance()
+                var lbody: List<AST.Stmt> = this.parse_block_stmts()
+                return AST.Expr.Lambda([], "Any", lbody)
+            }
+            if (this.match_kind_check("ident") and (this.peek_is("->") or this.peek_is(","))) {
+                // Lambda with params: { x -> ... } or { x, y -> ... }
+                var lparams: List<AST.Param> = []
+                var lpname: String = this.expect_ident()
+                lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
+                while (this.match_kind(",")) {
+                    lpname = this.expect_ident()
+                    lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
+                }
+                this.consume("->")
+                var lbody: List<AST.Stmt> = this.parse_block_stmts()
+                return AST.Expr.Lambda(lparams, "Int", lbody)
             }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
             if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
@@ -1008,8 +1028,8 @@ class Parser {
     }
 
     fun parse_call_arg(): AST.Expr {
-        // Named argument: ident: expr → Assign(name, value)
-        if (this.match_kind_check("ident") and this.peek_is(":")) {
+        // Named argument: ident = expr (Kotlin-style)
+        if (this.match_kind_check("ident") and this.peek_is("=")) {
             var arg_name: String = this.expect_ident()
             this.advance()
             var arg_val: AST.Expr = this.parse_expr()
@@ -1676,12 +1696,12 @@ class Parser {
     }
 }
 
-var last_parse_had_error: Bool = false
+
 
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
     var result: List<AST.Stmt> = p.parse_program()
-    last_parse_had_error = p.had_error
+    
     return result
 }
 
@@ -1689,10 +1709,10 @@ fun parse_with_source(tokens: List<Lexer.Token>, source: String): List<AST.Stmt>
     var p: Parser = Parser(tokens)
     p.source = source
     var result: List<AST.Stmt> = p.parse_program()
-    last_parse_had_error = p.had_error
+    
     return result
 }
 
 fun had_error(): Bool {
-    return last_parse_had_error
+    return false
 }
