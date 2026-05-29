@@ -45,6 +45,7 @@ COMMAND=""
 INPUT=""
 OUTPUT=""
 OPT="-O2"
+TARGET=""
 VERBOSE=false
 
 if [[ $# -eq 0 ]]; then
@@ -86,6 +87,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --verbose)
             VERBOSE=true
+            ;;
+        --target)
+            shift
+            TARGET="$1"
             ;;
         *.sf)
             INPUT="$1"
@@ -178,17 +183,29 @@ build_project() {
     local output="$2"
 
     local ll_path="$TMPDIR/output.ll"
+    local saffronc_flags=""
+    [[ -n "$TARGET" ]] && saffronc_flags="--target $TARGET"
+
     [[ "$VERBOSE" == true ]] && echo "  compile: $entry"
-    "$SAFFRONC" "$entry" "$ll_path" || {
+    "$SAFFRONC" $saffronc_flags "$entry" "$ll_path" || {
         echo "saffron: compilation failed: $entry" >&2
         exit 1
     }
 
     [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
-    clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
-        echo "saffron: linking failed" >&2
-        exit 1
-    }
+    if [[ "$TARGET" == "wasm32" ]]; then
+        local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base.ll"
+        clang --target=wasm32 -O2 -w --no-standard-libraries -Wl,--no-entry -Wl,--export-all \
+            -o "$output" "$ll_path" "$RUNTIME" "$WASM_BASE" || {
+            echo "saffron: wasm linking failed" >&2
+            exit 1
+        }
+    else
+        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
+            echo "saffron: linking failed" >&2
+            exit 1
+        }
+    fi
 }
 
 case "$COMMAND" in

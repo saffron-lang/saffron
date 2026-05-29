@@ -1,4 +1,5 @@
 //! `pantry install` — resolve and install all dependencies.
+//! Creates .pantry/packages/ with symlinks to resolved sources.
 import "@args" as Args
 
 import "@os" as OS
@@ -6,7 +7,7 @@ import "../config.sf" as Config
 import "../resolver.sf" as Resolver
 
 fun _manifest_dir(): String {
-    var path = Config.find_manifest()
+    var path: String = Config.find_manifest()
     var last_slash: Int = -1
     var i: Int = 0
     while (i < path.length()) {
@@ -20,7 +21,7 @@ fun _manifest_dir(): String {
 }
 
 fun run(parsed: Args.ParsedArgs) {
-    var manifest = Config.load()
+    var manifest: Config.Manifest = Config.load()
     var dir: String = _manifest_dir()
 
     if (manifest.dependencies.length() == 0) {
@@ -30,12 +31,25 @@ fun run(parsed: Args.ParsedArgs) {
 
     IO.println("Resolving dependencies for '${manifest.name}'...")
 
-    var resolved = Resolver.resolve_all(manifest.dependencies, dir)
+    var resolved: List<Resolver.ResolvedDep> = Resolver.resolve_all(manifest.dependencies, dir)
 
+    // Create .pantry/packages/ directory
+    var packages_dir: String = dir + "/.pantry/packages"
+    OS.exec("mkdir -p ${packages_dir}")
+
+    // Symlink each resolved dep into packages/
     var i: Int = 0
     while (i < resolved.length()) {
-        var dep = resolved[i]
-        IO.println("  ${dep.name} ${dep.version} (${dep.source_type}: ${dep.source_path})")
+        var dep: Resolver.ResolvedDep = resolved[i]
+        var link_path: String = packages_dir + "/" + dep.name
+
+        // Remove existing symlink/dir if present
+        OS.exec("rm -rf ${link_path}")
+
+        // Create symlink to source
+        OS.exec("ln -s ${dep.source_path} ${link_path}")
+
+        IO.println("  ${dep.name} ${dep.version} (${dep.source_type}) -> ${dep.source_path}")
         i = i + 1
     }
 
@@ -44,6 +58,6 @@ fun run(parsed: Args.ParsedArgs) {
     Resolver.write_lockfile(resolved, lock_path)
 
     IO.println("")
-    IO.println("Resolved ${resolved.length()} dependencies.")
+    IO.println("Installed ${resolved.length()} packages to .pantry/packages/")
     IO.println("Written pantry.lock")
 }
