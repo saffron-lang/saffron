@@ -25,6 +25,7 @@ import "./commands/list.sf" as ListCmd
 import "./commands/clean.sf" as Clean
 
 fun main() {
+    IO.println("[main] start")
     var raw_args = OS.args()
     // Skip leading non-command args (interpreter path, script path, etc.)
     // Find first arg that doesn't end in .sf and isn't a flag we don't own
@@ -53,6 +54,7 @@ fun main() {
     }
 
     var command = positional[0]
+    IO.println("[main] command: " + command)
 
     if (command == "init") {
         Init.run(parsed)

@@ -331,7 +331,7 @@ extend fun Codegen.find_free_vars_expr(expr: AST.Expr, bound: List<String>, free
                     // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
                 } else {
-                    var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name)
+                    var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
                     if (!is_known and name.length() > 0) {
                         var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                         if (upper.index_of(name.char_at(0)) >= 0) {

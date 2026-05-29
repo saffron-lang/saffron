@@ -359,6 +359,12 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
                 this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
                 vi = vi + 1
             }
+            // Call module init functions before user code
+            var mi2: Float = 0
+            while (mi2 < this.module_init_names.length()) {
+                this.emit_indent("call i64 @" + this.module_init_names[mi2] + "()")
+                mi2 = mi2 + 1
+            }
             i = 0
             while (i < program.length()) {
                 if (!this.is_decl(program[i])) {

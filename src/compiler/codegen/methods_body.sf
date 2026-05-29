@@ -743,7 +743,6 @@
         }
         if (obj_type_for_get.starts_with("Map<")) {
             var val_type_str: String = this.get_map_value_type(obj_type_for_get)
-            if (val_type_str == "Any") { val_type_str = "String" }
             this.last_type = this.str_to_type(val_type_str)
         } else {
             this.last_type = AST.Type.StringType

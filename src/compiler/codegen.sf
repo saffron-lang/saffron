@@ -49,6 +49,7 @@ class Codegen {
     var named_imports: Map<String, String>
     var target: String
     var has_errors: Bool
+    var module_init_names: List<String>
 
     fun init() {
         this.sb = StringBuilder()
@@ -92,6 +93,7 @@ class Codegen {
         this.named_imports = {}
         this.target = "native"
         this.has_errors = false
+        this.module_init_names = []
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
@@ -526,6 +528,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
 
     // Then compile the main program without prefix
     gen.current_prefix = ""
+    gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
     _codegen_had_error = gen.has_errors
     return result
@@ -808,6 +811,7 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     }
 
     gen.current_prefix = ""
+    gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
     _codegen_had_error = gen.has_errors
     return result
