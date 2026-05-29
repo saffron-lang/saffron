@@ -423,9 +423,7 @@ class Parser {
             // Kotlin-style lambda: { x => body } or { x, y => body }
             // After {, if current is ident, grab it and check next
             if (this.match_kind_check("ident")) {
-                var kl_kind: Lexer.TokenKind = this.current_kind()
-                var kl_name: String = match (kl_kind) { TkIdent(n) => n }
-                this.advance()
+                var kl_name: String = this.expect_ident()
                 if (this.match_kind("=>")) {
                     var lparams: List<AST.Param> = []
                     lparams.push(AST.Param.Param(kl_name, "Any", AST.Expr.NilLit))
