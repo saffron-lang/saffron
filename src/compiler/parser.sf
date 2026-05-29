@@ -335,9 +335,9 @@ class Parser {
                     this.advance()
                     var args: List<AST.Expr> = []
                     if (!this.match_kind_check(")")) {
-                        args.push(this.parse_expr())
+                        args.push(this.parse_call_arg())
                         while (this.match_kind(",")) {
-                            args.push(this.parse_expr())
+                            args.push(this.parse_call_arg())
                         }
                         this.consume(")")
                     } else {
@@ -361,9 +361,9 @@ class Parser {
                 this.advance()
                 var args: List<AST.Expr> = []
                 if (!this.match_kind_check(")")) {
-                    args.push(this.parse_expr())
+                    args.push(this.parse_call_arg())
                     while (this.match_kind(",")) {
-                        args.push(this.parse_expr())
+                        args.push(this.parse_call_arg())
                     }
                     this.consume(")")
                 } else {
@@ -1005,6 +1005,17 @@ class Parser {
         var next_tok: Lexer.Token = this.tokens[this.pos + 1]
         var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
         return this.kind_name(next_kind) == expected
+    }
+
+    fun parse_call_arg(): AST.Expr {
+        // Named argument: ident: expr → Assign(name, value)
+        if (this.match_kind_check("ident") and this.peek_is(":")) {
+            var arg_name: String = this.expect_ident()
+            this.advance()
+            var arg_val: AST.Expr = this.parse_expr()
+            return AST.Expr.Assign(arg_name, arg_val)
+        }
+        return this.parse_expr()
     }
 
     fun parse_assign(): AST.Stmt {
