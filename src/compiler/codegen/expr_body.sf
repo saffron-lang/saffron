@@ -1065,6 +1065,12 @@
         }
 
         // Indirect call: callee is a variable holding a function pointer
+        if (callee_name.length() == 0) {
+            // Callee is a complex expression (e.g. method call returning a closure)
+            // Evaluate it directly to get the closure pointer
+            var expr_val: String = this.gen_arg_value(callee)
+            return this.gen_indirect_call(expr_val, args)
+        }
         var ptr_val: String = this.fresh_local()
         this.emit_indent(ptr_val + " = load i64, i64* %" + this.sanitize_name(callee_name))
         return this.gen_indirect_call(ptr_val, args)

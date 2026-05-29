@@ -1,36 +1,40 @@
-// Element tree representation
-// Each element is a node in a virtual DOM tree that will be rendered to real DOM
+// Turmeric Element Types — virtual DOM node tree
+
+import "./signal.sf" as Sig
+
+// =============================================================================
+// Node Tree
+// =============================================================================
 
 enum Node {
-    Element(tag: String, attrs: Any, children: Any),
-    Text(content: String)
+    Element(tag: String, attrs: List<Attr>, children: List<Node>),
+    Text(content: String),
+    Fragment(children: List<Node>)
 }
 
 enum Attr {
     Prop(name: String, value: String),
-    Event(name: String, handler: Any),
-    Bind(name: String, signal: Any)
+    Event(name: String, handler: (Float) => Nil),
+    Bind(name: String, signal: Sig.Signal<String>)
 }
 
-// Rendering context — collects children during a builder block
+// =============================================================================
+// Rendering Context — collects children during builder blocks
+// =============================================================================
+
 class Context {
-    var children: List<Any>
+    var children: List<Node>
 
     fun init() {
         this.children = []
     }
 
-    fun add(node: Any) {
+    fun add(node: Node) {
         this.children.push(node)
-    }
-
-    fun text(content: String) {
-        this.children.push(Node.Text(content))
     }
 }
 
-// Global context stack for nested element builders
-var _ctx_stack: List<Any> = []
+var _ctx_stack: List<Context> = []
 
 fun _push_ctx(): Context {
     var ctx = Context()
@@ -46,100 +50,58 @@ fun _current_ctx(): Context {
     return _ctx_stack[_ctx_stack.length() - 1]
 }
 
-// --- Element builder functions ---
-// Each takes attrs (Map or Nil) and a block that populates children
-
-fun _build_element(tag: String, attrs: Any, block: Any): Any {
+fun _el(tag: String, attrs: List<Attr>, block: () => Nil): Node {
     var ctx: Context = _push_ctx()
-    if (block != nil) {
-        block()
-    }
+    block()
     _pop_ctx()
-    var node: Any = Node.Element(tag, attrs, ctx.children)
-    // If there's a parent context, add to it
+    var node: Node = Node.Element(tag, attrs, ctx.children)
     if (_ctx_stack.length() > 0) {
         _current_ctx().add(node)
     }
     return node
 }
 
-// --- HTML element functions ---
-
-fun div(block: Any): Any {
-    return _build_element("div", nil, block)
-}
-
-fun span(block: Any): Any {
-    return _build_element("span", nil, block)
-}
-
-fun p(block: Any): Any {
-    return _build_element("p", nil, block)
-}
-
-fun h1(block: Any): Any {
-    return _build_element("h1", nil, block)
-}
-
-fun h2(block: Any): Any {
-    return _build_element("h2", nil, block)
-}
-
-fun h3(block: Any): Any {
-    return _build_element("h3", nil, block)
-}
-
-fun button(block: Any): Any {
-    return _build_element("button", nil, block)
-}
-
-fun input(block: Any): Any {
-    return _build_element("input", nil, block)
-}
-
-fun ul(block: Any): Any {
-    return _build_element("ul", nil, block)
-}
-
-fun ol(block: Any): Any {
-    return _build_element("ol", nil, block)
-}
-
-fun li(block: Any): Any {
-    return _build_element("li", nil, block)
-}
-
-fun a(block: Any): Any {
-    return _build_element("a", nil, block)
-}
-
-fun img(block: Any): Any {
-    return _build_element("img", nil, block)
-}
-
-fun nav(block: Any): Any {
-    return _build_element("nav", nil, block)
-}
-
-fun header(block: Any): Any {
-    return _build_element("header", nil, block)
-}
-
-fun footer(block: Any): Any {
-    return _build_element("footer", nil, block)
-}
-
-fun section(block: Any): Any {
-    return _build_element("section", nil, block)
-}
-
-fun main(block: Any): Any {
-    return _build_element("main", nil, block)
-}
-
-// --- Text node helper ---
-// Inside a builder block, call text() to add text content
-
 fun text(content: String) {
-    _current_ctx().text(content)
+    _current_ctx().add(Node.Text(content))
+}
+
+// =============================================================================
+// Render to HTML (for testing / SSR)
+// =============================================================================
+
+fun render_to_html(node: Node): String {
+    return match (node) {
+        Text(content) => content
+        Fragment(children) => {
+            var html: String = ""
+            var i: Float = 0
+            while (i < children.length()) {
+                html = html + render_to_html(children[i])
+                i = i + 1
+            }
+            html
+        }
+        Element(tag, attrs, children) => {
+            var html: String = "<" + tag
+            var i: Float = 0
+            while (i < attrs.length()) {
+                match (attrs[i]) {
+                    Prop(n, v) => { html = html + " " + n + "=\"" + v + "\"" }
+                    Event(n, h) => {}
+                    Bind(n, sig) => { html = html + " " + n + "=\"" + sig.get() + "\"" }
+                }
+                i = i + 1
+            }
+            if (tag == "br" or tag == "hr" or tag == "img" or tag == "input") {
+                return html + " />"
+            }
+            html = html + ">"
+            i = 0
+            while (i < children.length()) {
+                html = html + render_to_html(children[i])
+                i = i + 1
+            }
+            html + "</" + tag + ">"
+        }
+    }
 }
