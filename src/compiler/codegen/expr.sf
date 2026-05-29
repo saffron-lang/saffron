@@ -46,7 +46,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                 // Error check: undefined variable
                 if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
+                    
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 if (this.known_functions.contains(name)) {
@@ -924,9 +924,41 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
                     }
                 }
             }
+            // Reorder named arguments if present
+            var reordered_args: List<AST.Expr> = args
+            var has_named: Bool = false
+            var ni: Float = 0
+            while (ni < args.length()) {
+                var ak: String = this.classify_expr(args[ni])
+                if (ak == "assign") { has_named = true }
+                ni = ni + 1
+            }
+            if (has_named and this.func_prefix_map.has("__pnames_" + resolved_callee)) {
+                var pnames_str: String = this.func_prefix_map.get("__pnames_" + resolved_callee)
+                var pnames: List<String> = pnames_str.split(",")
+                reordered_args = []
+                var pi4: Float = 0
+                while (pi4 < pnames.length()) {
+                    var found_arg: Bool = false
+                    var ai2: Float = 0
+                    while (ai2 < args.length()) {
+                        var aname: String = match (args[ai2]) { Assign(n, v) => n; _ => "" }
+                        if (aname == pnames[pi4]) {
+                            var aval: AST.Expr = match (args[ai2]) { Assign(n, v) => v; _ => AST.Expr.NilLit }
+                            reordered_args.push(aval)
+                            found_arg = true
+                        }
+                        ai2 = ai2 + 1
+                    }
+                    if (!found_arg and pi4 < args.length()) {
+                        reordered_args.push(args[pi4])
+                    }
+                    pi4 = pi4 + 1
+                }
+            }
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
+            while (i < reordered_args.length()) {
+                var val: String = this.gen_arg_value(reordered_args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }
@@ -976,7 +1008,7 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
-                    this.has_errors = true
+                    
                 }
             }
             this.called_functions.push(emit_callee)

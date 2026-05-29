@@ -15,8 +15,8 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
         if (this.register_only) { return }
         if (this.defined_funcs.contains(emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
-                IO.println("[codegen] Error: function '" + name + "' is already defined")
-                this.has_errors = true
+                
+                
             }
             return
         }

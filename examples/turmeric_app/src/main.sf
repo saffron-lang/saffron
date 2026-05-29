@@ -1,273 +1,160 @@
-// Turmeric Demo App — full-featured reactive counter + todo list
-// Single-file (no imports) to work around module prefix codegen issue
+// Turmeric Demo — what a real app looks like
+import "turmeric" as T
 
 // =============================================================================
-// DOM FFI
+// State
 // =============================================================================
 
-@extern("i64 js_dom_create_element(void*)") fun dom_create(tag: String): Float
-@extern("void js_dom_set_text(i64, void*)") fun dom_set_text(handle: Float, text: String)
-@extern("void js_dom_set_attribute(i64, void*, void*)") fun dom_set_attr(handle: Float, name: String, value: String)
-@extern("void js_dom_append_child(i64, i64)") fun dom_append(parent: Float, child: Float)
-@extern("void js_dom_remove_child(i64, i64)") fun dom_remove(parent: Float, child: Float)
-@extern("i64 js_dom_query_selector(void*)") fun dom_query(selector: String): Float
-@extern("void js_dom_add_event_listener(i64, void*, i64)") fun dom_on(handle: Float, event: String, callback_id: Float)
+var count = T.signal(0)
+var page = T.signal("counter")
+var todos = T.signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = T.signal("")
 
 // =============================================================================
-// Signals (inline)
+// Components
 // =============================================================================
 
-var _tracking: Bool = false
-var _tracker_deps: List<Signal> = []
-var _sub_id_counter: Float = 0
+fun CounterPage(): T.Node {
+    var doubled = T.computed(fun (): Float => count.get() * 2)
+    var parity = T.computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
+    })
 
-class Subscription {
-    var id: Float
-    var fn: () => Nil
-    var active: Bool
-    fun init(id: Float, fn: () => Nil) {
-        this.id = id
-        this.fn = fn
-        this.active = true
-    }
-}
+    return section(cls="counter") {
+        h1 { "Reactive Counter" }
+        p(cls="count-display") { "${count.get()}" }
+        p(cls="derived") { "Doubled: ${doubled.get()} | ${parity.get()}" }
 
-class Signal {
-    var value: Float
-    var subs: List<Subscription>
-    fun init(initial: Float) {
-        this.value = initial
-        this.subs = []
-    }
-    fun get(): Float {
-        if (_tracking) { _tracker_deps.push(this) }
-        return this.value
-    }
-    fun set(next: Float) {
-        this.value = next
-        var i: Float = 0
-        while (i < this.subs.length()) {
-            if (this.subs[i].active) { this.subs[i].fn() }
-            i = i + 1
-        }
-    }
-    fun subscribe(fn: () => Nil): Float {
-        _sub_id_counter = _sub_id_counter + 1
-        this.subs.push(Subscription(_sub_id_counter, fn))
-        return _sub_id_counter
-    }
-    fun unsubscribe(id: Float) {
-        var i: Float = 0
-        while (i < this.subs.length()) {
-            if (this.subs[i].id == id) { this.subs[i].active = false }
-            i = i + 1
+        div(cls="button-row") {
+            button(on_click=fun (e: T.Event) => count.update(fun (n: Float): Float => n + 1)) {
+                "+ Increment"
+            }
+            button(on_click=fun (e: T.Event) => count.update(fun (n: Float): Float => n - 1)) {
+                "- Decrement"
+            }
+            button(cls="danger", on_click=fun (e: T.Event) => count.set(0)) {
+                "Reset"
+            }
         }
     }
 }
 
-class StringSignal {
-    var value: String
-    var subs: List<Subscription>
-    fun init(initial: String) {
-        this.value = initial
-        this.subs = []
-    }
-    fun get(): String {
-        return this.value
-    }
-    fun set(next: String) {
-        this.value = next
-        var i: Float = 0
-        while (i < this.subs.length()) {
-            if (this.subs[i].active) { this.subs[i].fn() }
-            i = i + 1
+fun TodoPage(): T.Node {
+    var active_count = T.computed(fun (): Float => {
+        var items: List<String> = todos.get()
+        return items.length()
+    })
+
+    return section(cls="todos") {
+        div(cls="todo-header") {
+            h1 { "Todo List" }
+            span(cls="badge") { "${active_count.get()} items" }
+        }
+
+        div(cls="todo-input") {
+            input(
+                type="text",
+                placeholder="What needs doing?",
+                bind_value=new_todo,
+                on_keydown=fun (e: T.Event) => {
+                    match (e) {
+                        KeyDown(data) => {
+                            if (data.key =="Enter" and new_todo.get().length() > 0) {
+                                todos.update(fun (list: List<String>): List<String> => {
+                                    list.push(new_todo.get())
+                                    return list
+                                })
+                                new_todo.set("")
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            )
+            button(on_click=fun (e: T.Event) => {
+                if (new_todo.get().length() > 0) {
+                    todos.update(fun (list: List<String>): List<String> => {
+                        list.push(new_todo.get())
+                        return list
+                    })
+                    new_todo.set("")
+                }
+            }) {
+                "Add"
+            }
+        }
+
+        ul(cls="todo-list") {
+            T.each(todos.get()) { todo =>
+                li(cls="todo-item") { todo }
+            }
         }
     }
-    fun subscribe(fn: () => Nil): Float {
-        _sub_id_counter = _sub_id_counter + 1
-        this.subs.push(Subscription(_sub_id_counter, fn))
-        return _sub_id_counter
+}
+
+fun AboutPage(): T.Node {
+    return section(cls="about") {
+        h1 { "About Turmeric" }
+        p { "A reactive web framework for Saffron, compiled to WebAssembly." }
+
+        ul(cls="features") {
+            li { "Fine-grained reactivity via Signals" }
+            li { "No virtual DOM — surgical DOM updates" }
+            li { "Compiles to < 40KB WASM binary" }
+            li { "Typed from the DOM spec (112 elements)" }
+            li { "Pattern matching on events" }
+            li { "Component lifecycle with automatic cleanup" }
+            li { "Client-side routing" }
+            li { "Scoped CSS + theming" }
+        }
     }
 }
 
-fun effect(fn: () => Nil) {
-    _tracking = true
-    _tracker_deps = []
-    fn()
-    _tracking = false
-    var i: Float = 0
-    while (i < _tracker_deps.length()) {
-        _tracker_deps[i].subscribe(fn)
-        i = i + 1
+// =============================================================================
+// App Shell
+// =============================================================================
+
+fun App(): T.Node {
+    return div(id="app") {
+        header(cls="app-header") {
+            h1(cls="logo") { "Turmeric" }
+
+            nav(cls="nav") {
+                button(
+                    cls=T.cx({"nav-link": true, "active": page.get() == "counter"}),
+                    on_click=fun (e: T.Event) => page.set("counter")
+                ) { "Counter" }
+
+                button(
+                    cls=T.cx({"nav-link": true, "active": page.get() == "todos"}),
+                    on_click=fun (e: T.Event) => page.set("todos")
+                ) { "Todos" }
+
+                button(
+                    cls=T.cx({"nav-link": true, "active": page.get() == "about"}),
+                    on_click=fun (e: T.Event) => page.set("about")
+                ) { "About" }
+            }
+        }
+
+        main(cls="content") {
+            match (page.get()) {
+                "counter" => CounterPage()
+                "todos" => TodoPage()
+                "about" => AboutPage()
+                _ => p { "404 — Not Found" }
+            }
+        }
+
+        footer(cls="app-footer") {
+            "Built with Saffron + Turmeric | Signals + Effects + WASM"
+        }
     }
 }
 
 // =============================================================================
-// App State
+// Mount
 // =============================================================================
 
-var count: Signal = Signal(0)
-var page: StringSignal = StringSignal("counter")
-
-// =============================================================================
-// Callback Dispatch — JS calls this on events
-// =============================================================================
-
-fun __dispatch_event(callback_id: Float) {
-    // Counter buttons
-    if (callback_id == 1) { count.set(count.get() + 1) }
-    if (callback_id == 2) { count.set(count.get() - 1) }
-    if (callback_id == 3) { count.set(0) }
-    // Nav
-    if (callback_id == 10) { page.set("counter") }
-    if (callback_id == 11) { page.set("about") }
-}
-
-// =============================================================================
-// Build UI
-// =============================================================================
-
-var root: Float = dom_query("#app")
-
-// --- Header ---
-var header: Float = dom_create("header")
-dom_set_attr(header, "style", "display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #3d3d55")
-
-var logo: Float = dom_create("h1")
-dom_set_text(logo, "Turmeric")
-dom_set_attr(logo, "style", "color: #ffb347; margin: 0")
-dom_append(header, logo)
-
-var nav: Float = dom_create("nav")
-dom_set_attr(nav, "style", "display: flex; gap: 1rem")
-
-var counter_link: Float = dom_create("button")
-dom_set_text(counter_link, "Counter")
-dom_set_attr(counter_link, "style", "background: #2d2d44; color: #4fc3f7; border: 1px solid #4fc3f7; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer")
-dom_on(counter_link, "click", 10)
-dom_append(nav, counter_link)
-
-var about_link: Float = dom_create("button")
-dom_set_text(about_link, "About")
-dom_set_attr(about_link, "style", "background: #2d2d44; color: #4fc3f7; border: 1px solid #4fc3f7; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer")
-dom_on(about_link, "click", 11)
-dom_append(nav, about_link)
-
-dom_append(header, nav)
-dom_append(root, header)
-
-// --- Content area ---
-var content: Float = dom_create("main")
-dom_set_attr(content, "style", "padding: 2rem; max-width: 600px; margin: 0 auto")
-dom_append(root, content)
-
-// --- Counter Section ---
-var counter_section: Float = dom_create("div")
-
-var counter_title: Float = dom_create("h2")
-dom_set_text(counter_title, "Reactive Counter")
-dom_append(counter_section, counter_title)
-
-var count_display: Float = dom_create("p")
-dom_set_attr(count_display, "style", "font-size: 3rem; font-weight: bold; color: #4fc3f7; margin: 1rem 0")
-dom_append(counter_section, count_display)
-
-// Reactive: count display updates when signal changes
-effect(fun () => {
-    dom_set_text(count_display, count.get().to_string())
-})
-
-// Derived display
-var derived: Float = dom_create("p")
-dom_set_attr(derived, "style", "color: #aaa")
-dom_append(counter_section, derived)
-
-effect(fun () => {
-    var n: Float = count.get()
-    var doubled: Float = n * 2
-    var parity: String = "even"
-    if (n % 2 != 0) { parity = "odd" }
-    dom_set_text(derived, "Doubled: " + doubled.to_string() + " | Parity: " + parity)
-})
-
-// Buttons
-var btn_row: Float = dom_create("div")
-dom_set_attr(btn_row, "style", "display: flex; gap: 0.75rem; margin-top: 1.5rem")
-
-var inc_btn: Float = dom_create("button")
-dom_set_text(inc_btn, "+ Increment")
-dom_set_attr(inc_btn, "style", "background: #4fc3f7; color: #1a1a2e; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer")
-dom_on(inc_btn, "click", 1)
-dom_append(btn_row, inc_btn)
-
-var dec_btn: Float = dom_create("button")
-dom_set_text(dec_btn, "- Decrement")
-dom_set_attr(dec_btn, "style", "background: #4fc3f7; color: #1a1a2e; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer")
-dom_on(dec_btn, "click", 2)
-dom_append(btn_row, dec_btn)
-
-var reset_btn: Float = dom_create("button")
-dom_set_text(reset_btn, "Reset")
-dom_set_attr(reset_btn, "style", "background: #ef5350; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer")
-dom_on(reset_btn, "click", 3)
-dom_append(btn_row, reset_btn)
-
-dom_append(counter_section, btn_row)
-dom_append(content, counter_section)
-
-// --- About Section (hidden by default) ---
-var about_section: Float = dom_create("div")
-dom_set_attr(about_section, "style", "display: none")
-
-var about_title: Float = dom_create("h2")
-dom_set_text(about_title, "About Turmeric")
-dom_append(about_section, about_title)
-
-var about_text: Float = dom_create("p")
-dom_set_text(about_text, "Turmeric is a reactive web framework for Saffron, compiled to WebAssembly.")
-dom_append(about_section, about_text)
-
-var features: Float = dom_create("ul")
-dom_set_attr(features, "style", "line-height: 2")
-
-var f1: Float = dom_create("li")
-dom_set_text(f1, "Fine-grained reactivity via Signals")
-dom_append(features, f1)
-
-var f2: Float = dom_create("li")
-dom_set_text(f2, "No virtual DOM — surgical DOM updates")
-dom_append(features, f2)
-
-var f3: Float = dom_create("li")
-dom_set_text(f3, "Compiles to < 40KB WASM binary")
-dom_append(features, f3)
-
-var f4: Float = dom_create("li")
-dom_set_text(f4, "Typed from the DOM spec (112 elements)")
-dom_append(features, f4)
-
-var f5: Float = dom_create("li")
-dom_set_text(f5, "Pattern matching on events")
-dom_append(features, f5)
-
-dom_append(about_section, features)
-dom_append(content, about_section)
-
-// --- Page switching (reactive) ---
-page.subscribe(fun () => {
-    if (page.get() == "counter") {
-        dom_set_attr(counter_section, "style", "display: block")
-        dom_set_attr(about_section, "style", "display: none")
-    } else {
-        dom_set_attr(counter_section, "style", "display: none")
-        dom_set_attr(about_section, "style", "display: block")
-    }
-})
-
-// --- Footer ---
-var footer: Float = dom_create("footer")
-dom_set_attr(footer, "style", "text-align: center; padding: 2rem; color: #666; font-size: 0.85rem; border-top: 1px solid #3d3d55; margin-top: 3rem")
-dom_set_text(footer, "Built with Saffron + Turmeric | Signals + Effects + WASM")
-dom_append(root, footer)
-
-IO.println("Turmeric app ready!")
+T.mount("#app", App)

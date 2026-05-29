@@ -6,16 +6,12 @@
     <description>Language support for Saffron (.sf files)</description>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>org.jetbrains.plugins.textmate</depends>
+    <depends optional="true" config-file="textmate.xml">org.jetbrains.plugins.textmate</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <platform.lsp.serverSupportProvider
             implementation="dev.saffron.intellij.SaffronLspServerSupportProvider"/>
         <configurationType
             implementation="dev.saffron.intellij.SaffronPantryConfigurationType"/>
-    </extensions>
-
-    <extensions defaultExtensionNs="com.intellij.textmate">
-        <bundleProvider implementation="dev.saffron.intellij.SaffronTextMateBundleProvider"/>
     </extensions>
 </idea-plugin>

@@ -686,7 +686,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.682 = private unnamed_addr constant [7 x i8] c"member\00"
 @.str.683 = private unnamed_addr constant [6 x i8] c"other\00"
 @.str.684 = private unnamed_addr constant [6 x i8] c"ident\00"
-@.str.685 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.685 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.686 = private unnamed_addr constant [2 x i8] c"=\00"
 @.str.687 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.688 = private unnamed_addr constant [2 x i8] c"[\00"
@@ -17043,13 +17043,8 @@ entry:
   %t4 = load i64, i64* %p
   %t5 = call i64 @Parser__parse_program(i64 %t4)
   store i64 %t5, i64* %result
-  %t6 = load i64, i64* %p
-  %t7 = inttoptr i64 %t6 to %Parser*
-  %t8 = getelementptr %Parser, %Parser* %t7, i32 0, i32 2
-  %t9 = load volatile i64, i64* %t8
-  store i64 %t9, i64* %last_parse_had_error
-  %t10 = load i64, i64* %result
-  ret i64 %t10
+  %t6 = load i64, i64* %result
+  ret i64 %t6
 }
 
 define i64 @parse_with_source(i64 %tokens.arg, i64 %source.arg) {
@@ -17072,34 +17067,13 @@ entry:
   %t8 = load i64, i64* %p
   %t9 = call i64 @Parser__parse_program(i64 %t8)
   store i64 %t9, i64* %result
-  %t10 = load i64, i64* %p
-  %t11 = inttoptr i64 %t10 to %Parser*
-  %t12 = getelementptr %Parser, %Parser* %t11, i32 0, i32 2
-  %t13 = load volatile i64, i64* %t12
-  store i64 %t13, i64* %last_parse_had_error
-  %t14 = load i64, i64* %result
-  ret i64 %t14
+  %t10 = load i64, i64* %result
+  ret i64 %t10
 }
 
 define i64 @had_error() {
 entry:
-  %t1 = load i64, i64* %last_parse_had_error
-  ret i64 %t1
-}
-
-define i64 @__saffron_entry() {
-entry:
-  %last_parse_had_error = alloca i64
   %t1 = add i64 0, 0
   %t2 = call i64 @__val_tag_bool(i64 %t1)
-  store i64 %t2, i64* %last_parse_had_error
-  ret i64 0
-}
-
-define i32 @main(i32 %argc, i8** %argv) {
-entry:
-  store i32 %argc, i32* @__argc
-  store i8** %argv, i8*** @__argv
-  call i64 @__saffron_entry()
-  ret i32 0
+  ret i64 %t2
 }

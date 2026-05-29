@@ -3,7 +3,6 @@ package dev.saffron.intellij
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
 import com.intellij.execution.configurations.RunConfiguration
-import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.project.Project
 
 class SaffronPantryConfigurationFactory(type: ConfigurationType) : ConfigurationFactory(type) {
@@ -11,6 +10,4 @@ class SaffronPantryConfigurationFactory(type: ConfigurationType) : Configuration
 
     override fun createTemplateConfiguration(project: Project): RunConfiguration =
         SaffronPantryRunConfiguration(project, this, "Pantry Script")
-
-    override fun getOptionsClass(): Class<out BaseState> = SaffronPantryRunConfigurationOptions::class.java
 }

@@ -24,29 +24,18 @@ fun styles(pairs: Map<String, String>): String {
 // Conditional Classes
 // =============================================================================
 
-class ClassEntry {
-    var name: String
-    var active: Bool
-    fun init(name: String, active: Bool) {
-        this.name = name
-        this.active = active
-    }
-}
-
-fun cx(classes: List<ClassEntry>): String {
+// cx({"active": true, "disabled": false}) → "active"
+fun cx(classes: Map<String, Bool>): String {
     var result: List<String> = []
+    var keys: List<String> = classes.keys()
     var i: Float = 0
-    while (i < classes.length()) {
-        if (classes[i].active) {
-            result.push(classes[i].name)
+    while (i < keys.length()) {
+        if (classes.get(keys[i])) {
+            result.push(keys[i])
         }
         i = i + 1
     }
     return result.join(" ")
-}
-
-fun cls(names: List<String>): String {
-    return names.join(" ")
 }
 
 // =============================================================================

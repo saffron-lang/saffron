@@ -6,16 +6,12 @@ import com.intellij.execution.configurations.*
 import com.intellij.execution.process.ProcessHandlerFactory
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
-import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import org.jdom.Element
 import javax.swing.*
 import java.awt.BorderLayout
 import java.io.File
-
-class SaffronPantryRunConfigurationOptions : BaseState() {
-    var scriptName by string("")
-}
 
 class SaffronPantryRunConfiguration(
     project: Project,
@@ -23,9 +19,17 @@ class SaffronPantryRunConfiguration(
     name: String
 ) : RunConfigurationBase<RunConfigurationOptions>(project, factory, name) {
 
-    var scriptName: String
-        get() = (options as? SaffronPantryRunConfigurationOptions)?.scriptName ?: ""
-        set(value) { (options as? SaffronPantryRunConfigurationOptions)?.scriptName = value }
+    var scriptName: String = ""
+
+    override fun readExternal(element: Element) {
+        super.readExternal(element)
+        scriptName = element.getAttributeValue("scriptName") ?: ""
+    }
+
+    override fun writeExternal(element: Element) {
+        super.writeExternal(element)
+        element.setAttribute("scriptName", scriptName)
+    }
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> =
         SaffronPantrySettingsEditor(project)

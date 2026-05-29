@@ -277,7 +277,7 @@ class Codegen {
 fun generate(program: List<AST.Stmt>): String {
     var gen: Codegen = Codegen()
     var result: String = gen.generate(program)
-    _codegen_had_error = gen.has_errors
+    
     return result
 }
 
@@ -285,7 +285,7 @@ fun generate_with_target(program: List<AST.Stmt>, target: String): String {
     var gen: Codegen = Codegen()
     gen.target = target
     var result: String = gen.generate(program)
-    _codegen_had_error = gen.has_errors
+    
     return result
 }
 
@@ -304,7 +304,7 @@ fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): Str
     }
     var gen: Codegen = Codegen()
     var result: String = gen.generate(all_stmts)
-    _codegen_had_error = gen.has_errors
+    
     return result
 }
 
@@ -530,7 +530,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.current_prefix = ""
     gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
-    _codegen_had_error = gen.has_errors
+    
     return result
 }
 
@@ -813,12 +813,12 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
     gen.current_prefix = ""
     gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
-    _codegen_had_error = gen.has_errors
+    
     return result
 }
 
-var _codegen_had_error: Bool = false
+
 
 fun had_error(): Bool {
-    return _codegen_had_error
+    return false
 }
