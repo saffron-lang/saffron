@@ -486,6 +486,13 @@
     // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
     // when class_fields only has "Thing".
     fun resolve_class_type(vtype: String): String {
+        // Try module-prefixed version first to get correct struct type
+        if (this.current_prefix.length() > 0) {
+            var prefixed: String = this.current_prefix + vtype
+            if (this.class_fields.has(prefixed)) {
+                return prefixed
+            }
+        }
         if (this.class_fields.has(vtype)) {
             return vtype
         }
@@ -493,6 +500,13 @@
         if (vtype.contains(".")) {
             var dot_idx: Float = vtype.index_of(".")
             var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            // Try current module prefix on the bare name
+            if (this.current_prefix.length() > 0) {
+                var prefixed_bare: String = this.current_prefix + bare
+                if (this.class_fields.has(prefixed_bare)) {
+                    return prefixed_bare
+                }
+            }
             if (this.class_fields.has(bare)) {
                 return bare
             }
@@ -500,12 +514,24 @@
         // Strip generic params then try: "Mod.Thing<X>" -> "Thing"
         if (vtype.contains("<")) {
             var base: String = vtype.slice(0, vtype.index_of("<"))
+            if (this.current_prefix.length() > 0) {
+                var prefixed_base: String = this.current_prefix + base
+                if (this.class_fields.has(prefixed_base)) {
+                    return prefixed_base
+                }
+            }
             if (this.class_fields.has(base)) {
                 return base
             }
             if (base.contains(".")) {
                 var dot_idx2: Float = base.index_of(".")
                 var bare2: String = base.slice(dot_idx2 + 1, base.length())
+                if (this.current_prefix.length() > 0) {
+                    var prefixed_bare2: String = this.current_prefix + bare2
+                    if (this.class_fields.has(prefixed_bare2)) {
+                        return prefixed_bare2
+                    }
+                }
                 if (this.class_fields.has(bare2)) {
                     return bare2
                 }

@@ -222,7 +222,15 @@ extend fun Codegen.gen_class_decl_with_parent(name: String, parent: String, fiel
     }
 
 extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        // Use module-prefixed type name to avoid cross-module class name collisions
+        var type_name: String = name
+        if (this.current_prefix.length() > 0) {
+            type_name = this.current_prefix + name
+        }
         this.class_fields.set(name, fields)
+        if (this.current_prefix.length() > 0) {
+            this.class_fields.set(type_name, fields)
+        }
 
         // Parse field names for struct layout
         var field_list: List<String> = []
@@ -238,8 +246,8 @@ extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AS
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
-            this.known_functions.push("__type_" + name)
+        if (!this.register_only and !this.known_functions.contains("__type_" + type_name)) {
+            this.known_functions.push("__type_" + type_name)
             var field_types_str: String = ""
             var fi: Float = 0
             while (fi < num_fields) {
@@ -247,7 +255,7 @@ extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AS
                 field_types_str = field_types_str + "i64"
                 fi = fi + 1
             }
-            this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
+            this.type_defs.append("%" + type_name + " = type { " + field_types_str + " }\n")
         }
 
         // Register method names
@@ -275,10 +283,11 @@ extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AS
         }
 
         // Pre-register constructor so methods can call ClassName(args)
-        this.known_functions.push(name)
+        this.known_functions.push(type_name)
         if (this.current_prefix.length() > 0) {
-            this.known_functions.push(this.current_prefix + name)
+            this.known_functions.push(name)
         }
+        this.func_ret_types.set(type_name, name)
         this.func_ret_types.set(name, name)
 
         // Generate methods as functions with name prefix: ClassName__method
@@ -291,7 +300,7 @@ extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AS
         }
 
         // Generate constructor function: ClassName(args...) -> instance ptr
-        this.gen_class_constructor(name, fields, field_list)
+        this.gen_class_constructor(type_name, fields, field_list)
     }
 
 extend fun Codegen.get_fun_name(stmt: AST.Stmt): String {
@@ -340,40 +349,34 @@ extend fun Codegen.gen_class_method(class_name: String, method: AST.Stmt) {
         this.gen_function(full_name, full_params, mret, mbody)
     }
 
-extend fun Codegen.gen_class_constructor(name: String, fields: String, field_list: List<String>) {
+extend fun Codegen.gen_class_constructor(type_name: String, fields: String, field_list: List<String>) {
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
-        this.known_functions.push(name)
-        if (this.current_prefix.length() > 0) {
-            this.known_functions.push(this.current_prefix + name)
-        }
-        this.func_ret_types.set(name, name)
-        if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(this.current_prefix + name, name)
-        }
+        this.known_functions.push(type_name)
+        this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(name)) { return }
-        this.defined_funcs.push(name)
+        if (this.defined_funcs.contains(type_name)) { return }
+        this.defined_funcs.push(type_name)
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + name + "() {")
+        this.emit("define linkonce_odr i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
         var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + name + "*")
+        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
         // Zero-initialize fields
         var i: Float = 0
         while (i < num_fields) {
             var field_ptr: String = this.fresh_local()
-            this.emit_indent(field_ptr + " = getelementptr %" + name + ", %" + name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
+            this.emit_indent(field_ptr + " = getelementptr %" + type_name + ", %" + type_name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
             this.emit_indent("store i64 0, i64* " + field_ptr)
             i = i + 1
         }
         // Return as i64
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint %" + name + "* " + ptr + " to i64")
+        this.emit_indent(result + " = ptrtoint %" + type_name + "* " + ptr + " to i64")
         this.emit_terminator("ret i64 " + result)
         this.emit("}")
         this.block_terminated = false

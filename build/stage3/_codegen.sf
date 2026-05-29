@@ -751,6 +751,13 @@ class Codegen {
     // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
     // when class_fields only has "Thing".
     fun resolve_class_type(vtype: String): String {
+        // Try module-prefixed version first to get correct struct type
+        if (this.current_prefix.length() > 0) {
+            var prefixed: String = this.current_prefix + vtype
+            if (this.class_fields.has(prefixed)) {
+                return prefixed
+            }
+        }
         if (this.class_fields.has(vtype)) {
             return vtype
         }
@@ -758,6 +765,13 @@ class Codegen {
         if (vtype.contains(".")) {
             var dot_idx: Float = vtype.index_of(".")
             var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            // Try current module prefix on the bare name
+            if (this.current_prefix.length() > 0) {
+                var prefixed_bare: String = this.current_prefix + bare
+                if (this.class_fields.has(prefixed_bare)) {
+                    return prefixed_bare
+                }
+            }
             if (this.class_fields.has(bare)) {
                 return bare
             }
@@ -765,12 +779,24 @@ class Codegen {
         // Strip generic params then try: "Mod.Thing<X>" -> "Thing"
         if (vtype.contains("<")) {
             var base: String = vtype.slice(0, vtype.index_of("<"))
+            if (this.current_prefix.length() > 0) {
+                var prefixed_base: String = this.current_prefix + base
+                if (this.class_fields.has(prefixed_base)) {
+                    return prefixed_base
+                }
+            }
             if (this.class_fields.has(base)) {
                 return base
             }
             if (base.contains(".")) {
                 var dot_idx2: Float = base.index_of(".")
                 var bare2: String = base.slice(dot_idx2 + 1, base.length())
+                if (this.current_prefix.length() > 0) {
+                    var prefixed_bare2: String = this.current_prefix + bare2
+                    if (this.class_fields.has(prefixed_bare2)) {
+                        return prefixed_bare2
+                    }
+                }
                 if (this.class_fields.has(bare2)) {
                     return bare2
                 }
@@ -1609,7 +1635,7 @@ class Codegen {
         }
 
         var resolved_callee: String = callee_name
-        if (!this.known_functions.contains(callee_name) and this.current_prefix.length() > 0) {
+        if (this.current_prefix.length() > 0) {
             if (this.known_functions.contains(this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
             }
@@ -3146,7 +3172,15 @@ class Codegen {
     }
 
     fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        // Use module-prefixed type name to avoid cross-module class name collisions
+        var type_name: String = name
+        if (this.current_prefix.length() > 0) {
+            type_name = this.current_prefix + name
+        }
         this.class_fields.set(name, fields)
+        if (this.current_prefix.length() > 0) {
+            this.class_fields.set(type_name, fields)
+        }
 
         // Parse field names for struct layout
         var field_list: List<String> = []
@@ -3162,8 +3196,8 @@ class Codegen {
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
-            this.known_functions.push("__type_" + name)
+        if (!this.register_only and !this.known_functions.contains("__type_" + type_name)) {
+            this.known_functions.push("__type_" + type_name)
             var field_types_str: String = ""
             var fi: Float = 0
             while (fi < num_fields) {
@@ -3171,7 +3205,7 @@ class Codegen {
                 field_types_str = field_types_str + "i64"
                 fi = fi + 1
             }
-            this.type_defs.append("%" + name + " = type { " + field_types_str + " }\n")
+            this.type_defs.append("%" + type_name + " = type { " + field_types_str + " }\n")
         }
 
         // Register method names
@@ -3199,10 +3233,11 @@ class Codegen {
         }
 
         // Pre-register constructor so methods can call ClassName(args)
-        this.known_functions.push(name)
+        this.known_functions.push(type_name)
         if (this.current_prefix.length() > 0) {
-            this.known_functions.push(this.current_prefix + name)
+            this.known_functions.push(name)
         }
+        this.func_ret_types.set(type_name, name)
         this.func_ret_types.set(name, name)
 
         // Generate methods as functions with name prefix: ClassName__method
@@ -3215,7 +3250,7 @@ class Codegen {
         }
 
         // Generate constructor function: ClassName(args...) -> instance ptr
-        this.gen_class_constructor(name, fields, field_list)
+        this.gen_class_constructor(type_name, fields, field_list)
     }
 
     fun get_fun_name(stmt: AST.Stmt): String {
@@ -3264,40 +3299,34 @@ class Codegen {
         this.gen_function(full_name, full_params, mret, mbody)
     }
 
-    fun gen_class_constructor(name: String, fields: String, field_list: List<String>) {
+    fun gen_class_constructor(type_name: String, fields: String, field_list: List<String>) {
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
-        this.known_functions.push(name)
-        if (this.current_prefix.length() > 0) {
-            this.known_functions.push(this.current_prefix + name)
-        }
-        this.func_ret_types.set(name, name)
-        if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(this.current_prefix + name, name)
-        }
+        this.known_functions.push(type_name)
+        this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(name)) { return }
-        this.defined_funcs.push(name)
+        if (this.defined_funcs.contains(type_name)) { return }
+        this.defined_funcs.push(type_name)
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + name + "() {")
+        this.emit("define linkonce_odr i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
         var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + name + "*")
+        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
         // Zero-initialize fields
         var i: Float = 0
         while (i < num_fields) {
             var field_ptr: String = this.fresh_local()
-            this.emit_indent(field_ptr + " = getelementptr %" + name + ", %" + name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
+            this.emit_indent(field_ptr + " = getelementptr %" + type_name + ", %" + type_name + "* " + ptr + ", i32 0, i32 " + i.floor().to_string())
             this.emit_indent("store i64 0, i64* " + field_ptr)
             i = i + 1
         }
         // Return as i64
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint %" + name + "* " + ptr + " to i64")
+        this.emit_indent(result + " = ptrtoint %" + type_name + "* " + ptr + " to i64")
         this.emit_terminator("ret i64 " + result)
         this.emit("}")
         this.block_terminated = false

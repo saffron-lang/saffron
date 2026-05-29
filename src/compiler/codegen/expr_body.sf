@@ -827,7 +827,7 @@
         }
 
         var resolved_callee: String = callee_name
-        if (!this.known_functions.contains(callee_name) and this.current_prefix.length() > 0) {
+        if (this.current_prefix.length() > 0) {
             if (this.known_functions.contains(this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
             }
