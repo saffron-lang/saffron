@@ -59,27 +59,33 @@ fun _cache_dir(manifest_dir: String): String {
 fun parse_dep_spec(name: String, value: Any): Map<String, String> {
     var spec: Map<String, String> = {}
 
-    // TOML parser returns a Map for inline tables, String for plain values
-    if (value is String) {
+    // TOML parser returns a Map for inline tables, String for plain values.
+    // Use Map.has() to detect maps — if it has "path" or "git" keys, it's an inline table.
+    // Cast to Map for map operations (safe: TOML only produces String or Map values).
+    var m: Map<String, String> = value
+    var is_map: Bool = m.has("path") or m.has("git") or m.has("version")
+
+    if (!is_map) {
         // Plain string — version constraint for registry
         spec.set("type", "registry")
-        spec.set("version", value)
+        var version_str: String = value
+        spec.set("version", version_str)
     } else {
         // Already a parsed Map (inline table from TOML)
         // Extract optional version constraint (applies to any source type)
-        if (value.has("version")) {
-            spec.set("version", value.get("version"))
+        if (m.has("version")) {
+            spec.set("version", m.get("version"))
         }
 
-        if (value.has("path")) {
+        if (m.has("path")) {
             spec.set("type", "path")
-            spec.set("path", value.get("path"))
-        } else if (value.has("git")) {
+            spec.set("path", m.get("path"))
+        } else if (m.has("git")) {
             spec.set("type", "git")
-            spec.set("url", value.get("git"))
-            if (value.has("tag")) { spec.set("tag", value.get("tag")) }
-            if (value.has("branch")) { spec.set("branch", value.get("branch")) }
-            if (value.has("rev")) { spec.set("rev", value.get("rev")) }
+            spec.set("url", m.get("git"))
+            if (m.has("tag")) { spec.set("tag", m.get("tag")) }
+            if (m.has("branch")) { spec.set("branch", m.get("branch")) }
+            if (m.has("rev")) { spec.set("rev", m.get("rev")) }
         } else {
             spec.set("type", "registry")
             if (!(spec.has("version"))) { spec.set("version", "*") }

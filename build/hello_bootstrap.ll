@@ -115,6 +115,13 @@ declare i64 @__os_cwd()
 declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
+declare i1 @__val_is_int(i64)
+declare i1 @__val_is_float(i64)
+declare i1 @__val_is_string(i64)
+declare i1 @__val_is_bool(i64)
+declare i1 @__val_is_nil(i64)
+declare i1 @__val_is_list(i64)
+declare i1 @__val_is_map(i64)
 @__g_name = global i64 0
 @__g_version = global i64 0
 

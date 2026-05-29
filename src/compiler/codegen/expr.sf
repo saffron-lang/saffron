@@ -48,6 +48,21 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                 }
+                // Function reference as first-class value: ptrtoint (check BEFORE load)
+                if (this.known_functions.contains(name)) {
+                    if (!this.typed_vars.has(name)) {
+                        if (!this.module_globals.has(this.current_prefix + name)) {
+                            return this.gen_func_ref(name)
+                        }
+                    }
+                }
+                if (this.known_functions.contains(this.current_prefix + name)) {
+                    if (!this.typed_vars.has(name)) {
+                        if (!this.module_globals.has(this.current_prefix + name)) {
+                            return this.gen_func_ref(this.current_prefix + name)
+                        }
+                    }
+                }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
@@ -407,9 +422,47 @@ extend fun Codegen.flatten_string_expr(expr: AST.Expr): String {
         return kind
     }
 
+extend fun Codegen.gen_func_ref(fn_name: String): String {
+        this.last_type = AST.Type.IntType
+        var nparams: Float = 1
+        if (this.func_param_count.has(fn_name)) {
+            nparams = this.func_param_count.get(fn_name)
+        }
+        var ftype: String = "i64 ("
+        var fti: Float = 0
+        while (fti < nparams) {
+            if (fti > 0) { ftype = ftype + ", " }
+            ftype = ftype + "i64"
+            fti = fti + 1
+        }
+        ftype = ftype + ")*"
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint " + ftype + " @" + fn_name + " to i64")
+        return local
+    }
+
 extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
-        // Handle specific expression types that don't match reliably in gen_expr
+        // Handle function references as values (e.g. passing HomePage to Router.Route)
         var expr_kind: String = this.classify_expr(expr)
+        if (expr_kind == "variable") {
+            var __vn: String = match (expr) { Variable(n) => n
+                _ => ""
+            }
+            if (this.known_functions.contains(__vn)) {
+                if (!this.typed_vars.has(__vn)) {
+                    if (!this.module_globals.has(this.current_prefix + __vn)) {
+                        return this.gen_func_ref(__vn)
+                    }
+                }
+            }
+            if (this.known_functions.contains(this.current_prefix + __vn)) {
+                if (!this.typed_vars.has(__vn)) {
+                    if (!this.module_globals.has(this.current_prefix + __vn)) {
+                        return this.gen_func_ref(this.current_prefix + __vn)
+                    }
+                }
+            }
+        }
         if (expr_kind == "method_call") {
             var mc_obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o
                 _ => AST.Expr.NilLit
@@ -504,11 +557,6 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
                 this.last_type = this.typed_vars.get(vname)
             } else {
                 this.last_type = AST.Type.IntType
-            }
-            // Error check: undefined variable
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
-                IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
