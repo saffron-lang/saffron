@@ -343,6 +343,7 @@ fun main(): Int {
     var run_checker: Bool = true
     var stdlib_dir: String = ""
     var target: String = "native"
+    var identity_mode: Bool = false
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
@@ -351,6 +352,9 @@ fun main(): Int {
         }
         if (arg == "--check") {
             run_checker = true
+        }
+        if (arg == "--identity-mode") {
+            identity_mode = true
         }
         if (arg == "--stdlib") {
             if (i + 1 < args.length()) {
@@ -535,9 +539,9 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports)
+        ir = Codegen.generate_with_modules_flat_opts(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode)
     } else {
-        ir = Codegen.generate_with_target(program, target)
+        ir = Codegen.generate_with_target_opts(program, target, identity_mode)
     }
 
     if (Codegen.had_error()) {

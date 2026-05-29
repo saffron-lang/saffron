@@ -281,16 +281,14 @@ extend fun Codegen.coerce_to_string(val: String, val_type: String): String {
             var const_name: String = this.add_string_constant("[Map]")
             var gep: String = this.fresh_local()
             this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            var result: String = this.emit_tag_ptr(gep)
             return result
         }
         // Fallback: return "[unknown]" string constant
         var const_name: String = this.add_string_constant("[unknown]")
         var gep: String = this.fresh_local()
         this.emit_indent(gep + " = getelementptr [10 x i8], [10 x i8]* " + const_name + ", i64 0, i64 0")
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+        var result: String = this.emit_tag_ptr(gep)
         return result
     }
 

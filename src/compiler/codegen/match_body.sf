@@ -24,8 +24,7 @@
                 var bname: String = first_bindings[0]
                 var raw: String = this.fresh_local()
                 this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-                var extracted: String = this.fresh_local()
-                this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
+                var extracted: String = this.emit_tag_int(raw)
                 this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
             } else if (first_bindings.length() > 1) {
                 // Multi-field variant: inttoptr → GEP for each binding
@@ -164,8 +163,7 @@
             var bname: String = bindings[0]
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-            var extracted: String = this.fresh_local()
-            this.emit_indent(extracted + " = call i64 @__val_tag_int(i64 " + raw + ")")
+            var extracted: String = this.emit_tag_int(raw)
             this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
         } else {
             // Array encoding: inttoptr and GEP to extract fields
