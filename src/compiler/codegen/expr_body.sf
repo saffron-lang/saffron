@@ -9,8 +9,7 @@
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
                 // v is the float literal text (e.g. "3.14").
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_float(double " + v + ")")
+                var local: String = this.emit_tag_float(v)
                 local
             }
             BoolLit(v) => {
@@ -708,34 +707,28 @@
 
         if (op == "-") {
             // NaN-boxed negation: untag → negate → retag
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
+            var raw: String = this.emit_untag_int(rhs)
             var negated: String = this.fresh_local()
             this.emit_indent(negated + " = sub i64 0, " + raw)
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + negated + ")")
+            var local: String = this.emit_tag_int(negated)
             this.last_type = AST.Type.IntType
             return local
         }
         if (op == "!") {
             // Logical not: untag bool, flip, retag as bool
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + rhs + ")")
+            var raw: String = this.emit_untag_bool(rhs)
             var flipped: String = this.fresh_local()
             this.emit_indent(flipped + " = xor i64 " + raw + ", 1")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + flipped + ")")
+            var local: String = this.emit_tag_bool(flipped)
             this.last_type = AST.Type.BoolType
             return local
         }
         if (op == "~") {
             // Bitwise not: untag int, flip all bits, retag
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
+            var raw: String = this.emit_untag_int(rhs)
             var flipped: String = this.fresh_local()
             this.emit_indent(flipped + " = xor i64 " + raw + ", -1")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + flipped + ")")
+            var local: String = this.emit_tag_int(flipped)
             this.last_type = AST.Type.IntType
             return local
         }

@@ -420,25 +420,72 @@ class Parser {
                 this.advance()
                 return AST.Expr.MapLit
             }
-            // Kotlin-style lambda: { x -> body } or { x, y -> body } or { -> body }
-            if (this.match_kind_check("->")) {
-                // No-param lambda: { -> body }
+            // Kotlin-style lambda: { x => body } or { x, y => body }
+            // After {, if current is ident, grab it and check next
+            if (this.match_kind_check("ident")) {
+                var kl_kind: Lexer.TokenKind = this.current_kind()
+                var kl_name: String = match (kl_kind) { TkIdent(n) => n }
                 this.advance()
-                var lbody: List<AST.Stmt> = this.parse_block_stmts()
-                return AST.Expr.Lambda([], "Any", lbody)
-            }
-            if (this.match_kind_check("ident") and (this.peek_is("->") or this.peek_is(","))) {
-                // Lambda with params: { x -> ... } or { x, y -> ... }
-                var lparams: List<AST.Param> = []
-                var lpname: String = this.expect_ident()
-                lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
-                while (this.match_kind(",")) {
-                    lpname = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
+                if (this.match_kind("=>")) {
+                    var lparams: List<AST.Param> = []
+                    lparams.push(AST.Param.Param(kl_name, "Any", AST.Expr.NilLit))
+                    var lbody: List<AST.Stmt> = []
+                    while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                        while (this.match_kind(";")) {}
+                        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                            break
+                        }
+                        lbody.push(this.parse_stmt())
+                    }
+                    this.consume("}")
+                    if (lbody.length() > 0) {
+                        var klast: AST.Stmt = lbody[lbody.length() - 1]
+                        var kis_expr: Bool = match (klast) {
+                            ExprStmt(e) => true
+                            _ => false
+                        }
+                        if (kis_expr) {
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
+                        }
+                    }
+                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                } else if (this.match_kind(",")) {
+                    var lparams: List<AST.Param> = []
+                    lparams.push(AST.Param.Param(kl_name, "Any", AST.Expr.NilLit))
+                    var lpname: String = this.expect_ident()
+                    lparams.push(AST.Param.Param(lpname, "Any", AST.Expr.NilLit))
+                    while (this.match_kind(",")) {
+                        lpname = this.expect_ident()
+                        lparams.push(AST.Param.Param(lpname, "Any", AST.Expr.NilLit))
+                    }
+                    this.consume("=>")
+                    var lbody: List<AST.Stmt> = []
+                    while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                        while (this.match_kind(";")) {}
+                        if (this.match_kind_check("}") or this.match_kind_check("eof")) {
+                            break
+                        }
+                        lbody.push(this.parse_stmt())
+                    }
+                    this.consume("}")
+                    if (lbody.length() > 0) {
+                        var klast: AST.Stmt = lbody[lbody.length() - 1]
+                        var kis_expr: Bool = match (klast) {
+                            ExprStmt(e) => true
+                            _ => false
+                        }
+                        if (kis_expr) {
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
+                        }
+                    }
+                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                } else {
+                    // Not a lambda — treat as block expression starting with a variable ref
+                    // Put back the consumed ident by adjusting pos
+                    this.pos = this.pos - 1
                 }
-                this.consume("->")
-                var lbody: List<AST.Stmt> = this.parse_block_stmts()
-                return AST.Expr.Lambda(lparams, "Int", lbody)
             }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
             if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
@@ -1642,15 +1689,12 @@ class Parser {
     }
 
     fun build_lambda(names: List<String>, body: List<AST.Stmt>): AST.Expr {
-        IO.println("[DEBUG build_lambda] names=" + names.length().to_string())
         var params: List<AST.Param> = []
         var i: Float = 0
         while (i < names.length()) {
-            IO.println("[DEBUG build_lambda]   name: " + names[i])
-            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
+            params.push(AST.Param.Param(names[i], "Any", AST.Expr.NilLit))
             i = i + 1
         }
-        IO.println("[DEBUG build_lambda] params.length=" + params.length().to_string())
         return AST.Expr.Lambda(params, "Any", body)
     }
 

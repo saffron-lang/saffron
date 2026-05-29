@@ -820,8 +820,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             var const_name: String = this.add_string_constant("[Map]")
             var gep: String = this.fresh_local()
             this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            var local: String = this.emit_tag_ptr(gep)
             this.set_last_type(AST.Type.StringType)
             return local
         } else {
@@ -979,14 +978,17 @@ extend fun Codegen.gen_get_field(object: AST.Expr, field: String): String {
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         class_name = this.current_class
     }
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     var result: String = this.fresh_local()
     this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
-    // Infer field type from class declaration
     this.set_last_type(this.str_to_type(this.get_field_type(class_name, field)))
     return result
     }
@@ -1012,11 +1014,15 @@ extend fun Codegen.gen_set_field(object: AST.Expr, field: String, value: AST.Exp
         class_name = this.current_class
     }
     var val: String = this.gen_arg_value(value)
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)
     return val
     }

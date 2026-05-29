@@ -232,8 +232,7 @@
             return val
         }
         if (val_type == "Int") {
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i64 @__val_untag_int(i64 " + val + ")")
+            var raw: String = this.emit_untag_int(val)
             var result: String = this.fresh_local()
             this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
             return result
@@ -244,8 +243,7 @@
             return result
         }
         if (val_type == "Bool") {
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i64 @__val_untag_bool(i64 " + val + ")")
+            var raw: String = this.emit_untag_bool(val)
             var result: String = this.fresh_local()
             this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + raw + ")")
             return result
@@ -289,16 +287,14 @@
             var const_name: String = this.add_string_constant("[Map]")
             var gep: String = this.fresh_local()
             this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            var result: String = this.emit_tag_ptr(gep)
             return result
         }
         // Fallback: return "[unknown]" string constant
         var const_name: String = this.add_string_constant("[unknown]")
         var gep: String = this.fresh_local()
         this.emit_indent(gep + " = getelementptr [10 x i8], [10 x i8]* " + const_name + ", i64 0, i64 0")
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+        var result: String = this.emit_tag_ptr(gep)
         return result
     }
 
@@ -551,5 +547,81 @@
             }
         }
         return ""
+    }
+
+    // --- Identity-mode tag/untag helpers ---
+    // In identity mode, these are no-ops (values are raw i64).
+    // In normal mode, they emit __val_tag/untag calls for NaN-boxing.
+
+    fun emit_tag_int(val: String): String {
+        if (this.identity_mode) { return val }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + val + ")")
+        return local
+    }
+
+    fun emit_untag_int(val: String): String {
+        if (this.identity_mode) { return val }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_untag_int(i64 " + val + ")")
+        return local
+    }
+
+    fun emit_tag_ptr(ptr: String): String {
+        if (this.identity_mode) {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = ptrtoint i8* " + ptr + " to i64")
+            return local
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + ptr + ")")
+        return local
+    }
+
+    fun emit_untag_ptr(val: String): String {
+        if (this.identity_mode) {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = inttoptr i64 " + val + " to i8*")
+            return local
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i8* @__val_untag_ptr(i64 " + val + ")")
+        return local
+    }
+
+    fun emit_tag_bool(val: String): String {
+        if (this.identity_mode) { return val }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + val + ")")
+        return local
+    }
+
+    fun emit_untag_bool(val: String): String {
+        if (this.identity_mode) { return val }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_untag_bool(i64 " + val + ")")
+        return local
+    }
+
+    fun emit_tag_float(val: String): String {
+        if (this.identity_mode) {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = bitcast double " + val + " to i64")
+            return local
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_float(double " + val + ")")
+        return local
+    }
+
+    fun emit_untag_float(val: String): String {
+        if (this.identity_mode) {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = bitcast i64 " + val + " to double")
+            return local
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call double @__val_untag_float(i64 " + val + ")")
+        return local
     }
 
