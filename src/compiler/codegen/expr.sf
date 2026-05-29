@@ -993,9 +993,18 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
             return local
         }
 
-        // Indirect call: callee is a variable holding a function pointer
-        var ptr_val: String = this.fresh_local()
-        this.emit_indent(ptr_val + " = load i64, i64* %" + this.sanitize_name(callee_name))
+        // Indirect call: callee is a variable or expression holding a function pointer
+        var ptr_val: String = ""
+        if (callee_name.length() == 0) {
+            ptr_val = this.gen_arg_value(callee)
+        } else {
+            ptr_val = this.fresh_local()
+            var var_ref: String = "%" + this.sanitize_name(callee_name)
+            if (this.module_globals.has(this.current_prefix + callee_name)) {
+                var_ref = "@__g_" + this.current_prefix + this.sanitize_name(callee_name)
+            }
+            this.emit_indent(ptr_val + " = load i64, i64* " + var_ref)
+        }
         return this.gen_indirect_call(ptr_val, args)
     }
 
