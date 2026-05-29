@@ -395,7 +395,14 @@ class Lexer {
             else if (ch == ":") { this.emit(TokenKind.TkColon) }
             else if (ch == ";") { this.emit(TokenKind.TkSemicolon) }
             else if (ch == "+") { this.emit(TokenKind.TkPlus) }
-            else if (ch == "-") { this.emit(TokenKind.TkMinus) }
+            else if (ch == "-") {
+                if (this.peek() == ">") {
+                    this.advance()
+                    this.emit(TokenKind.TkArrow)
+                } else {
+                    this.emit(TokenKind.TkMinus)
+                }
+            }
             else if (ch == "*") { this.emit(TokenKind.TkStar) }
             else if (ch == "/") { this.emit(TokenKind.TkSlash) }
             else if (ch == "%") { this.emit(TokenKind.TkPercent) }

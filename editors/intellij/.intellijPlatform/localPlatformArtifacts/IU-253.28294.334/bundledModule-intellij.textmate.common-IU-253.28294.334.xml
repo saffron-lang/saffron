@@ -1,0 +1,14 @@
+<ivy-module version="2.0">
+  <info organisation="bundledModule" module="intellij.textmate.common" revision="IU-253.28294.334"/>
+  <configurations>
+    <conf name="default" visibility="public"/>
+  </configurations>
+  <publications>
+    <artifact name="intellij.textmate.common" ext="jar" conf="default" url="plugins/textmate-plugin/lib/modules"/>
+  </publications>
+  <dependencies>
+    <dependency org="bundledModule" name="intellij.textmate" rev="IU-253.28294.334"/>
+    <dependency org="bundledModule" name="intellij.textmate.core" rev="IU-253.28294.334"/>
+    <dependency org="bundledModule" name="intellij.textmate.joni" rev="IU-253.28294.334"/>
+  </dependencies>
+</ivy-module>

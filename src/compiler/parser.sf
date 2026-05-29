@@ -420,6 +420,26 @@ class Parser {
                 this.advance()
                 return AST.Expr.MapLit
             }
+            // Kotlin-style lambda: { x -> body } or { x, y -> body } or { -> body }
+            if (this.match_kind_check("->")) {
+                // No-param lambda: { -> body }
+                this.advance()
+                var lbody: List<AST.Stmt> = this.parse_block_stmts()
+                return AST.Expr.Lambda([], "Any", lbody)
+            }
+            if (this.match_kind_check("ident") and (this.peek_is("->") or this.peek_is(","))) {
+                // Lambda with params: { x -> ... } or { x, y -> ... }
+                var lparams: List<AST.Param> = []
+                var lpname: String = this.expect_ident()
+                lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
+                while (this.match_kind(",")) {
+                    lpname = this.expect_ident()
+                    lparams.push(AST.Param.Param(lpname, "Int", AST.Expr.NilLit))
+                }
+                this.consume("->")
+                var lbody: List<AST.Stmt> = this.parse_block_stmts()
+                return AST.Expr.Lambda(lparams, "Int", lbody)
+            }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
             if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
                 // Parse as map literal — desugar to BlockExpr that builds the map
