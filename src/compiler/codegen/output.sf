@@ -303,6 +303,10 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
         this.known_functions.push("__os_path_sep")
         this.known_functions.push("__os_platform")
         this.known_functions.push("__os_env")
+        this.known_functions.push("__runtime_error")
+        this.known_functions.push("__runtime_error_fatal")
+        this.known_functions.push("__null_pointer_error")
+        this.known_functions.push("__division_error")
         this.func_ret_types.set("StringBuilder", "StringBuilder")
 
         // Pre-scan: register extension methods before compilation
@@ -466,10 +470,12 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
         // Runtime error helpers (bodies in runtime.ll)
-        out.append("declare i64 @__division_error()\n")
-        out.append("declare i64 @__null_pointer_error()\n")
-        out.append("declare i64 @__runtime_error(i64)\n")
-        out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
+        if (!this.defined_funcs.contains("__runtime_error")) {
+            out.append("declare i64 @__division_error()\n")
+            out.append("declare i64 @__null_pointer_error()\n")
+            out.append("declare i64 @__runtime_error(i64)\n")
+            out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
+        }
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
@@ -519,7 +525,7 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
         var ci: Float = 0
         while (ci < this.called_functions.length()) {
             var cfname: String = this.called_functions[ci]
-            if (!this.known_functions.contains(cfname) and !declared.contains(cfname)) {
+            if (!this.known_functions.contains(cfname) and !declared.contains(cfname) and !this.defined_funcs.contains(cfname)) {
                 var arity: Float = 1
                 if (this.called_function_arity.has(cfname)) {
                     arity = this.called_function_arity.get(cfname)
