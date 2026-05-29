@@ -1,22 +1,26 @@
 // Turmeric Demo — what a real app looks like
-import "turmeric" as T
+import { signal, computed, effect } from "turmeric/signal"
+import { Node, mount } from "turmeric/element"
+import { cx } from "turmeric/style"
+import { Event, on_click, on_keydown, bind_value } from "turmeric/events"
+import { each } from "turmeric/reconcile"
 
 // =============================================================================
 // State
 // =============================================================================
 
-var count = T.signal(0)
-var page = T.signal("counter")
-var todos = T.signal(["Buy milk", "Write compiler", "Ship framework"])
-var new_todo = T.signal("")
+var count = signal(0)
+var page = signal("counter")
+var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = signal("")
 
 // =============================================================================
 // Components
 // =============================================================================
 
-fun CounterPage(): T.Node {
-    var doubled = T.computed(fun (): Float => count.get() * 2)
-    var parity = T.computed(fun (): String => {
+fun CounterPage(): Node {
+    var doubled = computed(fun (): Float => count.get() * 2)
+    var parity = computed(fun (): String => {
         if (count.get() % 2 == 0) { return "even" }
         return "odd"
     })
@@ -29,23 +33,22 @@ fun CounterPage(): T.Node {
         p(style={"color": "#aaa"}) { "Doubled: ${doubled.get()} | ${parity.get()}" }
 
         div(cls="button-row") {
-            button(on_click=fun (e: T.Event) => count.update(fun (n: Float): Float => n + 1)) {
+            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
                 "+ Increment"
             }
-            button(on_click=fun (e: T.Event) => count.update(fun (n: Float): Float => n - 1)) {
+            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n - 1)) {
                 "- Decrement"
             }
-            button(cls="danger", on_click=fun (e: T.Event) => count.set(0)) {
+            button(cls="danger", on_click=fun (e: Event) => count.set(0)) {
                 "Reset"
             }
         }
     }
 }
 
-fun TodoPage(): T.Node {
-    var active_count = T.computed(fun (): Float => {
-        var items: List<String> = todos.get()
-        return items.length()
+fun TodoPage(): Node {
+    var active_count = computed(fun (): Float => {
+        return todos.get().length()
     })
 
     return section(cls="todos") {
@@ -59,10 +62,10 @@ fun TodoPage(): T.Node {
                 type="text",
                 placeholder="What needs doing?",
                 bind_value=new_todo,
-                on_keydown=fun (e: T.Event) => {
+                on_keydown=fun (e: Event) => {
                     match (e) {
                         KeyDown(data) => {
-                            if (data.key =="Enter" and new_todo.get().length() > 0) {
+                            if (data.key == "Enter" and new_todo.get().length() > 0) {
                                 todos.update(fun (list: List<String>): List<String> => {
                                     list.push(new_todo.get())
                                     return list
@@ -74,7 +77,7 @@ fun TodoPage(): T.Node {
                     }
                 }
             )
-            button(on_click=fun (e: T.Event) => {
+            button(on_click=fun (e: Event) => {
                 if (new_todo.get().length() > 0) {
                     todos.update(fun (list: List<String>): List<String> => {
                         list.push(new_todo.get())
@@ -88,14 +91,14 @@ fun TodoPage(): T.Node {
         }
 
         ul(cls="todo-list") {
-            T.each(todos.get()) { todo =>
+            each(todos.get()) { todo =>
                 li(cls="todo-item") { todo }
             }
         }
     }
 }
 
-fun AboutPage(): T.Node {
+fun AboutPage(): Node {
     return section(cls="about") {
         h1 { "About Turmeric" }
         p { "A reactive web framework for Saffron, compiled to WebAssembly." }
@@ -117,25 +120,25 @@ fun AboutPage(): T.Node {
 // App Shell
 // =============================================================================
 
-fun App(): T.Node {
+fun App(): Node {
     return div(id="app") {
         header(cls="app-header") {
             h1(cls="logo") { "Turmeric" }
 
             nav(cls="nav") {
                 button(
-                    cls=T.cx({"nav-link": true, "active": page.get() == "counter"}),
-                    on_click=fun (e: T.Event) => page.set("counter")
+                    cls=cx({"nav-link": true, "active": page.get() == "counter"}),
+                    on_click=fun (e: Event) => page.set("counter")
                 ) { "Counter" }
 
                 button(
-                    cls=T.cx({"nav-link": true, "active": page.get() == "todos"}),
-                    on_click=fun (e: T.Event) => page.set("todos")
+                    cls=cx({"nav-link": true, "active": page.get() == "todos"}),
+                    on_click=fun (e: Event) => page.set("todos")
                 ) { "Todos" }
 
                 button(
-                    cls=T.cx({"nav-link": true, "active": page.get() == "about"}),
-                    on_click=fun (e: T.Event) => page.set("about")
+                    cls=cx({"nav-link": true, "active": page.get() == "about"}),
+                    on_click=fun (e: Event) => page.set("about")
                 ) { "About" }
             }
         }
@@ -159,4 +162,4 @@ fun App(): T.Node {
 // Mount
 // =============================================================================
 
-T.mount("#app", App)
+mount("#app", App)

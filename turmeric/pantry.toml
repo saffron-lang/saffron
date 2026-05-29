@@ -11,3 +11,6 @@ target = "wasm32"
 
 [scripts]
 generate = "saffron run tools/generate_types.sf"
+
+[scripts.bin]
+sfx = "saffron run tools/sfx_transform.sf"
