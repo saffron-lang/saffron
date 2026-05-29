@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaUltimate("2025.1")
+        intellijIdeaUltimate("2025.3")
         bundledPlugin("org.jetbrains.plugins.textmate")
     }
 }

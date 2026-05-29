@@ -2,28 +2,23 @@
         return match (expr) {
             IntLit(v) => {
                 this.last_type = AST.Type.IntType
-                var raw: String = this.fresh_local()
-                this.emit_indent(raw + " = add i64 0, " + v.floor().to_string())
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + raw + ")")
+                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
                 local
             }
             FloatLit(v) => {
                 this.last_type = AST.Type.FloatType
                 // v is the float literal text (e.g. "3.14").
-                // Emit directly as an LLVM double constant.
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = call i64 @__val_tag_float(double " + v + ")")
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.BoolType
-                var raw: String = this.fresh_local()
+                this.last_type = AST.Type.IntType
+                var local: String = this.fresh_local()
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
-                this.emit_indent(raw + " = add i64 0, " + val_str)
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw + ")")
+                this.emit_indent(local + " = add i64 0, " + val_str)
                 local
             }
             StringLit(s) => {
@@ -33,7 +28,7 @@
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
                 local
             }
             NilLit => {
@@ -45,6 +40,11 @@
                     this.last_type = this.typed_vars.get(name)
                 } else {
                     this.last_type = AST.Type.IntType
+                }
+                // Error check: undefined variable
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
+                    IO.println("[codegen] Error: undefined variable '" + name + "'")
+                    
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 if (this.known_functions.contains(name)) {
@@ -199,6 +199,7 @@
                 rt_func = "__val_is_map"
             }
             if (rt_func.length() > 0) {
+                this.called_functions.push(rt_func)
                 var check_result: String = this.fresh_local()
                 this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
                 var local: String = this.fresh_local()
@@ -230,40 +231,6 @@
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
-        return local
-    }
-
-    fun gen_is_check_nanboxed(val: String, type_name: String): String {
-        // Runtime type check using NaN-boxing tag bits
-        var check_result: String = this.fresh_local()
-
-        if (type_name == "Int" or type_name == "Number") {
-            this.emit_indent(check_result + " = call i1 @__val_is_int(i64 " + val + ")")
-        } else if (type_name == "Float") {
-            this.emit_indent(check_result + " = call i1 @__val_is_float(i64 " + val + ")")
-        } else if (type_name == "String") {
-            this.emit_indent(check_result + " = call i1 @__val_is_string(i64 " + val + ")")
-        } else if (type_name == "Bool") {
-            this.emit_indent(check_result + " = call i1 @__val_is_bool(i64 " + val + ")")
-        } else if (type_name == "Nil") {
-            this.emit_indent(check_result + " = call i1 @__val_is_nil(i64 " + val + ")")
-        } else if (type_name == "List") {
-            this.emit_indent(check_result + " = call i1 @__val_is_list(i64 " + val + ")")
-        } else if (type_name == "Map") {
-            this.emit_indent(check_result + " = call i1 @__val_is_map(i64 " + val + ")")
-        } else {
-            // Class type check: is_ptr && type_id matches
-            var is_ptr: String = this.fresh_local()
-            this.emit_indent(is_ptr + " = call i1 @__val_is_ptr(i64 " + val + ")")
-            var tid: String = this.fresh_local()
-            this.emit_indent(tid + " = call i64 @__val_type_id(i64 " + val + ")")
-            // TODO: look up class type ID from class registry
-            this.emit_indent(check_result + " = and i1 " + is_ptr + ", true")
-        }
-
-        // Convert i1 result to NaN-boxed bool (VAL_TRUE or VAL_FALSE)
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = select i1 " + check_result + ", i64 9222246136947933185, i64 9222246136947933184")
         return local
     }
 
@@ -320,17 +287,15 @@
             var left_type: String = this.get_expr_type(left)
             var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
-            var left_actual_eq: AST.Type = this.last_type
             if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
             var rhs: String = this.gen_arg_value(right)
-            var right_actual_eq: AST.Type = this.last_type
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
+                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
+                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
                 var cmp: String = this.fresh_local()
                 this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
                 var cmp_result: String = this.fresh_local()
@@ -343,11 +308,6 @@
                 this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
                 this.last_type = AST.Type.IntType
                 return local
-            }
-
-            // Float comparison when both operands are genuinely float-tagged
-            if (this.is_float_type(left_actual_eq) and this.is_float_type(right_actual_eq)) {
-                return this.gen_binary_float(lhs, rhs, op)
             }
 
             // Integer comparison
@@ -365,19 +325,17 @@
             var left_type: String = this.get_expr_type(left)
             var right_type: String = this.get_expr_type(right)
             var lhs: String = this.gen_arg_value(left)
-            var left_actual: AST.Type = this.last_type
             if (left_type == "Any") { left_type = this.type_to_string(this.last_type) }
             var rhs: String = this.gen_arg_value(right)
-            var right_actual: AST.Type = this.last_type
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
                 // String concatenation
                 this.last_type = AST.Type.StringType
                 var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = call i8* @__val_untag_ptr(i64 " + lhs + ")")
+                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
                 var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = call i8* @__val_untag_ptr(i64 " + rhs + ")")
+                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -391,34 +349,31 @@
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
                 var result: String = this.fresh_local()
-                this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
+                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
                 return result
             }
 
-            // Float arithmetic when both operands are genuinely float-tagged
-            if (this.is_float_type(left_actual) and this.is_float_type(right_actual)) {
-                return this.gen_binary_float(lhs, rhs, "+")
-            }
-
-            // Integer addition (NaN-boxed: untag, add, retag)
-            return this.gen_binary_nanboxed(lhs, rhs, "+")
+            // Integer addition
+            this.last_type = AST.Type.IntType
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
+            return local
         }
 
         var lhs: String = this.gen_arg_value(left)
-        var left_actual: AST.Type = this.last_type
         var rhs: String = this.gen_arg_value(right)
-        var right_actual: AST.Type = this.last_type
-
-        // Float arithmetic when both operands are genuinely float-tagged
-        if (this.is_float_type(left_actual) and this.is_float_type(right_actual)) {
-            return this.gen_binary_float(lhs, rhs, op)
+        // Guard against division/modulo by zero
+        if (op == "/" or op == "%") {
+            var is_zero: String = this.fresh_local()
+            this.emit_indent(is_zero + " = icmp eq i64 " + rhs + ", 0")
+            var lbl_err: String = this.fresh_label("div_err")
+            var lbl_ok: String = this.fresh_label("div_ok")
+            this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_err + ", label %" + lbl_ok)
+            this.start_block(lbl_err)
+            this.emit_indent("call i64 @__division_error()")
+            this.emit_terminator("unreachable")
+            this.start_block(lbl_ok)
         }
-
-        return this.gen_binary_nanboxed(lhs, rhs, op)
-    }
-
-    fun gen_binary_legacy(lhs: String, rhs: String, op: String): String {
-        // Legacy untagged path (kept for reference, no longer called)
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
@@ -446,107 +401,6 @@
         return local
     }
 
-    fun gen_binary_nanboxed(lhs: String, rhs: String, op: String): String {
-        // NaN-boxed arithmetic: untag → operate → retag
-        var is_cmp: Bool = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
-        var is_arith: Bool = op == "+" or op == "-" or op == "*" or op == "/" or op == "%"
-        var is_bitwise: Bool = op == "&" or op == "|" or op == "^" or op == "<<" or op == ">>"
-
-        // Untag both operands as integers
-        var l_raw: String = this.fresh_local()
-        this.emit_indent(l_raw + " = call i64 @__val_untag_int(i64 " + lhs + ")")
-        var r_raw: String = this.fresh_local()
-        this.emit_indent(r_raw + " = call i64 @__val_untag_int(i64 " + rhs + ")")
-
-        if (is_arith or is_bitwise) {
-            // Guard against division/modulo by zero
-            if (op == "/" or op == "%") {
-                var is_zero: String = this.fresh_local()
-                this.emit_indent(is_zero + " = icmp eq i64 " + r_raw + ", 0")
-                var lbl_err: String = this.fresh_label("div_err")
-                var lbl_ok: String = this.fresh_label("div_ok")
-                this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_err + ", label %" + lbl_ok)
-                this.start_block(lbl_err)
-                this.emit_indent("call i64 @__division_error()")
-                this.emit_terminator("unreachable")
-                this.start_block(lbl_ok)
-            }
-            var result_raw: String = this.fresh_local()
-            if (op == "+") { this.emit_indent(result_raw + " = add i64 " + l_raw + ", " + r_raw) }
-            else if (op == "-") { this.emit_indent(result_raw + " = sub i64 " + l_raw + ", " + r_raw) }
-            else if (op == "*") { this.emit_indent(result_raw + " = mul i64 " + l_raw + ", " + r_raw) }
-            else if (op == "/") { this.emit_indent(result_raw + " = sdiv i64 " + l_raw + ", " + r_raw) }
-            else if (op == "%") { this.emit_indent(result_raw + " = srem i64 " + l_raw + ", " + r_raw) }
-            else if (op == "&") { this.emit_indent(result_raw + " = and i64 " + l_raw + ", " + r_raw) }
-            else if (op == "|") { this.emit_indent(result_raw + " = or i64 " + l_raw + ", " + r_raw) }
-            else if (op == "^") { this.emit_indent(result_raw + " = xor i64 " + l_raw + ", " + r_raw) }
-            else if (op == "<<") { this.emit_indent(result_raw + " = shl i64 " + l_raw + ", " + r_raw) }
-            else if (op == ">>") { this.emit_indent(result_raw + " = ashr i64 " + l_raw + ", " + r_raw) }
-            // Retag as integer
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + result_raw + ")")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-
-        if (is_cmp) {
-            var cmp_result: String = this.fresh_local()
-            if (op == "==") { this.emit_indent(cmp_result + " = icmp eq i64 " + l_raw + ", " + r_raw) }
-            else if (op == "!=") { this.emit_indent(cmp_result + " = icmp ne i64 " + l_raw + ", " + r_raw) }
-            else if (op == "<") { this.emit_indent(cmp_result + " = icmp slt i64 " + l_raw + ", " + r_raw) }
-            else if (op == "<=") { this.emit_indent(cmp_result + " = icmp sle i64 " + l_raw + ", " + r_raw) }
-            else if (op == ">") { this.emit_indent(cmp_result + " = icmp sgt i64 " + l_raw + ", " + r_raw) }
-            else if (op == ">=") { this.emit_indent(cmp_result + " = icmp sge i64 " + l_raw + ", " + r_raw) }
-            // Tag the boolean result via __val_tag_bool (safe for both identity and NaN-box modes)
-            var raw_bool: String = this.fresh_local()
-            this.emit_indent(raw_bool + " = zext i1 " + cmp_result + " to i64")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw_bool + ")")
-            this.last_type = AST.Type.BoolType
-            return local
-        }
-
-        // Fallback: just use raw addition (for + which might be string concat elsewhere)
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_tag_int(i64 " + l_raw + ")")
-        this.last_type = AST.Type.IntType
-        return local
-    }
-
-    fun gen_binary_float(lhs: String, rhs: String, op: String): String {
-        // Float arithmetic: untag as double → operate → retag
-        var is_cmp: Bool = op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">="
-        var l_f: String = this.fresh_local()
-        this.emit_indent(l_f + " = call double @__val_untag_float(i64 " + lhs + ")")
-        var r_f: String = this.fresh_local()
-        this.emit_indent(r_f + " = call double @__val_untag_float(i64 " + rhs + ")")
-        if (!is_cmp) {
-            var result_f: String = this.fresh_local()
-            if (op == "+") { this.emit_indent(result_f + " = fadd double " + l_f + ", " + r_f) }
-            else if (op == "-") { this.emit_indent(result_f + " = fsub double " + l_f + ", " + r_f) }
-            else if (op == "*") { this.emit_indent(result_f + " = fmul double " + l_f + ", " + r_f) }
-            else if (op == "/") { this.emit_indent(result_f + " = fdiv double " + l_f + ", " + r_f) }
-            else if (op == "%") { this.emit_indent(result_f + " = frem double " + l_f + ", " + r_f) }
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_float(double " + result_f + ")")
-            this.last_type = AST.Type.FloatType
-            return local
-        }
-        var cmp_result: String = this.fresh_local()
-        if (op == "==") { this.emit_indent(cmp_result + " = fcmp oeq double " + l_f + ", " + r_f) }
-        else if (op == "!=") { this.emit_indent(cmp_result + " = fcmp one double " + l_f + ", " + r_f) }
-        else if (op == "<") { this.emit_indent(cmp_result + " = fcmp olt double " + l_f + ", " + r_f) }
-        else if (op == "<=") { this.emit_indent(cmp_result + " = fcmp ole double " + l_f + ", " + r_f) }
-        else if (op == ">") { this.emit_indent(cmp_result + " = fcmp ogt double " + l_f + ", " + r_f) }
-        else if (op == ">=") { this.emit_indent(cmp_result + " = fcmp oge double " + l_f + ", " + r_f) }
-        var raw_bool: String = this.fresh_local()
-        this.emit_indent(raw_bool + " = zext i1 " + cmp_result + " to i64")
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_tag_bool(i64 " + raw_bool + ")")
-        this.last_type = AST.Type.BoolType
-        return local
-    }
-
     fun gen_string_concat(left: AST.Expr, right: AST.Expr): String {
         // Flatten string concat at compile time
         var combined: String = this.flatten_string_expr(left) + this.flatten_string_expr(right)
@@ -555,7 +409,7 @@
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
         return local
     }
 
@@ -565,6 +419,25 @@
             Binary(l, o, r) => this.flatten_string_expr(l) + this.flatten_string_expr(r)
         }
         return kind
+    }
+
+    fun gen_func_ref(fn_name: String): String {
+        this.last_type = AST.Type.IntType
+        var nparams: Float = 1
+        if (this.func_param_count.has(fn_name)) {
+            nparams = this.func_param_count.get(fn_name)
+        }
+        var ftype: String = "i64 ("
+        var fti: Float = 0
+        while (fti < nparams) {
+            if (fti > 0) { ftype = ftype + ", " }
+            ftype = ftype + "i64"
+            fti = fti + 1
+        }
+        ftype = ftype + ")*"
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = ptrtoint " + ftype + " @" + fn_name + " to i64")
+        return local
     }
 
     fun gen_arg_value(expr: AST.Expr): String {
@@ -684,29 +557,6 @@
             } else {
                 this.last_type = AST.Type.IntType
             }
-            // Function reference as first-class value: ptrtoint
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and (this.known_functions.contains(vname) or this.known_functions.contains(this.current_prefix + vname))) {
-                var local: String = this.fresh_local()
-                var fn_name2: String = vname
-                if (!this.known_functions.contains(vname) and this.known_functions.contains(this.current_prefix + vname)) {
-                    fn_name2 = this.current_prefix + vname
-                }
-                var nparams2: Float = 1
-                if (this.func_param_count.has(fn_name2)) {
-                    nparams2 = this.func_param_count.get(fn_name2)
-                }
-                var ftype2: String = "i64 ("
-                var fti2: Float = 0
-                while (fti2 < nparams2) {
-                    if (fti2 > 0) { ftype2 = ftype2 + ", " }
-                    ftype2 = ftype2 + "i64"
-                    fti2 = fti2 + 1
-                }
-                ftype2 = ftype2 + ")*"
-                this.emit_indent(local + " = ptrtoint " + ftype2 + " @" + fn_name2 + " to i64")
-                return local
-            }
-            // Module global or local variable
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
@@ -801,7 +651,7 @@
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
             return local
         }
         return this.gen_expr(expr)
@@ -820,7 +670,7 @@
         // Variable or expression: gen_expr gives i64, convert to i8*
         var val: String = this.gen_arg_value(expr)
         var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
+        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
         return ptr
     }
 
@@ -845,7 +695,7 @@
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
         // Return as i64
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = call i64 @__val_tag_ptr(i8* " + buf + ")")
+        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
         return result
     }
 
@@ -998,16 +848,12 @@
         // Error check: argument count validation
         if (this.called_function_arity.has(resolved_callee)) {
             var expected: Float = this.called_function_arity.get(resolved_callee)
-            var min_args: Float = expected
-            if (this.func_defaults.has(resolved_callee)) { min_args = expected - this.func_defaults.get(resolved_callee).length() }
-            if (args.length() < min_args or args.length() > expected) {
+            if (args.length() != expected and expected > 0) {
                 IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
             }
         } else if (this.func_param_count.has(resolved_callee)) {
             var expected: Float = this.func_param_count.get(resolved_callee)
-            var min_args: Float = expected
-            if (this.func_defaults.has(resolved_callee)) { min_args = expected - this.func_defaults.get(resolved_callee).length() }
-            if (args.length() < min_args or args.length() > expected) {
+            if (args.length() != expected and expected > 0) {
                 IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
             }
         }
@@ -1076,9 +922,41 @@
                     }
                 }
             }
+            // Reorder named arguments if present
+            var reordered_args: List<AST.Expr> = args
+            var has_named: Bool = false
+            var ni: Float = 0
+            while (ni < args.length()) {
+                var ak: String = this.classify_expr(args[ni])
+                if (ak == "assign") { has_named = true }
+                ni = ni + 1
+            }
+            if (has_named and this.func_prefix_map.has("__pnames_" + resolved_callee)) {
+                var pnames_str: String = this.func_prefix_map.get("__pnames_" + resolved_callee)
+                var pnames: List<String> = pnames_str.split(",")
+                reordered_args = []
+                var pi4: Float = 0
+                while (pi4 < pnames.length()) {
+                    var found_arg: Bool = false
+                    var ai2: Float = 0
+                    while (ai2 < args.length()) {
+                        var aname: String = match (args[ai2]) { Assign(n, v) => n; _ => "" }
+                        if (aname == pnames[pi4]) {
+                            var aval: AST.Expr = match (args[ai2]) { Assign(n, v) => v; _ => AST.Expr.NilLit }
+                            reordered_args.push(aval)
+                            found_arg = true
+                        }
+                        ai2 = ai2 + 1
+                    }
+                    if (!found_arg and pi4 < args.length()) {
+                        reordered_args.push(args[pi4])
+                    }
+                    pi4 = pi4 + 1
+                }
+            }
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
+            while (i < reordered_args.length()) {
+                var val: String = this.gen_arg_value(reordered_args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }
@@ -1146,12 +1024,6 @@
         }
 
         // Indirect call: callee is a variable holding a function pointer
-        if (callee_name.length() == 0) {
-            // Callee is a complex expression (e.g. method call returning a closure)
-            // Evaluate it directly to get the closure pointer
-            var expr_val: String = this.gen_arg_value(callee)
-            return this.gen_indirect_call(expr_val, args)
-        }
         var ptr_val: String = this.fresh_local()
         this.emit_indent(ptr_val + " = load i64, i64* %" + this.sanitize_name(callee_name))
         return this.gen_indirect_call(ptr_val, args)
@@ -1328,16 +1200,13 @@
         var max_fields: Float = this.get_max_fields(enum_name)
 
         if (max_fields <= 1) {
-            // Simple encoding: (tag << 56) | raw_value
-            // Untag value before storing to avoid NaN-box tag collision
+            // Simple encoding: (tag << 56) | value
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 this.last_type = AST.Type.EnumType(enum_name); return local
             }
-            var val_tagged: String = this.gen_arg_value(args[0])
-            var val: String = this.fresh_local()
-            this.emit_indent(val + " = call i64 @__val_untag_int(i64 " + val_tagged + ")")
+            var val: String = this.gen_arg_value(args[0])
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
             var combined: String = this.fresh_local()
@@ -1386,24 +1255,5 @@
         var as_int: String = this.fresh_local()
         this.emit_indent(as_int + " = ptrtoint [" + num_slots.to_string() + " x i64]* " + arr_ptr + " to i64")
         this.last_type = AST.Type.EnumType(enum_name); return as_int
-    }
-
-    fun gen_func_ref(fn_name: String): String {
-        this.last_type = AST.Type.IntType
-        var nparams: Float = 1
-        if (this.func_param_count.has(fn_name)) {
-            nparams = this.func_param_count.get(fn_name)
-        }
-        var ftype: String = "i64 ("
-        var fti: Float = 0
-        while (fti < nparams) {
-            if (fti > 0) { ftype = ftype + ", " }
-            ftype = ftype + "i64"
-            fti = fti + 1
-        }
-        ftype = ftype + ")*"
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint " + ftype + " @" + fn_name + " to i64")
-        return local
     }
 

@@ -1008,8 +1008,8 @@ class Parser {
     }
 
     fun parse_call_arg(): AST.Expr {
-        // Named argument: ident: expr → Assign(name, value)
-        if (this.match_kind_check("ident") and this.peek_is(":")) {
+        // Named argument: ident = expr (Kotlin-style)
+        if (this.match_kind_check("ident") and this.peek_is("=")) {
             var arg_name: String = this.expect_ident()
             this.advance()
             var arg_val: AST.Expr = this.parse_expr()
@@ -1676,12 +1676,12 @@ class Parser {
     }
 }
 
-var last_parse_had_error: Bool = false
+
 
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
     var result: List<AST.Stmt> = p.parse_program()
-    last_parse_had_error = p.had_error
+    
     return result
 }
 
@@ -1689,10 +1689,10 @@ fun parse_with_source(tokens: List<Lexer.Token>, source: String): List<AST.Stmt>
     var p: Parser = Parser(tokens)
     p.source = source
     var result: List<AST.Stmt> = p.parse_program()
-    last_parse_had_error = p.had_error
+    
     return result
 }
 
 fun had_error(): Bool {
-    return last_parse_had_error
+    return false
 }
