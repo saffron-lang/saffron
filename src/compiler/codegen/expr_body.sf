@@ -79,13 +79,24 @@
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                var var_ref: String = "%" + this.sanitize_name(name)
-                if (this.module_globals.has(this.current_prefix + name)) {
-                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
+                    var var_ref: String = "%" + this.sanitize_name(name)
+                    if (this.module_globals.has(this.current_prefix + name)) {
+                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    }
+                    this.emit_indent("store i64 " + val + ", i64* " + var_ref)
                 }
-                this.emit_indent("store i64 " + val + ", i64* " + var_ref)
                 val
             }
+
+
+
+
+
+
+
+
+
             Logical(left, op, right) => {
                 this.gen_logical(left, op, right)
             }

@@ -377,7 +377,7 @@
             }
             Assign(name, value) => {
                 this.find_free_vars_expr(value, bound, free)
-                if (!bound.contains(name) and !free.contains(name)) {
+                if (!bound.contains(name) and !free.contains(name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
                     free.push(name)
                 }
             }

@@ -976,13 +976,24 @@ class Codegen {
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                var var_ref: String = "%" + this.sanitize_name(name)
-                if (this.module_globals.has(this.current_prefix + name)) {
-                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
+                    var var_ref: String = "%" + this.sanitize_name(name)
+                    if (this.module_globals.has(this.current_prefix + name)) {
+                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    }
+                    this.emit_indent("store i64 " + val + ", i64* " + var_ref)
                 }
-                this.emit_indent("store i64 " + val + ", i64* " + var_ref)
                 val
             }
+
+
+
+
+
+
+
+
+
             Logical(left, op, right) => {
                 this.gen_logical(left, op, right)
             }
@@ -2745,7 +2756,7 @@ class Codegen {
             }
             Assign(name, value) => {
                 this.find_free_vars_expr(value, bound, free)
-                if (!bound.contains(name) and !free.contains(name)) {
+                if (!bound.contains(name) and !free.contains(name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
                     free.push(name)
                 }
             }
@@ -6443,6 +6454,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             si = si + 1
         }
         mi = mi + 1
+    }
+
+    // Pre-scan: register main program top-level VarDecls as globals
+    var gvi: Float = 0
+    while (gvi < program.length()) {
+        var gvk: String = gen.classify_stmt(program[gvi])
+        if (gvk == "var") {
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+                _ => ""
+            }
+            if (gvname.length() > 0) {
+                gen.module_globals.set(gvname, true)
+                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+            }
+        }
+        gvi = gvi + 1
     }
 
     // Pre-register main program's class declarations so imported modules'

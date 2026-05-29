@@ -3,16 +3,16 @@ import "@args" as Args
 
 import "@os" as OS
 import "../config.sf" as Config
-import "./run.sf" as RunCmd
+import "./run.sf" as Run
 
 fun run(parsed: Args.ParsedArgs) {
     var manifest: Config.Manifest = Config.load()
-    var scripts: Map<String, String> = RunCmd._collect_scripts(manifest)
+    var scripts: Map<String, String> = Run._collect_scripts(manifest)
 
     // If there's a build script defined, run it (with script expansion)
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
-        RunCmd._exec_command(cmd, scripts, 0)
+        Run._exec_command(cmd, scripts, 0)
         return
     }
 

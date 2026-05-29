@@ -123,6 +123,8 @@ declare i1 @__val_is_bool(i64)
 declare i1 @__val_is_nil(i64)
 declare i1 @__val_is_list(i64)
 declare i1 @__val_is_map(i64)
+@__g_name = global i64 0
+@__g_version = global i64 0
 
 define i64 @__saffron_entry() {
 entry:
@@ -130,13 +132,13 @@ entry:
   %version = alloca i64
   %t1 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  store i64 %t2, i64* %name
+  store i64 %t2, i64* @__g_name
   %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  store i64 %t4, i64* %version
+  store i64 %t4, i64* @__g_version
   %t5 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
-  %t7 = load i64, i64* %name
+  %t7 = load i64, i64* @__g_name
   %t8 = inttoptr i64 %t6 to i8*
   %t9 = inttoptr i64 %t7 to i8*
   %t10 = call i64 @strlen(i8* %t8)
@@ -159,7 +161,7 @@ entry:
   call i8* @strcpy(i8* %t24, i8* %t18)
   call i8* @strcat(i8* %t24, i8* %t19)
   %t25 = ptrtoint i8* %t24 to i64
-  %t26 = load i64, i64* %version
+  %t26 = load i64, i64* @__g_version
   %t27 = inttoptr i64 %t25 to i8*
   %t28 = inttoptr i64 %t26 to i8*
   %t29 = call i64 @strlen(i8* %t27)
