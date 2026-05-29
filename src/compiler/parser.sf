@@ -1576,7 +1576,13 @@ class Parser {
                 this.consume("}")
                 return AST.Expr.Lambda([], "Nil", body)
             }
-            body.push(this.parse_stmt())
+            // Bare string literals desugar to text(string)
+            if (this.match_kind_check("string")) {
+                var str_expr: AST.Expr = this.parse_expr()
+                body.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [str_expr])))
+            } else {
+                body.push(this.parse_stmt())
+            }
         }
         this.consume("}")
         return AST.Expr.Lambda([], "Nil", body)

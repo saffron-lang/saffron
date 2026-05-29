@@ -123,8 +123,9 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
         } else if (gf_obj_name.length() > 0) {
             gf_class = this.get_var_type_str(gf_obj_name)
         }
-        if (gf_class.length() > 0 and this.class_fields.has(gf_class)) {
-            return this.get_field_type(gf_class, gf_field)
+        var gf_resolved: String = this.resolve_class_type(gf_class)
+        if (gf_resolved.length() > 0) {
+            return this.get_field_type(gf_resolved, gf_field)
         }
     }
     if (ek == "method_call") {
@@ -165,13 +166,15 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
                     inner_class = this.get_var_type_str(in_name)
                 }
             }
-            if (inner_class.length() > 0 and this.class_fields.has(inner_class)) {
-                mc_obj_type = this.get_field_type(inner_class, inner_field)
+            var inner_resolved: String = this.resolve_class_type(inner_class)
+            if (inner_resolved.length() > 0) {
+                mc_obj_type = this.get_field_type(inner_resolved, inner_field)
             }
         }
         // If object is a user class, look up method return type
-        if (mc_obj_type.length() > 0 and this.class_fields.has(mc_obj_type)) {
-            var full_mc: String = mc_obj_type + "__" + mc_method
+        var mc_resolved: String = this.resolve_class_type(mc_obj_type)
+        if (mc_resolved.length() > 0) {
+            var full_mc: String = mc_resolved + "__" + mc_method
             if (this.func_ret_types.has(full_mc)) {
                 return this.func_ret_types.get(full_mc)
             }
@@ -456,7 +459,8 @@ extend fun Codegen.resolve_namespace(obj_name: String, object: AST.Expr): String
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
         var vtype: String = this.get_var_type_str(obj_name)
-        if (vtype.length() > 0 and this.class_fields.has(vtype)) { return vtype }
+        var resolved: String = this.resolve_class_type(vtype)
+        if (resolved.length() > 0) { return resolved }
     }
     return ""
     }
@@ -597,28 +601,17 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     var is_user_class: Bool = false
     if (obj_name.length() > 0) {
         var uc_type: String = this.get_var_type_str(obj_name)
-        if (uc_type.length() > 0 and this.class_fields.has(uc_type)) {
+        var uc_resolved: String = this.resolve_class_type(uc_type)
+        if (uc_resolved.length() > 0) {
             is_user_class = true
-        }
-        // Check with generic parameters stripped (Box<Float> → Box)
-        if (!is_user_class and uc_type.length() > 0 and uc_type.contains("<")) {
-            var uc_base: String = uc_type.slice(0, uc_type.index_of("<"))
-            if (this.class_fields.has(uc_base)) {
-                is_user_class = true
-            }
         }
     }
     // Also check last_type after evaluation (handles chained field access like this.field.method())
     if (!is_user_class) {
         var eval_type: String = this.type_to_string(this.last_type)
-        if (this.class_fields.has(eval_type)) {
+        var eval_resolved: String = this.resolve_class_type(eval_type)
+        if (eval_resolved.length() > 0) {
             is_user_class = true
-        }
-        if (!is_user_class and eval_type.contains("<")) {
-            var eval_base: String = eval_type.slice(0, eval_type.index_of("<"))
-            if (this.class_fields.has(eval_base)) {
-                is_user_class = true
-            }
         }
     }
 
@@ -907,12 +900,14 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     // (must come BEFORE universal methods so class .to_string() is found)
     // typed_vars is the single source of truth for variable types.
     var class_name: String = ""
-    if (this.class_fields.has(obj_type)) {
-        class_name = obj_type
+    var cn_resolved: String = this.resolve_class_type(obj_type)
+    if (cn_resolved.length() > 0) {
+        class_name = cn_resolved
     } else if (obj_name.length() > 0) {
         var cn_type: String = this.get_var_type_str(obj_name)
-        if (cn_type.length() > 0 and this.class_fields.has(cn_type)) {
-            class_name = cn_type
+        var cn_type_resolved: String = this.resolve_class_type(cn_type)
+        if (cn_type_resolved.length() > 0) {
+            class_name = cn_type_resolved
         }
     }
     if (class_name.length() == 0 and this.current_class.length() > 0) {

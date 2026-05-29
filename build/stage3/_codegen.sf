@@ -528,8 +528,9 @@ class Codegen {
             return result
         }
         // Class with to_string method
-        if (this.class_fields.has(val_type)) {
-            var ts_method: String = val_type + "__to_string"
+        var ts_class: String = this.resolve_class_type(val_type)
+        if (ts_class.length() > 0) {
+            var ts_method: String = ts_class + "__to_string"
             if (this.func_prefix_map.has(ts_method)) {
                 ts_method = this.func_prefix_map.get(ts_method)
             } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
@@ -746,6 +747,38 @@ class Codegen {
         return ""
     }
 
+    // Resolve a type string to the class name registered in class_fields.
+    // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
+    // when class_fields only has "Thing".
+    fun resolve_class_type(vtype: String): String {
+        if (this.class_fields.has(vtype)) {
+            return vtype
+        }
+        // Strip module prefix: "Mod.Thing" -> "Thing"
+        if (vtype.contains(".")) {
+            var dot_idx: Float = vtype.index_of(".")
+            var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            if (this.class_fields.has(bare)) {
+                return bare
+            }
+        }
+        // Strip generic params then try: "Mod.Thing<X>" -> "Thing"
+        if (vtype.contains("<")) {
+            var base: String = vtype.slice(0, vtype.index_of("<"))
+            if (this.class_fields.has(base)) {
+                return base
+            }
+            if (base.contains(".")) {
+                var dot_idx2: Float = base.index_of(".")
+                var bare2: String = base.slice(dot_idx2 + 1, base.length())
+                if (this.class_fields.has(bare2)) {
+                    return bare2
+                }
+            }
+        }
+        return ""
+    }
+
     // @codegen-split: expr
     fun gen_expr(expr: AST.Expr): String {
         return match (expr) {
@@ -854,19 +887,20 @@ class Codegen {
                     }
                     // Check if variable holds a class instance
                     var vtype: String = this.get_var_type_str(obj_name)
-                    if (vtype.length() > 0 and this.class_fields.has(vtype)) {
+                    var resolved_type: String = this.resolve_class_type(vtype)
+                    if (resolved_type.length() > 0) {
                         // It's a class instance — do field access
                         var obj_val: String = this.gen_arg_value(object)
                         var saved_class: String = this.current_class
-                        this.current_class = vtype
-                        var field_idx: Float = this.get_field_index(vtype, field)
+                        this.current_class = resolved_type
+                        var field_idx: Float = this.get_field_index(resolved_type, field)
                         var obj_ptr: String = this.fresh_local()
-                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + vtype + "*")
+                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + resolved_type + "*")
                         var field_ptr: String = this.fresh_local()
-                        this.emit_indent(field_ptr + " = getelementptr %" + vtype + ", %" + vtype + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                        this.emit_indent(field_ptr + " = getelementptr %" + resolved_type + ", %" + resolved_type + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                         var result: String = this.fresh_local()
                         this.emit_indent(result + " = load i64, i64* " + field_ptr)
-                        this.last_type = this.str_to_type(this.get_field_type(vtype, field))
+                        this.last_type = this.str_to_type(this.get_field_type(resolved_type, field))
                         this.current_class = saved_class
                         return result
                     }
@@ -1481,16 +1515,17 @@ class Codegen {
             if (mn.length() > 0) {
                 vt = this.get_var_type_str(mn)
             }
-            if (vt.length() > 0 and this.class_fields.has(vt)) {
+            var vt_resolved: String = this.resolve_class_type(vt)
+            if (vt_resolved.length() > 0) {
                     var ov: String = this.gen_arg_value(m_obj)
-                    var fi: Float = this.get_field_index(vt, m_field)
+                    var fi: Float = this.get_field_index(vt_resolved, m_field)
                     var op: String = this.fresh_local()
-                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt + "*")
+                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt_resolved + "*")
                     var fp: String = this.fresh_local()
-                    this.emit_indent(fp + " = getelementptr %" + vt + ", %" + vt + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                    this.emit_indent(fp + " = getelementptr %" + vt_resolved + ", %" + vt_resolved + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                     var result: String = this.fresh_local()
                     this.emit_indent(result + " = load volatile i64, i64* " + fp)
-                    this.last_type = this.str_to_type(this.get_field_type(vt, m_field))
+                    this.last_type = this.str_to_type(this.get_field_type(vt_resolved, m_field))
                     return result
             }
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
@@ -4999,8 +5034,9 @@ class Codegen {
         } else if (gf_obj_name.length() > 0) {
             gf_class = this.get_var_type_str(gf_obj_name)
         }
-        if (gf_class.length() > 0 and this.class_fields.has(gf_class)) {
-            return this.get_field_type(gf_class, gf_field)
+        var gf_resolved: String = this.resolve_class_type(gf_class)
+        if (gf_resolved.length() > 0) {
+            return this.get_field_type(gf_resolved, gf_field)
         }
     }
     if (ek == "method_call") {
@@ -5041,13 +5077,15 @@ class Codegen {
                     inner_class = this.get_var_type_str(in_name)
                 }
             }
-            if (inner_class.length() > 0 and this.class_fields.has(inner_class)) {
-                mc_obj_type = this.get_field_type(inner_class, inner_field)
+            var inner_resolved: String = this.resolve_class_type(inner_class)
+            if (inner_resolved.length() > 0) {
+                mc_obj_type = this.get_field_type(inner_resolved, inner_field)
             }
         }
         // If object is a user class, look up method return type
-        if (mc_obj_type.length() > 0 and this.class_fields.has(mc_obj_type)) {
-            var full_mc: String = mc_obj_type + "__" + mc_method
+        var mc_resolved: String = this.resolve_class_type(mc_obj_type)
+        if (mc_resolved.length() > 0) {
+            var full_mc: String = mc_resolved + "__" + mc_method
             if (this.func_ret_types.has(full_mc)) {
                 return this.func_ret_types.get(full_mc)
             }
@@ -5365,7 +5403,8 @@ class Codegen {
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
         var vtype: String = this.get_var_type_str(obj_name)
-        if (vtype.length() > 0 and this.class_fields.has(vtype)) { return vtype }
+        var resolved: String = this.resolve_class_type(vtype)
+        if (resolved.length() > 0) { return resolved }
     }
     return ""
     }
@@ -5506,28 +5545,17 @@ class Codegen {
     var is_user_class: Bool = false
     if (obj_name.length() > 0) {
         var uc_type: String = this.get_var_type_str(obj_name)
-        if (uc_type.length() > 0 and this.class_fields.has(uc_type)) {
+        var uc_resolved: String = this.resolve_class_type(uc_type)
+        if (uc_resolved.length() > 0) {
             is_user_class = true
-        }
-        // Check with generic parameters stripped (Box<Float> → Box)
-        if (!is_user_class and uc_type.length() > 0 and uc_type.contains("<")) {
-            var uc_base: String = uc_type.slice(0, uc_type.index_of("<"))
-            if (this.class_fields.has(uc_base)) {
-                is_user_class = true
-            }
         }
     }
     // Also check last_type after evaluation (handles chained field access like this.field.method())
     if (!is_user_class) {
         var eval_type: String = this.type_to_string(this.last_type)
-        if (this.class_fields.has(eval_type)) {
+        var eval_resolved: String = this.resolve_class_type(eval_type)
+        if (eval_resolved.length() > 0) {
             is_user_class = true
-        }
-        if (!is_user_class and eval_type.contains("<")) {
-            var eval_base: String = eval_type.slice(0, eval_type.index_of("<"))
-            if (this.class_fields.has(eval_base)) {
-                is_user_class = true
-            }
         }
     }
 
@@ -5924,12 +5952,14 @@ class Codegen {
     // (must come BEFORE universal methods so class .to_string() is found)
     // typed_vars is the single source of truth for variable types.
     var class_name: String = ""
-    if (this.class_fields.has(obj_type)) {
-        class_name = obj_type
+    var cn_resolved: String = this.resolve_class_type(obj_type)
+    if (cn_resolved.length() > 0) {
+        class_name = cn_resolved
     } else if (obj_name.length() > 0) {
         var cn_type: String = this.get_var_type_str(obj_name)
-        if (cn_type.length() > 0 and this.class_fields.has(cn_type)) {
-            class_name = cn_type
+        var cn_type_resolved: String = this.resolve_class_type(cn_type)
+        if (cn_type_resolved.length() > 0) {
+            class_name = cn_type_resolved
         }
     }
     if (class_name.length() == 0 and this.current_class.length() > 0) {

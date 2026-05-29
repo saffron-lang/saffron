@@ -13,7 +13,13 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) { return }
+        if (this.defined_funcs.contains(emit_name)) {
+            if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
+                IO.println("[codegen] Error: function '" + name + "' is already defined")
+                this.has_errors = true
+            }
+            return
+        }
         this.defined_funcs.push(emit_name)
         var is_nested: Bool = this.in_function
 

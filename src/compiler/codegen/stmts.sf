@@ -222,6 +222,10 @@ extend fun Codegen.gen_class_decl_with_parent(name: String, parent: String, fiel
     }
 
 extend fun Codegen.gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        if (this.class_fields.has(name) and this.current_prefix.length() == 0) {
+            IO.println("[codegen] Error: class '" + name + "' is already defined")
+            this.has_errors = true
+        }
         this.class_fields.set(name, fields)
 
         // Parse field names for struct layout

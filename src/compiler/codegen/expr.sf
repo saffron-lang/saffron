@@ -107,19 +107,20 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                     }
                     // Check if variable holds a class instance
                     var vtype: String = this.get_var_type_str(obj_name)
-                    if (vtype.length() > 0 and this.class_fields.has(vtype)) {
+                    var resolved_type: String = this.resolve_class_type(vtype)
+                    if (resolved_type.length() > 0) {
                         // It's a class instance — do field access
                         var obj_val: String = this.gen_arg_value(object)
                         var saved_class: String = this.current_class
-                        this.current_class = vtype
-                        var field_idx: Float = this.get_field_index(vtype, field)
+                        this.current_class = resolved_type
+                        var field_idx: Float = this.get_field_index(resolved_type, field)
                         var obj_ptr: String = this.fresh_local()
-                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + vtype + "*")
+                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + resolved_type + "*")
                         var field_ptr: String = this.fresh_local()
-                        this.emit_indent(field_ptr + " = getelementptr %" + vtype + ", %" + vtype + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                        this.emit_indent(field_ptr + " = getelementptr %" + resolved_type + ", %" + resolved_type + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                         var result: String = this.fresh_local()
                         this.emit_indent(result + " = load i64, i64* " + field_ptr)
-                        this.last_type = this.str_to_type(this.get_field_type(vtype, field))
+                        this.last_type = this.str_to_type(this.get_field_type(resolved_type, field))
                         this.current_class = saved_class
                         return result
                     }
@@ -584,16 +585,17 @@ extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
             if (mn.length() > 0) {
                 vt = this.get_var_type_str(mn)
             }
-            if (vt.length() > 0 and this.class_fields.has(vt)) {
+            var vt_resolved: String = this.resolve_class_type(vt)
+            if (vt_resolved.length() > 0) {
                     var ov: String = this.gen_arg_value(m_obj)
-                    var fi: Float = this.get_field_index(vt, m_field)
+                    var fi: Float = this.get_field_index(vt_resolved, m_field)
                     var op: String = this.fresh_local()
-                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt + "*")
+                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt_resolved + "*")
                     var fp: String = this.fresh_local()
-                    this.emit_indent(fp + " = getelementptr %" + vt + ", %" + vt + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                    this.emit_indent(fp + " = getelementptr %" + vt_resolved + ", %" + vt_resolved + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                     var result: String = this.fresh_local()
                     this.emit_indent(result + " = load volatile i64, i64* " + fp)
-                    this.last_type = this.str_to_type(this.get_field_type(vt, m_field))
+                    this.last_type = this.str_to_type(this.get_field_type(vt_resolved, m_field))
                     return result
             }
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
