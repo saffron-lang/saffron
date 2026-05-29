@@ -315,8 +315,6 @@
             ei = ei + 1
         }
 
-        }
-
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {

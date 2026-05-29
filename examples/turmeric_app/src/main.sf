@@ -23,8 +23,10 @@ fun CounterPage(): T.Node {
 
     return section(cls="counter") {
         h1 { "Reactive Counter" }
-        p(cls="count-display") { "${count.get()}" }
-        p(cls="derived") { "Doubled: ${doubled.get()} | ${parity.get()}" }
+        p(style={"font-size": "3rem", "font-weight": "bold", "color": "#4fc3f7"}) {
+            "${count.get()}"
+        }
+        p(style={"color": "#aaa"}) { "Doubled: ${doubled.get()} | ${parity.get()}" }
 
         div(cls="button-row") {
             button(on_click=fun (e: T.Event) => count.update(fun (n: Float): Float => n + 1)) {
