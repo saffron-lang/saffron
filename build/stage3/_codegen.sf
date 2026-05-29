@@ -915,7 +915,40 @@ class Codegen {
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        // Compile-time resolution (no runtime tags)
+        // When the compile-time type is Any, emit a runtime NaN-boxing tag check
+        var val_type_str: String = this.type_to_string(val_type)
+        if (val_type_str == "Any") {
+            var rt_func: String = ""
+            if (type_name == "Int" or type_name == "Number") {
+                rt_func = "__val_is_int"
+            } else if (type_name == "Float") {
+                rt_func = "__val_is_float"
+            } else if (type_name == "String") {
+                rt_func = "__val_is_string"
+            } else if (type_name == "Bool") {
+                rt_func = "__val_is_bool"
+            } else if (type_name == "Nil") {
+                rt_func = "__val_is_nil"
+            } else if (type_name == "List") {
+                rt_func = "__val_is_list"
+            } else if (type_name == "Map") {
+                rt_func = "__val_is_map"
+            }
+            if (rt_func.length() > 0) {
+                this.called_functions.push(rt_func)
+                var check_result: String = this.fresh_local()
+                this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = zext i1 " + check_result + " to i64")
+                return local
+            }
+            // Unknown class type with Any — cannot resolve at runtime yet, return false
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = add i64 0, 0")
+            return local
+        }
+
+        // Compile-time resolution when type is statically known
         var matches: String = "0"
         if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
             if (this.is_int_type(val_type)) { matches = "1" }
@@ -2618,7 +2651,7 @@ class Codegen {
             Variable(name) => {
                 if (bound.contains(name) or free.contains(name)) {
                     // Already bound or already free — skip
-                } else if (this.typed_vars.has(name)) {
+                } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
                     // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
                 } else {
@@ -3928,6 +3961,14 @@ class Codegen {
             }
             di = di + 1
         }
+        // Runtime type-check functions (NaN-boxing tag inspection, return i1)
+        rt.append("declare i1 @__val_is_int(i64)\n")
+        rt.append("declare i1 @__val_is_float(i64)\n")
+        rt.append("declare i1 @__val_is_string(i64)\n")
+        rt.append("declare i1 @__val_is_bool(i64)\n")
+        rt.append("declare i1 @__val_is_nil(i64)\n")
+        rt.append("declare i1 @__val_is_list(i64)\n")
+        rt.append("declare i1 @__val_is_map(i64)\n")
         return rt.to_string()
     }
     fun find_enum_for_variant(variant: String): String {
@@ -4056,8 +4097,22 @@ class Codegen {
             }
             Unary(op, right) => { this.collect_vars_expr(right, names, types) }
             Assign(name, value) => { this.collect_vars_expr(value, names, types) }
-            Call(callee, args) => { this.collect_vars_expr(callee, names, types) }
-            MethodCall(obj, method, args) => { this.collect_vars_expr(obj, names, types) }
+            Call(callee, args) => {
+                this.collect_vars_expr(callee, names, types)
+                var ci: Float = 0
+                while (ci < args.length()) {
+                    this.collect_vars_expr(args[ci], names, types)
+                    ci = ci + 1
+                }
+            }
+            MethodCall(obj, method, args) => {
+                this.collect_vars_expr(obj, names, types)
+                var mi: Float = 0
+                while (mi < args.length()) {
+                    this.collect_vars_expr(args[mi], names, types)
+                    mi = mi + 1
+                }
+            }
             SetField(obj, field, value) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(value, names, types)

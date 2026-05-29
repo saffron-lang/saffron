@@ -66,6 +66,11 @@ fun parse_dep_spec(name: String, value: Any): Map<String, String> {
         spec.set("version", value)
     } else {
         // Already a parsed Map (inline table from TOML)
+        // Extract optional version constraint (applies to any source type)
+        if (value.has("version")) {
+            spec.set("version", value.get("version"))
+        }
+
         if (value.has("path")) {
             spec.set("type", "path")
             spec.set("path", value.get("path"))
@@ -77,7 +82,7 @@ fun parse_dep_spec(name: String, value: Any): Map<String, String> {
             if (value.has("rev")) { spec.set("rev", value.get("rev")) }
         } else {
             spec.set("type", "registry")
-            spec.set("version", "*")
+            if (!(spec.has("version"))) { spec.set("version", "*") }
         }
     }
 
@@ -185,16 +190,30 @@ fun resolve_all(dependencies: Map<String, String>, manifest_dir: String): List<R
         var spec: Map<String, String> = parse_dep_spec(name, value)
         var source_type: String = spec.get("type")
 
+        var dep: ResolvedDep = nil
         if (source_type == "path") {
-            var dep: ResolvedDep = resolve_path_dep(name, spec.get("path"), manifest_dir)
-            resolved.push(dep)
+            dep = resolve_path_dep(name, spec.get("path"), manifest_dir)
         } else if (source_type == "git") {
-            var dep: ResolvedDep = resolve_git_dep(name, spec, manifest_dir)
-            resolved.push(dep)
+            dep = resolve_git_dep(name, spec, manifest_dir)
         } else if (source_type == "registry") {
             throw "pantry: registry dependencies not yet supported (${name} @ ${spec.get("version")})"
         } else {
             throw "pantry: unknown dependency source type '${source_type}' for ${name}"
+        }
+
+        // Verify version constraint if specified
+        if (spec.has("version") and dep != nil) {
+            var constraint: String = spec.get("version")
+            if (constraint != "*" and constraint != "") {
+                var resolved_version = SemVer.parse(dep.version)
+                if (!(SemVer.satisfies(resolved_version, constraint))) {
+                    throw "pantry: '${name}' version ${dep.version} does not satisfy constraint ${constraint}"
+                }
+            }
+        }
+
+        if (dep != nil) {
+            resolved.push(dep)
         }
 
         i = i + 1

@@ -11,6 +11,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <platform.lsp.serverSupportProvider
             implementation="dev.saffron.intellij.SaffronLspServerSupportProvider"/>
+        <configurationType
+            implementation="dev.saffron.intellij.SaffronPantryConfigurationType"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij.textmate">

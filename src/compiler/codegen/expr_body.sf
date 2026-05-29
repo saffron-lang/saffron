@@ -168,7 +168,40 @@
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        // Compile-time resolution (no runtime tags)
+        // When the compile-time type is Any, emit a runtime NaN-boxing tag check
+        var val_type_str: String = this.type_to_string(val_type)
+        if (val_type_str == "Any") {
+            var rt_func: String = ""
+            if (type_name == "Int" or type_name == "Number") {
+                rt_func = "__val_is_int"
+            } else if (type_name == "Float") {
+                rt_func = "__val_is_float"
+            } else if (type_name == "String") {
+                rt_func = "__val_is_string"
+            } else if (type_name == "Bool") {
+                rt_func = "__val_is_bool"
+            } else if (type_name == "Nil") {
+                rt_func = "__val_is_nil"
+            } else if (type_name == "List") {
+                rt_func = "__val_is_list"
+            } else if (type_name == "Map") {
+                rt_func = "__val_is_map"
+            }
+            if (rt_func.length() > 0) {
+                this.called_functions.push(rt_func)
+                var check_result: String = this.fresh_local()
+                this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = zext i1 " + check_result + " to i64")
+                return local
+            }
+            // Unknown class type with Any — cannot resolve at runtime yet, return false
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = add i64 0, 0")
+            return local
+        }
+
+        // Compile-time resolution when type is statically known
         var matches: String = "0"
         if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
             if (this.is_int_type(val_type)) { matches = "1" }
