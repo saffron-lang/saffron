@@ -199,7 +199,6 @@
                 rt_func = "__val_is_map"
             }
             if (rt_func.length() > 0) {
-                this.called_functions.push(rt_func)
                 var check_result: String = this.fresh_local()
                 this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
                 var local: String = this.fresh_local()
@@ -627,11 +626,16 @@
                     var inner_val: String = this.gen_arg_value(m_obj)
                     var inner_type: String = this.type_to_string(this.last_type)
                     if (this.class_fields.has(inner_type)) {
+                        // Resolve struct name via class_struct_names for module-prefixed types
+                        var inner_struct: String = inner_type
+                        if (this.class_struct_names.has(inner_type)) {
+                            inner_struct = this.class_struct_names.get(inner_type)
+                        }
                         var fi: Float = this.get_field_index(inner_type, m_field)
                         var op: String = this.fresh_local()
-                        this.emit_indent(op + " = inttoptr i64 " + inner_val + " to %" + inner_type + "*")
+                        this.emit_indent(op + " = inttoptr i64 " + inner_val + " to %" + inner_struct + "*")
                         var fp: String = this.fresh_local()
-                        this.emit_indent(fp + " = getelementptr %" + inner_type + ", %" + inner_type + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                        this.emit_indent(fp + " = getelementptr %" + inner_struct + ", %" + inner_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                         var result: String = this.fresh_local()
                         this.emit_indent(result + " = load i64, i64* " + fp)
                         this.last_type = this.str_to_type(this.get_field_type(inner_type, m_field))
