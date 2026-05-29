@@ -335,9 +335,9 @@ class Parser {
                     this.advance()
                     var args: List<AST.Expr> = []
                     if (!this.match_kind_check(")")) {
-                        args.push(this.parse_call_arg())
+                        args.push(this.parse_expr())
                         while (this.match_kind(",")) {
-                            args.push(this.parse_call_arg())
+                            args.push(this.parse_expr())
                         }
                         this.consume(")")
                     } else {
@@ -361,9 +361,9 @@ class Parser {
                 this.advance()
                 var args: List<AST.Expr> = []
                 if (!this.match_kind_check(")")) {
-                    args.push(this.parse_call_arg())
+                    args.push(this.parse_expr())
                     while (this.match_kind(",")) {
-                        args.push(this.parse_call_arg())
+                        args.push(this.parse_expr())
                     }
                     this.consume(")")
                 } else {

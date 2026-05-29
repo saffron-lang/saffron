@@ -8466,7 +8466,7 @@ then608:
 then611:
   %t29 = load i64, i64* %args
   %t30 = load i64, i64* %self
-  %t31 = call i64 @Parser__parse_call_arg(i64 %t30)
+  %t31 = call i64 @Parser__parse_expr(i64 %t30)
   %t32 = call i64 @__list_push(i64 %t29, i64 %t31)
   br label %while.cond613
 while.cond613:
@@ -8479,7 +8479,7 @@ while.cond613:
 while.body614:
   %t38 = load i64, i64* %args
   %t39 = load i64, i64* %self
-  %t40 = call i64 @Parser__parse_call_arg(i64 %t39)
+  %t40 = call i64 @Parser__parse_expr(i64 %t39)
   %t41 = call i64 @__list_push(i64 %t38, i64 %t40)
   br label %while.cond613
 while.end615:
@@ -8592,7 +8592,7 @@ then621:
 then624:
   %t110 = load i64, i64* %args
   %t111 = load i64, i64* %self
-  %t112 = call i64 @Parser__parse_call_arg(i64 %t111)
+  %t112 = call i64 @Parser__parse_expr(i64 %t111)
   %t113 = call i64 @__list_push(i64 %t110, i64 %t112)
   br label %while.cond626
 while.cond626:
@@ -8605,7 +8605,7 @@ while.cond626:
 while.body627:
   %t119 = load i64, i64* %args
   %t120 = load i64, i64* %self
-  %t121 = call i64 @Parser__parse_call_arg(i64 %t120)
+  %t121 = call i64 @Parser__parse_expr(i64 %t120)
   %t122 = call i64 @__list_push(i64 %t119, i64 %t121)
   br label %while.cond626
 while.end628:
