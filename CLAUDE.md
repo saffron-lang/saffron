@@ -378,6 +378,70 @@ var sound = match (animal) {
 }
 ```
 
+## Bootstrap & New Syntax
+
+The self-hosted compiler has a chicken-and-egg constraint: gen2 (`build/stage2/saffronc`) must be able to compile the current source. You cannot use syntax in the compiler source that gen2 doesn't support.
+
+### Adding new syntax (safe workflow)
+
+1. **Implement** the new syntax in parser/codegen using ONLY constructs gen2 already handles
+2. **Bootstrap**: `./bootstrap.sh` — gen2 compiles your source into gen3
+3. **Test gen3** can compile programs that USE the new syntax: `build/saffronc test_new_feature.sf out.ll`
+4. **Run end-to-end**: `tools/saffron run test_new_feature.sf`
+5. **Do NOT** use the new syntax in compiler source yet — gen2 can't parse it
+
+Only after promoting gen3 to gen2 (see below) can you use the new syntax in the compiler itself.
+
+### Promoting gen2
+
+Promotion copies a working gen3 into `build/stage2/saffronc`, enabling new syntax in compiler source.
+
+**Criteria** — ALL must pass:
+- `./bootstrap.sh` completes (gen2 → gen3 builds and links)
+- Gen3 compiles test programs correctly: `tools/saffron run test/hello_bootstrap.sf`
+- Gen3 can compile itself (bootstrap a gen4 from gen3): the test stage in bootstrap.sh verifies this
+
+**Ceremony:**
+
+```bash
+./bootstrap.sh                          # verify current bootstrap passes
+tools/saffron run test/hello_bootstrap.sf  # verify gen3 output runs
+cp build/saffronc build/stage2/saffronc    # promote
+./bootstrap.sh                          # verify promoted gen2 still bootstraps
+git add build/stage2/saffronc
+git commit -m "Promote gen2: <new capability enabled>"
+```
+
+### Known gen2 pitfalls
+
+These are bugs in the current gen2 binary that constrain what you can write in the compiler source:
+
+| Issue | Symptom | Workaround |
+|-------|---------|------------|
+| NaN-boxed arithmetic in list index | `this.tokens[this.pos + 1]` segfaults — adds 1 to tagged value before untagging | Save pos to variable, use `advance()`, restore saved pos |
+| `pos - 1` arithmetic | `this.pos = this.pos - 1` crashes | Save pos before consuming, restore the saved variable |
+| Adding methods to Parser class | Unrelated `%TypeEnv` linker error (struct layout shift) | Inline logic instead of adding helper methods |
+| `parse_block_stmts()` inside `{` handler | Expects opening `{` but it was already consumed | Parse statements inline with `while (!match_kind_check("}")) { ... }` |
+| `peek_is("=>")` | Returns false for TkFatArrow despite correct token | Use speculative advance: consume ident, check `match_kind("=>")`, restore pos on failure |
+
+### Bootstrap file layout
+
+```
+build/
+├── stage2/saffronc    ← gen2 (checked in, used to compile source)
+├── saffronc           ← gen3 (built by bootstrap, the "current" compiler)
+└── stage3/            ← intermediate .ll files from compilation
+src/compiler/
+├── codegen.sf         ← main class (assembled from codegen/ by bootstrap)
+├── codegen/*_body.sf  ← actual compilation input (sed-assembled into codegen.sf)
+├── codegen/*.sf       ← extend fun source (for future direct use)
+├── parser.sf          ← parser (compiled directly)
+├── lexer.sf           ← lexer (compiled directly)
+└── main.sf            ← entry point with import resolution
+```
+
+The bootstrap uses `sed` to assemble `codegen/*_body.sf` files into the class at `@codegen-split:` markers. Changes to `codegen/*.sf` (the extend-fun versions) do NOT affect bootstrap — only `*_body.sf` files matter.
+
 ## Known Issues
 
 See `BUGS.md` for the full list. Remaining critical bugs:
