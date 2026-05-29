@@ -469,7 +469,7 @@
                 while (fi < inner_free.length()) {
                     var fv: String = inner_free[fi]
                     // Skip module globals — they are accessed via @__g_ not local capture
-                    if (!bound.contains(fv) and !free.contains(fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
+                    if (!bound.contains(fv) and !free.contains(fv) and !inner_bound.contains(fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
                         free.push(fv)
                     }
                     fi = fi + 1
