@@ -114,12 +114,12 @@ sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf
 
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    timeout 60 "$GEN2" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
+    timeout 60 "$GEN2" --stdlib /dev/null "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
         || fail "STAGE 1" "gen2 failed to compile $src.sf"
 done
 
 [[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
-timeout 60 "$GEN2" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+timeout 60 "$GEN2" --stdlib /dev/null "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
     || fail "STAGE 1" "gen2 failed to compile codegen.sf"
 
 # Compile main.sf with a modified copy that imports the assembled codegen
@@ -132,12 +132,12 @@ cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
 # Rewrite the codegen import to use the assembled file and strip methods import
 sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
 sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
-timeout 60 "$GEN2" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+timeout 60 "$GEN2" --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
     || fail "STAGE 1" "gen2 failed to compile main.sf"
 
 # Compile runtime.sf
 [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-timeout 60 "$GEN2" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+timeout 60 "$GEN2" --stdlib /dev/null "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
     || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
