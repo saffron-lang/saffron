@@ -3229,15 +3229,8 @@ class Codegen {
         if (vtype == "Any") {
             vtype = this.type_to_string(this.last_type)
         }
-        // If annotation says Float but the init produced an Int-tagged value,
-        // store as Int so arithmetic uses the correct (integer) path.
-        // Only store as Float when the init genuinely produced a float-tagged value.
-        var effective_type: AST.Type = this.str_to_type(vtype)
-        if (vtype == "Float" and !this.is_float_type(this.last_type)) {
-            effective_type = AST.Type.IntType
-        }
         this.var_types.set(name, vtype)
-        this.typed_vars.set(name, effective_type)
+        this.typed_vars.set(name, this.str_to_type(vtype))
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
         // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
@@ -3335,6 +3328,10 @@ class Codegen {
     }
 
     fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
+        if (this.class_fields.has(name) and this.current_prefix.length() == 0) {
+            IO.println("[codegen] Error: class '" + name + "' is already defined")
+            this.has_errors = true
+        }
         this.class_fields.set(name, fields)
 
         // Parse field names for struct layout
@@ -3603,13 +3600,14 @@ class Codegen {
                 var gep: String = this.fresh_local()
                 this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var as_i64: String = this.fresh_local()
-                this.emit_indent(as_i64 + " = call i64 @__val_tag_ptr(i8* " + gep + ")")
+                this.emit_indent(as_i64 + " = ptrtoint i8* " + gep + " to i64")
                 this.emit_terminator("ret i64 " + as_i64)
             } else {
                 // Has fields: build "VariantName(field0, field1, ...)"
                 var parts: List<String> = this.split_respecting_generics(vfields, ",")
                 var num_fields: Float = parts.length()
 
+                // Allocate StringBuilder via malloc + manual concat
                 // Start with "VariantName("
                 var prefix_str: String = vname + "("
                 var prefix_const: String = this.add_string_constant(prefix_str)
@@ -3617,7 +3615,7 @@ class Codegen {
                 var prefix_gep: String = this.fresh_local()
                 this.emit_indent(prefix_gep + " = getelementptr [" + prefix_len.to_string() + " x i8], [" + prefix_len.to_string() + " x i8]* " + prefix_const + ", i64 0, i64 0")
                 var prefix_i64: String = this.fresh_local()
-                this.emit_indent(prefix_i64 + " = call i64 @__val_tag_ptr(i8* " + prefix_gep + ")")
+                this.emit_indent(prefix_i64 + " = ptrtoint i8* " + prefix_gep + " to i64")
 
                 // Create a StringBuilder, append prefix
                 var sb: String = this.fresh_local()
@@ -3676,7 +3674,7 @@ class Codegen {
                         var comma_gep: String = this.fresh_local()
                         this.emit_indent(comma_gep + " = getelementptr [" + comma_len.to_string() + " x i8], [" + comma_len.to_string() + " x i8]* " + comma_const + ", i64 0, i64 0")
                         var comma_i64: String = this.fresh_local()
-                        this.emit_indent(comma_i64 + " = call i64 @__val_tag_ptr(i8* " + comma_gep + ")")
+                        this.emit_indent(comma_i64 + " = ptrtoint i8* " + comma_gep + " to i64")
                         this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + comma_i64 + ")")
                     }
 
@@ -3689,7 +3687,7 @@ class Codegen {
                 var close_gep: String = this.fresh_local()
                 this.emit_indent(close_gep + " = getelementptr [" + close_len.to_string() + " x i8], [" + close_len.to_string() + " x i8]* " + close_const + ", i64 0, i64 0")
                 var close_i64: String = this.fresh_local()
-                this.emit_indent(close_i64 + " = call i64 @__val_tag_ptr(i8* " + close_gep + ")")
+                this.emit_indent(close_i64 + " = ptrtoint i8* " + close_gep + " to i64")
                 this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + close_i64 + ")")
 
                 // Finalize
@@ -3708,7 +3706,7 @@ class Codegen {
         var empty_gep: String = this.fresh_local()
         this.emit_indent(empty_gep + " = getelementptr [" + empty_len.to_string() + " x i8], [" + empty_len.to_string() + " x i8]* " + empty_const + ", i64 0, i64 0")
         var empty_i64: String = this.fresh_local()
-        this.emit_indent(empty_i64 + " = call i64 @__val_tag_ptr(i8* " + empty_gep + ")")
+        this.emit_indent(empty_i64 + " = ptrtoint i8* " + empty_gep + " to i64")
         this.emit_terminator("ret i64 " + empty_i64)
 
         this.emit("}")
@@ -4339,7 +4337,13 @@ class Codegen {
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) { return }
+        if (this.defined_funcs.contains(emit_name)) {
+            if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
+                IO.println("[codegen] Error: function '" + name + "' is already defined")
+                this.has_errors = true
+            }
+            return
+        }
         this.defined_funcs.push(emit_name)
         var is_nested: Bool = this.in_function
 
@@ -4422,11 +4426,7 @@ class Codegen {
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
                 this.var_types.set(pp2[0], pp2[1])
-                if (pp2[1] == "Float") {
-                    this.typed_vars.set(pp2[0], AST.Type.IntType)
-                } else {
-                    this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
-                }
+                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -4505,7 +4505,7 @@ class Codegen {
         i = 0
         while (i < var_names.length()) {
             var vn: String = var_names[i]
-            if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
+            if (!this.module_globals.has(this.current_prefix + vn)) {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
@@ -4518,14 +4518,7 @@ class Codegen {
             var pname: String = parts[0]
             var ptype: String = parts[1]
             this.var_types.set(pname, ptype)
-            // Function parameters typed "Float" are stored as IntType because
-            // we cannot guarantee the caller passes float-tagged values.
-            // Only FloatLit assignments produce genuinely float-tagged values.
-            if (ptype == "Float") {
-                this.typed_vars.set(pname, AST.Type.IntType)
-            } else {
-                this.typed_vars.set(pname, this.str_to_type(ptype))
-            }
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }
@@ -4646,23 +4639,6 @@ class Codegen {
                 this.extend_map.set(this.current_prefix + ename, ecls)
             }
             ei = ei + 1
-        }
-
-        // Pre-scan: register top-level VarDecls as module globals
-        var gi: Float = 0
-        while (gi < program.length()) {
-            if (!this.is_decl(program[gi])) {
-                var gk: String = this.classify_stmt(program[gi])
-                if (gk == "var") {
-                    var gname: String = match (program[gi]) { VarDecl(n, t, i, d) => n }
-                    var gdoc: String = this.get_var_doc(program[gi])
-                    if (!gdoc.starts_with("@import:")) {
-                        this.module_globals.set(this.current_prefix + gname, true)
-                        this.globals.push("@__g_" + this.current_prefix + this.sanitize_name(gname) + " = global i64 0\n")
-                    }
-                }
-            }
-            gi = gi + 1
         }
 
         // First pass: emit all declarations (functions, enums, classes)
@@ -4789,7 +4765,6 @@ class Codegen {
         out.append("declare i8* @popen(i8*, i8*)\n")
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
-        out.append("declare double @llvm.floor.f64(double)\n")
         out.append("declare i32 @setjmp(i8*)\n")
         out.append("declare void @longjmp(i8*, i32)\n")
         out.append("declare void @__io_println_str(i64)\n")
@@ -4799,26 +4774,13 @@ class Codegen {
         out.append("declare void @__io_print_str(i64)\n")
         out.append("declare void @__io_print_int(i64)\n")
         out.append("declare i64 @__bool_to_string(i64)\n")
-        out.append("declare i64 @__nil_to_string()\n")
-        out.append("declare i64 @__float_to_string(i64)\n")
-        out.append("; --- NaN-boxing value helpers ---\n")
-        out.append("declare i64 @__val_tag_int(i64)\n")
-        out.append("declare i64 @__val_untag_int(i64)\n")
-        out.append("declare i64 @__val_tag_ptr(i8*)\n")
-        out.append("declare i8* @__val_untag_ptr(i64)\n")
-        out.append("declare i64 @__val_tag_float(double)\n")
-        out.append("declare double @__val_untag_float(i64)\n")
-        out.append("declare i64 @__val_tag_bool(i64)\n")
-        out.append("declare i64 @__val_untag_bool(i64)\n")
-        out.append("declare i64 @__val_nil()\n\n")
+        out.append("declare i64 @__nil_to_string()\n\n")
 
         // Runtime error helpers (bodies in runtime.ll)
         out.append("declare i64 @__division_error()\n")
         out.append("declare i64 @__null_pointer_error()\n")
         out.append("declare i64 @__runtime_error(i64)\n")
         out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
-
-        out.append("declare double @strtod(i8*, i8*)\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
