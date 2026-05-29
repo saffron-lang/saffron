@@ -427,7 +427,7 @@ class Parser {
                 var kl_name: String = this.expect_ident()
                 if (this.match_kind("=>")) {
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, "Any", AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -451,12 +451,12 @@ class Parser {
                     return AST.Expr.Lambda(lparams, "Any", lbody)
                 } else if (this.match_kind(",")) {
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, "Any", AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
                     var lpname: String = this.expect_ident()
-                    lparams.push(AST.Param.Param(lpname, "Any", AST.Expr.NilLit))
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
                     while (this.match_kind(",")) {
                         lpname = this.expect_ident()
-                        lparams.push(AST.Param.Param(lpname, "Any", AST.Expr.NilLit))
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
                     }
                     this.consume("=>")
                     var lbody: List<AST.Stmt> = []
@@ -1689,7 +1689,7 @@ class Parser {
         var params: List<AST.Param> = []
         var i: Float = 0
         while (i < names.length()) {
-            params.push(AST.Param.Param(names[i], "Any", AST.Expr.NilLit))
+            params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
             i = i + 1
         }
         return AST.Expr.Lambda(params, "Any", body)
