@@ -3,17 +3,16 @@ import "@args" as Args
 
 import "@os" as OS
 import "../config.sf" as Config
+import "./run.sf" as RunCmd
 
 fun run(parsed: Args.ParsedArgs) {
-    var manifest = Config.load()
+    var manifest: Config.Manifest = Config.load()
+    var scripts: Map<String, String> = RunCmd._collect_scripts(manifest)
 
-    // If there's a build script defined, use it
-    var scripts: Map<String, String> = manifest.scripts
+    // If there's a build script defined, run it (with script expansion)
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
-        IO.println("> ${cmd}")
-        var output: String = OS.exec(cmd)
-        IO.print(output)
+        RunCmd._exec_command(cmd, scripts, 0)
         return
     }
 
@@ -30,13 +29,9 @@ fun run(parsed: Args.ParsedArgs) {
     }
     var output_path: String = "build/" + output_name
 
-    // Ensure build/ dir exists
     OS.exec("mkdir -p build")
 
-    // Build the saffron compile command with lib paths
     var cmd: String = "saffron build ${entry} -o ${output_path}"
-
-    // Add .pantry/packages as a lib path if it exists
     if (IO.file_exists(".pantry/packages")) {
         cmd = cmd + " --lib-path .pantry/packages"
     }

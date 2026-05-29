@@ -1,41 +1,138 @@
 //! `pantry run <script>` — run a named script from pantry.toml.
+//! Scripts can reference other scripts by name. Commands are split on `&&`
+//! and each segment is checked against [scripts] before being run as shell.
+//!
+//! Dependencies can export scripts via [scripts.bin] in their pantry.toml.
+//! These become available in the consuming project as if locally defined.
 import "@args" as Args
 
 import "@os" as OS
+import "@toml" as TOML
 import "../config.sf" as Config
 
-fun _exec(cmd: String) {
+fun _exec_shell(cmd: String) {
     IO.println("> ${cmd}")
     var output: String = OS.exec(cmd)
-    IO.print(output)
+    if (output.length() > 0) {
+        IO.print(output)
+    }
 }
 
-/// Run a named script from the [scripts] section.
-fun run(script_name: String, parsed: Args.ParsedArgs) {
-    var manifest = Config.load()
+/// Collect all available scripts: project scripts + dependency bin scripts.
+fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
+    var scripts: Map<String, String> = {}
 
-    if (!(manifest.scripts.has(script_name))) {
+    // Start with project scripts
+    var proj_keys: List<String> = manifest.scripts.keys()
+    var i: Int = 0
+    while (i < proj_keys.length()) {
+        var key: String = proj_keys[i]
+        scripts.set(key, manifest.scripts.get(key))
+        i = i + 1
+    }
+
+    // Scan installed dependencies for exported bin scripts
+    var packages_dir: String = ".pantry/packages"
+    if (!(IO.file_exists(packages_dir))) {
+        return scripts
+    }
+
+    var packages: List<String> = OS.exec("ls ${packages_dir} 2>/dev/null").trim().split("\n")
+    i = 0
+    while (i < packages.length()) {
+        var pkg_name: String = packages[i].trim()
+        if (pkg_name == "") {
+            i = i + 1
+            continue
+        }
+
+        var pkg_manifest: String = packages_dir + "/" + pkg_name + "/pantry.toml"
+        if (!(IO.file_exists(pkg_manifest))) {
+            i = i + 1
+            continue
+        }
+
+        var pkg_toml: Map<String, Any> = TOML.parse_file(pkg_manifest)
+
+        if (pkg_toml.has("scripts")) {
+            var pkg_scripts: Map<String, Any> = pkg_toml.get("scripts")
+            if (pkg_scripts.has("bin")) {
+                var bin_scripts: Map<String, String> = pkg_scripts.get("bin")
+                var bin_keys: List<String> = bin_scripts.keys()
+                var j: Int = 0
+                while (j < bin_keys.length()) {
+                    var bin_name: String = bin_keys[j]
+                    var bin_cmd: String = bin_scripts.get(bin_name)
+                    var resolved_cmd: String = "cd ${packages_dir}/${pkg_name} && ${bin_cmd}"
+
+                    // Always available as pkg_name:script_name
+                    scripts.set(pkg_name + ":" + bin_name, resolved_cmd)
+
+                    // Also available unprefixed if no conflict
+                    if (!(scripts.has(bin_name))) {
+                        scripts.set(bin_name, resolved_cmd)
+                    }
+
+                    j = j + 1
+                }
+            }
+        }
+
+        i = i + 1
+    }
+
+    return scripts
+}
+
+/// Execute a command string, expanding script references.
+fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
+    if (depth > 10) {
+        throw "pantry: script recursion depth exceeded (circular reference?)"
+    }
+
+    var segments: List<String> = cmd.split("&&")
+    var i: Int = 0
+    while (i < segments.length()) {
+        var segment: String = segments[i].trim()
+        if (segment.length() > 0) {
+            if (scripts.has(segment)) {
+                var expanded: String = scripts.get(segment)
+                _exec_command(expanded, scripts, depth + 1)
+            } else {
+                _exec_shell(segment)
+            }
+        }
+        i = i + 1
+    }
+}
+
+/// Run a named script from the [scripts] section (or dep bin scripts).
+fun run(script_name: String, parsed: Args.ParsedArgs) {
+    var manifest: Config.Manifest = Config.load()
+    var scripts: Map<String, String> = _collect_scripts(manifest)
+
+    if (!(scripts.has(script_name))) {
         IO.println("pantry run: no script named '${script_name}'")
         IO.println("")
-        if (manifest.scripts.length() > 0) {
+        if (scripts.length() > 0) {
             IO.println("Available scripts:")
-            var keys: List<String> = manifest.scripts.keys()
-            var i = 0
+            var keys: List<String> = scripts.keys()
+            var i: Int = 0
             while (i < keys.length()) {
-                IO.println("  ${keys[i]} = ${manifest.scripts.get(keys[i])}")
+                IO.println("  ${keys[i]} = ${scripts.get(keys[i])}")
                 i = i + 1
             }
         } else {
-            IO.println("No scripts defined in pantry.toml. Add a [scripts] section.")
+            IO.println("No scripts defined. Add a [scripts] section to pantry.toml.")
         }
         OS.exit(1)
     }
 
-    var cmd: String = manifest.scripts.get(script_name)
-    _exec(cmd)
+    var cmd: String = scripts.get(script_name)
+    _exec_command(cmd, scripts, 0)
 }
 
 /// Run a raw shell command in the project context.
 fun run_raw(cmd: String, parsed: Args.ParsedArgs) {
-    _exec(cmd)
+    _exec_shell(cmd)
 }
