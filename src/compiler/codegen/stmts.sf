@@ -67,18 +67,6 @@ extend fun Codegen.gen_stmt(stmt: AST.Stmt) {
                     }
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
-                    // Register param names for named argument resolution
-                    var param_names_str: String = ""
-                    pi = 0
-                    while (pi < params.length()) {
-                        var p2: AST.Param = params[pi]
-                        var pn: String = match (p2) { Param(n, t, d) => n }
-                        if (pi > 0) { param_names_str = param_names_str + "," }
-                        param_names_str = param_names_str + pn
-                        pi = pi + 1
-                    }
-                    this.func_prefix_map.set("__pnames_" + emit_name, param_names_str)
-                    this.func_prefix_map.set("__pnames_" + name, param_names_str)
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
