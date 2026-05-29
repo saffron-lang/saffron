@@ -20,6 +20,7 @@ class Codegen {
     var known_functions: List<String>
     var func_ret_types: Map<String, String>
     var class_fields: Map<String, String>
+    var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
     var current_parent: String
@@ -64,6 +65,7 @@ class Codegen {
         this.known_functions = []
         this.func_ret_types = {}
         this.class_fields = {}
+        this.class_struct_names = {}
         this.class_methods = {}
         this.current_class = ""
         this.current_parent = ""
@@ -759,6 +761,10 @@ class Codegen {
             }
         }
         if (this.class_fields.has(vtype)) {
+            // Return the actual struct type name (may be prefixed)
+            if (this.class_struct_names.has(vtype)) {
+                return this.class_struct_names.get(vtype)
+            }
             return vtype
         }
         // Strip module prefix: "Mod.Thing" -> "Thing"
@@ -773,6 +779,9 @@ class Codegen {
                 }
             }
             if (this.class_fields.has(bare)) {
+                if (this.class_struct_names.has(bare)) {
+                    return this.class_struct_names.get(bare)
+                }
                 return bare
             }
         }
@@ -786,6 +795,9 @@ class Codegen {
                 }
             }
             if (this.class_fields.has(base)) {
+                if (this.class_struct_names.has(base)) {
+                    return this.class_struct_names.get(base)
+                }
                 return base
             }
             if (base.contains(".")) {
@@ -798,6 +810,9 @@ class Codegen {
                     }
                 }
                 if (this.class_fields.has(bare2)) {
+                    if (this.class_struct_names.has(bare2)) {
+                        return this.class_struct_names.get(bare2)
+                    }
                     return bare2
                 }
             }
@@ -3178,8 +3193,10 @@ class Codegen {
             type_name = this.current_prefix + name
         }
         this.class_fields.set(name, fields)
+        this.class_struct_names.set(name, type_name)
         if (this.current_prefix.length() > 0) {
             this.class_fields.set(type_name, fields)
+            this.class_struct_names.set(type_name, type_name)
         }
 
         // Parse field names for struct layout
@@ -3242,7 +3259,7 @@ class Codegen {
 
         // Generate methods as functions with name prefix: ClassName__method
         // Methods get 'self' (i64 pointer to instance) as first param
-        this.current_class = name
+        this.current_class = type_name
         i = 0
         while (i < methods.length()) {
             this.gen_class_method(name, methods[i])
@@ -5849,11 +5866,16 @@ class Codegen {
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         class_name = this.current_class
     }
+    // Resolve to struct type name for GEP
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     var result: String = this.fresh_local()
     this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
     // Infer field type from class declaration
@@ -5881,12 +5903,17 @@ class Codegen {
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         class_name = this.current_class
     }
+    // Resolve to struct type name for GEP
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var val: String = this.gen_arg_value(value)
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)
     return val
     }
@@ -6030,6 +6057,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     mi2 = 0
     while (mi2 < module_stmts.length()) {
         var stmts3: List<AST.Stmt> = module_stmts[mi2]
+        var prefix3: String = module_prefixes_list[mi2]
         var si3: Float = 0
         while (si3 < stmts3.length()) {
             var sk3: String = gen.classify_stmt(stmts3[si3])
@@ -6060,6 +6088,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         }
                     }
                     gen.class_fields.set(cn3, cf3_all)
+                    gen.class_fields.set(prefix3 + cn3, cf3_all)
                     var cm3_names: List<String> = []
                     var cm3i: Float = 0
                     while (cm3i < cm3.length()) {
@@ -6299,6 +6328,8 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
                         }
                     }
                     gen.class_fields.set(mod_name, mod_all_fields)
+                    // Also register with module prefix for cross-module disambiguation
+                    gen.class_fields.set(prefix + mod_name, mod_all_fields)
                     // Register class methods list
                     var mod_method_names: List<String> = []
                     var mod_mi2: Float = 0

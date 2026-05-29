@@ -21,6 +21,7 @@ class Codegen {
     var known_functions: List<String>
     var func_ret_types: Map<String, String>
     var class_fields: Map<String, String>
+    var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
     var current_parent: String
@@ -65,6 +66,7 @@ class Codegen {
         this.known_functions = []
         this.func_ret_types = {}
         this.class_fields = {}
+        this.class_struct_names = {}
         this.class_methods = {}
         this.current_class = ""
         this.current_parent = ""
@@ -399,6 +401,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     mi2 = 0
     while (mi2 < module_stmts.length()) {
         var stmts3: List<AST.Stmt> = module_stmts[mi2]
+        var prefix3: String = module_prefixes_list[mi2]
         var si3: Float = 0
         while (si3 < stmts3.length()) {
             var sk3: String = gen.classify_stmt(stmts3[si3])
@@ -429,6 +432,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         }
                     }
                     gen.class_fields.set(cn3, cf3_all)
+                    gen.class_fields.set(prefix3 + cn3, cf3_all)
                     var cm3_names: List<String> = []
                     var cm3i: Float = 0
                     while (cm3i < cm3.length()) {

@@ -1118,11 +1118,16 @@
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         class_name = this.current_class
     }
+    // Resolve to struct type name for GEP
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     var result: String = this.fresh_local()
     this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
     // Infer field type from class declaration
@@ -1150,12 +1155,17 @@
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
         class_name = this.current_class
     }
+    // Resolve to struct type name for GEP
+    var struct_name: String = class_name
+    if (this.class_struct_names.has(class_name)) {
+        struct_name = this.class_struct_names.get(class_name)
+    }
     var val: String = this.gen_arg_value(value)
     var field_idx: Float = this.get_field_index(class_name, field)
     var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + class_name + "*")
+    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
-    this.emit_indent(field_ptr + " = getelementptr %" + class_name + ", %" + class_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)
     return val
     }
