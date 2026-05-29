@@ -1,15 +1,463 @@
-import "turmeric" as UI
+// Turmeric Demo — Full-featured app showcasing all framework capabilities
+// Includes: signals, computed, effects, components, lists, routing, styling
 
-var count = UI.signal(0)
+import "turmeric/signal" as Sig
+import "turmeric/element" as El
+import "turmeric/reconcile" as R
+import "turmeric/router" as Router
+import "turmeric/style" as Style
 
-var app = UI.div([UI.class_("app")]) {
-    UI.h1 { UI.text("Turmeric Demo") }
-    UI.p { UI.text("Count: ${count.get()}") }
-    UI.button([UI.on_click(fun (e: UI.Event) {
-        count.update(fun (n: Float): Float => n + 1)
-    })]) {
-        UI.text("Increment")
+// =============================================================================
+// Models
+// =============================================================================
+
+class Todo {
+    var id: String
+    var text: String
+    var completed: Bool
+
+    fun init(id: String, text: String) {
+        this.id = id
+        this.text = text
+        this.completed = false
     }
 }
 
-IO.println(UI.render_to_html(app))
+class User {
+    var name: String
+    var email: String
+    var avatar_url: String
+
+    fun init(name: String, email: String, avatar_url: String) {
+        this.name = name
+        this.email = email
+        this.avatar_url = avatar_url
+    }
+}
+
+// =============================================================================
+// Styles
+// =============================================================================
+
+var app_styles: Style.ScopedStyles = Style.scoped_styles({
+    "container": "max-width: 800px; margin: 0 auto; padding: 2rem; font-family: -apple-system, sans-serif",
+    "header": "display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem",
+    "nav": "display: flex; gap: 1rem",
+    "nav_link": "color: #4fc3f7; text-decoration: none; padding: 0.5rem 1rem; border-radius: 4px",
+    "nav_link_active": "background: #2d2d44",
+    "card": "background: #2d2d44; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem",
+    "button": "background: #4fc3f7; color: #1a1a2e; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold",
+    "button_danger": "background: #ef5350; color: white",
+    "input": "background: #1a1a2e; color: #e0e0e0; border: 1px solid #4fc3f7; padding: 0.5rem; border-radius: 4px; width: 100%",
+    "badge": "background: #4fc3f7; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem",
+    "error": "color: #ef5350; padding: 1rem; border: 1px solid #ef5350; border-radius: 4px",
+    "skeleton": "background: #3d3d55; border-radius: 4px; height: 1rem; margin-bottom: 0.5rem; animation: pulse 1.5s infinite"
+})
+
+var theme: Sig.Signal<String> = Sig.signal("dark")
+
+fun theme_vars(): String {
+    if (theme.get() == "dark") {
+        return Style.css_vars({
+            "--bg": "#1a1a2e",
+            "--fg": "#e0e0e0",
+            "--accent": "#4fc3f7",
+            "--surface": "#2d2d44"
+        })
+    }
+    return Style.css_vars({
+        "--bg": "#ffffff",
+        "--fg": "#1a1a2e",
+        "--accent": "#1976d2",
+        "--surface": "#f5f5f5"
+    })
+}
+
+// =============================================================================
+// Components
+// =============================================================================
+
+// --- Counter Component ---
+
+fun CounterComponent(parent: Float): R.Component {
+    var count: Sig.Signal<Float> = Sig.signal(0)
+    var doubled: Sig.Computed<Float> = Sig.computed(fun (): Float => count.get() * 2)
+    var parity: Sig.Computed<String> = Sig.computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
+    })
+
+    var comp: R.Component = R.Component(R.dom_create("div"), parent)
+    R.dom_set_attr(comp.handle, "class", app_styles.get("card"))
+
+    var title_el: Float = R.dom_create("h3")
+    R.dom_set_text(title_el, "Counter")
+    R.dom_append(comp.handle, title_el)
+
+    // Count display — updates reactively
+    var count_el: Float = R.dom_create("p")
+    R.dom_set_attr(count_el, "style", "font-size: 2rem; font-weight: bold")
+    R.dom_append(comp.handle, count_el)
+
+    R.managed_effect(comp, fun () => {
+        R.dom_set_text(count_el, count.get().to_string())
+    })
+
+    // Derived displays
+    var doubled_el: Float = R.dom_create("p")
+    R.dom_append(comp.handle, doubled_el)
+    R.managed_effect(comp, fun () => {
+        R.dom_set_text(doubled_el, "Doubled: " + doubled.get().to_string() + " (" + parity.get() + ")")
+    })
+
+    // Buttons
+    var btn_container: Float = R.dom_create("div")
+    R.dom_set_attr(btn_container, "style", "display: flex; gap: 0.5rem; margin-top: 1rem")
+
+    var inc_btn: Float = R.dom_create("button")
+    R.dom_set_text(inc_btn, "+ Increment")
+    R.dom_set_attr(inc_btn, "class", app_styles.get("button"))
+    R.dom_on(inc_btn, "click", 1)
+    R.dom_append(btn_container, inc_btn)
+
+    var dec_btn: Float = R.dom_create("button")
+    R.dom_set_text(dec_btn, "- Decrement")
+    R.dom_set_attr(dec_btn, "class", app_styles.get("button"))
+    R.dom_on(dec_btn, "click", 2)
+    R.dom_append(btn_container, dec_btn)
+
+    var reset_btn: Float = R.dom_create("button")
+    R.dom_set_text(reset_btn, "Reset")
+    R.dom_set_attr(reset_btn, "class", Style.cls([app_styles.get("button"), app_styles.get("button_danger")]))
+    R.dom_on(reset_btn, "click", 3)
+    R.dom_append(btn_container, reset_btn)
+
+    R.dom_append(comp.handle, btn_container)
+
+    return comp
+}
+
+// --- Todo List Component ---
+
+fun TodoListComponent(parent: Float): R.Component {
+    var next_id: Sig.Signal<Float> = Sig.signal(4)
+    var todos: Sig.Signal<List<Todo>> = Sig.signal([
+        Todo("1", "Build Turmeric framework"),
+        Todo("2", "Compile to WASM"),
+        Todo("3", "Ship it")
+    ])
+    var filter: Sig.Signal<String> = Sig.signal("all")
+    var input_text: Sig.Signal<String> = Sig.signal("")
+
+    var filtered_todos: Sig.Computed<List<Todo>> = Sig.computed(fun (): List<Todo> => {
+        var all: List<Todo> = todos.get()
+        var f: String = filter.get()
+        if (f == "all") { return all }
+        var result: List<Todo> = []
+        var i: Float = 0
+        while (i < all.length()) {
+            if (f == "active" and !all[i].completed) { result.push(all[i]) }
+            if (f == "completed" and all[i].completed) { result.push(all[i]) }
+            i = i + 1
+        }
+        return result
+    })
+
+    var active_count: Sig.Computed<Float> = Sig.computed(fun (): Float => {
+        var all: List<Todo> = todos.get()
+        var count: Float = 0
+        var i: Float = 0
+        while (i < all.length()) {
+            if (!all[i].completed) { count = count + 1 }
+            i = i + 1
+        }
+        return count
+    })
+
+    var comp: R.Component = R.Component(R.dom_create("div"), parent)
+    R.dom_set_attr(comp.handle, "class", app_styles.get("card"))
+
+    // Header
+    var header: Float = R.dom_create("div")
+    R.dom_set_attr(header, "style", "display: flex; justify-content: space-between; align-items: center")
+    var title: Float = R.dom_create("h3")
+    R.dom_set_text(title, "Todo List")
+    R.dom_append(header, title)
+
+    var badge_el: Float = R.dom_create("span")
+    R.dom_set_attr(badge_el, "class", app_styles.get("badge"))
+    R.dom_append(header, badge_el)
+    R.managed_effect(comp, fun () => {
+        R.dom_set_text(badge_el, active_count.get().to_string() + " remaining")
+    })
+
+    R.dom_append(comp.handle, header)
+
+    // Input form
+    var form: Float = R.dom_create("div")
+    R.dom_set_attr(form, "style", "display: flex; gap: 0.5rem; margin: 1rem 0")
+
+    var input_el: Float = R.dom_create("input")
+    R.dom_set_attr(input_el, "class", app_styles.get("input"))
+    R.dom_set_attr(input_el, "placeholder", "What needs doing?")
+    R.dom_on(input_el, "input", 10)  // callback updates input_text signal
+    R.dom_append(form, input_el)
+
+    var add_btn: Float = R.dom_create("button")
+    R.dom_set_text(add_btn, "Add")
+    R.dom_set_attr(add_btn, "class", app_styles.get("button"))
+    R.dom_on(add_btn, "click", 11)  // callback adds todo
+    R.dom_append(form, add_btn)
+
+    R.dom_append(comp.handle, form)
+
+    // Filter buttons
+    var filter_bar: Float = R.dom_create("div")
+    R.dom_set_attr(filter_bar, "style", "display: flex; gap: 0.5rem; margin-bottom: 1rem")
+
+    var all_btn: Float = R.dom_create("button")
+    R.dom_set_text(all_btn, "All")
+    R.dom_on(all_btn, "click", 12)
+    R.dom_append(filter_bar, all_btn)
+
+    var active_btn: Float = R.dom_create("button")
+    R.dom_set_text(active_btn, "Active")
+    R.dom_on(active_btn, "click", 13)
+    R.dom_append(filter_bar, active_btn)
+
+    var done_btn: Float = R.dom_create("button")
+    R.dom_set_text(done_btn, "Completed")
+    R.dom_on(done_btn, "click", 14)
+    R.dom_append(filter_bar, done_btn)
+
+    R.dom_append(comp.handle, filter_bar)
+
+    // Todo list — keyed reconciliation
+    var list_el: Float = R.dom_create("ul")
+    R.dom_set_attr(list_el, "style", "list-style: none; padding: 0")
+    R.dom_append(comp.handle, list_el)
+
+    R.keyed_list(list_el, filtered_todos,
+        fun (todo: Todo): String => todo.id,
+        fun (todo: Todo): R.Component => {
+            var li_comp: R.Component = R.Component(R.dom_create("li"), list_el)
+            R.dom_set_attr(li_comp.handle, "style", "display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #3d3d55")
+
+            var checkbox: Float = R.dom_create("input")
+            R.dom_set_attr(checkbox, "type", "checkbox")
+            if (todo.completed) { R.dom_set_attr(checkbox, "checked", "true") }
+            R.dom_append(li_comp.handle, checkbox)
+
+            var text_el: Float = R.dom_create("span")
+            R.dom_set_text(text_el, todo.text)
+            if (todo.completed) {
+                R.dom_set_attr(text_el, "style", "text-decoration: line-through; color: #666")
+            }
+            R.dom_append(li_comp.handle, text_el)
+
+            li_comp.mount()
+            return li_comp
+        }
+    )
+
+    return comp
+}
+
+// --- User Profile Component (with loading state) ---
+
+fun UserProfileComponent(parent: Float, user_signal: Sig.Signal<User>): R.Component {
+    var comp: R.Component = R.Component(R.dom_create("div"), parent)
+    R.dom_set_attr(comp.handle, "class", app_styles.get("card"))
+
+    var avatar_el: Float = R.dom_create("img")
+    R.dom_set_attr(avatar_el, "style", "width: 64px; height: 64px; border-radius: 50%")
+    R.dom_append(comp.handle, avatar_el)
+
+    var name_el: Float = R.dom_create("h3")
+    R.dom_append(comp.handle, name_el)
+
+    var email_el: Float = R.dom_create("p")
+    R.dom_set_attr(email_el, "style", "color: #888")
+    R.dom_append(comp.handle, email_el)
+
+    // All fields update reactively when user signal changes
+    R.managed_effect(comp, fun () => {
+        var u: User = user_signal.get()
+        R.dom_set_attr(avatar_el, "src", u.avatar_url)
+        R.dom_set_text(name_el, u.name)
+        R.dom_set_text(email_el, u.email)
+    })
+
+    return comp
+}
+
+// --- Theme Toggle ---
+
+fun ThemeToggleComponent(parent: Float): R.Component {
+    var comp: R.Component = R.Component(R.dom_create("button"), parent)
+    R.dom_set_attr(comp.handle, "class", app_styles.get("button"))
+    R.dom_on(comp.handle, "click", 20)
+
+    R.managed_effect(comp, fun () => {
+        if (theme.get() == "dark") {
+            R.dom_set_text(comp.handle, "☀ Light Mode")
+        } else {
+            R.dom_set_text(comp.handle, "☾ Dark Mode")
+        }
+    })
+
+    return comp
+}
+
+// =============================================================================
+// Pages (for routing)
+// =============================================================================
+
+fun HomePage(route: Router.RouteParams): R.Component {
+    var root: Float = R.dom_create("div")
+    var comp: R.Component = R.Component(root, 0)
+
+    var welcome: Float = R.dom_create("h1")
+    R.dom_set_text(welcome, "Welcome to Turmeric")
+    R.dom_append(root, welcome)
+
+    var desc: Float = R.dom_create("p")
+    R.dom_set_text(desc, "A reactive web framework for Saffron, compiled to WASM.")
+    R.dom_append(root, desc)
+
+    // Embed counter
+    var counter: R.Component = CounterComponent(root)
+    counter.mount()
+    comp.add_child(counter)
+
+    return comp
+}
+
+fun TodoPage(route: Router.RouteParams): R.Component {
+    var root: Float = R.dom_create("div")
+    var comp: R.Component = R.Component(root, 0)
+
+    var todo_comp: R.Component = TodoListComponent(root)
+    todo_comp.mount()
+    comp.add_child(todo_comp)
+
+    return comp
+}
+
+fun ProfilePage(route: Router.RouteParams): R.Component {
+    var user_id: String = route.get("id")
+    var root: Float = R.dom_create("div")
+    var comp: R.Component = R.Component(root, 0)
+
+    var title: Float = R.dom_create("h2")
+    R.dom_set_text(title, "User Profile: " + user_id)
+    R.dom_append(root, title)
+
+    var user: Sig.Signal<User> = Sig.signal(User("User " + user_id, "user" + user_id + "@example.com", "/avatars/" + user_id + ".png"))
+    var profile: R.Component = UserProfileComponent(root, user)
+    profile.mount()
+    comp.add_child(profile)
+
+    return comp
+}
+
+fun NotFoundPage(route: Router.RouteParams): R.Component {
+    var root: Float = R.dom_create("div")
+    var comp: R.Component = R.Component(root, 0)
+    R.dom_set_attr(root, "class", app_styles.get("error"))
+
+    var msg: Float = R.dom_create("h2")
+    R.dom_set_text(msg, "404 — Page Not Found")
+    R.dom_append(root, msg)
+
+    var detail: Float = R.dom_create("p")
+    R.dom_set_text(detail, "No route matches: " + route.path)
+    R.dom_append(root, detail)
+
+    return comp
+}
+
+// =============================================================================
+// App Shell
+// =============================================================================
+
+fun App() {
+    var root: Float = R.dom_create("div")
+    R.dom_set_attr(root, "id", "app")
+
+    // Apply theme
+    Sig.effect(fun () => {
+        R.dom_set_attr(root, "style", theme_vars())
+    })
+
+    // Navigation
+    var nav: Float = R.dom_create("nav")
+    R.dom_set_attr(nav, "class", app_styles.get("nav"))
+
+    var home_link: Float = R.dom_create("a")
+    R.dom_set_text(home_link, "Home")
+    R.dom_set_attr(home_link, "href", "/")
+    R.dom_set_attr(home_link, "class", app_styles.get("nav_link"))
+    R.dom_on(home_link, "click", 30)
+    R.dom_append(nav, home_link)
+
+    var todo_link: Float = R.dom_create("a")
+    R.dom_set_text(todo_link, "Todos")
+    R.dom_set_attr(todo_link, "href", "/todos")
+    R.dom_set_attr(todo_link, "class", app_styles.get("nav_link"))
+    R.dom_on(todo_link, "click", 31)
+    R.dom_append(nav, todo_link)
+
+    var profile_link: Float = R.dom_create("a")
+    R.dom_set_text(profile_link, "Profile")
+    R.dom_set_attr(profile_link, "href", "/users/1")
+    R.dom_set_attr(profile_link, "class", app_styles.get("nav_link"))
+    R.dom_on(profile_link, "click", 32)
+    R.dom_append(nav, profile_link)
+
+    // Header
+    var header: Float = R.dom_create("header")
+    R.dom_set_attr(header, "class", app_styles.get("header"))
+
+    var logo: Float = R.dom_create("h1")
+    R.dom_set_text(logo, "🌿 Turmeric")
+    R.dom_set_attr(logo, "style", "color: var(--accent)")
+    R.dom_append(header, logo)
+
+    R.dom_append(header, nav)
+
+    var theme_toggle: R.Component = ThemeToggleComponent(header)
+    theme_toggle.mount()
+
+    R.dom_append(root, header)
+
+    // Router
+    var router: Router.Router = Router.create([
+        Router.Route("/", HomePage),
+        Router.Route("/todos", TodoPage),
+        Router.Route("/users/:id", ProfilePage),
+    ], NotFoundPage)
+
+    // Content area — switches based on route
+    var content: Float = R.dom_create("main")
+    R.dom_set_attr(content, "class", app_styles.get("container"))
+    R.dom_append(root, content)
+
+    // Route-based rendering
+    R.match_slot(content, router.current_route(), {
+        "/": fun (): R.Component => HomePage(router.current.get()),
+        "/todos": fun (): R.Component => TodoPage(router.current.get()),
+    })
+
+    // Inject CSS
+    var style_el: Float = R.dom_create("style")
+    R.dom_set_text(style_el, app_styles.to_css())
+    R.dom_append(root, style_el)
+
+    // Mount to document
+    var body: Float = R.dom_create("body")
+    R.dom_append(body, root)
+}
+
+// --- Entry Point ---
+App()

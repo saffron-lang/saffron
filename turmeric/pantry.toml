@@ -3,7 +3,7 @@ name = "turmeric"
 version = "0.1.0"
 description = "Reactive web framework for Saffron targeting WASM"
 type = "library"
-entry = "src/lib.sf"
+entry = "src/index.sf"
 authors = ["henry232323"]
 
 [dependencies]
