@@ -922,41 +922,9 @@
                     }
                 }
             }
-            // Reorder named arguments if present
-            var reordered_args: List<AST.Expr> = args
-            var has_named: Bool = false
-            var ni: Float = 0
-            while (ni < args.length()) {
-                var ak: String = this.classify_expr(args[ni])
-                if (ak == "assign") { has_named = true }
-                ni = ni + 1
-            }
-            if (has_named and this.func_prefix_map.has("__pnames_" + resolved_callee)) {
-                var pnames_str: String = this.func_prefix_map.get("__pnames_" + resolved_callee)
-                var pnames: List<String> = pnames_str.split(",")
-                reordered_args = []
-                var pi4: Float = 0
-                while (pi4 < pnames.length()) {
-                    var found_arg: Bool = false
-                    var ai2: Float = 0
-                    while (ai2 < args.length()) {
-                        var aname: String = match (args[ai2]) { Assign(n, v) => n; _ => "" }
-                        if (aname == pnames[pi4]) {
-                            var aval: AST.Expr = match (args[ai2]) { Assign(n, v) => v; _ => AST.Expr.NilLit }
-                            reordered_args.push(aval)
-                            found_arg = true
-                        }
-                        ai2 = ai2 + 1
-                    }
-                    if (!found_arg and pi4 < args.length()) {
-                        reordered_args.push(args[pi4])
-                    }
-                    pi4 = pi4 + 1
-                }
-            }
             var i: Float = 0
-            while (i < reordered_args.length()) {
-                var val: String = this.gen_arg_value(reordered_args[i])
+            while (i < args.length()) {
+                var val: String = this.gen_arg_value(args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }
