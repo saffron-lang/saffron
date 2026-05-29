@@ -413,7 +413,33 @@
                 this.find_free_vars_expr(idx, bound, free)
                 this.find_free_vars_expr(v, bound, free)
             }
-            Match(s, a) => { this.find_free_vars_expr(s, bound, free) }
+            Match(s, a) => {
+                this.find_free_vars_expr(s, bound, free)
+                var mi: Float = 0
+                while (mi < a.length()) {
+                    var arm: AST.MatchArm = a[mi]
+                    var arm_pattern: AST.Pattern = match (arm) { Arm(p, b) => p }
+                    var arm_body: AST.Expr = match (arm) { Arm(p, b) => b }
+                    var arm_bindings: List<String> = match (arm_pattern) {
+                        VariantPattern(v, binds) => binds
+                        _ => []
+                    }
+                    // Pattern bindings are local to the arm body
+                    var arm_bound: List<String> = []
+                    var bi2: Float = 0
+                    while (bi2 < bound.length()) {
+                        arm_bound.push(bound[bi2])
+                        bi2 = bi2 + 1
+                    }
+                    var bi3: Float = 0
+                    while (bi3 < arm_bindings.length()) {
+                        arm_bound.push(arm_bindings[bi3])
+                        bi3 = bi3 + 1
+                    }
+                    this.find_free_vars_expr(arm_body, arm_bound, free)
+                    mi = mi + 1
+                }
+            }
             EnumConstruct(e, v, a) => {
                 var ei: Float = 0
                 while (ei < a.length()) {
