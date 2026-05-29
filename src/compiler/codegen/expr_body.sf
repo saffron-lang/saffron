@@ -874,7 +874,10 @@
             // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
             var is_constructor: Bool = false
             if (this.func_ret_types.has(resolved_callee)) {
-                if (this.func_ret_types.get(resolved_callee) == callee_name) {
+                var ret_type_val: String = this.func_ret_types.get(resolved_callee)
+                if (ret_type_val == callee_name) {
+                    is_constructor = true
+                } else if (ret_type_val == resolved_callee and this.class_fields.has(callee_name)) {
                     is_constructor = true
                 }
             }

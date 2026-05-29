@@ -302,7 +302,7 @@ class Codegen {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
         if (s == "Int" or s == "Number") return AST.Type.IntType
-        if (s == "Float") return AST.Type.FloatType
+        if (s == "Float") return AST.Type.IntType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
@@ -1697,7 +1697,10 @@ class Codegen {
             // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
             var is_constructor: Bool = false
             if (this.func_ret_types.has(resolved_callee)) {
-                if (this.func_ret_types.get(resolved_callee) == callee_name) {
+                var ret_type_val: String = this.func_ret_types.get(resolved_callee)
+                if (ret_type_val == callee_name) {
+                    is_constructor = true
+                } else if (ret_type_val == resolved_callee and this.class_fields.has(callee_name)) {
                     is_constructor = true
                 }
             }
@@ -3093,7 +3096,7 @@ class Codegen {
             vtype = this.type_to_string(this.last_type)
         }
         this.var_types.set(name, vtype)
-        this.typed_vars.set(name, this.str_to_type(vtype))
+        if (vtype == "Float") { this.typed_vars.set(name, AST.Type.IntType) } else { this.typed_vars.set(name, this.str_to_type(vtype)) }
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
         // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
@@ -3324,6 +3327,7 @@ class Codegen {
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
+        this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
         if (this.defined_funcs.contains(type_name)) { return }
         this.defined_funcs.push(type_name)
@@ -6098,6 +6102,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     }
                     gen.class_fields.set(cn3, cf3_all)
                     gen.class_fields.set(prefix3 + cn3, cf3_all)
+                    // Register struct names so resolve_class_type uses prefixed name
+                    var sn3: String = cn3
+                    if (prefix3.length() > 0) { sn3 = prefix3 + cn3 }
+                    gen.class_struct_names.set(cn3, sn3)
+                    if (prefix3.length() > 0) {
+                        gen.class_struct_names.set(prefix3 + cn3, sn3)
+                    }
                     var cm3_names: List<String> = []
                     var cm3i: Float = 0
                     while (cm3i < cm3.length()) {
@@ -6339,6 +6350,13 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
                     gen.class_fields.set(mod_name, mod_all_fields)
                     // Also register with module prefix for cross-module disambiguation
                     gen.class_fields.set(prefix + mod_name, mod_all_fields)
+                    // Register struct names so resolve_class_type uses prefixed name
+                    var mod_sn: String = mod_name
+                    if (prefix.length() > 0) { mod_sn = prefix + mod_name }
+                    gen.class_struct_names.set(mod_name, mod_sn)
+                    if (prefix.length() > 0) {
+                        gen.class_struct_names.set(prefix + mod_name, mod_sn)
+                    }
                     // Register class methods list
                     var mod_method_names: List<String> = []
                     var mod_mi2: Float = 0
@@ -6389,6 +6407,7 @@ fun generate_with_modules_flat(program: List<AST.Stmt>, all_stmts: List<AST.Stmt
                     }
                 }
                 gen.class_fields.set(pr_name, pr_all_fields)
+                gen.class_struct_names.set(pr_name, pr_name)
                 // Register class methods list
                 var pr_method_names: List<String> = []
                 var pr_mi2: Float = 0
