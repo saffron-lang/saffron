@@ -3146,8 +3146,6 @@ class Codegen {
     }
 
     fun gen_class_decl(name: String, fields: String, methods: List<AST.Stmt>) {
-            
-        }
         this.class_fields.set(name, fields)
 
         // Parse field names for struct layout
