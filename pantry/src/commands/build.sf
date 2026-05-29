@@ -5,13 +5,10 @@ import "@os" as OS
 import "../config.sf" as Config
 
 fun run(parsed: Args.ParsedArgs) {
-    IO.println("[build] loading...")
-    var manifest: Config.Manifest = Config.load()
-    IO.println("[build] loaded ok")
+    var manifest = Config.load()
 
     // If there's a build script defined, use it
     var scripts: Map<String, String> = manifest.scripts
-    IO.println("[build] got scripts")
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
         IO.println("> ${cmd}")

@@ -21,13 +21,9 @@ fun _manifest_dir(): String {
 }
 
 fun run(parsed: Args.ParsedArgs) {
-    IO.println("[1] loading manifest")
-    var manifest: Config.Manifest = Config.load()
-    IO.println("[2] manifest loaded")
+    var manifest = Config.load()
     var dir: String = _manifest_dir()
-    IO.println("[3] dir: " + dir)
     var deps: Map<String, Any> = manifest.dependencies
-    IO.println("[4] got deps")
 
     if (deps.length() == 0) {
         IO.println("No dependencies to install.")

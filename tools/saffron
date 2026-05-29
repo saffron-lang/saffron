@@ -195,7 +195,12 @@ build_project() {
     [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
     if [[ "$TARGET" == "wasm32" ]]; then
         local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base.ll"
-        clang --target=wasm32 -O2 -w --no-standard-libraries -Wl,--no-entry -Wl,--export-all \
+        local WASM_CLANG="${WASM_CLANG:-/opt/homebrew/opt/llvm/bin/clang}"
+        if [[ ! -x "$WASM_CLANG" ]]; then
+            WASM_CLANG="clang"
+        fi
+        "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
+            -Wl,--no-entry -Wl,--export-all -Wl,--allow-multiple-definition -Wl,--allow-undefined \
             -o "$output" "$ll_path" "$RUNTIME" "$WASM_BASE" || {
             echo "saffron: wasm linking failed" >&2
             exit 1
