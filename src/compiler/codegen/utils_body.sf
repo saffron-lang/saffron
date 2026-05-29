@@ -11,6 +11,14 @@
             }
             di = di + 1
         }
+        // Runtime type-check functions (NaN-boxing tag inspection, return i1)
+        rt.append("declare i1 @__val_is_int(i64)\n")
+        rt.append("declare i1 @__val_is_float(i64)\n")
+        rt.append("declare i1 @__val_is_string(i64)\n")
+        rt.append("declare i1 @__val_is_bool(i64)\n")
+        rt.append("declare i1 @__val_is_nil(i64)\n")
+        rt.append("declare i1 @__val_is_list(i64)\n")
+        rt.append("declare i1 @__val_is_map(i64)\n")
         return rt.to_string()
     }
     fun find_enum_for_variant(variant: String): String {
@@ -139,8 +147,22 @@
             }
             Unary(op, right) => { this.collect_vars_expr(right, names, types) }
             Assign(name, value) => { this.collect_vars_expr(value, names, types) }
-            Call(callee, args) => { this.collect_vars_expr(callee, names, types) }
-            MethodCall(obj, method, args) => { this.collect_vars_expr(obj, names, types) }
+            Call(callee, args) => {
+                this.collect_vars_expr(callee, names, types)
+                var ci: Float = 0
+                while (ci < args.length()) {
+                    this.collect_vars_expr(args[ci], names, types)
+                    ci = ci + 1
+                }
+            }
+            MethodCall(obj, method, args) => {
+                this.collect_vars_expr(obj, names, types)
+                var mi: Float = 0
+                while (mi < args.length()) {
+                    this.collect_vars_expr(args[mi], names, types)
+                    mi = mi + 1
+                }
+            }
             SetField(obj, field, value) => {
                 this.collect_vars_expr(obj, names, types)
                 this.collect_vars_expr(value, names, types)

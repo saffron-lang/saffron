@@ -327,7 +327,7 @@ extend fun Codegen.find_free_vars_expr(expr: AST.Expr, bound: List<String>, free
             Variable(name) => {
                 if (bound.contains(name) or free.contains(name)) {
                     // Already bound or already free — skip
-                } else if (this.typed_vars.has(name)) {
+                } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
                     // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
                 } else {

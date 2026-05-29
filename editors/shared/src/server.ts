@@ -202,6 +202,39 @@ interface WordContext {
   qualifier: string | null;
 }
 
+interface ImportContext {
+  importPath: string;
+}
+
+function getImportAtPosition(doc: TextDocument, line: number, character: number): ImportContext | null {
+  const text = doc.getText();
+  const lines = text.split("\n");
+  if (line >= lines.length) return null;
+  const lineText = lines[line];
+
+  const importRegex = /import\s+"([^"]+)"/g;
+  const namedImportRegex = /import\s+\{[^}]+\}\s+from\s+"([^"]+)"/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = importRegex.exec(lineText)) !== null) {
+    const pathStart = match.index + match[0].indexOf('"') + 1;
+    const pathEnd = pathStart + match[1].length;
+    if (character >= pathStart && character <= pathEnd) {
+      return { importPath: match[1] };
+    }
+  }
+
+  while ((match = namedImportRegex.exec(lineText)) !== null) {
+    const pathStart = match.index + match[0].lastIndexOf('"', match[0].length - 2) + 1;
+    const pathEnd = pathStart + match[1].length;
+    if (character >= pathStart && character <= pathEnd) {
+      return { importPath: match[1] };
+    }
+  }
+
+  return null;
+}
+
 function getWordAtPosition(doc: TextDocument, line: number, character: number): WordContext | null {
   const text = doc.getText();
   const lines = text.split("\n");
@@ -302,6 +335,29 @@ connection.onHover(async (params: HoverParams): Promise<Hover | null> => {
 connection.onDefinition(async (params: DefinitionParams): Promise<Location | null> => {
   const doc = documents.get(params.textDocument.uri);
   if (!doc) return null;
+
+  const importCtx = getImportAtPosition(doc, params.position.line, params.position.character);
+  if (importCtx) {
+    const filePath = decodeURIComponent(params.textDocument.uri.replace("file://", ""));
+    const fileDir = path.dirname(filePath);
+    const resolved = resolveImportPath(importCtx.importPath, fileDir);
+    if (resolved) {
+      return {
+        uri: "file://" + resolved,
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      };
+    }
+    if (isBuiltinModule(importCtx.importPath)) {
+      const stubPath = ensureStub(importCtx.importPath);
+      if (stubPath) {
+        return {
+          uri: "file://" + stubPath,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+        };
+      }
+    }
+    return null;
+  }
 
   const ctx = getWordAtPosition(doc, params.position.line, params.position.character);
   if (!ctx) return null;
