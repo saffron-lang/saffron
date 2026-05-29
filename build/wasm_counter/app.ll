@@ -83,6 +83,11 @@ declare i64 @__val_tag_bool(i64)
 declare i64 @__val_untag_bool(i64)
 declare i64 @__val_nil()
 
+declare i64 @__division_error()
+declare i64 @__null_pointer_error()
+declare i64 @__runtime_error(i64)
+declare i64 @__runtime_error_fatal(i64)
+
 declare double @strtod(i8*, i8*)
 @.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c"%ld\00"
 @.str.empty = linkonce_odr unnamed_addr constant [1 x i8] c"\00"
@@ -136,12 +141,27 @@ declare i64 @__os_cwd()
 declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
+declare i1 @__val_is_int(i64)
+declare i1 @__val_is_float(i64)
+declare i1 @__val_is_string(i64)
+declare i1 @__val_is_bool(i64)
+declare i1 @__val_is_nil(i64)
+declare i1 @__val_is_list(i64)
+declare i1 @__val_is_map(i64)
 declare i64 @js_dom_create_element(i8*)
 declare void @js_dom_set_text(i64, i8*)
 declare void @js_dom_set_attribute(i64, i8*, i8*)
 declare void @js_dom_append_child(i64, i64)
 declare i64 @js_dom_query_selector(i8*)
 declare void @js_dom_add_event_listener(i64, i8*, i64)
+@__g_root = global i64 0
+@__g_h1 = global i64 0
+@__g_count_el = global i64 0
+@__g_buttons = global i64 0
+@__g_inc_btn = global i64 0
+@__g_dec_btn = global i64 0
+@__g_rst_btn = global i64 0
+@__g_footer = global i64 0
 
 define i64 @__saffron_entry() {
 entry:
@@ -157,26 +177,26 @@ entry:
   %t2 = call i64 @__val_tag_ptr(i8* %t1)
   %t3 = call i8* @__val_untag_ptr(i64 %t2)
   %t4 = call i64 @js_dom_query_selector(i8* %t3)
-  store i64 %t4, i64* %root
+  store i64 %t4, i64* @__g_root
   %t5 = getelementptr [3 x i8], [3 x i8]* @.str.1, i64 0, i64 0
   %t6 = call i64 @__val_tag_ptr(i8* %t5)
   %t7 = call i8* @__val_untag_ptr(i64 %t6)
   %t8 = call i64 @js_dom_create_element(i8* %t7)
-  store i64 %t8, i64* %h1
-  %t9 = load i64, i64* %h1
+  store i64 %t8, i64* @__g_h1
+  %t9 = load i64, i64* @__g_h1
   %t10 = getelementptr [21 x i8], [21 x i8]* @.str.2, i64 0, i64 0
   %t11 = call i64 @__val_tag_ptr(i8* %t10)
   %t12 = call i8* @__val_untag_ptr(i64 %t11)
   call void @js_dom_set_text(i64 %t9, i8* %t12)
-  %t13 = load i64, i64* %root
-  %t14 = load i64, i64* %h1
+  %t13 = load i64, i64* @__g_root
+  %t14 = load i64, i64* @__g_h1
   call void @js_dom_append_child(i64 %t13, i64 %t14)
   %t15 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
   %t16 = call i64 @__val_tag_ptr(i8* %t15)
   %t17 = call i8* @__val_untag_ptr(i64 %t16)
   %t18 = call i64 @js_dom_create_element(i8* %t17)
-  store i64 %t18, i64* %count_el
-  %t19 = load i64, i64* %count_el
+  store i64 %t18, i64* @__g_count_el
+  %t19 = load i64, i64* @__g_count_el
   %t20 = getelementptr [3 x i8], [3 x i8]* @.str.4, i64 0, i64 0
   %t21 = call i64 @__val_tag_ptr(i8* %t20)
   %t22 = call i8* @__val_untag_ptr(i64 %t21)
@@ -184,12 +204,12 @@ entry:
   %t24 = call i64 @__val_tag_ptr(i8* %t23)
   %t25 = call i8* @__val_untag_ptr(i64 %t24)
   call void @js_dom_set_attribute(i64 %t19, i8* %t22, i8* %t25)
-  %t26 = load i64, i64* %count_el
+  %t26 = load i64, i64* @__g_count_el
   %t27 = getelementptr [9 x i8], [9 x i8]* @.str.6, i64 0, i64 0
   %t28 = call i64 @__val_tag_ptr(i8* %t27)
   %t29 = call i8* @__val_untag_ptr(i64 %t28)
   call void @js_dom_set_text(i64 %t26, i8* %t29)
-  %t30 = load i64, i64* %count_el
+  %t30 = load i64, i64* @__g_count_el
   %t31 = getelementptr [6 x i8], [6 x i8]* @.str.7, i64 0, i64 0
   %t32 = call i64 @__val_tag_ptr(i8* %t31)
   %t33 = call i8* @__val_untag_ptr(i64 %t32)
@@ -197,15 +217,15 @@ entry:
   %t35 = call i64 @__val_tag_ptr(i8* %t34)
   %t36 = call i8* @__val_untag_ptr(i64 %t35)
   call void @js_dom_set_attribute(i64 %t30, i8* %t33, i8* %t36)
-  %t37 = load i64, i64* %root
-  %t38 = load i64, i64* %count_el
+  %t37 = load i64, i64* @__g_root
+  %t38 = load i64, i64* @__g_count_el
   call void @js_dom_append_child(i64 %t37, i64 %t38)
   %t39 = getelementptr [4 x i8], [4 x i8]* @.str.9, i64 0, i64 0
   %t40 = call i64 @__val_tag_ptr(i8* %t39)
   %t41 = call i8* @__val_untag_ptr(i64 %t40)
   %t42 = call i64 @js_dom_create_element(i8* %t41)
-  store i64 %t42, i64* %buttons
-  %t43 = load i64, i64* %buttons
+  store i64 %t42, i64* @__g_buttons
+  %t43 = load i64, i64* @__g_buttons
   %t44 = getelementptr [6 x i8], [6 x i8]* @.str.10, i64 0, i64 0
   %t45 = call i64 @__val_tag_ptr(i8* %t44)
   %t46 = call i8* @__val_untag_ptr(i64 %t45)
@@ -217,13 +237,13 @@ entry:
   %t51 = call i64 @__val_tag_ptr(i8* %t50)
   %t52 = call i8* @__val_untag_ptr(i64 %t51)
   %t53 = call i64 @js_dom_create_element(i8* %t52)
-  store i64 %t53, i64* %inc_btn
-  %t54 = load i64, i64* %inc_btn
+  store i64 %t53, i64* @__g_inc_btn
+  %t54 = load i64, i64* @__g_inc_btn
   %t55 = getelementptr [2 x i8], [2 x i8]* @.str.13, i64 0, i64 0
   %t56 = call i64 @__val_tag_ptr(i8* %t55)
   %t57 = call i8* @__val_untag_ptr(i64 %t56)
   call void @js_dom_set_text(i64 %t54, i8* %t57)
-  %t58 = load i64, i64* %inc_btn
+  %t58 = load i64, i64* @__g_inc_btn
   %t59 = getelementptr [6 x i8], [6 x i8]* @.str.14, i64 0, i64 0
   %t60 = call i64 @__val_tag_ptr(i8* %t59)
   %t61 = call i8* @__val_untag_ptr(i64 %t60)
@@ -231,27 +251,27 @@ entry:
   %t63 = call i64 @__val_tag_ptr(i8* %t62)
   %t64 = call i8* @__val_untag_ptr(i64 %t63)
   call void @js_dom_set_attribute(i64 %t58, i8* %t61, i8* %t64)
-  %t65 = load i64, i64* %inc_btn
+  %t65 = load i64, i64* @__g_inc_btn
   %t66 = getelementptr [6 x i8], [6 x i8]* @.str.16, i64 0, i64 0
   %t67 = call i64 @__val_tag_ptr(i8* %t66)
   %t68 = call i8* @__val_untag_ptr(i64 %t67)
   %t69 = add i64 0, 1
   %t70 = call i64 @__val_tag_int(i64 %t69)
   call void @js_dom_add_event_listener(i64 %t65, i8* %t68, i64 %t70)
-  %t71 = load i64, i64* %buttons
-  %t72 = load i64, i64* %inc_btn
+  %t71 = load i64, i64* @__g_buttons
+  %t72 = load i64, i64* @__g_inc_btn
   call void @js_dom_append_child(i64 %t71, i64 %t72)
   %t73 = getelementptr [7 x i8], [7 x i8]* @.str.17, i64 0, i64 0
   %t74 = call i64 @__val_tag_ptr(i8* %t73)
   %t75 = call i8* @__val_untag_ptr(i64 %t74)
   %t76 = call i64 @js_dom_create_element(i8* %t75)
-  store i64 %t76, i64* %dec_btn
-  %t77 = load i64, i64* %dec_btn
+  store i64 %t76, i64* @__g_dec_btn
+  %t77 = load i64, i64* @__g_dec_btn
   %t78 = getelementptr [2 x i8], [2 x i8]* @.str.18, i64 0, i64 0
   %t79 = call i64 @__val_tag_ptr(i8* %t78)
   %t80 = call i8* @__val_untag_ptr(i64 %t79)
   call void @js_dom_set_text(i64 %t77, i8* %t80)
-  %t81 = load i64, i64* %dec_btn
+  %t81 = load i64, i64* @__g_dec_btn
   %t82 = getelementptr [6 x i8], [6 x i8]* @.str.19, i64 0, i64 0
   %t83 = call i64 @__val_tag_ptr(i8* %t82)
   %t84 = call i8* @__val_untag_ptr(i64 %t83)
@@ -259,27 +279,27 @@ entry:
   %t86 = call i64 @__val_tag_ptr(i8* %t85)
   %t87 = call i8* @__val_untag_ptr(i64 %t86)
   call void @js_dom_set_attribute(i64 %t81, i8* %t84, i8* %t87)
-  %t88 = load i64, i64* %dec_btn
+  %t88 = load i64, i64* @__g_dec_btn
   %t89 = getelementptr [6 x i8], [6 x i8]* @.str.21, i64 0, i64 0
   %t90 = call i64 @__val_tag_ptr(i8* %t89)
   %t91 = call i8* @__val_untag_ptr(i64 %t90)
   %t92 = add i64 0, 2
   %t93 = call i64 @__val_tag_int(i64 %t92)
   call void @js_dom_add_event_listener(i64 %t88, i8* %t91, i64 %t93)
-  %t94 = load i64, i64* %buttons
-  %t95 = load i64, i64* %dec_btn
+  %t94 = load i64, i64* @__g_buttons
+  %t95 = load i64, i64* @__g_dec_btn
   call void @js_dom_append_child(i64 %t94, i64 %t95)
   %t96 = getelementptr [7 x i8], [7 x i8]* @.str.22, i64 0, i64 0
   %t97 = call i64 @__val_tag_ptr(i8* %t96)
   %t98 = call i8* @__val_untag_ptr(i64 %t97)
   %t99 = call i64 @js_dom_create_element(i8* %t98)
-  store i64 %t99, i64* %rst_btn
-  %t100 = load i64, i64* %rst_btn
+  store i64 %t99, i64* @__g_rst_btn
+  %t100 = load i64, i64* @__g_rst_btn
   %t101 = getelementptr [6 x i8], [6 x i8]* @.str.23, i64 0, i64 0
   %t102 = call i64 @__val_tag_ptr(i8* %t101)
   %t103 = call i8* @__val_untag_ptr(i64 %t102)
   call void @js_dom_set_text(i64 %t100, i8* %t103)
-  %t104 = load i64, i64* %rst_btn
+  %t104 = load i64, i64* @__g_rst_btn
   %t105 = getelementptr [6 x i8], [6 x i8]* @.str.24, i64 0, i64 0
   %t106 = call i64 @__val_tag_ptr(i8* %t105)
   %t107 = call i8* @__val_untag_ptr(i64 %t106)
@@ -287,30 +307,30 @@ entry:
   %t109 = call i64 @__val_tag_ptr(i8* %t108)
   %t110 = call i8* @__val_untag_ptr(i64 %t109)
   call void @js_dom_set_attribute(i64 %t104, i8* %t107, i8* %t110)
-  %t111 = load i64, i64* %rst_btn
+  %t111 = load i64, i64* @__g_rst_btn
   %t112 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
   %t113 = call i64 @__val_tag_ptr(i8* %t112)
   %t114 = call i8* @__val_untag_ptr(i64 %t113)
   %t115 = add i64 0, 3
   %t116 = call i64 @__val_tag_int(i64 %t115)
   call void @js_dom_add_event_listener(i64 %t111, i8* %t114, i64 %t116)
-  %t117 = load i64, i64* %buttons
-  %t118 = load i64, i64* %rst_btn
+  %t117 = load i64, i64* @__g_buttons
+  %t118 = load i64, i64* @__g_rst_btn
   call void @js_dom_append_child(i64 %t117, i64 %t118)
-  %t119 = load i64, i64* %root
-  %t120 = load i64, i64* %buttons
+  %t119 = load i64, i64* @__g_root
+  %t120 = load i64, i64* @__g_buttons
   call void @js_dom_append_child(i64 %t119, i64 %t120)
   %t121 = getelementptr [2 x i8], [2 x i8]* @.str.27, i64 0, i64 0
   %t122 = call i64 @__val_tag_ptr(i8* %t121)
   %t123 = call i8* @__val_untag_ptr(i64 %t122)
   %t124 = call i64 @js_dom_create_element(i8* %t123)
-  store i64 %t124, i64* %footer
-  %t125 = load i64, i64* %footer
+  store i64 %t124, i64* @__g_footer
+  %t125 = load i64, i64* @__g_footer
   %t126 = getelementptr [37 x i8], [37 x i8]* @.str.28, i64 0, i64 0
   %t127 = call i64 @__val_tag_ptr(i8* %t126)
   %t128 = call i8* @__val_untag_ptr(i64 %t127)
   call void @js_dom_set_text(i64 %t125, i8* %t128)
-  %t129 = load i64, i64* %footer
+  %t129 = load i64, i64* @__g_footer
   %t130 = getelementptr [6 x i8], [6 x i8]* @.str.29, i64 0, i64 0
   %t131 = call i64 @__val_tag_ptr(i8* %t130)
   %t132 = call i8* @__val_untag_ptr(i64 %t131)
@@ -318,8 +338,8 @@ entry:
   %t134 = call i64 @__val_tag_ptr(i8* %t133)
   %t135 = call i8* @__val_untag_ptr(i64 %t134)
   call void @js_dom_set_attribute(i64 %t129, i8* %t132, i8* %t135)
-  %t136 = load i64, i64* %root
-  %t137 = load i64, i64* %footer
+  %t136 = load i64, i64* @__g_root
+  %t137 = load i64, i64* @__g_footer
   call void @js_dom_append_child(i64 %t136, i64 %t137)
   %t138 = getelementptr [31 x i8], [31 x i8]* @.str.31, i64 0, i64 0
   %t139 = call i64 @__val_tag_ptr(i8* %t138)

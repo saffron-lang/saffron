@@ -255,8 +255,9 @@ extend fun Codegen.coerce_to_string(val: String, val_type: String): String {
             return result
         }
         // Class with to_string method
-        if (this.class_fields.has(val_type)) {
-            var ts_method: String = val_type + "__to_string"
+        var ts_class: String = this.resolve_class_type(val_type)
+        if (ts_class.length() > 0) {
+            var ts_method: String = ts_class + "__to_string"
             if (this.func_prefix_map.has(ts_method)) {
                 ts_method = this.func_prefix_map.get(ts_method)
             } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
@@ -452,6 +453,38 @@ extend fun Codegen.get_map_value_type(map_type: String): String {
 extend fun Codegen.get_var_type_str(name: String): String {
         if (this.typed_vars.has(name)) {
             return this.type_to_string(this.typed_vars.get(name))
+        }
+        return ""
+    }
+
+    // Resolve a type string to the class name registered in class_fields.
+    // Handles module-prefixed types like "Mod.Thing" by stripping the prefix
+    // when class_fields only has "Thing".
+extend fun Codegen.resolve_class_type(vtype: String): String {
+        if (this.class_fields.has(vtype)) {
+            return vtype
+        }
+        // Strip module prefix: "Mod.Thing" -> "Thing"
+        if (vtype.contains(".")) {
+            var dot_idx: Float = vtype.index_of(".")
+            var bare: String = vtype.slice(dot_idx + 1, vtype.length())
+            if (this.class_fields.has(bare)) {
+                return bare
+            }
+        }
+        // Strip generic params then try: "Mod.Thing<X>" -> "Thing"
+        if (vtype.contains("<")) {
+            var base: String = vtype.slice(0, vtype.index_of("<"))
+            if (this.class_fields.has(base)) {
+                return base
+            }
+            if (base.contains(".")) {
+                var dot_idx2: Float = base.index_of(".")
+                var bare2: String = base.slice(dot_idx2 + 1, base.length())
+                if (this.class_fields.has(bare2)) {
+                    return bare2
+                }
+            }
         }
         return ""
     }

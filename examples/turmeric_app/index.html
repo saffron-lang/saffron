@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Turmeric Demo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+        #app { min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        const decoder = new TextDecoder();
+        const handles = [null];
+        let instance;
+
+        function allocHandle(el) { handles.push(el); return handles.length - 1; }
+        function getHandle(id) { return handles[Number(id)]; }
+        function n(v) { return Number(v); }
+        function readCString(ptr) {
+            const p = n(ptr);
+            const bytes = new Uint8Array(instance.exports.memory.buffer);
+            let end = p;
+            while (end < bytes.length && bytes[end] !== 0) end++;
+            return decoder.decode(bytes.slice(p, end));
+        }
+
+        const imports = {
+            env: {
+                js_log_str: (ptr) => console.log(readCString(ptr)),
+                js_log_int: (num) => console.log(n(num)),
+                js_log_bool: (b) => console.log(n(b) ? "true" : "false"),
+                js_log_nil: () => console.log("nil"),
+                __builtin_trap: () => { throw new Error("trap"); },
+
+                js_dom_create_element: (tagPtr) => BigInt(allocHandle(document.createElement(readCString(tagPtr)))),
+                js_dom_set_text: (handle, textPtr) => { getHandle(handle).textContent = readCString(textPtr); },
+                js_dom_set_attribute: (handle, namePtr, valuePtr) => {
+                    const el = getHandle(handle);
+                    const name = readCString(namePtr);
+                    const value = readCString(valuePtr);
+                    name === 'style' ? el.style.cssText = value : el.setAttribute(name, value);
+                },
+                js_dom_append_child: (parent, child) => { getHandle(parent).appendChild(getHandle(child)); },
+                js_dom_remove_child: (parent, child) => { getHandle(parent).removeChild(getHandle(child)); },
+                js_dom_query_selector: (selectorPtr) => {
+                    const el = document.querySelector(readCString(selectorPtr));
+                    return el ? BigInt(allocHandle(el)) : 0n;
+                },
+                js_dom_add_event_listener: (handle, eventPtr, callbackId) => {
+                    const el = getHandle(handle);
+                    const event = readCString(eventPtr);
+                    el.addEventListener(event, (e) => {
+                        e.preventDefault();
+                        instance.exports.__dispatch_event(callbackId);
+                    });
+                },
+            },
+        };
+
+        const response = await fetch('./build/app.wasm');
+        const wasmBytes = await response.arrayBuffer();
+        const result = await WebAssembly.instantiate(wasmBytes, imports);
+        instance = result.instance;
+        instance.exports._start();
+    </script>
+</body>
+</html>
