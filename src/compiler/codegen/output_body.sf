@@ -11,7 +11,13 @@
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) { return }
+        if (this.defined_funcs.contains(emit_name)) {
+            if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
+                IO.println("[codegen] Error: function '" + name + "' is already defined")
+                this.has_errors = true
+            }
+            return
+        }
         this.defined_funcs.push(emit_name)
         var is_nested: Bool = this.in_function
 
@@ -94,11 +100,7 @@
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
                 this.var_types.set(pp2[0], pp2[1])
-                if (pp2[1] == "Float") {
-                    this.typed_vars.set(pp2[0], AST.Type.IntType)
-                } else {
-                    this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
-                }
+                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -177,7 +179,7 @@
         i = 0
         while (i < var_names.length()) {
             var vn: String = var_names[i]
-            if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
+            if (!this.module_globals.has(this.current_prefix + vn)) {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
@@ -190,14 +192,7 @@
             var pname: String = parts[0]
             var ptype: String = parts[1]
             this.var_types.set(pname, ptype)
-            // Function parameters typed "Float" are stored as IntType because
-            // we cannot guarantee the caller passes float-tagged values.
-            // Only FloatLit assignments produce genuinely float-tagged values.
-            if (ptype == "Float") {
-                this.typed_vars.set(pname, AST.Type.IntType)
-            } else {
-                this.typed_vars.set(pname, this.str_to_type(ptype))
-            }
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }
@@ -318,23 +313,6 @@
                 this.extend_map.set(this.current_prefix + ename, ecls)
             }
             ei = ei + 1
-        }
-
-        // Pre-scan: register top-level VarDecls as module globals
-        var gi: Float = 0
-        while (gi < program.length()) {
-            if (!this.is_decl(program[gi])) {
-                var gk: String = this.classify_stmt(program[gi])
-                if (gk == "var") {
-                    var gname: String = match (program[gi]) { VarDecl(n, t, i, d) => n }
-                    var gdoc: String = this.get_var_doc(program[gi])
-                    if (!gdoc.starts_with("@import:")) {
-                        this.module_globals.set(this.current_prefix + gname, true)
-                        this.globals.push("@__g_" + this.current_prefix + this.sanitize_name(gname) + " = global i64 0\n")
-                    }
-                }
-            }
-            gi = gi + 1
         }
 
         // First pass: emit all declarations (functions, enums, classes)
@@ -461,7 +439,6 @@
         out.append("declare i8* @popen(i8*, i8*)\n")
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
-        out.append("declare double @llvm.floor.f64(double)\n")
         out.append("declare i32 @setjmp(i8*)\n")
         out.append("declare void @longjmp(i8*, i32)\n")
         out.append("declare void @__io_println_str(i64)\n")
@@ -471,26 +448,13 @@
         out.append("declare void @__io_print_str(i64)\n")
         out.append("declare void @__io_print_int(i64)\n")
         out.append("declare i64 @__bool_to_string(i64)\n")
-        out.append("declare i64 @__nil_to_string()\n")
-        out.append("declare i64 @__float_to_string(i64)\n")
-        out.append("; --- NaN-boxing value helpers ---\n")
-        out.append("declare i64 @__val_tag_int(i64)\n")
-        out.append("declare i64 @__val_untag_int(i64)\n")
-        out.append("declare i64 @__val_tag_ptr(i8*)\n")
-        out.append("declare i8* @__val_untag_ptr(i64)\n")
-        out.append("declare i64 @__val_tag_float(double)\n")
-        out.append("declare double @__val_untag_float(i64)\n")
-        out.append("declare i64 @__val_tag_bool(i64)\n")
-        out.append("declare i64 @__val_untag_bool(i64)\n")
-        out.append("declare i64 @__val_nil()\n\n")
+        out.append("declare i64 @__nil_to_string()\n\n")
 
         // Runtime error helpers (bodies in runtime.ll)
         out.append("declare i64 @__division_error()\n")
         out.append("declare i64 @__null_pointer_error()\n")
         out.append("declare i64 @__runtime_error(i64)\n")
         out.append("declare i64 @__runtime_error_fatal(i64)\n\n")
-
-        out.append("declare double @strtod(i8*, i8*)\n")
 
         // Runtime string constants (linkonce_odr for multi-file linking)
         out.append("@.fmt.ld = linkonce_odr unnamed_addr constant [4 x i8] c\"%ld\\00\"\n")
