@@ -1,0 +1,265 @@
+// sfx_transform.sf — Transforms .sfx files (inline HTML) to .sf (builder calls)
+// Usage: saffron run tools/sfx_transform.sf input.sfx output.sf
+//
+// Transforms:
+//   <div cls="app">...</div>  →  div(cls="app") { ... }
+//   <br />                     →  br()
+//   {expr}                     →  expr
+//   plain text                 →  "plain text"
+//
+// Auto-inserts imports for all HTML elements used.
+
+var VOID_ELEMENTS: List<String> = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "source", "track", "wbr"
+]
+
+var ALL_ELEMENTS: List<String> = [
+    "a", "abbr", "address", "area", "article", "aside", "audio",
+    "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
+    "canvas", "caption", "cite", "code", "col", "colgroup",
+    "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div", "dl", "dt",
+    "em", "embed", "fieldset", "figcaption", "figure", "footer", "form",
+    "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hgroup", "hr", "html",
+    "i", "iframe", "img", "input", "ins", "kbd", "label", "legend", "li", "link",
+    "main", "map", "mark", "menu", "meta", "meter", "nav", "noscript",
+    "object", "ol", "optgroup", "option", "output",
+    "p", "picture", "pre", "progress", "q",
+    "rp", "rt", "ruby", "s", "samp", "script", "search", "section", "select",
+    "slot", "small", "source", "span", "strong", "style", "sub", "summary", "sup",
+    "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead",
+    "time", "title", "tr", "track", "u", "ul", "video", "wbr"
+]
+
+fun is_void(tag: String): Bool {
+    var i: Float = 0
+    while (i < VOID_ELEMENTS.length()) {
+        if (VOID_ELEMENTS[i] == tag) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+fun is_html_element(name: String): Bool {
+    var i: Float = 0
+    while (i < ALL_ELEMENTS.length()) {
+        if (ALL_ELEMENTS[i] == name) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+fun transform_attrs(attrs_str: String): String {
+    var result: String = attrs_str
+    result = result.replace("={", "=")
+    // Remove trailing } from attribute values that were {expr}
+    // This is simplified — a real impl would track brace depth
+    return result
+}
+
+fun transform_html_block(source: String): String {
+    var out: StringBuilder = StringBuilder()
+    var i: Float = 0
+    var len: Float = source.length()
+    var indent: Float = 0
+
+    fun emit_indent() {
+        var j: Float = 0
+        while (j < indent) {
+            out.append("    ")
+            j = j + 1
+        }
+    }
+
+    while (i < len) {
+        var ch: String = source.char_at(i)
+
+        if (ch == "<") {
+            if (i + 1 < len and source.char_at(i + 1) == "/") {
+                // Close tag
+                i = i + 2
+                while (i < len and source.char_at(i) != ">") { i = i + 1 }
+                i = i + 1
+                indent = indent - 1
+                emit_indent()
+                out.append("}\n")
+            } else {
+                // Open tag
+                i = i + 1
+                var tag_name: String = ""
+                while (i < len and source.char_at(i) != " " and source.char_at(i) != ">" and source.char_at(i) != "/") {
+                    tag_name = tag_name + source.char_at(i)
+                    i = i + 1
+                }
+
+                var attrs: String = ""
+                var self_closing: Bool = false
+                while (i < len and source.char_at(i) != ">") {
+                    if (source.char_at(i) == "/" and i + 1 < len and source.char_at(i + 1) == ">") {
+                        self_closing = true
+                        i = i + 1
+                        break
+                    }
+                    attrs = attrs + source.char_at(i)
+                    i = i + 1
+                }
+                i = i + 1
+
+                if (is_void(tag_name)) { self_closing = true }
+
+                emit_indent()
+                out.append(tag_name)
+                var trimmed_attrs: String = attrs.trim()
+                if (trimmed_attrs.length() > 0) {
+                    out.append("(" + transform_attrs(trimmed_attrs) + ")")
+                }
+                if (self_closing) {
+                    if (trimmed_attrs.length() == 0) { out.append("()") }
+                    out.append("\n")
+                } else {
+                    out.append(" {\n")
+                    indent = indent + 1
+                }
+            }
+        } else if (ch == "{") {
+            // Expression
+            i = i + 1
+            var code: String = ""
+            var depth: Float = 1
+            while (i < len and depth > 0) {
+                var c: String = source.char_at(i)
+                if (c == "{") { depth = depth + 1 }
+                if (c == "}") { depth = depth - 1 }
+                if (depth > 0) { code = code + c }
+                i = i + 1
+            }
+            var trimmed_code: String = code.trim()
+            if (trimmed_code.length() > 0) {
+                emit_indent()
+                out.append(trimmed_code + "\n")
+            }
+        } else {
+            // Text content
+            var text: String = ""
+            while (i < len and source.char_at(i) != "<" and source.char_at(i) != "{") {
+                text = text + source.char_at(i)
+                i = i + 1
+            }
+            var trimmed_text: String = text.trim()
+            if (trimmed_text.length() > 0) {
+                emit_indent()
+                out.append("\"" + trimmed_text + "\"\n")
+            }
+        }
+    }
+
+    return out.to_string()
+}
+
+fun collect_used_elements(source: String): List<String> {
+    var used: List<String> = []
+    var i: Float = 0
+    while (i < ALL_ELEMENTS.length()) {
+        var el: String = ALL_ELEMENTS[i]
+        if (source.contains("<" + el + " ") or source.contains("<" + el + ">") or source.contains("<" + el + "/")) {
+            used.push(el)
+        }
+        i = i + 1
+    }
+    return used
+}
+
+fun generate_imports(used_elements: List<String>, source: String): String {
+    var sb: StringBuilder = StringBuilder()
+
+    if (source.contains("signal(") or source.contains("computed(") or source.contains("effect(")) {
+        sb.append("import { signal, computed, effect } from \"turmeric/signal\"\n")
+    }
+    if (source.contains("Node") or source.contains("mount(")) {
+        sb.append("import { Node, mount } from \"turmeric/element\"\n")
+    }
+    if (source.contains("Event") or source.contains("on_click") or source.contains("on_input") or source.contains("on_keydown")) {
+        sb.append("import { Event, on_click, on_input, on_keydown, on_change, on_submit, bind_value } from \"turmeric/events\"\n")
+    }
+    if (source.contains("cx(")) {
+        sb.append("import { cx } from \"turmeric/style\"\n")
+    }
+    if (source.contains("each(")) {
+        sb.append("import { each } from \"turmeric/reconcile\"\n")
+    }
+    if (used_elements.length() > 0) {
+        sb.append("import { " + used_elements.join(", ") + " } from \"turmeric/elements\"\n")
+    }
+
+    sb.append("\n")
+    return sb.to_string()
+}
+
+fun find_and_transform_html(source: String): String {
+    var lines: List<String> = source.split("\n")
+    var out: StringBuilder = StringBuilder()
+    var in_html: Bool = false
+    var html_buffer: String = ""
+
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var trimmed: String = line.trim()
+
+        if (!in_html) {
+            // HTML region starts after return (
+            if (trimmed == "return (" or trimmed.ends_with("return (")) {
+                in_html = true
+                html_buffer = ""
+                out.append(line.replace("return (", "return ") + "\n")
+            } else {
+                out.append(line + "\n")
+            }
+        } else {
+            if (trimmed == ")") {
+                // End of HTML region
+                out.append(transform_html_block(html_buffer))
+                in_html = false
+                html_buffer = ""
+            } else {
+                html_buffer = html_buffer + trimmed + "\n"
+            }
+        }
+        i = i + 1
+    }
+
+    if (html_buffer.length() > 0) {
+        out.append(transform_html_block(html_buffer))
+    }
+
+    return out.to_string()
+}
+
+fun transform_file(source: String): String {
+    var used: List<String> = collect_used_elements(source)
+    var transformed: String = find_and_transform_html(source)
+
+    if (!source.starts_with("import ")) {
+        var imports: String = generate_imports(used, source)
+        transformed = imports + transformed
+    }
+
+    return transformed
+}
+
+// --- Main ---
+
+var args: List<String> = OS.args()
+if (args.length() < 3) {
+    IO.println("Usage: sfx <input.sfx> <output.sf>")
+    IO.println("Transforms inline HTML (.sfx) to Saffron builder calls (.sf)")
+}
+
+var input_path: String = args[1]
+var output_path: String = args[2]
+
+IO.println("sfx: " + input_path + " → " + output_path)
+var source: String = IO.read_file(input_path)
+var result: String = transform_file(source)
+IO.write_file(output_path, result)
+IO.println("Done!")
