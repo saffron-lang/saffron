@@ -226,8 +226,10 @@
             type_name = this.current_prefix + name
         }
         this.class_fields.set(name, fields)
+        this.class_struct_names.set(name, type_name)
         if (this.current_prefix.length() > 0) {
             this.class_fields.set(type_name, fields)
+            this.class_struct_names.set(type_name, type_name)
         }
 
         // Parse field names for struct layout
@@ -290,7 +292,7 @@
 
         // Generate methods as functions with name prefix: ClassName__method
         // Methods get 'self' (i64 pointer to instance) as first param
-        this.current_class = name
+        this.current_class = type_name
         i = 0
         while (i < methods.length()) {
             this.gen_class_method(name, methods[i])

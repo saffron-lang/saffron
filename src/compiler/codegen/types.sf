@@ -469,6 +469,9 @@ extend fun Codegen.resolve_class_type(vtype: String): String {
             }
         }
         if (this.class_fields.has(vtype)) {
+            if (this.class_struct_names.has(vtype)) {
+                return this.class_struct_names.get(vtype)
+            }
             return vtype
         }
         // Strip module prefix: "Mod.Thing" -> "Thing"
@@ -482,6 +485,9 @@ extend fun Codegen.resolve_class_type(vtype: String): String {
                 }
             }
             if (this.class_fields.has(bare)) {
+                if (this.class_struct_names.has(bare)) {
+                    return this.class_struct_names.get(bare)
+                }
                 return bare
             }
         }
@@ -495,6 +501,9 @@ extend fun Codegen.resolve_class_type(vtype: String): String {
                 }
             }
             if (this.class_fields.has(base)) {
+                if (this.class_struct_names.has(base)) {
+                    return this.class_struct_names.get(base)
+                }
                 return base
             }
             if (base.contains(".")) {
@@ -507,6 +516,9 @@ extend fun Codegen.resolve_class_type(vtype: String): String {
                     }
                 }
                 if (this.class_fields.has(bare2)) {
+                    if (this.class_struct_names.has(bare2)) {
+                        return this.class_struct_names.get(bare2)
+                    }
                     return bare2
                 }
             }

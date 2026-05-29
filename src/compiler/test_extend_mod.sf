@@ -1,4 +1,0 @@
-extend fun Codegen.test_method(): Float {
-    var x: Float = this.label_counter
-    return x
-}
