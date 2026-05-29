@@ -722,6 +722,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         mi = mi + 1
     }
 
+    // Pre-scan: register main program top-level VarDecls as globals
+    var gvi: Float = 0
+    while (gvi < program.length()) {
+        var gvk: String = gen.classify_stmt(program[gvi])
+        if (gvk == "var") {
+            var gvname: String = match (program[gvi]) { VarDecl(n, t, ii, d) => n
+                _ => ""
+            }
+            if (gvname.length() > 0) {
+                gen.module_globals.set(gvname, true)
+                gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
+            }
+        }
+        gvi = gvi + 1
+    }
+
     // Pre-register main program's class declarations so imported modules'
     // extend funs can reference class fields without crashing on null map lookups.
     var pri: Float = 0
