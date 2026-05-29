@@ -355,6 +355,7 @@ extend fun Codegen.gen_class_constructor(type_name: String, fields: String, fiel
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
+        this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
         if (this.defined_funcs.contains(type_name)) { return }
         this.defined_funcs.push(type_name)
