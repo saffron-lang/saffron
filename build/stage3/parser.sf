@@ -1728,6 +1728,9 @@ class Parser {
             Block(s) => "other"
             Break => "other"
             Continue => "other"
+            TryCatch(t, n, c, f) => "other"
+            Throw(v) => "other"
+            LetPattern(p, v) => "other"
         }
         if (kind == "expr") {
             return match (stmt) { ExprStmt(e) => e }

@@ -1270,20 +1270,40 @@ class NullChecker {
     }
 
     fun check_exhaustiveness(enum_type: String, matched: List<String>) {
-        // Look up all variants of this enum
-        if (!this.env.enum_variants.has(enum_type)) return nil
-        var all_variants_str: String = this.env.enum_variants.get(enum_type)
+        // Look up all variants of this enum (try both qualified and unqualified names)
+        var lookup_name: String = enum_type
+        if (!this.env.enum_variants.has(lookup_name)) {
+            // Try stripping module prefix: "AST.Stmt" → "Stmt"
+            if (lookup_name.contains(".")) {
+                var dot_pos: Float = -1
+                var ci: Float = 0
+                while (ci < lookup_name.length()) {
+                    if (lookup_name.char_at(ci) == ".") { dot_pos = ci }
+                    ci = ci + 1
+                }
+                if (dot_pos >= 0) {
+                    lookup_name = lookup_name.slice(dot_pos + 1, lookup_name.length())
+                }
+            }
+            if (!this.env.enum_variants.has(lookup_name)) return nil
+        }
+        var all_variants_str: String = this.env.enum_variants.get(lookup_name)
         if (all_variants_str.length() == 0) return nil
         var all_variants: List<String> = all_variants_str.split(",")
+        var missing: List<String> = []
         var i: Float = 0
         while (i < all_variants.length()) {
             var v: String = all_variants[i]
             if (!matched.contains(v)) {
-                this.warn("non-exhaustive match on " + enum_type + ": missing " + v)
+                missing.push(v)
             }
             i = i + 1
         }
+        if (missing.length() > 0) {
+            this.error("non-exhaustive match on " + enum_type + ": missing variants " + missing.join(", "))
+        }
     }
+
 
     // --- Report ---
 

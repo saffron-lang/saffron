@@ -273,6 +273,7 @@
             Continue => false
             TryCatch(t, n, c, f) => false
             Throw(v) => false
+            LetPattern(p, v) => false
         }
     }
 
@@ -565,6 +566,13 @@
                 out.append("  call i64 @__saffron_entry()\n")
                 out.append("  ret i32 0\n")
             } else {
+                // Call module init functions before __saffron_main
+                // (when has_top_level is true, inits are called inside __saffron_entry)
+                var mi3: Float = 0
+                while (mi3 < this.module_init_names.length()) {
+                    out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
+                    mi3 = mi3 + 1
+                }
                 out.append("  %main_ret = call i64 @__saffron_main()\n")
                 out.append("  %exit_code = trunc i64 %main_ret to i32\n")
                 out.append("  ret i32 %exit_code\n")

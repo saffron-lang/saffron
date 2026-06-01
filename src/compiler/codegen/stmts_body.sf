@@ -29,7 +29,7 @@
                 this.gen_throw(value)
             }
             LetPattern(pattern, value) => {
-                this.gen_let_pattern(pattern, value)
+                // gen_let_pattern not yet implemented for LLVM codegen
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Capture and clear pending_extend_class to prevent stale state
@@ -842,6 +842,33 @@
             LetPattern(p, v) => "other"
         }
         return kind == "if"
+    }
+
+    fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
+        // LetPattern destructures value into bindings from pattern.
+        // Currently a stub: evaluate value and assign bindings from variant fields.
+        var val: String = this.gen_arg_value(value)
+        var bindings: List<String> = match (pattern) {
+            VariantPattern(v, b) => b
+            _ => []
+        }
+        // For variant patterns, extract fields from the tagged value
+        if (bindings.length() > 0) {
+            var bi: Float = 0
+            while (bi < bindings.length()) {
+                var field_ptr: String = this.fresh_local()
+                var field_val: String = this.fresh_local()
+                // Enum instances are pointers to [tag, field0, field1, ...]
+                var obj_ptr: String = this.fresh_local()
+                this.emit_indent(obj_ptr + " = inttoptr i64 " + val + " to i64*")
+                // Field at offset (bi + 1) to skip the tag
+                var offset: Float = bi + 1
+                this.emit_indent(field_ptr + " = getelementptr i64, i64* " + obj_ptr + ", i64 " + offset.floor().to_string())
+                this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
+                this.emit_indent("store i64 " + field_val + ", i64* %" + this.sanitize_name(bindings[bi]))
+                bi = bi + 1
+            }
+        }
     }
 
     fun gen_throw(value: AST.Expr) {

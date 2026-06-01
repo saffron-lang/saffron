@@ -2696,6 +2696,9 @@ class Codegen {
                 this.find_free_vars_stmts(finally_body, bound, free)
             }
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
+            LetPattern(pattern, value) => {
+                this.find_free_vars_expr(value, bound, free)
+            }
         }
     }
 
@@ -3106,6 +3109,9 @@ class Codegen {
             }
             Throw(value) => {
                 this.gen_throw(value)
+            }
+            LetPattern(pattern, value) => {
+                // gen_let_pattern not yet implemented for LLVM codegen
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Capture and clear pending_extend_class to prevent stale state
@@ -3782,6 +3788,7 @@ class Codegen {
             Continue => {}
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
+            LetPattern(p, v) => {}
         }
     }
 
@@ -3895,6 +3902,7 @@ class Codegen {
             Continue => "continue"
             TryCatch(t, n, c, f) => "try"
             Throw(v) => "throw"
+            LetPattern(p, v) => "let_pattern"
         }
     }
 
@@ -3913,8 +3921,36 @@ class Codegen {
             Continue => "other"
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
+            LetPattern(p, v) => "other"
         }
         return kind == "if"
+    }
+
+    fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
+        // LetPattern destructures value into bindings from pattern.
+        // Currently a stub: evaluate value and assign bindings from variant fields.
+        var val: String = this.gen_arg_value(value)
+        var bindings: List<String> = match (pattern) {
+            VariantPattern(v, b) => b
+            _ => []
+        }
+        // For variant patterns, extract fields from the tagged value
+        if (bindings.length() > 0) {
+            var bi: Float = 0
+            while (bi < bindings.length()) {
+                var field_ptr: String = this.fresh_local()
+                var field_val: String = this.fresh_local()
+                // Enum instances are pointers to [tag, field0, field1, ...]
+                var obj_ptr: String = this.fresh_local()
+                this.emit_indent(obj_ptr + " = inttoptr i64 " + val + " to i64*")
+                // Field at offset (bi + 1) to skip the tag
+                var offset: Float = bi + 1
+                this.emit_indent(field_ptr + " = getelementptr i64, i64* " + obj_ptr + ", i64 " + offset.floor().to_string())
+                this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
+                this.emit_indent("store i64 " + field_val + ", i64* %" + this.sanitize_name(bindings[bi]))
+                bi = bi + 1
+            }
+        }
     }
 
     fun gen_throw(value: AST.Expr) {
@@ -4147,6 +4183,9 @@ class Codegen {
                 this.collect_vars(finally_body, names, types)
             }
             Throw(value) => {
+                this.collect_vars_expr(value, names, types)
+            }
+            LetPattern(pattern, value) => {
                 this.collect_vars_expr(value, names, types)
             }
         }
@@ -4547,6 +4586,15 @@ class Codegen {
         return k == "nil"
     }
 
+    fun is_nil_expr_stmt(stmt: AST.Stmt): Bool {
+        var sk: String = this.classify_stmt(stmt)
+        if (sk != "expr") { return false }
+        var e: AST.Expr = match (stmt) { ExprStmt(ex) => ex
+            _ => AST.Expr.IntLit(1)
+        }
+        return this.is_nil_expr(e)
+    }
+
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true
@@ -4562,6 +4610,7 @@ class Codegen {
             Continue => false
             TryCatch(t, n, c, f) => false
             Throw(v) => false
+            LetPattern(p, v) => false
         }
     }
 
@@ -4854,6 +4903,13 @@ class Codegen {
                 out.append("  call i64 @__saffron_entry()\n")
                 out.append("  ret i32 0\n")
             } else {
+                // Call module init functions before __saffron_main
+                // (when has_top_level is true, inits are called inside __saffron_entry)
+                var mi3: Float = 0
+                while (mi3 < this.module_init_names.length()) {
+                    out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
+                    mi3 = mi3 + 1
+                }
                 out.append("  %main_ret = call i64 @__saffron_main()\n")
                 out.append("  %exit_code = trunc i64 %main_ret to i32\n")
                 out.append("  ret i32 %exit_code\n")
@@ -6209,10 +6265,12 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var prefix: String = module_prefixes_list[mi]
         gen.current_prefix = prefix
 
-        // Compile declarations (functions, classes, enums)
+        // Compile declarations (functions, classes, enums) — use classify_stmt
+        // for reliable detection since is_decl can misfire for VarDecl
         var si: Float = 0
         while (si < stmts.length()) {
-            if (gen.is_decl(stmts[si])) {
+            var sk: String = gen.classify_stmt(stmts[si])
+            if (sk == "fun" or sk == "enum" or sk == "class") {
                 // Set pending_extend_class from pre-scanned map before gen_stmt
                 var fn_name: String = gen.get_fun_name(stmts[si])
                 if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
@@ -6229,7 +6287,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var has_top: Bool = false
         si = 0
         while (si < stmts.length()) {
-            if (!gen.is_decl(stmts[si])) {
+            var sk2: String = gen.classify_stmt(stmts[si])
+            if (sk2 == "var" or sk2 == "let_pattern") {
+                has_top = true
+            } else if (sk2 == "expr") {
+                if (!gen.is_nil_expr_stmt(stmts[si])) {
+                    has_top = true
+                }
+            } else if (sk2 != "fun" and sk2 != "enum" and sk2 != "class") {
                 has_top = true
             }
             si = si + 1
@@ -6250,7 +6315,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             var top_var_types: List<String> = []
             si = 0
             while (si < stmts.length()) {
-                if (!gen.is_decl(stmts[si])) {
+                var sk3: String = gen.classify_stmt(stmts[si])
+                if (sk3 == "var" or sk3 == "let_pattern" or (sk3 == "expr" and !gen.is_nil_expr_stmt(stmts[si])) or (sk3 != "fun" and sk3 != "enum" and sk3 != "class" and sk3 != "expr")) {
                     var single_list: List<AST.Stmt> = []
                     single_list.push(stmts[si])
                     gen.collect_vars(single_list, top_vars, top_var_types)
@@ -6267,7 +6333,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             }
             si = 0
             while (si < stmts.length()) {
-                if (!gen.is_decl(stmts[si])) {
+                var sk4: String = gen.classify_stmt(stmts[si])
+                if (sk4 == "var" or sk4 == "let_pattern" or (sk4 == "expr" and !gen.is_nil_expr_stmt(stmts[si])) or (sk4 != "fun" and sk4 != "enum" and sk4 != "class" and sk4 != "expr")) {
                     gen.gen_stmt(stmts[si])
                 }
                 si = si + 1
@@ -6532,7 +6599,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
 
         var si: Float = start
         while (si < end) {
-            if (gen.is_decl(all_stmts[si])) {
+            // Use classify_stmt for reliable declaration detection —
+            // is_decl can misfire for VarDecl due to cross-module enum matching issues
+            var sk: String = gen.classify_stmt(all_stmts[si])
+            if (sk == "fun" or sk == "enum" or sk == "class") {
                 // Set pending_extend_class from pre-scanned map before gen_stmt
                 var fn_name: String = gen.get_fun_name(all_stmts[si])
                 if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
@@ -6545,11 +6615,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             si = si + 1
         }
 
-        // Module top-level code
+        // Module top-level code — use classify_stmt for reliable VarDecl detection
         var has_top: Bool = false
         si = start
         while (si < end) {
-            if (!gen.is_decl(all_stmts[si])) { has_top = true }
+            var sk2: String = gen.classify_stmt(all_stmts[si])
+            if (sk2 == "var" or sk2 == "let_pattern") {
+                has_top = true
+            } else if (sk2 == "expr") {
+                if (!gen.is_nil_expr_stmt(all_stmts[si])) {
+                    has_top = true
+                }
+            } else if (sk2 != "fun" and sk2 != "enum" and sk2 != "class") {
+                has_top = true
+            }
             si = si + 1
         }
         if (has_top) {
@@ -6565,7 +6644,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             var top_var_types: List<String> = []
             si = start
             while (si < end) {
-                if (!gen.is_decl(all_stmts[si])) {
+                var sk3: String = gen.classify_stmt(all_stmts[si])
+                if (sk3 == "var" or sk3 == "let_pattern" or (sk3 == "expr" and !gen.is_nil_expr_stmt(all_stmts[si])) or (sk3 != "fun" and sk3 != "enum" and sk3 != "class" and sk3 != "expr")) {
                     var single_list: List<AST.Stmt> = []
                     single_list.push(all_stmts[si])
                     gen.collect_vars(single_list, top_vars, top_var_types)
@@ -6582,7 +6662,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             }
             si = start
             while (si < end) {
-                if (!gen.is_decl(all_stmts[si])) {
+                var sk4: String = gen.classify_stmt(all_stmts[si])
+                if (sk4 == "var" or sk4 == "let_pattern" or (sk4 == "expr" and !gen.is_nil_expr_stmt(all_stmts[si])) or (sk4 != "fun" and sk4 != "enum" and sk4 != "class" and sk4 != "expr")) {
                     gen.gen_stmt(all_stmts[si])
                 }
                 si = si + 1
