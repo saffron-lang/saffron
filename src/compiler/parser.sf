@@ -427,7 +427,7 @@ class Parser {
                 var kl_name: String = this.expect_ident()
                 if (this.match_kind("=>")) {
                     var lparams: List<AST.Param> = []
-                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    IO.println("[KL-PATH]"); lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
                     var lbody: List<AST.Stmt> = []
                     while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                         while (this.match_kind(";")) {}
@@ -1641,9 +1641,8 @@ class Parser {
     fun parse_trailing_closure(): AST.Expr {
         this.consume("{")
         // Check for param list: ident => or ident, ident => ...
-        if (this.match_kind_check("ident") and (this.peek_is("=>") or this.peek_is(","))) {
-            return this.parse_trailing_closure_with_params()
-        }
+        if (this.match_kind_check("ident")) { if (this.peek_is("=>") or this.peek_is(",")) {
+            return this.parse_trailing_closure_with_params() } }
         var body: List<AST.Stmt> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
