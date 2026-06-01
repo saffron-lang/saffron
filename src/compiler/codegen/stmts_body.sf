@@ -441,6 +441,8 @@
 
     fun emit_enum_to_string(name: String, variants: List<AST.Variant>) {
         if (this.register_only) { return }
+        if (this.defined_funcs.contains(name + "__to_string")) { return }
+        this.defined_funcs.push(name + "__to_string")
         var max_fields: Float = this.get_max_fields(name)
         var func_name: String = name + "__to_string"
 
@@ -613,6 +615,8 @@
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
         if (this.register_only) { return }
+        if (this.defined_funcs.contains(vname)) { return }
+        this.defined_funcs.push(vname)
         var parts: List<String> = this.split_respecting_generics(fields_str, ",")
         var num_fields: Float = parts.length()
 

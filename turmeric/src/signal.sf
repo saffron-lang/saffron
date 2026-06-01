@@ -226,8 +226,8 @@ fun batch(fn: () => Nil) {
         _batch_pending = []
         var i: Float = 0
         while (i < pending.length()) {
-            var fn: () => Nil = pending[i]
-            fn()
+            var cb: () => Nil = pending[i]
+            cb()
             i = i + 1
         }
     }
