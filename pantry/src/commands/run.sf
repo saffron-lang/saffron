@@ -18,6 +18,34 @@ fun _exec_shell(cmd: String) {
     }
 }
 
+/// Resolve a bin command by prefixing relative file paths with the package directory.
+/// "saffron run tools/sfx.sf" → "saffron run /abs/path/.pantry/packages/pkg/tools/sfx.sf"
+fun _resolve_bin_cmd(bin_cmd: String, pkg_dir: String): String {
+    // Find .sf file references in the command and make them absolute
+    var parts: List<String> = bin_cmd.split(" ")
+    var result: List<String> = []
+    var i: Int = 0
+    while (i < parts.length()) {
+        var part: String = parts[i]
+        if (part.ends_with(".sf") and !(part.starts_with("/"))) {
+            // Relative .sf path — prefix with package dir
+            result.push(pkg_dir + "/" + part)
+        } else {
+            result.push(part)
+        }
+        i = i + 1
+    }
+    // Join with spaces
+    var joined: String = ""
+    i = 0
+    while (i < result.length()) {
+        if (i > 0) { joined = joined + " " }
+        joined = joined + result[i]
+        i = i + 1
+    }
+    return joined
+}
+
 /// Collect all available scripts: project scripts + dependency bin scripts.
 fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
     var scripts: Map<String, String> = {}
@@ -63,7 +91,10 @@ fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
                 while (j < bin_keys.length()) {
                     var bin_name: String = bin_keys[j]
                     var bin_cmd: String = bin_scripts.get(bin_name)
-                    var resolved_cmd: String = "cd ${packages_dir}/${pkg_name} && ${bin_cmd}"
+
+                    // Rewrite "saffron run <path>" to use absolute path from package dir
+                    var pkg_dir: String = packages_dir + "/" + pkg_name
+                    var resolved_cmd: String = _resolve_bin_cmd(bin_cmd, pkg_dir)
 
                     // Always available as pkg_name:script_name
                     scripts.set(pkg_name + ":" + bin_name, resolved_cmd)
@@ -84,7 +115,22 @@ fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
     return scripts
 }
 
+/// Get the first word of a command string.
+fun _first_word(s: String): String {
+    var space_idx: Int = s.index_of(" ")
+    if (space_idx < 0) { return s }
+    return s.slice(0, space_idx)
+}
+
+/// Get everything after the first word (including the leading space).
+fun _rest_after_first(s: String): String {
+    var space_idx: Int = s.index_of(" ")
+    if (space_idx < 0) { return "" }
+    return s.slice(space_idx, s.length())
+}
+
 /// Execute a command string, expanding script references.
+/// Matches full segment first, then first-word for bin scripts with args.
 fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
     if (depth > 10) {
         throw "pantry: script recursion depth exceeded (circular reference?)"
@@ -96,10 +142,19 @@ fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
         var segment: String = segments[i].trim()
         if (segment.length() > 0) {
             if (scripts.has(segment)) {
+                // Exact match — expand recursively
                 var expanded: String = scripts.get(segment)
                 _exec_command(expanded, scripts, depth + 1)
             } else {
-                _exec_shell(segment)
+                // Check first word against scripts (for "sfx arg1 arg2")
+                var first: String = _first_word(segment)
+                if (scripts.has(first)) {
+                    var replacement: String = scripts.get(first)
+                    var args: String = _rest_after_first(segment)
+                    _exec_shell(replacement + args)
+                } else {
+                    _exec_shell(segment)
+                }
             }
         }
         i = i + 1
