@@ -649,6 +649,26 @@ fun li(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
     return _el("li", attrs, block)
 }
 
+fun button(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("button", attrs, block)
+}
+
+fun h1(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h1", attrs, block)
+}
+
+fun input(attrs: List<Attr> = []): Node {
+    return _el("input", attrs, fun () {})
+}
+
+fun header(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("header", attrs, block)
+}
+
+fun main_el(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("main", attrs, block)
+}
+
 // =============================================================================
 // Event Handler Helpers
 // =============================================================================
