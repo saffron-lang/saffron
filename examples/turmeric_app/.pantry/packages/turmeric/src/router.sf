@@ -1,0 +1,214 @@
+// Turmeric Router — client-side SPA routing, fully typed
+
+import "./signal.sf" as Sig
+import "./reconcile.sf" as R
+
+// =============================================================================
+// Route Params
+// =============================================================================
+
+class RouteParams {
+    var params: Map<String, String>
+    var query: Map<String, String>
+    var path: String
+
+    fun init(path: String, params: Map<String, String>, query: Map<String, String>) {
+        this.path = path
+        this.params = params
+        this.query = query
+    }
+
+    fun get(name: String): String {
+        return this.params.get(name)
+    }
+}
+
+// =============================================================================
+// Route Definition
+// =============================================================================
+
+class Route {
+    var pattern: String
+    var component: (RouteParams) => R.Component
+    var guard: (RouteParams) => Bool
+    var children: List<Route>
+
+    fun init(pattern: String, component: (RouteParams) => R.Component) {
+        this.pattern = pattern
+        this.component = component
+        this.guard = nil
+        this.children = []
+    }
+
+    fun with_guard(guard_fn: (RouteParams) => Bool): Route {
+        this.guard = guard_fn
+        return this
+    }
+
+    fun with_children(routes: List<Route>): Route {
+        this.children = routes
+        return this
+    }
+}
+
+// =============================================================================
+// Path Utilities
+// =============================================================================
+
+fun split_path(path: String): List<String> {
+    var segments: List<String> = []
+    var parts: List<String> = path.split("/")
+    var i: Float = 0
+    while (i < parts.length()) {
+        if (parts[i].length() > 0) {
+            segments.push(parts[i])
+        }
+        i = i + 1
+    }
+    return segments
+}
+
+fun parse_query(query_str: String): Map<String, String> {
+    var result: Map<String, String> = {}
+    if (query_str.length() == 0) { return result }
+    var qs: String = query_str
+    if (qs.starts_with("?")) {
+        qs = qs.slice(1, qs.length())
+    }
+    var pairs: List<String> = qs.split("&")
+    var i: Float = 0
+    while (i < pairs.length()) {
+        var pair: String = pairs[i]
+        var eq: Float = pair.index_of("=")
+        if (eq > 0) {
+            var key: String = pair.slice(0, eq)
+            var val: String = pair.slice(eq + 1, pair.length())
+            result.set(key, val)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+// =============================================================================
+// Pattern Matching
+// =============================================================================
+
+fun match_route(pattern: String, path: String): Map<String, String> {
+    if (pattern == "*") { return {} }
+
+    var pat_segs: List<String> = split_path(pattern)
+    var path_segs: List<String> = split_path(path)
+    var params: Map<String, String> = {}
+
+    var i: Float = 0
+    while (i < pat_segs.length()) {
+        var pat: String = pat_segs[i]
+
+        // Catch-all: *name
+        if (pat.starts_with("*")) {
+            var param_name: String = pat.slice(1, pat.length())
+            var rest: List<String> = []
+            while (i < path_segs.length()) {
+                rest.push(path_segs[i])
+                i = i + 1
+            }
+            params.set(param_name, rest.join("/"))
+            return params
+        }
+
+        if (i >= path_segs.length()) { return nil }
+
+        // Dynamic: :name
+        if (pat.starts_with(":")) {
+            var param_name: String = pat.slice(1, pat.length())
+            params.set(param_name, path_segs[i])
+        } else {
+            if (pat != path_segs[i]) { return nil }
+        }
+
+        i = i + 1
+    }
+
+    if (path_segs.length() != pat_segs.length()) { return nil }
+    return params
+}
+
+// =============================================================================
+// Router
+// =============================================================================
+
+class Router {
+    var routes: List<Route>
+    var current: Sig.Signal<RouteParams>
+    var not_found: (RouteParams) => R.Component
+
+    fun init(routes: List<Route>, not_found: (RouteParams) => R.Component) {
+        this.routes = routes
+        this.current = Sig.signal(RouteParams("/", {}, {}))
+        this.not_found = not_found
+    }
+
+    fun navigate(url: String) {
+        var qmark: Float = url.index_of("?")
+        var path: String = url
+        var query_str: String = ""
+        if (qmark >= 0) {
+            path = url.slice(0, qmark)
+            query_str = url.slice(qmark, url.length())
+        }
+
+        var query: Map<String, String> = parse_query(query_str)
+
+        var i: Float = 0
+        while (i < this.routes.length()) {
+            var route: Route = this.routes[i]
+            var params: Map<String, String> = match_route(route.pattern, path)
+            if (params != nil) {
+                var route_params: RouteParams = RouteParams(path, params, query)
+                if (route.guard != nil) {
+                    if (!route.guard(route_params)) { return }
+                }
+                this.current.set(route_params)
+                return
+            }
+            i = i + 1
+        }
+
+        this.current.set(RouteParams(path, {}, query))
+    }
+
+    fun back() {
+        // In WASM: calls js_history_back()
+    }
+
+    fun forward() {
+        // In WASM: calls js_history_forward()
+    }
+
+    fun resolve(): (RouteParams) => R.Component {
+        var route_params: RouteParams = this.current.get()
+        var i: Float = 0
+        while (i < this.routes.length()) {
+            var route: Route = this.routes[i]
+            var params: Map<String, String> = match_route(route.pattern, route_params.path)
+            if (params != nil) {
+                return route.component
+            }
+            i = i + 1
+        }
+        return this.not_found
+    }
+
+    fun current_route(): Sig.Signal<RouteParams> {
+        return this.current
+    }
+}
+
+// =============================================================================
+// Convenience
+// =============================================================================
+
+fun create(routes: List<Route>, not_found: (RouteParams) => R.Component): Router {
+    return Router(routes, not_found)
+}

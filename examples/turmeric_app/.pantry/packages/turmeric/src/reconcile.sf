@@ -1,0 +1,287 @@
+// Turmeric Reconciler — component lifecycle + keyed list diffing
+// Fully generic, no Any
+
+import "./signal.sf" as Sig
+
+// =============================================================================
+// DOM Operations (FFI)
+// =============================================================================
+
+@extern("i64 js_dom_create_element(void*)") fun dom_create(tag: String): Float
+@extern("void js_dom_set_text(i64, void*)") fun dom_set_text(handle: Float, text: String)
+@extern("void js_dom_set_attribute(i64, void*, void*)") fun dom_set_attr(handle: Float, name: String, value: String)
+@extern("void js_dom_append_child(i64, i64)") fun dom_append(parent: Float, child: Float)
+@extern("void js_dom_remove_child(i64, i64)") fun dom_remove(parent: Float, child: Float)
+@extern("void js_dom_insert_before(i64, i64, i64)") fun dom_insert_before(parent: Float, node: Float, ref: Float)
+@extern("void js_dom_add_event_listener(i64, void*, i64)") fun dom_on(handle: Float, event: String, callback_id: Float)
+
+// =============================================================================
+// Component — owns DOM subtree + effect cleanup
+// =============================================================================
+
+class Component {
+    var handle: Float
+    var parent_handle: Float
+    var children: List<Component>
+    var effects: List<Sig.EffectHandle>
+    var mounted: Bool
+
+    fun init(handle: Float, parent_handle: Float) {
+        this.handle = handle
+        this.parent_handle = parent_handle
+        this.children = []
+        this.effects = []
+        this.mounted = false
+    }
+
+    fun mount() {
+        if (this.mounted) { return }
+        this.mounted = true
+        dom_append(this.parent_handle, this.handle)
+    }
+
+    fun unmount() {
+        if (!this.mounted) { return }
+        var i: Float = 0
+        while (i < this.children.length()) {
+            this.children[i].unmount()
+            i = i + 1
+        }
+        i = 0
+        while (i < this.effects.length()) {
+            this.effects[i].dispose()
+            i = i + 1
+        }
+        dom_remove(this.parent_handle, this.handle)
+        this.mounted = false
+        this.children = []
+        this.effects = []
+    }
+
+    fun add_child(child: Component) {
+        this.children.push(child)
+    }
+
+    fun own_effect(handle: Sig.EffectHandle) {
+        this.effects.push(handle)
+    }
+}
+
+// =============================================================================
+// Managed Effect
+// =============================================================================
+
+fun managed_effect(owner: Component, fn: () => Nil) {
+    var handle: Sig.EffectHandle = Sig.effect(fn)
+    owner.own_effect(handle)
+}
+
+// =============================================================================
+// Conditional Slot
+// =============================================================================
+
+class ConditionalSlot {
+    var parent_handle: Float
+    var condition: Sig.Signal<Bool>
+    var builder: () => Component
+    var current: Component
+    var sub_id: Float
+
+    fun init(parent_handle: Float, condition: Sig.Signal<Bool>, builder: () => Component) {
+        this.parent_handle = parent_handle
+        this.condition = condition
+        this.builder = builder
+        this.current = nil
+        this.sync()
+        this.sub_id = this.condition.subscribe(fun () => {
+            this.sync()
+        })
+    }
+
+    fun sync() {
+        var should_show: Bool = this.condition.get()
+        if (should_show and this.current == nil) {
+            this.current = this.builder()
+            this.current.mount()
+        }
+        if (!should_show and this.current != nil) {
+            this.current.unmount()
+            this.current = nil
+        }
+    }
+
+    fun destroy() {
+        if (this.current != nil) {
+            this.current.unmount()
+            this.current = nil
+        }
+        this.condition.unsubscribe(this.sub_id)
+    }
+}
+
+fun conditional(parent: Float, condition: Sig.Signal<Bool>, builder: () => Component): ConditionalSlot {
+    return ConditionalSlot(parent, condition, builder)
+}
+
+// =============================================================================
+// Match Slot
+// =============================================================================
+
+class MatchSlot {
+    var parent_handle: Float
+    var discriminator: Sig.Signal<String>
+    var builders: Map<String, () => Component>
+    var current_key: String
+    var current: Component
+    var sub_id: Float
+
+    fun init(parent_handle: Float, discriminator: Sig.Signal<String>, builders: Map<String, () => Component>) {
+        this.parent_handle = parent_handle
+        this.discriminator = discriminator
+        this.builders = builders
+        this.current_key = ""
+        this.current = nil
+        this.sync()
+        this.sub_id = this.discriminator.subscribe(fun () => {
+            this.sync()
+        })
+    }
+
+    fun sync() {
+        var key: String = this.discriminator.get()
+        if (key == this.current_key) { return }
+        if (this.current != nil) {
+            this.current.unmount()
+        }
+        this.current_key = key
+        if (this.builders.has(key)) {
+            this.current = this.builders.get(key)()
+            this.current.mount()
+        } else {
+            this.current = nil
+        }
+    }
+
+    fun destroy() {
+        if (this.current != nil) {
+            this.current.unmount()
+            this.current = nil
+        }
+        this.discriminator.unsubscribe(this.sub_id)
+    }
+}
+
+fun match_slot(parent: Float, discriminator: Sig.Signal<String>, builders: Map<String, () => Component>): MatchSlot {
+    return MatchSlot(parent, discriminator, builders)
+}
+
+// =============================================================================
+// Keyed List<T>
+// =============================================================================
+
+class KeyedItem {
+    var key: String
+    var comp: Component
+
+    fun init(key: String, comp: Component) {
+        this.key = key
+        this.comp = comp
+    }
+}
+
+class KeyedList<T> {
+    var parent_handle: Float
+    var items_signal: Sig.Signal<List<T>>
+    var key_fn: (T) => String
+    var builder_fn: (T) => Component
+    var rendered: List<KeyedItem>
+    var sub_id: Float
+
+    fun init(parent_handle: Float, items_signal: Sig.Signal<List<T>>, key_fn: (T) => String, builder_fn: (T) => Component) {
+        this.parent_handle = parent_handle
+        this.items_signal = items_signal
+        this.key_fn = key_fn
+        this.builder_fn = builder_fn
+        this.rendered = []
+        this.sync()
+        this.sub_id = this.items_signal.subscribe(fun () => {
+            this.sync()
+        })
+    }
+
+    fun sync() {
+        var new_items: List<T> = this.items_signal.get()
+
+        // Old key → index
+        var old_map: Map<String, Float> = {}
+        var i: Float = 0
+        while (i < this.rendered.length()) {
+            old_map.set(this.rendered[i].key, i)
+            i = i + 1
+        }
+
+        // New keys
+        var new_keys: List<String> = []
+        i = 0
+        while (i < new_items.length()) {
+            new_keys.push(this.key_fn(new_items[i]))
+            i = i + 1
+        }
+
+        // Set of new keys
+        var new_key_set: Map<String, Bool> = {}
+        i = 0
+        while (i < new_keys.length()) {
+            new_key_set.set(new_keys[i], true)
+            i = i + 1
+        }
+
+        // Unmount removed
+        i = 0
+        while (i < this.rendered.length()) {
+            if (!new_key_set.has(this.rendered[i].key)) {
+                this.rendered[i].comp.unmount()
+            }
+            i = i + 1
+        }
+
+        // Reuse or create
+        var new_rendered: List<KeyedItem> = []
+        i = 0
+        while (i < new_items.length()) {
+            var key: String = new_keys[i]
+            if (old_map.has(key)) {
+                var old_idx: Float = old_map.get(key)
+                new_rendered.push(this.rendered[old_idx])
+            } else {
+                var comp: Component = this.builder_fn(new_items[i])
+                comp.mount()
+                new_rendered.push(KeyedItem(key, comp))
+            }
+            i = i + 1
+        }
+
+        // Re-append in order
+        i = 0
+        while (i < new_rendered.length()) {
+            dom_append(this.parent_handle, new_rendered[i].comp.handle)
+            i = i + 1
+        }
+
+        this.rendered = new_rendered
+    }
+
+    fun destroy() {
+        var i: Float = 0
+        while (i < this.rendered.length()) {
+            this.rendered[i].comp.unmount()
+            i = i + 1
+        }
+        this.rendered = []
+        this.items_signal.unsubscribe(this.sub_id)
+    }
+}
+
+fun keyed_list<T>(parent: Float, items: Sig.Signal<List<T>>, key_fn: (T) => String, builder_fn: (T) => Component): KeyedList<T> {
+    return KeyedList(parent, items, key_fn, builder_fn)
+}

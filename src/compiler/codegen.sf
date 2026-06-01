@@ -549,7 +549,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
 
         // Wrap module's top-level code in an init function
         if (has_top) {
-            var init_name: String = "__mod_init_" + prefix.slice(0, prefix.length() - 1)
+            var init_suffix: String = "prelude_" + mi.to_string()
+            if (prefix.length() > 0) {
+                init_suffix = prefix.slice(0, prefix.length() - 1)
+            }
+            var init_name: String = "__mod_init_" + init_suffix
             gen.known_functions.push(init_name)
             module_init_names.push(init_name)
             gen.emit("")
@@ -879,7 +883,11 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             si = si + 1
         }
         if (has_top) {
-            var init_name: String = "__mod_init_" + prefix.slice(0, prefix.length() - 1)
+            var init_suffix2: String = "prelude_" + mi.to_string()
+            if (prefix.length() > 0) {
+                init_suffix2 = prefix.slice(0, prefix.length() - 1)
+            }
+            var init_name: String = "__mod_init_" + init_suffix2
             gen.known_functions.push(init_name)
             module_init_names.push(init_name)
             gen.emit("")

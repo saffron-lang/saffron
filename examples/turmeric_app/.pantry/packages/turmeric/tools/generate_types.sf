@@ -1,0 +1,413 @@
+// generate_types.sf — Generate Saffron UI element types from dom.generated.d.ts
+// Usage: saffron run tools/generate_types.sf
+
+var INPUT: String = "tools/dom.generated.d.ts"
+var OUTPUT: String = "src/generated_types.sf"
+
+// --- Helpers ---
+
+// Known acronyms to keep as single units
+fun replace_acronyms(name: String): String {
+    var result: String = name
+    result = result.replace("URI", "Uri")
+    result = result.replace("URL", "Url")
+    result = result.replace("HTML", "Html")
+    result = result.replace("CSS", "Css")
+    result = result.replace("DOM", "Dom")
+    result = result.replace("API", "Api")
+    result = result.replace("HTTP", "Http")
+    result = result.replace("XML", "Xml")
+    result = result.replace("JSON", "Json")
+    result = result.replace("SVG", "Svg")
+    return result
+}
+
+fun to_snake_case(name: String): String {
+    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var fixed: String = replace_acronyms(name)
+    var result: String = ""
+    var i: Float = 0
+    while (i < fixed.length()) {
+        var ch: String = fixed.char_at(i)
+        if (upper.contains(ch)) {
+            if (i > 0) {
+                result = result + "_"
+            }
+            result = result + ch.to_lower()
+        } else {
+            result = result + ch
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun is_all_upper(s: String): Bool {
+    var lower: String = "abcdefghijklmnopqrstuvwxyz"
+    var i: Float = 0
+    while (i < s.length()) {
+        if (lower.contains(s.char_at(i))) return false
+        i = i + 1
+    }
+    return true
+}
+
+fun map_ts_type(ts_type: String): String {
+    var t: String = ts_type.trim()
+    if (t == "string") return "String"
+    if (t == "number") return "Float"
+    if (t == "boolean") return "Bool"
+    if (t == "null" or t == "undefined" or t == "void") return "Nil"
+    if (t == "any") return "Any"
+    if (t.starts_with("\"")) return "String"
+    return "String"
+}
+
+fun is_saffron_keyword(name: String): Bool {
+    if (name == "var") return true
+    if (name == "class") return true
+    if (name == "import") return true
+    if (name == "return") return true
+    if (name == "if") return true
+    if (name == "else") return true
+    if (name == "while") return true
+    if (name == "for") return true
+    if (name == "in") return true
+    if (name == "fun") return true
+    if (name == "try") return true
+    if (name == "catch") return true
+    if (name == "throw") return true
+    if (name == "match") return true
+    if (name == "is") return true
+    if (name == "true") return true
+    if (name == "false") return true
+    if (name == "nil") return true
+    if (name == "this") return true
+    if (name == "enum") return true
+    if (name == "let") return true
+    if (name == "type") return true
+    return false
+}
+
+// Void elements that are self-closing
+fun is_void_element(tag: String): Bool {
+    if (tag == "area") return true
+    if (tag == "base") return true
+    if (tag == "br") return true
+    if (tag == "col") return true
+    if (tag == "embed") return true
+    if (tag == "hr") return true
+    if (tag == "img") return true
+    if (tag == "input") return true
+    if (tag == "link") return true
+    if (tag == "meta") return true
+    if (tag == "source") return true
+    if (tag == "track") return true
+    if (tag == "wbr") return true
+    return false
+}
+
+// --- Parsing ---
+
+fun extract_tag_map(lines: List<String>): Map<String, String> {
+    var tag_map: Map<String, String> = {}
+    var in_map: Bool = false
+
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.contains("interface HTMLElementTagNameMap")) {
+            in_map = true
+            i = i + 1
+            continue
+        }
+        if (in_map) {
+            if (line == "}") {
+                break
+            }
+            // Parse: "tag": InterfaceName;
+            if (line.contains("\":")) {
+                var quote1: Float = line.index_of("\"")
+                var rest: String = line.slice(quote1 + 1, line.length())
+                var quote2: Float = rest.index_of("\"")
+                var tag: String = rest.slice(0, quote2)
+                var colon: Float = line.index_of(": ")
+                var semi: Float = line.index_of(";")
+                if (colon >= 0 and semi > colon) {
+                    var elem_type: String = line.slice(colon + 2, semi).trim()
+                    tag_map.set(tag, elem_type)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return tag_map
+}
+
+fun extract_event_map(lines: List<String>): Map<String, String> {
+    var event_map: Map<String, String> = {}
+    var in_map: Bool = false
+
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.contains("interface GlobalEventHandlersEventMap")) {
+            in_map = true
+            i = i + 1
+            continue
+        }
+        if (in_map) {
+            if (line == "}") break
+            if (line.contains("\":")) {
+                var quote1: Float = line.index_of("\"")
+                var rest: String = line.slice(quote1 + 1, line.length())
+                var quote2: Float = rest.index_of("\"")
+                var event_name: String = rest.slice(0, quote2)
+                var colon: Float = line.index_of(": ")
+                var semi: Float = line.index_of(";")
+                if (colon >= 0 and semi > colon) {
+                    var event_type: String = line.slice(colon + 2, semi).trim()
+                    event_map.set(event_name, event_type)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return event_map
+}
+
+fun extract_interface_props(lines: List<String>, interface_name: String): List<List<String>> {
+    var props: List<List<String>> = []
+    var in_iface_name: Bool = false
+    var depth: Float = 0
+    var deprecated: Bool = false
+
+    var target: String = "interface " + interface_name
+
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var trimmed: String = line.trim()
+
+        if (!in_iface_name) {
+            if (trimmed.starts_with(target)) {
+                in_iface_name = true
+                depth = 1
+                i = i + 1
+                continue
+            }
+        } else {
+            // Track brace depth
+            var j: Float = 0
+            while (j < trimmed.length()) {
+                if (trimmed.char_at(j) == "{") { depth = depth + 1 }
+                if (trimmed.char_at(j) == "}") { depth = depth - 1 }
+                j = j + 1
+            }
+            if (depth <= 0) break
+
+            if (trimmed.contains("@deprecated")) {
+                deprecated = true
+                i = i + 1
+                continue
+            }
+
+            // Skip readonly, methods, complex types
+            if (!trimmed.starts_with("readonly") and !deprecated and trimmed.contains(": ") and trimmed.ends_with(";")) {
+                if (!trimmed.contains("(") and !trimmed.contains("=>") and !trimmed.contains("{")) {
+                    // Extract property name and type
+                    var colon: Float = trimmed.index_of(": ")
+                    if (colon > 0) {
+                        var prop_name: String = trimmed.slice(0, colon).trim()
+                        // Remove optional marker
+                        if (prop_name.ends_with("?")) {
+                            prop_name = prop_name.slice(0, prop_name.length() - 1)
+                        }
+                        var semi: Float = trimmed.index_of(";")
+                        var prop_type: String = trimmed.slice(colon + 2, semi).trim()
+
+                        // Skip ALL_CAPS constants and complex union types
+                        if (!is_all_upper(prop_name) and !prop_type.contains("|") and !prop_type.contains("<")) {
+                            var sf_type: String = map_ts_type(prop_type)
+                            if (sf_type == "String" or sf_type == "Float" or sf_type == "Bool") {
+                                props.push([prop_name, sf_type])
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!trimmed.starts_with("*") and !trimmed.starts_with("/*") and !trimmed.starts_with("//")) {
+                deprecated = false
+            }
+        }
+        i = i + 1
+    }
+    return props
+}
+
+// --- Code generation ---
+
+fun generate(tag_map: Map<String, String>, event_map: Map<String, String>, lines: List<String>): String {
+    var sb = StringBuilder()
+
+    sb.append("// AUTO-GENERATED from dom.generated.d.ts\n")
+    sb.append("// Run: saffron run tools/generate_types.sf\n\n")
+
+    // --- Event types ---
+    sb.append("// =============================================================================\n")
+    sb.append("// Event Types\n")
+    sb.append("// =============================================================================\n\n")
+
+    var event_types: List<String> = []
+    var event_keys: List<String> = event_map.keys()
+    var ei: Float = 0
+    while (ei < event_keys.length()) {
+        var etype: String = event_map.get(event_keys[ei])
+        if (!event_types.contains(etype)) {
+            event_types.push(etype)
+        }
+        ei = ei + 1
+    }
+
+    // Generate event classes
+    var eti: Float = 0
+    while (eti < event_types.length()) {
+        var etype: String = event_types[eti]
+        var props: List<List<String>> = extract_interface_props(lines, etype)
+
+        sb.append("class " + etype + " {\n")
+        var pi: Float = 0
+        while (pi < props.length() and pi < 15) {
+            var prop: List<String> = props[pi]
+            var sf_name: String = to_snake_case(prop[0])
+            sb.append("    var " + sf_name + ": " + prop[1] + "\n")
+            pi = pi + 1
+        }
+        sb.append("    fun init() {}\n")
+        sb.append("    fun prevent_default() {}\n")
+        sb.append("    fun stop_propagation() {}\n")
+        sb.append("}\n\n")
+        eti = eti + 1
+    }
+
+    // --- Element builders ---
+    sb.append("// =============================================================================\n")
+    sb.append("// Element Builder Functions\n")
+    sb.append("// =============================================================================\n\n")
+
+    var tags: List<String> = tag_map.keys()
+    tags.sort()
+    var ti: Float = 0
+    while (ti < tags.length()) {
+        var tag: String = tags[ti]
+        var fn_name: String = tag
+        if (is_saffron_keyword(tag)) {
+            fn_name = tag + "_"
+        }
+
+        if (is_void_element(tag)) {
+            sb.append("fun " + fn_name + "(attrs: List<Attr> = []): Node {\n")
+            sb.append("    return Node.Element(\"" + tag + "\", attrs, [])\n")
+            sb.append("}\n\n")
+        } else {
+            sb.append("fun " + fn_name + "(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {\n")
+            sb.append("    return _el(\"" + tag + "\", attrs, block)\n")
+            sb.append("}\n\n")
+        }
+        ti = ti + 1
+    }
+
+    // --- Event handler helpers ---
+    sb.append("// =============================================================================\n")
+    sb.append("// Event Handler Helpers\n")
+    sb.append("// =============================================================================\n\n")
+
+    var common_events: List<String> = [
+        "click", "dblclick", "mousedown", "mouseup", "mousemove",
+        "mouseenter", "mouseleave", "mouseover", "mouseout",
+        "keydown", "keyup",
+        "input", "change", "submit", "reset",
+        "focus", "blur", "focusin", "focusout",
+        "scroll", "resize",
+        "dragstart", "drag", "dragend", "dragenter", "dragleave", "dragover", "drop",
+        "touchstart", "touchmove", "touchend",
+        "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave",
+        "animationstart", "animationend",
+        "transitionend",
+        "contextmenu", "wheel",
+        "copy", "cut", "paste",
+        "load", "error"
+    ]
+
+    var ci: Float = 0
+    while (ci < common_events.length()) {
+        var ev: String = common_events[ci]
+        if (event_map.has(ev)) {
+            var ev_type: String = event_map.get(ev)
+            sb.append("fun on_" + ev + "(handler: (" + ev_type + ") => Nil): Attr {\n")
+            sb.append("    return Attr.Event(\"" + ev + "\", handler)\n")
+            sb.append("}\n\n")
+        }
+        ci = ci + 1
+    }
+
+    // --- Attribute helpers ---
+    sb.append("// =============================================================================\n")
+    sb.append("// Attribute Helpers\n")
+    sb.append("// =============================================================================\n\n")
+
+    var attr_defs: List<List<String>> = [
+        ["class_", "class"], ["id", "id"], ["style", "style"],
+        ["title", "title"], ["tabindex", "tabindex"], ["role", "role"],
+        ["hidden", "hidden"], ["draggable", "draggable"],
+        ["contenteditable", "contenteditable"], ["dir", "dir"],
+        ["lang", "lang"], ["spellcheck", "spellcheck"],
+        ["href", "href"], ["src", "src"], ["alt", "alt"],
+        ["type_", "type"], ["name", "name"], ["value", "value"],
+        ["placeholder", "placeholder"], ["disabled", "disabled"],
+        ["checked", "checked"], ["readonly_", "readonly"],
+        ["required", "required"], ["multiple", "multiple"],
+        ["selected", "selected"], ["action", "action"],
+        ["method", "method"], ["target", "target"], ["rel", "rel"],
+        ["width", "width"], ["height", "height"],
+        ["min", "min"], ["max", "max"], ["step", "step"],
+        ["pattern", "pattern"], ["autocomplete", "autocomplete"],
+        ["autofocus", "autofocus"], ["for_", "for"],
+        ["colspan", "colspan"], ["rowspan", "rowspan"]
+    ]
+
+    var ai: Float = 0
+    while (ai < attr_defs.length()) {
+        var def: List<String> = attr_defs[ai]
+        sb.append("fun " + def[0] + "(value: String): Attr { return Attr.Prop(\"" + def[1] + "\", value) }\n")
+        ai = ai + 1
+    }
+
+    sb.append("\n// --- Data & ARIA attributes ---\n\n")
+    sb.append("fun data(name: String, value: String): Attr { return Attr.Prop(\"data-\" + name, value) }\n")
+    sb.append("fun aria(name: String, value: String): Attr { return Attr.Prop(\"aria-\" + name, value) }\n")
+
+    return sb.to_string()
+}
+
+// --- Main ---
+
+IO.println("Reading " + INPUT + "...")
+var content: String = IO.read_file(INPUT)
+var lines: List<String> = content.split("\n")
+IO.println("  " + lines.length().to_string() + " lines")
+
+IO.println("Extracting tag map...")
+var tag_map: Map<String, String> = extract_tag_map(lines)
+IO.println("  " + tag_map.keys().length().to_string() + " elements")
+
+IO.println("Extracting event map...")
+var event_map: Map<String, String> = extract_event_map(lines)
+IO.println("  " + event_map.keys().length().to_string() + " events")
+
+IO.println("Generating...")
+var output: String = generate(tag_map, event_map, lines)
+
+IO.write_file(OUTPUT, output)
+IO.println("Written to " + OUTPUT)

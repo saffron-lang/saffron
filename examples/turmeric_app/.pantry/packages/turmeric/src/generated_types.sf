@@ -1,0 +1,908 @@
+// AUTO-GENERATED from dom.generated.d.ts
+// Run: saffron run tools/generate_types.sf
+
+import "./element.sf" as Element
+
+// =============================================================================
+// Event Types
+// =============================================================================
+
+class DomEvent {
+    var bubbles: Bool
+    var cancelable: Bool
+    var composed: Bool
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class PointerEvent {
+    var altitude_angle: Float
+    var azimuth_angle: Float
+    var coalesced_events: String
+    var height: Float
+    var is_primary: Bool
+    var pointer_id: Float
+    var pointer_type: String
+    var predicted_events: String
+    var pressure: Float
+    var tangential_pressure: Float
+    var tilt_x: Float
+    var tilt_y: Float
+    var twist: Float
+    var width: Float
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class ToggleEvent {
+    var new_state: String
+    var old_state: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class AnimationEvent {
+    var animation_name: String
+    var elapsed_time: Float
+    var pseudo_element: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class MouseEvent {
+    var button: Float
+    var buttons: Float
+    var client_x: Float
+    var client_y: Float
+    var movement_x: Float
+    var movement_y: Float
+    var screen_x: Float
+    var screen_y: Float
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class TouchEvent {
+    var changed_touches: String
+    var target_touches: String
+    var touches: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class FocusEvent {
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class CompositionEvent {
+    var data: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class SubmitEvent {
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class DragEvent {
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class ClipboardEvent {
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class ProgressEvent {
+    var length_computable: Bool
+    var loaded: Float
+    var total: Float
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class ErrorEvent {
+    var colno: Float
+    var filename: String
+    var lineno: Float
+    var message: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class InputEvent {
+    var input_type: String
+    var is_composing: Bool
+    var target_ranges: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class TransitionEvent {
+    var elapsed_time: Float
+    var property_name: String
+    var pseudo_element: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class UIEvent {
+    var detail: Float
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class FormDataEvent {
+    var form_data: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class KeyboardEvent {
+    var code: String
+    var is_composing: Bool
+    var key: String
+    var location: Float
+    var repeat: Bool
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class SecurityPolicyViolationEvent {
+    var blocked_uri: String
+    var column_number: Float
+    var disposition: String
+    var document_uri: String
+    var effective_directive: String
+    var line_number: Float
+    var original_policy: String
+    var referrer: String
+    var sample: String
+    var source_file: String
+    var status_code: Float
+    var violated_directive: String
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+class WheelEvent {
+    var delta_mode: Float
+    var delta_x: Float
+    var delta_y: Float
+    var delta_z: Float
+    fun init() {}
+    fun prevent_default() {}
+    fun stop_propagation() {}
+}
+
+// =============================================================================
+// Element Builder Functions
+// =============================================================================
+
+fun audio(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("audio", attrs, block)
+}
+
+fun thead(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("thead", attrs, block)
+}
+
+fun blockquote(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("blockquote", attrs, block)
+}
+
+fun mark(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("mark", attrs, block)
+}
+
+fun iframe(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("iframe", attrs, block)
+}
+
+fun data(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("data", attrs, block)
+}
+
+fun details(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("details", attrs, block)
+}
+
+fun search(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("search", attrs, block)
+}
+
+fun script(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("script", attrs, block)
+}
+
+fun map(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("map", attrs, block)
+}
+
+fun footer(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("footer", attrs, block)
+}
+
+fun h6(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h6", attrs, block)
+}
+
+fun dfn(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dfn", attrs, block)
+}
+
+fun br(attrs: List<Attr> = []): Node {
+    return Node.Element("br", attrs, [])
+}
+
+fun rt(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("rt", attrs, block)
+}
+
+fun dialog(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dialog", attrs, block)
+}
+
+fun object(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("object", attrs, block)
+}
+
+fun abbr(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("abbr", attrs, block)
+}
+
+fun sup(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("sup", attrs, block)
+}
+
+fun var_(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("var", attrs, block)
+}
+
+fun span(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("span", attrs, block)
+}
+
+fun head(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("head", attrs, block)
+}
+
+fun i(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("i", attrs, block)
+}
+
+fun samp(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("samp", attrs, block)
+}
+
+fun aside(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("aside", attrs, block)
+}
+
+fun wbr(attrs: List<Attr> = []): Node {
+    return Node.Element("wbr", attrs, [])
+}
+
+fun section(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("section", attrs, block)
+}
+
+fun dl(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dl", attrs, block)
+}
+
+fun html(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("html", attrs, block)
+}
+
+fun style(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("style", attrs, block)
+}
+
+fun base(attrs: List<Attr> = []): Node {
+    return Node.Element("base", attrs, [])
+}
+
+fun h4(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h4", attrs, block)
+}
+
+fun source(attrs: List<Attr> = []): Node {
+    return Node.Element("source", attrs, [])
+}
+
+fun table(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("table", attrs, block)
+}
+
+fun meter(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("meter", attrs, block)
+}
+
+fun time(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("time", attrs, block)
+}
+
+fun b(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("b", attrs, block)
+}
+
+fun pre(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("pre", attrs, block)
+}
+
+fun optgroup(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("optgroup", attrs, block)
+}
+
+fun p(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("p", attrs, block)
+}
+
+fun nav(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("nav", attrs, block)
+}
+
+fun code(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("code", attrs, block)
+}
+
+fun ol(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("ol", attrs, block)
+}
+
+fun em(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("em", attrs, block)
+}
+
+fun textarea(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("textarea", attrs, block)
+}
+
+fun fieldset(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("fieldset", attrs, block)
+}
+
+fun label(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("label", attrs, block)
+}
+
+fun rp(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("rp", attrs, block)
+}
+
+fun source(attrs: List<Attr> = []): Node {
+    return Node.Element("source", attrs, [])
+}
+
+fun table(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("table", attrs, block)
+}
+
+fun meter(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("meter", attrs, block)
+}
+
+fun time(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("time", attrs, block)
+}
+
+fun b(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("b", attrs, block)
+}
+
+fun pre(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("pre", attrs, block)
+}
+
+fun optgroup(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("optgroup", attrs, block)
+}
+
+fun p(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("p", attrs, block)
+}
+
+fun nav(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("nav", attrs, block)
+}
+
+fun code(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("code", attrs, block)
+}
+
+fun ol(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("ol", attrs, block)
+}
+
+fun em(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("em", attrs, block)
+}
+
+fun textarea(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("textarea", attrs, block)
+}
+
+fun fieldset(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("fieldset", attrs, block)
+}
+
+fun label(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("label", attrs, block)
+}
+
+fun rp(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("rp", attrs, block)
+}
+
+fun audio(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("audio", attrs, block)
+}
+
+fun thead(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("thead", attrs, block)
+}
+
+fun blockquote(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("blockquote", attrs, block)
+}
+
+fun mark(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("mark", attrs, block)
+}
+
+fun iframe(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("iframe", attrs, block)
+}
+
+fun data(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("data", attrs, block)
+}
+
+fun details(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("details", attrs, block)
+}
+
+fun search(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("search", attrs, block)
+}
+
+fun script(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("script", attrs, block)
+}
+
+fun map(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("map", attrs, block)
+}
+
+fun footer(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("footer", attrs, block)
+}
+
+fun h6(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h6", attrs, block)
+}
+
+fun dfn(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dfn", attrs, block)
+}
+
+fun br(attrs: List<Attr> = []): Node {
+    return Node.Element("br", attrs, [])
+}
+
+fun rt(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("rt", attrs, block)
+}
+
+fun dialog(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dialog", attrs, block)
+}
+
+fun object(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("object", attrs, block)
+}
+
+fun abbr(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("abbr", attrs, block)
+}
+
+fun sup(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("sup", attrs, block)
+}
+
+fun var_(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("var", attrs, block)
+}
+
+fun span(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("span", attrs, block)
+}
+
+fun head(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("head", attrs, block)
+}
+
+fun i(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("i", attrs, block)
+}
+
+fun samp(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("samp", attrs, block)
+}
+
+fun aside(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("aside", attrs, block)
+}
+
+fun wbr(attrs: List<Attr> = []): Node {
+    return Node.Element("wbr", attrs, [])
+}
+
+fun section(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("section", attrs, block)
+}
+
+fun dl(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dl", attrs, block)
+}
+
+fun html(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("html", attrs, block)
+}
+
+fun style(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("style", attrs, block)
+}
+
+fun base(attrs: List<Attr> = []): Node {
+    return Node.Element("base", attrs, [])
+}
+
+fun h4(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h4", attrs, block)
+}
+
+fun hgroup(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("hgroup", attrs, block)
+}
+
+fun a(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("a", attrs, block)
+}
+
+fun select(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("select", attrs, block)
+}
+
+fun bdo(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("bdo", attrs, block)
+}
+
+fun dd(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("dd", attrs, block)
+}
+
+fun kbd(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("kbd", attrs, block)
+}
+
+fun ul(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("ul", attrs, block)
+}
+
+fun menu(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("menu", attrs, block)
+}
+
+fun track(attrs: List<Attr> = []): Node {
+    return Node.Element("track", attrs, [])
+}
+
+fun hr(attrs: List<Attr> = []): Node {
+    return Node.Element("hr", attrs, [])
+}
+
+fun area(attrs: List<Attr> = []): Node {
+    return Node.Element("area", attrs, [])
+}
+
+fun td(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("td", attrs, block)
+}
+
+fun h5(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h5", attrs, block)
+}
+
+fun form(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("form", attrs, block)
+}
+
+fun div(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("div", attrs, block)
+}
+
+fun li(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("li", attrs, block)
+}
+
+fun button(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("button", attrs, block)
+}
+
+fun h1(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("h1", attrs, block)
+}
+
+fun input(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("input", attrs, block)
+}
+
+fun header(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("header", attrs, block)
+}
+
+fun main_el(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("main", attrs, block)
+}
+
+// =============================================================================
+// Event Handler Helpers
+// =============================================================================
+
+fun on_click(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("click", handler)
+}
+
+fun on_dblclick(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("dblclick", handler)
+}
+
+fun on_mousedown(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mousedown", handler)
+}
+
+fun on_mouseup(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mouseup", handler)
+}
+
+fun on_mousemove(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mousemove", handler)
+}
+
+fun on_mouseenter(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mouseenter", handler)
+}
+
+fun on_mouseleave(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mouseleave", handler)
+}
+
+fun on_mouseover(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mouseover", handler)
+}
+
+fun on_mouseout(handler: (MouseEvent) => Nil): Attr {
+    return Attr.Event("mouseout", handler)
+}
+
+fun on_keydown(handler: (KeyboardEvent) => Nil): Attr {
+    return Attr.Event("keydown", handler)
+}
+
+fun on_keyup(handler: (KeyboardEvent) => Nil): Attr {
+    return Attr.Event("keyup", handler)
+}
+
+fun on_input(handler: (InputEvent) => Nil): Attr {
+    return Attr.Event("input", handler)
+}
+
+fun on_change(handler: (Event) => Nil): Attr {
+    return Attr.Event("change", handler)
+}
+
+fun on_submit(handler: (SubmitEvent) => Nil): Attr {
+    return Attr.Event("submit", handler)
+}
+
+fun on_reset(handler: (Event) => Nil): Attr {
+    return Attr.Event("reset", handler)
+}
+
+fun on_focus(handler: (FocusEvent) => Nil): Attr {
+    return Attr.Event("focus", handler)
+}
+
+fun on_blur(handler: (FocusEvent) => Nil): Attr {
+    return Attr.Event("blur", handler)
+}
+
+fun on_focusin(handler: (FocusEvent) => Nil): Attr {
+    return Attr.Event("focusin", handler)
+}
+
+fun on_focusout(handler: (FocusEvent) => Nil): Attr {
+    return Attr.Event("focusout", handler)
+}
+
+fun on_scroll(handler: (Event) => Nil): Attr {
+    return Attr.Event("scroll", handler)
+}
+
+fun on_resize(handler: (UIEvent) => Nil): Attr {
+    return Attr.Event("resize", handler)
+}
+
+fun on_dragstart(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("dragstart", handler)
+}
+
+fun on_drag(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("drag", handler)
+}
+
+fun on_dragend(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("dragend", handler)
+}
+
+fun on_dragenter(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("dragenter", handler)
+}
+
+fun on_dragleave(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("dragleave", handler)
+}
+
+fun on_dragover(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("dragover", handler)
+}
+
+fun on_drop(handler: (DragEvent) => Nil): Attr {
+    return Attr.Event("drop", handler)
+}
+
+fun on_touchstart(handler: (TouchEvent) => Nil): Attr {
+    return Attr.Event("touchstart", handler)
+}
+
+fun on_touchmove(handler: (TouchEvent) => Nil): Attr {
+    return Attr.Event("touchmove", handler)
+}
+
+fun on_touchend(handler: (TouchEvent) => Nil): Attr {
+    return Attr.Event("touchend", handler)
+}
+
+fun on_pointerdown(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("pointerdown", handler)
+}
+
+fun on_pointerup(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("pointerup", handler)
+}
+
+fun on_pointermove(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("pointermove", handler)
+}
+
+fun on_pointerenter(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("pointerenter", handler)
+}
+
+fun on_pointerleave(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("pointerleave", handler)
+}
+
+fun on_animationstart(handler: (AnimationEvent) => Nil): Attr {
+    return Attr.Event("animationstart", handler)
+}
+
+fun on_animationend(handler: (AnimationEvent) => Nil): Attr {
+    return Attr.Event("animationend", handler)
+}
+
+fun on_transitionend(handler: (TransitionEvent) => Nil): Attr {
+    return Attr.Event("transitionend", handler)
+}
+
+fun on_contextmenu(handler: (PointerEvent) => Nil): Attr {
+    return Attr.Event("contextmenu", handler)
+}
+
+fun on_wheel(handler: (WheelEvent) => Nil): Attr {
+    return Attr.Event("wheel", handler)
+}
+
+fun on_copy(handler: (ClipboardEvent) => Nil): Attr {
+    return Attr.Event("copy", handler)
+}
+
+fun on_cut(handler: (ClipboardEvent) => Nil): Attr {
+    return Attr.Event("cut", handler)
+}
+
+fun on_paste(handler: (ClipboardEvent) => Nil): Attr {
+    return Attr.Event("paste", handler)
+}
+
+fun on_load(handler: (Event) => Nil): Attr {
+    return Attr.Event("load", handler)
+}
+
+fun on_error(handler: (ErrorEvent) => Nil): Attr {
+    return Attr.Event("error", handler)
+}
+
+// =============================================================================
+// Attribute Helpers
+// =============================================================================
+
+fun class_(value: String): Attr { return Attr.Prop("class", value) }
+fun id(value: String): Attr { return Attr.Prop("id", value) }
+fun style(value: String): Attr { return Attr.Prop("style", value) }
+fun title(value: String): Attr { return Attr.Prop("title", value) }
+fun tabindex(value: String): Attr { return Attr.Prop("tabindex", value) }
+fun role(value: String): Attr { return Attr.Prop("role", value) }
+fun hidden(value: String): Attr { return Attr.Prop("hidden", value) }
+fun draggable(value: String): Attr { return Attr.Prop("draggable", value) }
+fun contenteditable(value: String): Attr { return Attr.Prop("contenteditable", value) }
+fun dir(value: String): Attr { return Attr.Prop("dir", value) }
+fun lang(value: String): Attr { return Attr.Prop("lang", value) }
+fun spellcheck(value: String): Attr { return Attr.Prop("spellcheck", value) }
+fun href(value: String): Attr { return Attr.Prop("href", value) }
+fun src(value: String): Attr { return Attr.Prop("src", value) }
+fun alt(value: String): Attr { return Attr.Prop("alt", value) }
+fun type_(value: String): Attr { return Attr.Prop("type", value) }
+fun name(value: String): Attr { return Attr.Prop("name", value) }
+fun value(value: String): Attr { return Attr.Prop("value", value) }
+fun placeholder(value: String): Attr { return Attr.Prop("placeholder", value) }
+fun disabled(value: String): Attr { return Attr.Prop("disabled", value) }
+fun checked(value: String): Attr { return Attr.Prop("checked", value) }
+fun readonly_(value: String): Attr { return Attr.Prop("readonly", value) }
+fun required(value: String): Attr { return Attr.Prop("required", value) }
+fun multiple(value: String): Attr { return Attr.Prop("multiple", value) }
+fun selected(value: String): Attr { return Attr.Prop("selected", value) }
+fun action(value: String): Attr { return Attr.Prop("action", value) }
+fun method(value: String): Attr { return Attr.Prop("method", value) }
+fun target(value: String): Attr { return Attr.Prop("target", value) }
+fun rel(value: String): Attr { return Attr.Prop("rel", value) }
+fun width(value: String): Attr { return Attr.Prop("width", value) }
+fun height(value: String): Attr { return Attr.Prop("height", value) }
+fun min(value: String): Attr { return Attr.Prop("min", value) }
+fun max(value: String): Attr { return Attr.Prop("max", value) }
+fun step(value: String): Attr { return Attr.Prop("step", value) }
+fun pattern(value: String): Attr { return Attr.Prop("pattern", value) }
+fun autocomplete(value: String): Attr { return Attr.Prop("autocomplete", value) }
+fun autofocus(value: String): Attr { return Attr.Prop("autofocus", value) }
+fun for_(value: String): Attr { return Attr.Prop("for", value) }
+fun colspan(value: String): Attr { return Attr.Prop("colspan", value) }
+fun rowspan(value: String): Attr { return Attr.Prop("rowspan", value) }
+
+// --- Data & ARIA attributes ---
+
+fun data(name: String, value: String): Attr { return Attr.Prop("data-" + name, value) }
+fun aria(name: String, value: String): Attr { return Attr.Prop("aria-" + name, value) }
