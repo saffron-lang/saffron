@@ -10,9 +10,51 @@ import "@os" as OS
 import "@toml" as TOML
 import "../config.sf" as Config
 
+/// Build a PATH prefix that includes all dep bin directories.
+fun _bin_path_prefix(): String {
+    var packages_dir: String = ".pantry/packages"
+    if (!(IO.file_exists(packages_dir))) {
+        return ""
+    }
+
+    var packages: List<String> = OS.exec("ls ${packages_dir} 2>/dev/null").trim().split("\n")
+    var paths: List<String> = []
+    var i: Int = 0
+    while (i < packages.length()) {
+        var pkg_name: String = packages[i].trim()
+        if (pkg_name == "") {
+            i = i + 1
+            continue
+        }
+        // Add package's bin/ directory if it exists
+        var bin_dir: String = packages_dir + "/" + pkg_name + "/bin"
+        if (IO.file_exists(bin_dir)) {
+            paths.push(bin_dir)
+        }
+        // Also add the package root (for scripts defined in pantry.toml [scripts.bin])
+        paths.push(packages_dir + "/" + pkg_name)
+        i = i + 1
+    }
+
+    // Join as PATH-style string
+    var result: String = ""
+    i = 0
+    while (i < paths.length()) {
+        if (i > 0) { result = result + ":" }
+        result = result + paths[i]
+        i = i + 1
+    }
+    return result
+}
+
 fun _exec_shell(cmd: String) {
     IO.println("> ${cmd}")
-    var output: String = OS.exec(cmd)
+    var bin_path: String = _bin_path_prefix()
+    var full_cmd: String = cmd
+    if (bin_path.length() > 0) {
+        full_cmd = "PATH=${bin_path}:$PATH " + cmd
+    }
+    var output: String = OS.exec(full_cmd)
     if (output.length() > 0) {
         IO.print(output)
     }
