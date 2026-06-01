@@ -686,6 +686,64 @@ fun __io_mkdir(path: Int) {
     rt_mkdir(path, 493)
 }
 
+fun __io_append_file(path: Int, content: Int) {
+    if (path == 0) { return }
+    var mode: Int = rt_malloc(2)
+    store8(mode, 97)
+    store8(mode + 1, 0)
+    var fp: Int = rt_fopen(path, mode)
+    rt_free(mode)
+    if (fp == 0) { return }
+    if (content == 0) {
+        rt_fclose(fp)
+        return
+    }
+    var len: Int = rt_strlen(content)
+    rt_fwrite(content, 1, len, fp)
+    rt_fclose(fp)
+}
+
+fun __io_walk_dir(path: Int): Int {
+    var list: Int = __list_new()
+    if (path == 0) { return list }
+    var path_len: Int = rt_strlen(path)
+    var cmd: Int = rt_malloc(path_len + 16)
+    store8(cmd, 108)
+    store8(cmd + 1, 115)
+    store8(cmd + 2, 32)
+    store8(cmd + 3, 45)
+    store8(cmd + 4, 49)
+    store8(cmd + 5, 32)
+    store8(cmd + 6, 0)
+    rt_strcat(cmd, path)
+    var mode: Int = rt_malloc(2)
+    store8(mode, 114)
+    store8(mode + 1, 0)
+    var fp: Int = rt_popen(cmd, mode)
+    rt_free(mode)
+    rt_free(cmd)
+    if (fp == 0) { return list }
+    var buf: Int = rt_malloc(4096)
+    var line: Int = rt_fgets(buf, 4096, fp)
+    while (line != 0) {
+        var len: Int = rt_strlen(buf)
+        if (len > 0) {
+            if (load8(buf + len - 1) == 10) {
+                store8(buf + len - 1, 0)
+                len = len - 1
+            }
+        }
+        if (len > 0) {
+            var entry: Int = rt_strdup(buf)
+            __list_push(list, entry)
+        }
+        line = rt_fgets(buf, 4096, fp)
+    }
+    rt_free(buf)
+    rt_pclose(fp)
+    return list
+}
+
 // =============================================================================
 // OS
 // =============================================================================

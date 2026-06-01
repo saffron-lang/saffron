@@ -670,6 +670,39 @@ fun main(): Int {
         visited.set(prelude_path, true)
     }
 
+    // Auto-import dependency preludes (src/prelude.sf in each lib-path package)
+    // Look for prelude files in each lib path directory
+    var lpi: Float = 0
+    while (lpi < _lib_paths.length()) {
+        var lib_dir: String = _lib_paths[lpi]
+        // Check for known preludes by import analysis
+        // Dependencies that provide src/prelude.sf get auto-imported
+        var dep_imports: List<String> = extract_imports(source)
+        var di: Float = 0
+        while (di < dep_imports.length()) {
+            var dep_path: String = dep_imports[di]
+            if (!dep_path.starts_with("./") and !dep_path.starts_with("@")) {
+                // Bare package name like "turmeric/signal" → package is "turmeric"
+                var pkg_name: String = dep_path
+                var slash: Float = dep_path.index_of("/")
+                if (slash > 0) {
+                    pkg_name = dep_path.slice(0, slash)
+                }
+                var pkg_prelude: String = lib_dir + "/" + pkg_name + "/src/prelude.sf"
+                if (IO.file_exists(pkg_prelude) and !visited.has(pkg_prelude)) {
+                    var dep_src: String = IO.read_file(pkg_prelude)
+                    var dep_tokens: List = Lexer.lex(dep_src)
+                    var dep_program: List = Parser.parse_with_source(dep_tokens, dep_src)
+                    module_stmts.push(dep_program)
+                    module_prefixes_list.push("")
+                    visited.set(pkg_prelude, true)
+                }
+            }
+            di = di + 1
+        }
+        lpi = lpi + 1
+    }
+
     // Recursively collect modules (text-based extraction)
     var import_paths: List<String> = extract_imports(source)
     var pi: Float = 0

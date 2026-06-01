@@ -927,16 +927,18 @@
         }
 
         var resolved_callee: String = callee_name
-        if (this.current_prefix.length() > 0) {
-            if (this.known_functions.contains(this.current_prefix + callee_name)) {
-                resolved_callee = this.current_prefix + callee_name
-            }
-        }
-        // Named imports: resolve bare name to prefixed module function
-        if (!this.known_functions.contains(resolved_callee) and this.named_imports.has(callee_name)) {
+        // Named imports take highest priority: explicit user directive
+        if (this.named_imports.has(callee_name)) {
             var ni_target: String = this.named_imports.get(callee_name)
             if (this.known_functions.contains(ni_target)) {
                 resolved_callee = ni_target
+            } else {
+                // Trust the named import even if target not yet in known_functions
+                resolved_callee = ni_target
+            }
+        } else if (this.current_prefix.length() > 0) {
+            if (this.known_functions.contains(this.current_prefix + callee_name)) {
+                resolved_callee = this.current_prefix + callee_name
             }
         }
         if (this.intrinsic_funcs.contains(resolved_callee)) {
@@ -1067,17 +1069,18 @@
                 return local
             }
             var emit_callee: String = this.current_prefix + callee_name
-            if (!this.known_functions.contains(emit_callee)) {
+            // Named imports take priority over all other resolution
+            if (this.named_imports.has(callee_name)) {
+                emit_callee = this.named_imports.get(callee_name)
+            } else if (!this.known_functions.contains(emit_callee)) {
                 if (this.known_functions.contains(callee_name)) {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
-                } else if (this.named_imports.has(callee_name)) {
-                    emit_callee = this.named_imports.get(callee_name)
                 } else {
                     // Warning: calling undefined function
                     IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
-                    
+
                 }
             }
             this.called_functions.push(emit_callee)
