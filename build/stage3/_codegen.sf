@@ -5086,7 +5086,7 @@ class Codegen {
         }
 
         // Only emit C main wrapper if program defines a main function
-        if (this.known_functions.contains("main") or has_top_level) {
+        if (this.defined_funcs.contains("__saffron_main") or has_top_level) {
             out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
             out.append("entry:\n")
             out.append("  store i32 %argc, i32* @__argc\n")

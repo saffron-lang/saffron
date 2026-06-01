@@ -1970,7 +1970,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.1966 = private unnamed_addr constant [2 x i8] c"(\00"
 @.str.1967 = private unnamed_addr constant [3 x i8] c")\0A\00"
 @.str.1968 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.1969 = private unnamed_addr constant [5 x i8] c"main\00"
+@.str.1969 = private unnamed_addr constant [15 x i8] c"__saffron_main\00"
 @.str.1970 = private unnamed_addr constant [44 x i8] c"\0Adefine i32 @main(i32 %argc, i8** %argv) {\0A\00"
 @.str.1971 = private unnamed_addr constant [8 x i8] c"entry:\0A\00"
 @.str.1972 = private unnamed_addr constant [33 x i8] c"  store i32 %argc, i32* @__argc\0A\00"
@@ -51315,9 +51315,9 @@ else2741:
 endif2739:
   %t1505 = load i64, i64* %self
   %t1506 = inttoptr i64 %t1505 to %Codegen*
-  %t1507 = getelementptr %Codegen, %Codegen* %t1506, i32 0, i32 10
+  %t1507 = getelementptr %Codegen, %Codegen* %t1506, i32 0, i32 35
   %t1508 = load volatile i64, i64* %t1507
-  %t1509 = getelementptr [5 x i8], [5 x i8]* @.str.1969, i64 0, i64 0
+  %t1509 = getelementptr [15 x i8], [15 x i8]* @.str.1969, i64 0, i64 0
   %t1510 = ptrtoint i8* %t1509 to i64
   %t1511 = call i64 @__list_contains(i64 %t1508, i64 %t1510)
   %t1512 = trunc i64 %t1511 to i1
