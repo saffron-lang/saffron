@@ -1117,6 +1117,17 @@ class NullChecker {
             ai = ai + 1
         }
 
+        // Enum variant construction: Shape.Circle(5) → type is "Shape"
+        if (obj_type == "Any") {
+            var obj_name: String = match (obj) {
+                Variable(n) => n
+                _ => ""
+            }
+            if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
+                return obj_name
+            }
+        }
+
         // Map.get returns nullable — unless inside a has() guard
         if (method == "get") {
             if (obj_type == "Map" or obj_type.starts_with("Map<")) {
