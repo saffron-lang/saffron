@@ -26980,51 +26980,60 @@ while.body1535:
   call i8* @strcat(i8* %t40, i8* %t35)
   %t41 = ptrtoint i8* %t40 to i64
   %t42 = load i64, i64* %vname
-  %t43 = add i64 %t41, %t42
-  store i64 %t43, i64* %key
-  %t44 = load i64, i64* %self
-  %t45 = inttoptr i64 %t44 to %Codegen*
-  %t46 = getelementptr %Codegen, %Codegen* %t45, i32 0, i32 8
-  %t47 = load volatile i64, i64* %t46
-  %t48 = load i64, i64* %key
-  %t49 = call i64 @__map_has(i64 %t47, i64 %t48)
-  %t50 = trunc i64 %t49 to i1
-  br i1 %t50, label %then1538, label %else1539
-then1538:
+  %t43 = inttoptr i64 %t41 to i8*
+  %t44 = inttoptr i64 %t42 to i8*
+  %t45 = call i64 @strlen(i8* %t43)
+  %t46 = call i64 @strlen(i8* %t44)
+  %t47 = add i64 %t45, %t46
+  %t48 = add i64 %t47, 1
+  %t49 = call i8* @malloc(i64 %t48)
+  call i8* @strcpy(i8* %t49, i8* %t43)
+  call i8* @strcat(i8* %t49, i8* %t44)
+  %t50 = ptrtoint i8* %t49 to i64
+  store i64 %t50, i64* %key
   %t51 = load i64, i64* %self
   %t52 = inttoptr i64 %t51 to %Codegen*
   %t53 = getelementptr %Codegen, %Codegen* %t52, i32 0, i32 8
   %t54 = load volatile i64, i64* %t53
   %t55 = load i64, i64* %key
-  %t56 = call i64 @__map_get(i64 %t54, i64 %t55)
-  store i64 %t56, i64* %fields
-  %t57 = load i64, i64* %fields
-  %t58 = inttoptr i64 %t57 to i8*
-  %t59 = call i64 @strlen(i8* %t58)
-  %t60 = add i64 0, 0
-  %t62 = icmp sgt i64 %t59, %t60
-  %t61 = zext i1 %t62 to i64
-  %t63 = trunc i64 %t61 to i1
-  br i1 %t63, label %then1541, label %else1542
+  %t56 = call i64 @__map_has(i64 %t54, i64 %t55)
+  %t57 = trunc i64 %t56 to i1
+  br i1 %t57, label %then1538, label %else1539
+then1538:
+  %t58 = load i64, i64* %self
+  %t59 = inttoptr i64 %t58 to %Codegen*
+  %t60 = getelementptr %Codegen, %Codegen* %t59, i32 0, i32 8
+  %t61 = load volatile i64, i64* %t60
+  %t62 = load i64, i64* %key
+  %t63 = call i64 @__map_get(i64 %t61, i64 %t62)
+  store i64 %t63, i64* %fields
+  %t64 = load i64, i64* %fields
+  %t65 = inttoptr i64 %t64 to i8*
+  %t66 = call i64 @strlen(i8* %t65)
+  %t67 = add i64 0, 0
+  %t69 = icmp sgt i64 %t66, %t67
+  %t68 = zext i1 %t69 to i64
+  %t70 = trunc i64 %t68 to i1
+  br i1 %t70, label %then1541, label %else1542
 then1541:
-  %t64 = load i64, i64* %self
-  %t65 = load i64, i64* %fields
-  %t66 = getelementptr [2 x i8], [2 x i8]* @.str.982, i64 0, i64 0
-  %t67 = ptrtoint i8* %t66 to i64
-  %t68 = call i64 @Codegen__split_respecting_generics(i64 %t64, i64 %t65, i64 %t67)
-  store i64 %t68, i64* %parts
-  %t69 = load i64, i64* %parts
-  %t70 = call i64 @__list_length(i64 %t69)
-  store i64 %t70, i64* %field_count
-  %t71 = load i64, i64* %field_count
-  %t72 = load i64, i64* %max_f
-  %t74 = icmp sgt i64 %t71, %t72
-  %t73 = zext i1 %t74 to i64
-  %t75 = trunc i64 %t73 to i1
-  br i1 %t75, label %then1544, label %else1545
+  %t71 = load i64, i64* %self
+  %t72 = load i64, i64* %fields
+  %t73 = getelementptr [2 x i8], [2 x i8]* @.str.982, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i64 @Codegen__split_respecting_generics(i64 %t71, i64 %t72, i64 %t74)
+  store i64 %t75, i64* %parts
+  %t76 = load i64, i64* %parts
+  %t77 = call i64 @__list_length(i64 %t76)
+  store i64 %t77, i64* %field_count
+  %t78 = load i64, i64* %field_count
+  %t79 = load i64, i64* %max_f
+  %t81 = icmp sgt i64 %t78, %t79
+  %t80 = zext i1 %t81 to i64
+  %t82 = trunc i64 %t80 to i1
+  br i1 %t82, label %then1544, label %else1545
 then1544:
-  %t76 = load i64, i64* %field_count
-  store i64 %t76, i64* %max_f
+  %t83 = load i64, i64* %field_count
+  store i64 %t83, i64* %max_f
   br label %endif1543
 else1545:
   br label %endif1543
@@ -27037,14 +27046,14 @@ endif1540:
 else1539:
   br label %endif1537
 endif1537:
-  %t77 = load i64, i64* %i
-  %t78 = add i64 0, 1
-  %t79 = add i64 %t77, %t78
-  store i64 %t79, i64* %i
+  %t84 = load i64, i64* %i
+  %t85 = add i64 0, 1
+  %t86 = add i64 %t84, %t85
+  store i64 %t86, i64* %i
   br label %while.cond1534
 while.end1536:
-  %t80 = load i64, i64* %max_f
-  ret i64 %t80
+  %t87 = load i64, i64* %max_f
+  ret i64 %t87
 }
 
 define i64 @Codegen__gen_lambda(i64 %self.arg, i64 %params.arg, i64 %ret_type.arg, i64 %v_body.arg) {

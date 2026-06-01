@@ -212,7 +212,7 @@
         var variants: List = this.enum_defs.get(enum_name)
         var i: Float = 0
         while (i < variants.length()) {
-            var vname: AST.Variant = variants[i]
+            var vname: String = variants[i]
             var key: String = enum_name + "." + vname
             if (this.enum_variant_fields.has(key)) {
                 var fields: String = this.enum_variant_fields.get(key)
