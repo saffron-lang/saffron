@@ -1930,7 +1930,7 @@ class Parser {
     }
 
     fun parse_html_attr_value(): AST.Expr {
-        // "string" → StringLit
+        // "string" → StringLit (common case, fast path)
         if (this.match_kind_check("string")) {
             var kind: Lexer.TokenKind = this.current_kind()
             this.advance()
@@ -1938,14 +1938,9 @@ class Parser {
                 TkString(s) => AST.Expr.StringLit(s)
             }
         }
-        // {expression} → parse_expr()
-        if (this.match_kind_check("{")) {
-            this.advance()
-            var expr: AST.Expr = this.parse_expr()
-            this.consume("}")
-            return expr
-        }
-        // Bare identifier or number
+        // Everything else: parse as a full expression
+        // Handles: {map: literal}, fun () => ..., identifiers, calls, etc.
+        // The { starts a map literal or block which parse_expr already handles.
         return this.parse_expr()
     }
 

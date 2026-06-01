@@ -8,5 +8,5 @@ target = "wasm32"
 turmeric = { path = "../../turmeric" }
 
 [scripts]
-build = "sfx src/main.sfx src/main.sf && saffron build --target wasm32 src/main.sf -o build/app.wasm"
-dev = "sfx src/main.sfx src/main.sf && saffron build --target wasm32 src/main.sf -o build/app.wasm && cd build && python3 -m http.server 8080"
+build = "saffron build --target wasm32 src/main.sf -o build/app.wasm"
+dev = "saffron build --target wasm32 src/main.sf -o build/app.wasm && cd build && python3 -m http.server 8080"
