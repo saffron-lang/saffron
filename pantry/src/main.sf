@@ -96,6 +96,23 @@ fun main() {
     } else if (command == "version" or command == "--version") {
         IO.println("pantry 0.1.0")
     } else {
+        // Detect pointer values from OS.args() bug
+        if (command.length() > 5 and !(command.contains("-"))) {
+            var is_numeric: Bool = true
+            var ci: Int = 0
+            while (ci < command.length()) {
+                var ch: String = command.char_at(ci)
+                if (!(ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9")) {
+                    is_numeric = false
+                }
+                ci = ci + 1
+            }
+            if (is_numeric) {
+                IO.println("pantry: OS.args() returned raw pointer values instead of strings.")
+                IO.println("This is a known runtime bug. Try rebuilding with: ./bootstrap.sh")
+                OS.exit(1)
+            }
+        }
         IO.println("pantry: unknown command '${command}'")
         IO.println("Run 'pantry --help' for usage.")
         OS.exit(1)

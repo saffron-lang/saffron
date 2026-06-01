@@ -1824,9 +1824,13 @@ class Parser {
     // =========================================================================
 
     fun peek_is_html_start(): Bool {
-        // After seeing <, check if next token is an ident that's an HTML element or Component
-        if (!this.match_kind_check("ident")) { return false }
-        var name: String = this.peek_ident()
+        // Current token is <. Check if NEXT token (pos+1) is an HTML element or component.
+        if (this.pos + 1 >= this.tokens.length()) { return false }
+        var next_tok: Lexer.Token = this.tokens[this.pos + 1]
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
+        var kind_str: String = this.kind_name(next_kind)
+        if (kind_str != "ident") { return false }
+        var name: String = match (next_kind) { TkIdent(n) => n }
         if (name.length() == 0) { return false }
         // Uppercase = component
         var first: String = name.char_at(0)
@@ -1926,7 +1930,7 @@ class Parser {
     }
 
     fun parse_html_attr_value(): AST.Expr {
-        // "string" → StringLit
+        // "string" → StringLit (common case, fast path)
         if (this.match_kind_check("string")) {
             var kind: Lexer.TokenKind = this.current_kind()
             this.advance()
@@ -1934,14 +1938,9 @@ class Parser {
                 TkString(s) => AST.Expr.StringLit(s)
             }
         }
-        // {expression} → parse_expr()
-        if (this.match_kind_check("{")) {
-            this.advance()
-            var expr: AST.Expr = this.parse_expr()
-            this.consume("}")
-            return expr
-        }
-        // Bare identifier or number
+        // Everything else: parse as a full expression
+        // Handles: {map: literal}, fun () => ..., identifiers, calls, etc.
+        // The { starts a map literal or block which parse_expr already handles.
         return this.parse_expr()
     }
 
