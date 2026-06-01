@@ -1,0 +1,19 @@
+// If expression
+var x = if (true) { 42 } else { 0 }
+IO.println(x.to_string())
+
+var name = if (1 > 0) { "yes" } else { "no" }
+IO.println(name)
+
+// Try expression
+var y = try { throw "oops" } catch (e) { 99 }
+IO.println(y.to_string())
+
+var z = try { 50 } catch (e) { 0 }
+IO.println(z.to_string())
+
+// Let destructuring
+enum Option { Some(value: Number), None }
+var opt = Option.Some(7)
+let Some(v) = opt
+IO.println(v.to_string())

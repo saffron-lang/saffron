@@ -181,6 +181,12 @@
             IsCheck(value, type_name) => {
                 this.gen_is_check(value, type_name)
             }
+            IfExpr(cond, then_stmts, then_val, else_stmts, else_val) => {
+                this.gen_if_expr(cond, then_stmts, then_val, else_stmts, else_val)
+            }
+            TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val) => {
+                this.gen_try_expr(try_stmts, try_val, catch_name, catch_stmts, catch_val)
+            }
         }
     }
 
@@ -241,6 +247,86 @@
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
         return local
+    }
+
+    fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
+        var result_ptr: String = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        var cond_val: String = this.to_i1(this.gen_arg_value(cond))
+        var then_label: String = this.fresh_label("ifexpr.then")
+        var else_label: String = this.fresh_label("ifexpr.else")
+        var end_label: String = this.fresh_label("ifexpr.end")
+
+        this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+
+        this.start_block(then_label)
+        this.gen_stmts(then_stmts)
+        var then_result: String = this.gen_arg_value(then_val)
+        this.emit_indent("store i64 " + then_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(else_label)
+        this.gen_stmts(else_stmts)
+        var else_result: String = this.gen_arg_value(else_val)
+        this.emit_indent("store i64 " + else_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        return result
+    }
+
+    fun gen_try_expr(try_stmts: List<AST.Stmt>, try_val: AST.Expr, catch_name: String, catch_stmts: List<AST.Stmt>, catch_val: AST.Expr): String {
+        var result_ptr: String = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        var try_label: String = this.fresh_label("tryexpr.try")
+        var catch_label: String = this.fresh_label("tryexpr.catch")
+        var end_label: String = this.fresh_label("tryexpr.end")
+
+        // Allocate a local jmp_buf on the stack
+        var jmp_buf: String = this.fresh_local()
+        this.emit_indent(jmp_buf + " = alloca [512 x i8], align 16")
+        var jmp_buf_ptr: String = this.fresh_local()
+        this.emit_indent(jmp_buf_ptr + " = getelementptr [512 x i8], [512 x i8]* " + jmp_buf + ", i64 0, i64 0")
+
+        // Save previous jmp_buf
+        var saved_jmp: String = this.fresh_local()
+        this.emit_indent(saved_jmp + " = load i8*, i8** @__jmp_buf_current")
+        this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
+
+        // setjmp
+        var setjmp_result: String = this.fresh_local()
+        this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
+        var is_throw: String = this.fresh_local()
+        this.emit_indent(is_throw + " = icmp ne i32 " + setjmp_result + ", 0")
+        this.emit_terminator("br i1 " + is_throw + ", label %" + catch_label + ", label %" + try_label)
+
+        // Try body
+        this.start_block(try_label)
+        this.gen_stmts(try_stmts)
+        var try_result: String = this.gen_arg_value(try_val)
+        this.emit_indent("store i64 " + try_result + ", i64* " + result_ptr)
+        this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        this.emit_terminator("br label %" + end_label)
+
+        // Catch body
+        this.start_block(catch_label)
+        this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        var exc_val: String = this.fresh_local()
+        this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
+        this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.gen_stmts(catch_stmts)
+        var catch_result: String = this.gen_arg_value(catch_val)
+        this.emit_indent("store i64 " + catch_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        return result
     }
 
     fun op_to_method(op: String): String {
@@ -506,6 +592,12 @@
         }
         if (expr_kind == "match_expr") {
             // Fall through to gen_expr which handles Match(subject, arms) directly
+            return this.gen_expr(expr)
+        }
+        if (expr_kind == "if_expr") {
+            return this.gen_expr(expr)
+        }
+        if (expr_kind == "try_expr") {
             return this.gen_expr(expr)
         }
         if (expr_kind == "block_expr") {

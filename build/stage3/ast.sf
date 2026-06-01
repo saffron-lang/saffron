@@ -38,7 +38,9 @@ enum Expr {
     MethodCall(object: Expr, method: String, args: List<Expr>),
     MapLit,
     BlockExpr(stmts: List<Stmt>, value: Expr),
-    IsCheck(value: Expr, type_name: String)
+    IsCheck(value: Expr, type_name: String),
+    IfExpr(cond: Expr, then_stmts: List<Stmt>, then_val: Expr, else_stmts: List<Stmt>, else_val: Expr),
+    TryExpr(try_stmts: List<Stmt>, try_val: Expr, catch_name: String, catch_stmts: List<Stmt>, catch_val: Expr)
 }
 
 enum MatchArm {

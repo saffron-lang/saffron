@@ -29,7 +29,7 @@
                 this.gen_throw(value)
             }
             LetPattern(pattern, value) => {
-                // gen_let_pattern not yet implemented for LLVM codegen
+                this.gen_let_pattern(pattern, value)
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Capture and clear pending_extend_class to prevent stale state
@@ -846,26 +846,37 @@
 
     fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
         // LetPattern destructures value into bindings from pattern.
-        // Currently a stub: evaluate value and assign bindings from variant fields.
         var val: String = this.gen_arg_value(value)
+        var variant_name: String = match (pattern) {
+            VariantPattern(v, b) => v
+            _ => ""
+        }
         var bindings: List<String> = match (pattern) {
             VariantPattern(v, b) => b
             _ => []
         }
         // For variant patterns, extract fields from the tagged value
         if (bindings.length() > 0) {
+            // Determine the enum name from the variant
+            var enum_name: String = this.find_enum_for_variant(variant_name)
+            var max_fields: Float = 0
+            if (enum_name != "Unknown") {
+                max_fields = this.get_max_fields(enum_name)
+            }
+            // Use extract_arm_bindings which handles both encodings
+            this.extract_arm_bindings(bindings, val, max_fields)
+            // Set type information for each binding
             var bi: Float = 0
             while (bi < bindings.length()) {
-                var field_ptr: String = this.fresh_local()
-                var field_val: String = this.fresh_local()
-                // Enum instances are pointers to [tag, field0, field1, ...]
-                var obj_ptr: String = this.fresh_local()
-                this.emit_indent(obj_ptr + " = inttoptr i64 " + val + " to i64*")
-                // Field at offset (bi + 1) to skip the tag
-                var offset: Float = bi + 1
-                this.emit_indent(field_ptr + " = getelementptr i64, i64* " + obj_ptr + ", i64 " + offset.floor().to_string())
-                this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
-                this.emit_indent("store i64 " + field_val + ", i64* %" + this.sanitize_name(bindings[bi]))
+                var btype: String = "Int"
+                if (enum_name != "Unknown") {
+                    btype = this.get_variant_field_type(enum_name, variant_name, bi)
+                }
+                this.var_types.set(bindings[bi], btype)
+                this.typed_vars.set(bindings[bi], this.str_to_type(btype))
+                if (btype == "String") {
+                    this.string_vars.push(bindings[bi])
+                }
                 bi = bi + 1
             }
         }
