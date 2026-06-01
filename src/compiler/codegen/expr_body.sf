@@ -961,7 +961,7 @@
         if (this.known_functions.contains(resolved_callee)) {
             // Direct call to known function
             var call_target: String = resolved_callee
-            if (callee_name == "main") {
+            if (callee_name == "main" and this.defined_funcs.contains("__saffron_main")) {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(resolved_callee)

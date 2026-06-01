@@ -51,6 +51,7 @@ fun __list_new(): Int {
 }
 
 fun __list_push(list: Int, value: Int) {
+    if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
     var cap: Int = load64(list + 8)
     if (count >= cap) {
@@ -68,6 +69,7 @@ fun __list_push(list: Int, value: Int) {
 }
 
 fun __list_get(list: Int, index: Int): Int {
+    if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
     var actual_idx: Int = index
     if (index < 0) {
@@ -82,6 +84,7 @@ fun __list_get(list: Int, index: Int): Int {
 }
 
 fun __list_set(list: Int, index: Int, value: Int) {
+    if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
     var actual_idx: Int = index
     if (index < 0) {
@@ -96,10 +99,12 @@ fun __list_set(list: Int, index: Int, value: Int) {
 }
 
 fun __list_length(list: Int): Int {
+    if (list == 0) { return 0 }
     return load64(list)
 }
 
 fun __list_pop(list: Int): Int {
+    if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
     if (count <= 0) {
         __index_error(0, 0)
@@ -126,6 +131,7 @@ fun StringBuilder(): Int {
 }
 
 fun __sb_append(sb: Int, str: Int) {
+    if (str == 0) { return }
     var len: Int = load64(sb)
     var cap: Int = load64(sb + 8)
     var buf: Int = load64(sb + 16)
@@ -170,6 +176,7 @@ fun __map_new(): Int {
 }
 
 fun __map_set(map: Int, key: Int, value: Int) {
+    if (map == 0) { __null_pointer_error() }
     var count: Int = load64(map)
     var cap: Int = load64(map + 8)
     var keys: Int = load64(map + 16)
@@ -202,6 +209,7 @@ fun __map_set(map: Int, key: Int, value: Int) {
 }
 
 fun __map_get(map: Int, key: Int): Int {
+    if (map == 0) { return 0 }
     var count: Int = load64(map)
     var keys: Int = load64(map + 16)
     var vals: Int = load64(map + 24)
@@ -217,6 +225,7 @@ fun __map_get(map: Int, key: Int): Int {
 }
 
 fun __map_has(map: Int, key: Int): Int {
+    if (map == 0) { return 0 }
     var count: Int = load64(map)
     var keys: Int = load64(map + 16)
     var i: Int = 0
@@ -231,6 +240,7 @@ fun __map_has(map: Int, key: Int): Int {
 }
 
 fun __map_keys(map: Int): Int {
+    if (map == 0) { return __list_new() }
     var count: Int = load64(map)
     var kp: Int = load64(map + 16)
     var list: Int = __list_new()
@@ -259,6 +269,13 @@ fun __int_to_string(val: Int): Int {
 }
 
 fun __list_to_string(list: Int): Int {
+    if (list == 0) {
+        var nil_s: Int = rt_malloc(3)
+        store8(nil_s, 91)      // [
+        store8(nil_s + 1, 93)  // ]
+        store8(nil_s + 2, 0)
+        return nil_s
+    }
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
     // Estimate buffer size: each element up to 20 chars + ", " + "[]"
@@ -387,10 +404,7 @@ fun __index_error(index: Int, count: Int) {
     store8(p3, 41)       // )
     store8(p3 + 1, 0)
     __sb_append(sb, p3)
-    __runtime_error(__sb_to_string(sb))
-    rt_free(p1)
-    rt_free(p2)
-    rt_free(p3)
+    __runtime_error_fatal(__sb_to_string(sb))
 }
 
 fun __division_error() {
@@ -474,6 +488,7 @@ fun __null_pointer_error() {
 }
 
 fun __str_ends_with(str: Int, suffix: Int): Int {
+    if (str == 0 or suffix == 0) { return 0 }
     var slen: Int = rt_strlen(str)
     var plen: Int = rt_strlen(suffix)
     if (plen > slen) { return 0 }
@@ -485,6 +500,7 @@ fun __str_ends_with(str: Int, suffix: Int): Int {
 
 fun __str_split(input: Int, delim: Int): Int {
     var list: Int = __list_new()
+    if (input == 0 or delim == 0) { return list }
     var slen: Int = rt_strlen(input)
     var buf: Int = rt_malloc(slen + 1)
     rt_strcpy(buf, input)
@@ -528,6 +544,12 @@ fun __join_append(buf_p: Int, len_p: Int, cap_p: Int, src: Int, src_len: Int) {
 }
 
 fun __str_replace(str: Int, old: Int, replacement: Int): Int {
+    if (str == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
+    if (old == 0 or replacement == 0) { return rt_strdup(str) }
     var slen: Int = rt_strlen(str)
     var olen: Int = rt_strlen(old)
     var nlen: Int = rt_strlen(replacement)
@@ -556,9 +578,17 @@ fun __str_replace(str: Int, old: Int, replacement: Int): Int {
 }
 
 fun __list_join(list: Int, sep: Int): Int {
+    if (list == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
-    var sep_len: Int = rt_strlen(sep)
+    var sep_len: Int = 0
+    if (sep != 0) {
+        sep_len = rt_strlen(sep)
+    }
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
     var cap_p: Int = rt_malloc(8)
@@ -573,14 +603,17 @@ fun __list_join(list: Int, sep: Int): Int {
             __join_append(buf_p, len_p, cap_p, sep, sep_len)
         }
         var elem: Int = load64(data + i * 8)
-        var elem_len: Int = rt_strlen(elem)
-        __join_append(buf_p, len_p, cap_p, elem, elem_len)
+        if (elem != 0) {
+            var elem_len: Int = rt_strlen(elem)
+            __join_append(buf_p, len_p, cap_p, elem, elem_len)
+        }
         i = i + 1
     }
     return load64(buf_p)
 }
 
 fun __list_contains(list: Int, val: Int): Int {
+    if (list == 0) { return 0 }
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
     var i: Int = 0
@@ -599,6 +632,11 @@ fun __list_contains(list: Int, val: Int): Int {
 // =============================================================================
 
 fun __io_read_file(path: Int): Int {
+    if (path == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
     store8(mode + 1, 0)
@@ -620,24 +658,31 @@ fun __io_read_file(path: Int): Int {
 }
 
 fun __io_write_file(path: Int, content: Int) {
+    if (path == 0) { return }
     var mode: Int = rt_malloc(2)
     store8(mode, 119)
     store8(mode + 1, 0)
     var fp: Int = rt_fopen(path, mode)
     rt_free(mode)
     if (fp == 0) { return }
+    if (content == 0) {
+        rt_fclose(fp)
+        return
+    }
     var len: Int = rt_strlen(content)
     rt_fwrite(content, 1, len, fp)
     rt_fclose(fp)
 }
 
 fun __io_file_exists(path: Int): Int {
+    if (path == 0) { return 0 }
     var rc: Int = rt_access(path, 0)
     if (rc == 0) { return 1 }
     return 0
 }
 
 fun __io_mkdir(path: Int) {
+    if (path == 0) { return }
     rt_mkdir(path, 493)
 }
 
@@ -683,6 +728,11 @@ fun __os_env(name: Int): Int {
 }
 
 fun __os_exec(cmd: Int): Int {
+    if (cmd == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
     store8(mode + 1, 0)
@@ -735,6 +785,11 @@ fun __os_args(): Int {
 // =============================================================================
 
 fun rt_str_trim(s: Int): Int {
+    if (s == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var len: Int = rt_strlen(s)
     var start: Int = 0
     var end: Int = len
@@ -762,12 +817,18 @@ fun rt_str_trim(s: Int): Int {
 }
 
 fun rt_str_index_of(s: Int, needle: Int): Int {
+    if (s == 0 or needle == 0) { return 0 - 1 }
     var found: Int = rt_strstr(s, needle)
     if (found == 0) { return 0 - 1 }
     return found - s
 }
 
 fun rt_str_repeat(s: Int, count: Int): Int {
+    if (s == 0 or count <= 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var len: Int = rt_strlen(s)
     var total: Int = len * count
     var buf: Int = rt_malloc(total + 1)
@@ -781,6 +842,11 @@ fun rt_str_repeat(s: Int, count: Int): Int {
 }
 
 fun rt_str_to_upper(s: Int): Int {
+    if (s == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var len: Int = rt_strlen(s)
     var buf: Int = rt_malloc(len + 1)
     var i: Int = 0
@@ -798,6 +864,11 @@ fun rt_str_to_upper(s: Int): Int {
 }
 
 fun rt_str_to_lower(s: Int): Int {
+    if (s == 0) {
+        var empty: Int = rt_malloc(1)
+        store8(empty, 0)
+        return empty
+    }
     var len: Int = rt_strlen(s)
     var buf: Int = rt_malloc(len + 1)
     var i: Int = 0
@@ -819,6 +890,7 @@ fun rt_str_to_lower(s: Int): Int {
 // =============================================================================
 
 fun rt_list_reverse(list: Int): Int {
+    if (list == 0) { return __list_new() }
     var len: Int = __list_length(list)
     var new_list: Int = __list_new()
     var i: Int = len - 1
@@ -830,6 +902,7 @@ fun rt_list_reverse(list: Int): Int {
 }
 
 fun rt_list_copy(list: Int): Int {
+    if (list == 0) { return __list_new() }
     var len: Int = __list_length(list)
     var new_list: Int = __list_new()
     var i: Int = 0
@@ -841,6 +914,7 @@ fun rt_list_copy(list: Int): Int {
 }
 
 fun rt_list_sort(list: Int): Int {
+    if (list == 0) { return __list_new() }
     var copy: Int = rt_list_copy(list)
     var len: Int = __list_length(copy)
     var outer: Int = 0

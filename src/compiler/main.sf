@@ -266,6 +266,91 @@ fun module_prefix_from_path(imp_path: String): String {
     return name + "_"
 }
 
+fun path_based_prefix(imp_path: String, full_path: String, stdlib_dir: String): String {
+    // Generate a stable, path-based prefix that uniquely identifies a module
+    // regardless of what alias the user gives it.
+    //
+    // Rules:
+    //   @name        → stdlib_name_
+    //   ./path/file  → path components joined with _ (relative to project)
+    //   pkg/module   → pkg_module_
+    //
+    // The full_path is the resolved absolute path. We derive prefix from imp_path
+    // structure when possible (more readable), falling back to full_path components.
+
+    if (imp_path.starts_with("@")) {
+        // stdlib module: @iter → stdlib_iter_
+        var name: String = imp_path.slice(1, imp_path.length())
+        if (name.ends_with(".sf")) {
+            name = name.slice(0, name.length() - 3)
+        }
+        // Replace / with _ for sub-paths like @foo/bar
+        var result: StringBuilder = StringBuilder()
+        result.append("stdlib_")
+        var i: Float = 0
+        while (i < name.length()) {
+            var ch: String = name.char_at(i)
+            if (ch == "/") { result.append("_") }
+            else if (ch == "-") { result.append("_") }
+            else { result.append(ch) }
+            i = i + 1
+        }
+        result.append("_")
+        return result.to_string()
+    }
+
+    // For relative/package imports, use the import path components
+    var name: String = imp_path
+    // Strip leading ./ or ../
+    if (name.starts_with("./")) {
+        name = name.slice(2, name.length())
+    }
+    if (name.starts_with("../")) {
+        name = name.slice(3, name.length())
+    }
+    // Strip .sf extension
+    if (name.ends_with(".sf")) {
+        name = name.slice(0, name.length() - 3)
+    }
+    // Replace / and - with _
+    var result: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < name.length()) {
+        var ch: String = name.char_at(i)
+        if (ch == "/") { result.append("_") }
+        else if (ch == "-") { result.append("_") }
+        else if (ch == ".") { result.append("_") }
+        else { result.append(ch) }
+        i = i + 1
+    }
+    result.append("_")
+    return result.to_string()
+}
+
+fun check_duplicate_aliases(source: String, file_path: String) {
+    // Scan source for duplicate import aliases in the same file.
+    // extract_import_aliases uses a Map which deduplicates, so we must
+    // check the raw text to catch duplicates.
+    var lines: List<String> = source.split("\n")
+    var seen: Map<String, Bool> = {}
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        if (line.starts_with("import \"")) {
+            var as_idx: Float = line.index_of(" as ")
+            if (as_idx >= 0) {
+                var alias: String = line.slice(as_idx + 4, line.length()).trim()
+                if (seen.has(alias)) {
+                    IO.println("Error: duplicate import alias '" + alias + "' in " + file_path)
+                    c_exit(1)
+                }
+                seen.set(alias, true)
+            }
+        }
+        i = i + 1
+    }
+}
+
 fun is_builtin_module(imp_path: String): Bool {
     if (imp_path == "@os") { return true }
     if (imp_path == "os") { return true }
@@ -281,17 +366,27 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
     var program: List = Parser.parse_with_source(tokens, source)
 
     // Collect this module's import aliases from text (robust)
+    // Detect duplicate aliases within this file
+    check_duplicate_aliases(source, file_path)
     var mod_aliases: Map<String, String> = extract_import_aliases(source)
     var mak: List<String> = mod_aliases.keys()
     var mai: Float = 0
     while (mai < mak.length()) {
         var ma: String = mak[mai]
         var ma_path: String = mod_aliases.get(ma)
-        if (!is_builtin_module(ma_path) and !all_aliases.has(ma)) {
-            all_aliases.set(ma, ma + "_")
+        if (!is_builtin_module(ma_path)) {
             var ma_full: String = resolve_import_path(file_path, ma_path, stdlib_dir)
-            if (!path_to_prefix.has(ma_full)) {
-                path_to_prefix.set(ma_full, ma + "_")
+            // Use path-based prefix for the LLVM symbol name
+            var ma_prefix: String = ""
+            if (path_to_prefix.has(ma_full)) {
+                ma_prefix = path_to_prefix.get(ma_full)
+            } else {
+                ma_prefix = path_based_prefix(ma_path, ma_full, stdlib_dir)
+                path_to_prefix.set(ma_full, ma_prefix)
+            }
+            // Map alias → path-based prefix (alias is just source-level sugar)
+            if (!all_aliases.has(ma)) {
+                all_aliases.set(ma, ma_prefix)
             }
         }
         mai = mai + 1
@@ -303,12 +398,16 @@ fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, 
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(file_path, imp_path, stdlib_dir)
+            // Ensure path_to_prefix is populated before recursing
+            if (!path_to_prefix.has(full_path)) {
+                path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
+            }
             collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, all_aliases, path_to_prefix)
         }
         pi = pi + 1
     }
 
-    // Use alias-based prefix if available, fall back to filename-based
+    // Use path-based prefix from path_to_prefix (always populated by caller)
     var prefix: String = ""
     if (path_to_prefix.has(file_path)) {
         prefix = path_to_prefix.get(file_path)
@@ -414,21 +513,31 @@ fun main(): Int {
     }
 
     // Use text-based import extraction (robust — doesn't depend on AST field access)
-    // Map alias names directly to alias-based prefixes (e.g., "Parser" → "Parser_")
+    // Map alias names to path-based prefixes for LLVM symbol uniqueness.
+    // The alias is SOURCE-level sugar; the LLVM prefix is derived from the module path.
     var resolved_aliases: Map<String, String> = {}
     var path_to_prefix: Map<String, String> = {}
     var alias_map: Map<String, String> = extract_import_aliases(source)
     var alias_keys: List<String> = alias_map.keys()
+
+    // Duplicate alias detection: check for same alias used twice in one file
+    check_duplicate_aliases(source, input_path)
+
     var ak: Float = 0
     while (ak < alias_keys.length()) {
         var alias: String = alias_keys[ak]
         var imp_path: String = alias_map.get(alias)
         if (!is_builtin_module(imp_path)) {
-            resolved_aliases.set(alias, alias + "_")
             var full_imp_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
-            if (!path_to_prefix.has(full_imp_path)) {
-                path_to_prefix.set(full_imp_path, alias + "_")
+            // Compute stable path-based prefix
+            var pprefix: String = ""
+            if (path_to_prefix.has(full_imp_path)) {
+                pprefix = path_to_prefix.get(full_imp_path)
+            } else {
+                pprefix = path_based_prefix(imp_path, full_imp_path, stdlib_dir)
+                path_to_prefix.set(full_imp_path, pprefix)
             }
+            resolved_aliases.set(alias, pprefix)
         }
         ak = ak + 1
     }
@@ -442,7 +551,7 @@ fun main(): Int {
         if (!is_builtin_module(ni_path_e)) {
             var ni_full_e: String = resolve_import_path(input_path, ni_path_e, stdlib_dir)
             if (!path_to_prefix.has(ni_full_e)) {
-                path_to_prefix.set(ni_full_e, module_prefix_from_path(ni_path_e))
+                path_to_prefix.set(ni_full_e, path_based_prefix(ni_path_e, ni_full_e, stdlib_dir))
             }
         }
         npe = npe + 1
@@ -469,6 +578,10 @@ fun main(): Int {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
+            // Ensure path_to_prefix is populated before recursing
+            if (!path_to_prefix.has(full_path)) {
+                path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
+            }
             collect_modules(full_path, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
         }
         pi = pi + 1
