@@ -1943,10 +1943,11 @@ class Parser {
                 TkString(s) => AST.Expr.StringLit(s)
             }
         }
-        // Everything else: parse as a full expression
-        // Handles: {map: literal}, fun () => ..., identifiers, calls, etc.
-        // The { starts a map literal or block which parse_expr already handles.
-        return this.parse_expr()
+        // Use parse_call (primary + member/index/call chains) instead of parse_expr
+        // to avoid consuming HTML structural tokens (>, <, /) as binary operators.
+        // Brace-delimited values like {map} or {expr} are handled by parse_primary
+        // which parses the entire {...} block, so full expressions work inside braces.
+        return this.parse_call()
     }
 
     fun parse_html_children(parent_tag: String): List<AST.Stmt> {
