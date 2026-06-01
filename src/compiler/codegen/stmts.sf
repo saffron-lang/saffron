@@ -705,6 +705,7 @@ extend fun Codegen.try_register_enum(decl: AST.Stmt) {
             Continue => {}
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
+            LetPattern(p, v) => {}
         }
     }
 
