@@ -1,23 +1,17 @@
-// Turmeric Demo — what a real app looks like
 import { signal, computed, effect } from "turmeric/signal"
-import { Node, mount, text } from "turmeric/element"
-import { div, span, button, section, h1, p, ul, li, input, nav, header, footer, a, main_el } from "turmeric/generated_types"
+import { Node, mount } from "turmeric/element"
+import { Event, on_click, on_input, on_keydown, on_change, on_submit, bind_value } from "turmeric/events"
 import { cx } from "turmeric/style"
-import { Event, on_click, on_keydown, bind_value } from "turmeric/events"
 import { each } from "turmeric/reconcile"
+import { button, div, footer, h1, header, input, li, main, nav, p, section, span, ul } from "turmeric/elements"
 
-// =============================================================================
-// State
-// =============================================================================
+// Turmeric Demo — written in .sfx (inline HTML mode)
+// Build: pantry build (runs sfx transform + wasm compile)
 
 var count = signal(0)
 var page = signal("counter")
 var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
 var new_todo = signal("")
-
-// =============================================================================
-// Components
-// =============================================================================
 
 fun CounterPage(): Node {
     var doubled = computed(fun (): Float => count.get() * 2)
@@ -26,141 +20,453 @@ fun CounterPage(): Node {
         return "odd"
     })
 
-    return section(cls="counter") {
-        h1 { "Reactive Counter" }
-        p(style={"font-size": "3rem", "font-weight": "bold", "color": "#4fc3f7"}) {
-            "${count.get()}"
-        }
-        p(style={"color": "#aaa"}) { "Doubled: ${doubled.get()} | ${parity.get()}" }
+    return 
+"// Turmeric Demo — written in .sfx (inline HTML mode)
+// Build: pantry build (runs sfx transform + wasm compile)
 
-        div(cls="button-row") {
-            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
-                "+ Increment"
-            }
-            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n - 1)) {
-                "- Decrement"
-            }
-            button(cls="danger", on_click=fun (e: Event) => count.set(0)) {
-                "Reset"
-            }
-        }
-    }
+var count = signal(0)
+var page = signal("counter")
+var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = signal("")
+
+fun CounterPage(): Node"
+var doubled = computed(fun (): Float => count.get() * 2)
+    var parity = computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
+    })
+
+    return (
+        <section cls="counter">
+            <h1>Reactive Counter</h1>
+            <p style={"font-size": "3rem", "color": "#4fc3f7"}>{count.get()}</p>
+            <p style={"color": "#aaa"}>Doubled: {doubled.get()} | {parity.get()}</p>
+
+            <div cls="button-row">
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+                    + Increment
+                </button>
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n - 1)}>
+                    - Decrement
+                </button>
+                <button cls="danger" on_click={fun (e: Event) => count.set(0)}>
+                    Reset
+                </button>
+            </div>
+        </section>
+    )
+"fun TodoPage(): Node"
+var active_count = computed(fun (): Float => todos.get().length())
+
+    return (
+        <section cls="todos">
+            <div cls="todo-header">
+                <h1>Todo List</h1>
+                <span cls="badge">{active_count.get()} items</span>
+            </div>
+
+            <div cls="todo-input">
+                <input type="text" placeholder="What needs doing?" bind_value={new_todo} />
+                <button on_click={fun (e: Event) => {
+                    if (new_todo.get().length() > 0) {
+                        todos.update(fun (list: List<String>): List<String> => {
+                            list.push(new_todo.get())
+                            return list
+                        })
+                        new_todo.set("")
+                    }
+                }}>Add</button>
+            </div>
+
+            <ul cls="todo-list">
+                {each(todos.get()) { todo =>
+                    <li cls="todo-item">{todo}</li>
+                }}
+            </ul>
+        </section>
+    )
+"fun AboutPage(): Node"
+return (
+        <section cls="about">
+            <h1>About Turmeric</h1>
+            <p>A reactive web framework for Saffron, compiled to WebAssembly.</p>
+            <ul cls="features">
+                <li>Fine-grained reactivity via Signals</li>
+                <li>No virtual DOM — surgical DOM updates</li>
+                <li>Compiles to a tiny WASM binary</li>
+                <li>Typed from the DOM spec (112 elements)</li>
+                <li>Pattern matching on events</li>
+                <li>Component lifecycle with automatic cleanup</li>
+                <li>Client-side routing</li>
+                <li>Scoped CSS + theming</li>
+            </ul>
+        </section>
+    )
+"fun App(): Node"
+return (
+        <div id="app">
+            <header cls="app-header">
+                <h1 cls="logo">Turmeric</h1>
+                <nav cls="nav">
+                    <button cls={cx({"nav-link": true, "active": page.get() == "counter"})} on_click={fun (e: Event) => page.set("counter")}>Counter</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "todos"})} on_click={fun (e: Event) => page.set("todos")}>Todos</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "about"})} on_click={fun (e: Event) => page.set("about")}>About</button>
+                </nav>
+            </header>
+
+            <main cls="content">
+                {match (page.get()) {
+                    "counter" => CounterPage()
+                    "todos" => TodoPage()
+                    "about" => AboutPage()
+                    _ => <p>404 — Not Found</p>
+                }}
+            </main>
+
+            <footer cls="app-footer">
+                Built with Saffron + Turmeric | Signals + Effects + WASM
+            </footer>
+        </div>
+    )
+"mount("#app", App)"
 }
 
 fun TodoPage(): Node {
-    var active_count = computed(fun (): Float => {
-        return todos.get().length()
+    var active_count = computed(fun (): Float => todos.get().length())
+
+    return 
+"// Turmeric Demo — written in .sfx (inline HTML mode)
+// Build: pantry build (runs sfx transform + wasm compile)
+
+var count = signal(0)
+var page = signal("counter")
+var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = signal("")
+
+fun CounterPage(): Node"
+var doubled = computed(fun (): Float => count.get() * 2)
+    var parity = computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
     })
 
-    return section(cls="todos") {
-        div(cls="todo-header") {
-            h1 { "Todo List" }
-            span(cls="badge") { "${active_count.get()} items" }
-        }
+    return (
+        <section cls="counter">
+            <h1>Reactive Counter</h1>
+            <p style={"font-size": "3rem", "color": "#4fc3f7"}>{count.get()}</p>
+            <p style={"color": "#aaa"}>Doubled: {doubled.get()} | {parity.get()}</p>
 
-        div(cls="todo-input") {
-            input(
-                type="text",
-                placeholder="What needs doing?",
-                bind_value=new_todo,
-                on_keydown=fun (e: Event) => {
-                    match (e) {
-                        KeyDown(data) => {
-                            if (data.key == "Enter" and new_todo.get().length() > 0) {
-                                todos.update(fun (list: List<String>): List<String> => {
-                                    list.push(new_todo.get())
-                                    return list
-                                })
-                                new_todo.set("")
-                            }
-                        }
-                        _ => {}
+            <div cls="button-row">
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+                    + Increment
+                </button>
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n - 1)}>
+                    - Decrement
+                </button>
+                <button cls="danger" on_click={fun (e: Event) => count.set(0)}>
+                    Reset
+                </button>
+            </div>
+        </section>
+    )
+"fun TodoPage(): Node"
+var active_count = computed(fun (): Float => todos.get().length())
+
+    return (
+        <section cls="todos">
+            <div cls="todo-header">
+                <h1>Todo List</h1>
+                <span cls="badge">{active_count.get()} items</span>
+            </div>
+
+            <div cls="todo-input">
+                <input type="text" placeholder="What needs doing?" bind_value={new_todo} />
+                <button on_click={fun (e: Event) => {
+                    if (new_todo.get().length() > 0) {
+                        todos.update(fun (list: List<String>): List<String> => {
+                            list.push(new_todo.get())
+                            return list
+                        })
+                        new_todo.set("")
                     }
-                }
-            )
-            button(on_click=fun (e: Event) => {
-                if (new_todo.get().length() > 0) {
-                    todos.update(fun (list: List<String>): List<String> => {
-                        list.push(new_todo.get())
-                        return list
-                    })
-                    new_todo.set("")
-                }
-            }) {
-                "Add"
-            }
-        }
+                }}>Add</button>
+            </div>
 
-        ul(cls="todo-list") {
-            each(todos.get()) { todo =>
-                li(cls="todo-item") { todo }
-            }
-        }
-    }
+            <ul cls="todo-list">
+                {each(todos.get()) { todo =>
+                    <li cls="todo-item">{todo}</li>
+                }}
+            </ul>
+        </section>
+    )
+"fun AboutPage(): Node"
+return (
+        <section cls="about">
+            <h1>About Turmeric</h1>
+            <p>A reactive web framework for Saffron, compiled to WebAssembly.</p>
+            <ul cls="features">
+                <li>Fine-grained reactivity via Signals</li>
+                <li>No virtual DOM — surgical DOM updates</li>
+                <li>Compiles to a tiny WASM binary</li>
+                <li>Typed from the DOM spec (112 elements)</li>
+                <li>Pattern matching on events</li>
+                <li>Component lifecycle with automatic cleanup</li>
+                <li>Client-side routing</li>
+                <li>Scoped CSS + theming</li>
+            </ul>
+        </section>
+    )
+"fun App(): Node"
+return (
+        <div id="app">
+            <header cls="app-header">
+                <h1 cls="logo">Turmeric</h1>
+                <nav cls="nav">
+                    <button cls={cx({"nav-link": true, "active": page.get() == "counter"})} on_click={fun (e: Event) => page.set("counter")}>Counter</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "todos"})} on_click={fun (e: Event) => page.set("todos")}>Todos</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "about"})} on_click={fun (e: Event) => page.set("about")}>About</button>
+                </nav>
+            </header>
+
+            <main cls="content">
+                {match (page.get()) {
+                    "counter" => CounterPage()
+                    "todos" => TodoPage()
+                    "about" => AboutPage()
+                    _ => <p>404 — Not Found</p>
+                }}
+            </main>
+
+            <footer cls="app-footer">
+                Built with Saffron + Turmeric | Signals + Effects + WASM
+            </footer>
+        </div>
+    )
+"mount("#app", App)"
 }
 
 fun AboutPage(): Node {
-    return section(cls="about") {
-        h1 { "About Turmeric" }
-        p { "A reactive web framework for Saffron, compiled to WebAssembly." }
+    return 
+"// Turmeric Demo — written in .sfx (inline HTML mode)
+// Build: pantry build (runs sfx transform + wasm compile)
 
-        ul(cls="features") {
-            li { "Fine-grained reactivity via Signals" }
-            li { "No virtual DOM — surgical DOM updates" }
-            li { "Compiles to < 40KB WASM binary" }
-            li { "Typed from the DOM spec (112 elements)" }
-            li { "Pattern matching on events" }
-            li { "Component lifecycle with automatic cleanup" }
-            li { "Client-side routing" }
-            li { "Scoped CSS + theming" }
-        }
-    }
+var count = signal(0)
+var page = signal("counter")
+var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = signal("")
+
+fun CounterPage(): Node"
+var doubled = computed(fun (): Float => count.get() * 2)
+    var parity = computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
+    })
+
+    return (
+        <section cls="counter">
+            <h1>Reactive Counter</h1>
+            <p style={"font-size": "3rem", "color": "#4fc3f7"}>{count.get()}</p>
+            <p style={"color": "#aaa"}>Doubled: {doubled.get()} | {parity.get()}</p>
+
+            <div cls="button-row">
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+                    + Increment
+                </button>
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n - 1)}>
+                    - Decrement
+                </button>
+                <button cls="danger" on_click={fun (e: Event) => count.set(0)}>
+                    Reset
+                </button>
+            </div>
+        </section>
+    )
+"fun TodoPage(): Node"
+var active_count = computed(fun (): Float => todos.get().length())
+
+    return (
+        <section cls="todos">
+            <div cls="todo-header">
+                <h1>Todo List</h1>
+                <span cls="badge">{active_count.get()} items</span>
+            </div>
+
+            <div cls="todo-input">
+                <input type="text" placeholder="What needs doing?" bind_value={new_todo} />
+                <button on_click={fun (e: Event) => {
+                    if (new_todo.get().length() > 0) {
+                        todos.update(fun (list: List<String>): List<String> => {
+                            list.push(new_todo.get())
+                            return list
+                        })
+                        new_todo.set("")
+                    }
+                }}>Add</button>
+            </div>
+
+            <ul cls="todo-list">
+                {each(todos.get()) { todo =>
+                    <li cls="todo-item">{todo}</li>
+                }}
+            </ul>
+        </section>
+    )
+"fun AboutPage(): Node"
+return (
+        <section cls="about">
+            <h1>About Turmeric</h1>
+            <p>A reactive web framework for Saffron, compiled to WebAssembly.</p>
+            <ul cls="features">
+                <li>Fine-grained reactivity via Signals</li>
+                <li>No virtual DOM — surgical DOM updates</li>
+                <li>Compiles to a tiny WASM binary</li>
+                <li>Typed from the DOM spec (112 elements)</li>
+                <li>Pattern matching on events</li>
+                <li>Component lifecycle with automatic cleanup</li>
+                <li>Client-side routing</li>
+                <li>Scoped CSS + theming</li>
+            </ul>
+        </section>
+    )
+"fun App(): Node"
+return (
+        <div id="app">
+            <header cls="app-header">
+                <h1 cls="logo">Turmeric</h1>
+                <nav cls="nav">
+                    <button cls={cx({"nav-link": true, "active": page.get() == "counter"})} on_click={fun (e: Event) => page.set("counter")}>Counter</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "todos"})} on_click={fun (e: Event) => page.set("todos")}>Todos</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "about"})} on_click={fun (e: Event) => page.set("about")}>About</button>
+                </nav>
+            </header>
+
+            <main cls="content">
+                {match (page.get()) {
+                    "counter" => CounterPage()
+                    "todos" => TodoPage()
+                    "about" => AboutPage()
+                    _ => <p>404 — Not Found</p>
+                }}
+            </main>
+
+            <footer cls="app-footer">
+                Built with Saffron + Turmeric | Signals + Effects + WASM
+            </footer>
+        </div>
+    )
+"mount("#app", App)"
 }
-
-// =============================================================================
-// App Shell
-// =============================================================================
 
 fun App(): Node {
-    return div(id="app") {
-        header(cls="app-header") {
-            h1(cls="logo") { "Turmeric" }
+    return 
+"// Turmeric Demo — written in .sfx (inline HTML mode)
+// Build: pantry build (runs sfx transform + wasm compile)
 
-            nav(cls="nav") {
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "counter"}),
-                    on_click=fun (e: Event) => page.set("counter")
-                ) { "Counter" }
+var count = signal(0)
+var page = signal("counter")
+var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
+var new_todo = signal("")
 
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "todos"}),
-                    on_click=fun (e: Event) => page.set("todos")
-                ) { "Todos" }
+fun CounterPage(): Node"
+var doubled = computed(fun (): Float => count.get() * 2)
+    var parity = computed(fun (): String => {
+        if (count.get() % 2 == 0) { return "even" }
+        return "odd"
+    })
 
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "about"}),
-                    on_click=fun (e: Event) => page.set("about")
-                ) { "About" }
-            }
-        }
+    return (
+        <section cls="counter">
+            <h1>Reactive Counter</h1>
+            <p style={"font-size": "3rem", "color": "#4fc3f7"}>{count.get()}</p>
+            <p style={"color": "#aaa"}>Doubled: {doubled.get()} | {parity.get()}</p>
 
-        main_el(cls="content") {
-            match (page.get()) {
-                "counter" => CounterPage()
-                "todos" => TodoPage()
-                "about" => AboutPage()
-                _ => p { "404 — Not Found" }
-            }
-        }
+            <div cls="button-row">
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+                    + Increment
+                </button>
+                <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n - 1)}>
+                    - Decrement
+                </button>
+                <button cls="danger" on_click={fun (e: Event) => count.set(0)}>
+                    Reset
+                </button>
+            </div>
+        </section>
+    )
+"fun TodoPage(): Node"
+var active_count = computed(fun (): Float => todos.get().length())
 
-        footer(cls="app-footer") {
-            "Built with Saffron + Turmeric | Signals + Effects + WASM"
-        }
-    }
+    return (
+        <section cls="todos">
+            <div cls="todo-header">
+                <h1>Todo List</h1>
+                <span cls="badge">{active_count.get()} items</span>
+            </div>
+
+            <div cls="todo-input">
+                <input type="text" placeholder="What needs doing?" bind_value={new_todo} />
+                <button on_click={fun (e: Event) => {
+                    if (new_todo.get().length() > 0) {
+                        todos.update(fun (list: List<String>): List<String> => {
+                            list.push(new_todo.get())
+                            return list
+                        })
+                        new_todo.set("")
+                    }
+                }}>Add</button>
+            </div>
+
+            <ul cls="todo-list">
+                {each(todos.get()) { todo =>
+                    <li cls="todo-item">{todo}</li>
+                }}
+            </ul>
+        </section>
+    )
+"fun AboutPage(): Node"
+return (
+        <section cls="about">
+            <h1>About Turmeric</h1>
+            <p>A reactive web framework for Saffron, compiled to WebAssembly.</p>
+            <ul cls="features">
+                <li>Fine-grained reactivity via Signals</li>
+                <li>No virtual DOM — surgical DOM updates</li>
+                <li>Compiles to a tiny WASM binary</li>
+                <li>Typed from the DOM spec (112 elements)</li>
+                <li>Pattern matching on events</li>
+                <li>Component lifecycle with automatic cleanup</li>
+                <li>Client-side routing</li>
+                <li>Scoped CSS + theming</li>
+            </ul>
+        </section>
+    )
+"fun App(): Node"
+return (
+        <div id="app">
+            <header cls="app-header">
+                <h1 cls="logo">Turmeric</h1>
+                <nav cls="nav">
+                    <button cls={cx({"nav-link": true, "active": page.get() == "counter"})} on_click={fun (e: Event) => page.set("counter")}>Counter</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "todos"})} on_click={fun (e: Event) => page.set("todos")}>Todos</button>
+                    <button cls={cx({"nav-link": true, "active": page.get() == "about"})} on_click={fun (e: Event) => page.set("about")}>About</button>
+                </nav>
+            </header>
+
+            <main cls="content">
+                {match (page.get()) {
+                    "counter" => CounterPage()
+                    "todos" => TodoPage()
+                    "about" => AboutPage()
+                    _ => <p>404 — Not Found</p>
+                }}
+            </main>
+
+            <footer cls="app-footer">
+                Built with Saffron + Turmeric | Signals + Effects + WASM
+            </footer>
+        </div>
+    )
+"mount("#app", App)"
 }
-
-// =============================================================================
-// Mount
-// =============================================================================
 
 mount("#app", App)

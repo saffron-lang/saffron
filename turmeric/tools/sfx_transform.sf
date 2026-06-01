@@ -1,18 +1,8 @@
-// sfx_transform.sf — Transforms .sfx files (inline HTML) to .sf (builder calls)
+// sfx_transform.sf — Robust .sfx → .sf transformer
+// Parses Saffron code and switches to HTML mode inside expressions.
+// Like TSX: <tag> is valid anywhere an expression is expected.
+//
 // Usage: saffron run tools/sfx_transform.sf input.sfx output.sf
-//
-// Transforms:
-//   <div cls="app">...</div>  →  div(cls="app") { ... }
-//   <br />                     →  br()
-//   {expr}                     →  expr
-//   plain text                 →  "plain text"
-//
-// Auto-inserts imports for all HTML elements used.
-
-var VOID_ELEMENTS: List<String> = [
-    "area", "base", "br", "col", "embed", "hr", "img", "input",
-    "link", "meta", "source", "track", "wbr"
-]
 
 var ALL_ELEMENTS: List<String> = [
     "a", "abbr", "address", "area", "article", "aside", "audio",
@@ -29,6 +19,11 @@ var ALL_ELEMENTS: List<String> = [
     "slot", "small", "source", "span", "strong", "style", "sub", "summary", "sup",
     "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead",
     "time", "title", "tr", "track", "u", "ul", "video", "wbr"
+]
+
+var VOID_ELEMENTS: List<String> = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "source", "track", "wbr"
 ]
 
 fun is_void(tag: String): Bool {
@@ -49,125 +44,322 @@ fun is_html_element(name: String): Bool {
     return false
 }
 
-fun transform_attrs(attrs_str: String): String {
-    var result: String = attrs_str
-    result = result.replace("={", "=")
-    // Remove trailing } from attribute values that were {expr}
-    // This is simplified — a real impl would track brace depth
-    return result
+fun is_alpha(ch: String): Bool {
+    var lower: String = "abcdefghijklmnopqrstuvwxyz"
+    var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return lower.contains(ch) or upper.contains(ch)
 }
 
-fun transform_html_block(source: String): String {
-    var out: StringBuilder = StringBuilder()
-    var i: Float = 0
-    var len: Float = source.length()
-    var indent: Float = 0
+fun is_ident_char(ch: String): Bool {
+    return is_alpha(ch) or ch == "_" or ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9"
+}
 
-    fun emit_indent() {
-        var j: Float = 0
-        while (j < indent) {
-            out.append("    ")
-            j = j + 1
+// =============================================================================
+// Main Transform — character-by-character with mode switching
+// =============================================================================
+
+class Transformer {
+    var src: String
+    var pos: Float
+    var len: Float
+    var out: StringBuilder
+    var used_elements: List<String>
+
+    fun init(source: String) {
+        this.src = source
+        this.pos = 0
+        this.len = source.length()
+        this.out = StringBuilder()
+        this.used_elements = []
+    }
+
+    fun peek(): String {
+        if (this.pos >= this.len) { return "" }
+        return this.src.char_at(this.pos)
+    }
+
+    fun peek_at(offset: Float): String {
+        var idx: Float = this.pos + offset
+        if (idx >= this.len) { return "" }
+        return this.src.char_at(idx)
+    }
+
+    fun advance(): String {
+        var ch: String = this.src.char_at(this.pos)
+        this.pos = this.pos + 1
+        return ch
+    }
+
+    fun emit(s: String) {
+        this.out.append(s)
+    }
+
+    fun remaining(): String {
+        return this.src.slice(this.pos, this.len)
+    }
+
+    fun starts_with(prefix: String): Bool {
+        if (this.pos + prefix.length() > this.len) { return false }
+        var chunk: String = this.src.slice(this.pos, this.pos + prefix.length())
+        return chunk == prefix
+    }
+
+    // Read an identifier at current position
+    fun read_ident(): String {
+        var result: String = ""
+        while (this.pos < this.len and is_ident_char(this.peek())) {
+            result = result + this.advance()
+        }
+        return result
+    }
+
+    // Skip whitespace, return what was skipped
+    fun skip_ws(): String {
+        var ws: String = ""
+        while (this.pos < this.len and (this.peek() == " " or this.peek() == "\t" or this.peek() == "\n" or this.peek() == "\r")) {
+            ws = ws + this.advance()
+        }
+        return ws
+    }
+
+    // ==========================================================================
+    // Code mode — copy characters, detect < that starts HTML
+    // ==========================================================================
+
+    fun transform() {
+        while (this.pos < this.len) {
+            var ch: String = this.peek()
+
+            // Detect HTML start: < followed by an ident that's an HTML element or uppercase (component)
+            if (ch == "<" and this.is_html_start()) {
+                this.transform_element()
+            }
+            // Skip strings without interpreting their contents
+            else if (ch == "\"") {
+                this.copy_string()
+            }
+            // Skip line comments
+            else if (ch == "/" and this.peek_at(1) == "/") {
+                this.copy_line_comment()
+            }
+            else {
+                this.emit(this.advance())
+            }
         }
     }
 
-    while (i < len) {
-        var ch: String = source.char_at(i)
+    fun is_html_start(): Bool {
+        // < followed by alpha = potential tag
+        if (this.pos + 1 >= this.len) { return false }
+        var next: String = this.peek_at(1)
+        if (!is_alpha(next)) { return false }
+        // Read ahead to get the tag name
+        var save_pos: Float = this.pos
+        this.pos = this.pos + 1
+        var name: String = this.read_ident()
+        this.pos = save_pos
+        // It's HTML if it's a known element OR starts with uppercase (component)
+        return is_html_element(name) or (name.char_at(0) >= "A" and name.char_at(0) <= "Z")
+    }
 
-        if (ch == "<") {
-            if (i + 1 < len and source.char_at(i + 1) == "/") {
-                // Close tag
-                i = i + 2
-                while (i < len and source.char_at(i) != ">") { i = i + 1 }
-                i = i + 1
-                indent = indent - 1
-                emit_indent()
-                out.append("}\n")
-            } else {
-                // Open tag
-                i = i + 1
-                var tag_name: String = ""
-                while (i < len and source.char_at(i) != " " and source.char_at(i) != ">" and source.char_at(i) != "/") {
-                    tag_name = tag_name + source.char_at(i)
-                    i = i + 1
-                }
+    // ==========================================================================
+    // HTML mode — parse element, emit builder calls
+    // ==========================================================================
 
-                var attrs: String = ""
-                var self_closing: Bool = false
-                while (i < len and source.char_at(i) != ">") {
-                    if (source.char_at(i) == "/" and i + 1 < len and source.char_at(i + 1) == ">") {
-                        self_closing = true
-                        i = i + 1
-                        break
-                    }
-                    attrs = attrs + source.char_at(i)
-                    i = i + 1
-                }
-                i = i + 1
+    fun transform_element() {
+        // Skip <
+        this.advance()
+        var tag: String = this.read_ident()
 
-                if (is_void(tag_name)) { self_closing = true }
+        // Track used elements
+        if (is_html_element(tag) and !this.used_elements.contains(tag)) {
+            this.used_elements.push(tag)
+        }
 
-                emit_indent()
-                out.append(tag_name)
-                var trimmed_attrs: String = attrs.trim()
-                if (trimmed_attrs.length() > 0) {
-                    out.append("(" + transform_attrs(trimmed_attrs) + ")")
-                }
-                if (self_closing) {
-                    if (trimmed_attrs.length() == 0) { out.append("()") }
-                    out.append("\n")
-                } else {
-                    out.append(" {\n")
-                    indent = indent + 1
-                }
-            }
-        } else if (ch == "{") {
-            // Expression
-            i = i + 1
-            var code: String = ""
-            var depth: Float = 1
-            while (i < len and depth > 0) {
-                var c: String = source.char_at(i)
-                if (c == "{") { depth = depth + 1 }
-                if (c == "}") { depth = depth - 1 }
-                if (depth > 0) { code = code + c }
-                i = i + 1
-            }
-            var trimmed_code: String = code.trim()
-            if (trimmed_code.length() > 0) {
-                emit_indent()
-                out.append(trimmed_code + "\n")
-            }
+        // Parse attributes
+        var attrs: String = this.parse_attrs()
+
+        // Check for self-closing /> or >
+        this.skip_ws()
+        var self_closing: Bool = false
+        if (this.peek() == "/" and this.peek_at(1) == ">") {
+            self_closing = true
+            this.advance()
+            this.advance()
+        } else if (this.peek() == ">") {
+            self_closing = is_void(tag)
+            this.advance()
+        }
+
+        // Emit builder call
+        if (attrs.length() > 0) {
+            this.emit(tag + "(" + attrs + ")")
         } else {
+            this.emit(tag)
+        }
+
+        if (self_closing) {
+            if (attrs.length() == 0) { this.emit("()") }
+        } else {
+            this.emit(" {\n")
+            // Parse children until </tag>
+            this.parse_children(tag)
+            this.emit("}")
+        }
+    }
+
+    fun parse_attrs(): String {
+        var attrs: String = ""
+        this.skip_ws()
+
+        while (this.pos < this.len and this.peek() != ">" and this.peek() != "/") {
+            if (!is_alpha(this.peek()) and this.peek() != "_") { break }
+
+            var attr_name: String = this.read_ident()
+            this.skip_ws()
+
+            if (this.peek() == "=") {
+                this.advance()
+                this.skip_ws()
+                var attr_value: String = this.parse_attr_value()
+                if (attrs.length() > 0) { attrs = attrs + ", " }
+                attrs = attrs + attr_name + "=" + attr_value
+            } else {
+                // Boolean attribute (no value)
+                if (attrs.length() > 0) { attrs = attrs + ", " }
+                attrs = attrs + attr_name + "=true"
+            }
+
+            this.skip_ws()
+        }
+
+        return attrs
+    }
+
+    fun parse_attr_value(): String {
+        if (this.peek() == "\"") {
+            // String literal
+            return this.read_string_literal()
+        }
+        if (this.peek() == "{") {
+            // Expression: {expr}
+            this.advance()
+            var expr: String = this.read_balanced_braces()
+            return expr
+        }
+        // Bare identifier or number
+        var val: String = ""
+        while (this.pos < this.len and this.peek() != " " and this.peek() != ">" and this.peek() != "/" and this.peek() != "\n") {
+            val = val + this.advance()
+        }
+        return val
+    }
+
+    fun read_string_literal(): String {
+        var result: String = ""
+        result = result + this.advance() // opening "
+        while (this.pos < this.len and this.peek() != "\"") {
+            if (this.peek() == "\\") {
+                result = result + this.advance()
+            }
+            result = result + this.advance()
+        }
+        if (this.pos < this.len) {
+            result = result + this.advance() // closing "
+        }
+        return result
+    }
+
+    fun read_balanced_braces(): String {
+        var result: String = ""
+        var depth: Float = 1
+        while (this.pos < this.len and depth > 0) {
+            var ch: String = this.peek()
+            if (ch == "{") { depth = depth + 1 }
+            if (ch == "}") {
+                depth = depth - 1
+                if (depth == 0) {
+                    this.advance()
+                    return result
+                }
+            }
+            result = result + this.advance()
+        }
+        return result
+    }
+
+    // ==========================================================================
+    // Children — text, expressions, nested elements
+    // ==========================================================================
+
+    fun parse_children(parent_tag: String) {
+        while (this.pos < this.len) {
+            this.skip_ws()
+
+            // Check for closing tag
+            if (this.starts_with("</" + parent_tag)) {
+                // Skip </tag>
+                this.pos = this.pos + 2 + parent_tag.length()
+                this.skip_ws()
+                if (this.peek() == ">") { this.advance() }
+                return
+            }
+
+            // Nested element
+            if (this.peek() == "<" and this.is_html_start()) {
+                this.transform_element()
+                this.emit("\n")
+            }
+            // Expression: {code}
+            else if (this.peek() == "{") {
+                this.advance()
+                var expr: String = this.read_balanced_braces()
+                this.emit(expr + "\n")
+            }
             // Text content
-            var text: String = ""
-            while (i < len and source.char_at(i) != "<" and source.char_at(i) != "{") {
-                text = text + source.char_at(i)
-                i = i + 1
+            else if (this.peek() != "<" and this.pos < this.len) {
+                var text: String = ""
+                while (this.pos < this.len and this.peek() != "<" and this.peek() != "{") {
+                    text = text + this.advance()
+                }
+                var trimmed: String = text.trim()
+                if (trimmed.length() > 0) {
+                    this.emit("\"" + trimmed + "\"\n")
+                }
             }
-            var trimmed_text: String = text.trim()
-            if (trimmed_text.length() > 0) {
-                emit_indent()
-                out.append("\"" + trimmed_text + "\"\n")
+            else {
+                break
             }
         }
     }
 
-    return out.to_string()
+    // ==========================================================================
+    // Helpers for copying non-HTML content
+    // ==========================================================================
+
+    fun copy_string() {
+        this.emit(this.advance()) // opening "
+        while (this.pos < this.len and this.peek() != "\"") {
+            if (this.peek() == "\\") {
+                this.emit(this.advance())
+            }
+            this.emit(this.advance())
+        }
+        if (this.pos < this.len) {
+            this.emit(this.advance()) // closing "
+        }
+    }
+
+    fun copy_line_comment() {
+        while (this.pos < this.len and this.peek() != "\n") {
+            this.emit(this.advance())
+        }
+    }
 }
 
-fun collect_used_elements(source: String): List<String> {
-    var used: List<String> = []
-    var i: Float = 0
-    while (i < ALL_ELEMENTS.length()) {
-        var el: String = ALL_ELEMENTS[i]
-        if (source.contains("<" + el + " ") or source.contains("<" + el + ">") or source.contains("<" + el + "/")) {
-            used.push(el)
-        }
-        i = i + 1
-    }
-    return used
-}
+// =============================================================================
+// Import Generation
+// =============================================================================
 
 fun generate_imports(used_elements: List<String>, source: String): String {
     var sb: StringBuilder = StringBuilder()
@@ -188,6 +380,7 @@ fun generate_imports(used_elements: List<String>, source: String): String {
         sb.append("import { each } from \"turmeric/reconcile\"\n")
     }
     if (used_elements.length() > 0) {
+        used_elements.sort()
         sb.append("import { " + used_elements.join(", ") + " } from \"turmeric/elements\"\n")
     }
 
@@ -195,64 +388,15 @@ fun generate_imports(used_elements: List<String>, source: String): String {
     return sb.to_string()
 }
 
-fun find_and_transform_html(source: String): String {
-    var lines: List<String> = source.split("\n")
-    var out: StringBuilder = StringBuilder()
-    var in_html: Bool = false
-    var html_buffer: String = ""
-
-    var i: Float = 0
-    while (i < lines.length()) {
-        var line: String = lines[i]
-        var trimmed: String = line.trim()
-
-        if (!in_html) {
-            // HTML region starts after return (
-            if (trimmed == "return (" or trimmed.ends_with("return (")) {
-                in_html = true
-                html_buffer = ""
-                out.append(line.replace("return (", "return ") + "\n")
-            } else {
-                out.append(line + "\n")
-            }
-        } else {
-            if (trimmed == ")") {
-                // End of HTML region
-                out.append(transform_html_block(html_buffer))
-                in_html = false
-                html_buffer = ""
-            } else {
-                html_buffer = html_buffer + trimmed + "\n"
-            }
-        }
-        i = i + 1
-    }
-
-    if (html_buffer.length() > 0) {
-        out.append(transform_html_block(html_buffer))
-    }
-
-    return out.to_string()
-}
-
-fun transform_file(source: String): String {
-    var used: List<String> = collect_used_elements(source)
-    var transformed: String = find_and_transform_html(source)
-
-    if (!source.starts_with("import ")) {
-        var imports: String = generate_imports(used, source)
-        transformed = imports + transformed
-    }
-
-    return transformed
-}
-
-// --- Main ---
+// =============================================================================
+// Main
+// =============================================================================
 
 var args: List<String> = OS.args()
 if (args.length() < 3) {
     IO.println("Usage: sfx <input.sfx> <output.sf>")
-    IO.println("Transforms inline HTML (.sfx) to Saffron builder calls (.sf)")
+    IO.println("Transforms .sfx (inline HTML) to .sf (Saffron builder calls)")
+    return
 }
 
 var input_path: String = args[1]
@@ -260,6 +404,15 @@ var output_path: String = args[2]
 
 IO.println("sfx: " + input_path + " → " + output_path)
 var source: String = IO.read_file(input_path)
-var result: String = transform_file(source)
+
+// Transform
+var t: Transformer = Transformer(source)
+t.transform()
+var transformed: String = t.out.to_string()
+
+// Generate and prepend imports
+var imports: String = generate_imports(t.used_elements, source)
+var result: String = imports + transformed
+
 IO.write_file(output_path, result)
 IO.println("Done!")
