@@ -624,7 +624,7 @@ fun main(): Int {
         if (path_to_prefix.has(ni_full_path)) {
             ni_prefix = path_to_prefix.get(ni_full_path)
         } else {
-            ni_prefix = module_prefix_from_path(ni_path)
+            ni_prefix = path_based_prefix(ni_path, ni_full_path, stdlib_dir)
         }
         var ni_names: List<String> = named_imports_raw.get(ni_path)
         var nni: Float = 0
