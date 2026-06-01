@@ -112,33 +112,82 @@ sed -e "/@codegen-split: types/r $COMPILER_DIR/codegen/types_body.sf" \
     "$COMPILER_DIR/codegen.sf" > "$BUILD_DIR/stage3/_codegen.sf"
 sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf"
 
+# Try gen2 first; if it fails (e.g. AST has new variants gen2 doesn't know),
+# fall back to linking from checked-in .ll artifacts compiled by gen3.
+GEN2_OK=true
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
-        || fail "STAGE 1" "gen2 failed to compile $src.sf"
+    if ! timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
+        GEN2_OK=false
+        break
+    fi
 done
 
-[[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
-timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
-    || fail "STAGE 1" "gen2 failed to compile codegen.sf"
+if [[ "$GEN2_OK" == true ]]; then
+    [[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
+    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+        || GEN2_OK=false
+fi
 
-# Compile main.sf with a modified copy that imports the assembled codegen
-[[ "$VERBOSE" == true ]] && echo "  compile: main.sf"
-cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
-cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
-cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
-cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
-cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
-# Rewrite the codegen import to use the assembled file and strip methods import
-sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
-sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
-timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
-    || fail "STAGE 1" "gen2 failed to compile main.sf"
+if [[ "$GEN2_OK" == true ]]; then
+    # Compile main.sf with a modified copy that imports the assembled codegen
+    [[ "$VERBOSE" == true ]] && echo "  compile: main.sf"
+    cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
+    cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
+    cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
+    cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
+    cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+    # Rewrite the codegen import to use the assembled file and strip methods import
+    sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
+    sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
+    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+        || GEN2_OK=false
+fi
 
-# Compile runtime.sf
-[[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
-    || fail "STAGE 1" "gen2 failed to compile runtime.sf"
+if [[ "$GEN2_OK" == true ]]; then
+    # Compile runtime.sf
+    [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
+    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+        || fail "STAGE 1" "gen2 failed to compile runtime.sf"
+fi
+
+if [[ "$GEN2_OK" == false ]]; then
+    # gen2 cannot compile current source (new AST variants, etc.)
+    # Link gen3 from checked-in .ll files, then use gen3 to recompile itself
+    info "STAGE 1" "gen2 outdated, bootstrapping via checked-in .ll artifacts..."
+    clang -O2 -w -Wl,-stack_size,0x10000000 -o "$BUILD_DIR/saffronc" \
+        "$BUILD_DIR/stage3/main.ll" \
+        "$BUILD_DIR/stage3/runtime.ll" \
+        "$RUNTIME_BASE" \
+        || fail "STAGE 1" "Linking gen3 from .ll artifacts failed"
+    GEN3="$BUILD_DIR/saffronc"
+
+    # Now use gen3 to recompile itself from current source
+    for src in "${SOURCES[@]}"; do
+        [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
+        timeout 60 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
+            || fail "STAGE 1" "gen3 failed to compile $src.sf"
+    done
+
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
+    timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+        || fail "STAGE 1" "gen3 failed to compile codegen.sf"
+
+    cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage3/_main.sf"
+    cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
+    cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
+    cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
+    cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
+    sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
+    sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
+    timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+        || fail "STAGE 1" "gen3 failed to compile main.sf"
+
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
+    timeout 60 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+        || fail "STAGE 1" "gen3 failed to compile runtime.sf"
+fi
 
 [[ "$VERBOSE" == true ]] && echo "  linking gen3..."
 clang -O2 -w -Wl,-stack_size,0x10000000 -o "$BUILD_DIR/saffronc" \
