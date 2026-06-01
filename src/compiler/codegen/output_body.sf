@@ -249,6 +249,15 @@
         return k == "nil"
     }
 
+    fun is_nil_expr_stmt(stmt: AST.Stmt): Bool {
+        var sk: String = this.classify_stmt(stmt)
+        if (sk != "expr") { return false }
+        var e: AST.Expr = match (stmt) { ExprStmt(ex) => ex
+            _ => AST.Expr.IntLit(1)
+        }
+        return this.is_nil_expr(e)
+    }
+
     fun is_decl(stmt: AST.Stmt): Bool {
         return match (stmt) {
             FunDecl(n, p, r, b, d) => true

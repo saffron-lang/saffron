@@ -504,6 +504,7 @@ class NullChecker {
             Continue => {}
             TryCatch(tb, cn, cb, fb) => {}
             Throw(v) => {}
+            LetPattern(p, v) => {}
         }
     }
 
@@ -639,6 +640,9 @@ class NullChecker {
                 this.env.pop_scope()
             }
             Throw(value) => {
+                this.infer_expr(value)
+            }
+            LetPattern(pattern, value) => {
                 this.infer_expr(value)
             }
         }

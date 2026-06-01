@@ -28,6 +28,9 @@
             Throw(value) => {
                 this.gen_throw(value)
             }
+            LetPattern(pattern, value) => {
+                this.gen_let_pattern(pattern, value)
+            }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Capture and clear pending_extend_class to prevent stale state
                 // in nested gen_stmt calls
@@ -703,6 +706,7 @@
             Continue => {}
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
+            LetPattern(p, v) => {}
         }
     }
 
@@ -816,6 +820,7 @@
             Continue => "continue"
             TryCatch(t, n, c, f) => "try"
             Throw(v) => "throw"
+            LetPattern(p, v) => "let_pattern"
         }
     }
 
@@ -834,6 +839,7 @@
             Continue => "other"
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
+            LetPattern(p, v) => "other"
         }
         return kind == "if"
     }
