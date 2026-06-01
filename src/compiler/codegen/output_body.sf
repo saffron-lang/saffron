@@ -305,6 +305,8 @@
         this.known_functions.push("__io_write_file")
         this.known_functions.push("__io_file_exists")
         this.known_functions.push("__io_mkdir")
+        this.known_functions.push("__io_walk_dir")
+        this.known_functions.push("__io_append_file")
         this.known_functions.push("__os_exec")
         this.known_functions.push("__os_args")
         this.known_functions.push("__os_cwd")

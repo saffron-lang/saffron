@@ -1,0 +1,83 @@
+// Turmeric Prelude — auto-imported into any app that depends on turmeric
+// Provides HTML element builder functions and text() for inline HTML support
+
+@extern("i64 js_dom_create_element(void*)") fun _dom_create(tag: String): Float
+@extern("void js_dom_set_text(i64, void*)") fun _dom_set_text(handle: Float, text: String)
+@extern("void js_dom_set_attribute(i64, void*, void*)") fun _dom_set_attr(handle: Float, name: String, value: String)
+@extern("void js_dom_append_child(i64, i64)") fun _dom_append(parent: Float, child: Float)
+@extern("void js_dom_add_event_listener(i64, void*, i64)") fun _dom_on(handle: Float, event: String, cb: Float)
+
+// --- Text node ---
+fun text(content: String) {
+    // In WASM: creates a text node and appends to current parent
+    // For now: noop (framework wires this up at mount time)
+}
+
+// --- Element builders ---
+// Each creates an element, applies named args as attrs, calls block for children
+
+fun div(block: Any = nil) { if (block != nil) { block() } }
+fun span(block: Any = nil) { if (block != nil) { block() } }
+fun p(block: Any = nil) { if (block != nil) { block() } }
+fun a(block: Any = nil) { if (block != nil) { block() } }
+fun h1(block: Any = nil) { if (block != nil) { block() } }
+fun h2(block: Any = nil) { if (block != nil) { block() } }
+fun h3(block: Any = nil) { if (block != nil) { block() } }
+fun h4(block: Any = nil) { if (block != nil) { block() } }
+fun h5(block: Any = nil) { if (block != nil) { block() } }
+fun h6(block: Any = nil) { if (block != nil) { block() } }
+fun button(block: Any = nil) { if (block != nil) { block() } }
+fun input() {}
+fun textarea(block: Any = nil) { if (block != nil) { block() } }
+fun select(block: Any = nil) { if (block != nil) { block() } }
+fun option(block: Any = nil) { if (block != nil) { block() } }
+fun form(block: Any = nil) { if (block != nil) { block() } }
+fun label(block: Any = nil) { if (block != nil) { block() } }
+fun fieldset(block: Any = nil) { if (block != nil) { block() } }
+fun legend(block: Any = nil) { if (block != nil) { block() } }
+fun ul(block: Any = nil) { if (block != nil) { block() } }
+fun ol(block: Any = nil) { if (block != nil) { block() } }
+fun li(block: Any = nil) { if (block != nil) { block() } }
+fun dl(block: Any = nil) { if (block != nil) { block() } }
+fun dt(block: Any = nil) { if (block != nil) { block() } }
+fun dd(block: Any = nil) { if (block != nil) { block() } }
+fun table(block: Any = nil) { if (block != nil) { block() } }
+fun thead(block: Any = nil) { if (block != nil) { block() } }
+fun tbody(block: Any = nil) { if (block != nil) { block() } }
+fun tr(block: Any = nil) { if (block != nil) { block() } }
+fun th(block: Any = nil) { if (block != nil) { block() } }
+fun td(block: Any = nil) { if (block != nil) { block() } }
+fun nav(block: Any = nil) { if (block != nil) { block() } }
+fun header(block: Any = nil) { if (block != nil) { block() } }
+fun footer(block: Any = nil) { if (block != nil) { block() } }
+fun section(block: Any = nil) { if (block != nil) { block() } }
+fun article(block: Any = nil) { if (block != nil) { block() } }
+fun aside(block: Any = nil) { if (block != nil) { block() } }
+fun details(block: Any = nil) { if (block != nil) { block() } }
+fun summary(block: Any = nil) { if (block != nil) { block() } }
+fun dialog(block: Any = nil) { if (block != nil) { block() } }
+fun pre(block: Any = nil) { if (block != nil) { block() } }
+fun code(block: Any = nil) { if (block != nil) { block() } }
+fun blockquote(block: Any = nil) { if (block != nil) { block() } }
+fun em(block: Any = nil) { if (block != nil) { block() } }
+fun strong(block: Any = nil) { if (block != nil) { block() } }
+fun small(block: Any = nil) { if (block != nil) { block() } }
+fun mark(block: Any = nil) { if (block != nil) { block() } }
+fun del(block: Any = nil) { if (block != nil) { block() } }
+fun ins(block: Any = nil) { if (block != nil) { block() } }
+fun figure(block: Any = nil) { if (block != nil) { block() } }
+fun figcaption(block: Any = nil) { if (block != nil) { block() } }
+fun picture(block: Any = nil) { if (block != nil) { block() } }
+fun video(block: Any = nil) { if (block != nil) { block() } }
+fun audio(block: Any = nil) { if (block != nil) { block() } }
+fun canvas(block: Any = nil) { if (block != nil) { block() } }
+fun iframe(block: Any = nil) { if (block != nil) { block() } }
+fun br() {}
+fun hr() {}
+fun img() {}
+fun source() {}
+fun track() {}
+fun wbr() {}
+fun embed() {}
+fun link() {}
+fun meta() {}

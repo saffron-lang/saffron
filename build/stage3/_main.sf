@@ -24,10 +24,92 @@ fun dir_of(path: String): String {
     return path.slice(0, last_slash)
 }
 
+var _lib_paths: List<String> = []
+
+fun _find_in_lib_paths(name: String, stdlib_dir: String): String {
+    // 1. Check stdlib: <stdlib>/<name>.sf
+    var stdlib_file: String = stdlib_dir + "/" + name + ".sf"
+    if (IO.file_exists(stdlib_file)) {
+        return stdlib_file
+    }
+
+    // 2. Search each --lib-path
+    var i: Float = 0
+    while (i < _lib_paths.length()) {
+        var lib_dir: String = _lib_paths[i]
+
+        // <lib_dir>/<name>.sf
+        var single_file: String = lib_dir + "/" + name + ".sf"
+        if (IO.file_exists(single_file)) {
+            return single_file
+        }
+
+        // <lib_dir>/<name>/pantry.toml → read entry
+        var pkg_manifest: String = lib_dir + "/" + name + "/pantry.toml"
+        if (IO.file_exists(pkg_manifest)) {
+            var entry: String = _extract_entry_from_toml(IO.read_file(pkg_manifest))
+            return lib_dir + "/" + name + "/" + entry
+        }
+
+        // <lib_dir>/<name>/src/lib.sf (convention)
+        var convention: String = lib_dir + "/" + name + "/src/lib.sf"
+        if (IO.file_exists(convention)) {
+            return convention
+        }
+
+        i = i + 1
+    }
+
+    return stdlib_dir + "/" + name + ".sf"
+}
+
+fun _find_submodule_in_lib_paths(pkg_name: String, sub_path: String, stdlib_dir: String): String {
+    // Search lib paths for: <lib_dir>/<pkg_name>/src/<sub_path>.sf
+    var i: Float = 0
+    while (i < _lib_paths.length()) {
+        var lib_dir: String = _lib_paths[i]
+
+        var candidate: String = lib_dir + "/" + pkg_name + "/src/" + sub_path + ".sf"
+        if (IO.file_exists(candidate)) {
+            return candidate
+        }
+
+        // Also try without src/ prefix
+        var candidate2: String = lib_dir + "/" + pkg_name + "/" + sub_path + ".sf"
+        if (IO.file_exists(candidate2)) {
+            return candidate2
+        }
+
+        i = i + 1
+    }
+
+    // Fallback
+    return stdlib_dir + "/" + pkg_name + "/" + sub_path + ".sf"
+}
+
+fun _extract_entry_from_toml(source: String): String {
+    var lines: List<String> = source.split("\n")
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.starts_with("entry")) {
+            var eq_idx: Float = line.index_of("=")
+            if (eq_idx >= 0) {
+                var value: String = line.slice(eq_idx + 1, line.length()).trim()
+                if (value.starts_with("\"") and value.ends_with("\"")) {
+                    return value.slice(1, value.length() - 1)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return "src/lib.sf"
+}
+
 fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: String): String {
     if (import_path.starts_with("@")) {
         var name: String = import_path.slice(1, import_path.length())
-        return stdlib_dir + "/" + name + ".sf"
+        return _find_in_lib_paths(name, stdlib_dir)
     }
     if (import_path.starts_with("./")) {
         var dir: String = dir_of(base_path)
@@ -38,7 +120,15 @@ fun resolve_import_path(base_path: String, import_path: String, stdlib_dir: Stri
         var parent: String = dir_of(dir)
         return parent + "/" + import_path.slice(3, import_path.length())
     }
-    return import_path
+    // Bare import with slash: "turmeric/signal" → package submodule
+    if (import_path.contains("/")) {
+        var slash_idx: Float = import_path.index_of("/")
+        var pkg_name: String = import_path.slice(0, slash_idx)
+        var sub_path: String = import_path.slice(slash_idx + 1, import_path.length())
+        return _find_submodule_in_lib_paths(pkg_name, sub_path, stdlib_dir)
+    }
+    // Bare import without slash: "turmeric" → search lib paths
+    return _find_in_lib_paths(import_path, stdlib_dir)
 }
 
 fun get_stmt_doc(stmt: AST.Stmt): String {
@@ -137,12 +227,15 @@ fun extract_imports(source: String): List<String> {
     var i: Float = 0
     while (i < lines.length()) {
         var line: String = lines[i]
-        if (line.starts_with("import \"./") or line.starts_with("import \"../") or line.starts_with("import \"@")) {
+        if (line.starts_with("import \"")) {
             var start: Float = 8
             var end: Float = start + 1
             while (end < line.length()) {
                 if (line.char_at(end) == "\"") {
-                    imports.push(line.slice(start, end))
+                    var imp_path: String = line.slice(start, end)
+                    if (!is_builtin_module(imp_path)) {
+                        imports.push(imp_path)
+                    }
                     end = line.length()
                 }
                 end = end + 1
@@ -161,7 +254,7 @@ fun extract_imports(source: String): List<String> {
                     path_end = path_end + 1
                 }
                 var imp_path: String = line.slice(path_start, path_end)
-                if (imp_path.starts_with("./") or imp_path.starts_with("../") or imp_path.starts_with("@")) {
+                if (!is_builtin_module(imp_path)) {
                     imports.push(imp_path)
                 }
             }
@@ -461,6 +554,12 @@ fun main(): Int {
                 stdlib_dir = args[i]
             }
         }
+        if (arg == "--lib-path") {
+            if (i + 1 < args.length()) {
+                i = i + 1
+                _lib_paths.push(args[i])
+            }
+        }
         if (arg == "--target") {
             if (i + 1 < args.length()) {
                 i = i + 1
@@ -482,7 +581,7 @@ fun main(): Int {
     }
 
     if (last_sf_idx < 0) {
-        IO.println("Usage: saffronc [--check] [--stdlib <path>] <input.sf> [output.ll]")
+        IO.println("Usage: saffronc [--check] [--stdlib <path>] [--lib-path <path>]... <input.sf> [output.ll]")
         return 1
     }
 
@@ -569,6 +668,39 @@ fun main(): Int {
         module_stmts.push(prelude_program)
         module_prefixes_list.push("")
         visited.set(prelude_path, true)
+    }
+
+    // Auto-import dependency preludes (src/prelude.sf in each lib-path package)
+    // Look for prelude files in each lib path directory
+    var lpi: Float = 0
+    while (lpi < _lib_paths.length()) {
+        var lib_dir: String = _lib_paths[lpi]
+        // Check for known preludes by import analysis
+        // Dependencies that provide src/prelude.sf get auto-imported
+        var dep_imports: List<String> = extract_imports(source)
+        var di: Float = 0
+        while (di < dep_imports.length()) {
+            var dep_path: String = dep_imports[di]
+            if (!dep_path.starts_with("./") and !dep_path.starts_with("@")) {
+                // Bare package name like "turmeric/signal" → package is "turmeric"
+                var pkg_name: String = dep_path
+                var slash: Float = dep_path.index_of("/")
+                if (slash > 0) {
+                    pkg_name = dep_path.slice(0, slash)
+                }
+                var pkg_prelude: String = lib_dir + "/" + pkg_name + "/src/prelude.sf"
+                if (IO.file_exists(pkg_prelude) and !visited.has(pkg_prelude)) {
+                    var dep_src: String = IO.read_file(pkg_prelude)
+                    var dep_tokens: List = Lexer.lex(dep_src)
+                    var dep_program: List = Parser.parse_with_source(dep_tokens, dep_src)
+                    module_stmts.push(dep_program)
+                    module_prefixes_list.push("")
+                    visited.set(pkg_prelude, true)
+                }
+            }
+            di = di + 1
+        }
+        lpi = lpi + 1
     }
 
     // Recursively collect modules (text-based extraction)

@@ -1117,7 +1117,7 @@ class Parser {
 
         if (this.match_kind_check("var")) return this.parse_var_decl_with_doc(docstring)
         if (this.match_kind_check("let")) return this.parse_var_decl_with_doc(docstring)
-        if (this.match_kind_check("fun")) return this.parse_fun_decl_with_doc(docstring)
+        if (this.match_kind_check("fun") and !this.peek_is("(")) return this.parse_fun_decl_with_doc(docstring)
         if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
         if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
         if (this.is_ident_named("interface")) return this.parse_class_decl_with_doc(docstring)
@@ -1943,10 +1943,109 @@ class Parser {
                 TkString(s) => AST.Expr.StringLit(s)
             }
         }
-        // Everything else: parse as a full expression
-        // Handles: {map: literal}, fun () => ..., identifiers, calls, etc.
-        // The { starts a map literal or block which parse_expr already handles.
-        return this.parse_expr()
+        // {expr} — brace-delimited expression value (map literals, lambdas, etc.)
+        // Consume the { ourselves, parse a full expression, then consume }.
+        // This is safe because the } delimiter prevents parse_expr from consuming
+        // HTML structural tokens (>, <, /) as binary operators.
+        // We handle { here rather than letting parse_primary's block-expression path
+        // handle it, because that path calls parse_stmt() which can misparse
+        // anonymous lambdas (fun () => ...) as declarations.
+        if (this.match_kind_check("{")) {
+            this.advance()
+            // Check for empty map: {}
+            if (this.match_kind_check("}")) {
+                this.advance()
+                return AST.Expr.MapLit
+            }
+            // Check for Kotlin-style lambda: {x => body} or {x, y => body}
+            var is_kotlin_lambda: Bool = false
+            if (this.match_kind_check("ident")) {
+                if (this.peek_is("=>") or this.peek_is(",")) {
+                    is_kotlin_lambda = true
+                }
+            }
+            if (is_kotlin_lambda) {
+                var kl_before: Float = this.pos
+                var kl_name: String = this.expect_ident()
+                if (this.match_kind("=>")) {
+                    // Single-param Kotlin lambda: {x => body}
+                    var lparams: List<AST.Param> = []
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    var lbody: List<AST.Stmt> = []
+                    while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                        while (this.match_kind(";")) {}
+                        if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+                        lbody.push(this.parse_stmt())
+                    }
+                    this.consume("}")
+                    if (lbody.length() > 0) {
+                        var klast: AST.Stmt = lbody[lbody.length() - 1]
+                        var kis_expr: Bool = match (klast) { ExprStmt(e) => true   _ => false }
+                        if (kis_expr) {
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
+                        }
+                    }
+                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                } else if (this.match_kind(",")) {
+                    // Multi-param Kotlin lambda: {x, y => body}
+                    var lparams: List<AST.Param> = []
+                    lparams.push(AST.Param.Param(kl_name, AST.Type.AnyType, AST.Expr.NilLit))
+                    var lpname: String = this.expect_ident()
+                    lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    while (this.match_kind(",")) {
+                        lpname = this.expect_ident()
+                        lparams.push(AST.Param.Param(lpname, AST.Type.AnyType, AST.Expr.NilLit))
+                    }
+                    this.consume("=>")
+                    var lbody: List<AST.Stmt> = []
+                    while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                        while (this.match_kind(";")) {}
+                        if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+                        lbody.push(this.parse_stmt())
+                    }
+                    this.consume("}")
+                    if (lbody.length() > 0) {
+                        var klast: AST.Stmt = lbody[lbody.length() - 1]
+                        var kis_expr: Bool = match (klast) { ExprStmt(e) => true   _ => false }
+                        if (kis_expr) {
+                            var kexpr: AST.Expr = match (klast) { ExprStmt(e) => e }
+                            lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
+                        }
+                    }
+                    return AST.Expr.Lambda(lparams, "Any", lbody)
+                } else {
+                    // Not a Kotlin lambda — restore position
+                    this.pos = kl_before
+                }
+            }
+            // Check for map literal: {"key": val, ...} or {ident: val, ...}
+            if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
+                var map_stmts: List<AST.Stmt> = []
+                map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
+                // First entry
+                var key: AST.Expr = this.parse_primary()
+                this.consume(":")
+                var value: AST.Expr = this.parse_expr()
+                map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
+                while (this.match_kind(",")) {
+                    if (this.match_kind_check("}")) { break }
+                    var k: AST.Expr = this.parse_primary()
+                    this.consume(":")
+                    var v: AST.Expr = this.parse_expr()
+                    map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
+                }
+                this.consume("}")
+                return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable("__map"))
+            }
+            // General expression (lambda, arithmetic, etc.)
+            var expr: AST.Expr = this.parse_expr()
+            this.consume("}")
+            return expr
+        }
+        // Bare value (identifier, number, etc.) — use parse_call to avoid
+        // consuming HTML structural tokens (>, <, /) as binary operators.
+        return this.parse_call()
     }
 
     fun parse_html_children(parent_tag: String): List<AST.Stmt> {
