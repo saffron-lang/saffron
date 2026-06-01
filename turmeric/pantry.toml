@@ -10,6 +10,7 @@ target = "wasm32"
 [dependencies]
 
 [scripts]
+build = "saffronc --target wasm32 src/index.sf build/turmeric.ll"
 generate = "saffron run tools/generate_types.sf"
 
 [scripts.bin]
