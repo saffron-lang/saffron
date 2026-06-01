@@ -327,7 +327,6 @@
                     // Already bound or already free — skip
                 } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
                     // Local variable in enclosing scope shadows any function of same name
-                    if (name == "todo") { IO.println("[DBG] todo added to free via typed_vars path, bound=" + bound.join(",")) }
                     free.push(name)
                 } else {
                     var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
@@ -338,7 +337,6 @@
                         }
                     }
                     if (!is_known) {
-                        if (name == "todo") { IO.println("[DBG] todo added to free via is_known path, bound=" + bound.join(",")) }
                         free.push(name)
                     }
                 }
@@ -467,13 +465,11 @@
                 }
                 var inner_free: List<String> = []
                 this.find_free_vars_stmts(b, inner_bound, inner_free)
-                if (inner_free.contains("todo")) { IO.println("[DBG-L] Lambda propagation: inner_bound=" + inner_bound.join(",") + " inner_free=" + inner_free.join(",") + " outer_bound=" + bound.join(",")) }
                 var fi: Float = 0
                 while (fi < inner_free.length()) {
                     var fv: String = inner_free[fi]
                     // Skip module globals — they are accessed via @__g_ not local capture
                     if (!bound.contains(fv) and !free.contains(fv) and !inner_bound.contains(fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
-                        if (fv == "todo") { IO.println("[DBG-L] PROPAGATING todo to outer free") }
                         free.push(fv)
                     }
                     fi = fi + 1
