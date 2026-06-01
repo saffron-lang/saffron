@@ -602,47 +602,52 @@ class Parser {
         this.consume("(")
         var cond: AST.Expr = this.parse_expr()
         this.consume(")")
-        this.consume("{")
         var then_stmts: List<AST.Stmt> = []
-        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
-            while (this.match_kind(";")) {}
-            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
-            then_stmts.push(this.parse_stmt())
-        }
-        this.consume("}")
-        // Extract last statement as value expression
         var then_val: AST.Expr = AST.Expr.NilLit
-        if (then_stmts.length() > 0) {
-            var last: AST.Stmt = then_stmts[then_stmts.length() - 1]
-            var is_expr: Bool = match (last) {
-                ExprStmt(e) => true
-                _ => false
+        if (this.match_kind_check("{")) {
+            this.advance()
+            while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                while (this.match_kind(";")) {}
+                if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+                then_stmts.push(this.parse_stmt())
             }
-            if (is_expr) {
-                then_val = match (last) { ExprStmt(e) => e }
-                then_stmts.pop()
+            this.consume("}")
+            if (then_stmts.length() > 0) {
+                var last: AST.Stmt = then_stmts[then_stmts.length() - 1]
+                var is_expr: Bool = match (last) { ExprStmt(e) => true   _ => false }
+                if (is_expr) {
+                    then_val = match (last) { ExprStmt(e) => e   _ => AST.Expr.NilLit }
+                    then_stmts.pop()
+                }
             }
+        } else {
+            then_val = this.parse_expr()
         }
-        this.consume("else")
-        this.consume("{")
+        if (!this.match_kind("else")) {
+            this.parse_error("if-expression requires an else branch")
+        }
         var else_stmts: List<AST.Stmt> = []
-        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
-            while (this.match_kind(";")) {}
-            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
-            else_stmts.push(this.parse_stmt())
-        }
-        this.consume("}")
         var else_val: AST.Expr = AST.Expr.NilLit
-        if (else_stmts.length() > 0) {
-            var last: AST.Stmt = else_stmts[else_stmts.length() - 1]
-            var is_expr: Bool = match (last) {
-                ExprStmt(e) => true
-                _ => false
+        if (this.match_kind_check("if")) {
+            else_val = this.parse_if_expr()
+        } else if (this.match_kind_check("{")) {
+            this.advance()
+            while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                while (this.match_kind(";")) {}
+                if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+                else_stmts.push(this.parse_stmt())
             }
-            if (is_expr) {
-                else_val = match (last) { ExprStmt(e) => e }
-                else_stmts.pop()
+            this.consume("}")
+            if (else_stmts.length() > 0) {
+                var last: AST.Stmt = else_stmts[else_stmts.length() - 1]
+                var is_expr: Bool = match (last) { ExprStmt(e) => true   _ => false }
+                if (is_expr) {
+                    else_val = match (last) { ExprStmt(e) => e   _ => AST.Expr.NilLit }
+                    else_stmts.pop()
+                }
             }
+        } else {
+            else_val = this.parse_expr()
         }
         return AST.Expr.IfExpr(cond, then_stmts, then_val, else_stmts, else_val)
     }
