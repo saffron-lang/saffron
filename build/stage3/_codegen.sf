@@ -6510,7 +6510,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
 
         // Wrap module's top-level code in an init function
         if (has_top) {
-            var init_suffix: String = "prelude"
+            var init_suffix: String = "prelude_" + mi.to_string()
             if (prefix.length() > 0) {
                 init_suffix = prefix.slice(0, prefix.length() - 1)
             }
@@ -6844,7 +6844,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             si = si + 1
         }
         if (has_top) {
-            var init_suffix2: String = "prelude"
+            var init_suffix2: String = "prelude_" + mi.to_string()
             if (prefix.length() > 0) {
                 init_suffix2 = prefix.slice(0, prefix.length() - 1)
             }
