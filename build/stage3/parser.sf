@@ -370,7 +370,7 @@ class Parser {
                     this.advance()
                 }
                 // Trailing closure: func(args) { ... }
-                IO.println("[TC-CHECK] sees_brace=" + this.match_kind_check("{").to_string()); if (this.match_kind_check("{")) {
+                if (this.match_kind_check("{")) {
                     args.push(this.parse_trailing_closure())
                 }
                 expr = AST.Expr.Call(expr, args)
@@ -1682,6 +1682,7 @@ class Parser {
         }
         this.consume("}")
         // Build the Lambda using the same pattern as parse_lambda
+        return this.build_lambda(param_names, body)
     }
 
     fun build_lambda(names: List<String>, body: List<AST.Stmt>): AST.Expr {
@@ -1691,6 +1692,7 @@ class Parser {
             params.push(AST.Param.Param(names[i], AST.Type.AnyType, AST.Expr.NilLit))
             i = i + 1
         }
+        return AST.Expr.Lambda(params, "Any", body)
     }
 
     fun parse_block(): AST.Stmt {
