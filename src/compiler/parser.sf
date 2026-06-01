@@ -396,6 +396,16 @@ class Parser {
     }
 
     fun parse_primary(): AST.Expr {
+        // HTML element expression: <tag attrs...>children</tag>
+        if (this.match_kind_check("<") and this.peek_is_html_start()) {
+            return this.parse_html_element()
+        }
+        if (this.match_kind_check("if")) {
+            return this.parse_if_expr()
+        }
+        if (this.match_kind_check("try")) {
+            return this.parse_try_expr()
+        }
         if (this.match_kind_check("match")) {
             return this.parse_match_expr()
         }
@@ -585,6 +595,106 @@ class Parser {
         }
         this.consume("}")
         return AST.Expr.Match(subject, arms)
+    }
+
+    fun parse_if_expr(): AST.Expr {
+        this.advance() // consume if
+        this.consume("(")
+        var cond: AST.Expr = this.parse_expr()
+        this.consume(")")
+        this.consume("{")
+        var then_stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            then_stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        // Extract last statement as value expression
+        var then_val: AST.Expr = AST.Expr.NilLit
+        if (then_stmts.length() > 0) {
+            var last: AST.Stmt = then_stmts[then_stmts.length() - 1]
+            var is_expr: Bool = match (last) {
+                ExprStmt(e) => true
+                _ => false
+            }
+            if (is_expr) {
+                then_val = match (last) { ExprStmt(e) => e }
+                then_stmts.pop()
+            }
+        }
+        this.consume("else")
+        this.consume("{")
+        var else_stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            else_stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        var else_val: AST.Expr = AST.Expr.NilLit
+        if (else_stmts.length() > 0) {
+            var last: AST.Stmt = else_stmts[else_stmts.length() - 1]
+            var is_expr: Bool = match (last) {
+                ExprStmt(e) => true
+                _ => false
+            }
+            if (is_expr) {
+                else_val = match (last) { ExprStmt(e) => e }
+                else_stmts.pop()
+            }
+        }
+        return AST.Expr.IfExpr(cond, then_stmts, then_val, else_stmts, else_val)
+    }
+
+    fun parse_try_expr(): AST.Expr {
+        this.advance() // consume try
+        this.consume("{")
+        var try_stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            try_stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        // Extract last statement as value expression
+        var try_val: AST.Expr = AST.Expr.NilLit
+        if (try_stmts.length() > 0) {
+            var last: AST.Stmt = try_stmts[try_stmts.length() - 1]
+            var is_expr: Bool = match (last) {
+                ExprStmt(e) => true
+                _ => false
+            }
+            if (is_expr) {
+                try_val = match (last) { ExprStmt(e) => e }
+                try_stmts.pop()
+            }
+        }
+        this.consume("catch")
+        this.consume("(")
+        var catch_name: String = this.expect_ident()
+        this.consume(")")
+        this.consume("{")
+        var catch_stmts: List<AST.Stmt> = []
+        while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            while (this.match_kind(";")) {}
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            catch_stmts.push(this.parse_stmt())
+        }
+        this.consume("}")
+        var catch_val: AST.Expr = AST.Expr.NilLit
+        if (catch_stmts.length() > 0) {
+            var last: AST.Stmt = catch_stmts[catch_stmts.length() - 1]
+            var is_expr: Bool = match (last) {
+                ExprStmt(e) => true
+                _ => false
+            }
+            if (is_expr) {
+                catch_val = match (last) { ExprStmt(e) => e }
+                catch_stmts.pop()
+            }
+        }
+        return AST.Expr.TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val)
     }
 
     fun parse_pattern(): AST.Pattern {
@@ -1707,6 +1817,189 @@ class Parser {
             i = i + 1
         }
         return AST.Expr.Lambda(params, "Any", body)
+    }
+
+    // =========================================================================
+    // HTML Element Parsing — <tag attrs>children</tag> desugars to builder calls
+    // =========================================================================
+
+    fun peek_is_html_start(): Bool {
+        // After seeing <, check if next token is an ident that's an HTML element or Component
+        if (!this.match_kind_check("ident")) { return false }
+        var name: String = this.peek_ident()
+        if (name.length() == 0) { return false }
+        // Uppercase = component
+        var first: String = name.char_at(0)
+        if (first >= "A" and first <= "Z") { return true }
+        // Known HTML elements
+        return this.is_html_tag(name)
+    }
+
+    fun is_html_tag(name: String): Bool {
+        // Common HTML elements (covers 99% of usage)
+        if (name == "div") { return true }
+        if (name == "span") { return true }
+        if (name == "p") { return true }
+        if (name == "a") { return true }
+        if (name == "h1" or name == "h2" or name == "h3" or name == "h4" or name == "h5" or name == "h6") { return true }
+        if (name == "button") { return true }
+        if (name == "input") { return true }
+        if (name == "form") { return true }
+        if (name == "label") { return true }
+        if (name == "img") { return true }
+        if (name == "ul" or name == "ol" or name == "li") { return true }
+        if (name == "table" or name == "tr" or name == "td" or name == "th" or name == "thead" or name == "tbody") { return true }
+        if (name == "nav" or name == "header" or name == "footer" or name == "main" or name == "section" or name == "article" or name == "aside") { return true }
+        if (name == "br" or name == "hr") { return true }
+        if (name == "select" or name == "option" or name == "textarea") { return true }
+        if (name == "pre" or name == "code" or name == "blockquote") { return true }
+        if (name == "em" or name == "strong" or name == "small" or name == "mark" or name == "del" or name == "ins") { return true }
+        if (name == "video" or name == "audio" or name == "canvas" or name == "source") { return true }
+        if (name == "details" or name == "summary" or name == "dialog") { return true }
+        if (name == "fieldset" or name == "legend" or name == "optgroup") { return true }
+        if (name == "iframe" or name == "embed" or name == "object") { return true }
+        if (name == "link" or name == "meta" or name == "style" or name == "script") { return true }
+        if (name == "head" or name == "body" or name == "html" or name == "title") { return true }
+        if (name == "dl" or name == "dt" or name == "dd") { return true }
+        if (name == "figure" or name == "figcaption" or name == "picture") { return true }
+        if (name == "area" or name == "base" or name == "col" or name == "colgroup" or name == "caption") { return true }
+        if (name == "track" or name == "wbr" or name == "slot" or name == "template") { return true }
+        return false
+    }
+
+    fun is_void_tag(name: String): Bool {
+        if (name == "br" or name == "hr" or name == "img" or name == "input") { return true }
+        if (name == "area" or name == "base" or name == "col" or name == "embed") { return true }
+        if (name == "link" or name == "meta" or name == "source" or name == "track" or name == "wbr") { return true }
+        return false
+    }
+
+    fun parse_html_element(): AST.Expr {
+        // < already checked but not consumed. Consume it.
+        this.advance()
+        // Read tag name
+        var tag: String = this.expect_ident()
+
+        // Parse attributes
+        var args: List<AST.Expr> = this.parse_html_attrs()
+
+        // Check for self-closing /> or >
+        if (this.match_kind_check("/")) {
+            this.advance()
+            this.consume(">")
+            // Self-closing: tag(attrs...)
+            return AST.Expr.Call(AST.Expr.Variable(tag), args)
+        }
+
+        this.consume(">")
+
+        if (this.is_void_tag(tag)) {
+            // Void element: tag(attrs...)
+            return AST.Expr.Call(AST.Expr.Variable(tag), args)
+        }
+
+        // Parse children until </tag>
+        var children: List<AST.Stmt> = this.parse_html_children(tag)
+
+        // Emit: tag(attrs...) { children }
+        // Add trailing closure (Lambda with children as body)
+        args.push(AST.Expr.Lambda([], "Nil", children))
+        return AST.Expr.Call(AST.Expr.Variable(tag), args)
+    }
+
+    fun parse_html_attrs(): List<AST.Expr> {
+        var args: List<AST.Expr> = []
+        // Parse name=value pairs until > or />
+        while (this.match_kind_check("ident")) {
+            var attr_name: String = this.expect_ident()
+
+            if (this.match_kind("=")) {
+                // name=value
+                var attr_val: AST.Expr = this.parse_html_attr_value()
+                args.push(AST.Expr.Assign(attr_name, attr_val))
+            } else {
+                // Boolean attribute: name (no value) → name=true
+                args.push(AST.Expr.Assign(attr_name, AST.Expr.BoolLit(true)))
+            }
+        }
+        return args
+    }
+
+    fun parse_html_attr_value(): AST.Expr {
+        // "string" → StringLit
+        if (this.match_kind_check("string")) {
+            var kind: Lexer.TokenKind = this.current_kind()
+            this.advance()
+            return match (kind) {
+                TkString(s) => AST.Expr.StringLit(s)
+            }
+        }
+        // {expression} → parse_expr()
+        if (this.match_kind_check("{")) {
+            this.advance()
+            var expr: AST.Expr = this.parse_expr()
+            this.consume("}")
+            return expr
+        }
+        // Bare identifier or number
+        return this.parse_expr()
+    }
+
+    fun parse_html_children(parent_tag: String): List<AST.Stmt> {
+        var stmts: List<AST.Stmt> = []
+
+        while (!this.match_kind_check("eof")) {
+            // Check for closing tag: </tag>
+            if (this.match_kind_check("<") and this.peek_is("/")) {
+                // Consume </ tag >
+                this.advance()
+                this.advance()
+                this.expect_ident()
+                this.consume(">")
+                return stmts
+            }
+
+            // Nested HTML element
+            if (this.match_kind_check("<") and this.peek_is_html_start()) {
+                var child: AST.Expr = this.parse_html_element()
+                stmts.push(AST.Stmt.ExprStmt(child))
+            }
+            // Expression: {code}
+            else if (this.match_kind_check("{")) {
+                this.advance()
+                var expr: AST.Expr = this.parse_expr()
+                this.consume("}")
+                stmts.push(AST.Stmt.ExprStmt(expr))
+            }
+            // Text content — accumulate until < or { or EOF
+            else if (this.match_kind_check("string")) {
+                var kind: Lexer.TokenKind = this.current_kind()
+                this.advance()
+                var text: String = match (kind) { TkString(s) => s }
+                stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(text)])))
+            }
+            else {
+                // Text as identifier tokens (HTML text content between tags)
+                // Accumulate tokens as text until we see < or { or EOF
+                var text_parts: List<String> = []
+                while (!this.match_kind_check("<") and !this.match_kind_check("{") and !this.match_kind_check("eof")) {
+                    var kind: Lexer.TokenKind = this.current_kind()
+                    var text_part: String = match (kind) {
+                        TkIdent(s) => s
+                        TkInt(v) => v.to_string()
+                        _ => this.kind_name(kind)
+                    }
+                    text_parts.push(text_part)
+                    this.advance()
+                }
+                if (text_parts.length() > 0) {
+                    var full_text: String = text_parts.join(" ")
+                    stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(full_text)])))
+                }
+            }
+        }
+
+        return stmts
     }
 
     fun parse_block(): AST.Stmt {

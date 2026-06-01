@@ -1078,6 +1078,12 @@ class Codegen {
             IsCheck(value, type_name) => {
                 this.gen_is_check(value, type_name)
             }
+            IfExpr(cond, then_stmts, then_val, else_stmts, else_val) => {
+                this.gen_if_expr(cond, then_stmts, then_val, else_stmts, else_val)
+            }
+            TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val) => {
+                this.gen_try_expr(try_stmts, try_val, catch_name, catch_stmts, catch_val)
+            }
         }
     }
 
@@ -1138,6 +1144,86 @@ class Codegen {
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
         return local
+    }
+
+    fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
+        var result_ptr: String = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        var cond_val: String = this.to_i1(this.gen_arg_value(cond))
+        var then_label: String = this.fresh_label("ifexpr.then")
+        var else_label: String = this.fresh_label("ifexpr.else")
+        var end_label: String = this.fresh_label("ifexpr.end")
+
+        this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+
+        this.start_block(then_label)
+        this.gen_stmts(then_stmts)
+        var then_result: String = this.gen_arg_value(then_val)
+        this.emit_indent("store i64 " + then_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(else_label)
+        this.gen_stmts(else_stmts)
+        var else_result: String = this.gen_arg_value(else_val)
+        this.emit_indent("store i64 " + else_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        return result
+    }
+
+    fun gen_try_expr(try_stmts: List<AST.Stmt>, try_val: AST.Expr, catch_name: String, catch_stmts: List<AST.Stmt>, catch_val: AST.Expr): String {
+        var result_ptr: String = this.fresh_local()
+        this.emit_indent(result_ptr + " = alloca i64")
+
+        var try_label: String = this.fresh_label("tryexpr.try")
+        var catch_label: String = this.fresh_label("tryexpr.catch")
+        var end_label: String = this.fresh_label("tryexpr.end")
+
+        // Allocate a local jmp_buf on the stack
+        var jmp_buf: String = this.fresh_local()
+        this.emit_indent(jmp_buf + " = alloca [512 x i8], align 16")
+        var jmp_buf_ptr: String = this.fresh_local()
+        this.emit_indent(jmp_buf_ptr + " = getelementptr [512 x i8], [512 x i8]* " + jmp_buf + ", i64 0, i64 0")
+
+        // Save previous jmp_buf
+        var saved_jmp: String = this.fresh_local()
+        this.emit_indent(saved_jmp + " = load i8*, i8** @__jmp_buf_current")
+        this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
+
+        // setjmp
+        var setjmp_result: String = this.fresh_local()
+        this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
+        var is_throw: String = this.fresh_local()
+        this.emit_indent(is_throw + " = icmp ne i32 " + setjmp_result + ", 0")
+        this.emit_terminator("br i1 " + is_throw + ", label %" + catch_label + ", label %" + try_label)
+
+        // Try body
+        this.start_block(try_label)
+        this.gen_stmts(try_stmts)
+        var try_result: String = this.gen_arg_value(try_val)
+        this.emit_indent("store i64 " + try_result + ", i64* " + result_ptr)
+        this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        this.emit_terminator("br label %" + end_label)
+
+        // Catch body
+        this.start_block(catch_label)
+        this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        var exc_val: String = this.fresh_local()
+        this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
+        this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.gen_stmts(catch_stmts)
+        var catch_result: String = this.gen_arg_value(catch_val)
+        this.emit_indent("store i64 " + catch_result + ", i64* " + result_ptr)
+        this.emit_terminator("br label %" + end_label)
+
+        this.start_block(end_label)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        return result
     }
 
     fun op_to_method(op: String): String {
@@ -1403,6 +1489,12 @@ class Codegen {
         }
         if (expr_kind == "match_expr") {
             // Fall through to gen_expr which handles Match(subject, arms) directly
+            return this.gen_expr(expr)
+        }
+        if (expr_kind == "if_expr") {
+            return this.gen_expr(expr)
+        }
+        if (expr_kind == "try_expr") {
             return this.gen_expr(expr)
         }
         if (expr_kind == "block_expr") {
@@ -1991,6 +2083,8 @@ class Codegen {
             This => "no"
             BlockExpr(s, v) => "no"
             IsCheck(val, t) => "no"
+            IfExpr(c, tb, tv, eb, ev) => "no"
+            TryExpr(tb, tv, cn, cb, cv) => "no"
         }
         return kind == "yes"
     }
@@ -2017,6 +2111,8 @@ class Codegen {
             This => ""
             BlockExpr(s, v) => ""
             IsCheck(val, t) => ""
+            IfExpr(c, tb, tv, eb, ev) => ""
+            TryExpr(tb, tv, cn, cb, cv) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -2065,6 +2161,8 @@ class Codegen {
             MethodCall(o, m, a) => "method"
             BlockExpr(s, v) => "block"
             IsCheck(val, t) => "is"
+            IfExpr(c, tb, tv, eb, ev) => "other"
+            TryExpr(tb, tv, cn, cb, cv) => "other"
         }
         return kind == "string"
     }
@@ -3111,7 +3209,7 @@ class Codegen {
                 this.gen_throw(value)
             }
             LetPattern(pattern, value) => {
-                // gen_let_pattern not yet implemented for LLVM codegen
+                this.gen_let_pattern(pattern, value)
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Capture and clear pending_extend_class to prevent stale state
@@ -3928,26 +4026,37 @@ class Codegen {
 
     fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
         // LetPattern destructures value into bindings from pattern.
-        // Currently a stub: evaluate value and assign bindings from variant fields.
         var val: String = this.gen_arg_value(value)
+        var variant_name: String = match (pattern) {
+            VariantPattern(v, b) => v
+            _ => ""
+        }
         var bindings: List<String> = match (pattern) {
             VariantPattern(v, b) => b
             _ => []
         }
         // For variant patterns, extract fields from the tagged value
         if (bindings.length() > 0) {
+            // Determine the enum name from the variant
+            var enum_name: String = this.find_enum_for_variant(variant_name)
+            var max_fields: Float = 0
+            if (enum_name != "Unknown") {
+                max_fields = this.get_max_fields(enum_name)
+            }
+            // Use extract_arm_bindings which handles both encodings
+            this.extract_arm_bindings(bindings, val, max_fields)
+            // Set type information for each binding
             var bi: Float = 0
             while (bi < bindings.length()) {
-                var field_ptr: String = this.fresh_local()
-                var field_val: String = this.fresh_local()
-                // Enum instances are pointers to [tag, field0, field1, ...]
-                var obj_ptr: String = this.fresh_local()
-                this.emit_indent(obj_ptr + " = inttoptr i64 " + val + " to i64*")
-                // Field at offset (bi + 1) to skip the tag
-                var offset: Float = bi + 1
-                this.emit_indent(field_ptr + " = getelementptr i64, i64* " + obj_ptr + ", i64 " + offset.floor().to_string())
-                this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
-                this.emit_indent("store i64 " + field_val + ", i64* %" + this.sanitize_name(bindings[bi]))
+                var btype: String = "Int"
+                if (enum_name != "Unknown") {
+                    btype = this.get_variant_field_type(enum_name, variant_name, bi)
+                }
+                this.var_types.set(bindings[bi], btype)
+                this.typed_vars.set(bindings[bi], this.str_to_type(btype))
+                if (btype == "String") {
+                    this.string_vars.push(bindings[bi])
+                }
                 bi = bi + 1
             }
         }
@@ -4293,6 +4402,8 @@ class Codegen {
             EnumConstruct(e, v, a) => {}
             Lambda(p, r, b) => {}
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
+            IfExpr(c, tb, tv, eb, ev) => {}
+            TryExpr(tb, tv, cn, cb, cv) => {}
         }
     }
 
@@ -4364,6 +4475,8 @@ class Codegen {
             MapLit => "other"
             BlockExpr(s, v) => "other"
             IsCheck(val, t) => "other"
+            IfExpr(c, tb, tv, eb, ev) => "other"
+            TryExpr(tb, tv, cn, cb, cv) => "other"
         }
         return kind == "match"
     }
@@ -4985,8 +5098,6 @@ class Codegen {
 
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
-        IfExpr(c, tb, tv, eb, ev) => "if_expr"
-        TryExpr(tb, tv, cn, cb, cv) => "try_expr"
         MethodCall(o, m, a) => "method_call"
         ListLit(e) => "list_lit"
         IndexGet(o, i) => "index_get"
@@ -5012,13 +5123,13 @@ class Codegen {
         This => "this"
         BlockExpr(s, v) => "block_expr"
         IsCheck(val, t) => "is_check"
+        IfExpr(c, tb, tv, eb, ev) => "if_expr"
+        TryExpr(tb, tv, cn, cb, cv) => "try_expr"
     }
     }
 
     fun get_variable_name(expr: AST.Expr): String {
     var name: Any = match (expr) {
-        IfExpr(c, tb, tv, eb, ev) => ""
-        TryExpr(tb, tv, cn, cb, cv) => ""
         Variable(n) => n
         IntLit(v) => ""
         FloatLit(v) => ""
@@ -5044,7 +5155,8 @@ class Codegen {
         MapLit => ""
         BlockExpr(s, v) => ""
         IsCheck(val, t) => ""
-    }
+        IfExpr(c, tb, tv, eb, ev) => ""
+        TryExpr(tb, tv, cn, cb, cv) => ""    }
     return name
     }
 
@@ -6018,8 +6130,6 @@ class Codegen {
 
     fun is_this_expr(expr: AST.Expr): Bool {
     var kind: Any = match (expr) {
-        IfExpr(c, tb, tv, eb, ev) => "other"
-        TryExpr(tb, tv, cn, cb, cv) => "other"
         This => "this"
         IntLit(v) => "other"
         FloatLit(v) => "other"
@@ -6040,6 +6150,8 @@ class Codegen {
         SetField(o, f, v) => "other"
         BlockExpr(s, v) => "other"
         IsCheck(val, t) => "other"
+        IfExpr(c, tb, tv, eb, ev) => "other"
+        TryExpr(tb, tv, cn, cb, cv) => "other"
     }
     return kind == "this"
     }
