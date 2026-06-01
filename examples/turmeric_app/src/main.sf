@@ -1,7 +1,7 @@
 // Turmeric Demo — what a real app looks like
 import { signal, computed, effect } from "turmeric/signal"
 import { Node, mount, text } from "turmeric/element"
-import { div, span, button, section, h1, p, ul, li, input, nav, header, footer, a } from "turmeric/generated_types"
+import { div, span, button, section, h1, p, ul, li, input, nav, header, footer, a, main_el } from "turmeric/generated_types"
 import { cx } from "turmeric/style"
 import { Event, on_click, on_keydown, bind_value } from "turmeric/events"
 import { each } from "turmeric/reconcile"
@@ -144,7 +144,7 @@ fun App(): Node {
             }
         }
 
-        main(cls="content") {
+        main_el(cls="content") {
             match (page.get()) {
                 "counter" => CounterPage()
                 "todos" => TodoPage()
