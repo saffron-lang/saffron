@@ -1100,6 +1100,21 @@ class Parser {
             return this.parse_destructure()
         }
         var name: String = this.expect_ident()
+        // Variant pattern: let Some(x) = expr
+        if (this.match_kind_check("(")) {
+            this.advance()
+            var bindings: List<String> = []
+            if (!this.match_kind_check(")")) {
+                bindings.push(this.expect_ident())
+                while (this.match_kind(",")) {
+                    bindings.push(this.expect_ident())
+                }
+            }
+            this.consume(")")
+            this.consume("=")
+            var pat_val: AST.Expr = this.parse_expr()
+            return AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, bindings), pat_val)
+        }
         var type_ann: String = "Any"
         if (this.match_kind(":")) {
             type_ann = this.parse_type()

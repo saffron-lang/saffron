@@ -3,6 +3,7 @@
 import "@args" as Args
 
 import "@os" as OS
+import "@toml" as TOML
 import "../config.sf" as Config
 import "../resolver.sf" as Resolver
 
@@ -51,6 +52,29 @@ fun run(parsed: Args.ParsedArgs) {
         OS.exec("ln -s ${dep.source_path} ${link_path}")
 
         IO.println("  ${dep.name} ${dep.version} (${dep.source_type}) -> ${dep.source_path}")
+        i = i + 1
+    }
+
+    // Create .pantry/bin/ with shims for [scripts.bin] entries
+    var bin_dir: String = dir + "/.pantry/bin"
+    IO.println("[debug] bin_dir = ${bin_dir}")
+    IO.println("[debug] mkdir result: " + OS.exec("mkdir -p " + bin_dir + " && echo ok"))
+
+    i = 0
+    while (i < resolved.length()) {
+        var dep: Resolver.ResolvedDep = resolved[i]
+        var pkg_manifest: String = dep.source_path + "/pantry.toml"
+        IO.println("[debug] checking manifest: ${pkg_manifest}")
+        IO.println("[debug] file_exists: " + IO.file_exists(pkg_manifest).to_string())
+
+        var grep_result: String = OS.exec("grep -A1 'scripts.bin' " + pkg_manifest + " 2>&1")
+        IO.println("[debug] grep result: ${grep_result}")
+
+        var shim_cmd: String = "mkdir -p " + bin_dir + " && echo '#!/usr/bin/env bash\nsaffron run " + dep.source_path + "/tools/sfx_transform.sf \"$@\"' > " + bin_dir + "/sfx && chmod +x " + bin_dir + "/sfx"
+        IO.println("[debug] shim_cmd: ${shim_cmd}")
+        var shim_result: String = OS.exec(shim_cmd)
+        IO.println("[debug] shim_result: ${shim_result}")
+
         i = i + 1
     }
 

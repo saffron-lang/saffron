@@ -4186,6 +4186,12 @@ class Codegen {
                 this.collect_vars_expr(value, names, types)
             }
             LetPattern(pattern, value) => {
+                var pat_bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+                var pbi: Float = 0
+                while (pbi < pat_bindings.length()) {
+                    this.add_var_unique(names, types, pat_bindings[pbi], "Any")
+                    pbi = pbi + 1
+                }
                 this.collect_vars_expr(value, names, types)
             }
         }
@@ -4251,6 +4257,20 @@ class Codegen {
             EnumConstruct(e, v, a) => {}
             Lambda(p, r, b) => {}
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
+            IfExpr(cond, then_body, then_val, else_body, else_val) => {
+                this.collect_vars_expr(cond, names, types)
+                this.collect_vars(then_body, names, types)
+                this.collect_vars_expr(then_val, names, types)
+                this.collect_vars(else_body, names, types)
+                this.collect_vars_expr(else_val, names, types)
+            }
+            TryExpr(try_body, try_val, catch_name, catch_body, catch_val) => {
+                this.collect_vars(try_body, names, types)
+                this.collect_vars_expr(try_val, names, types)
+                this.add_var_unique(names, types, catch_name, "String")
+                this.collect_vars(catch_body, names, types)
+                this.collect_vars_expr(catch_val, names, types)
+            }
         }
     }
 
