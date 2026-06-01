@@ -55,25 +55,55 @@ fun run(parsed: Args.ParsedArgs) {
         i = i + 1
     }
 
-    // Create .pantry/bin/ with shims for [scripts.bin] entries
+    // Create .pantry/bin/ with executable shims for [scripts.bin] entries
     var bin_dir: String = dir + "/.pantry/bin"
-    IO.println("[debug] bin_dir = ${bin_dir}")
-    IO.println("[debug] mkdir result: " + OS.exec("mkdir -p " + bin_dir + " && echo ok"))
+    OS.exec("mkdir -p " + bin_dir)
 
     i = 0
     while (i < resolved.length()) {
         var dep: Resolver.ResolvedDep = resolved[i]
         var pkg_manifest: String = dep.source_path + "/pantry.toml"
-        IO.println("[debug] checking manifest: ${pkg_manifest}")
-        IO.println("[debug] file_exists: " + IO.file_exists(pkg_manifest).to_string())
 
-        var grep_result: String = OS.exec("grep -A1 'scripts.bin' " + pkg_manifest + " 2>&1")
-        IO.println("[debug] grep result: ${grep_result}")
-
-        var shim_cmd: String = "mkdir -p " + bin_dir + " && echo '#!/usr/bin/env bash\nsaffron run " + dep.source_path + "/tools/sfx_transform.sf \"$@\"' > " + bin_dir + "/sfx && chmod +x " + bin_dir + "/sfx"
-        IO.println("[debug] shim_cmd: ${shim_cmd}")
-        var shim_result: String = OS.exec(shim_cmd)
-        IO.println("[debug] shim_result: ${shim_result}")
+        if (IO.file_exists(pkg_manifest)) {
+            // Extract bin script entries from the dep's pantry.toml
+            var grep_out: String = OS.exec("sed -n '/\\[scripts.bin\\]/,/^\\[/p' " + pkg_manifest + " | grep '=' 2>/dev/null")
+            if (grep_out.length() > 0) {
+                var lines: List<String> = grep_out.trim().split("\n")
+                var j: Int = 0
+                while (j < lines.length()) {
+                    var line: String = lines[j].trim()
+                    if (line.contains("=")) {
+                        var eq_idx: Int = line.index_of("=")
+                        var bin_name: String = line.slice(0, eq_idx).trim()
+                        var bin_cmd: String = line.slice(eq_idx + 1, line.length()).trim()
+                        // Strip quotes
+                        if (bin_cmd.starts_with("\"")) {
+                            bin_cmd = bin_cmd.slice(1, bin_cmd.length() - 1)
+                        }
+                        // Resolve relative .sf paths to absolute
+                        var parts: List<String> = bin_cmd.split(" ")
+                        var resolved_cmd: String = ""
+                        var k: Int = 0
+                        while (k < parts.length()) {
+                            var part: String = parts[k]
+                            if (k > 0) { resolved_cmd = resolved_cmd + " " }
+                            if (part.ends_with(".sf") and !(part.starts_with("/"))) {
+                                resolved_cmd = resolved_cmd + dep.source_path + "/" + part
+                            } else {
+                                resolved_cmd = resolved_cmd + part
+                            }
+                            k = k + 1
+                        }
+                        // Write shim
+                        var shim_path: String = bin_dir + "/" + bin_name
+                        var shim_content: String = "#!/usr/bin/env bash\n" + resolved_cmd + " \"$@\"\n"
+                        IO.write_file(shim_path, shim_content)
+                        OS.exec("chmod +x " + shim_path)
+                    }
+                    j = j + 1
+                }
+            }
+        }
 
         i = i + 1
     }
