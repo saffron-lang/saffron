@@ -266,6 +266,7 @@ extend fun Codegen.is_decl(stmt: AST.Stmt): Bool {
             Continue => false
             TryCatch(t, n, c, f) => false
             Throw(v) => false
+            LetPattern(p, v) => false
         }
     }
 

@@ -127,6 +127,9 @@
             Throw(value) => {
                 this.collect_vars_expr(value, names, types)
             }
+            LetPattern(pattern, value) => {
+                this.collect_vars_expr(value, names, types)
+            }
         }
     }
 

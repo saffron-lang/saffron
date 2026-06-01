@@ -475,10 +475,12 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var prefix: String = module_prefixes_list[mi]
         gen.current_prefix = prefix
 
-        // Compile declarations (functions, classes, enums)
+        // Compile declarations (functions, classes, enums) — use classify_stmt
+        // for reliable detection since is_decl can misfire for VarDecl
         var si: Float = 0
         while (si < stmts.length()) {
-            if (gen.is_decl(stmts[si])) {
+            var sk: String = gen.classify_stmt(stmts[si])
+            if (sk == "fun" or sk == "enum" or sk == "class") {
                 // Set pending_extend_class from pre-scanned map before gen_stmt
                 var fn_name: String = gen.get_fun_name(stmts[si])
                 if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
@@ -495,7 +497,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var has_top: Bool = false
         si = 0
         while (si < stmts.length()) {
-            if (!gen.is_decl(stmts[si])) {
+            var sk2: String = gen.classify_stmt(stmts[si])
+            if (sk2 == "var" or sk2 == "let_pattern") {
+                has_top = true
+            } else if (sk2 == "expr") {
+                if (!gen.is_nil_expr_stmt(stmts[si])) {
+                    has_top = true
+                }
+            } else if (sk2 != "fun" and sk2 != "enum" and sk2 != "class") {
                 has_top = true
             }
             si = si + 1
@@ -516,7 +525,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             var top_var_types: List<String> = []
             si = 0
             while (si < stmts.length()) {
-                if (!gen.is_decl(stmts[si])) {
+                var sk3: String = gen.classify_stmt(stmts[si])
+                if (sk3 == "var" or sk3 == "let_pattern" or (sk3 == "expr" and !gen.is_nil_expr_stmt(stmts[si])) or (sk3 != "fun" and sk3 != "enum" and sk3 != "class" and sk3 != "expr")) {
                     var single_list: List<AST.Stmt> = []
                     single_list.push(stmts[si])
                     gen.collect_vars(single_list, top_vars, top_var_types)
@@ -533,7 +543,8 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             }
             si = 0
             while (si < stmts.length()) {
-                if (!gen.is_decl(stmts[si])) {
+                var sk4: String = gen.classify_stmt(stmts[si])
+                if (sk4 == "var" or sk4 == "let_pattern" or (sk4 == "expr" and !gen.is_nil_expr_stmt(stmts[si])) or (sk4 != "fun" and sk4 != "enum" and sk4 != "class" and sk4 != "expr")) {
                     gen.gen_stmt(stmts[si])
                 }
                 si = si + 1
@@ -798,7 +809,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
 
         var si: Float = start
         while (si < end) {
-            if (gen.is_decl(all_stmts[si])) {
+            // Use classify_stmt for reliable declaration detection —
+            // is_decl can misfire for VarDecl due to cross-module enum matching issues
+            var sk: String = gen.classify_stmt(all_stmts[si])
+            if (sk == "fun" or sk == "enum" or sk == "class") {
                 // Set pending_extend_class from pre-scanned map before gen_stmt
                 var fn_name: String = gen.get_fun_name(all_stmts[si])
                 if (fn_name.length() > 0 and gen.extend_map.has(prefix + fn_name)) {
@@ -811,11 +825,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             si = si + 1
         }
 
-        // Module top-level code
+        // Module top-level code — use classify_stmt for reliable VarDecl detection
         var has_top: Bool = false
         si = start
         while (si < end) {
-            if (!gen.is_decl(all_stmts[si])) { has_top = true }
+            var sk2: String = gen.classify_stmt(all_stmts[si])
+            if (sk2 == "var" or sk2 == "let_pattern") {
+                has_top = true
+            } else if (sk2 == "expr") {
+                if (!gen.is_nil_expr_stmt(all_stmts[si])) {
+                    has_top = true
+                }
+            } else if (sk2 != "fun" and sk2 != "enum" and sk2 != "class") {
+                has_top = true
+            }
             si = si + 1
         }
         if (has_top) {
@@ -831,7 +854,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             var top_var_types: List<String> = []
             si = start
             while (si < end) {
-                if (!gen.is_decl(all_stmts[si])) {
+                var sk3: String = gen.classify_stmt(all_stmts[si])
+                if (sk3 == "var" or sk3 == "let_pattern" or (sk3 == "expr" and !gen.is_nil_expr_stmt(all_stmts[si])) or (sk3 != "fun" and sk3 != "enum" and sk3 != "class" and sk3 != "expr")) {
                     var single_list: List<AST.Stmt> = []
                     single_list.push(all_stmts[si])
                     gen.collect_vars(single_list, top_vars, top_var_types)
@@ -848,7 +872,8 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             }
             si = start
             while (si < end) {
-                if (!gen.is_decl(all_stmts[si])) {
+                var sk4: String = gen.classify_stmt(all_stmts[si])
+                if (sk4 == "var" or sk4 == "let_pattern" or (sk4 == "expr" and !gen.is_nil_expr_stmt(all_stmts[si])) or (sk4 != "fun" and sk4 != "enum" and sk4 != "class" and sk4 != "expr")) {
                     gen.gen_stmt(all_stmts[si])
                 }
                 si = si + 1
