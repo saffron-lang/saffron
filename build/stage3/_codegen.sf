@@ -4150,6 +4150,19 @@ class Codegen {
     }
 
     fun collect_vars_stmt(stmt: AST.Stmt, names: List<String>, types: List<String>) {
+        var sk: String = this.classify_stmt(stmt)
+        if (sk == "let_pattern") {
+            var lp_pat: AST.Pattern = match (stmt) { LetPattern(p, v) => p   _ => AST.Pattern.VariantPattern("", []) }
+            var lp_val: AST.Expr = match (stmt) { LetPattern(p, v) => v   _ => AST.Expr.NilLit }
+            var lp_bindings: List<String> = match (lp_pat) { VariantPattern(v, b) => b   _ => [] }
+            var lpi: Float = 0
+            while (lpi < lp_bindings.length()) {
+                this.add_var_unique(names, types, lp_bindings[lpi], "Any")
+                lpi = lpi + 1
+            }
+            this.collect_vars_expr(lp_val, names, types)
+            return
+        }
         match (stmt) {
             VarDecl(name, type_ann, init, doc) => {
                 this.add_var_unique(names, types, name, type_ann)
@@ -4186,18 +4199,41 @@ class Codegen {
                 this.collect_vars_expr(value, names, types)
             }
             LetPattern(pattern, value) => {
-                var pat_bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
-                var pbi: Float = 0
-                while (pbi < pat_bindings.length()) {
-                    this.add_var_unique(names, types, pat_bindings[pbi], "Any")
-                    pbi = pbi + 1
-                }
                 this.collect_vars_expr(value, names, types)
             }
         }
     }
 
     fun collect_vars_expr(expr: AST.Expr, names: List<String>, types: List<String>) {
+        var ek: String = this.classify_expr(expr)
+        if (ek == "if_expr") {
+            var ie_cond: AST.Expr = match (expr) { IfExpr(c, tb, tv, eb, ev) => c   _ => AST.Expr.NilLit }
+            var ie_tb: List<AST.Stmt> = match (expr) { IfExpr(c, tb, tv, eb, ev) => tb   _ => [] }
+            var ie_tv: AST.Expr = match (expr) { IfExpr(c, tb, tv, eb, ev) => tv   _ => AST.Expr.NilLit }
+            var ie_eb: List<AST.Stmt> = match (expr) { IfExpr(c, tb, tv, eb, ev) => eb   _ => [] }
+            var ie_ev: AST.Expr = match (expr) { IfExpr(c, tb, tv, eb, ev) => ev   _ => AST.Expr.NilLit }
+            this.collect_vars_expr(ie_cond, names, types)
+            this.collect_vars(ie_tb, names, types)
+            this.collect_vars_expr(ie_tv, names, types)
+            this.collect_vars(ie_eb, names, types)
+            this.collect_vars_expr(ie_ev, names, types)
+            return
+        }
+        if (ek == "try_expr") {
+            var te_tb: List<AST.Stmt> = match (expr) { TryExpr(tb, tv, cn, cb, cv) => tb   _ => [] }
+            var te_tv: AST.Expr = match (expr) { TryExpr(tb, tv, cn, cb, cv) => tv   _ => AST.Expr.NilLit }
+            var te_cn: String = match (expr) { TryExpr(tb, tv, cn, cb, cv) => cn   _ => "" }
+            var te_cb: List<AST.Stmt> = match (expr) { TryExpr(tb, tv, cn, cb, cv) => cb   _ => [] }
+            var te_cv: AST.Expr = match (expr) { TryExpr(tb, tv, cn, cb, cv) => cv   _ => AST.Expr.NilLit }
+            this.collect_vars(te_tb, names, types)
+            this.collect_vars_expr(te_tv, names, types)
+            if (te_cn.length() > 0) {
+                this.add_var_unique(names, types, te_cn, "String")
+            }
+            this.collect_vars(te_cb, names, types)
+            this.collect_vars_expr(te_cv, names, types)
+            return
+        }
         match (expr) {
             Match(s, a) => { this.collect_vars_match(expr, names, types) }
             BlockExpr(stmts, value) => {
@@ -4257,20 +4293,6 @@ class Codegen {
             EnumConstruct(e, v, a) => {}
             Lambda(p, r, b) => {}
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
-            IfExpr(cond, then_body, then_val, else_body, else_val) => {
-                this.collect_vars_expr(cond, names, types)
-                this.collect_vars(then_body, names, types)
-                this.collect_vars_expr(then_val, names, types)
-                this.collect_vars(else_body, names, types)
-                this.collect_vars_expr(else_val, names, types)
-            }
-            TryExpr(try_body, try_val, catch_name, catch_body, catch_val) => {
-                this.collect_vars(try_body, names, types)
-                this.collect_vars_expr(try_val, names, types)
-                this.add_var_unique(names, types, catch_name, "String")
-                this.collect_vars(catch_body, names, types)
-                this.collect_vars_expr(catch_val, names, types)
-            }
         }
     }
 
@@ -4963,6 +4985,8 @@ class Codegen {
 
     fun classify_expr(expr: AST.Expr): String {
     return match (expr) {
+        IfExpr(c, tb, tv, eb, ev) => "if_expr"
+        TryExpr(tb, tv, cn, cb, cv) => "try_expr"
         MethodCall(o, m, a) => "method_call"
         ListLit(e) => "list_lit"
         IndexGet(o, i) => "index_get"
@@ -4993,6 +5017,8 @@ class Codegen {
 
     fun get_variable_name(expr: AST.Expr): String {
     var name: Any = match (expr) {
+        IfExpr(c, tb, tv, eb, ev) => ""
+        TryExpr(tb, tv, cn, cb, cv) => ""
         Variable(n) => n
         IntLit(v) => ""
         FloatLit(v) => ""
@@ -5992,6 +6018,8 @@ class Codegen {
 
     fun is_this_expr(expr: AST.Expr): Bool {
     var kind: Any = match (expr) {
+        IfExpr(c, tb, tv, eb, ev) => "other"
+        TryExpr(tb, tv, cn, cb, cv) => "other"
         This => "this"
         IntLit(v) => "other"
         FloatLit(v) => "other"
