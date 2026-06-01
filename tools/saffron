@@ -47,6 +47,8 @@ OUTPUT=""
 OPT="-O2"
 TARGET=""
 VERBOSE=false
+LIB_PATHS=()
+EXTRA_SAFFRONC_FLAGS=""
 
 if [[ $# -eq 0 ]]; then
     usage
@@ -91,6 +93,10 @@ while [[ $# -gt 0 ]]; do
         --target)
             shift
             TARGET="$1"
+            ;;
+        --lib-path)
+            shift
+            LIB_PATHS+=("$1")
             ;;
         *.sf)
             INPUT="$1"
@@ -185,6 +191,9 @@ build_project() {
     local ll_path="$TMPDIR/output.ll"
     local saffronc_flags=""
     [[ -n "$TARGET" ]] && saffronc_flags="--target $TARGET"
+    for lp in "${LIB_PATHS[@]:-}"; do
+        [[ -n "$lp" ]] && saffronc_flags="$saffronc_flags --lib-path $lp"
+    done
 
     [[ "$VERBOSE" == true ]] && echo "  compile: $entry"
     "$SAFFRONC" $saffronc_flags "$entry" "$ll_path" || {
@@ -218,6 +227,7 @@ case "$COMMAND" in
         TMPIR="$TMPDIR/output.ll"
         compile_to_ir "$INPUT" "$TMPIR"
         cat "$TMPIR"
+        exit 0
         ;;
     build)
         if [[ -z "$OUTPUT" ]]; then
@@ -225,6 +235,7 @@ case "$COMMAND" in
         fi
         build_project "$INPUT" "$OUTPUT"
         [[ "$VERBOSE" == true ]] && echo "  done: $OUTPUT"
+        exit 0
         ;;
     run)
         TMPBIN="$TMPDIR/program"

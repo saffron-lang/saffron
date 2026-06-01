@@ -5,6 +5,8 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
         if (name == "main") {
             emit_name = "__saffron_main"
             this.known_functions.push("main")
+        } else if (name.starts_with("__lambda")) {
+            emit_name = name
         }
         this.known_functions.push(emit_name)
         this.func_ret_types.set(emit_name, ret_type)

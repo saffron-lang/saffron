@@ -657,8 +657,8 @@ fun h1(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
     return _el("h1", attrs, block)
 }
 
-fun input(attrs: List<Attr> = []): Node {
-    return _el("input", attrs, fun () {})
+fun input(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
+    return _el("input", attrs, block)
 }
 
 fun header(attrs: List<Attr> = [], block: () => Nil = fun () {}): Node {
