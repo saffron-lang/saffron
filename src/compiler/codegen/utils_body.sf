@@ -235,6 +235,8 @@
             EnumConstruct(e, v, a) => {}
             Lambda(p, r, b) => {}
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
+            IfExpr(c, tb, tv, eb, ev) => {}
+            TryExpr(tb, tv, cn, cb, cv) => {}
         }
     }
 
@@ -306,6 +308,8 @@
             MapLit => "other"
             BlockExpr(s, v) => "other"
             IsCheck(val, t) => "other"
+            IfExpr(c, tb, tv, eb, ev) => "other"
+            TryExpr(tb, tv, cn, cb, cv) => "other"
         }
         return kind == "match"
     }

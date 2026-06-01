@@ -1094,6 +1094,8 @@
             This => "no"
             BlockExpr(s, v) => "no"
             IsCheck(val, t) => "no"
+            IfExpr(c, tb, tv, eb, ev) => "no"
+            TryExpr(tb, tv, cn, cb, cv) => "no"
         }
         return kind == "yes"
     }
@@ -1120,6 +1122,8 @@
             This => ""
             BlockExpr(s, v) => ""
             IsCheck(val, t) => ""
+            IfExpr(c, tb, tv, eb, ev) => ""
+            TryExpr(tb, tv, cn, cb, cv) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -1168,6 +1172,8 @@
             MethodCall(o, m, a) => "method"
             BlockExpr(s, v) => "block"
             IsCheck(val, t) => "is"
+            IfExpr(c, tb, tv, eb, ev) => "other"
+            TryExpr(tb, tv, cn, cb, cv) => "other"
         }
         return kind == "string"
     }

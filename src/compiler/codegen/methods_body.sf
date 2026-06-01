@@ -44,6 +44,8 @@
         This => "this"
         BlockExpr(s, v) => "block_expr"
         IsCheck(val, t) => "is_check"
+        IfExpr(c, tb, tv, eb, ev) => "if_expr"
+        TryExpr(tb, tv, cn, cb, cv) => "try_expr"
     }
     }
 
@@ -74,7 +76,8 @@
         MapLit => ""
         BlockExpr(s, v) => ""
         IsCheck(val, t) => ""
-    }
+        IfExpr(c, tb, tv, eb, ev) => ""
+        TryExpr(tb, tv, cn, cb, cv) => ""    }
     return name
     }
 
@@ -1068,6 +1071,8 @@
         SetField(o, f, v) => "other"
         BlockExpr(s, v) => "other"
         IsCheck(val, t) => "other"
+        IfExpr(c, tb, tv, eb, ev) => "other"
+        TryExpr(tb, tv, cn, cb, cv) => "other"
     }
     return kind == "this"
     }
