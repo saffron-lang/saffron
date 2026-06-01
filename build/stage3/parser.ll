@@ -1115,7 +1115,7 @@ target triple = "arm64-apple-macosx15.0.0"
 %TypedVal = type { i8, [16 x i8] }
 %TokenKind = type { i8, [16 x i8] }
 %Token = type { i8, [16 x i8] }
-%Lexer_Lexer = type { i64, i64, i64, i64, i64 }
+%lexer_Lexer = type { i64, i64, i64, i64, i64 }
 %Parser = type { i64, i64, i64, i64 }
 
 declare i32 @puts(i8*)
@@ -3406,7 +3406,7 @@ ets.end67:
   ret i64 %t18
 }
 
-define linkonce_odr i64 @AST_type_to_string(i64 %t.arg) {
+define linkonce_odr i64 @ast_type_to_string(i64 %t.arg) {
 entry:
   %t = alloca i64
   %name = alloca i64
@@ -3507,7 +3507,7 @@ match.arm81:
   %t46 = load i64, i64* %t45
   store i64 %t46, i64* %inner
   %t47 = load i64, i64* %inner
-  %t48 = call i64 @AST_type_to_string(i64 %t47)
+  %t48 = call i64 @ast_type_to_string(i64 %t47)
   %t49 = getelementptr [5 x i8], [5 x i8]* @.str.183, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = inttoptr i64 %t48 to i8*
@@ -3946,7 +3946,7 @@ ets.end148:
   ret i64 %t26
 }
 
-define linkonce_odr i64 @Lexer_Lexer__init(i64 %self.arg, i64 %source.arg) {
+define linkonce_odr i64 @lexer_Lexer__init(i64 %self.arg, i64 %source.arg) {
 entry:
   %self = alloca i64
   %source = alloca i64
@@ -3954,43 +3954,43 @@ entry:
   store i64 %source.arg, i64* %source
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %source
-  %t3 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t4 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t3, i32 0, i32 0
+  %t3 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t4 = getelementptr %lexer_Lexer, %lexer_Lexer* %t3, i32 0, i32 0
   store volatile i64 %t2, i64* %t4
   %t5 = load i64, i64* %self
   %t6 = add i64 0, 0
-  %t7 = inttoptr i64 %t5 to %Lexer_Lexer*
-  %t8 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t7, i32 0, i32 1
+  %t7 = inttoptr i64 %t5 to %lexer_Lexer*
+  %t8 = getelementptr %lexer_Lexer, %lexer_Lexer* %t7, i32 0, i32 1
   store volatile i64 %t6, i64* %t8
   %t9 = load i64, i64* %self
   %t10 = add i64 0, 1
-  %t11 = inttoptr i64 %t9 to %Lexer_Lexer*
-  %t12 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t11, i32 0, i32 2
+  %t11 = inttoptr i64 %t9 to %lexer_Lexer*
+  %t12 = getelementptr %lexer_Lexer, %lexer_Lexer* %t11, i32 0, i32 2
   store volatile i64 %t10, i64* %t12
   %t13 = load i64, i64* %self
   %t14 = add i64 0, 1
-  %t15 = inttoptr i64 %t13 to %Lexer_Lexer*
-  %t16 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t15, i32 0, i32 3
+  %t15 = inttoptr i64 %t13 to %lexer_Lexer*
+  %t16 = getelementptr %lexer_Lexer, %lexer_Lexer* %t15, i32 0, i32 3
   store volatile i64 %t14, i64* %t16
   %t17 = load i64, i64* %self
   %t18 = call i64 @__list_new()
-  %t19 = inttoptr i64 %t17 to %Lexer_Lexer*
-  %t20 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t19, i32 0, i32 4
+  %t19 = inttoptr i64 %t17 to %lexer_Lexer*
+  %t20 = getelementptr %lexer_Lexer, %lexer_Lexer* %t19, i32 0, i32 4
   store volatile i64 %t18, i64* %t20
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__peek(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__peek(i64 %self.arg) {
 entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = load i64, i64* %self
-  %t6 = inttoptr i64 %t5 to %Lexer_Lexer*
-  %t7 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t6, i32 0, i32 0
+  %t6 = inttoptr i64 %t5 to %lexer_Lexer*
+  %t7 = getelementptr %lexer_Lexer, %lexer_Lexer* %t6, i32 0, i32 0
   %t8 = load volatile i64, i64* %t7
   %t9 = inttoptr i64 %t8 to i8*
   %t10 = call i64 @strlen(i8* %t9)
@@ -4006,13 +4006,13 @@ else152:
   br label %endif150
 endif150:
   %t16 = load i64, i64* %self
-  %t17 = inttoptr i64 %t16 to %Lexer_Lexer*
-  %t18 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t17, i32 0, i32 0
+  %t17 = inttoptr i64 %t16 to %lexer_Lexer*
+  %t18 = getelementptr %lexer_Lexer, %lexer_Lexer* %t17, i32 0, i32 0
   %t19 = load volatile i64, i64* %t18
   %t20 = inttoptr i64 %t19 to i8*
   %t21 = load i64, i64* %self
-  %t22 = inttoptr i64 %t21 to %Lexer_Lexer*
-  %t23 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t22, i32 0, i32 1
+  %t22 = inttoptr i64 %t21 to %lexer_Lexer*
+  %t23 = getelementptr %lexer_Lexer, %lexer_Lexer* %t22, i32 0, i32 1
   %t24 = load volatile i64, i64* %t23
   %t25 = getelementptr i8, i8* %t20, i64 %t24
   %t26 = call i8* @malloc(i64 2)
@@ -4024,19 +4024,19 @@ endif150:
   ret i64 %t29
 }
 
-define linkonce_odr i64 @Lexer_Lexer__peek_next(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__peek_next(i64 %self.arg) {
 entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = add i64 0, 1
   %t6 = add i64 %t4, %t5
   %t7 = load i64, i64* %self
-  %t8 = inttoptr i64 %t7 to %Lexer_Lexer*
-  %t9 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t8, i32 0, i32 0
+  %t8 = inttoptr i64 %t7 to %lexer_Lexer*
+  %t9 = getelementptr %lexer_Lexer, %lexer_Lexer* %t8, i32 0, i32 0
   %t10 = load volatile i64, i64* %t9
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = call i64 @strlen(i8* %t11)
@@ -4052,13 +4052,13 @@ else155:
   br label %endif153
 endif153:
   %t18 = load i64, i64* %self
-  %t19 = inttoptr i64 %t18 to %Lexer_Lexer*
-  %t20 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t19, i32 0, i32 0
+  %t19 = inttoptr i64 %t18 to %lexer_Lexer*
+  %t20 = getelementptr %lexer_Lexer, %lexer_Lexer* %t19, i32 0, i32 0
   %t21 = load volatile i64, i64* %t20
   %t22 = inttoptr i64 %t21 to i8*
   %t23 = load i64, i64* %self
-  %t24 = inttoptr i64 %t23 to %Lexer_Lexer*
-  %t25 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t24, i32 0, i32 1
+  %t24 = inttoptr i64 %t23 to %lexer_Lexer*
+  %t25 = getelementptr %lexer_Lexer, %lexer_Lexer* %t24, i32 0, i32 1
   %t26 = load volatile i64, i64* %t25
   %t27 = add i64 0, 1
   %t28 = add i64 %t26, %t27
@@ -4072,19 +4072,19 @@ endif153:
   ret i64 %t33
 }
 
-define linkonce_odr i64 @Lexer_Lexer__advance(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__advance(i64 %self.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 0
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 0
   %t4 = load volatile i64, i64* %t3
   %t5 = inttoptr i64 %t4 to i8*
   %t6 = load i64, i64* %self
-  %t7 = inttoptr i64 %t6 to %Lexer_Lexer*
-  %t8 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t7, i32 0, i32 1
+  %t7 = inttoptr i64 %t6 to %lexer_Lexer*
+  %t8 = getelementptr %lexer_Lexer, %lexer_Lexer* %t7, i32 0, i32 1
   %t9 = load volatile i64, i64* %t8
   %t10 = getelementptr i8, i8* %t5, i64 %t9
   %t11 = call i8* @malloc(i64 2)
@@ -4096,37 +4096,37 @@ entry:
   store i64 %t14, i64* %ch
   %t15 = load i64, i64* %self
   %t16 = load i64, i64* %self
-  %t17 = inttoptr i64 %t16 to %Lexer_Lexer*
-  %t18 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t17, i32 0, i32 1
+  %t17 = inttoptr i64 %t16 to %lexer_Lexer*
+  %t18 = getelementptr %lexer_Lexer, %lexer_Lexer* %t17, i32 0, i32 1
   %t19 = load volatile i64, i64* %t18
   %t20 = add i64 0, 1
   %t21 = add i64 %t19, %t20
-  %t22 = inttoptr i64 %t15 to %Lexer_Lexer*
-  %t23 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t22, i32 0, i32 1
+  %t22 = inttoptr i64 %t15 to %lexer_Lexer*
+  %t23 = getelementptr %lexer_Lexer, %lexer_Lexer* %t22, i32 0, i32 1
   store volatile i64 %t21, i64* %t23
   %t24 = load i64, i64* %self
   %t25 = load i64, i64* %self
-  %t26 = inttoptr i64 %t25 to %Lexer_Lexer*
-  %t27 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t26, i32 0, i32 3
+  %t26 = inttoptr i64 %t25 to %lexer_Lexer*
+  %t27 = getelementptr %lexer_Lexer, %lexer_Lexer* %t26, i32 0, i32 3
   %t28 = load volatile i64, i64* %t27
   %t29 = add i64 0, 1
   %t30 = add i64 %t28, %t29
-  %t31 = inttoptr i64 %t24 to %Lexer_Lexer*
-  %t32 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t31, i32 0, i32 3
+  %t31 = inttoptr i64 %t24 to %lexer_Lexer*
+  %t32 = getelementptr %lexer_Lexer, %lexer_Lexer* %t31, i32 0, i32 3
   store volatile i64 %t30, i64* %t32
   %t33 = load i64, i64* %ch
   ret i64 %t33
 }
 
-define linkonce_odr i64 @Lexer_Lexer__emit(i64 %self.arg, i64 %kind.arg) {
+define linkonce_odr i64 @lexer_Lexer__emit(i64 %self.arg, i64 %kind.arg) {
 entry:
   %self = alloca i64
   %kind = alloca i64
   store i64 %self.arg, i64* %self
   store i64 %kind.arg, i64* %kind
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 4
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 4
   %t4 = load volatile i64, i64* %t3
   %t5 = call i8* @malloc(i64 32)
   %t6 = bitcast i8* %t5 to [4 x i64]*
@@ -4136,14 +4136,14 @@ entry:
   %t9 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 1
   store i64 %t8, i64* %t9
   %t10 = load i64, i64* %self
-  %t11 = inttoptr i64 %t10 to %Lexer_Lexer*
-  %t12 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t11, i32 0, i32 2
+  %t11 = inttoptr i64 %t10 to %lexer_Lexer*
+  %t12 = getelementptr %lexer_Lexer, %lexer_Lexer* %t11, i32 0, i32 2
   %t13 = load volatile i64, i64* %t12
   %t14 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 2
   store i64 %t13, i64* %t14
   %t15 = load i64, i64* %self
-  %t16 = inttoptr i64 %t15 to %Lexer_Lexer*
-  %t17 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t16, i32 0, i32 3
+  %t16 = inttoptr i64 %t15 to %lexer_Lexer*
+  %t17 = getelementptr %lexer_Lexer, %lexer_Lexer* %t16, i32 0, i32 3
   %t18 = load volatile i64, i64* %t17
   %t19 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 3
   store i64 %t18, i64* %t19
@@ -4152,7 +4152,7 @@ entry:
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__is_digit(i64 %self.arg, i64 %ch.arg) {
+define linkonce_odr i64 @lexer_Lexer__is_digit(i64 %self.arg, i64 %ch.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
@@ -4169,7 +4169,7 @@ entry:
   ret i64 %t9
 }
 
-define linkonce_odr i64 @Lexer_Lexer__is_alpha(i64 %self.arg, i64 %ch.arg) {
+define linkonce_odr i64 @lexer_Lexer__is_alpha(i64 %self.arg, i64 %ch.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
@@ -4186,7 +4186,7 @@ entry:
   ret i64 %t9
 }
 
-define linkonce_odr i64 @Lexer_Lexer__is_alnum(i64 %self.arg, i64 %ch.arg) {
+define linkonce_odr i64 @lexer_Lexer__is_alnum(i64 %self.arg, i64 %ch.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
@@ -4194,7 +4194,7 @@ entry:
   store i64 %ch.arg, i64* %ch
   %t1 = load i64, i64* %self
   %t2 = load i64, i64* %ch
-  %t3 = call i64 @Lexer_Lexer__is_digit(i64 %t1, i64 %t2)
+  %t3 = call i64 @lexer_Lexer__is_digit(i64 %t1, i64 %t2)
   %t4 = trunc i64 %t3 to i1
   br label %logic.entry156
 logic.entry156:
@@ -4202,7 +4202,7 @@ logic.entry156:
 rhs157:
   %t5 = load i64, i64* %self
   %t6 = load i64, i64* %ch
-  %t7 = call i64 @Lexer_Lexer__is_alpha(i64 %t5, i64 %t6)
+  %t7 = call i64 @lexer_Lexer__is_alpha(i64 %t5, i64 %t6)
   %t8 = trunc i64 %t7 to i1
   br label %end158
 end158:
@@ -4211,7 +4211,7 @@ end158:
   ret i64 %t10
 }
 
-define linkonce_odr i64 @Lexer_Lexer__is_hex(i64 %self.arg, i64 %ch.arg) {
+define linkonce_odr i64 @lexer_Lexer__is_hex(i64 %self.arg, i64 %ch.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
@@ -4228,7 +4228,7 @@ entry:
   ret i64 %t9
 }
 
-define linkonce_odr i64 @Lexer_Lexer__skip_whitespace(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__skip_whitespace(i64 %self.arg) {
 entry:
   %self = alloca i64
   %ch = alloca i64
@@ -4237,12 +4237,12 @@ entry:
   br label %while.cond159
 while.cond159:
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = load i64, i64* %self
-  %t6 = inttoptr i64 %t5 to %Lexer_Lexer*
-  %t7 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t6, i32 0, i32 0
+  %t6 = inttoptr i64 %t5 to %lexer_Lexer*
+  %t7 = getelementptr %lexer_Lexer, %lexer_Lexer* %t6, i32 0, i32 0
   %t8 = load volatile i64, i64* %t7
   %t9 = inttoptr i64 %t8 to i8*
   %t10 = call i64 @strlen(i8* %t9)
@@ -4252,7 +4252,7 @@ while.cond159:
   br i1 %t13, label %while.body160, label %while.end161
 while.body160:
   %t14 = load i64, i64* %self
-  %t15 = call i64 @Lexer_Lexer__peek(i64 %t14)
+  %t15 = call i64 @lexer_Lexer__peek(i64 %t14)
   store i64 %t15, i64* %ch
   %t16 = load i64, i64* %ch
   %t17 = getelementptr [2 x i8], [2 x i8]* @.str.266, i64 0, i64 0
@@ -4302,7 +4302,7 @@ end168:
   br i1 %t48, label %then169, label %else170
 then169:
   %t49 = load i64, i64* %self
-  %t50 = call i64 @Lexer_Lexer__advance(i64 %t49)
+  %t50 = call i64 @lexer_Lexer__advance(i64 %t49)
   br label %endif162
 else170:
   %t51 = load i64, i64* %ch
@@ -4318,28 +4318,28 @@ else170:
 then171:
   %t60 = load i64, i64* %self
   %t61 = load i64, i64* %self
-  %t62 = inttoptr i64 %t61 to %Lexer_Lexer*
-  %t63 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t62, i32 0, i32 2
+  %t62 = inttoptr i64 %t61 to %lexer_Lexer*
+  %t63 = getelementptr %lexer_Lexer, %lexer_Lexer* %t62, i32 0, i32 2
   %t64 = load volatile i64, i64* %t63
   %t65 = add i64 0, 1
   %t66 = add i64 %t64, %t65
-  %t67 = inttoptr i64 %t60 to %Lexer_Lexer*
-  %t68 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t67, i32 0, i32 2
+  %t67 = inttoptr i64 %t60 to %lexer_Lexer*
+  %t68 = getelementptr %lexer_Lexer, %lexer_Lexer* %t67, i32 0, i32 2
   store volatile i64 %t66, i64* %t68
   %t69 = load i64, i64* %self
   %t70 = add i64 0, 1
-  %t71 = inttoptr i64 %t69 to %Lexer_Lexer*
-  %t72 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t71, i32 0, i32 3
+  %t71 = inttoptr i64 %t69 to %lexer_Lexer*
+  %t72 = getelementptr %lexer_Lexer, %lexer_Lexer* %t71, i32 0, i32 3
   store volatile i64 %t70, i64* %t72
   %t73 = load i64, i64* %self
   %t74 = load i64, i64* %self
-  %t75 = inttoptr i64 %t74 to %Lexer_Lexer*
-  %t76 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t75, i32 0, i32 1
+  %t75 = inttoptr i64 %t74 to %lexer_Lexer*
+  %t76 = getelementptr %lexer_Lexer, %lexer_Lexer* %t75, i32 0, i32 1
   %t77 = load volatile i64, i64* %t76
   %t78 = add i64 0, 1
   %t79 = add i64 %t77, %t78
-  %t80 = inttoptr i64 %t73 to %Lexer_Lexer*
-  %t81 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t80, i32 0, i32 1
+  %t80 = inttoptr i64 %t73 to %lexer_Lexer*
+  %t81 = getelementptr %lexer_Lexer, %lexer_Lexer* %t80, i32 0, i32 1
   store volatile i64 %t79, i64* %t81
   br label %endif162
 else172:
@@ -4357,7 +4357,7 @@ logic.entry173:
   br i1 %t90, label %rhs174, label %end175
 rhs174:
   %t91 = load i64, i64* %self
-  %t92 = call i64 @Lexer_Lexer__peek_next(i64 %t91)
+  %t92 = call i64 @lexer_Lexer__peek_next(i64 %t91)
   %t93 = getelementptr [2 x i8], [2 x i8]* @.str.271, i64 0, i64 0
   %t94 = ptrtoint i8* %t93 to i64
   %t95 = inttoptr i64 %t92 to i8*
@@ -4374,14 +4374,14 @@ end175:
   br i1 %t103, label %then176, label %else177
 then176:
   %t104 = load i64, i64* %self
-  %t105 = inttoptr i64 %t104 to %Lexer_Lexer*
-  %t106 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t105, i32 0, i32 1
+  %t105 = inttoptr i64 %t104 to %lexer_Lexer*
+  %t106 = getelementptr %lexer_Lexer, %lexer_Lexer* %t105, i32 0, i32 1
   %t107 = load volatile i64, i64* %t106
   %t108 = add i64 0, 2
   %t109 = add i64 %t107, %t108
   %t110 = load i64, i64* %self
-  %t111 = inttoptr i64 %t110 to %Lexer_Lexer*
-  %t112 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t111, i32 0, i32 0
+  %t111 = inttoptr i64 %t110 to %lexer_Lexer*
+  %t112 = getelementptr %lexer_Lexer, %lexer_Lexer* %t111, i32 0, i32 0
   %t113 = load volatile i64, i64* %t112
   %t114 = inttoptr i64 %t113 to i8*
   %t115 = call i64 @strlen(i8* %t114)
@@ -4391,13 +4391,13 @@ then176:
   br i1 %t118, label %then179, label %else180
 then179:
   %t119 = load i64, i64* %self
-  %t120 = inttoptr i64 %t119 to %Lexer_Lexer*
-  %t121 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t120, i32 0, i32 0
+  %t120 = inttoptr i64 %t119 to %lexer_Lexer*
+  %t121 = getelementptr %lexer_Lexer, %lexer_Lexer* %t120, i32 0, i32 0
   %t122 = load volatile i64, i64* %t121
   %t123 = inttoptr i64 %t122 to i8*
   %t124 = load i64, i64* %self
-  %t125 = inttoptr i64 %t124 to %Lexer_Lexer*
-  %t126 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t125, i32 0, i32 1
+  %t125 = inttoptr i64 %t124 to %lexer_Lexer*
+  %t126 = getelementptr %lexer_Lexer, %lexer_Lexer* %t125, i32 0, i32 1
   %t127 = load volatile i64, i64* %t126
   %t128 = add i64 0, 2
   %t129 = add i64 %t127, %t128
@@ -4449,12 +4449,12 @@ endif178:
   br label %while.cond187
 while.cond187:
   %t156 = load i64, i64* %self
-  %t157 = inttoptr i64 %t156 to %Lexer_Lexer*
-  %t158 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t157, i32 0, i32 1
+  %t157 = inttoptr i64 %t156 to %lexer_Lexer*
+  %t158 = getelementptr %lexer_Lexer, %lexer_Lexer* %t157, i32 0, i32 1
   %t159 = load volatile i64, i64* %t158
   %t160 = load i64, i64* %self
-  %t161 = inttoptr i64 %t160 to %Lexer_Lexer*
-  %t162 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t161, i32 0, i32 0
+  %t161 = inttoptr i64 %t160 to %lexer_Lexer*
+  %t162 = getelementptr %lexer_Lexer, %lexer_Lexer* %t161, i32 0, i32 0
   %t163 = load volatile i64, i64* %t162
   %t164 = inttoptr i64 %t163 to i8*
   %t165 = call i64 @strlen(i8* %t164)
@@ -4466,7 +4466,7 @@ logic.entry190:
   br i1 %t168, label %rhs191, label %end192
 rhs191:
   %t169 = load i64, i64* %self
-  %t170 = call i64 @Lexer_Lexer__peek(i64 %t169)
+  %t170 = call i64 @lexer_Lexer__peek(i64 %t169)
   %t171 = getelementptr [2 x i8], [2 x i8]* @.str.274, i64 0, i64 0
   %t172 = ptrtoint i8* %t171 to i64
   %t173 = inttoptr i64 %t170 to i8*
@@ -4483,7 +4483,7 @@ end192:
   br i1 %t181, label %while.body188, label %while.end189
 while.body188:
   %t182 = load i64, i64* %self
-  %t183 = call i64 @Lexer_Lexer__advance(i64 %t182)
+  %t183 = call i64 @lexer_Lexer__advance(i64 %t182)
   br label %while.cond187
 while.end189:
   br label %endif162
@@ -4495,7 +4495,7 @@ while.end161:
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__read_number(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__read_number(i64 %self.arg) {
 entry:
   %self = alloca i64
   %start = alloca i64
@@ -4506,15 +4506,15 @@ entry:
   %ivalue = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = add i64 0, 1
   %t6 = sub i64 %t4, %t5
   store i64 %t6, i64* %start
   %t7 = load i64, i64* %self
-  %t8 = inttoptr i64 %t7 to %Lexer_Lexer*
-  %t9 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t8, i32 0, i32 0
+  %t8 = inttoptr i64 %t7 to %lexer_Lexer*
+  %t9 = getelementptr %lexer_Lexer, %lexer_Lexer* %t8, i32 0, i32 0
   %t10 = load volatile i64, i64* %t9
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = load i64, i64* %start
@@ -4536,12 +4536,12 @@ entry:
   br i1 %t25, label %then194, label %else195
 then194:
   %t26 = load i64, i64* %self
-  %t27 = inttoptr i64 %t26 to %Lexer_Lexer*
-  %t28 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t27, i32 0, i32 1
+  %t27 = inttoptr i64 %t26 to %lexer_Lexer*
+  %t28 = getelementptr %lexer_Lexer, %lexer_Lexer* %t27, i32 0, i32 1
   %t29 = load volatile i64, i64* %t28
   %t30 = load i64, i64* %self
-  %t31 = inttoptr i64 %t30 to %Lexer_Lexer*
-  %t32 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t31, i32 0, i32 0
+  %t31 = inttoptr i64 %t30 to %lexer_Lexer*
+  %t32 = getelementptr %lexer_Lexer, %lexer_Lexer* %t31, i32 0, i32 0
   %t33 = load volatile i64, i64* %t32
   %t34 = inttoptr i64 %t33 to i8*
   %t35 = call i64 @strlen(i8* %t34)
@@ -4551,7 +4551,7 @@ then194:
   br i1 %t38, label %then197, label %else198
 then197:
   %t39 = load i64, i64* %self
-  %t40 = call i64 @Lexer_Lexer__peek(i64 %t39)
+  %t40 = call i64 @lexer_Lexer__peek(i64 %t39)
   store i64 %t40, i64* %next_ch
   %t41 = load i64, i64* %next_ch
   %t42 = getelementptr [2 x i8], [2 x i8]* @.str.276, i64 0, i64 0
@@ -4583,16 +4583,16 @@ end202:
   br i1 %t61, label %then203, label %else204
 then203:
   %t62 = load i64, i64* %self
-  %t63 = call i64 @Lexer_Lexer__advance(i64 %t62)
+  %t63 = call i64 @lexer_Lexer__advance(i64 %t62)
   br label %while.cond205
 while.cond205:
   %t64 = load i64, i64* %self
-  %t65 = inttoptr i64 %t64 to %Lexer_Lexer*
-  %t66 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t65, i32 0, i32 1
+  %t65 = inttoptr i64 %t64 to %lexer_Lexer*
+  %t66 = getelementptr %lexer_Lexer, %lexer_Lexer* %t65, i32 0, i32 1
   %t67 = load volatile i64, i64* %t66
   %t68 = load i64, i64* %self
-  %t69 = inttoptr i64 %t68 to %Lexer_Lexer*
-  %t70 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t69, i32 0, i32 0
+  %t69 = inttoptr i64 %t68 to %lexer_Lexer*
+  %t70 = getelementptr %lexer_Lexer, %lexer_Lexer* %t69, i32 0, i32 0
   %t71 = load volatile i64, i64* %t70
   %t72 = inttoptr i64 %t71 to i8*
   %t73 = call i64 @strlen(i8* %t72)
@@ -4605,8 +4605,8 @@ logic.entry208:
 rhs209:
   %t77 = load i64, i64* %self
   %t78 = load i64, i64* %self
-  %t79 = call i64 @Lexer_Lexer__peek(i64 %t78)
-  %t80 = call i64 @Lexer_Lexer__is_hex(i64 %t77, i64 %t79)
+  %t79 = call i64 @lexer_Lexer__peek(i64 %t78)
+  %t80 = call i64 @lexer_Lexer__is_hex(i64 %t77, i64 %t79)
   %t81 = trunc i64 %t80 to i1
   br label %end210
 end210:
@@ -4616,18 +4616,18 @@ end210:
   br i1 %t84, label %while.body206, label %while.end207
 while.body206:
   %t85 = load i64, i64* %self
-  %t86 = call i64 @Lexer_Lexer__advance(i64 %t85)
+  %t86 = call i64 @lexer_Lexer__advance(i64 %t85)
   br label %while.cond205
 while.end207:
   %t87 = load i64, i64* %self
-  %t88 = inttoptr i64 %t87 to %Lexer_Lexer*
-  %t89 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t88, i32 0, i32 0
+  %t88 = inttoptr i64 %t87 to %lexer_Lexer*
+  %t89 = getelementptr %lexer_Lexer, %lexer_Lexer* %t88, i32 0, i32 0
   %t90 = load volatile i64, i64* %t89
   %t91 = inttoptr i64 %t90 to i8*
   %t92 = load i64, i64* %start
   %t93 = load i64, i64* %self
-  %t94 = inttoptr i64 %t93 to %Lexer_Lexer*
-  %t95 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t94, i32 0, i32 1
+  %t94 = inttoptr i64 %t93 to %lexer_Lexer*
+  %t95 = getelementptr %lexer_Lexer, %lexer_Lexer* %t94, i32 0, i32 1
   %t96 = load volatile i64, i64* %t95
   %t97 = sub i64 %t96, %t92
   %t98 = add i64 %t97, 1
@@ -4646,7 +4646,7 @@ while.end207:
   %t107 = load i64, i64* %value
   %t108 = shl i64 0, 56
   %t109 = or i64 %t108, %t107
-  %t110 = call i64 @Lexer_Lexer__emit(i64 %t106, i64 %t109)
+  %t110 = call i64 @lexer_Lexer__emit(i64 %t106, i64 %t109)
   ret i64 0
 else204:
   br label %endif199
@@ -4662,12 +4662,12 @@ endif193:
   br label %while.cond211
 while.cond211:
   %t111 = load i64, i64* %self
-  %t112 = inttoptr i64 %t111 to %Lexer_Lexer*
-  %t113 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t112, i32 0, i32 1
+  %t112 = inttoptr i64 %t111 to %lexer_Lexer*
+  %t113 = getelementptr %lexer_Lexer, %lexer_Lexer* %t112, i32 0, i32 1
   %t114 = load volatile i64, i64* %t113
   %t115 = load i64, i64* %self
-  %t116 = inttoptr i64 %t115 to %Lexer_Lexer*
-  %t117 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t116, i32 0, i32 0
+  %t116 = inttoptr i64 %t115 to %lexer_Lexer*
+  %t117 = getelementptr %lexer_Lexer, %lexer_Lexer* %t116, i32 0, i32 0
   %t118 = load volatile i64, i64* %t117
   %t119 = inttoptr i64 %t118 to i8*
   %t120 = call i64 @strlen(i8* %t119)
@@ -4680,8 +4680,8 @@ logic.entry214:
 rhs215:
   %t124 = load i64, i64* %self
   %t125 = load i64, i64* %self
-  %t126 = call i64 @Lexer_Lexer__peek(i64 %t125)
-  %t127 = call i64 @Lexer_Lexer__is_digit(i64 %t124, i64 %t126)
+  %t126 = call i64 @lexer_Lexer__peek(i64 %t125)
+  %t127 = call i64 @lexer_Lexer__is_digit(i64 %t124, i64 %t126)
   %t128 = trunc i64 %t127 to i1
   br label %end216
 end216:
@@ -4691,18 +4691,18 @@ end216:
   br i1 %t131, label %while.body212, label %while.end213
 while.body212:
   %t132 = load i64, i64* %self
-  %t133 = call i64 @Lexer_Lexer__advance(i64 %t132)
+  %t133 = call i64 @lexer_Lexer__advance(i64 %t132)
   br label %while.cond211
 while.end213:
   %t134 = add i64 0, 0
   store i64 %t134, i64* %has_dot
   %t135 = load i64, i64* %self
-  %t136 = inttoptr i64 %t135 to %Lexer_Lexer*
-  %t137 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t136, i32 0, i32 1
+  %t136 = inttoptr i64 %t135 to %lexer_Lexer*
+  %t137 = getelementptr %lexer_Lexer, %lexer_Lexer* %t136, i32 0, i32 1
   %t138 = load volatile i64, i64* %t137
   %t139 = load i64, i64* %self
-  %t140 = inttoptr i64 %t139 to %Lexer_Lexer*
-  %t141 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t140, i32 0, i32 0
+  %t140 = inttoptr i64 %t139 to %lexer_Lexer*
+  %t141 = getelementptr %lexer_Lexer, %lexer_Lexer* %t140, i32 0, i32 0
   %t142 = load volatile i64, i64* %t141
   %t143 = inttoptr i64 %t142 to i8*
   %t144 = call i64 @strlen(i8* %t143)
@@ -4714,7 +4714,7 @@ logic.entry218:
   br i1 %t147, label %rhs219, label %end220
 rhs219:
   %t148 = load i64, i64* %self
-  %t149 = call i64 @Lexer_Lexer__peek(i64 %t148)
+  %t149 = call i64 @lexer_Lexer__peek(i64 %t148)
   %t150 = getelementptr [2 x i8], [2 x i8]* @.str.278, i64 0, i64 0
   %t151 = ptrtoint i8* %t150 to i64
   %t152 = inttoptr i64 %t149 to i8*
@@ -4733,16 +4733,16 @@ then221:
   %t161 = add i64 0, 1
   store i64 %t161, i64* %has_dot
   %t162 = load i64, i64* %self
-  %t163 = call i64 @Lexer_Lexer__advance(i64 %t162)
+  %t163 = call i64 @lexer_Lexer__advance(i64 %t162)
   br label %while.cond223
 while.cond223:
   %t164 = load i64, i64* %self
-  %t165 = inttoptr i64 %t164 to %Lexer_Lexer*
-  %t166 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t165, i32 0, i32 1
+  %t165 = inttoptr i64 %t164 to %lexer_Lexer*
+  %t166 = getelementptr %lexer_Lexer, %lexer_Lexer* %t165, i32 0, i32 1
   %t167 = load volatile i64, i64* %t166
   %t168 = load i64, i64* %self
-  %t169 = inttoptr i64 %t168 to %Lexer_Lexer*
-  %t170 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t169, i32 0, i32 0
+  %t169 = inttoptr i64 %t168 to %lexer_Lexer*
+  %t170 = getelementptr %lexer_Lexer, %lexer_Lexer* %t169, i32 0, i32 0
   %t171 = load volatile i64, i64* %t170
   %t172 = inttoptr i64 %t171 to i8*
   %t173 = call i64 @strlen(i8* %t172)
@@ -4755,8 +4755,8 @@ logic.entry226:
 rhs227:
   %t177 = load i64, i64* %self
   %t178 = load i64, i64* %self
-  %t179 = call i64 @Lexer_Lexer__peek(i64 %t178)
-  %t180 = call i64 @Lexer_Lexer__is_digit(i64 %t177, i64 %t179)
+  %t179 = call i64 @lexer_Lexer__peek(i64 %t178)
+  %t180 = call i64 @lexer_Lexer__is_digit(i64 %t177, i64 %t179)
   %t181 = trunc i64 %t180 to i1
   br label %end228
 end228:
@@ -4766,7 +4766,7 @@ end228:
   br i1 %t184, label %while.body224, label %while.end225
 while.body224:
   %t185 = load i64, i64* %self
-  %t186 = call i64 @Lexer_Lexer__advance(i64 %t185)
+  %t186 = call i64 @lexer_Lexer__advance(i64 %t185)
   br label %while.cond223
 while.end225:
   br label %endif217
@@ -4774,14 +4774,14 @@ else222:
   br label %endif217
 endif217:
   %t187 = load i64, i64* %self
-  %t188 = inttoptr i64 %t187 to %Lexer_Lexer*
-  %t189 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t188, i32 0, i32 0
+  %t188 = inttoptr i64 %t187 to %lexer_Lexer*
+  %t189 = getelementptr %lexer_Lexer, %lexer_Lexer* %t188, i32 0, i32 0
   %t190 = load volatile i64, i64* %t189
   %t191 = inttoptr i64 %t190 to i8*
   %t192 = load i64, i64* %start
   %t193 = load i64, i64* %self
-  %t194 = inttoptr i64 %t193 to %Lexer_Lexer*
-  %t195 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t194, i32 0, i32 1
+  %t194 = inttoptr i64 %t193 to %lexer_Lexer*
+  %t195 = getelementptr %lexer_Lexer, %lexer_Lexer* %t194, i32 0, i32 1
   %t196 = load volatile i64, i64* %t195
   %t197 = sub i64 %t196, %t192
   %t198 = add i64 %t197, 1
@@ -4800,7 +4800,7 @@ then230:
   %t206 = load i64, i64* %text
   %t207 = shl i64 1, 56
   %t208 = or i64 %t207, %t206
-  %t209 = call i64 @Lexer_Lexer__emit(i64 %t205, i64 %t208)
+  %t209 = call i64 @lexer_Lexer__emit(i64 %t205, i64 %t208)
   br label %endif229
 else231:
   %t210 = load i64, i64* %text
@@ -4811,13 +4811,13 @@ else231:
   %t214 = load i64, i64* %ivalue
   %t215 = shl i64 0, 56
   %t216 = or i64 %t215, %t214
-  %t217 = call i64 @Lexer_Lexer__emit(i64 %t213, i64 %t216)
+  %t217 = call i64 @lexer_Lexer__emit(i64 %t213, i64 %t216)
   br label %endif229
 endif229:
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__read_string(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__read_string(i64 %self.arg) {
 entry:
   %self = alloca i64
   %result = alloca i64
@@ -4832,12 +4832,12 @@ entry:
   br label %while.cond232
 while.cond232:
   %t3 = load i64, i64* %self
-  %t4 = inttoptr i64 %t3 to %Lexer_Lexer*
-  %t5 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t4, i32 0, i32 1
+  %t4 = inttoptr i64 %t3 to %lexer_Lexer*
+  %t5 = getelementptr %lexer_Lexer, %lexer_Lexer* %t4, i32 0, i32 1
   %t6 = load volatile i64, i64* %t5
   %t7 = load i64, i64* %self
-  %t8 = inttoptr i64 %t7 to %Lexer_Lexer*
-  %t9 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t8, i32 0, i32 0
+  %t8 = inttoptr i64 %t7 to %lexer_Lexer*
+  %t9 = getelementptr %lexer_Lexer, %lexer_Lexer* %t8, i32 0, i32 0
   %t10 = load volatile i64, i64* %t9
   %t11 = inttoptr i64 %t10 to i8*
   %t12 = call i64 @strlen(i8* %t11)
@@ -4849,7 +4849,7 @@ logic.entry235:
   br i1 %t15, label %rhs236, label %end237
 rhs236:
   %t16 = load i64, i64* %self
-  %t17 = call i64 @Lexer_Lexer__peek(i64 %t16)
+  %t17 = call i64 @lexer_Lexer__peek(i64 %t16)
   %t18 = getelementptr [2 x i8], [2 x i8]* @.str.279, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = inttoptr i64 %t17 to i8*
@@ -4866,7 +4866,7 @@ end237:
   br i1 %t28, label %while.body233, label %while.end234
 while.body233:
   %t29 = load i64, i64* %self
-  %t30 = call i64 @Lexer_Lexer__advance(i64 %t29)
+  %t30 = call i64 @lexer_Lexer__advance(i64 %t29)
   store i64 %t30, i64* %ch
   %t31 = load i64, i64* %ch
   %t32 = getelementptr [2 x i8], [2 x i8]* @.str.280, i64 0, i64 0
@@ -4880,7 +4880,7 @@ while.body233:
   br i1 %t39, label %then239, label %else240
 then239:
   %t40 = load i64, i64* %self
-  %t41 = call i64 @Lexer_Lexer__advance(i64 %t40)
+  %t41 = call i64 @lexer_Lexer__advance(i64 %t40)
   store i64 %t41, i64* %esc
   %t42 = load i64, i64* %esc
   %t43 = getelementptr [2 x i8], [2 x i8]* @.str.281, i64 0, i64 0
@@ -4998,12 +4998,12 @@ else240:
   br i1 %t130, label %then252, label %else253
 then252:
   %t131 = load i64, i64* %self
-  %t132 = inttoptr i64 %t131 to %Lexer_Lexer*
-  %t133 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t132, i32 0, i32 1
+  %t132 = inttoptr i64 %t131 to %lexer_Lexer*
+  %t133 = getelementptr %lexer_Lexer, %lexer_Lexer* %t132, i32 0, i32 1
   %t134 = load volatile i64, i64* %t133
   %t135 = load i64, i64* %self
-  %t136 = inttoptr i64 %t135 to %Lexer_Lexer*
-  %t137 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t136, i32 0, i32 0
+  %t136 = inttoptr i64 %t135 to %lexer_Lexer*
+  %t137 = getelementptr %lexer_Lexer, %lexer_Lexer* %t136, i32 0, i32 0
   %t138 = load volatile i64, i64* %t137
   %t139 = inttoptr i64 %t138 to i8*
   %t140 = call i64 @strlen(i8* %t139)
@@ -5013,7 +5013,7 @@ then252:
   br i1 %t143, label %then255, label %else256
 then255:
   %t144 = load i64, i64* %self
-  %t145 = call i64 @Lexer_Lexer__peek(i64 %t144)
+  %t145 = call i64 @lexer_Lexer__peek(i64 %t144)
   %t146 = getelementptr [2 x i8], [2 x i8]* @.str.292, i64 0, i64 0
   %t147 = ptrtoint i8* %t146 to i64
   %t148 = inttoptr i64 %t145 to i8*
@@ -5025,42 +5025,42 @@ then255:
   br i1 %t153, label %then258, label %else259
 then258:
   %t154 = load i64, i64* %self
-  %t155 = call i64 @Lexer_Lexer__advance(i64 %t154)
+  %t155 = call i64 @lexer_Lexer__advance(i64 %t154)
   %t156 = load i64, i64* %self
   %t157 = load i64, i64* %result
   %t158 = call i64 @__sb_to_string(i64 %t157)
   %t159 = shl i64 2, 56
   %t160 = or i64 %t159, %t158
-  %t161 = call i64 @Lexer_Lexer__emit(i64 %t156, i64 %t160)
+  %t161 = call i64 @lexer_Lexer__emit(i64 %t156, i64 %t160)
   %t162 = load i64, i64* %self
   %t163 = shl i64 29, 56
-  %t164 = call i64 @Lexer_Lexer__emit(i64 %t162, i64 %t163)
+  %t164 = call i64 @lexer_Lexer__emit(i64 %t162, i64 %t163)
   %t165 = load i64, i64* %self
   %t166 = shl i64 48, 56
-  %t167 = call i64 @Lexer_Lexer__emit(i64 %t165, i64 %t166)
+  %t167 = call i64 @lexer_Lexer__emit(i64 %t165, i64 %t166)
   %t168 = load i64, i64* %self
-  %t169 = call i64 @Lexer_Lexer__read_interpolation(i64 %t168)
+  %t169 = call i64 @lexer_Lexer__read_interpolation(i64 %t168)
   %t170 = load i64, i64* %self
   %t171 = shl i64 49, 56
-  %t172 = call i64 @Lexer_Lexer__emit(i64 %t170, i64 %t171)
+  %t172 = call i64 @lexer_Lexer__emit(i64 %t170, i64 %t171)
   %t173 = load i64, i64* %self
   %t174 = shl i64 55, 56
-  %t175 = call i64 @Lexer_Lexer__emit(i64 %t173, i64 %t174)
+  %t175 = call i64 @lexer_Lexer__emit(i64 %t173, i64 %t174)
   %t176 = load i64, i64* %self
   %t177 = getelementptr [10 x i8], [10 x i8]* @.str.293, i64 0, i64 0
   %t178 = ptrtoint i8* %t177 to i64
   %t179 = shl i64 6, 56
   %t180 = or i64 %t179, %t178
-  %t181 = call i64 @Lexer_Lexer__emit(i64 %t176, i64 %t180)
+  %t181 = call i64 @lexer_Lexer__emit(i64 %t176, i64 %t180)
   %t182 = load i64, i64* %self
   %t183 = shl i64 48, 56
-  %t184 = call i64 @Lexer_Lexer__emit(i64 %t182, i64 %t183)
+  %t184 = call i64 @lexer_Lexer__emit(i64 %t182, i64 %t183)
   %t185 = load i64, i64* %self
   %t186 = shl i64 49, 56
-  %t187 = call i64 @Lexer_Lexer__emit(i64 %t185, i64 %t186)
+  %t187 = call i64 @lexer_Lexer__emit(i64 %t185, i64 %t186)
   %t188 = load i64, i64* %self
   %t189 = shl i64 29, 56
-  %t190 = call i64 @Lexer_Lexer__emit(i64 %t188, i64 %t189)
+  %t190 = call i64 @lexer_Lexer__emit(i64 %t188, i64 %t189)
   %t191 = call i64 @StringBuilder()
   store i64 %t191, i64* %result
   %t192 = add i64 0, 1
@@ -5095,17 +5095,17 @@ endif238:
   br label %while.cond232
 while.end234:
   %t208 = load i64, i64* %self
-  %t209 = call i64 @Lexer_Lexer__advance(i64 %t208)
+  %t209 = call i64 @lexer_Lexer__advance(i64 %t208)
   %t210 = load i64, i64* %self
   %t211 = load i64, i64* %result
   %t212 = call i64 @__sb_to_string(i64 %t211)
   %t213 = shl i64 2, 56
   %t214 = or i64 %t213, %t212
-  %t215 = call i64 @Lexer_Lexer__emit(i64 %t210, i64 %t214)
+  %t215 = call i64 @lexer_Lexer__emit(i64 %t210, i64 %t214)
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__read_interpolation(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__read_interpolation(i64 %self.arg) {
 entry:
   %self = alloca i64
   %depth = alloca i64
@@ -5119,12 +5119,12 @@ entry:
   br label %while.cond260
 while.cond260:
   %t2 = load i64, i64* %self
-  %t3 = inttoptr i64 %t2 to %Lexer_Lexer*
-  %t4 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t3, i32 0, i32 1
+  %t3 = inttoptr i64 %t2 to %lexer_Lexer*
+  %t4 = getelementptr %lexer_Lexer, %lexer_Lexer* %t3, i32 0, i32 1
   %t5 = load volatile i64, i64* %t4
   %t6 = load i64, i64* %self
-  %t7 = inttoptr i64 %t6 to %Lexer_Lexer*
-  %t8 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t7, i32 0, i32 0
+  %t7 = inttoptr i64 %t6 to %lexer_Lexer*
+  %t8 = getelementptr %lexer_Lexer, %lexer_Lexer* %t7, i32 0, i32 0
   %t9 = load volatile i64, i64* %t8
   %t10 = inttoptr i64 %t9 to i8*
   %t11 = call i64 @strlen(i8* %t10)
@@ -5148,14 +5148,14 @@ end265:
   br i1 %t22, label %while.body261, label %while.end262
 while.body261:
   %t23 = load i64, i64* %self
-  %t24 = call i64 @Lexer_Lexer__skip_whitespace(i64 %t23)
+  %t24 = call i64 @lexer_Lexer__skip_whitespace(i64 %t23)
   %t25 = load i64, i64* %self
-  %t26 = inttoptr i64 %t25 to %Lexer_Lexer*
-  %t27 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t26, i32 0, i32 1
+  %t26 = inttoptr i64 %t25 to %lexer_Lexer*
+  %t27 = getelementptr %lexer_Lexer, %lexer_Lexer* %t26, i32 0, i32 1
   %t28 = load volatile i64, i64* %t27
   %t29 = load i64, i64* %self
-  %t30 = inttoptr i64 %t29 to %Lexer_Lexer*
-  %t31 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t30, i32 0, i32 0
+  %t30 = inttoptr i64 %t29 to %lexer_Lexer*
+  %t31 = getelementptr %lexer_Lexer, %lexer_Lexer* %t30, i32 0, i32 0
   %t32 = load volatile i64, i64* %t31
   %t33 = inttoptr i64 %t32 to i8*
   %t34 = call i64 @strlen(i8* %t33)
@@ -5169,7 +5169,7 @@ else268:
   br label %endif266
 endif266:
   %t38 = load i64, i64* %self
-  %t39 = call i64 @Lexer_Lexer__peek(i64 %t38)
+  %t39 = call i64 @lexer_Lexer__peek(i64 %t38)
   store i64 %t39, i64* %ch
   %t40 = load i64, i64* %ch
   %t41 = getelementptr [2 x i8], [2 x i8]* @.str.294, i64 0, i64 0
@@ -5194,7 +5194,7 @@ then270:
   br i1 %t56, label %then273, label %else274
 then273:
   %t57 = load i64, i64* %self
-  %t58 = call i64 @Lexer_Lexer__advance(i64 %t57)
+  %t58 = call i64 @lexer_Lexer__advance(i64 %t57)
   ret i64 0
 else274:
   br label %endif272
@@ -5223,35 +5223,35 @@ else277:
   br label %endif275
 endif275:
   %t71 = load i64, i64* %self
-  %t72 = inttoptr i64 %t71 to %Lexer_Lexer*
-  %t73 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t72, i32 0, i32 1
+  %t72 = inttoptr i64 %t71 to %lexer_Lexer*
+  %t73 = getelementptr %lexer_Lexer, %lexer_Lexer* %t72, i32 0, i32 1
   %t74 = load volatile i64, i64* %t73
   store i64 %t74, i64* %start_pos
   %t75 = load i64, i64* %self
-  %t76 = call i64 @Lexer_Lexer__advance(i64 %t75)
+  %t76 = call i64 @lexer_Lexer__advance(i64 %t75)
   store i64 %t76, i64* %tok_ch
   %t77 = load i64, i64* %self
   %t78 = load i64, i64* %tok_ch
-  %t79 = call i64 @Lexer_Lexer__is_digit(i64 %t77, i64 %t78)
+  %t79 = call i64 @lexer_Lexer__is_digit(i64 %t77, i64 %t78)
   %t80 = trunc i64 %t79 to i1
   br i1 %t80, label %then279, label %else280
 then279:
   %t81 = load i64, i64* %self
-  %t82 = call i64 @Lexer_Lexer__read_number(i64 %t81)
+  %t82 = call i64 @lexer_Lexer__read_number(i64 %t81)
   br label %endif278
 else280:
   %t83 = load i64, i64* %self
   %t84 = load i64, i64* %tok_ch
-  %t85 = call i64 @Lexer_Lexer__is_alpha(i64 %t83, i64 %t84)
+  %t85 = call i64 @lexer_Lexer__is_alpha(i64 %t83, i64 %t84)
   %t86 = trunc i64 %t85 to i1
   br i1 %t86, label %then281, label %else282
 then281:
   %t87 = load i64, i64* %self
-  %t88 = call i64 @Lexer_Lexer__read_identifier(i64 %t87)
+  %t88 = call i64 @lexer_Lexer__read_identifier(i64 %t87)
   store i64 %t88, i64* %text
   %t89 = load i64, i64* %self
   %t90 = load i64, i64* %text
-  %t91 = call i64 @Lexer_Lexer__keyword_or_ident(i64 %t89, i64 %t90)
+  %t91 = call i64 @lexer_Lexer__keyword_or_ident(i64 %t89, i64 %t90)
   br label %endif278
 else282:
   %t92 = load i64, i64* %tok_ch
@@ -5266,7 +5266,7 @@ else282:
   br i1 %t100, label %then283, label %else284
 then283:
   %t101 = load i64, i64* %self
-  %t102 = call i64 @Lexer_Lexer__read_string(i64 %t101)
+  %t102 = call i64 @lexer_Lexer__read_string(i64 %t101)
   br label %endif278
 else284:
   %t103 = load i64, i64* %tok_ch
@@ -5282,7 +5282,7 @@ else284:
 then285:
   %t112 = load i64, i64* %self
   %t113 = shl i64 48, 56
-  %t114 = call i64 @Lexer_Lexer__emit(i64 %t112, i64 %t113)
+  %t114 = call i64 @lexer_Lexer__emit(i64 %t112, i64 %t113)
   br label %endif278
 else286:
   %t115 = load i64, i64* %tok_ch
@@ -5298,7 +5298,7 @@ else286:
 then287:
   %t124 = load i64, i64* %self
   %t125 = shl i64 49, 56
-  %t126 = call i64 @Lexer_Lexer__emit(i64 %t124, i64 %t125)
+  %t126 = call i64 @lexer_Lexer__emit(i64 %t124, i64 %t125)
   br label %endif278
 else288:
   %t127 = load i64, i64* %tok_ch
@@ -5314,7 +5314,7 @@ else288:
 then289:
   %t136 = load i64, i64* %self
   %t137 = shl i64 29, 56
-  %t138 = call i64 @Lexer_Lexer__emit(i64 %t136, i64 %t137)
+  %t138 = call i64 @lexer_Lexer__emit(i64 %t136, i64 %t137)
   br label %endif278
 else290:
   %t139 = load i64, i64* %tok_ch
@@ -5330,7 +5330,7 @@ else290:
 then291:
   %t148 = load i64, i64* %self
   %t149 = shl i64 30, 56
-  %t150 = call i64 @Lexer_Lexer__emit(i64 %t148, i64 %t149)
+  %t150 = call i64 @lexer_Lexer__emit(i64 %t148, i64 %t149)
   br label %endif278
 else292:
   %t151 = load i64, i64* %tok_ch
@@ -5346,7 +5346,7 @@ else292:
 then293:
   %t160 = load i64, i64* %self
   %t161 = shl i64 31, 56
-  %t162 = call i64 @Lexer_Lexer__emit(i64 %t160, i64 %t161)
+  %t162 = call i64 @lexer_Lexer__emit(i64 %t160, i64 %t161)
   br label %endif278
 else294:
   %t163 = load i64, i64* %tok_ch
@@ -5362,7 +5362,7 @@ else294:
 then295:
   %t172 = load i64, i64* %self
   %t173 = shl i64 32, 56
-  %t174 = call i64 @Lexer_Lexer__emit(i64 %t172, i64 %t173)
+  %t174 = call i64 @lexer_Lexer__emit(i64 %t172, i64 %t173)
   br label %endif278
 else296:
   %t175 = load i64, i64* %tok_ch
@@ -5378,7 +5378,7 @@ else296:
 then297:
   %t184 = load i64, i64* %self
   %t185 = shl i64 55, 56
-  %t186 = call i64 @Lexer_Lexer__emit(i64 %t184, i64 %t185)
+  %t186 = call i64 @lexer_Lexer__emit(i64 %t184, i64 %t185)
   br label %endif278
 else298:
   %t187 = load i64, i64* %tok_ch
@@ -5394,7 +5394,7 @@ else298:
 then299:
   %t196 = load i64, i64* %self
   %t197 = shl i64 54, 56
-  %t198 = call i64 @Lexer_Lexer__emit(i64 %t196, i64 %t197)
+  %t198 = call i64 @lexer_Lexer__emit(i64 %t196, i64 %t197)
   br label %endif278
 else300:
   %t199 = load i64, i64* %tok_ch
@@ -5410,7 +5410,7 @@ else300:
 then301:
   %t208 = load i64, i64* %self
   %t209 = shl i64 52, 56
-  %t210 = call i64 @Lexer_Lexer__emit(i64 %t208, i64 %t209)
+  %t210 = call i64 @lexer_Lexer__emit(i64 %t208, i64 %t209)
   br label %endif278
 else302:
   %t211 = load i64, i64* %tok_ch
@@ -5426,7 +5426,7 @@ else302:
 then303:
   %t220 = load i64, i64* %self
   %t221 = shl i64 53, 56
-  %t222 = call i64 @Lexer_Lexer__emit(i64 %t220, i64 %t221)
+  %t222 = call i64 @lexer_Lexer__emit(i64 %t220, i64 %t221)
   br label %endif278
 else304:
   br label %endif278
@@ -5436,15 +5436,15 @@ while.end262:
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__read_identifier(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__read_identifier(i64 %self.arg) {
 entry:
   %self = alloca i64
   %start = alloca i64
   %trail = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = add i64 0, 1
   %t6 = sub i64 %t4, %t5
@@ -5452,12 +5452,12 @@ entry:
   br label %while.cond305
 while.cond305:
   %t7 = load i64, i64* %self
-  %t8 = inttoptr i64 %t7 to %Lexer_Lexer*
-  %t9 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t8, i32 0, i32 1
+  %t8 = inttoptr i64 %t7 to %lexer_Lexer*
+  %t9 = getelementptr %lexer_Lexer, %lexer_Lexer* %t8, i32 0, i32 1
   %t10 = load volatile i64, i64* %t9
   %t11 = load i64, i64* %self
-  %t12 = inttoptr i64 %t11 to %Lexer_Lexer*
-  %t13 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t12, i32 0, i32 0
+  %t12 = inttoptr i64 %t11 to %lexer_Lexer*
+  %t13 = getelementptr %lexer_Lexer, %lexer_Lexer* %t12, i32 0, i32 0
   %t14 = load volatile i64, i64* %t13
   %t15 = inttoptr i64 %t14 to i8*
   %t16 = call i64 @strlen(i8* %t15)
@@ -5470,8 +5470,8 @@ logic.entry308:
 rhs309:
   %t20 = load i64, i64* %self
   %t21 = load i64, i64* %self
-  %t22 = call i64 @Lexer_Lexer__peek(i64 %t21)
-  %t23 = call i64 @Lexer_Lexer__is_alnum(i64 %t20, i64 %t22)
+  %t22 = call i64 @lexer_Lexer__peek(i64 %t21)
+  %t23 = call i64 @lexer_Lexer__is_alnum(i64 %t20, i64 %t22)
   %t24 = trunc i64 %t23 to i1
   br label %end310
 end310:
@@ -5481,16 +5481,16 @@ end310:
   br i1 %t27, label %while.body306, label %while.end307
 while.body306:
   %t28 = load i64, i64* %self
-  %t29 = call i64 @Lexer_Lexer__advance(i64 %t28)
+  %t29 = call i64 @lexer_Lexer__advance(i64 %t28)
   br label %while.cond305
 while.end307:
   %t30 = load i64, i64* %self
-  %t31 = inttoptr i64 %t30 to %Lexer_Lexer*
-  %t32 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t31, i32 0, i32 1
+  %t31 = inttoptr i64 %t30 to %lexer_Lexer*
+  %t32 = getelementptr %lexer_Lexer, %lexer_Lexer* %t31, i32 0, i32 1
   %t33 = load volatile i64, i64* %t32
   %t34 = load i64, i64* %self
-  %t35 = inttoptr i64 %t34 to %Lexer_Lexer*
-  %t36 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t35, i32 0, i32 0
+  %t35 = inttoptr i64 %t34 to %lexer_Lexer*
+  %t36 = getelementptr %lexer_Lexer, %lexer_Lexer* %t35, i32 0, i32 0
   %t37 = load volatile i64, i64* %t36
   %t38 = inttoptr i64 %t37 to i8*
   %t39 = call i64 @strlen(i8* %t38)
@@ -5500,7 +5500,7 @@ while.end307:
   br i1 %t42, label %then312, label %else313
 then312:
   %t43 = load i64, i64* %self
-  %t44 = call i64 @Lexer_Lexer__peek(i64 %t43)
+  %t44 = call i64 @lexer_Lexer__peek(i64 %t43)
   store i64 %t44, i64* %trail
   %t45 = load i64, i64* %trail
   %t46 = getelementptr [2 x i8], [2 x i8]* @.str.307, i64 0, i64 0
@@ -5532,7 +5532,7 @@ end317:
   br i1 %t65, label %then318, label %else319
 then318:
   %t66 = load i64, i64* %self
-  %t67 = call i64 @Lexer_Lexer__advance(i64 %t66)
+  %t67 = call i64 @lexer_Lexer__advance(i64 %t66)
   br label %endif314
 else319:
   br label %endif314
@@ -5542,14 +5542,14 @@ else313:
   br label %endif311
 endif311:
   %t68 = load i64, i64* %self
-  %t69 = inttoptr i64 %t68 to %Lexer_Lexer*
-  %t70 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t69, i32 0, i32 0
+  %t69 = inttoptr i64 %t68 to %lexer_Lexer*
+  %t70 = getelementptr %lexer_Lexer, %lexer_Lexer* %t69, i32 0, i32 0
   %t71 = load volatile i64, i64* %t70
   %t72 = inttoptr i64 %t71 to i8*
   %t73 = load i64, i64* %start
   %t74 = load i64, i64* %self
-  %t75 = inttoptr i64 %t74 to %Lexer_Lexer*
-  %t76 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t75, i32 0, i32 1
+  %t75 = inttoptr i64 %t74 to %lexer_Lexer*
+  %t76 = getelementptr %lexer_Lexer, %lexer_Lexer* %t75, i32 0, i32 1
   %t77 = load volatile i64, i64* %t76
   %t78 = sub i64 %t77, %t73
   %t79 = add i64 %t78, 1
@@ -5562,7 +5562,7 @@ endif311:
   ret i64 %t83
 }
 
-define linkonce_odr i64 @Lexer_Lexer__keyword_or_ident(i64 %self.arg, i64 %text.arg) {
+define linkonce_odr i64 @lexer_Lexer__keyword_or_ident(i64 %self.arg, i64 %text.arg) {
 entry:
   %self = alloca i64
   %text = alloca i64
@@ -5581,7 +5581,7 @@ entry:
 then321:
   %t10 = load i64, i64* %self
   %t11 = shl i64 7, 56
-  %t12 = call i64 @Lexer_Lexer__emit(i64 %t10, i64 %t11)
+  %t12 = call i64 @lexer_Lexer__emit(i64 %t10, i64 %t11)
   br label %endif320
 else322:
   %t13 = load i64, i64* %text
@@ -5597,7 +5597,7 @@ else322:
 then323:
   %t22 = load i64, i64* %self
   %t23 = shl i64 8, 56
-  %t24 = call i64 @Lexer_Lexer__emit(i64 %t22, i64 %t23)
+  %t24 = call i64 @lexer_Lexer__emit(i64 %t22, i64 %t23)
   br label %endif320
 else324:
   %t25 = load i64, i64* %text
@@ -5613,7 +5613,7 @@ else324:
 then325:
   %t34 = load i64, i64* %self
   %t35 = shl i64 9, 56
-  %t36 = call i64 @Lexer_Lexer__emit(i64 %t34, i64 %t35)
+  %t36 = call i64 @lexer_Lexer__emit(i64 %t34, i64 %t35)
   br label %endif320
 else326:
   %t37 = load i64, i64* %text
@@ -5629,7 +5629,7 @@ else326:
 then327:
   %t46 = load i64, i64* %self
   %t47 = shl i64 10, 56
-  %t48 = call i64 @Lexer_Lexer__emit(i64 %t46, i64 %t47)
+  %t48 = call i64 @lexer_Lexer__emit(i64 %t46, i64 %t47)
   br label %endif320
 else328:
   %t49 = load i64, i64* %text
@@ -5645,7 +5645,7 @@ else328:
 then329:
   %t58 = load i64, i64* %self
   %t59 = shl i64 11, 56
-  %t60 = call i64 @Lexer_Lexer__emit(i64 %t58, i64 %t59)
+  %t60 = call i64 @lexer_Lexer__emit(i64 %t58, i64 %t59)
   br label %endif320
 else330:
   %t61 = load i64, i64* %text
@@ -5661,7 +5661,7 @@ else330:
 then331:
   %t70 = load i64, i64* %self
   %t71 = shl i64 12, 56
-  %t72 = call i64 @Lexer_Lexer__emit(i64 %t70, i64 %t71)
+  %t72 = call i64 @lexer_Lexer__emit(i64 %t70, i64 %t71)
   br label %endif320
 else332:
   %t73 = load i64, i64* %text
@@ -5677,7 +5677,7 @@ else332:
 then333:
   %t82 = load i64, i64* %self
   %t83 = shl i64 13, 56
-  %t84 = call i64 @Lexer_Lexer__emit(i64 %t82, i64 %t83)
+  %t84 = call i64 @lexer_Lexer__emit(i64 %t82, i64 %t83)
   br label %endif320
 else334:
   %t85 = load i64, i64* %text
@@ -5693,7 +5693,7 @@ else334:
 then335:
   %t94 = load i64, i64* %self
   %t95 = shl i64 14, 56
-  %t96 = call i64 @Lexer_Lexer__emit(i64 %t94, i64 %t95)
+  %t96 = call i64 @lexer_Lexer__emit(i64 %t94, i64 %t95)
   br label %endif320
 else336:
   %t97 = load i64, i64* %text
@@ -5709,7 +5709,7 @@ else336:
 then337:
   %t106 = load i64, i64* %self
   %t107 = shl i64 15, 56
-  %t108 = call i64 @Lexer_Lexer__emit(i64 %t106, i64 %t107)
+  %t108 = call i64 @lexer_Lexer__emit(i64 %t106, i64 %t107)
   br label %endif320
 else338:
   %t109 = load i64, i64* %text
@@ -5725,7 +5725,7 @@ else338:
 then339:
   %t118 = load i64, i64* %self
   %t119 = shl i64 3, 56
-  %t120 = call i64 @Lexer_Lexer__emit(i64 %t118, i64 %t119)
+  %t120 = call i64 @lexer_Lexer__emit(i64 %t118, i64 %t119)
   br label %endif320
 else340:
   %t121 = load i64, i64* %text
@@ -5741,7 +5741,7 @@ else340:
 then341:
   %t130 = load i64, i64* %self
   %t131 = shl i64 4, 56
-  %t132 = call i64 @Lexer_Lexer__emit(i64 %t130, i64 %t131)
+  %t132 = call i64 @lexer_Lexer__emit(i64 %t130, i64 %t131)
   br label %endif320
 else342:
   %t133 = load i64, i64* %text
@@ -5757,7 +5757,7 @@ else342:
 then343:
   %t142 = load i64, i64* %self
   %t143 = shl i64 5, 56
-  %t144 = call i64 @Lexer_Lexer__emit(i64 %t142, i64 %t143)
+  %t144 = call i64 @lexer_Lexer__emit(i64 %t142, i64 %t143)
   br label %endif320
 else344:
   %t145 = load i64, i64* %text
@@ -5773,7 +5773,7 @@ else344:
 then345:
   %t154 = load i64, i64* %self
   %t155 = shl i64 16, 56
-  %t156 = call i64 @Lexer_Lexer__emit(i64 %t154, i64 %t155)
+  %t156 = call i64 @lexer_Lexer__emit(i64 %t154, i64 %t155)
   br label %endif320
 else346:
   %t157 = load i64, i64* %text
@@ -5789,7 +5789,7 @@ else346:
 then347:
   %t166 = load i64, i64* %self
   %t167 = shl i64 17, 56
-  %t168 = call i64 @Lexer_Lexer__emit(i64 %t166, i64 %t167)
+  %t168 = call i64 @lexer_Lexer__emit(i64 %t166, i64 %t167)
   br label %endif320
 else348:
   %t169 = load i64, i64* %text
@@ -5805,7 +5805,7 @@ else348:
 then349:
   %t178 = load i64, i64* %self
   %t179 = shl i64 18, 56
-  %t180 = call i64 @Lexer_Lexer__emit(i64 %t178, i64 %t179)
+  %t180 = call i64 @lexer_Lexer__emit(i64 %t178, i64 %t179)
   br label %endif320
 else350:
   %t181 = load i64, i64* %text
@@ -5821,7 +5821,7 @@ else350:
 then351:
   %t190 = load i64, i64* %self
   %t191 = shl i64 19, 56
-  %t192 = call i64 @Lexer_Lexer__emit(i64 %t190, i64 %t191)
+  %t192 = call i64 @lexer_Lexer__emit(i64 %t190, i64 %t191)
   br label %endif320
 else352:
   %t193 = load i64, i64* %text
@@ -5837,7 +5837,7 @@ else352:
 then353:
   %t202 = load i64, i64* %self
   %t203 = shl i64 20, 56
-  %t204 = call i64 @Lexer_Lexer__emit(i64 %t202, i64 %t203)
+  %t204 = call i64 @lexer_Lexer__emit(i64 %t202, i64 %t203)
   br label %endif320
 else354:
   %t205 = load i64, i64* %text
@@ -5853,7 +5853,7 @@ else354:
 then355:
   %t214 = load i64, i64* %self
   %t215 = shl i64 21, 56
-  %t216 = call i64 @Lexer_Lexer__emit(i64 %t214, i64 %t215)
+  %t216 = call i64 @lexer_Lexer__emit(i64 %t214, i64 %t215)
   br label %endif320
 else356:
   %t217 = load i64, i64* %text
@@ -5869,7 +5869,7 @@ else356:
 then357:
   %t226 = load i64, i64* %self
   %t227 = shl i64 22, 56
-  %t228 = call i64 @Lexer_Lexer__emit(i64 %t226, i64 %t227)
+  %t228 = call i64 @lexer_Lexer__emit(i64 %t226, i64 %t227)
   br label %endif320
 else358:
   %t229 = load i64, i64* %text
@@ -5885,7 +5885,7 @@ else358:
 then359:
   %t238 = load i64, i64* %self
   %t239 = shl i64 23, 56
-  %t240 = call i64 @Lexer_Lexer__emit(i64 %t238, i64 %t239)
+  %t240 = call i64 @lexer_Lexer__emit(i64 %t238, i64 %t239)
   br label %endif320
 else360:
   %t241 = load i64, i64* %text
@@ -5901,7 +5901,7 @@ else360:
 then361:
   %t250 = load i64, i64* %self
   %t251 = shl i64 24, 56
-  %t252 = call i64 @Lexer_Lexer__emit(i64 %t250, i64 %t251)
+  %t252 = call i64 @lexer_Lexer__emit(i64 %t250, i64 %t251)
   br label %endif320
 else362:
   %t253 = load i64, i64* %text
@@ -5917,7 +5917,7 @@ else362:
 then363:
   %t262 = load i64, i64* %self
   %t263 = shl i64 25, 56
-  %t264 = call i64 @Lexer_Lexer__emit(i64 %t262, i64 %t263)
+  %t264 = call i64 @lexer_Lexer__emit(i64 %t262, i64 %t263)
   br label %endif320
 else364:
   %t265 = load i64, i64* %text
@@ -5933,7 +5933,7 @@ else364:
 then365:
   %t274 = load i64, i64* %self
   %t275 = shl i64 26, 56
-  %t276 = call i64 @Lexer_Lexer__emit(i64 %t274, i64 %t275)
+  %t276 = call i64 @lexer_Lexer__emit(i64 %t274, i64 %t275)
   br label %endif320
 else366:
   %t277 = load i64, i64* %text
@@ -5949,7 +5949,7 @@ else366:
 then367:
   %t286 = load i64, i64* %self
   %t287 = shl i64 27, 56
-  %t288 = call i64 @Lexer_Lexer__emit(i64 %t286, i64 %t287)
+  %t288 = call i64 @lexer_Lexer__emit(i64 %t286, i64 %t287)
   br label %endif320
 else368:
   %t289 = load i64, i64* %text
@@ -5965,31 +5965,31 @@ else368:
 then369:
   %t298 = load i64, i64* %self
   %t299 = shl i64 28, 56
-  %t300 = call i64 @Lexer_Lexer__emit(i64 %t298, i64 %t299)
+  %t300 = call i64 @lexer_Lexer__emit(i64 %t298, i64 %t299)
   br label %endif320
 else370:
   %t301 = load i64, i64* %self
   %t302 = load i64, i64* %text
   %t303 = shl i64 6, 56
   %t304 = or i64 %t303, %t302
-  %t305 = call i64 @Lexer_Lexer__emit(i64 %t301, i64 %t304)
+  %t305 = call i64 @lexer_Lexer__emit(i64 %t301, i64 %t304)
   br label %endif320
 endif320:
   ret i64 0
 }
 
-define linkonce_odr i64 @Lexer_Lexer__read_doc_comment(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__read_doc_comment(i64 %self.arg) {
 entry:
   %self = alloca i64
   %start = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = load i64, i64* %self
-  %t6 = inttoptr i64 %t5 to %Lexer_Lexer*
-  %t7 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t6, i32 0, i32 0
+  %t6 = inttoptr i64 %t5 to %lexer_Lexer*
+  %t7 = getelementptr %lexer_Lexer, %lexer_Lexer* %t6, i32 0, i32 0
   %t8 = load volatile i64, i64* %t7
   %t9 = inttoptr i64 %t8 to i8*
   %t10 = call i64 @strlen(i8* %t9)
@@ -6001,7 +6001,7 @@ logic.entry372:
   br i1 %t13, label %rhs373, label %end374
 rhs373:
   %t14 = load i64, i64* %self
-  %t15 = call i64 @Lexer_Lexer__peek(i64 %t14)
+  %t15 = call i64 @lexer_Lexer__peek(i64 %t14)
   %t16 = getelementptr [2 x i8], [2 x i8]* @.str.334, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = inttoptr i64 %t15 to i8*
@@ -6018,25 +6018,25 @@ end374:
   br i1 %t26, label %then375, label %else376
 then375:
   %t27 = load i64, i64* %self
-  %t28 = call i64 @Lexer_Lexer__advance(i64 %t27)
+  %t28 = call i64 @lexer_Lexer__advance(i64 %t27)
   br label %endif371
 else376:
   br label %endif371
 endif371:
   %t29 = load i64, i64* %self
-  %t30 = inttoptr i64 %t29 to %Lexer_Lexer*
-  %t31 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t30, i32 0, i32 1
+  %t30 = inttoptr i64 %t29 to %lexer_Lexer*
+  %t31 = getelementptr %lexer_Lexer, %lexer_Lexer* %t30, i32 0, i32 1
   %t32 = load volatile i64, i64* %t31
   store i64 %t32, i64* %start
   br label %while.cond377
 while.cond377:
   %t33 = load i64, i64* %self
-  %t34 = inttoptr i64 %t33 to %Lexer_Lexer*
-  %t35 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t34, i32 0, i32 1
+  %t34 = inttoptr i64 %t33 to %lexer_Lexer*
+  %t35 = getelementptr %lexer_Lexer, %lexer_Lexer* %t34, i32 0, i32 1
   %t36 = load volatile i64, i64* %t35
   %t37 = load i64, i64* %self
-  %t38 = inttoptr i64 %t37 to %Lexer_Lexer*
-  %t39 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t38, i32 0, i32 0
+  %t38 = inttoptr i64 %t37 to %lexer_Lexer*
+  %t39 = getelementptr %lexer_Lexer, %lexer_Lexer* %t38, i32 0, i32 0
   %t40 = load volatile i64, i64* %t39
   %t41 = inttoptr i64 %t40 to i8*
   %t42 = call i64 @strlen(i8* %t41)
@@ -6048,7 +6048,7 @@ logic.entry380:
   br i1 %t45, label %rhs381, label %end382
 rhs381:
   %t46 = load i64, i64* %self
-  %t47 = call i64 @Lexer_Lexer__peek(i64 %t46)
+  %t47 = call i64 @lexer_Lexer__peek(i64 %t46)
   %t48 = getelementptr [2 x i8], [2 x i8]* @.str.335, i64 0, i64 0
   %t49 = ptrtoint i8* %t48 to i64
   %t50 = inttoptr i64 %t47 to i8*
@@ -6065,18 +6065,18 @@ end382:
   br i1 %t58, label %while.body378, label %while.end379
 while.body378:
   %t59 = load i64, i64* %self
-  %t60 = call i64 @Lexer_Lexer__advance(i64 %t59)
+  %t60 = call i64 @lexer_Lexer__advance(i64 %t59)
   br label %while.cond377
 while.end379:
   %t61 = load i64, i64* %self
-  %t62 = inttoptr i64 %t61 to %Lexer_Lexer*
-  %t63 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t62, i32 0, i32 0
+  %t62 = inttoptr i64 %t61 to %lexer_Lexer*
+  %t63 = getelementptr %lexer_Lexer, %lexer_Lexer* %t62, i32 0, i32 0
   %t64 = load volatile i64, i64* %t63
   %t65 = inttoptr i64 %t64 to i8*
   %t66 = load i64, i64* %start
   %t67 = load i64, i64* %self
-  %t68 = inttoptr i64 %t67 to %Lexer_Lexer*
-  %t69 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t68, i32 0, i32 1
+  %t68 = inttoptr i64 %t67 to %lexer_Lexer*
+  %t69 = getelementptr %lexer_Lexer, %lexer_Lexer* %t68, i32 0, i32 1
   %t70 = load volatile i64, i64* %t69
   %t71 = sub i64 %t70, %t66
   %t72 = add i64 %t71, 1
@@ -6089,7 +6089,7 @@ while.end379:
   ret i64 %t76
 }
 
-define linkonce_odr i64 @Lexer_Lexer__tokenize(i64 %self.arg) {
+define linkonce_odr i64 @lexer_Lexer__tokenize(i64 %self.arg) {
 entry:
   %self = alloca i64
   %third = alloca i64
@@ -6099,12 +6099,12 @@ entry:
   br label %while.cond383
 while.cond383:
   %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %Lexer_Lexer*
-  %t3 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t2, i32 0, i32 1
+  %t2 = inttoptr i64 %t1 to %lexer_Lexer*
+  %t3 = getelementptr %lexer_Lexer, %lexer_Lexer* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
   %t5 = load i64, i64* %self
-  %t6 = inttoptr i64 %t5 to %Lexer_Lexer*
-  %t7 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t6, i32 0, i32 0
+  %t6 = inttoptr i64 %t5 to %lexer_Lexer*
+  %t7 = getelementptr %lexer_Lexer, %lexer_Lexer* %t6, i32 0, i32 0
   %t8 = load volatile i64, i64* %t7
   %t9 = inttoptr i64 %t8 to i8*
   %t10 = call i64 @strlen(i8* %t9)
@@ -6114,14 +6114,14 @@ while.cond383:
   br i1 %t13, label %while.body384, label %while.end385
 while.body384:
   %t14 = load i64, i64* %self
-  %t15 = call i64 @Lexer_Lexer__skip_whitespace(i64 %t14)
+  %t15 = call i64 @lexer_Lexer__skip_whitespace(i64 %t14)
   %t16 = load i64, i64* %self
-  %t17 = inttoptr i64 %t16 to %Lexer_Lexer*
-  %t18 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t17, i32 0, i32 1
+  %t17 = inttoptr i64 %t16 to %lexer_Lexer*
+  %t18 = getelementptr %lexer_Lexer, %lexer_Lexer* %t17, i32 0, i32 1
   %t19 = load volatile i64, i64* %t18
   %t20 = load i64, i64* %self
-  %t21 = inttoptr i64 %t20 to %Lexer_Lexer*
-  %t22 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t21, i32 0, i32 0
+  %t21 = inttoptr i64 %t20 to %lexer_Lexer*
+  %t22 = getelementptr %lexer_Lexer, %lexer_Lexer* %t21, i32 0, i32 0
   %t23 = load volatile i64, i64* %t22
   %t24 = inttoptr i64 %t23 to i8*
   %t25 = call i64 @strlen(i8* %t24)
@@ -6135,7 +6135,7 @@ else388:
   br label %endif386
 endif386:
   %t29 = load i64, i64* %self
-  %t30 = call i64 @Lexer_Lexer__peek(i64 %t29)
+  %t30 = call i64 @lexer_Lexer__peek(i64 %t29)
   %t31 = getelementptr [2 x i8], [2 x i8]* @.str.336, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = inttoptr i64 %t30 to i8*
@@ -6149,7 +6149,7 @@ logic.entry390:
   br i1 %t38, label %rhs391, label %end392
 rhs391:
   %t39 = load i64, i64* %self
-  %t40 = call i64 @Lexer_Lexer__peek_next(i64 %t39)
+  %t40 = call i64 @lexer_Lexer__peek_next(i64 %t39)
   %t41 = getelementptr [2 x i8], [2 x i8]* @.str.337, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = inttoptr i64 %t40 to i8*
@@ -6166,14 +6166,14 @@ end392:
   br i1 %t51, label %then393, label %else394
 then393:
   %t52 = load i64, i64* %self
-  %t53 = inttoptr i64 %t52 to %Lexer_Lexer*
-  %t54 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t53, i32 0, i32 1
+  %t53 = inttoptr i64 %t52 to %lexer_Lexer*
+  %t54 = getelementptr %lexer_Lexer, %lexer_Lexer* %t53, i32 0, i32 1
   %t55 = load volatile i64, i64* %t54
   %t56 = add i64 0, 2
   %t57 = add i64 %t55, %t56
   %t58 = load i64, i64* %self
-  %t59 = inttoptr i64 %t58 to %Lexer_Lexer*
-  %t60 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t59, i32 0, i32 0
+  %t59 = inttoptr i64 %t58 to %lexer_Lexer*
+  %t60 = getelementptr %lexer_Lexer, %lexer_Lexer* %t59, i32 0, i32 0
   %t61 = load volatile i64, i64* %t60
   %t62 = inttoptr i64 %t61 to i8*
   %t63 = call i64 @strlen(i8* %t62)
@@ -6183,13 +6183,13 @@ then393:
   br i1 %t66, label %then396, label %else397
 then396:
   %t67 = load i64, i64* %self
-  %t68 = inttoptr i64 %t67 to %Lexer_Lexer*
-  %t69 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t68, i32 0, i32 0
+  %t68 = inttoptr i64 %t67 to %lexer_Lexer*
+  %t69 = getelementptr %lexer_Lexer, %lexer_Lexer* %t68, i32 0, i32 0
   %t70 = load volatile i64, i64* %t69
   %t71 = inttoptr i64 %t70 to i8*
   %t72 = load i64, i64* %self
-  %t73 = inttoptr i64 %t72 to %Lexer_Lexer*
-  %t74 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t73, i32 0, i32 1
+  %t73 = inttoptr i64 %t72 to %lexer_Lexer*
+  %t74 = getelementptr %lexer_Lexer, %lexer_Lexer* %t73, i32 0, i32 1
   %t75 = load volatile i64, i64* %t74
   %t76 = add i64 0, 2
   %t77 = add i64 %t75, %t76
@@ -6213,19 +6213,19 @@ then396:
   br i1 %t91, label %then399, label %else400
 then399:
   %t92 = load i64, i64* %self
-  %t93 = call i64 @Lexer_Lexer__advance(i64 %t92)
+  %t93 = call i64 @lexer_Lexer__advance(i64 %t92)
   %t94 = load i64, i64* %self
-  %t95 = call i64 @Lexer_Lexer__advance(i64 %t94)
+  %t95 = call i64 @lexer_Lexer__advance(i64 %t94)
   %t96 = load i64, i64* %self
-  %t97 = call i64 @Lexer_Lexer__advance(i64 %t96)
+  %t97 = call i64 @lexer_Lexer__advance(i64 %t96)
   %t98 = load i64, i64* %self
-  %t99 = call i64 @Lexer_Lexer__read_doc_comment(i64 %t98)
+  %t99 = call i64 @lexer_Lexer__read_doc_comment(i64 %t98)
   store i64 %t99, i64* %text
   %t100 = load i64, i64* %self
   %t101 = load i64, i64* %text
   %t102 = shl i64 61, 56
   %t103 = or i64 %t102, %t101
-  %t104 = call i64 @Lexer_Lexer__emit(i64 %t100, i64 %t103)
+  %t104 = call i64 @lexer_Lexer__emit(i64 %t100, i64 %t103)
   br label %while.cond383
 else400:
   %t105 = load i64, i64* %third
@@ -6240,19 +6240,19 @@ else400:
   br i1 %t113, label %then401, label %else402
 then401:
   %t114 = load i64, i64* %self
-  %t115 = call i64 @Lexer_Lexer__advance(i64 %t114)
+  %t115 = call i64 @lexer_Lexer__advance(i64 %t114)
   %t116 = load i64, i64* %self
-  %t117 = call i64 @Lexer_Lexer__advance(i64 %t116)
+  %t117 = call i64 @lexer_Lexer__advance(i64 %t116)
   %t118 = load i64, i64* %self
-  %t119 = call i64 @Lexer_Lexer__advance(i64 %t118)
+  %t119 = call i64 @lexer_Lexer__advance(i64 %t118)
   %t120 = load i64, i64* %self
-  %t121 = call i64 @Lexer_Lexer__read_doc_comment(i64 %t120)
+  %t121 = call i64 @lexer_Lexer__read_doc_comment(i64 %t120)
   store i64 %t121, i64* %text
   %t122 = load i64, i64* %self
   %t123 = load i64, i64* %text
   %t124 = shl i64 62, 56
   %t125 = or i64 %t124, %t123
-  %t126 = call i64 @Lexer_Lexer__emit(i64 %t122, i64 %t125)
+  %t126 = call i64 @lexer_Lexer__emit(i64 %t122, i64 %t125)
   br label %while.cond383
 else402:
   br label %endif398
@@ -6266,30 +6266,30 @@ else394:
   br label %endif389
 endif389:
   %t127 = load i64, i64* %self
-  %t128 = call i64 @Lexer_Lexer__advance(i64 %t127)
+  %t128 = call i64 @lexer_Lexer__advance(i64 %t127)
   store i64 %t128, i64* %ch
   %t129 = load i64, i64* %self
   %t130 = load i64, i64* %ch
-  %t131 = call i64 @Lexer_Lexer__is_digit(i64 %t129, i64 %t130)
+  %t131 = call i64 @lexer_Lexer__is_digit(i64 %t129, i64 %t130)
   %t132 = trunc i64 %t131 to i1
   br i1 %t132, label %then404, label %else405
 then404:
   %t133 = load i64, i64* %self
-  %t134 = call i64 @Lexer_Lexer__read_number(i64 %t133)
+  %t134 = call i64 @lexer_Lexer__read_number(i64 %t133)
   br label %endif403
 else405:
   %t135 = load i64, i64* %self
   %t136 = load i64, i64* %ch
-  %t137 = call i64 @Lexer_Lexer__is_alpha(i64 %t135, i64 %t136)
+  %t137 = call i64 @lexer_Lexer__is_alpha(i64 %t135, i64 %t136)
   %t138 = trunc i64 %t137 to i1
   br i1 %t138, label %then406, label %else407
 then406:
   %t139 = load i64, i64* %self
-  %t140 = call i64 @Lexer_Lexer__read_identifier(i64 %t139)
+  %t140 = call i64 @lexer_Lexer__read_identifier(i64 %t139)
   store i64 %t140, i64* %text
   %t141 = load i64, i64* %self
   %t142 = load i64, i64* %text
-  %t143 = call i64 @Lexer_Lexer__keyword_or_ident(i64 %t141, i64 %t142)
+  %t143 = call i64 @lexer_Lexer__keyword_or_ident(i64 %t141, i64 %t142)
   br label %endif403
 else407:
   %t144 = load i64, i64* %ch
@@ -6304,7 +6304,7 @@ else407:
   br i1 %t152, label %then408, label %else409
 then408:
   %t153 = load i64, i64* %self
-  %t154 = call i64 @Lexer_Lexer__read_string(i64 %t153)
+  %t154 = call i64 @lexer_Lexer__read_string(i64 %t153)
   br label %endif403
 else409:
   %t155 = load i64, i64* %ch
@@ -6320,7 +6320,7 @@ else409:
 then410:
   %t164 = load i64, i64* %self
   %t165 = shl i64 48, 56
-  %t166 = call i64 @Lexer_Lexer__emit(i64 %t164, i64 %t165)
+  %t166 = call i64 @lexer_Lexer__emit(i64 %t164, i64 %t165)
   br label %endif403
 else411:
   %t167 = load i64, i64* %ch
@@ -6336,7 +6336,7 @@ else411:
 then412:
   %t176 = load i64, i64* %self
   %t177 = shl i64 49, 56
-  %t178 = call i64 @Lexer_Lexer__emit(i64 %t176, i64 %t177)
+  %t178 = call i64 @lexer_Lexer__emit(i64 %t176, i64 %t177)
   br label %endif403
 else413:
   %t179 = load i64, i64* %ch
@@ -6352,7 +6352,7 @@ else413:
 then414:
   %t188 = load i64, i64* %self
   %t189 = shl i64 50, 56
-  %t190 = call i64 @Lexer_Lexer__emit(i64 %t188, i64 %t189)
+  %t190 = call i64 @lexer_Lexer__emit(i64 %t188, i64 %t189)
   br label %endif403
 else415:
   %t191 = load i64, i64* %ch
@@ -6368,7 +6368,7 @@ else415:
 then416:
   %t200 = load i64, i64* %self
   %t201 = shl i64 51, 56
-  %t202 = call i64 @Lexer_Lexer__emit(i64 %t200, i64 %t201)
+  %t202 = call i64 @lexer_Lexer__emit(i64 %t200, i64 %t201)
   br label %endif403
 else417:
   %t203 = load i64, i64* %ch
@@ -6384,7 +6384,7 @@ else417:
 then418:
   %t212 = load i64, i64* %self
   %t213 = shl i64 52, 56
-  %t214 = call i64 @Lexer_Lexer__emit(i64 %t212, i64 %t213)
+  %t214 = call i64 @lexer_Lexer__emit(i64 %t212, i64 %t213)
   br label %endif403
 else419:
   %t215 = load i64, i64* %ch
@@ -6400,7 +6400,7 @@ else419:
 then420:
   %t224 = load i64, i64* %self
   %t225 = shl i64 53, 56
-  %t226 = call i64 @Lexer_Lexer__emit(i64 %t224, i64 %t225)
+  %t226 = call i64 @lexer_Lexer__emit(i64 %t224, i64 %t225)
   br label %endif403
 else421:
   %t227 = load i64, i64* %ch
@@ -6416,7 +6416,7 @@ else421:
 then422:
   %t236 = load i64, i64* %self
   %t237 = shl i64 54, 56
-  %t238 = call i64 @Lexer_Lexer__emit(i64 %t236, i64 %t237)
+  %t238 = call i64 @lexer_Lexer__emit(i64 %t236, i64 %t237)
   br label %endif403
 else423:
   %t239 = load i64, i64* %ch
@@ -6432,7 +6432,7 @@ else423:
 then424:
   %t248 = load i64, i64* %self
   %t249 = shl i64 55, 56
-  %t250 = call i64 @Lexer_Lexer__emit(i64 %t248, i64 %t249)
+  %t250 = call i64 @lexer_Lexer__emit(i64 %t248, i64 %t249)
   br label %endif403
 else425:
   %t251 = load i64, i64* %ch
@@ -6448,7 +6448,7 @@ else425:
 then426:
   %t260 = load i64, i64* %self
   %t261 = shl i64 56, 56
-  %t262 = call i64 @Lexer_Lexer__emit(i64 %t260, i64 %t261)
+  %t262 = call i64 @lexer_Lexer__emit(i64 %t260, i64 %t261)
   br label %endif403
 else427:
   %t263 = load i64, i64* %ch
@@ -6464,7 +6464,7 @@ else427:
 then428:
   %t272 = load i64, i64* %self
   %t273 = shl i64 57, 56
-  %t274 = call i64 @Lexer_Lexer__emit(i64 %t272, i64 %t273)
+  %t274 = call i64 @lexer_Lexer__emit(i64 %t272, i64 %t273)
   br label %endif403
 else429:
   %t275 = load i64, i64* %ch
@@ -6480,7 +6480,7 @@ else429:
 then430:
   %t284 = load i64, i64* %self
   %t285 = shl i64 29, 56
-  %t286 = call i64 @Lexer_Lexer__emit(i64 %t284, i64 %t285)
+  %t286 = call i64 @lexer_Lexer__emit(i64 %t284, i64 %t285)
   br label %endif403
 else431:
   %t287 = load i64, i64* %ch
@@ -6495,7 +6495,7 @@ else431:
   br i1 %t295, label %then432, label %else433
 then432:
   %t296 = load i64, i64* %self
-  %t297 = call i64 @Lexer_Lexer__peek(i64 %t296)
+  %t297 = call i64 @lexer_Lexer__peek(i64 %t296)
   %t298 = getelementptr [2 x i8], [2 x i8]* @.str.353, i64 0, i64 0
   %t299 = ptrtoint i8* %t298 to i64
   %t300 = inttoptr i64 %t297 to i8*
@@ -6507,15 +6507,15 @@ then432:
   br i1 %t305, label %then435, label %else436
 then435:
   %t306 = load i64, i64* %self
-  %t307 = call i64 @Lexer_Lexer__advance(i64 %t306)
+  %t307 = call i64 @lexer_Lexer__advance(i64 %t306)
   %t308 = load i64, i64* %self
   %t309 = shl i64 58, 56
-  %t310 = call i64 @Lexer_Lexer__emit(i64 %t308, i64 %t309)
+  %t310 = call i64 @lexer_Lexer__emit(i64 %t308, i64 %t309)
   br label %endif434
 else436:
   %t311 = load i64, i64* %self
   %t312 = shl i64 30, 56
-  %t313 = call i64 @Lexer_Lexer__emit(i64 %t311, i64 %t312)
+  %t313 = call i64 @lexer_Lexer__emit(i64 %t311, i64 %t312)
   br label %endif434
 endif434:
   br label %endif403
@@ -6533,7 +6533,7 @@ else433:
 then437:
   %t323 = load i64, i64* %self
   %t324 = shl i64 31, 56
-  %t325 = call i64 @Lexer_Lexer__emit(i64 %t323, i64 %t324)
+  %t325 = call i64 @lexer_Lexer__emit(i64 %t323, i64 %t324)
   br label %endif403
 else438:
   %t326 = load i64, i64* %ch
@@ -6549,7 +6549,7 @@ else438:
 then439:
   %t335 = load i64, i64* %self
   %t336 = shl i64 32, 56
-  %t337 = call i64 @Lexer_Lexer__emit(i64 %t335, i64 %t336)
+  %t337 = call i64 @lexer_Lexer__emit(i64 %t335, i64 %t336)
   br label %endif403
 else440:
   %t338 = load i64, i64* %ch
@@ -6565,7 +6565,7 @@ else440:
 then441:
   %t347 = load i64, i64* %self
   %t348 = shl i64 33, 56
-  %t349 = call i64 @Lexer_Lexer__emit(i64 %t347, i64 %t348)
+  %t349 = call i64 @lexer_Lexer__emit(i64 %t347, i64 %t348)
   br label %endif403
 else442:
   %t350 = load i64, i64* %ch
@@ -6581,7 +6581,7 @@ else442:
 then443:
   %t359 = load i64, i64* %self
   %t360 = shl i64 34, 56
-  %t361 = call i64 @Lexer_Lexer__emit(i64 %t359, i64 %t360)
+  %t361 = call i64 @lexer_Lexer__emit(i64 %t359, i64 %t360)
   br label %endif403
 else444:
   %t362 = load i64, i64* %ch
@@ -6597,7 +6597,7 @@ else444:
 then445:
   %t371 = load i64, i64* %self
   %t372 = shl i64 36, 56
-  %t373 = call i64 @Lexer_Lexer__emit(i64 %t371, i64 %t372)
+  %t373 = call i64 @lexer_Lexer__emit(i64 %t371, i64 %t372)
   br label %endif403
 else446:
   %t374 = load i64, i64* %ch
@@ -6613,7 +6613,7 @@ else446:
 then447:
   %t383 = load i64, i64* %self
   %t384 = shl i64 37, 56
-  %t385 = call i64 @Lexer_Lexer__emit(i64 %t383, i64 %t384)
+  %t385 = call i64 @lexer_Lexer__emit(i64 %t383, i64 %t384)
   br label %endif403
 else448:
   %t386 = load i64, i64* %ch
@@ -6628,8 +6628,8 @@ else448:
   br i1 %t394, label %then449, label %else450
 then449:
   %t395 = load i64, i64* %self
-  %t396 = inttoptr i64 %t395 to %Lexer_Lexer*
-  %t397 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t396, i32 0, i32 4
+  %t396 = inttoptr i64 %t395 to %lexer_Lexer*
+  %t397 = getelementptr %lexer_Lexer, %lexer_Lexer* %t396, i32 0, i32 4
   %t398 = load volatile i64, i64* %t397
   %t399 = call i8* @malloc(i64 32)
   %t400 = bitcast i8* %t399 to [4 x i64]*
@@ -6642,14 +6642,14 @@ then449:
   %t406 = getelementptr [4 x i64], [4 x i64]* %t400, i64 0, i64 1
   store i64 %t405, i64* %t406
   %t407 = load i64, i64* %self
-  %t408 = inttoptr i64 %t407 to %Lexer_Lexer*
-  %t409 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t408, i32 0, i32 2
+  %t408 = inttoptr i64 %t407 to %lexer_Lexer*
+  %t409 = getelementptr %lexer_Lexer, %lexer_Lexer* %t408, i32 0, i32 2
   %t410 = load volatile i64, i64* %t409
   %t411 = getelementptr [4 x i64], [4 x i64]* %t400, i64 0, i64 2
   store i64 %t410, i64* %t411
   %t412 = load i64, i64* %self
-  %t413 = inttoptr i64 %t412 to %Lexer_Lexer*
-  %t414 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t413, i32 0, i32 3
+  %t413 = inttoptr i64 %t412 to %lexer_Lexer*
+  %t414 = getelementptr %lexer_Lexer, %lexer_Lexer* %t413, i32 0, i32 3
   %t415 = load volatile i64, i64* %t414
   %t416 = getelementptr [4 x i64], [4 x i64]* %t400, i64 0, i64 3
   store i64 %t415, i64* %t416
@@ -6670,7 +6670,7 @@ else450:
 then451:
   %t428 = load i64, i64* %self
   %t429 = shl i64 35, 56
-  %t430 = call i64 @Lexer_Lexer__emit(i64 %t428, i64 %t429)
+  %t430 = call i64 @lexer_Lexer__emit(i64 %t428, i64 %t429)
   br label %endif403
 else452:
   %t431 = load i64, i64* %ch
@@ -6685,7 +6685,7 @@ else452:
   br i1 %t439, label %then453, label %else454
 then453:
   %t440 = load i64, i64* %self
-  %t441 = call i64 @Lexer_Lexer__peek(i64 %t440)
+  %t441 = call i64 @lexer_Lexer__peek(i64 %t440)
   %t442 = getelementptr [2 x i8], [2 x i8]* @.str.364, i64 0, i64 0
   %t443 = ptrtoint i8* %t442 to i64
   %t444 = inttoptr i64 %t441 to i8*
@@ -6697,15 +6697,15 @@ then453:
   br i1 %t449, label %then456, label %else457
 then456:
   %t450 = load i64, i64* %self
-  %t451 = call i64 @Lexer_Lexer__advance(i64 %t450)
+  %t451 = call i64 @lexer_Lexer__advance(i64 %t450)
   %t452 = load i64, i64* %self
   %t453 = shl i64 41, 56
-  %t454 = call i64 @Lexer_Lexer__emit(i64 %t452, i64 %t453)
+  %t454 = call i64 @lexer_Lexer__emit(i64 %t452, i64 %t453)
   br label %endif455
 else457:
   %t455 = load i64, i64* %self
   %t456 = shl i64 40, 56
-  %t457 = call i64 @Lexer_Lexer__emit(i64 %t455, i64 %t456)
+  %t457 = call i64 @lexer_Lexer__emit(i64 %t455, i64 %t456)
   br label %endif455
 endif455:
   br label %endif403
@@ -6722,7 +6722,7 @@ else454:
   br i1 %t466, label %then458, label %else459
 then458:
   %t467 = load i64, i64* %self
-  %t468 = call i64 @Lexer_Lexer__peek(i64 %t467)
+  %t468 = call i64 @lexer_Lexer__peek(i64 %t467)
   %t469 = getelementptr [2 x i8], [2 x i8]* @.str.366, i64 0, i64 0
   %t470 = ptrtoint i8* %t469 to i64
   %t471 = inttoptr i64 %t468 to i8*
@@ -6734,14 +6734,14 @@ then458:
   br i1 %t476, label %then461, label %else462
 then461:
   %t477 = load i64, i64* %self
-  %t478 = call i64 @Lexer_Lexer__advance(i64 %t477)
+  %t478 = call i64 @lexer_Lexer__advance(i64 %t477)
   %t479 = load i64, i64* %self
   %t480 = shl i64 43, 56
-  %t481 = call i64 @Lexer_Lexer__emit(i64 %t479, i64 %t480)
+  %t481 = call i64 @lexer_Lexer__emit(i64 %t479, i64 %t480)
   br label %endif460
 else462:
   %t482 = load i64, i64* %self
-  %t483 = call i64 @Lexer_Lexer__peek(i64 %t482)
+  %t483 = call i64 @lexer_Lexer__peek(i64 %t482)
   %t484 = getelementptr [2 x i8], [2 x i8]* @.str.367, i64 0, i64 0
   %t485 = ptrtoint i8* %t484 to i64
   %t486 = inttoptr i64 %t483 to i8*
@@ -6753,15 +6753,15 @@ else462:
   br i1 %t491, label %then463, label %else464
 then463:
   %t492 = load i64, i64* %self
-  %t493 = call i64 @Lexer_Lexer__advance(i64 %t492)
+  %t493 = call i64 @lexer_Lexer__advance(i64 %t492)
   %t494 = load i64, i64* %self
   %t495 = shl i64 59, 56
-  %t496 = call i64 @Lexer_Lexer__emit(i64 %t494, i64 %t495)
+  %t496 = call i64 @lexer_Lexer__emit(i64 %t494, i64 %t495)
   br label %endif460
 else464:
   %t497 = load i64, i64* %self
   %t498 = shl i64 42, 56
-  %t499 = call i64 @Lexer_Lexer__emit(i64 %t497, i64 %t498)
+  %t499 = call i64 @lexer_Lexer__emit(i64 %t497, i64 %t498)
   br label %endif460
 endif460:
   br label %endif403
@@ -6778,7 +6778,7 @@ else459:
   br i1 %t508, label %then465, label %else466
 then465:
   %t509 = load i64, i64* %self
-  %t510 = call i64 @Lexer_Lexer__peek(i64 %t509)
+  %t510 = call i64 @lexer_Lexer__peek(i64 %t509)
   %t511 = getelementptr [2 x i8], [2 x i8]* @.str.369, i64 0, i64 0
   %t512 = ptrtoint i8* %t511 to i64
   %t513 = inttoptr i64 %t510 to i8*
@@ -6790,14 +6790,14 @@ then465:
   br i1 %t518, label %then468, label %else469
 then468:
   %t519 = load i64, i64* %self
-  %t520 = call i64 @Lexer_Lexer__advance(i64 %t519)
+  %t520 = call i64 @lexer_Lexer__advance(i64 %t519)
   %t521 = load i64, i64* %self
   %t522 = shl i64 45, 56
-  %t523 = call i64 @Lexer_Lexer__emit(i64 %t521, i64 %t522)
+  %t523 = call i64 @lexer_Lexer__emit(i64 %t521, i64 %t522)
   br label %endif467
 else469:
   %t524 = load i64, i64* %self
-  %t525 = call i64 @Lexer_Lexer__peek(i64 %t524)
+  %t525 = call i64 @lexer_Lexer__peek(i64 %t524)
   %t526 = getelementptr [2 x i8], [2 x i8]* @.str.370, i64 0, i64 0
   %t527 = ptrtoint i8* %t526 to i64
   %t528 = inttoptr i64 %t525 to i8*
@@ -6809,15 +6809,15 @@ else469:
   br i1 %t533, label %then470, label %else471
 then470:
   %t534 = load i64, i64* %self
-  %t535 = call i64 @Lexer_Lexer__advance(i64 %t534)
+  %t535 = call i64 @lexer_Lexer__advance(i64 %t534)
   %t536 = load i64, i64* %self
   %t537 = shl i64 38, 56
-  %t538 = call i64 @Lexer_Lexer__emit(i64 %t536, i64 %t537)
+  %t538 = call i64 @lexer_Lexer__emit(i64 %t536, i64 %t537)
   br label %endif467
 else471:
   %t539 = load i64, i64* %self
   %t540 = shl i64 44, 56
-  %t541 = call i64 @Lexer_Lexer__emit(i64 %t539, i64 %t540)
+  %t541 = call i64 @lexer_Lexer__emit(i64 %t539, i64 %t540)
   br label %endif467
 endif467:
   br label %endif403
@@ -6834,7 +6834,7 @@ else466:
   br i1 %t550, label %then472, label %else473
 then472:
   %t551 = load i64, i64* %self
-  %t552 = call i64 @Lexer_Lexer__peek(i64 %t551)
+  %t552 = call i64 @lexer_Lexer__peek(i64 %t551)
   %t553 = getelementptr [2 x i8], [2 x i8]* @.str.372, i64 0, i64 0
   %t554 = ptrtoint i8* %t553 to i64
   %t555 = inttoptr i64 %t552 to i8*
@@ -6846,14 +6846,14 @@ then472:
   br i1 %t560, label %then475, label %else476
 then475:
   %t561 = load i64, i64* %self
-  %t562 = call i64 @Lexer_Lexer__advance(i64 %t561)
+  %t562 = call i64 @lexer_Lexer__advance(i64 %t561)
   %t563 = load i64, i64* %self
   %t564 = shl i64 47, 56
-  %t565 = call i64 @Lexer_Lexer__emit(i64 %t563, i64 %t564)
+  %t565 = call i64 @lexer_Lexer__emit(i64 %t563, i64 %t564)
   br label %endif474
 else476:
   %t566 = load i64, i64* %self
-  %t567 = call i64 @Lexer_Lexer__peek(i64 %t566)
+  %t567 = call i64 @lexer_Lexer__peek(i64 %t566)
   %t568 = getelementptr [2 x i8], [2 x i8]* @.str.373, i64 0, i64 0
   %t569 = ptrtoint i8* %t568 to i64
   %t570 = inttoptr i64 %t567 to i8*
@@ -6865,15 +6865,15 @@ else476:
   br i1 %t575, label %then477, label %else478
 then477:
   %t576 = load i64, i64* %self
-  %t577 = call i64 @Lexer_Lexer__advance(i64 %t576)
+  %t577 = call i64 @lexer_Lexer__advance(i64 %t576)
   %t578 = load i64, i64* %self
   %t579 = shl i64 39, 56
-  %t580 = call i64 @Lexer_Lexer__emit(i64 %t578, i64 %t579)
+  %t580 = call i64 @lexer_Lexer__emit(i64 %t578, i64 %t579)
   br label %endif474
 else478:
   %t581 = load i64, i64* %self
   %t582 = shl i64 46, 56
-  %t583 = call i64 @Lexer_Lexer__emit(i64 %t581, i64 %t582)
+  %t583 = call i64 @lexer_Lexer__emit(i64 %t581, i64 %t582)
   br label %endif474
 endif474:
   br label %endif403
@@ -6884,43 +6884,43 @@ endif403:
 while.end385:
   %t584 = load i64, i64* %self
   %t585 = shl i64 64, 56
-  %t586 = call i64 @Lexer_Lexer__emit(i64 %t584, i64 %t585)
+  %t586 = call i64 @lexer_Lexer__emit(i64 %t584, i64 %t585)
   %t587 = load i64, i64* %self
-  %t588 = inttoptr i64 %t587 to %Lexer_Lexer*
-  %t589 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t588, i32 0, i32 4
+  %t588 = inttoptr i64 %t587 to %lexer_Lexer*
+  %t589 = getelementptr %lexer_Lexer, %lexer_Lexer* %t588, i32 0, i32 4
   %t590 = load volatile i64, i64* %t589
   ret i64 %t590
 }
 
-define linkonce_odr i64 @Lexer_Lexer() {
+define linkonce_odr i64 @lexer_Lexer() {
 entry:
   %t591 = call i8* @malloc(i64 40)
-  %t592 = bitcast i8* %t591 to %Lexer_Lexer*
-  %t593 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t592, i32 0, i32 0
+  %t592 = bitcast i8* %t591 to %lexer_Lexer*
+  %t593 = getelementptr %lexer_Lexer, %lexer_Lexer* %t592, i32 0, i32 0
   store i64 0, i64* %t593
-  %t594 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t592, i32 0, i32 1
+  %t594 = getelementptr %lexer_Lexer, %lexer_Lexer* %t592, i32 0, i32 1
   store i64 0, i64* %t594
-  %t595 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t592, i32 0, i32 2
+  %t595 = getelementptr %lexer_Lexer, %lexer_Lexer* %t592, i32 0, i32 2
   store i64 0, i64* %t595
-  %t596 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t592, i32 0, i32 3
+  %t596 = getelementptr %lexer_Lexer, %lexer_Lexer* %t592, i32 0, i32 3
   store i64 0, i64* %t596
-  %t597 = getelementptr %Lexer_Lexer, %Lexer_Lexer* %t592, i32 0, i32 4
+  %t597 = getelementptr %lexer_Lexer, %lexer_Lexer* %t592, i32 0, i32 4
   store i64 0, i64* %t597
-  %t598 = ptrtoint %Lexer_Lexer* %t592 to i64
+  %t598 = ptrtoint %lexer_Lexer* %t592 to i64
   ret i64 %t598
 }
 
-define linkonce_odr i64 @Lexer_lex(i64 %source.arg) {
+define linkonce_odr i64 @lexer_lex(i64 %source.arg) {
 entry:
   %source = alloca i64
   %lexer = alloca i64
   store i64 %source.arg, i64* %source
-  %t1 = call i64 @Lexer_Lexer()
+  %t1 = call i64 @lexer_Lexer()
   %t2 = load i64, i64* %source
-  %t3 = call i64 @Lexer_Lexer__init(i64 %t1, i64 %t2)
+  %t3 = call i64 @lexer_Lexer__init(i64 %t1, i64 %t2)
   store i64 %t1, i64* %lexer
   %t4 = load i64, i64* %lexer
-  %t5 = call i64 @Lexer_Lexer__tokenize(i64 %t4)
+  %t5 = call i64 @lexer_Lexer__tokenize(i64 %t4)
   ret i64 %t5
 }
 
@@ -20258,7 +20258,7 @@ else1934:
   br label %endif1932
 endif1932:
   %t22 = load i64, i64* %self
-  %t23 = call i64 @Parser__parse_expr(i64 %t22)
+  %t23 = call i64 @Parser__parse_call(i64 %t22)
   ret i64 %t23
 }
 
