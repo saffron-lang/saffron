@@ -224,15 +224,21 @@ build_project() {
             exit 1
         }
     elif [[ "$TARGET" == "wasm32" ]]; then
-        local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base.ll"
+        local WASM_BASE="${SCRIPT_DIR}/src/runtime/wasm_base_32.ll"
         local WASM_CLANG="${WASM_CLANG:-/opt/homebrew/opt/llvm/bin/clang}"
+        local WASM_LD_PATH="${WASM_LD:-/opt/homebrew/bin/wasm-ld}"
         if [[ ! -x "$WASM_CLANG" ]]; then
             WASM_CLANG="clang"
         fi
+        # Compile runtime for wasm32
+        local runtime_ll="$TMPDIR/runtime.ll"
+        "$SAFFRONC" --target wasm32 "$RUNTIME_SRC" "$runtime_ll" 2>/dev/null || true
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
-            -Wl,--no-entry -Wl,--export-all -Wl,--allow-multiple-definition -Wl,--allow-undefined \
-            -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$WASM_BASE" || {
-            echo "saffron: wasm linking failed" >&2
+            -fuse-ld="$WASM_LD_PATH" \
+            -Wl,--no-entry -Wl,--export=_start -Wl,--export=malloc -Wl,--export=memory \
+            -Wl,--allow-multiple-definition -Wl,--allow-undefined \
+            -o "$output" "$WASM_BASE" "$ll_path" "$runtime_ll" || {
+            echo "saffron: wasm32 linking failed" >&2
             exit 1
         }
     else
