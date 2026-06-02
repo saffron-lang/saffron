@@ -388,6 +388,49 @@ fail:
   ret i64 0
 }
 
+; Allocate directly in old gen — GC-tracked but never triggers collection.
+; Use for runtime helpers (e.g. __str_split) where locals hold GC pointers
+; but are not registered as roots in the shadow stack.
+define i64 @__gc_alloc_safe(i64 %size, i64 %type_tag) {
+entry:
+  %alloc_size = add i64 %size, 24
+  %raw_ptr = call i8* @malloc(i64 %alloc_size)
+  %raw = ptrtoint i8* %raw_ptr to i64
+  %is_null = icmp eq i64 %raw, 0
+  br i1 %is_null, label %fail, label %init_header
+
+init_header:
+  ; header[0] = old gc_head (next pointer)
+  %old_head = load i64, i64* @__gc_head
+  %next_ptr = inttoptr i64 %raw to i64*
+  store i64 %old_head, i64* %next_ptr
+  ; header[8] = pack_info(0, type_tag, size)
+  %info = call i64 @__gc_pack_info(i64 0, i64 %type_tag, i64 %size)
+  %info_addr = add i64 %raw, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  store i64 %info, i64* %info_ptr
+  ; header[16] = magic sentinel
+  %res_addr = add i64 %raw, 16
+  %res_ptr = inttoptr i64 %res_addr to i64*
+  store i64 6557403441622859503, i64* %res_ptr
+  ; Update gc_head
+  store i64 %raw, i64* @__gc_head
+  ; Update alloc_count
+  %ac = load i64, i64* @__gc_alloc_count
+  %ac_new = add i64 %ac, 1
+  store i64 %ac_new, i64* @__gc_alloc_count
+  ; Update total_bytes
+  %tb = load i64, i64* @__gc_total_bytes
+  %tb_new = add i64 %tb, %alloc_size
+  store i64 %tb_new, i64* @__gc_total_bytes
+  ; Return user pointer = raw + 24
+  %user = add i64 %raw, 24
+  ret i64 %user
+
+fail:
+  ret i64 0
+}
+
 ; Allocate zeroed memory
 define i64 @__gc_alloc_zeroed(i64 %size, i64 %type_tag) {
 entry:

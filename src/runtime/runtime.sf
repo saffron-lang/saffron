@@ -35,6 +35,7 @@
 
 @extern("i64 __gc_alloc(i64, i64)") fun __gc_alloc(size: Int, type_tag: Int): Int
 @extern("i64 __gc_realloc(i64, i64, i64)") fun __gc_realloc(old_ptr: Int, new_size: Int, type_tag: Int): Int
+@extern("i64 __gc_alloc_safe(i64, i64)") fun __gc_alloc_safe(size: Int, type_tag: Int): Int
 
 // --- Intrinsics ---
 
@@ -65,6 +66,26 @@ fun __list_push(list: Int, value: Int) {
         var old_data: Int = load64(list + 16)
         var new_data: Int = __gc_realloc(old_data, new_cap * 8, 7)
         if (new_data != 0) {
+            store64(list + 8, new_cap)
+            store64(list + 16, new_data)
+        }
+    }
+    var data: Int = load64(list + 16)
+    store64(data + count * 8, value)
+    store64(list, count + 1)
+}
+
+// Like __list_push but uses __gc_alloc_safe to grow (no GC triggered).
+// Used by __str_split to avoid nursery invalidation.
+fun __split_push(list: Int, value: Int) {
+    var count: Int = load64(list)
+    var cap: Int = load64(list + 8)
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        var old_data: Int = load64(list + 16)
+        var new_data: Int = __gc_alloc_safe(new_cap * 8, 7)
+        if (new_data != 0) {
+            rt_memcpy(new_data, old_data, cap * 8)
             store64(list + 8, new_cap)
             store64(list + 16, new_data)
         }
@@ -535,27 +556,34 @@ fun __str_ends_with(str: Int, suffix: Int): Int {
 }
 
 fun __str_split(input: Int, delim: Int): Int {
-    var list: Int = __list_new()
+    // Allocate list struct and data in old gen (no GC triggered).
+    // This prevents nursery collection from invalidating local pointers.
+    var list: Int = __gc_alloc_safe(24, 2)
+    store64(list, 0)
+    store64(list + 8, 64)
+    store64(list + 16, __gc_alloc_safe(64 * 8, 7))
     if (input == 0 or delim == 0) { return list }
     var slen: Int = rt_strlen(input)
-    var buf: Int = __gc_alloc(slen + 1, 1)
+    var buf: Int = rt_malloc(slen + 1)
     rt_strcpy(buf, input)
     var dlen: Int = rt_strlen(delim)
     var pos: Int = buf
     while (rt_strlen(pos) > 0) {
         var m: Int = rt_strstr(pos, delim)
         if (m == 0) {
-            var lb: Int = __gc_alloc(slen + 1, 1)
+            var lb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
             rt_strcpy(lb, pos)
-            __list_push(list, lb)
+            __split_push(list, lb)
+            rt_free(buf)
             return list
         }
         store8(m, 0)
-        var tb: Int = __gc_alloc(slen + 1, 1)
+        var tb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
         rt_strcpy(tb, pos)
-        __list_push(list, tb)
+        __split_push(list, tb)
         pos = m + dlen
     }
+    rt_free(buf)
     return list
 }
 
@@ -566,7 +594,7 @@ fun __join_append(buf_p: Int, len_p: Int, cap_p: Int, src: Int, src_len: Int) {
     var needed: Int = len + src_len + 1
     if (needed >= cap) {
         var new_cap: Int = needed * 2
-        var new_buf: Int = __gc_realloc(buf, new_cap, 0)
+        var new_buf: Int = rt_realloc(buf, new_cap)
         if (new_buf != 0) {
             store64(cap_p, new_cap)
             store64(buf_p, new_buf)
@@ -593,7 +621,7 @@ fun __str_replace(str: Int, old: Int, replacement: Int): Int {
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
     var cap_p: Int = rt_malloc(8)
-    var init_buf: Int = __gc_alloc(init_cap, 1)
+    var init_buf: Int = rt_malloc(init_cap)
     store8(init_buf, 0)
     store64(buf_p, init_buf)
     store64(len_p, 0)
@@ -628,7 +656,7 @@ fun __list_join(list: Int, sep: Int): Int {
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
     var cap_p: Int = rt_malloc(8)
-    var init_buf: Int = __gc_alloc(1024, 1)
+    var init_buf: Int = rt_malloc(1024)
     store8(init_buf, 0)
     store64(buf_p, init_buf)
     store64(len_p, 0)

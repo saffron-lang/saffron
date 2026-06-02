@@ -2351,8 +2351,8 @@ class Codegen {
             }
         }
 
-        if (this.known_functions.contains(resolved_callee)) {
-            // Direct call to known function
+        if (this.known_functions.contains(resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+            // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
             if (callee_name == "main" and this.defined_funcs.contains("__saffron_main")) {
                 call_target = "__saffron_main"
@@ -2638,7 +2638,19 @@ class Codegen {
                     emit_callee = this.func_prefix_map.get(callee_name)
                 } else {
                     // Warning: calling undefined function
-                    IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    // Suppress if it's a known class method (ClassName__method pattern)
+                    var is_known_method: Bool = false
+                    var kfi: Float = 0
+                    while (kfi < this.known_functions.length()) {
+                        if (this.known_functions[kfi].ends_with("__" + callee_name)) {
+                            is_known_method = true
+                            kfi = this.known_functions.length()
+                        }
+                        kfi = kfi + 1
+                    }
+                    if (!is_known_method) {
+                        IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    }
 
                 }
             }
@@ -3502,7 +3514,6 @@ class Codegen {
     }
 
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
-        if (name == "on_click") { IO.println("[DEBUG-KF] gen_closure_function pushing on_click") }
         this.known_functions.push(name)
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}
@@ -5870,7 +5881,6 @@ class Codegen {
         } else if (name.contains("__lambda")) {
             emit_name = name
         }
-        if (emit_name == "on_click") { IO.println("[DEBUG-KF] gen_function pushing on_click, name=" + name + " prefix=" + this.current_prefix) }
         this.known_functions.push(emit_name)
         this.func_ret_types.set(emit_name, ret_type)
         if (this.current_prefix.length() > 0) {
@@ -6377,12 +6387,10 @@ class Codegen {
                 FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
-                        if (pr_emit == "on_click") { IO.println("[DEBUG-KF] output pre-reg pushing on_click emit") }
                         if (!this.known_functions.contains(pr_emit)) {
                             this.known_functions.push(pr_emit)
                         }
                         if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
-                            if (pr_name == "on_click") { IO.println("[DEBUG-KF] output pre-reg pushing on_click name") }
                             this.known_functions.push(pr_name)
                         }
                     }
@@ -9278,12 +9286,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 var pr_fname: String = gen.get_fun_name(all_stmts[pr_si])
                 if (pr_fname.length() > 0) {
                     var pr_emit: String = pr_prefix + pr_fname
-                    if (pr_emit == "on_click") { IO.println("[DEBUG-KF] pre-reg pushing on_click emit, fname=" + pr_fname + " prefix=" + pr_prefix) }
                     if (!gen.known_functions.contains(pr_emit)) {
                         gen.known_functions.push(pr_emit)
                     }
                     if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
-                        if (pr_fname == "on_click") { IO.println("[DEBUG-KF] pre-reg pushing on_click fname") }
                         gen.known_functions.push(pr_fname)
                     }
                 }
