@@ -125,8 +125,14 @@
             vtype = this.get_expr_type(init)
         }
         var val: String = this.gen_arg_value(init)
-        if (vtype == "Any") {
-            vtype = this.type_to_string(this.last_type)
+        // After gen_arg_value, last_type reflects the actual compiled expression type.
+        // Always use last_type when type_ann was "Any" (inference), since get_expr_type
+        // may fail for complex expressions involving variables not yet in typed_vars.
+        if (type_ann == "Any") {
+            var post_type: String = this.type_to_string(this.last_type)
+            if (post_type != "Any") {
+                vtype = post_type
+            }
         }
         this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))

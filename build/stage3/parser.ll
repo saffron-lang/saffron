@@ -962,7 +962,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.958 = private unnamed_addr constant [2 x i8] c")\00"
 @.str.959 = private unnamed_addr constant [11 x i8] c"__for_list\00"
 @.str.960 = private unnamed_addr constant [8 x i8] c"__for_i\00"
-@.str.961 = private unnamed_addr constant [5 x i8] c"List\00"
+@.str.961 = private unnamed_addr constant [4 x i8] c"Any\00"
 @.str.962 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.963 = private unnamed_addr constant [4 x i8] c"Int\00"
 @.str.964 = private unnamed_addr constant [1 x i8] c"\00"
@@ -18479,7 +18479,7 @@ entry:
   %t16 = load i64, i64* %list_var
   %t17 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 1
   store i64 %t16, i64* %t17
-  %t18 = getelementptr [5 x i8], [5 x i8]* @.str.961, i64 0, i64 0
+  %t18 = getelementptr [4 x i8], [4 x i8]* @.str.961, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = getelementptr [5 x i64], [5 x i64]* %t14, i64 0, i64 2
   store i64 %t19, i64* %t20
