@@ -35,6 +35,9 @@ extend fun Codegen.params_to_string(params: List<AST.Param>): String {
 
 extend fun Codegen.str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
+        if (this.type_aliases.has(s)) {
+            return this.str_to_type(this.type_aliases.get(s))
+        }
         if (s == "String") return AST.Type.StringType
         if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
         if (s == "Bool") return AST.Type.BoolType

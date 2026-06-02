@@ -408,6 +408,7 @@
             IfExpr(c, tb, tv, eb, ev) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(eb) or this.expr_has_yield(ev)
             IsCheck(v, t) => this.expr_has_yield(v)
             TryExpr(tb, tv, cn, cb, cv) => this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(cb) or this.expr_has_yield(cv)
+            TupleLit(e) => this.exprs_have_yield(e)
             _ => false
         }
     }
