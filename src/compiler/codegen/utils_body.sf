@@ -62,6 +62,10 @@
             rt.append("@__yield_arg = external global i64\n")
             rt.append("@__task_result = external global i64\n")
             rt.append("@__coro_escape_sink = external global ptr\n")
+            rt.append("declare void @__sched_store_result(i64, i64)\n")
+            rt.append("declare i64 @__sched_get_stored_result(i64)\n")
+            this.known_functions.push("__sched_store_result")
+            this.known_functions.push("__sched_get_stored_result")
         }
         return rt.to_string()
     }

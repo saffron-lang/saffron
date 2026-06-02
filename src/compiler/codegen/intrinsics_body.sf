@@ -1,8 +1,7 @@
     fun gen_intrinsic_call(name: String, args: List<AST.Expr>): String {
         if (name.ends_with("load64")) {
             var addr: String = this.gen_arg_value(args[0])
-            var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i64*")
+            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
             var val: String = this.fresh_local()
             this.emit_indent(val + " = load i64, i64* " + ptr)
             this.last_type = AST.Type.IntType
@@ -11,8 +10,7 @@
         if (name.ends_with("store64")) {
             var addr: String = this.gen_arg_value(args[0])
             var val: String = this.gen_arg_value(args[1])
-            var ptr: String = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + addr + " to i64*")
+            var ptr: String = this.val_to_typed_ptr(addr, "i64*")
             this.emit_indent("store i64 " + val + ", i64* " + ptr)
             this.last_type = AST.Type.NilType
             return "0"
@@ -48,15 +46,13 @@
         if (name.ends_with("load_argv")) {
             var argv: String = this.fresh_local()
             this.emit_indent(argv + " = load i8**, i8*** @__argv")
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = ptrtoint i8** " + argv + " to i64")
+            var result: String = this.typed_ptr_to_val(argv, "i8**")
             this.last_type = AST.Type.IntType
             return result
         }
         if (name.ends_with("tag_ptr")) {
             var ptr_val: String = this.gen_arg_value(args[0])
-            var as_ptr: String = this.fresh_local()
-            this.emit_indent(as_ptr + " = inttoptr i64 " + ptr_val + " to i8*")
+            var as_ptr: String = this.val_to_ptr(ptr_val)
             var result: String = this.emit_tag_ptr(as_ptr)
             this.last_type = AST.Type.StringType
             return result
@@ -64,8 +60,7 @@
         if (name.ends_with("untag_ptr")) {
             var val: String = this.gen_arg_value(args[0])
             var ptr: String = this.emit_untag_ptr(val)
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = ptrtoint i8* " + ptr + " to i64")
+            var result: String = this.ptr_to_val(ptr)
             this.last_type = AST.Type.IntType
             return result
         }
@@ -165,8 +160,7 @@
                 var ptr: String = this.emit_untag_ptr(val)
                 call_args.push("i8* " + ptr)
             } else if (norm == "i8**") {
-                var ptr: String = this.fresh_local()
-                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8**")
+                var ptr: String = this.val_to_typed_ptr(val, "i8**")
                 call_args.push("i8** " + ptr)
             } else if (norm == "i32") {
                 var trunc_val: String = this.fresh_local()

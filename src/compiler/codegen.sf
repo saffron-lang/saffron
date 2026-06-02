@@ -255,6 +255,109 @@ class Codegen {
         this.block_terminated = true
     }
 
+    // --- Pointer ↔ value helpers (wasm32-aware) ---
+    // On wasm32, pointers are i32 but value slots are i64.
+    // These helpers insert the necessary i32↔i64 conversions.
+
+    fun ptr_to_val(ptr_reg: String): String {
+        // Convert an i8* pointer register to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint i8* " + ptr_reg + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint i8* " + ptr_reg + " to i64")
+        return reg
+    }
+
+    fun val_to_ptr(val_reg: String): String {
+        // Convert an i64 value to an i8* pointer register
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to i8*")
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to i8*")
+        return reg
+    }
+
+    fun typed_ptr_to_val(ptr_reg: String, ptr_type: String): String {
+        // Convert a typed pointer (e.g. [2 x i64]*) to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint " + ptr_type + " " + ptr_reg + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint " + ptr_type + " " + ptr_reg + " to i64")
+        return reg
+    }
+
+    fun val_to_typed_ptr(val_reg: String, ptr_type: String): String {
+        // Convert an i64 value to a typed pointer (e.g. [2 x i64]*)
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to " + ptr_type)
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to " + ptr_type)
+        return reg
+    }
+
+    fun fn_ptr_to_val(fn_type_str: String, fn_name: String): String {
+        // Convert a function pointer (@name with type) to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint " + fn_type_str + " " + fn_name + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint " + fn_type_str + " " + fn_name + " to i64")
+        return reg
+    }
+
+    fun val_to_fn_ptr(val_reg: String, fn_type: String): String {
+        // Convert an i64 value to a function pointer
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to " + fn_type)
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to " + fn_type)
+        return reg
+    }
+
+    fun malloc_size_arg(size_reg: String): String {
+        // On wasm32, malloc takes i32 size; on native, i64
+        if (this.target == "wasm32") {
+            var trunc_reg: String = this.fresh_local()
+            this.emit_indent(trunc_reg + " = trunc i64 " + size_reg + " to i32")
+            return trunc_reg
+        }
+        return size_reg
+    }
+
+    fun malloc_size_type(): String {
+        if (this.target == "wasm32") { return "i32" }
+        return "i64"
+    }
+
     fun start_block(label: String) {
         this.emit(label + ":")
         this.block_terminated = false

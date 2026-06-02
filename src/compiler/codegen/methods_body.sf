@@ -803,28 +803,32 @@
         var task_i64: String = this.fresh_local()
         this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
         // If the task completed synchronously (e.g. no real suspend points),
-        // save its result immediately before another spawn could overwrite @__task_result
+        // save its result immediately before another spawn could overwrite @__task_result.
+        // Don't enqueue already-done tasks (the scheduler would read stale @__task_result).
         var spawn_done: String = this.fresh_local()
         this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
         var spawn_done_cmp: String = this.fresh_local()
         this.emit_indent(spawn_done_cmp + " = icmp eq i64 " + spawn_done + ", 1")
         var spawn_save_label: String = this.fresh_label("spawn.save")
+        var spawn_enqueue_label: String = this.fresh_label("spawn.enqueue")
         var spawn_cont_label: String = this.fresh_label("spawn.cont")
-        this.emit_terminator("br i1 " + spawn_done_cmp + ", label %" + spawn_save_label + ", label %" + spawn_cont_label)
+        this.emit_terminator("br i1 " + spawn_done_cmp + ", label %" + spawn_save_label + ", label %" + spawn_enqueue_label)
         this.start_block(spawn_save_label)
         var spawn_res: String = this.fresh_local()
         this.emit_indent(spawn_res + " = load i64, i64* @__task_result")
         this.emit_indent("call void @__sched_store_result(i64 " + task_i64 + ", i64 " + spawn_res + ")")
         this.called_functions.push("__sched_store_result")
         this.emit_terminator("br label %" + spawn_cont_label)
-        this.start_block(spawn_cont_label)
-        // Enqueue to scheduler
+        this.start_block(spawn_enqueue_label)
+        // Only enqueue tasks that haven't completed yet
         var enqueue_name: String = "enqueue"
         if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
             enqueue_name = "stdlib_scheduler_enqueue"
         }
         this.emit_indent("call i64 @" + enqueue_name + "(i64 " + task_i64 + ")")
         this.called_functions.push(enqueue_name)
+        this.emit_terminator("br label %" + spawn_cont_label)
+        this.start_block(spawn_cont_label)
         this.last_type = this.str_to_type(task_result_type)
         return task_i64
     }

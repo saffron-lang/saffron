@@ -254,6 +254,109 @@ class Codegen {
         this.block_terminated = true
     }
 
+    // --- Pointer ↔ value helpers (wasm32-aware) ---
+    // On wasm32, pointers are i32 but value slots are i64.
+    // These helpers insert the necessary i32↔i64 conversions.
+
+    fun ptr_to_val(ptr_reg: String): String {
+        // Convert an i8* pointer register to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint i8* " + ptr_reg + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint i8* " + ptr_reg + " to i64")
+        return reg
+    }
+
+    fun val_to_ptr(val_reg: String): String {
+        // Convert an i64 value to an i8* pointer register
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to i8*")
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to i8*")
+        return reg
+    }
+
+    fun typed_ptr_to_val(ptr_reg: String, ptr_type: String): String {
+        // Convert a typed pointer (e.g. [2 x i64]*) to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint " + ptr_type + " " + ptr_reg + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint " + ptr_type + " " + ptr_reg + " to i64")
+        return reg
+    }
+
+    fun val_to_typed_ptr(val_reg: String, ptr_type: String): String {
+        // Convert an i64 value to a typed pointer (e.g. [2 x i64]*)
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to " + ptr_type)
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to " + ptr_type)
+        return reg
+    }
+
+    fun fn_ptr_to_val(fn_type_str: String, fn_name: String): String {
+        // Convert a function pointer (@name with type) to an i64 value
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = ptrtoint " + fn_type_str + " " + fn_name + " to i32")
+            var i64_reg: String = this.fresh_local()
+            this.emit_indent(i64_reg + " = zext i32 " + i32_reg + " to i64")
+            return i64_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = ptrtoint " + fn_type_str + " " + fn_name + " to i64")
+        return reg
+    }
+
+    fun val_to_fn_ptr(val_reg: String, fn_type: String): String {
+        // Convert an i64 value to a function pointer
+        if (this.target == "wasm32") {
+            var i32_reg: String = this.fresh_local()
+            this.emit_indent(i32_reg + " = trunc i64 " + val_reg + " to i32")
+            var ptr_reg: String = this.fresh_local()
+            this.emit_indent(ptr_reg + " = inttoptr i32 " + i32_reg + " to " + fn_type)
+            return ptr_reg
+        }
+        var reg: String = this.fresh_local()
+        this.emit_indent(reg + " = inttoptr i64 " + val_reg + " to " + fn_type)
+        return reg
+    }
+
+    fun malloc_size_arg(size_reg: String): String {
+        // On wasm32, malloc takes i32 size; on native, i64
+        if (this.target == "wasm32") {
+            var trunc_reg: String = this.fresh_local()
+            this.emit_indent(trunc_reg + " = trunc i64 " + size_reg + " to i32")
+            return trunc_reg
+        }
+        return size_reg
+    }
+
+    fun malloc_size_type(): String {
+        if (this.target == "wasm32") { return "i32" }
+        return "i64"
+    }
+
     fun start_block(label: String) {
         this.emit(label + ":")
         this.block_terminated = false
@@ -969,8 +1072,7 @@ class Codegen {
                 var gep: String = this.fresh_local()
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                var local: String = this.ptr_to_val(gep)
                 local
             }
             NilLit => {
@@ -1408,10 +1510,8 @@ class Codegen {
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
-                var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
-                var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                var lptr: String = this.val_to_ptr(lhs)
+                var rptr: String = this.val_to_ptr(rhs)
                 var cmp: String = this.fresh_local()
                 this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
                 var cmp_result: String = this.fresh_local()
@@ -1448,10 +1548,8 @@ class Codegen {
             if (left_type == "String" or right_type == "String") {
                 // String concatenation
                 this.last_type = AST.Type.StringType
-                var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
-                var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                var lptr: String = this.val_to_ptr(lhs)
+                var rptr: String = this.val_to_ptr(rhs)
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -1461,11 +1559,10 @@ class Codegen {
                 var total1: String = this.fresh_local()
                 this.emit_indent(total1 + " = add i64 " + total + ", 1")
                 var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
+                this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-                var result: String = this.fresh_local()
-                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+                var result: String = this.ptr_to_val(buf)
                 return result
             }
 
@@ -1524,8 +1621,7 @@ class Codegen {
         var gep: String = this.fresh_local()
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+        var local: String = this.ptr_to_val(gep)
         return local
     }
 
@@ -1587,16 +1683,14 @@ class Codegen {
         this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
-        var fn_as_int: String = this.fresh_local()
-        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + wrap_name + " to i64")
+        var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
 
@@ -1840,8 +1934,7 @@ class Codegen {
             var gep: String = this.fresh_local()
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+            var local: String = this.ptr_to_val(gep)
             return local
         }
         return this.gen_expr(expr)
@@ -1859,8 +1952,7 @@ class Codegen {
         }
         // Variable or expression: gen_expr gives i64, convert to i8*
         var val: String = this.gen_arg_value(expr)
-        var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+        var ptr: String = this.val_to_ptr(val)
         return ptr
     }
 
@@ -1879,13 +1971,12 @@ class Codegen {
         this.emit_indent(total1 + " = add i64 " + total + ", 1")
         // Malloc
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
+        this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
         // Return as i64
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        var result: String = this.ptr_to_val(buf)
         return result
     }
 
@@ -2655,8 +2746,7 @@ class Codegen {
         // 2. A closure pair pointer: [fn_ptr, env_ptr]
         // We use the closure calling convention for all indirect calls:
         // Unpack [fn_ptr, env_ptr], call fn(env, args...)
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = inttoptr i64 " + ptr_val + " to [2 x i64]*")
+        var closure_ptr: String = this.val_to_typed_ptr(ptr_val, "[2 x i64]*")
 
         // Load fn_ptr from slot 0
         var fn_slot: String = this.fresh_local()
@@ -2691,8 +2781,7 @@ class Codegen {
         var fn_type: String = "i64 (" + type_parts.join(", ") + ")*"
 
         // Cast and call
-        var fn_ptr: String = this.fresh_local()
-        this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_int + " to " + fn_type)
+        var fn_ptr: String = this.val_to_fn_ptr(fn_int, fn_type)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 " + fn_ptr + "(" + arg_strs.join(", ") + ")")
         return local
@@ -2853,8 +2942,7 @@ class Codegen {
             var tag_slot: String = this.fresh_local()
             this.emit_indent(tag_slot + " = getelementptr [1 x i64], [1 x i64]* " + arr_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
-            var as_int: String = this.fresh_local()
-            this.emit_indent(as_int + " = ptrtoint [1 x i64]* " + arr_ptr + " to i64")
+            var as_int: String = this.typed_ptr_to_val(arr_ptr, "[1 x i64]*")
             this.last_type = AST.Type.EnumType(enum_name); return as_int
         }
 
@@ -2881,8 +2969,7 @@ class Codegen {
             i = i + 1
         }
         // Cast pointer to i64 for storage
-        var as_int: String = this.fresh_local()
-        this.emit_indent(as_int + " = ptrtoint [" + num_slots.to_string() + " x i64]* " + arr_ptr + " to i64")
+        var as_int: String = this.typed_ptr_to_val(arr_ptr, "[" + num_slots.to_string() + " x i64]*")
         this.last_type = AST.Type.EnumType(enum_name); return as_int
     }
 
@@ -3219,7 +3306,6 @@ class Codegen {
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             // Store fn ptr
-            var fn_as_int: String = this.fresh_local()
             var num_params: Float = param_names.length() + 1
             var ret_ty: String = "i64"
             if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
@@ -3231,19 +3317,17 @@ class Codegen {
                 ti = ti + 1
             }
             fn_type_str = fn_type_str + ")*"
-            this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+            var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + lambda_name)
             var fn_slot: String = this.fresh_local()
             this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
             // Store env ptr
-            var env_as_int: String = this.fresh_local()
-            this.emit_indent(env_as_int + " = ptrtoint [" + env_size.floor().to_string() + " x i64]* " + env_ptr + " to i64")
+            var env_as_int: String = this.typed_ptr_to_val(env_ptr, "[" + env_size.floor().to_string() + " x i64]*")
             var env_slot: String = this.fresh_local()
             this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
             this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
             // Return closure pointer as i64
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+            var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
             return result
         }
 
@@ -3295,16 +3379,14 @@ class Codegen {
             tti = tti + 1
         }
         fn_type_str = fn_type_str + ")*"
-        var fn_as_int: String = this.fresh_local()
-        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+        var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + lambda_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
 
@@ -4984,6 +5066,10 @@ class Codegen {
             rt.append("@__yield_arg = external global i64\n")
             rt.append("@__task_result = external global i64\n")
             rt.append("@__coro_escape_sink = external global ptr\n")
+            rt.append("declare void @__sched_store_result(i64, i64)\n")
+            rt.append("declare i64 @__sched_get_stored_result(i64)\n")
+            this.known_functions.push("__sched_store_result")
+            this.known_functions.push("__sched_get_stored_result")
         }
         return rt.to_string()
     }
@@ -7156,28 +7242,32 @@ class Codegen {
         var task_i64: String = this.fresh_local()
         this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
         // If the task completed synchronously (e.g. no real suspend points),
-        // save its result immediately before another spawn could overwrite @__task_result
+        // save its result immediately before another spawn could overwrite @__task_result.
+        // Don't enqueue already-done tasks (the scheduler would read stale @__task_result).
         var spawn_done: String = this.fresh_local()
         this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
         var spawn_done_cmp: String = this.fresh_local()
         this.emit_indent(spawn_done_cmp + " = icmp eq i64 " + spawn_done + ", 1")
         var spawn_save_label: String = this.fresh_label("spawn.save")
+        var spawn_enqueue_label: String = this.fresh_label("spawn.enqueue")
         var spawn_cont_label: String = this.fresh_label("spawn.cont")
-        this.emit_terminator("br i1 " + spawn_done_cmp + ", label %" + spawn_save_label + ", label %" + spawn_cont_label)
+        this.emit_terminator("br i1 " + spawn_done_cmp + ", label %" + spawn_save_label + ", label %" + spawn_enqueue_label)
         this.start_block(spawn_save_label)
         var spawn_res: String = this.fresh_local()
         this.emit_indent(spawn_res + " = load i64, i64* @__task_result")
         this.emit_indent("call void @__sched_store_result(i64 " + task_i64 + ", i64 " + spawn_res + ")")
         this.called_functions.push("__sched_store_result")
         this.emit_terminator("br label %" + spawn_cont_label)
-        this.start_block(spawn_cont_label)
-        // Enqueue to scheduler
+        this.start_block(spawn_enqueue_label)
+        // Only enqueue tasks that haven't completed yet
         var enqueue_name: String = "enqueue"
         if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
             enqueue_name = "stdlib_scheduler_enqueue"
         }
         this.emit_indent("call i64 @" + enqueue_name + "(i64 " + task_i64 + ")")
         this.called_functions.push(enqueue_name)
+        this.emit_terminator("br label %" + spawn_cont_label)
+        this.start_block(spawn_cont_label)
         this.last_type = this.str_to_type(task_result_type)
         return task_i64
     }

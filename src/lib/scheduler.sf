@@ -8,6 +8,7 @@
 @extern("i64 __sched_get_yield_arg()") fun get_yield_arg(): Int
 @extern("i64 __sched_get_task_result()") fun get_task_result_global(): Int
 @extern("void __sched_reset_yield()") fun reset_yield()
+@extern("void __sched_store_result(i64, i64)") fun store_result(handle: Int, value: Int)
 
 var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
@@ -60,6 +61,7 @@ fun scheduler_tick(): Int {
         var res: Int = get_task_result_global()
         result_handles.push(hdl)
         result_values.push(res)
+        store_result(hdl, res)
         coro_destroy(hdl)
     } else {
         var reason: Int = get_yield_reason()
