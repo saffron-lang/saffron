@@ -63,11 +63,16 @@ export async function loadSaffron(wasmUrl, options = {}) {
 
     // Support both fetch (browser) and readFile (Node.js) loading
     let wasmBytes;
-    if (typeof wasmUrl === 'string' && typeof fetch === 'function') {
+    if (typeof wasmUrl === 'string' && typeof process !== 'undefined' && process.versions && process.versions.node) {
+        // Node.js: use fs to read the file
+        const { readFile } = await import('fs/promises');
+        wasmBytes = await readFile(wasmUrl);
+    } else if (typeof wasmUrl === 'string' && typeof fetch === 'function') {
+        // Browser: use fetch
         const response = await fetch(wasmUrl);
         wasmBytes = await response.arrayBuffer();
     } else if (typeof wasmUrl === 'string') {
-        // Node.js path — dynamically import fs
+        // Fallback: try fs
         const { readFile } = await import('fs/promises');
         wasmBytes = await readFile(wasmUrl);
     } else {

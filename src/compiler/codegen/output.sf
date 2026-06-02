@@ -634,21 +634,24 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
             out.append("\n")
         }
 
-        // Only emit C main wrapper if program defines a main function
-        if (this.defined_funcs.contains("__saffron_main") or has_top_level) {
-            out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
-            out.append("entry:\n")
-            out.append("  store i32 %argc, i32* @__argc\n")
-            out.append("  store i8** %argv, i8*** @__argv\n")
-            if (has_top_level) {
-                out.append("  call i64 @__saffron_entry()\n")
-                out.append("  ret i32 0\n")
-            } else {
-                out.append("  %main_ret = call i64 @__saffron_main()\n")
-                out.append("  %exit_code = trunc i64 %main_ret to i32\n")
-                out.append("  ret i32 %exit_code\n")
+        // Only emit C main wrapper for native targets (not WASM).
+        // For WASM, _start is provided by wasm_base.ll and calls __saffron_entry.
+        if (this.target != "wasm" and this.target != "wasm64") {
+            if (this.defined_funcs.contains("__saffron_main") or has_top_level) {
+                out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
+                out.append("entry:\n")
+                out.append("  store i32 %argc, i32* @__argc\n")
+                out.append("  store i8** %argv, i8*** @__argv\n")
+                if (has_top_level) {
+                    out.append("  call i64 @__saffron_entry()\n")
+                    out.append("  ret i32 0\n")
+                } else {
+                    out.append("  %main_ret = call i64 @__saffron_main()\n")
+                    out.append("  %exit_code = trunc i64 %main_ret to i32\n")
+                    out.append("  ret i32 %exit_code\n")
+                }
+                out.append("}\n")
             }
-            out.append("}\n")
         }
 
         return out.to_string()

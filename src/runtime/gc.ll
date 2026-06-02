@@ -785,18 +785,6 @@ done:
 ; Public API
 ; =============================================================================
 
-; Minor collection stub — promotes nursery survivors via full GC.
-; TODO: implement proper generational minor collection.
-define void @__gc_minor_collect() {
-entry:
-  call void @__gc_mark()
-  call void @__gc_sweep_impl()
-  %c = load i64, i64* @__gc_minor_collections
-  %c_new = add i64 %c, 1
-  store i64 %c_new, i64* @__gc_minor_collections
-  ret void
-}
-
 ; Run a full mark-and-sweep collection
 define void @__gc_collect() {
 entry:
@@ -1080,7 +1068,7 @@ done:
 ; Generational GC — Nursery Implementation
 ; =============================================================================
 
-; Initialize the nursery arena (256KB bump allocator)
+; Initialize the nursery arena
 define void @__gc_nursery_init() {
 entry:
   %already = load i64, i64* @__gc_nursery_inited
@@ -1088,21 +1076,736 @@ entry:
   br i1 %is_inited, label %done, label %do_init
 
 do_init:
-  %size = load i64, i64* @__gc_nursery_size
-  %arena = call i8* @malloc(i64 %size)
-  %arena_int = ptrtoint i8* %arena to i64
-  %is_null = icmp eq i64 %arena_int, 0
-  br i1 %is_null, label %done, label %init_ok
+  %nsize = load i64, i64* @__gc_nursery_size
+  %arena_raw = call i8* @malloc(i64 %nsize)
+  %arena = ptrtoint i8* %arena_raw to i64
+  %is_null = icmp eq i64 %arena, 0
+  br i1 %is_null, label %done, label %store_arena
 
-init_ok:
-  store i64 %arena_int, i64* @__gc_nursery_start
-  store i64 %arena_int, i64* @__gc_nursery_ptr
-  %end_addr = add i64 %arena_int, %size
+store_arena:
+  store i64 %arena, i64* @__gc_nursery_start
+  store i64 %arena, i64* @__gc_nursery_ptr
+  %end_addr = add i64 %arena, %nsize
   store i64 %end_addr, i64* @__gc_nursery_end
   store i64 1, i64* @__gc_nursery_inited
+  ; Initialize remembered set
+  call void @__gc_remembered_set_init()
   br label %done
 
 done:
   ret void
+}
+
+; Initialize the remembered set
+define private void @__gc_remembered_set_init() {
+entry:
+  %already = load i64, i64* @__gc_remembered_set_inited
+  %is_inited = icmp ne i64 %already, 0
+  br i1 %is_inited, label %done, label %do_init
+
+do_init:
+  ; Allocate struct: { count: i64, capacity: i64, data_ptr: i64 }
+  %rs_raw = call i8* @malloc(i64 24)
+  %rs = ptrtoint i8* %rs_raw to i64
+  %is_null = icmp eq i64 %rs, 0
+  br i1 %is_null, label %done, label %init_struct
+
+init_struct:
+  ; count = 0
+  %count_ptr = inttoptr i64 %rs to i64*
+  store i64 0, i64* %count_ptr
+  ; capacity = 256
+  %cap_addr = add i64 %rs, 8
+  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  store i64 256, i64* %cap_ptr
+  ; data = malloc(256 * 8)
+  %data_raw = call i8* @malloc(i64 2048)
+  %data = ptrtoint i8* %data_raw to i64
+  %data_addr = add i64 %rs, 16
+  %data_ptr = inttoptr i64 %data_addr to i64*
+  store i64 %data, i64* %data_ptr
+  store i64 %rs, i64* @__gc_remembered_set
+  store i64 1, i64* @__gc_remembered_set_inited
+  br label %done
+
+done:
+  ret void
+}
+
+; Check if a user pointer is in the nursery
+define i64 @__gc_is_nursery_ptr(i64 %ptr) {
+entry:
+  %is_zero = icmp eq i64 %ptr, 0
+  br i1 %is_zero, label %no, label %check_inited
+
+check_inited:
+  %inited = load i64, i64* @__gc_nursery_inited
+  %not_inited = icmp eq i64 %inited, 0
+  br i1 %not_inited, label %no, label %check_range
+
+check_range:
+  ; A user pointer is in nursery if its header (ptr - 24) is within [start, end)
+  %header = sub i64 %ptr, 24
+  %start = load i64, i64* @__gc_nursery_start
+  %end_val = load i64, i64* @__gc_nursery_end
+  %above_start = icmp uge i64 %header, %start
+  %below_end = icmp ult i64 %header, %end_val
+  %in_range = and i1 %above_start, %below_end
+  br i1 %in_range, label %yes, label %no
+
+yes:
+  ret i64 1
+
+no:
+  ret i64 0
+}
+
+; Write barrier: call when storing a pointer into an old-gen slot.
+; Records old-gen slots that reference nursery objects.
+define void @__gc_write_barrier(i64 %slot_addr, i64 %new_value) {
+entry:
+  %inited = load i64, i64* @__gc_nursery_inited
+  %not_inited = icmp eq i64 %inited, 0
+  br i1 %not_inited, label %done, label %check_value
+
+check_value:
+  ; Is the new value a nursery pointer?
+  %val_in_nursery = call i64 @__gc_is_nursery_ptr(i64 %new_value)
+  %not_nursery_val = icmp eq i64 %val_in_nursery, 0
+  br i1 %not_nursery_val, label %done, label %check_slot
+
+check_slot:
+  ; Is the slot in old-gen (NOT in nursery)?
+  %start = load i64, i64* @__gc_nursery_start
+  %end_val = load i64, i64* @__gc_nursery_end
+  %slot_above = icmp uge i64 %slot_addr, %start
+  %slot_below = icmp ult i64 %slot_addr, %end_val
+  %slot_in_nursery = and i1 %slot_above, %slot_below
+  br i1 %slot_in_nursery, label %done, label %record
+
+record:
+  %rs_inited = load i64, i64* @__gc_remembered_set_inited
+  %rs_not_inited = icmp eq i64 %rs_inited, 0
+  br i1 %rs_not_inited, label %done, label %do_record
+
+do_record:
+  %rs = load i64, i64* @__gc_remembered_set
+  %count_ptr = inttoptr i64 %rs to i64*
+  %count = load i64, i64* %count_ptr
+  %cap_addr = add i64 %rs, 8
+  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  %cap = load i64, i64* %cap_ptr
+  %need_grow = icmp uge i64 %count, %cap
+  br i1 %need_grow, label %grow, label %store_entry
+
+grow:
+  %new_cap = shl i64 %cap, 1
+  %new_bytes = shl i64 %new_cap, 3
+  %data_addr_g = add i64 %rs, 16
+  %data_ptr_g = inttoptr i64 %data_addr_g to i64*
+  %old_data = load i64, i64* %data_ptr_g
+  %old_data_raw = inttoptr i64 %old_data to i8*
+  %new_data_raw = call i8* @realloc(i8* %old_data_raw, i64 %new_bytes)
+  %new_data = ptrtoint i8* %new_data_raw to i64
+  %realloc_failed = icmp eq i64 %new_data, 0
+  br i1 %realloc_failed, label %done, label %update_cap
+
+update_cap:
+  store i64 %new_cap, i64* %cap_ptr
+  store i64 %new_data, i64* %data_ptr_g
+  br label %store_entry
+
+store_entry:
+  %rs2 = load i64, i64* @__gc_remembered_set
+  %data_addr_s = add i64 %rs2, 16
+  %data_ptr_s = inttoptr i64 %data_addr_s to i64*
+  %data_s = load i64, i64* %data_ptr_s
+  %offset = shl i64 %count, 3
+  %entry_addr = add i64 %data_s, %offset
+  %entry_ptr = inttoptr i64 %entry_addr to i64*
+  store i64 %slot_addr, i64* %entry_ptr
+  %new_count = add i64 %count, 1
+  %count_ptr2 = inttoptr i64 %rs2 to i64*
+  store i64 %new_count, i64* %count_ptr2
+  br label %done
+
+done:
+  ret void
+}
+
+; =============================================================================
+; Minor GC — Promote live nursery objects to old generation
+; =============================================================================
+
+define void @__gc_minor_collect() {
+entry:
+  %inited = load i64, i64* @__gc_nursery_inited
+  %not_inited = icmp eq i64 %inited, 0
+  br i1 %not_inited, label %done, label %begin
+
+begin:
+  ; Phase 1: Mark nursery objects reachable from roots
+  call void @__gc_minor_mark_roots()
+  ; Phase 2: Promote marked nursery objects, install forwarding pointers
+  call void @__gc_minor_promote()
+  ; Phase 3: Update all references to point to new old-gen locations
+  call void @__gc_minor_update_refs()
+  ; Phase 4: Reset nursery bump pointer
+  %start = load i64, i64* @__gc_nursery_start
+  store i64 %start, i64* @__gc_nursery_ptr
+  ; Clear remembered set
+  call void @__gc_remembered_set_clear()
+  ; Update minor collection count
+  %mc = load i64, i64* @__gc_minor_collections
+  %mc_new = add i64 %mc, 1
+  store i64 %mc_new, i64* @__gc_minor_collections
+  br label %done
+
+done:
+  ret void
+}
+
+; Mark nursery objects reachable from shadow stack and remembered set
+define private void @__gc_minor_mark_roots() optnone noinline {
+entry:
+  %ss_inited = load i64, i64* @__gc_shadow_stack_inited
+  %not_inited = icmp eq i64 %ss_inited, 0
+  br i1 %not_inited, label %scan_remembered, label %scan_roots
+
+scan_roots:
+  %ss = load i64, i64* @__gc_shadow_stack
+  %count_ptr = inttoptr i64 %ss to i64*
+  %count = load i64, i64* %count_ptr
+  %data_addr = add i64 %ss, 16
+  %data_ptr = inttoptr i64 %data_addr to i64*
+  %data = load i64, i64* %data_ptr
+  br label %root_loop
+
+root_loop:
+  %ri = phi i64 [0, %scan_roots], [%ri_next, %root_next]
+  %root_done = icmp uge i64 %ri, %count
+  br i1 %root_done, label %scan_remembered, label %root_body
+
+root_body:
+  %slot_offset = shl i64 %ri, 3
+  %slot_addr = add i64 %data, %slot_offset
+  %slot_ptr = inttoptr i64 %slot_addr to i64*
+  %root_addr = load i64, i64* %slot_ptr
+  %root_null = icmp eq i64 %root_addr, 0
+  br i1 %root_null, label %root_next, label %root_deref
+
+root_deref:
+  %val_ptr = inttoptr i64 %root_addr to i64*
+  %val = load i64, i64* %val_ptr
+  call void @__gc_minor_mark_value(i64 %val)
+  br label %root_next
+
+root_next:
+  %ri_next = add i64 %ri, 1
+  br label %root_loop
+
+scan_remembered:
+  %rs_inited = load i64, i64* @__gc_remembered_set_inited
+  %rs_not_inited = icmp eq i64 %rs_inited, 0
+  br i1 %rs_not_inited, label %done, label %do_scan_rs
+
+do_scan_rs:
+  %rs = load i64, i64* @__gc_remembered_set
+  %rs_count_ptr = inttoptr i64 %rs to i64*
+  %rs_count = load i64, i64* %rs_count_ptr
+  %rs_data_addr = add i64 %rs, 16
+  %rs_data_ptr = inttoptr i64 %rs_data_addr to i64*
+  %rs_data = load i64, i64* %rs_data_ptr
+  br label %rs_loop
+
+rs_loop:
+  %rsi = phi i64 [0, %do_scan_rs], [%rsi_next, %rs_next]
+  %rs_done = icmp uge i64 %rsi, %rs_count
+  br i1 %rs_done, label %done, label %rs_body
+
+rs_body:
+  %rs_offset = shl i64 %rsi, 3
+  %rs_entry_addr = add i64 %rs_data, %rs_offset
+  %rs_entry_ptr = inttoptr i64 %rs_entry_addr to i64*
+  %rs_slot = load i64, i64* %rs_entry_ptr
+  %rs_val_ptr = inttoptr i64 %rs_slot to i64*
+  %rs_val = load i64, i64* %rs_val_ptr
+  call void @__gc_minor_mark_value(i64 %rs_val)
+  br label %rs_next
+
+rs_next:
+  %rsi_next = add i64 %rsi, 1
+  br label %rs_loop
+
+done:
+  ret void
+}
+
+; Mark a nursery object as live (recursive for children)
+define private void @__gc_minor_mark_value(i64 %val) optnone noinline {
+entry:
+  %in_nursery = call i64 @__gc_is_nursery_ptr(i64 %val)
+  %not_nursery = icmp eq i64 %in_nursery, 0
+  br i1 %not_nursery, label %done, label %check_marked
+
+check_marked:
+  %header = sub i64 %val, 24
+  %info_addr = add i64 %header, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
+  %mark = call i64 @__gc_info_mark(i64 %info)
+  %already = icmp ne i64 %mark, 0
+  br i1 %already, label %done, label %do_mark
+
+do_mark:
+  %marked_info = or i64 %info, 1
+  store i64 %marked_info, i64* %info_ptr
+  ; Trace children
+  %tag = call i64 @__gc_info_tag(i64 %info)
+  %size = call i64 @__gc_info_size(i64 %info)
+  switch i64 %tag, label %done [
+    i64 0, label %done
+    i64 1, label %done
+    i64 2, label %trace_list
+    i64 3, label %trace_map
+    i64 4, label %trace_closure
+    i64 5, label %trace_instance
+    i64 6, label %trace_sb
+    i64 7, label %done
+    i64 8, label %done
+    i64 9, label %trace_env
+  ]
+
+trace_list:
+  %list_data_addr = add i64 %val, 16
+  %list_data_ptr = inttoptr i64 %list_data_addr to i64*
+  %list_data = load i64, i64* %list_data_ptr
+  call void @__gc_minor_mark_value(i64 %list_data)
+  %list_count_ptr = inttoptr i64 %val to i64*
+  %list_count = load i64, i64* %list_count_ptr
+  br label %list_loop
+
+list_loop:
+  %li = phi i64 [0, %trace_list], [%li_next, %list_body]
+  %list_done = icmp uge i64 %li, %list_count
+  br i1 %list_done, label %done, label %list_body
+
+list_body:
+  %elem_offset = shl i64 %li, 3
+  %elem_addr = add i64 %list_data, %elem_offset
+  %elem_ptr = inttoptr i64 %elem_addr to i64*
+  %elem = load i64, i64* %elem_ptr
+  call void @__gc_minor_mark_value(i64 %elem)
+  %li_next = add i64 %li, 1
+  br label %list_loop
+
+trace_map:
+  %map_keys_addr = add i64 %val, 16
+  %map_keys_ptr = inttoptr i64 %map_keys_addr to i64*
+  %map_keys = load i64, i64* %map_keys_ptr
+  %map_vals_addr = add i64 %val, 24
+  %map_vals_ptr = inttoptr i64 %map_vals_addr to i64*
+  %map_vals = load i64, i64* %map_vals_ptr
+  call void @__gc_minor_mark_value(i64 %map_keys)
+  call void @__gc_minor_mark_value(i64 %map_vals)
+  %map_count_ptr = inttoptr i64 %val to i64*
+  %map_count = load i64, i64* %map_count_ptr
+  br label %map_loop
+
+map_loop:
+  %mi = phi i64 [0, %trace_map], [%mi_next, %map_body]
+  %map_done = icmp uge i64 %mi, %map_count
+  br i1 %map_done, label %done, label %map_body
+
+map_body:
+  %mk_offset = shl i64 %mi, 3
+  %mk_addr = add i64 %map_keys, %mk_offset
+  %mk_ptr = inttoptr i64 %mk_addr to i64*
+  %mk = load i64, i64* %mk_ptr
+  call void @__gc_minor_mark_value(i64 %mk)
+  %mv_addr = add i64 %map_vals, %mk_offset
+  %mv_ptr = inttoptr i64 %mv_addr to i64*
+  %mv = load i64, i64* %mv_ptr
+  call void @__gc_minor_mark_value(i64 %mv)
+  %mi_next = add i64 %mi, 1
+  br label %map_loop
+
+trace_closure:
+  %env_addr = add i64 %val, 8
+  %env_ptr_c = inttoptr i64 %env_addr to i64*
+  %env_val = load i64, i64* %env_ptr_c
+  call void @__gc_minor_mark_value(i64 %env_val)
+  br label %done
+
+trace_instance:
+  %inst_num_fields = lshr i64 %size, 3
+  br label %inst_loop
+
+inst_loop:
+  %ii = phi i64 [0, %trace_instance], [%ii_next, %inst_body]
+  %inst_done = icmp uge i64 %ii, %inst_num_fields
+  br i1 %inst_done, label %done, label %inst_body
+
+inst_body:
+  %field_offset = shl i64 %ii, 3
+  %field_addr = add i64 %val, %field_offset
+  %field_ptr = inttoptr i64 %field_addr to i64*
+  %field_val = load i64, i64* %field_ptr
+  call void @__gc_minor_mark_value(i64 %field_val)
+  %ii_next = add i64 %ii, 1
+  br label %inst_loop
+
+trace_sb:
+  %sb_buf_addr = add i64 %val, 16
+  %sb_buf_ptr = inttoptr i64 %sb_buf_addr to i64*
+  %sb_buf = load i64, i64* %sb_buf_ptr
+  call void @__gc_minor_mark_value(i64 %sb_buf)
+  br label %done
+
+trace_env:
+  %env_num = lshr i64 %size, 3
+  br label %env_loop
+
+env_loop:
+  %ei = phi i64 [0, %trace_env], [%ei_next, %env_body]
+  %env_done = icmp uge i64 %ei, %env_num
+  br i1 %env_done, label %done, label %env_body
+
+env_body:
+  %env_offset = shl i64 %ei, 3
+  %env_elem_addr = add i64 %val, %env_offset
+  %env_elem_ptr = inttoptr i64 %env_elem_addr to i64*
+  %env_elem = load i64, i64* %env_elem_ptr
+  call void @__gc_minor_mark_value(i64 %env_elem)
+  %ei_next = add i64 %ei, 1
+  br label %env_loop
+
+done:
+  ret void
+}
+
+; Promote marked nursery objects to old gen, install forwarding pointers.
+; Forwarding sentinel in header[16]: 0x5AFF_F0AD_F0AD_F0AD = 6557438972390461613
+define private void @__gc_minor_promote() optnone noinline {
+entry:
+  %start = load i64, i64* @__gc_nursery_start
+  %end_val = load i64, i64* @__gc_nursery_ptr
+  br label %walk_loop
+
+walk_loop:
+  %pos = phi i64 [%start, %entry], [%next_pos, %advance]
+  %at_end = icmp uge i64 %pos, %end_val
+  br i1 %at_end, label %done, label %read_obj
+
+read_obj:
+  %info_addr = add i64 %pos, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
+  %size = call i64 @__gc_info_size(i64 %info)
+  %obj_total = add i64 %size, 24
+  %mark = call i64 @__gc_info_mark(i64 %info)
+  %is_live = icmp ne i64 %mark, 0
+  br i1 %is_live, label %promote, label %advance
+
+promote:
+  ; Allocate directly in old gen (bypass nursery)
+  %old_alloc_size = add i64 %size, 24
+  %old_raw_ptr = call i8* @malloc(i64 %old_alloc_size)
+  %old_raw = ptrtoint i8* %old_raw_ptr to i64
+  %is_null = icmp eq i64 %old_raw, 0
+  br i1 %is_null, label %advance, label %do_promote
+
+do_promote:
+  ; Link into old-gen list
+  %old_head = load i64, i64* @__gc_head
+  %old_next_ptr = inttoptr i64 %old_raw to i64*
+  store i64 %old_head, i64* %old_next_ptr
+  ; Info without mark bit
+  %clean_info = and i64 %info, -2
+  %old_info_addr = add i64 %old_raw, 8
+  %old_info_ptr = inttoptr i64 %old_info_addr to i64*
+  store i64 %clean_info, i64* %old_info_ptr
+  ; Normal GC magic sentinel
+  %old_magic_addr = add i64 %old_raw, 16
+  %old_magic_ptr = inttoptr i64 %old_magic_addr to i64*
+  store i64 6557403441622859503, i64* %old_magic_ptr
+  ; Update gc_head
+  store i64 %old_raw, i64* @__gc_head
+  ; Copy user data
+  %nursery_user = add i64 %pos, 24
+  %old_user = add i64 %old_raw, 24
+  br label %copy_loop
+
+copy_loop:
+  %ci = phi i64 [0, %do_promote], [%ci_next, %copy_body]
+  %copy_done = icmp uge i64 %ci, %size
+  br i1 %copy_done, label %install_fwd, label %copy_body
+
+copy_body:
+  %src_addr = add i64 %nursery_user, %ci
+  %src_ptr = inttoptr i64 %src_addr to i8*
+  %byte = load i8, i8* %src_ptr
+  %dst_addr = add i64 %old_user, %ci
+  %dst_ptr = inttoptr i64 %dst_addr to i8*
+  store i8 %byte, i8* %dst_ptr
+  %ci_next = add i64 %ci, 1
+  br label %copy_loop
+
+install_fwd:
+  ; Store new user ptr in nursery header[0] as forwarding pointer
+  %fwd_ptr = inttoptr i64 %pos to i64*
+  store i64 %old_user, i64* %fwd_ptr
+  ; Forwarding sentinel in header[16]
+  %fwd_magic_addr = add i64 %pos, 16
+  %fwd_magic_ptr = inttoptr i64 %fwd_magic_addr to i64*
+  store i64 6557438972390461613, i64* %fwd_magic_ptr
+  ; Track promoted bytes in old gen
+  %tb = load i64, i64* @__gc_total_bytes
+  %tb_new = add i64 %tb, %old_alloc_size
+  store i64 %tb_new, i64* @__gc_total_bytes
+  br label %advance
+
+advance:
+  %next_pos = add i64 %pos, %obj_total
+  ; Decrement alloc count and track freed bytes for dead objects
+  %was_dead = icmp eq i64 %mark, 0
+  br i1 %was_dead, label %dec_dead, label %walk_loop
+
+dec_dead:
+  %ac = load i64, i64* @__gc_alloc_count
+  %ac_new = sub i64 %ac, 1
+  store i64 %ac_new, i64* @__gc_alloc_count
+  %fb = load i64, i64* @__gc_freed_bytes
+  %fb_new = add i64 %fb, %obj_total
+  store i64 %fb_new, i64* @__gc_freed_bytes
+  %tb2 = load i64, i64* @__gc_total_bytes
+  %tb2_new = sub i64 %tb2, %obj_total
+  store i64 %tb2_new, i64* @__gc_total_bytes
+  br label %walk_loop
+
+done:
+  ret void
+}
+
+; Check if a nursery pointer has been forwarded; return new location or 0
+define private i64 @__gc_get_forwarded(i64 %user_ptr) optnone noinline {
+entry:
+  %in_nursery = call i64 @__gc_is_nursery_ptr(i64 %user_ptr)
+  %not_nursery = icmp eq i64 %in_nursery, 0
+  br i1 %not_nursery, label %not_fwd, label %check_fwd
+
+check_fwd:
+  %header = sub i64 %user_ptr, 24
+  %magic_addr = add i64 %header, 16
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %is_fwd = icmp eq i64 %magic, 6557438972390461613
+  br i1 %is_fwd, label %get_new, label %not_fwd
+
+get_new:
+  %new_ptr_addr = inttoptr i64 %header to i64*
+  %new_loc = load i64, i64* %new_ptr_addr
+  ret i64 %new_loc
+
+not_fwd:
+  ret i64 0
+}
+
+; Update all references that point to forwarded nursery objects
+define private void @__gc_minor_update_refs() optnone noinline {
+entry:
+  ; 1. Update shadow stack roots
+  %ss_inited = load i64, i64* @__gc_shadow_stack_inited
+  %no_ss = icmp eq i64 %ss_inited, 0
+  br i1 %no_ss, label %update_promoted, label %update_roots
+
+update_roots:
+  %ss = load i64, i64* @__gc_shadow_stack
+  %count_ptr = inttoptr i64 %ss to i64*
+  %count = load i64, i64* %count_ptr
+  %data_addr = add i64 %ss, 16
+  %data_ptr = inttoptr i64 %data_addr to i64*
+  %data = load i64, i64* %data_ptr
+  br label %root_loop
+
+root_loop:
+  %ri = phi i64 [0, %update_roots], [%ri_next, %root_next]
+  %root_done = icmp uge i64 %ri, %count
+  br i1 %root_done, label %update_promoted, label %root_body
+
+root_body:
+  %slot_offset = shl i64 %ri, 3
+  %slot_addr = add i64 %data, %slot_offset
+  %slot_ptr = inttoptr i64 %slot_addr to i64*
+  %root_addr = load i64, i64* %slot_ptr
+  %root_null = icmp eq i64 %root_addr, 0
+  br i1 %root_null, label %root_next, label %root_check
+
+root_check:
+  %val_ptr = inttoptr i64 %root_addr to i64*
+  %val = load i64, i64* %val_ptr
+  %fwd = call i64 @__gc_get_forwarded(i64 %val)
+  %has_fwd = icmp ne i64 %fwd, 0
+  br i1 %has_fwd, label %root_update, label %root_next
+
+root_update:
+  store i64 %fwd, i64* %val_ptr
+  br label %root_next
+
+root_next:
+  %ri_next = add i64 %ri, 1
+  br label %root_loop
+
+update_promoted:
+  ; 2. Fix internal pointers in promoted objects
+  %n_start = load i64, i64* @__gc_nursery_start
+  %n_end = load i64, i64* @__gc_nursery_ptr
+  br label %promo_loop
+
+promo_loop:
+  %pos = phi i64 [%n_start, %update_promoted], [%next_pos, %promo_advance]
+  %at_end = icmp uge i64 %pos, %n_end
+  br i1 %at_end, label %update_remembered, label %promo_check
+
+promo_check:
+  %p_info_addr = add i64 %pos, 8
+  %p_info_ptr = inttoptr i64 %p_info_addr to i64*
+  %p_info = load i64, i64* %p_info_ptr
+  %p_size = call i64 @__gc_info_size(i64 %p_info)
+  %p_total = add i64 %p_size, 24
+  %p_magic_addr = add i64 %pos, 16
+  %p_magic_ptr = inttoptr i64 %p_magic_addr to i64*
+  %p_magic = load i64, i64* %p_magic_ptr
+  %is_fwd = icmp eq i64 %p_magic, 6557438972390461613
+  br i1 %is_fwd, label %fix_internals, label %promo_advance
+
+fix_internals:
+  %new_loc_ptr = inttoptr i64 %pos to i64*
+  %new_loc = load i64, i64* %new_loc_ptr
+  %num_slots = lshr i64 %p_size, 3
+  br label %fix_loop
+
+fix_loop:
+  %fi = phi i64 [0, %fix_internals], [%fi_next, %fix_next]
+  %fix_done = icmp uge i64 %fi, %num_slots
+  br i1 %fix_done, label %promo_advance, label %fix_body
+
+fix_body:
+  %f_offset = shl i64 %fi, 3
+  %f_addr = add i64 %new_loc, %f_offset
+  %f_ptr = inttoptr i64 %f_addr to i64*
+  %f_val = load i64, i64* %f_ptr
+  %f_fwd = call i64 @__gc_get_forwarded(i64 %f_val)
+  %f_has_fwd = icmp ne i64 %f_fwd, 0
+  br i1 %f_has_fwd, label %fix_update, label %fix_next
+
+fix_update:
+  store i64 %f_fwd, i64* %f_ptr
+  br label %fix_next
+
+fix_next:
+  %fi_next = add i64 %fi, 1
+  br label %fix_loop
+
+promo_advance:
+  %next_pos = add i64 %pos, %p_total
+  br label %promo_loop
+
+update_remembered:
+  ; 3. Update remembered set entries
+  %rs_inited = load i64, i64* @__gc_remembered_set_inited
+  %rs_not_inited = icmp eq i64 %rs_inited, 0
+  br i1 %rs_not_inited, label %done, label %do_update_rs
+
+do_update_rs:
+  %rs = load i64, i64* @__gc_remembered_set
+  %rs_count_ptr = inttoptr i64 %rs to i64*
+  %rs_count = load i64, i64* %rs_count_ptr
+  %rs_data_addr = add i64 %rs, 16
+  %rs_data_ptr = inttoptr i64 %rs_data_addr to i64*
+  %rs_data = load i64, i64* %rs_data_ptr
+  br label %rs_loop
+
+rs_loop:
+  %rsi = phi i64 [0, %do_update_rs], [%rsi_next, %rs_next]
+  %rs_done = icmp uge i64 %rsi, %rs_count
+  br i1 %rs_done, label %done, label %rs_body
+
+rs_body:
+  %rs_offset = shl i64 %rsi, 3
+  %rs_entry_addr = add i64 %rs_data, %rs_offset
+  %rs_entry_ptr = inttoptr i64 %rs_entry_addr to i64*
+  %rs_slot = load i64, i64* %rs_entry_ptr
+  %rs_val_ptr = inttoptr i64 %rs_slot to i64*
+  %rs_val = load i64, i64* %rs_val_ptr
+  %rs_fwd = call i64 @__gc_get_forwarded(i64 %rs_val)
+  %rs_has_fwd = icmp ne i64 %rs_fwd, 0
+  br i1 %rs_has_fwd, label %rs_update, label %rs_next
+
+rs_update:
+  store i64 %rs_fwd, i64* %rs_val_ptr
+  br label %rs_next
+
+rs_next:
+  %rsi_next = add i64 %rsi, 1
+  br label %rs_loop
+
+done:
+  ret void
+}
+
+; Clear the remembered set
+define private void @__gc_remembered_set_clear() {
+entry:
+  %inited = load i64, i64* @__gc_remembered_set_inited
+  %not_inited = icmp eq i64 %inited, 0
+  br i1 %not_inited, label %done, label %clear
+
+clear:
+  %rs = load i64, i64* @__gc_remembered_set
+  %count_ptr = inttoptr i64 %rs to i64*
+  store i64 0, i64* %count_ptr
+  br label %done
+
+done:
+  ret void
+}
+
+; Set the nursery size (call before __gc_enable)
+define void @__gc_set_nursery_size(i64 %bytes) {
+entry:
+  store i64 %bytes, i64* @__gc_nursery_size
+  ret void
+}
+
+; Statistics: minor collections performed
+define i64 @__gc_stat_minor_collections() {
+entry:
+  %v = load i64, i64* @__gc_minor_collections
+  ret i64 %v
+}
+
+; Statistics: nursery bytes in use
+define i64 @__gc_stat_nursery_used() {
+entry:
+  %inited = load i64, i64* @__gc_nursery_inited
+  %not_inited = icmp eq i64 %inited, 0
+  br i1 %not_inited, label %zero, label %calc
+
+calc:
+  %ptr = load i64, i64* @__gc_nursery_ptr
+  %start = load i64, i64* @__gc_nursery_start
+  %used = sub i64 %ptr, %start
+  ret i64 %used
+
+zero:
+  ret i64 0
+}
+
+; Statistics: nursery capacity
+define i64 @__gc_stat_nursery_capacity() {
+entry:
+  %v = load i64, i64* @__gc_nursery_size
+  ret i64 %v
 }
 

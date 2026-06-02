@@ -25,6 +25,12 @@ target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128-ni:1:10:20"
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
 @__jmp_buf_current = weak global i8* null
 
+; Runtime global: SLOT_SIZE is always 8 (sizeof i64).
+; The runtime.sf declares this as a top-level var initialized in __saffron_entry,
+; but in WASM we pre-initialize it here so it's available before the runtime's
+; __saffron_entry runs (which gets dropped in favor of the user's entry).
+@__g_SLOT_SIZE = global i64 8
+
 ; --- JS Imports ---
 ; These are provided by the JS glue code via WebAssembly.imports
 

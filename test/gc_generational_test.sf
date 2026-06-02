@@ -1,0 +1,133 @@
+// Generational GC Test — Nursery allocation and minor collection
+// Tests that bump allocation works and minor GC promotes survivors.
+
+@extern("void __gc_enable()") fun gc_enable()
+@extern("void __gc_collect()") fun gc_collect()
+@extern("i64 __gc_stat_alloc_count()") fun gc_alloc_count(): Int
+@extern("i64 __gc_stat_total_bytes()") fun gc_total_bytes(): Int
+@extern("i64 __gc_stat_collections()") fun gc_collections(): Int
+@extern("i64 __gc_stat_freed_bytes()") fun gc_freed_bytes(): Int
+@extern("i64 __gc_stat_minor_collections()") fun gc_minor_collections(): Int
+@extern("i64 __gc_stat_nursery_used()") fun gc_nursery_used(): Int
+@extern("i64 __gc_stat_nursery_capacity()") fun gc_nursery_capacity(): Int
+@extern("i64 __gc_alloc(i64, i64)") fun gc_alloc(size: Int, tag: Int): Int
+@extern("void __gc_set_threshold(i64)") fun gc_set_threshold(bytes: Int)
+@extern("void __gc_set_nursery_size(i64)") fun gc_set_nursery_size(bytes: Int)
+@extern("i64 __gc_is_nursery_ptr(i64)") fun gc_is_nursery_ptr(ptr: Int): Int
+@extern("void __gc_write_barrier(i64, i64)") fun gc_write_barrier(slot: Int, val: Int)
+@extern("i64 __gc_list_new()") fun gc_list_new(): Int
+@extern("void __gc_list_push(i64, i64)") fun gc_list_push(list: Int, val: Int)
+
+IO.println("=== Generational GC Test Suite ===")
+
+// Test 1: Nursery initialization
+IO.println("")
+IO.println("Test 1: Nursery initialization")
+// Set a small nursery for testing (4KB)
+gc_set_nursery_size(4096)
+gc_enable()
+var capacity: Int = gc_nursery_capacity()
+IO.println("  Nursery capacity: ${capacity}")
+if (capacity == 4096) {
+    IO.println("  PASS: Nursery sized correctly")
+} else {
+    IO.println("  FAIL: Expected 4096, got ${capacity}")
+}
+
+// Test 2: Bump allocation in nursery
+IO.println("")
+IO.println("Test 2: Nursery bump allocation")
+var used_before: Int = gc_nursery_used()
+var ptr1: Int = gc_alloc(64, 0)
+var used_after: Int = gc_nursery_used()
+// Each object uses size + 24 (header) bytes in nursery
+var expected_used: Int = 64 + 24
+IO.println("  Nursery used before: ${used_before}")
+IO.println("  Nursery used after:  ${used_after}")
+IO.println("  Expected growth: ${expected_used}")
+var actual_growth: Int = used_after - used_before
+if (actual_growth == expected_used) {
+    IO.println("  PASS: Bump allocation grew nursery correctly")
+} else {
+    IO.println("  FAIL: Expected ${expected_used} growth, got ${actual_growth}")
+}
+
+// Test 3: Object is in nursery
+IO.println("")
+IO.println("Test 3: Nursery pointer detection")
+var in_nursery: Int = gc_is_nursery_ptr(ptr1)
+IO.println("  ptr1 in nursery: ${in_nursery}")
+if (in_nursery == 1) {
+    IO.println("  PASS: New allocation is in nursery")
+} else {
+    IO.println("  FAIL: Expected nursery ptr")
+}
+
+// Test 4: Minor GC triggers when nursery fills
+IO.println("")
+IO.println("Test 4: Minor GC on nursery full")
+var minors_before: Int = gc_minor_collections()
+// Fill the nursery (4096 bytes / (64 + 24) = ~46 objects)
+var i: Int = 0
+while (i < 60) {
+    gc_alloc(64, 0)
+    i = i + 1
+}
+var minors_after: Int = gc_minor_collections()
+IO.println("  Minor GCs before: ${minors_before}")
+IO.println("  Minor GCs after:  ${minors_after}")
+if (minors_after > minors_before) {
+    IO.println("  PASS: Minor GC was triggered")
+} else {
+    IO.println("  FAIL: No minor GC triggered")
+}
+
+// Test 5: Nursery resets after minor GC
+IO.println("")
+IO.println("Test 5: Nursery reset after collection")
+var used_now: Int = gc_nursery_used()
+IO.println("  Nursery used: ${used_now}")
+IO.println("  Nursery capacity: ${gc_nursery_capacity()}")
+if (used_now < capacity) {
+    IO.println("  PASS: Nursery was reset (not full)")
+} else {
+    IO.println("  FAIL: Nursery still full after minor GC")
+}
+
+// Test 6: List allocation uses nursery
+IO.println("")
+IO.println("Test 6: List allocation through nursery")
+// Force a minor GC to start fresh
+gc_collect()
+var used_pre_list: Int = gc_nursery_used()
+var list: Int = gc_list_new()
+var used_post_list: Int = gc_nursery_used()
+IO.println("  Nursery used before list: ${used_pre_list}")
+IO.println("  Nursery used after list:  ${used_post_list}")
+if (used_post_list > used_pre_list) {
+    IO.println("  PASS: List allocated in nursery")
+} else {
+    IO.println("  INFO: List may have gone to old gen (still correct)")
+}
+
+// Test 7: Overall stats consistency
+IO.println("")
+IO.println("Test 7: Stats consistency")
+var total_allocs: Int = gc_alloc_count()
+var total_bytes: Int = gc_total_bytes()
+var total_freed: Int = gc_freed_bytes()
+var total_major: Int = gc_collections()
+var total_minor: Int = gc_minor_collections()
+IO.println("  Total allocations: ${total_allocs}")
+IO.println("  Total bytes: ${total_bytes}")
+IO.println("  Total freed: ${total_freed}")
+IO.println("  Major collections: ${total_major}")
+IO.println("  Minor collections: ${total_minor}")
+if (total_minor > 0) {
+    IO.println("  PASS: Generational GC operational")
+} else {
+    IO.println("  FAIL: No minor collections occurred")
+}
+
+IO.println("")
+IO.println("=== Generational GC Test Complete ===")
