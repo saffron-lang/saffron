@@ -1533,7 +1533,23 @@
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
-        return this.gen_namespace_call(class_name, method, obj, args, true)
+        var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
+        // Resolve generic type parameter in return type (e.g. T -> String)
+        var ns_ret_str: String = this.type_to_string(this.last_type)
+        if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
+            // Looks like a type parameter — resolve from receiver's generic type args
+            if (obj_name.length() > 0) {
+                var recv_type: String = this.get_var_type_str(obj_name)
+                if (recv_type.contains("<") and recv_type.contains(">")) {
+                    var rg_start: Float = recv_type.index_of("<")
+                    var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
+                    if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
+                        this.last_type = this.str_to_type(rg_inner)
+                    }
+                }
+            }
+        }
+        return ns_result
     }
 
     // Universal methods (last resort, after class methods checked)
