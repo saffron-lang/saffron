@@ -3,6 +3,7 @@
 
 var INPUT: String = "tools/dom.generated.d.ts"
 var OUTPUT: String = "src/generated_types.sf"
+var OUTPUT_PRELUDE: String = "src/generated_prelude.sf"
 
 // --- Helpers ---
 
@@ -391,6 +392,478 @@ fun generate(tag_map: Map<String, String>, event_map: Map<String, String>, lines
     return sb.to_string()
 }
 
+// --- Prelude generation: typed per-element functions for direct DOM manipulation ---
+
+// Properties to skip (readonly, computed, or not useful as constructor params)
+fun is_skip_prop(name: String): Bool {
+    // Layout/measurement (readonly-like)
+    if (name == "offsetWidth") return true
+    if (name == "offsetHeight") return true
+    if (name == "offsetLeft") return true
+    if (name == "offsetTop") return true
+    if (name == "offsetParent") return true
+    if (name == "scrollWidth") return true
+    if (name == "scrollHeight") return true
+    if (name == "scrollLeft") return true
+    if (name == "scrollTop") return true
+    if (name == "clientWidth") return true
+    if (name == "clientHeight") return true
+    if (name == "clientLeft") return true
+    if (name == "clientTop") return true
+    if (name == "naturalWidth") return true
+    if (name == "naturalHeight") return true
+    if (name == "videoWidth") return true
+    if (name == "videoHeight") return true
+    if (name == "complete") return true
+    if (name == "currentSrc") return true
+    if (name == "networkState") return true
+    if (name == "readyState") return true
+    if (name == "seeking") return true
+    if (name == "ended") return true
+    if (name == "paused") return true
+    if (name == "duration") return true
+    if (name == "currentTime") return true
+    if (name == "buffered") return true
+    if (name == "played") return true
+    if (name == "seekable") return true
+    // Security risk
+    if (name == "innerHTML") return true
+    if (name == "outerHTML") return true
+    if (name == "innerText") return true
+    if (name == "outerText") return true
+    if (name == "textContent") return true
+    // Internal/computed
+    if (name == "validity") return true
+    if (name == "validationMessage") return true
+    if (name == "willValidate") return true
+    if (name == "form") return true
+    if (name == "labels") return true
+    if (name == "list") return true
+    if (name == "options") return true
+    if (name == "selectedOptions") return true
+    if (name == "files") return true
+    if (name == "elements") return true
+    if (name == "length") return true
+    if (name == "selectedIndex") return true
+    if (name == "defaultChecked") return true
+    if (name == "defaultValue") return true
+    if (name == "defaultSelected") return true
+    if (name == "command") return true
+    if (name == "commandForElement") return true
+    if (name == "popoverTargetAction") return true
+    if (name == "popoverTargetElement") return true
+    if (name == "encoding") return true
+    if (name == "relList") return true
+    if (name == "assignedSlot") return true
+    if (name == "sheet") return true
+    if (name == "contentDocument") return true
+    if (name == "contentWindow") return true
+    if (name == "sandbox") return true
+    if (name == "srcdoc") return true
+    if (name == "referrerPolicy") return true
+    if (name == "loading") return true
+    if (name == "decoding") return true
+    if (name == "fetchPriority") return true
+    if (name == "crossOrigin") return true
+    if (name == "useMap") return true
+    if (name == "isMap") return true
+    if (name == "sizes") return true
+    if (name == "srcset") return true
+    if (name == "x") return true
+    if (name == "y") return true
+    if (name == "text") return true
+    if (name == "ping") return true
+    if (name == "selectionStart") return true
+    if (name == "selectionEnd") return true
+    if (name == "selectionDirection") return true
+    if (name == "dirName") return true
+    if (name == "formAction") return true
+    if (name == "formEnctype") return true
+    if (name == "formMethod") return true
+    if (name == "formNoValidate") return true
+    if (name == "formTarget") return true
+    if (name == "capture") return true
+    if (name == "indeterminate") return true
+    if (name == "accept") return true
+    if (name == "acceptCharset") return true
+    // Not useful as construction params
+    if (name == "valueAsNumber") return true
+    if (name == "valueAsDate") return true
+    if (name == "webkitdirectory") return true
+    if (name == "webkitEntries") return true
+    // Deprecated layout
+    if (name == "align") return true
+    if (name == "border") return true
+    if (name == "hspace") return true
+    if (name == "vspace") return true
+    if (name == "longDesc") return true
+    if (name == "coords") return true
+    if (name == "shape") return true
+    if (name == "noWrap") return true
+    if (name == "ch") return true
+    if (name == "chOff") return true
+    if (name == "vAlign") return true
+    if (name == "compact") return true
+    if (name == "event") return true
+    if (name == "htmlFor") return true
+    // Marquee (deprecated)
+    if (name == "behavior") return true
+    if (name == "bgColor") return true
+    if (name == "direction") return true
+    if (name == "scrollAmount") return true
+    if (name == "scrollDelay") return true
+    if (name == "trueSpeed") return true
+    if (name == "loop") return true
+    // URL parts from HTMLHyperlinkElementUtils (only want href)
+    if (name == "hash") return true
+    if (name == "host") return true
+    if (name == "hostname") return true
+    if (name == "origin") return true
+    if (name == "password") return true
+    if (name == "pathname") return true
+    if (name == "port") return true
+    if (name == "protocol") return true
+    if (name == "search") return true
+    if (name == "username") return true
+    return false
+}
+
+// Special name mappings
+fun prelude_param_name(prop_name: String): String {
+    if (prop_name == "className") return "cls"
+    var sn: String = to_snake_case(prop_name)
+    if (is_saffron_keyword(sn)) return sn + "_"
+    return sn
+}
+
+// Map attr name to HTML attribute name for _tc_set_attr
+fun html_attr_name(prop_name: String): String {
+    if (prop_name == "className") return "class"
+    if (prop_name == "htmlFor") return "for"
+    if (prop_name == "noValidate") return "novalidate"
+    if (prop_name == "tabIndex") return "tabindex"
+    if (prop_name == "accessKey") return "accesskey"
+    if (prop_name == "readOnly") return "readonly"
+    if (prop_name == "colSpan") return "colspan"
+    if (prop_name == "rowSpan") return "rowspan"
+    if (prop_name == "hreflang") return "hreflang"
+    if (prop_name == "noWrap") return "nowrap"
+    if (prop_name == "maxLength") return "maxlength"
+    if (prop_name == "minLength") return "minlength"
+    if (prop_name == "dateTime") return "datetime"
+    if (prop_name == "cellPadding") return "cellpadding"
+    if (prop_name == "cellSpacing") return "cellspacing"
+    if (prop_name == "type") return "type"
+    if (prop_name == "autocomplete") return "autocomplete"
+    // General camelCase -> lowercase for HTML attributes
+    return to_snake_case(prop_name).replace("_", "")
+}
+
+// Extract the extends list for an interface (returns the base interface names)
+fun extract_extends(lines: List<String>, interface_name: String): List<String> {
+    var extends_list: List<String> = []
+    var target: String = "interface " + interface_name
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.starts_with(target)) {
+            var ext_idx: Float = line.index_of(" extends ")
+            if (ext_idx > 0) {
+                var brace_idx: Float = line.index_of("{")
+                if (brace_idx < 0) { brace_idx = line.length() }
+                var ext_str: String = line.slice(ext_idx + 9, brace_idx).trim()
+                var parts: List<String> = ext_str.split(",")
+                var pi: Float = 0
+                while (pi < parts.length()) {
+                    var base: String = parts[pi].trim()
+                    if (base.length() > 0) {
+                        extends_list.push(base)
+                    }
+                    pi = pi + 1
+                }
+            }
+            break
+        }
+        i = i + 1
+    }
+    return extends_list
+}
+
+// Bases to skip when collecting mixin props
+fun is_skip_base(name: String): Bool {
+    if (name == "HTMLElement") return true
+    if (name == "Element") return true
+    if (name == "HTMLMediaElement") return true
+    if (name == "Node") return true
+    if (name == "EventTarget") return true
+    if (name == "ElementCSSInlineStyle") return true
+    if (name == "ElementContentEditable") return true
+    if (name == "GlobalEventHandlers") return true
+    if (name == "HTMLOrSVGElement") return true
+    if (name == "WindowEventHandlers") return true
+    if (name == "PopoverTargetAttributes") return true
+    return false
+}
+
+// Extract props from an interface + its mixin bases
+fun extract_all_props(lines: List<String>, interface_name: String): List<List<String>> {
+    var props: List<List<String>> = extract_interface_props(lines, interface_name)
+    var seen: List<String> = []
+    var pi: Float = 0
+    while (pi < props.length()) {
+        seen.push(props[pi][0])
+        pi = pi + 1
+    }
+
+    var extends_list: List<String> = extract_extends(lines, interface_name)
+    var ei: Float = 0
+    while (ei < extends_list.length()) {
+        var base: String = extends_list[ei]
+        if (!is_skip_base(base)) {
+            var mixin_props: List<List<String>> = extract_interface_props(lines, base)
+            var mi: Float = 0
+            while (mi < mixin_props.length()) {
+                var prop_name: String = mixin_props[mi][0]
+                if (!seen.contains(prop_name)) {
+                    props.push(mixin_props[mi])
+                    seen.push(prop_name)
+                }
+                mi = mi + 1
+            }
+        }
+        ei = ei + 1
+    }
+    return props
+}
+
+// Which events to include per element category
+fun events_for_element(tag: String): List<List<String>> {
+    var events: List<List<String>> = []
+    // All elements get on_click
+    events.push(["on_click", "click"])
+    if (tag == "input" or tag == "textarea") {
+        events.push(["on_input", "input"])
+        events.push(["on_change", "change"])
+        events.push(["on_focus", "focus"])
+        events.push(["on_blur", "blur"])
+        events.push(["on_keydown", "keydown"])
+    } else if (tag == "select") {
+        events.push(["on_change", "change"])
+        events.push(["on_focus", "focus"])
+        events.push(["on_blur", "blur"])
+    } else if (tag == "form") {
+        events.push(["on_submit", "submit"])
+        events.push(["on_reset", "reset"])
+    } else if (tag == "button") {
+        events.push(["on_submit", "submit"])
+    } else if (tag == "a") {
+        // just on_click (already added)
+    } else if (tag == "details") {
+        events.push(["on_toggle", "toggle"])
+    } else if (tag == "video" or tag == "audio") {
+        events.push(["on_play", "play"])
+        events.push(["on_pause", "pause"])
+        events.push(["on_ended", "ended"])
+    }
+    return events
+}
+
+// Elements that should get fully typed functions (have their own interface with useful props)
+fun is_typed_element(tag: String, interface_name: String): Bool {
+    if (interface_name == "HTMLElement") return false
+    if (tag == "body" or tag == "head" or tag == "html") return false
+    if (tag == "script" or tag == "noscript") return false
+    if (tag == "style") return false
+    if (tag == "template" or tag == "slot") return false
+    if (tag == "object") return false
+    return true
+}
+
+// Default value for a Saffron type
+fun default_for_type(sf_type: String): String {
+    if (sf_type == "String") return "\"\""
+    if (sf_type == "Bool") return "false"
+    if (sf_type == "Float") return "0"
+    return "nil"
+}
+
+// Generate a typed prelude function for an element
+fun generate_prelude_fn(sb: StringBuilder, tag: String, fn_name: String,
+                        props: List<List<String>>, is_void: Bool) {
+    var events: List<List<String>> = events_for_element(tag)
+
+    // Build param list: cls, id, style + element-specific + events + attrs + block
+    sb.append("fun " + fn_name + "(cls: String = \"\", id: String = \"\", style: String = \"\"")
+
+    // Element-specific typed params (but not cls/id/style which are common)
+    var pi: Float = 0
+    while (pi < props.length()) {
+        var prop: List<String> = props[pi]
+        var prop_name: String = prop[0]
+        var sf_type: String = prop[1]
+        // Skip className (we have cls), skip id, skip style
+        if (prop_name != "className" and prop_name != "id" and prop_name != "style") {
+            var param: String = prelude_param_name(prop_name)
+            var def: String = default_for_type(sf_type)
+            sb.append(",\n           " + param + ": " + sf_type + " = " + def)
+        }
+        pi = pi + 1
+    }
+
+    // Event params
+    var ei: Float = 0
+    while (ei < events.length()) {
+        var ev: List<String> = events[ei]
+        sb.append(",\n           " + ev[0] + ": Any = nil")
+        ei = ei + 1
+    }
+
+    // Overflow attrs + block
+    sb.append(",\n           attrs: Map<String, Any> = {}")
+    if (!is_void) {
+        sb.append(", block: Any = nil")
+    }
+    sb.append("): Float {\n")
+
+    // Body: create element
+    sb.append("    var el: Float = _tc_create(\"" + tag + "\")\n")
+
+    // Common attrs
+    sb.append("    if (cls.length() > 0) { _tc_set_attr(el, \"class\", cls) }\n")
+    sb.append("    if (id.length() > 0) { _tc_set_attr(el, \"id\", id) }\n")
+    sb.append("    if (style.length() > 0) { _tc_set_attr(el, \"style\", style) }\n")
+
+    // Element-specific attrs
+    pi = 0
+    while (pi < props.length()) {
+        var prop: List<String> = props[pi]
+        var prop_name: String = prop[0]
+        var sf_type: String = prop[1]
+        if (prop_name != "className" and prop_name != "id" and prop_name != "style") {
+            var param: String = prelude_param_name(prop_name)
+            var attr_name: String = html_attr_name(prop_name)
+            if (sf_type == "Bool") {
+                sb.append("    if (" + param + ") { _tc_set_attr(el, \"" + attr_name + "\", \"true\") }\n")
+            } else if (sf_type == "Float") {
+                sb.append("    if (" + param + " != 0) { _tc_set_attr(el, \"" + attr_name + "\", " + param + ".to_string()) }\n")
+            } else {
+                sb.append("    if (" + param + ".length() > 0) { _tc_set_attr(el, \"" + attr_name + "\", " + param + ") }\n")
+            }
+        }
+        pi = pi + 1
+    }
+
+    // Events
+    ei = 0
+    while (ei < events.length()) {
+        var ev: List<String> = events[ei]
+        sb.append("    if (" + ev[0] + " != nil) { _tc_add_event(el, \"" + ev[1] + "\", " + ev[0] + ") }\n")
+        ei = ei + 1
+    }
+
+    // Overflow attrs
+    sb.append("    _tc_apply_attrs(el, attrs)\n")
+
+    // Append to parent
+    sb.append("    var parent: Float = _tc_current()\n")
+    sb.append("    _tc_append(parent, el)\n")
+
+    // Block (for non-void)
+    if (!is_void) {
+        sb.append("    if (block != nil) { _tc_push(el); block(); _tc_pop() }\n")
+    }
+
+    sb.append("    return el\n")
+    sb.append("}\n\n")
+}
+
+// Generate a simple prelude function (no element-specific attrs)
+fun generate_simple_prelude_fn(sb: StringBuilder, tag: String, fn_name: String, is_void: Bool) {
+    if (is_void) {
+        sb.append("fun " + fn_name + "(cls: String = \"\", id: String = \"\", style: String = \"\",\n")
+        sb.append("       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {\n")
+        sb.append("    var el: Float = _tc_create(\"" + tag + "\")\n")
+        sb.append("    if (cls.length() > 0) { _tc_set_attr(el, \"class\", cls) }\n")
+        sb.append("    if (id.length() > 0) { _tc_set_attr(el, \"id\", id) }\n")
+        sb.append("    if (style.length() > 0) { _tc_set_attr(el, \"style\", style) }\n")
+        sb.append("    if (on_click != nil) { _tc_add_event(el, \"click\", on_click) }\n")
+        sb.append("    _tc_apply_attrs(el, attrs)\n")
+        sb.append("    var parent: Float = _tc_current()\n")
+        sb.append("    _tc_append(parent, el)\n")
+        sb.append("    return el\n")
+        sb.append("}\n\n")
+    } else {
+        sb.append("fun " + fn_name + "(cls: String = \"\", id: String = \"\", style: String = \"\",\n")
+        sb.append("       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {\n")
+        sb.append("    return _tc_el_with_common(\"" + tag + "\", cls, id, style, attrs, block)\n")
+        sb.append("}\n\n")
+    }
+}
+
+fun generate_prelude(tag_map: Map<String, String>, lines: List<String>): String {
+    var sb = StringBuilder()
+
+    sb.append("// AUTO-GENERATED from dom.generated.d.ts — Turmeric Prelude element functions\n")
+    sb.append("// Run: saffron run tools/generate_types.sf\n")
+    sb.append("// Provides fully typed per-element builder functions for direct DOM manipulation.\n\n")
+
+    // --- Element functions ---
+    sb.append("// =============================================================================\n")
+    sb.append("// Element Builder Functions (typed per-element params)\n")
+    sb.append("// =============================================================================\n\n")
+
+    var tags: List<String> = tag_map.keys()
+    tags.sort()
+    var ti: Float = 0
+    while (ti < tags.length()) {
+        var tag: String = tags[ti]
+        var interface_name: String = tag_map.get(tag)
+        var fn_name: String = tag
+        if (is_saffron_keyword(tag)) {
+            fn_name = tag + "_"
+        }
+        // 'map' conflicts with Map type
+        if (fn_name == "map") {
+            fn_name = "map_el"
+        }
+        // Skip head, html, body, script, style, template, slot, noscript
+        if (tag == "head" or tag == "html" or tag == "body" or tag == "script" or
+            tag == "noscript" or tag == "style" or tag == "template" or tag == "slot") {
+            ti = ti + 1
+            continue
+        }
+
+        var void_el: Bool = is_void_element(tag)
+
+        if (is_typed_element(tag, interface_name)) {
+            // Get props from the interface + its mixin bases
+            var props: List<List<String>> = extract_all_props(lines, interface_name)
+
+            // Filter out skipped props and common params (cls, id, style)
+            var filtered: List<List<String>> = []
+            var fi: Float = 0
+            while (fi < props.length()) {
+                var prop: List<String> = props[fi]
+                if (!is_skip_prop(prop[0]) and prop[0] != "className" and prop[0] != "id" and prop[0] != "style") {
+                    filtered.push(prop)
+                }
+                fi = fi + 1
+            }
+
+            if (filtered.length() > 0) {
+                generate_prelude_fn(sb, tag, fn_name, filtered, void_el)
+            } else {
+                generate_simple_prelude_fn(sb, tag, fn_name, void_el)
+            }
+        } else {
+            generate_simple_prelude_fn(sb, tag, fn_name, void_el)
+        }
+        ti = ti + 1
+    }
+
+    return sb.to_string()
+}
+
 // --- Main ---
 
 IO.println("Reading " + INPUT + "...")
@@ -406,8 +879,14 @@ IO.println("Extracting event map...")
 var event_map: Map<String, String> = extract_event_map(lines)
 IO.println("  " + event_map.keys().length().to_string() + " events")
 
-IO.println("Generating...")
+IO.println("Generating types...")
 var output: String = generate(tag_map, event_map, lines)
 
 IO.write_file(OUTPUT, output)
 IO.println("Written to " + OUTPUT)
+
+IO.println("Generating prelude...")
+var prelude_output: String = generate_prelude(tag_map, lines)
+
+IO.write_file(OUTPUT_PRELUDE, prelude_output)
+IO.println("Written to " + OUTPUT_PRELUDE)
