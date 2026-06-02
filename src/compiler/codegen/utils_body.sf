@@ -206,6 +206,7 @@
             LetPattern(pattern, value) => {
                 this.collect_vars_expr(value, names, types)
             }
+            TypeAlias(n, t) => {}
         }
     }
 
@@ -301,6 +302,7 @@
             IfExpr(c, tb, tv, eb, ev) => {}
             TryExpr(tb, tv, cn, cb, cv) => {}
             Yield(v) => { this.collect_vars_expr(v, names, types) }
+            TupleLit(e) => {}
         }
     }
 
@@ -375,6 +377,7 @@
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
             Yield(v) => "other"
+            TupleLit(e) => "other"
         }
         return kind == "match"
     }

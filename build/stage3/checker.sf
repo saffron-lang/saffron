@@ -17,7 +17,6 @@ class Scope {
 class TypeEnv {
     var scopes: List<Scope>
     var funcs: Map<String, String>
-    var func_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
     var class_fields: Map<String, String>
@@ -27,7 +26,6 @@ class TypeEnv {
         this.scopes = []
         this.scopes.push(Scope())
         this.funcs = {}
-        this.func_params = {}
         this.enum_variants = {}
         this.enum_fields = {}
         this.class_fields = {}
@@ -79,17 +77,6 @@ class TypeEnv {
 
     fun define_func(name: String, ret_type: String) {
         this.funcs.set(name, ret_type)
-    }
-
-    fun define_func_params(name: String, params_str: String) {
-        this.func_params.set(name, params_str)
-    }
-
-    fun get_func_params(name: String): String {
-        if (this.func_params.has(name)) {
-            return this.func_params.get(name)
-        }
-        return ""
     }
 
     fun get_func_ret(name: String): String {
@@ -478,7 +465,6 @@ class NullChecker {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc) => {
                 this.env.define_func(name, ret_type)
-                this.env.define_func_params(name, this.params_list_to_string(params))
             }
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
@@ -491,7 +477,7 @@ class NullChecker {
                     this.env.define_var(name + "__parent", parent)
                     this.class_parents.set(name, parent)
                 }
-                // Register methods with their return types and param types
+                // Register methods with their return types
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
@@ -502,13 +488,8 @@ class NullChecker {
                         FunDecl(mn, mp, mr, mb, md) => mr
                         _ => "Any"
                     }
-                    var method_params: List<AST.Param> = match (methods[mi]) {
-                        FunDecl(mn, mp, mr, mb, md) => mp
-                        _ => []
-                    }
                     if (method_name.length() > 0) {
                         this.env.define_func(name + "__" + method_name, method_ret)
-                        this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
                     }
                     mi = mi + 1
                 }
@@ -573,7 +554,6 @@ class NullChecker {
                 // Register method with class prefix if inside a class
                 if (this.current_class.length() > 0) {
                     this.env.define_func(this.current_class + "__" + name, ret_type)
-                    this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
                     // Track method names for conformance checking
                     var existing: String = ""
                     if (this.class_method_names.has(this.current_class)) {
@@ -1112,108 +1092,6 @@ class NullChecker {
         return this.infer_expr(right)
     }
 
-    // Check if a type string is a type parameter (e.g., "T", "U", "V", "Element")
-    // Type parameters are: single uppercase letters, or names that aren't known
-    // concrete types (Int, Float, Bool, String, Nil, Any, List, Map, etc.)
-    fun is_type_param(typ: String): Bool {
-        if (typ.length() == 0) return false
-        // Known concrete types are not type parameters
-        if (typ == "Int" or typ == "Float" or typ == "Bool") return false
-        if (typ == "String" or typ == "Nil" or typ == "Any") return false
-        if (typ == "List" or typ == "Map" or typ == "Fun") return false
-        if (typ == "StringBuilder") return false
-        if (typ.contains("<")) return false
-        if (typ.contains("|")) return false
-        // Single uppercase letter: definitely a type param
-        if (typ.length() == 1) {
-            var ch: String = typ.char_at(0)
-            if (ch >= "A" and ch <= "Z") return true
-        }
-        // Multi-char: type param if first char is uppercase and not a known class/enum
-        var first: String = typ.char_at(0)
-        if (first >= "A" and first <= "Z") {
-            // Check if it's a known class or enum
-            if (this.env.class_fields.has(typ)) return false
-            if (this.env.enum_variants.has(typ)) return false
-            // Check if it's registered as a function (class constructor)
-            if (this.env.funcs.has(typ)) return false
-            return true
-        }
-        return false
-    }
-
-    // Resolve a type parameter in a return type by matching declared param types
-    // against actual argument types at the call site.
-    // params_str format: "name:Type,name:Type"
-    // Returns the resolved concrete type, or the original ret_type if unresolvable.
-    fun resolve_type_params(ret_type: String, params_str: String, args: List<AST.Expr>): String {
-        if (params_str.length() == 0) return ret_type
-        // Split params_str into individual param entries
-        var param_entries: List<String> = this.split_type_args(params_str)
-        var i: Float = 0
-        while (i < param_entries.length() and i < args.length()) {
-            var entry: String = param_entries[i]
-            // Each entry is "name:Type"
-            var colon_pos: Float = entry.index_of(":")
-            if (colon_pos >= 0) {
-                var param_type: String = entry.slice(colon_pos + 1, entry.length())
-                // Case 1: return type directly matches a param type (e.g., ret=T, param=T)
-                if (param_type == ret_type) {
-                    var arg_type: String = this.infer_expr(args[i])
-                    if (arg_type != "Any") return arg_type
-                }
-                // Case 2: return type is a type param inside a generic param
-                // e.g., ret=T, param=List<T> → extract T from the arg's generic type
-                if (param_type.contains("<")) {
-                    var inner: String = this.extract_generic_args(param_type)
-                    if (inner == ret_type) {
-                        // The param is like List<T> and ret is T
-                        // So extract the first generic arg from the actual arg type
-                        var arg_type: String = this.infer_expr(args[i])
-                        var resolved: String = this.extract_generic_args(arg_type)
-                        if (resolved.length() > 0 and resolved != "Any") return resolved
-                    }
-                    // Handle Map<K,V> style: check each generic arg
-                    var param_args: List<String> = this.split_type_args(inner)
-                    var pi: Float = 0
-                    while (pi < param_args.length()) {
-                        if (param_args[pi] == ret_type) {
-                            var arg_type: String = this.infer_expr(args[i])
-                            var resolved: String = this.extract_nth_generic_arg(arg_type, pi)
-                            if (resolved != "Any") return resolved
-                        }
-                        pi = pi + 1
-                    }
-                }
-            }
-            i = i + 1
-        }
-        return ret_type
-    }
-
-    // Resolve type params within a generic return type (e.g., "List<T>" → "List<Int>")
-    fun resolve_generic_return(ret_type: String, params_str: String, args: List<AST.Expr>): String {
-        if (!ret_type.contains("<")) return ret_type
-        // Extract base and args from return type
-        var lt_pos: Float = ret_type.index_of("<")
-        var base: String = ret_type.slice(0, lt_pos)
-        var ret_args_str: String = ret_type.slice(lt_pos + 1, ret_type.length() - 1)
-        var ret_args: List<String> = this.split_type_args(ret_args_str)
-        var resolved_args: List<String> = []
-        var ri: Float = 0
-        while (ri < ret_args.length()) {
-            var ra: String = ret_args[ri]
-            if (this.is_type_param(ra)) {
-                var resolved: String = this.resolve_type_params(ra, params_str, args)
-                resolved_args.push(resolved)
-            } else {
-                resolved_args.push(ra)
-            }
-            ri = ri + 1
-        }
-        return base + "<" + resolved_args.join(",") + ">"
-    }
-
     fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
         var name: String = match (callee) {
             Variable(n) => n
@@ -1228,22 +1106,7 @@ class NullChecker {
         // Look up declared return type
         if (name.length() > 0) {
             var ret: String = this.env.get_func_ret(name)
-            if (ret != "Any") {
-                // If return type contains a type parameter, try to resolve it
-                if (this.is_type_param(ret)) {
-                    var params_str: String = this.env.get_func_params(name)
-                    var resolved: String = this.resolve_type_params(ret, params_str, args)
-                    if (resolved != ret) return resolved
-                } else if (ret.contains("<")) {
-                    // Generic return type like List<T> — resolve type params within
-                    var params_str: String = this.env.get_func_params(name)
-                    if (params_str.length() > 0) {
-                        var resolved: String = this.resolve_generic_return(ret, params_str, args)
-                        if (resolved != ret) return resolved
-                    }
-                }
-                return ret
-            }
+            if (ret != "Any") return ret
             // Known builtins by name
             if (name == "read_file") return "String"
             if (name == "write_file") return "Nil"

@@ -209,6 +209,20 @@
             Yield(value) => {
                 this.gen_yield(value)
             }
+            TupleLit(elements) => {
+                var result: String = this.gen_list_lit(elements)
+                var tuple_type_str: String = "Tuple<"
+                var tti: Float = 0
+                while (tti < elements.length()) {
+                    if (tti > 0) { tuple_type_str = tuple_type_str + "," }
+                    var elem_type: String = this.get_expr_type(elements[tti])
+                    tuple_type_str = tuple_type_str + elem_type
+                    tti = tti + 1
+                }
+                tuple_type_str = tuple_type_str + ">"
+                this.last_type = this.str_to_type(tuple_type_str)
+                result
+            }
         }
     }
 
@@ -690,6 +704,23 @@
                 _ => []
             }
             return this.gen_list_lit(elems)
+        }
+        if (expr_kind == "tuple_lit") {
+            var elems: List<AST.Expr> = match (expr) { TupleLit(e) => e
+                _ => []
+            }
+            var result: String = this.gen_list_lit(elems)
+            var tuple_type_str: String = "Tuple<"
+            var tti: Float = 0
+            while (tti < elems.length()) {
+                if (tti > 0) { tuple_type_str = tuple_type_str + "," }
+                var elem_type: String = this.get_expr_type(elems[tti])
+                tuple_type_str = tuple_type_str + elem_type
+                tti = tti + 1
+            }
+            tuple_type_str = tuple_type_str + ">"
+            this.last_type = this.str_to_type(tuple_type_str)
+            return result
         }
         if (expr_kind == "index_get") {
             var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o
@@ -1830,6 +1861,7 @@
             IfExpr(c, tb, tv, eb, ev) => "no"
             TryExpr(tb, tv, cn, cb, cv) => "no"
             Yield(v) => "no"
+            TupleLit(e) => "no"
         }
         return kind == "yes"
     }
@@ -1859,6 +1891,7 @@
             IfExpr(c, tb, tv, eb, ev) => ""
             TryExpr(tb, tv, cn, cb, cv) => ""
             Yield(v) => ""
+            TupleLit(e) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -1910,6 +1943,7 @@
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
             Yield(v) => "other"
+            TupleLit(e) => "other"
         }
         return kind == "string"
     }

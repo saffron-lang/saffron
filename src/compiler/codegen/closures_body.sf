@@ -560,6 +560,13 @@
             Yield(v) => {
                 this.find_free_vars_expr(v, bound, free)
             }
+            TupleLit(elements) => {
+                var tli: Float = 0
+                while (tli < elements.length()) {
+                    this.find_free_vars_expr(elements[tli], bound, free)
+                    tli = tli + 1
+                }
+            }
             This => {
                 if (!bound.contains("self") and !free.contains("self")) {
                     free.push("self")
