@@ -474,8 +474,7 @@
                     struct_name = this.class_struct_names.get(ns)
                 }
                 var field_idx: Float = this.get_field_index(ns, method)
-                var obj_ptr: String = this.fresh_local()
-                this.emit_indent(obj_ptr + " = inttoptr i64 " + obj + " to %" + struct_name + "*")
+                var obj_ptr: String = this.val_to_typed_ptr(obj, "%" + struct_name + "*")
                 var field_ptr: String = this.fresh_local()
                 this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                 var field_val: String = this.fresh_local()
@@ -786,8 +785,7 @@
             }
         }
         // spawn_arg is a closure: [fn_ptr, env_ptr] packed as [2 x i64]*
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = inttoptr i64 " + spawn_arg + " to [2 x i64]*")
+        var closure_ptr: String = this.val_to_typed_ptr(spawn_arg, "[2 x i64]*")
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
         var fn_i64: String = this.fresh_local()
@@ -949,8 +947,7 @@
     if (!is_user_class and method == "append" and args.length() > 0) {
         var str_tagged: String = this.gen_arg_value(args[0])
         var str_ptr: String = this.emit_untag_ptr(str_tagged)
-        var str_raw: String = this.fresh_local()
-        this.emit_indent(str_raw + " = ptrtoint i8* " + str_ptr + " to i64")
+        var str_raw: String = this.ptr_to_val(str_ptr)
         var discard: String = this.fresh_local()
         this.emit_indent(discard + " = call i64 @__sb_append(i64 " + obj + ", i64 " + str_raw + ")")
         this.last_type = AST.Type.NilType
@@ -1417,8 +1414,7 @@
         struct_name = this.class_struct_names.get(class_name)
     }
     var field_idx: Float = this.get_field_index(class_name, field)
-    var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
+    var obj_ptr: String = this.val_to_typed_ptr(obj_val, "%" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
     this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     var result: String = this.fresh_local()
@@ -1455,8 +1451,7 @@
     }
     var val: String = this.gen_arg_value(value)
     var field_idx: Float = this.get_field_index(class_name, field)
-    var obj_ptr: String = this.fresh_local()
-    this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + struct_name + "*")
+    var obj_ptr: String = this.val_to_typed_ptr(obj_val, "%" + struct_name + "*")
     var field_ptr: String = this.fresh_local()
     this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     this.emit_indent("store volatile i64 " + val + ", i64* " + field_ptr)

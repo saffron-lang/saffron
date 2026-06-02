@@ -30,8 +30,7 @@
                 // Multi-field variant: inttoptr → GEP for each binding
                 var num_slots: Float = first_bindings.length() + 1
                 var total_str: String = num_slots.floor().to_string()
-                var arr_ptr: String = this.fresh_local()
-                this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+                var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
                 var bi: Float = 0
                 while (bi < first_bindings.length()) {
                     var bname: String = first_bindings[bi]
@@ -66,8 +65,7 @@
             this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
         } else {
             // Multi-field: ptrtoint encoding, tag at array[0]
-            var arr_ptr: String = this.fresh_local()
-            this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to i64*")
+            var arr_ptr: String = this.val_to_typed_ptr(subj, "i64*")
             var tag_i64: String = this.fresh_local()
             this.emit_indent(tag_i64 + " = load i64, i64* " + arr_ptr)
             this.emit_indent(tag_val + " = trunc i64 " + tag_i64 + " to i8")
@@ -169,8 +167,7 @@
             // Array encoding: inttoptr and GEP to extract fields
             var total: Float = bind_count + 1
             var total_str: String = total.floor().to_string()
-            var arr_ptr: String = this.fresh_local()
-            this.emit_indent(arr_ptr + " = inttoptr i64 " + subj + " to [" + total_str + " x i64]*")
+            var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
             // Extract each field individually to avoid VM loop variable bug
             if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
             if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
