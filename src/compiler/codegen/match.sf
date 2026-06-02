@@ -13,6 +13,67 @@ extend fun Codegen.gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): Strin
         var first_variant: String = match (first_pattern) { VariantPattern(v, b) => v
             _ => ""
         }
+
+        // Check if this is a string literal match (prefix "__strpat:")
+        if (first_variant.starts_with("__strpat:")) {
+            // String literal match — generate if/else chain with __string_eq
+            var end_label: String = this.fresh_label("match.end")
+            var match_result_type: AST.Type = AST.Type.StringType
+            var i: Float = 0
+            while (i < arms.length()) {
+                var arm: AST.MatchArm = arms[i]
+                var arm_pattern: AST.Pattern = match (arm) { Arm(p, b) => p
+                    _ => AST.Pattern.VariantPattern("", [])
+                }
+                var arm_body: AST.Expr = match (arm) { Arm(p, b) => b
+                    _ => AST.Expr.NilLit
+                }
+                var arm_vname: String = match (arm_pattern) { VariantPattern(v, b) => v
+                    _ => ""
+                }
+
+                if (arm_vname == "_") {
+                    // Default/wildcard arm — just generate body
+                    var val: String = this.gen_arg_value(arm_body)
+                    if (i == 0) { match_result_type = this.last_type }
+                    this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+                    this.emit_terminator("br label %" + end_label)
+                } else if (arm_vname.starts_with("__strpat:")) {
+                    // String pattern arm — compare with __string_eq
+                    var str_val: String = arm_vname.slice(9, arm_vname.length())
+                    var const_name: String = this.add_string_constant(str_val)
+                    var len: Float = str_val.length() + 1
+                    var gep: String = this.fresh_local()
+                    this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+                    var pattern_val: String = this.ptr_to_val(gep)
+                    var eq_result: String = this.fresh_local()
+                    this.emit_indent(eq_result + " = call i64 @__string_eq(i64 " + subj + ", i64 " + pattern_val + ")")
+                    var cmp: String = this.fresh_local()
+                    this.emit_indent(cmp + " = trunc i64 " + eq_result + " to i1")
+                    var then_label: String = this.fresh_label("match.arm")
+                    var next_label: String = this.fresh_label("match.next")
+                    this.emit_terminator("br i1 " + cmp + ", label %" + then_label + ", label %" + next_label)
+                    // Arm body
+                    this.start_block(then_label)
+                    var val: String = this.gen_arg_value(arm_body)
+                    if (i == 0) { match_result_type = this.last_type }
+                    this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
+                    this.emit_terminator("br label %" + end_label)
+                    // Continue to next arm
+                    this.start_block(next_label)
+                }
+                i = i + 1
+            }
+            // If no arm matched (no wildcard), store nil
+            this.emit_indent("store i64 0, i64* " + result_ptr)
+            this.emit_terminator("br label %" + end_label)
+            this.start_block(end_label)
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = load i64, i64* " + result_ptr)
+            this.last_type = match_result_type
+            return result
+        }
+
         var enum_name: String = this.find_enum_for_variant(first_variant)
 
         // If enum not found, just generate the first arm's body as default
