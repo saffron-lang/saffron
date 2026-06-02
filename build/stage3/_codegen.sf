@@ -2233,6 +2233,51 @@ class Codegen {
             }
         }
 
+        // Sync-calls-coro: non-coroutine calling a coroutine directly — drive to completion
+        if (!this.is_coroutine) {
+            var is_sync_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
+            if (!is_sync_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+                is_sync_coro_callee = true
+                resolved_callee = this.current_prefix + resolved_callee
+            }
+            if (is_sync_coro_callee) {
+                this.called_functions.push(resolved_callee)
+                var sync_arg_strs: List<String> = []
+                var sai: Float = 0
+                while (sai < args.length()) {
+                    var val: String = this.gen_arg_value(args[sai])
+                    sync_arg_strs.push("i64 " + val)
+                    sai = sai + 1
+                }
+                var s_hdl: String = this.fresh_local()
+                this.emit_indent(s_hdl + " = call ptr @" + resolved_callee + "(" + sync_arg_strs.join(", ") + ")")
+                var s_i64: String = this.fresh_local()
+                this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+                var sc: String = this.fresh_label("sync.check")
+                var sl: String = this.fresh_label("sync.loop")
+                var sd: String = this.fresh_label("sync.done")
+                this.emit_terminator("br label %" + sc)
+                this.start_block(sc)
+                var s_done: String = this.fresh_local()
+                this.emit_indent(s_done + " = call i64 @__sched_coro_done(i64 " + s_i64 + ")")
+                var s_cmp: String = this.fresh_local()
+                this.emit_indent(s_cmp + " = icmp eq i64 " + s_done + ", 1")
+                this.emit_terminator("br i1 " + s_cmp + ", label %" + sd + ", label %" + sl)
+                this.start_block(sl)
+                this.emit_indent("call void @__sched_coro_resume(i64 " + s_i64 + ")")
+                this.emit_terminator("br label %" + sc)
+                this.start_block(sd)
+                var s_result: String = this.fresh_local()
+                this.emit_indent(s_result + " = load i64, i64* @__task_result")
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return s_result
+            }
+        }
+
         // Error check: argument count validation (skip if named args present)
         var has_named_check: Bool = false
         var nac: Float = 0
@@ -3352,6 +3397,8 @@ class Codegen {
         var saved_counter2: Float = this.local_counter
         var saved_var_types2: Map<String, String> = this.var_types
         var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
+        var saved_in_fn2: Bool = this.in_function
+        this.in_function = false
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
         if (params_str.length() > 0) {
@@ -3359,6 +3406,7 @@ class Codegen {
         }
         this.gen_function(lambda_name, full_params, ret_type, body)
         this.globals.push(this.sb.to_string())
+        this.in_function = saved_in_fn2
         this.sb = saved_sb2
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
@@ -3371,7 +3419,9 @@ class Codegen {
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
-        var fn_type_str: String = "i64 ("
+        var nocap_ret_ty: String = "i64"
+        if (this.coroutine_funcs.contains(lambda_name)) { nocap_ret_ty = "ptr" }
+        var fn_type_str: String = nocap_ret_ty + " ("
         var tti: Float = 0
         while (tti < num_total_params) {
             if (tti > 0) { fn_type_str = fn_type_str + ", " }
@@ -6494,9 +6544,26 @@ class Codegen {
                         out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
                         mi3 = mi3 + 1
                     }
-                    out.append("  %main_ret = call i64 @__saffron_main()\n")
-                    out.append("  %exit_code = trunc i64 %main_ret to i32\n")
-                    out.append("  ret i32 %exit_code\n")
+                    if (this.coroutine_funcs.contains("__saffron_main")) {
+                        // Async main: __saffron_main is a coroutine — enqueue and run scheduler
+                        var enqueue_fn2: String = "enqueue"
+                        if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                            enqueue_fn2 = "stdlib_scheduler_enqueue"
+                        }
+                        var sched_fn2: String = "scheduler_run"
+                        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                            sched_fn2 = "stdlib_scheduler_scheduler_run"
+                        }
+                        out.append("  %__main_hdl = call ptr @__saffron_main()\n")
+                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
+                        out.append("  call i64 @" + sched_fn2 + "()\n")
+                        out.append("  ret i32 0\n")
+                    } else {
+                        out.append("  %main_ret = call i64 @__saffron_main()\n")
+                        out.append("  %exit_code = trunc i64 %main_ret to i32\n")
+                        out.append("  ret i32 %exit_code\n")
+                    }
                 }
                 out.append("}\n")
             }
@@ -6699,7 +6766,11 @@ class Codegen {
             }
         }
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
-        if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "slice" or mc_method == "char_at") return "String"
+        if (mc_method == "slice") {
+            if (mc_obj_type.starts_with("List")) { return mc_obj_type }
+            return "String"
+        }
+        if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "char_at") return "String"
         if (mc_method == "split" or mc_method == "keys") return "List<String>"
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
@@ -7236,6 +7307,37 @@ class Codegen {
                 this.last_type = AST.Type.IntType
             }
             return coro_result
+        }
+        // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
+        if (!this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+            var s_hdl: String = this.fresh_local()
+            this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            var s_i64: String = this.fresh_local()
+            this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            var sc: String = this.fresh_label("sync.check")
+            var sl: String = this.fresh_label("sync.loop")
+            var sd: String = this.fresh_label("sync.done")
+            this.emit_terminator("br label %" + sc)
+            this.start_block(sc)
+            var s_done: String = this.fresh_local()
+            this.emit_indent(s_done + " = call i64 @__sched_coro_done(i64 " + s_i64 + ")")
+            var s_cmp: String = this.fresh_local()
+            this.emit_indent(s_cmp + " = icmp eq i64 " + s_done + ", 1")
+            this.emit_terminator("br i1 " + s_cmp + ", label %" + sd + ", label %" + sl)
+            this.start_block(sl)
+            this.emit_indent("call void @__sched_coro_resume(i64 " + s_i64 + ")")
+            this.emit_terminator("br label %" + sc)
+            this.start_block(sd)
+            var s_result: String = this.fresh_local()
+            this.emit_indent(s_result + " = load i64, i64* @__task_result")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return s_result
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
@@ -7912,6 +8014,37 @@ class Codegen {
                 this.last_type = AST.Type.IntType
             }
             return coro_result
+        }
+        // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
+        if (!this.is_coroutine and is_coro_callee) {
+            var s_hdl: String = this.fresh_local()
+            this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            var s_i64: String = this.fresh_local()
+            this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            var sc: String = this.fresh_label("sync.check")
+            var sl: String = this.fresh_label("sync.loop")
+            var sd: String = this.fresh_label("sync.done")
+            this.emit_terminator("br label %" + sc)
+            this.start_block(sc)
+            var s_done: String = this.fresh_local()
+            this.emit_indent(s_done + " = call i64 @__sched_coro_done(i64 " + s_i64 + ")")
+            var s_cmp: String = this.fresh_local()
+            this.emit_indent(s_cmp + " = icmp eq i64 " + s_done + ", 1")
+            this.emit_terminator("br i1 " + s_cmp + ", label %" + sd + ", label %" + sl)
+            this.start_block(sl)
+            this.emit_indent("call void @__sched_coro_resume(i64 " + s_i64 + ")")
+            this.emit_terminator("br label %" + sc)
+            this.start_block(sd)
+            var s_result: String = this.fresh_local()
+            this.emit_indent(s_result + " = load i64, i64* @__task_result")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return s_result
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
@@ -8624,8 +8757,21 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         pri = pri + 1
     }
 
-    // Coroutine detection: scan all stmts with correct prefix
-    gen.mark_coroutines(all_stmts)
+    // Coroutine detection: scan each module's stmts with correct prefix
+    var cmi: Float = 0
+    while (cmi < prefixes.length()) {
+        gen.current_prefix = prefixes[cmi]
+        var cmi_start: Float = boundaries[cmi]
+        var cmi_end: Float = boundaries[cmi + 1]
+        var cmi_stmts: List<AST.Stmt> = []
+        var cmi_si: Float = cmi_start
+        while (cmi_si < cmi_end) {
+            cmi_stmts.push(all_stmts[cmi_si])
+            cmi_si = cmi_si + 1
+        }
+        gen.mark_coroutines(cmi_stmts)
+        cmi = cmi + 1
+    }
     gen.current_prefix = ""
     gen.mark_coroutines(program)
 
