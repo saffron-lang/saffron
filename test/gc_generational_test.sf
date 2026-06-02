@@ -20,18 +20,20 @@
 
 IO.println("=== Generational GC Test Suite ===")
 
+// Use a 16KB nursery so that string interpolation from IO.println doesn't
+// fill the nursery before our explicit test allocations.
+gc_set_nursery_size(16384)
+gc_enable()
+
 // Test 1: Nursery initialization
 IO.println("")
 IO.println("Test 1: Nursery initialization")
-// Set a small nursery for testing (4KB)
-gc_set_nursery_size(4096)
-gc_enable()
 var capacity: Int = gc_nursery_capacity()
 IO.println("  Nursery capacity: ${capacity}")
-if (capacity == 4096) {
+if (capacity == 16384) {
     IO.println("  PASS: Nursery sized correctly")
 } else {
-    IO.println("  FAIL: Expected 4096, got ${capacity}")
+    IO.println("  FAIL: Expected 16384, got ${capacity}")
 }
 
 // Test 2: Bump allocation in nursery
@@ -44,10 +46,9 @@ var used_after: Int = gc_nursery_used()
 var expected_used: Int = 64 + 24
 IO.println("  Nursery used before: ${used_before}")
 IO.println("  Nursery used after:  ${used_after}")
-IO.println("  Expected growth: ${expected_used}")
 var actual_growth: Int = used_after - used_before
 if (actual_growth == expected_used) {
-    IO.println("  PASS: Bump allocation grew nursery correctly")
+    IO.println("  PASS: Bump allocation grew nursery by ${expected_used} bytes")
 } else {
     IO.println("  FAIL: Expected ${expected_used} growth, got ${actual_growth}")
 }
@@ -56,20 +57,20 @@ if (actual_growth == expected_used) {
 IO.println("")
 IO.println("Test 3: Nursery pointer detection")
 var in_nursery: Int = gc_is_nursery_ptr(ptr1)
-IO.println("  ptr1 in nursery: ${in_nursery}")
 if (in_nursery == 1) {
     IO.println("  PASS: New allocation is in nursery")
 } else {
-    IO.println("  FAIL: Expected nursery ptr")
+    IO.println("  FAIL: Expected nursery ptr, got ${in_nursery}")
 }
 
 // Test 4: Minor GC triggers when nursery fills
 IO.println("")
 IO.println("Test 4: Minor GC on nursery full")
 var minors_before: Int = gc_minor_collections()
-// Fill the nursery (4096 bytes / (64 + 24) = ~46 objects)
+// Fill the nursery with many objects (no IO.println in loop to avoid
+// string allocations confusing the count)
 var i: Int = 0
-while (i < 60) {
+while (i < 250) {
     gc_alloc(64, 0)
     i = i + 1
 }
@@ -77,7 +78,7 @@ var minors_after: Int = gc_minor_collections()
 IO.println("  Minor GCs before: ${minors_before}")
 IO.println("  Minor GCs after:  ${minors_after}")
 if (minors_after > minors_before) {
-    IO.println("  PASS: Minor GC was triggered")
+    IO.println("  PASS: Minor GC was triggered (${minors_after - minors_before} collections)")
 } else {
     IO.println("  FAIL: No minor GC triggered")
 }
@@ -86,26 +87,21 @@ if (minors_after > minors_before) {
 IO.println("")
 IO.println("Test 5: Nursery reset after collection")
 var used_now: Int = gc_nursery_used()
-IO.println("  Nursery used: ${used_now}")
-IO.println("  Nursery capacity: ${gc_nursery_capacity()}")
+IO.println("  Nursery used after loop: ${used_now}")
 if (used_now < capacity) {
-    IO.println("  PASS: Nursery was reset (not full)")
+    IO.println("  PASS: Nursery was reset (${used_now} < ${capacity})")
 } else {
-    IO.println("  FAIL: Nursery still full after minor GC")
+    IO.println("  FAIL: Nursery still full (${used_now} >= ${capacity})")
 }
 
 // Test 6: List allocation uses nursery
 IO.println("")
 IO.println("Test 6: List allocation through nursery")
-// Force a minor GC to start fresh
-gc_collect()
 var used_pre_list: Int = gc_nursery_used()
 var list: Int = gc_list_new()
 var used_post_list: Int = gc_nursery_used()
-IO.println("  Nursery used before list: ${used_pre_list}")
-IO.println("  Nursery used after list:  ${used_post_list}")
 if (used_post_list > used_pre_list) {
-    IO.println("  PASS: List allocated in nursery")
+    IO.println("  PASS: List allocated in nursery (grew by ${used_post_list - used_pre_list})")
 } else {
     IO.println("  INFO: List may have gone to old gen (still correct)")
 }

@@ -83,12 +83,10 @@
             var susp_result: String = this.fresh_local()
             this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
             var resume_label: String = this.fresh_label("suspend.resume")
-            var suspend_label: String = this.fresh_label("suspend.ret")
             var cleanup_label: String = this.fresh_label("suspend.cleanup")
-            this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
-            this.emit(suspend_label + ":")
-            this.block_terminated = false
-            this.emit_terminator("ret ptr %__coro_hdl")
+            // Default (suspend) case branches to the shared __coro_suspend block.
+            // CoroSplit requires all suspend points to share a single suspend/ret block.
+            this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
             this.emit(cleanup_label + ":")
             this.block_terminated = false
             this.emit_terminator("br label %__coro_cleanup")
