@@ -11,9 +11,9 @@
         var captures: List<String> = []
         this.find_free_vars_stmts(body, param_names, captures)
 
-        // Generate a unique name for this lambda
+        // Generate a unique name for this lambda (module-prefixed for global uniqueness)
         this.label_counter = this.label_counter + 1
-        var lambda_name: String = "__lambda_" + this.label_counter.floor().to_string()
+        var lambda_name: String = this.current_prefix + "__lambda_" + this.label_counter.floor().to_string()
 
         // Check if this lambda is a coroutine (contains yield or calls a coroutine)
         if (this.stmts_have_yield(body)) {
@@ -223,7 +223,11 @@
         this.emit("")
         var closure_linkage: String = "define"
         if (this.current_prefix.length() > 0) {
-            closure_linkage = "define linkonce_odr"
+            // On WASM targets, linkonce_odr breaks indirect calls (function table index
+            // mismatch after linker deduplication). Use plain define with unique names.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                closure_linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         var ret_type_ll: String = ret_llvm

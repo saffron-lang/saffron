@@ -1651,7 +1651,12 @@ class Codegen {
         }
 
         // Build the trampoline function IR
-        var wrap_ir: String = "\ndefine linkonce_odr i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+        // On WASM targets, use plain define to avoid function table index mismatch
+        var wrap_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            wrap_linkage = "define"
+        }
+        var wrap_ir: String = "\n" + wrap_linkage + " i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
         if (nparams == 0) {
             wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "()\n"
         } else {
@@ -3216,9 +3221,9 @@ class Codegen {
         var captures: List<String> = []
         this.find_free_vars_stmts(body, param_names, captures)
 
-        // Generate a unique name for this lambda
+        // Generate a unique name for this lambda (module-prefixed for global uniqueness)
         this.label_counter = this.label_counter + 1
-        var lambda_name: String = "__lambda_" + this.label_counter.floor().to_string()
+        var lambda_name: String = this.current_prefix + "__lambda_" + this.label_counter.floor().to_string()
 
         // Check if this lambda is a coroutine (contains yield or calls a coroutine)
         if (this.stmts_have_yield(body)) {
@@ -3428,7 +3433,11 @@ class Codegen {
         this.emit("")
         var closure_linkage: String = "define"
         if (this.current_prefix.length() > 0) {
-            closure_linkage = "define linkonce_odr"
+            // On WASM targets, linkonce_odr breaks indirect calls (function table index
+            // mismatch after linker deduplication). Use plain define with unique names.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                closure_linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         var ret_type_ll: String = ret_llvm
@@ -4401,7 +4410,11 @@ class Codegen {
         if (this.defined_funcs.contains(type_name)) { return }
         this.defined_funcs.push(type_name)
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + type_name + "() {")
+        var ctor_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ctor_linkage = "define"
+        }
+        this.emit(ctor_linkage + " i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
@@ -4486,7 +4499,11 @@ class Codegen {
         var func_name: String = name + "__to_string"
 
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + func_name + "(i64 %self) {")
+        var ts_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ts_linkage = "define"
+        }
+        this.emit(ts_linkage + " i64 @" + func_name + "(i64 %self) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -4662,7 +4679,11 @@ class Codegen {
         }
 
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + vname + "(" + params + ") {")
+        var ev_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ev_linkage = "define"
+        }
+        this.emit(ev_linkage + " i64 @" + vname + "(" + params + ") {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -5651,7 +5672,7 @@ class Codegen {
         if (name == "main") {
             emit_name = "__saffron_main"
             this.known_functions.push("main")
-        } else if (name.starts_with("__lambda")) {
+        } else if (name.contains("__lambda")) {
             emit_name = name
         }
         this.known_functions.push(emit_name)
@@ -5662,9 +5683,9 @@ class Codegen {
         }
         if (this.register_only) { return }
         if (this.defined_funcs.contains(emit_name)) {
-            if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
-                
-                
+            if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
+
+
             }
             return
         }
@@ -5733,7 +5754,7 @@ class Codegen {
                 pi3 = pi3 + 1
             }
             var linkage2: String = "define"
-            if (this.current_prefix.length() > 0) { linkage2 = "define linkonce_odr" }
+            if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") { linkage2 = "define linkonce_odr" }
             this.emit("")
             this.emit(linkage2 + " " + ret_llvm2 + " @" + emit_name + "(" + param_strs2.join(", ") + ") {")
             this.emit("entry:")
@@ -5857,7 +5878,12 @@ class Codegen {
         this.emit("")
         var linkage: String = "define"
         if (this.current_prefix.length() > 0) {
-            linkage = "define linkonce_odr"
+            // On WASM targets, linkonce_odr breaks indirect calls through function table
+            // index mismatch after linker deduplication. Use plain define with module-prefixed
+            // names to ensure each function has a stable table entry.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
