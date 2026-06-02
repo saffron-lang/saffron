@@ -344,17 +344,11 @@ class Codegen {
     }
 
     fun malloc_size_arg(size_reg: String): String {
-        // On wasm32, malloc takes i32 size; on native, i64
-        if (this.target == "wasm32") {
-            var trunc_reg: String = this.fresh_local()
-            this.emit_indent(trunc_reg + " = trunc i64 " + size_reg + " to i32")
-            return trunc_reg
-        }
+        // malloc always takes i64 (runtime truncates internally for wasm32)
         return size_reg
     }
 
     fun malloc_size_type(): String {
-        if (this.target == "wasm32") { return "i32" }
         return "i64"
     }
 

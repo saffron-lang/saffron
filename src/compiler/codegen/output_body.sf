@@ -660,13 +660,8 @@
         out.append("declare i32 @puts(i8*)\n")
         out.append("declare i32 @printf(i8*, ...)\n")
         out.append("declare i32 @snprintf(i8*, i64, i8*, ...)\n")
-        if (this.target == "wasm32") {
-            out.append("declare i8* @malloc(i32)\n")
-            out.append("declare i8* @realloc(i8*, i32)\n")
-        } else {
-            out.append("declare i8* @malloc(i64)\n")
-            out.append("declare i8* @realloc(i8*, i64)\n")
-        }
+        out.append("declare i8* @malloc(i64)\n")
+        out.append("declare i8* @realloc(i8*, i64)\n")
         out.append("declare void @free(i8*)\n")
         out.append("declare i64 @strlen(i8*)\n")
         out.append("declare i8* @strcpy(i8*, i8*)\n")

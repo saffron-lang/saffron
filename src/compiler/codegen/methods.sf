@@ -476,7 +476,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
-    // Check for OS module calls
+    // Check for OS module calls (handled before module dispatch)
     if (obj_name == "OS") {
         if (method == "exit") {
             var code: String = this.gen_arg_value(args[0])
@@ -621,6 +621,48 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
+        // Coro-calls-coro: if this is a coroutine calling another coroutine,
+        // emit the await loop pattern (call as ptr, suspend/resume until done)
+        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+            var b_hdl: String = this.fresh_local()
+            this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            var b_i64: String = this.fresh_local()
+            this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            var ac: String = this.fresh_label("await.check")
+            var ay: String = this.fresh_label("await.yield")
+            var al: String = this.fresh_label("await.loop")
+            var acl: String = this.fresh_label("await.cleanup")
+            var ad: String = this.fresh_label("await.done")
+            this.emit_terminator("br label %" + ac)
+            this.start_block(ac)
+            var bd: String = this.fresh_local()
+            this.emit_indent(bd + " = call i64 @__sched_coro_done(i64 " + b_i64 + ")")
+            var bdc: String = this.fresh_local()
+            this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
+            this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
+            this.start_block(ay)
+            var st: String = this.fresh_local()
+            this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var sr: String = this.fresh_local()
+            this.emit_indent(sr + " = call i8 @llvm.coro.suspend(token " + st + ", i1 false)")
+            this.emit_terminator("switch i8 " + sr + ", label %__coro_suspend [i8 0, label %" + al + " i8 1, label %" + acl + "]")
+            this.start_block(acl)
+            this.emit_terminator("br label %__coro_cleanup")
+            this.start_block(al)
+            this.emit_indent("call void @__sched_coro_resume(i64 " + b_i64 + ")")
+            this.emit_terminator("br label %" + ac)
+            this.start_block(ad)
+            var coro_result: String = this.fresh_local()
+            this.emit_indent(coro_result + " = load i64, i64* @__task_result")
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.set_last_type(this.str_to_type(this.func_ret_types.get(prefixed_name)))
+            } else if (this.func_ret_types.has(method)) {
+                this.set_last_type(this.str_to_type(this.func_ret_types.get(method)))
+            } else {
+                this.set_last_type(AST.Type.IntType)
+            }
+            return coro_result
+        }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
         if (this.func_ret_types.has(prefixed_name)) {
