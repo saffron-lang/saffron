@@ -64,6 +64,18 @@
             this.last_type = AST.Type.IntType
             return result
         }
+        // call_void_ptr(fn_ptr, arg) — indirect call with signature void(*)(ptr)
+        if (name.ends_with("call_void_ptr")) {
+            var fn_val: String = this.gen_arg_value(args[0])
+            var arg_val: String = this.gen_arg_value(args[1])
+            var fn_ptr: String = this.fresh_local()
+            this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_val + " to ptr")
+            var arg_ptr: String = this.fresh_local()
+            this.emit_indent(arg_ptr + " = inttoptr i64 " + arg_val + " to ptr")
+            this.emit_indent("call void " + fn_ptr + "(ptr " + arg_ptr + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
         // __suspend(reason, arg) — async suspend point
         // Emits coro.save/coro.suspend/switch. Makes containing function a coroutine.
         if (name.ends_with("__suspend")) {

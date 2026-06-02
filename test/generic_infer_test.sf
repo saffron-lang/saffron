@@ -1,0 +1,42 @@
+// Test: generic type inference in the checker
+// Verifies that the checker resolves type parameters from argument types
+// when a function's return type is generic.
+
+// Case 1: Concrete return types still work
+fun add(x: Int, y: Int): Int { return x + y }
+var a: Int = add(1, 2)
+IO.println(a)
+
+// Case 2: String return types
+fun greet(name: String): String { return "hello " + name }
+var b: String = greet("world")
+IO.println(b)
+
+// Case 3: Function returning type inferred from List<T> param
+fun first_int(list: List<Int>): Int {
+    return list[0]
+}
+var c: Int = first_int([10, 20, 30])
+IO.println(c)
+
+// Case 4: Class method return type inference
+class Box {
+    var value: String
+    fun init(v: String) {
+        this.value = v
+    }
+    fun get(): String {
+        return this.value
+    }
+    fun size(): Int {
+        return this.value.length()
+    }
+}
+
+var box: Box = Box("hello")
+var val_str: String = box.get()
+IO.println(val_str)
+var sz: Int = box.size()
+IO.println(sz)
+
+IO.println("generic inference OK")

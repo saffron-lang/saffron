@@ -49,6 +49,7 @@
         var saved_counter: Float = this.local_counter
         var saved_var_types: Map<String, String> = this.var_types
         var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
+        var saved_is_coro: Bool = this.is_coroutine
 
         // Generate the lambda function (disable nested detection to avoid interception)
         var saved_in_fn: Bool = this.in_function
@@ -69,6 +70,7 @@
         this.local_counter = saved_counter
         this.var_types = saved_var_types
         this.typed_vars = saved_typed_vars
+        this.is_coroutine = saved_is_coro
         this.globals.push(lambda_ir)
 
         if (captures.length() > 0) {
