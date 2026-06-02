@@ -13,7 +13,7 @@ import "../config.sf" as Config
 /// Build a PATH prefix that includes all dep bin directories.
 fun _bin_path_prefix(): String {
     var packages_dir: String = ".pantry/packages"
-    if (!(IO.file_exists(packages_dir))) {
+    if (!(OS.file_exists(packages_dir))) {
         return ""
     }
 
@@ -28,7 +28,7 @@ fun _bin_path_prefix(): String {
         }
         // Add package's bin/ directory if it exists
         var bin_dir: String = packages_dir + "/" + pkg_name + "/bin"
-        if (IO.file_exists(bin_dir)) {
+        if (OS.file_exists(bin_dir)) {
             paths.push(bin_dir)
         }
         // Also add the package root (for scripts defined in pantry.toml [scripts.bin])
@@ -103,7 +103,7 @@ fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
 
     // Scan installed dependencies for exported bin scripts
     var packages_dir: String = ".pantry/packages"
-    if (!(IO.file_exists(packages_dir))) {
+    if (!(OS.file_exists(packages_dir))) {
         return scripts
     }
 
@@ -117,7 +117,7 @@ fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
         }
 
         var pkg_manifest: String = packages_dir + "/" + pkg_name + "/pantry.toml"
-        if (!(IO.file_exists(pkg_manifest))) {
+        if (!(OS.file_exists(pkg_manifest))) {
             i = i + 1
             continue
         }

@@ -18,7 +18,7 @@ fun run(parsed: Args.ParsedArgs) {
 
     // Default: compile the entry point with lib-path for installed packages
     var entry: String = manifest.entry
-    if (!(IO.file_exists(entry))) {
+    if (!(OS.file_exists(entry))) {
         IO.println("pantry build: entry file '${entry}' not found")
         OS.exit(1)
     }
@@ -32,7 +32,7 @@ fun run(parsed: Args.ParsedArgs) {
     OS.exec("mkdir -p build")
 
     var cmd: String = "saffron build ${entry} -o ${output_path}"
-    if (IO.file_exists(".pantry/packages")) {
+    if (OS.file_exists(".pantry/packages")) {
         cmd = cmd + " --lib-path .pantry/packages"
     }
 

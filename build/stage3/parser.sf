@@ -396,6 +396,15 @@ class Parser {
     }
 
     fun parse_primary(): AST.Expr {
+        // yield / yield expr
+        if (this.match_kind_check("yield")) {
+            this.advance()
+            if (this.match_kind_check(";") or this.match_kind_check("}") or this.match_kind_check("eof") or this.match_kind_check("newline")) {
+                return AST.Expr.Yield(AST.Expr.NilLit)
+            }
+            var yval: AST.Expr = this.parse_expr()
+            return AST.Expr.Yield(yval)
+        }
         // HTML element expression: <tag attrs...>children</tag>
         if (this.match_kind_check("<") and this.peek_is_html_start()) {
             return this.parse_html_element()
@@ -936,6 +945,7 @@ class Parser {
             TkThrow => "throw"
             TkFinally => "finally"
             TkIs => "is"
+            TkYield => "yield"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"
@@ -1254,7 +1264,7 @@ class Parser {
         // Desugar: var __destruct = init; var a = __destruct[0]; var b = __destruct[1]; ...
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "List", init, ""))
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
         var i: Int = 0
         while (i < names.length()) {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))

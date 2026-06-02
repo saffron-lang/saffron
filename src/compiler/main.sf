@@ -29,7 +29,7 @@ var _lib_paths: List<String> = []
 fun _find_in_lib_paths(name: String, stdlib_dir: String): String {
     // 1. Check stdlib: <stdlib>/<name>.sf
     var stdlib_file: String = stdlib_dir + "/" + name + ".sf"
-    if (IO.file_exists(stdlib_file)) {
+    if (OS.file_exists(stdlib_file)) {
         return stdlib_file
     }
 
@@ -40,20 +40,20 @@ fun _find_in_lib_paths(name: String, stdlib_dir: String): String {
 
         // <lib_dir>/<name>.sf
         var single_file: String = lib_dir + "/" + name + ".sf"
-        if (IO.file_exists(single_file)) {
+        if (OS.file_exists(single_file)) {
             return single_file
         }
 
         // <lib_dir>/<name>/pantry.toml → read entry
         var pkg_manifest: String = lib_dir + "/" + name + "/pantry.toml"
-        if (IO.file_exists(pkg_manifest)) {
+        if (OS.file_exists(pkg_manifest)) {
             var entry: String = _extract_entry_from_toml(IO.read_file(pkg_manifest))
             return lib_dir + "/" + name + "/" + entry
         }
 
         // <lib_dir>/<name>/src/lib.sf (convention)
         var convention: String = lib_dir + "/" + name + "/src/lib.sf"
-        if (IO.file_exists(convention)) {
+        if (OS.file_exists(convention)) {
             return convention
         }
 
@@ -70,13 +70,13 @@ fun _find_submodule_in_lib_paths(pkg_name: String, sub_path: String, stdlib_dir:
         var lib_dir: String = _lib_paths[i]
 
         var candidate: String = lib_dir + "/" + pkg_name + "/src/" + sub_path + ".sf"
-        if (IO.file_exists(candidate)) {
+        if (OS.file_exists(candidate)) {
             return candidate
         }
 
         // Also try without src/ prefix
         var candidate2: String = lib_dir + "/" + pkg_name + "/" + sub_path + ".sf"
-        if (IO.file_exists(candidate2)) {
+        if (OS.file_exists(candidate2)) {
             return candidate2
         }
 
@@ -661,7 +661,7 @@ fun main(): Int {
     var visited: Map<String, Bool> = {}
     var module_stmts: List<List<AST.Stmt>> = []
     var module_prefixes_list: List<String> = []
-    if (IO.file_exists(prelude_path)) {
+    if (OS.file_exists(prelude_path)) {
         var prelude_src: String = IO.read_file(prelude_path)
         var prelude_tokens: List = Lexer.lex(prelude_src)
         var prelude_program: List = Parser.parse_with_source(prelude_tokens, prelude_src)
@@ -689,7 +689,7 @@ fun main(): Int {
                     pkg_name = dep_path.slice(0, slash)
                 }
                 var pkg_prelude: String = lib_dir + "/" + pkg_name + "/src/prelude.sf"
-                if (IO.file_exists(pkg_prelude) and !visited.has(pkg_prelude)) {
+                if (OS.file_exists(pkg_prelude) and !visited.has(pkg_prelude)) {
                     var dep_src: String = IO.read_file(pkg_prelude)
                     var dep_tokens: List = Lexer.lex(dep_src)
                     var dep_program: List = Parser.parse_with_source(dep_tokens, dep_src)

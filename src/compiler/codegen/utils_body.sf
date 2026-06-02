@@ -237,6 +237,7 @@
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
             IfExpr(c, tb, tv, eb, ev) => {}
             TryExpr(tb, tv, cn, cb, cv) => {}
+            Yield(v) => { this.collect_vars_expr(v, names, types) }
         }
     }
 
@@ -310,6 +311,7 @@
             IsCheck(val, t) => "other"
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
+            Yield(v) => "other"
         }
         return kind == "match"
     }

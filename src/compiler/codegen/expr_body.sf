@@ -187,7 +187,61 @@
             TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val) => {
                 this.gen_try_expr(try_stmts, try_val, catch_name, catch_stmts, catch_val)
             }
+            Yield(value) => {
+                this.gen_yield(value)
+            }
         }
+    }
+
+    fun gen_yield(value: AST.Expr): String {
+        // Emit yield argument into globals (scheduler reads these after suspend)
+        var yield_val: String = this.gen_arg_value(value)
+
+        // Detect yield [reason, arg] pattern for sleep/IO
+        var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
+        if (is_list == "yes") {
+            var elems: List<AST.Expr> = match (value) { ListLit(e) => e }
+            if (elems.length() >= 1) {
+                var reason: String = this.gen_arg_value(elems[0])
+                this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
+                if (elems.length() >= 2) {
+                    var arg: String = this.gen_arg_value(elems[1])
+                    this.emit_indent("store i64 " + arg + ", i64* @__yield_arg")
+                }
+            }
+        }
+
+        // Coroutine suspend sequence
+        var save_tok: String = this.fresh_local()
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(i8* %__coro_hdl)")
+        var susp_result: String = this.fresh_local()
+        this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+
+        var resume_label: String = this.fresh_label("yield.resume")
+        var cleanup_label: String = this.fresh_label("yield.cleanup")
+        var suspend_label: String = this.fresh_label("yield.suspend")
+
+        this.emit_indent("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+
+        // Suspend path (returned to caller)
+        this.start_block(suspend_label)
+        this.emit_terminator("unreachable")
+
+        // Cleanup path (coroutine destroyed)
+        this.start_block(cleanup_label)
+        this.emit_terminator("br label %__coro_cleanup")
+
+        // Resume path — read resume value from promise slot
+        this.start_block(resume_label)
+        var promise_ptr: String = this.fresh_local()
+        this.emit_indent(promise_ptr + " = call i8* @llvm.coro.promise(i8* %__coro_hdl, i32 8, i1 false)")
+        var promise_i64ptr: String = this.fresh_local()
+        this.emit_indent(promise_i64ptr + " = bitcast i8* " + promise_ptr + " to i64*")
+        var resume_val: String = this.fresh_local()
+        this.emit_indent(resume_val + " = load i64, i64* " + promise_i64ptr)
+
+        this.last_type = AST.Type.IntType
+        return resume_val
     }
 
     fun gen_is_check(value: AST.Expr, type_name: String): String {

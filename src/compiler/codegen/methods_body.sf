@@ -46,6 +46,7 @@
         IsCheck(val, t) => "is_check"
         IfExpr(c, tb, tv, eb, ev) => "if_expr"
         TryExpr(tb, tv, cn, cb, cv) => "try_expr"
+        Yield(v) => "yield"
     }
     }
 
@@ -517,6 +518,23 @@
             this.emit_indent("call void @exit(i32 " + code32 + ")")
             this.last_type = AST.Type.NilType
             return "0"
+        }
+        if (method == "file_exists" or method == "mkdir" or method == "list_dir") {
+            var io_func: String = "__io_" + method
+            if (method == "list_dir") { io_func = "__io_walk_dir" }
+            this.called_functions.push(io_func)
+            var io_args: List<String> = []
+            var ii: Float = 0
+            while (ii < args.length()) {
+                io_args.push("i64 " + this.gen_arg_value(args[ii]))
+                ii = ii + 1
+            }
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            if (method == "file_exists") { this.last_type = AST.Type.BoolType }
+            else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
+            else if (method == "list_dir") { this.last_type = this.make_list_str_type() }
+            return local
         }
         var os_func: String = "__os_" + method
         this.called_functions.push(os_func)

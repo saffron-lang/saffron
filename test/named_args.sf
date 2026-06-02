@@ -1,0 +1,39 @@
+// Test named argument dispatch
+
+fun greet(name: String, greeting: String = "hello"): String {
+    return greeting + " " + name
+}
+
+// Positional (existing, must still work):
+IO.println(greet("world", "hi"))
+
+// Named:
+IO.println(greet(greeting="hey", name="you"))
+
+// Mixed (positional first, then named):
+IO.println(greet("bob", greeting="yo"))
+
+// All positional with defaults:
+IO.println(greet("default"))
+
+// Test with more params
+fun make_tag(tag: String, cls: String = "", id: String = ""): String {
+    var result: String = "<" + tag
+    if (cls.length() > 0) {
+        result = result + " class=\"" + cls + "\""
+    }
+    if (id.length() > 0) {
+        result = result + " id=\"" + id + "\""
+    }
+    result = result + ">"
+    return result
+}
+
+// Only specify id, skip cls (use default)
+IO.println(make_tag("div", id="main"))
+
+// Specify both out of order
+IO.println(make_tag("span", id="foo", cls="bar"))
+
+// Positional only
+IO.println(make_tag("p", "highlight", "intro"))
