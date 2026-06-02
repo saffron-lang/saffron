@@ -133,6 +133,28 @@
                         return result
                     }
                 }
+                // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)
+                var ma_obj_val: String = this.gen_arg_value(object)
+                var ma_type_str: String = this.type_to_string(this.last_type)
+                var ma_resolved: String = this.resolve_class_type(ma_type_str)
+                if (ma_resolved.length() > 0 and this.class_fields.has(ma_resolved)) {
+                    var saved_class: String = this.current_class
+                    this.current_class = ma_resolved
+                    var struct_name: String = ma_resolved
+                    if (this.class_struct_names.has(ma_resolved)) {
+                        struct_name = this.class_struct_names.get(ma_resolved)
+                    }
+                    var field_idx: Float = this.get_field_index(ma_resolved, field)
+                    var obj_ptr: String = this.fresh_local()
+                    this.emit_indent(obj_ptr + " = inttoptr i64 " + ma_obj_val + " to %" + struct_name + "*")
+                    var field_ptr: String = this.fresh_local()
+                    this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                    var result: String = this.fresh_local()
+                    this.emit_indent(result + " = load i64, i64* " + field_ptr)
+                    this.last_type = this.str_to_type(this.get_field_type(ma_resolved, field))
+                    this.current_class = saved_class
+                    return result
+                }
                 "0"
             }
             EnumConstruct(enum_name, variant, args) => {
@@ -1141,8 +1163,11 @@
                 this.emit_terminator("br label %" + await_check)
 
                 this.start_block(await_done)
+                // Read the child coroutine's return value from @__task_result
+                var coro_result: String = this.fresh_local()
+                this.emit_indent(coro_result + " = load i64, i64* @__task_result")
                 this.last_type = AST.Type.IntType
-                return "0"
+                return coro_result
             }
         }
 

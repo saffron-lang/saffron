@@ -36,8 +36,6 @@ target triple = "arm64-apple-macosx14.0.0"
 @__gc_freed_bytes = global i64 0     ; total bytes freed
 @__gc_shadow_stack = global i64 0    ; pointer to shadow stack struct
 @__gc_shadow_stack_inited = global i64 0  ; 0=not inited, 1=inited
-@__gc_heap_lo = global i64 -1        ; lowest user pointer ever allocated (init to max)
-@__gc_heap_hi = global i64 0         ; highest user pointer + size ever allocated
 
 ; =============================================================================
 ; Generational GC — Nursery (Young Generation)
@@ -296,26 +294,6 @@ bump_alloc:
   store i64 %tb_n_new, i64* @__gc_total_bytes
   ; Return user pointer = raw + 24
   %n_user = add i64 %n_ptr, 24
-  ; Update heap bounds
-  %n_cur_lo = load i64, i64* @__gc_heap_lo
-  %n_is_lo = icmp ult i64 %n_user, %n_cur_lo
-  br i1 %n_is_lo, label %n_update_lo, label %n_check_hi
-
-n_update_lo:
-  store i64 %n_user, i64* @__gc_heap_lo
-  br label %n_check_hi
-
-n_check_hi:
-  %n_user_end = add i64 %n_user, %size
-  %n_cur_hi = load i64, i64* @__gc_heap_hi
-  %n_is_hi = icmp ugt i64 %n_user_end, %n_cur_hi
-  br i1 %n_is_hi, label %n_update_hi, label %n_ret
-
-n_update_hi:
-  store i64 %n_user_end, i64* @__gc_heap_hi
-  br label %n_ret
-
-n_ret:
   ret i64 %n_user
 
 nursery_full:
@@ -346,26 +324,6 @@ bump_alloc_retry:
   %tb_n2_new = add i64 %tb_n2, %nursery_need
   store i64 %tb_n2_new, i64* @__gc_total_bytes
   %n2_user = add i64 %n_ptr2, 24
-  ; Update heap bounds for retry path
-  %n2_cur_lo = load i64, i64* @__gc_heap_lo
-  %n2_is_lo = icmp ult i64 %n2_user, %n2_cur_lo
-  br i1 %n2_is_lo, label %n2_update_lo, label %n2_check_hi
-
-n2_update_lo:
-  store i64 %n2_user, i64* @__gc_heap_lo
-  br label %n2_check_hi
-
-n2_check_hi:
-  %n2_user_end = add i64 %n2_user, %size
-  %n2_cur_hi = load i64, i64* @__gc_heap_hi
-  %n2_is_hi = icmp ugt i64 %n2_user_end, %n2_cur_hi
-  br i1 %n2_is_hi, label %n2_update_hi, label %n2_ret
-
-n2_update_hi:
-  store i64 %n2_user_end, i64* @__gc_heap_hi
-  br label %n2_ret
-
-n2_ret:
   ret i64 %n2_user
 
 check_threshold:
@@ -424,26 +382,6 @@ init_header:
   store i64 %tb_new, i64* @__gc_total_bytes
   ; Return user pointer = raw + 24
   %user = add i64 %raw, 24
-  ; Update heap bounds for safe pointer validation
-  %cur_lo = load i64, i64* @__gc_heap_lo
-  %is_new_lo = icmp ult i64 %user, %cur_lo
-  br i1 %is_new_lo, label %update_lo, label %check_hi
-
-update_lo:
-  store i64 %user, i64* @__gc_heap_lo
-  br label %check_hi
-
-check_hi:
-  %user_end = add i64 %user, %size
-  %cur_hi = load i64, i64* @__gc_heap_hi
-  %is_new_hi = icmp ugt i64 %user_end, %cur_hi
-  br i1 %is_new_hi, label %update_hi, label %ret_user
-
-update_hi:
-  store i64 %user_end, i64* @__gc_heap_hi
-  br label %ret_user
-
-ret_user:
   ret i64 %user
 
 fail:
@@ -1755,23 +1693,6 @@ install_fwd:
   %tb = load i64, i64* @__gc_total_bytes
   %tb_new = add i64 %tb, %old_alloc_size
   store i64 %tb_new, i64* @__gc_total_bytes
-  ; Update heap bounds for promoted object
-  %p_cur_lo = load i64, i64* @__gc_heap_lo
-  %p_is_lo = icmp ult i64 %old_user, %p_cur_lo
-  br i1 %p_is_lo, label %p_update_lo, label %p_check_hi
-
-p_update_lo:
-  store i64 %old_user, i64* @__gc_heap_lo
-  br label %p_check_hi
-
-p_check_hi:
-  %p_user_end = add i64 %old_user, %size
-  %p_cur_hi = load i64, i64* @__gc_heap_hi
-  %p_is_hi = icmp ugt i64 %p_user_end, %p_cur_hi
-  br i1 %p_is_hi, label %p_update_hi, label %advance
-
-p_update_hi:
-  store i64 %p_user_end, i64* @__gc_heap_hi
   br label %advance
 
 advance:
