@@ -1,0 +1,919 @@
+//! Buffer — fixed-size mutable byte array for binary data manipulation.
+//!
+//! Provides a safe API for reading and writing individual bytes and multi-byte
+//! integers with explicit endianness. Uses List<Int> internally as a pure-Saffron
+//! fallback until native C runtime functions are available.
+//!
+//! ```saffron
+//! import "@buffer" as Buffer
+//!
+//! var buf = Buffer.alloc(8)
+//! buf.write_u16_le(0, 4660)    // 0x1234
+//! buf.read_u16_le(0)           // 4660
+//!
+//! var reader = Buffer.reader(buf)
+//! reader.read_u16_le()         // 4660
+//! ```
+
+// --- Hex and character lookup tables ---
+
+// Hex + all alphanumerics for char conversion (combined to minimize module vars)
+// hex lowercase used for hex encoding/decoding
+var _hex_chars = "0123456789abcdef"
+// All alphanumerics: digits(48-57) + upper(65-90) + lower(97-122)
+var _chars_alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+/// Convert a single hex character to its 4-bit value (0-15).
+fun _hex_val(ch: String): Int {
+    var idx: Int = _hex_chars.index_of(ch)
+    if (idx >= 0) { return idx }
+    // Uppercase A-F: look up in _chars_alnum (positions 10-15 are A-F)
+    idx = _chars_alnum.index_of(ch)
+    if (idx >= 10 and idx <= 15) { return idx }
+    throw "Buffer.from_hex: invalid hex character"
+}
+
+/// Convert a byte value (0-255) to a 2-character lowercase hex string.
+fun _byte_to_hex(b: Int): String {
+    var hi: Int = (b >> 4) & 15
+    var lo: Int = b & 15
+    return _hex_chars.char_at(hi) + _hex_chars.char_at(lo)
+}
+
+/// Convert a byte value (0-255) to a 2-character uppercase hex string.
+fun _byte_to_hex_upper(b: Int): String {
+    var hi: Int = (b >> 4) & 15
+    var lo: Int = b & 15
+    // Use _chars_alnum positions 0-15 which are "0123456789ABCDEF"
+    return _chars_alnum.char_at(hi) + _chars_alnum.char_at(lo)
+}
+
+// --- Internal character/byte conversion helpers ---
+
+/// Convert a byte value to its ASCII character (printable range only).
+/// Non-printable bytes (0-31, 127+) return "?".
+fun _byte_to_char(b: Int): String {
+    // Digits 48-57: positions 0-9 in _chars_alnum
+    if (b >= 48 and b <= 57) { return _chars_alnum.char_at(b - 48) }
+    // Uppercase 65-90: positions 10-35 in _chars_alnum
+    if (b >= 65 and b <= 90) { return _chars_alnum.char_at(b - 65 + 10) }
+    // Lowercase 97-122: positions 36-61 in _chars_alnum
+    if (b >= 97 and b <= 122) { return _chars_alnum.char_at(b - 97 + 36) }
+    // Individual punctuation (inline, no module var needed)
+    if (b == 32) { return " " }
+    if (b == 33) { return "!" }
+    if (b == 34) { return "\"" }
+    if (b == 35) { return "#" }
+    if (b == 36) { return "$" }
+    if (b == 37) { return "%" }
+    if (b == 38) { return "&" }
+    if (b == 39) { return "'" }
+    if (b == 40) { return "(" }
+    if (b == 41) { return ")" }
+    if (b == 42) { return "*" }
+    if (b == 43) { return "+" }
+    if (b == 44) { return "," }
+    if (b == 45) { return "-" }
+    if (b == 46) { return "." }
+    if (b == 47) { return "/" }
+    if (b == 58) { return ":" }
+    if (b == 59) { return ";" }
+    if (b == 60) { return "<" }
+    if (b == 61) { return "=" }
+    if (b == 62) { return ">" }
+    if (b == 63) { return "?" }
+    if (b == 64) { return "@" }
+    if (b == 91) { return "[" }
+    if (b == 92) { return "\\" }
+    if (b == 93) { return "]" }
+    if (b == 94) { return "^" }
+    if (b == 95) { return "_" }
+    if (b == 96) { return "`" }
+    if (b == 123) { return "{" }
+    if (b == 124) { return "|" }
+    if (b == 125) { return "}" }
+    if (b == 126) { return "~" }
+    return "?"
+}
+
+/// Convert a single character to its ASCII byte value.
+/// Returns 0 for characters not found.
+fun _char_to_byte(ch: String): Int {
+    // Use the same index_of approach as _hex_val (which works)
+    var idx: Int = _chars_alnum.index_of(ch)
+    if (idx >= 0) {
+        if (idx < 10) { return idx + 48 }
+        if (idx < 36) { return idx - 10 + 65 }
+        return idx - 36 + 97
+    }
+    if (ch == " ") { return 32 }
+    if (ch == "!") { return 33 }
+    if (ch == ".") { return 46 }
+    if (ch == ",") { return 44 }
+    if (ch == "-") { return 45 }
+    if (ch == "_") { return 95 }
+    if (ch == ":") { return 58 }
+    if (ch == "/") { return 47 }
+    if (ch == "(") { return 40 }
+    if (ch == ")") { return 41 }
+    if (ch == "[") { return 91 }
+    if (ch == "]") { return 93 }
+    if (ch == "{") { return 123 }
+    if (ch == "}") { return 125 }
+    if (ch == "<") { return 60 }
+    if (ch == ">") { return 62 }
+    if (ch == "=") { return 61 }
+    if (ch == "+") { return 43 }
+    if (ch == "*") { return 42 }
+    if (ch == "#") { return 35 }
+    if (ch == "@") { return 64 }
+    if (ch == "^") { return 94 }
+    if (ch == "&") { return 38 }
+    if (ch == "|") { return 124 }
+    if (ch == "~") { return 126 }
+    if (ch == "`") { return 96 }
+    if (ch == "$") { return 36 }
+    if (ch == "%") { return 37 }
+    if (ch == "?") { return 63 }
+    if (ch == ";") { return 59 }
+    if (ch == "'") { return 39 }
+    return 0
+}
+
+// --- Buffer class ---
+
+class Buffer {
+    var _data: List<Int>
+    var _length: Int
+
+    /// Create a zero-filled buffer of the given size.
+    fun init(size: Int) {
+        this._data = []
+        this._length = size
+        var i: Int = 0
+        while (i < size) {
+            this._data.push(0)
+            i = i + 1
+        }
+    }
+
+    /// Return the number of bytes in this buffer.
+    fun length(): Int {
+        return this._length
+    }
+
+    // --- Byte access ---
+
+    /// Read the byte at the given index (supports negative indexing).
+    fun get(index: Int): Int {
+        var idx: Int = index
+        if (idx < 0) { idx = idx + this._length }
+        if (idx < 0 or idx >= this._length) {
+            throw "Buffer index out of bounds"
+        }
+        return this._data[idx]
+    }
+
+    /// Write a byte value (0-255) at the given index (supports negative indexing).
+    fun set(index: Int, value: Int) {
+        var idx: Int = index
+        if (idx < 0) { idx = idx + this._length }
+        if (idx < 0 or idx >= this._length) {
+            throw "Buffer index out of bounds"
+        }
+        this._data[idx] = value & 255
+    }
+
+    // --- Bulk operations ---
+
+    /// Return a new Buffer containing bytes [start, end).
+    fun slice(start: Int, end: Int): Buffer {
+        var s: Int = start
+        var e: Int = end
+        if (s < 0) { s = s + this._length }
+        if (e < 0) { e = e + this._length }
+        if (s < 0) { s = 0 }
+        if (e > this._length) { e = this._length }
+        if (s >= e) { return Buffer(0) }
+        var len: Int = e - s
+        var result: Buffer = Buffer(len)
+        var i: Int = 0
+        while (i < len) {
+            result.set(i, this._data[s + i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Fill all bytes with the given value.
+    fun fill(value: Int) {
+        var byte: Int = value & 255
+        var i: Int = 0
+        while (i < this._length) {
+            this._data[i] = byte
+            i = i + 1
+        }
+    }
+
+    /// Fill bytes [start, end) with the given value.
+    fun fill_range(value: Int, start: Int, end: Int) {
+        var byte: Int = value & 255
+        var s: Int = start
+        var e: Int = end
+        if (s < 0) { s = 0 }
+        if (e > this._length) { e = this._length }
+        var i: Int = s
+        while (i < e) {
+            this._data[i] = byte
+            i = i + 1
+        }
+    }
+
+    /// Copy bytes from src buffer into this buffer.
+    fun copy_from(src: Buffer, src_offset: Int, dst_offset: Int, length: Int) {
+        if (src_offset + length > src.length()) {
+            throw "Buffer.copy_from: source out of bounds"
+        }
+        if (dst_offset + length > this._length) {
+            throw "Buffer.copy_from: destination out of bounds"
+        }
+        var i: Int = 0
+        while (i < length) {
+            this._data[dst_offset + i] = src.get(src_offset + i)
+            i = i + 1
+        }
+    }
+
+    /// Compare two buffers byte-by-byte.
+    fun equals(other: Buffer): Bool {
+        if (this._length != other.length()) { return false }
+        var i: Int = 0
+        while (i < this._length) {
+            if (this._data[i] != other.get(i)) { return false }
+            i = i + 1
+        }
+        return true
+    }
+
+    /// Concatenate this buffer with another, returning a new buffer.
+    fun concat(other: Buffer): Buffer {
+        var result: Buffer = Buffer(this._length + other.length())
+        var i: Int = 0
+        while (i < this._length) {
+            result.set(i, this._data[i])
+            i = i + 1
+        }
+        var j: Int = 0
+        while (j < other.length()) {
+            result.set(this._length + j, other.get(j))
+            j = j + 1
+        }
+        return result
+    }
+
+    // --- Unsigned integer reads ---
+
+    /// Read an unsigned 8-bit integer at the given offset.
+    fun read_u8(offset: Int): Int {
+        if (offset < 0 or offset >= this._length) {
+            throw "Buffer out of bounds: read_u8"
+        }
+        return this._data[offset]
+    }
+
+    /// Read an unsigned 16-bit integer (little-endian) at the given offset.
+    fun read_u16_le(offset: Int): Int {
+        if (offset + 2 > this._length) {
+            throw "Buffer out of bounds: read_u16_le"
+        }
+        return this._data[offset] | (this._data[offset + 1] << 8)
+    }
+
+    /// Read an unsigned 16-bit integer (big-endian) at the given offset.
+    fun read_u16_be(offset: Int): Int {
+        if (offset + 2 > this._length) {
+            throw "Buffer out of bounds: read_u16_be"
+        }
+        return (this._data[offset] << 8) | this._data[offset + 1]
+    }
+
+    /// Read an unsigned 32-bit integer (little-endian) at the given offset.
+    fun read_u32_le(offset: Int): Int {
+        if (offset + 4 > this._length) {
+            throw "Buffer out of bounds: read_u32_le"
+        }
+        return this._data[offset]
+             | (this._data[offset + 1] << 8)
+             | (this._data[offset + 2] << 16)
+             | (this._data[offset + 3] << 24)
+    }
+
+    /// Read an unsigned 32-bit integer (big-endian) at the given offset.
+    fun read_u32_be(offset: Int): Int {
+        if (offset + 4 > this._length) {
+            throw "Buffer out of bounds: read_u32_be"
+        }
+        return (this._data[offset] << 24)
+             | (this._data[offset + 1] << 16)
+             | (this._data[offset + 2] << 8)
+             | this._data[offset + 3]
+    }
+
+    // --- Signed integer reads ---
+
+    /// Read a signed 8-bit integer at the given offset (-128 to 127).
+    fun read_i8(offset: Int): Int {
+        var val: Int = this.read_u8(offset)
+        if (val >= 128) { val = val - 256 }
+        return val
+    }
+
+    /// Read a signed 16-bit integer (little-endian) at the given offset.
+    fun read_i16_le(offset: Int): Int {
+        var val: Int = this.read_u16_le(offset)
+        if (val >= 32768) { val = val - 65536 }
+        return val
+    }
+
+    /// Read a signed 16-bit integer (big-endian) at the given offset.
+    fun read_i16_be(offset: Int): Int {
+        var val: Int = this.read_u16_be(offset)
+        if (val >= 32768) { val = val - 65536 }
+        return val
+    }
+
+    /// Read a signed 32-bit integer (little-endian) at the given offset.
+    fun read_i32_le(offset: Int): Int {
+        var val: Int = this.read_u32_le(offset)
+        if (val >= 2147483648) { val = val - 4294967296 }
+        return val
+    }
+
+    /// Read a signed 32-bit integer (big-endian) at the given offset.
+    fun read_i32_be(offset: Int): Int {
+        var val: Int = this.read_u32_be(offset)
+        if (val >= 2147483648) { val = val - 4294967296 }
+        return val
+    }
+
+    // --- Unsigned integer writes ---
+
+    /// Write an unsigned 8-bit integer at the given offset.
+    fun write_u8(offset: Int, value: Int) {
+        if (offset < 0 or offset >= this._length) {
+            throw "Buffer out of bounds: write_u8"
+        }
+        this._data[offset] = value & 255
+    }
+
+    /// Write an unsigned 16-bit integer (little-endian) at the given offset.
+    fun write_u16_le(offset: Int, value: Int) {
+        if (offset + 2 > this._length) {
+            throw "Buffer out of bounds: write_u16_le"
+        }
+        this._data[offset] = value & 255
+        this._data[offset + 1] = (value >> 8) & 255
+    }
+
+    /// Write an unsigned 16-bit integer (big-endian) at the given offset.
+    fun write_u16_be(offset: Int, value: Int) {
+        if (offset + 2 > this._length) {
+            throw "Buffer out of bounds: write_u16_be"
+        }
+        this._data[offset] = (value >> 8) & 255
+        this._data[offset + 1] = value & 255
+    }
+
+    /// Write an unsigned 32-bit integer (little-endian) at the given offset.
+    fun write_u32_le(offset: Int, value: Int) {
+        if (offset + 4 > this._length) {
+            throw "Buffer out of bounds: write_u32_le"
+        }
+        this._data[offset] = value & 255
+        this._data[offset + 1] = (value >> 8) & 255
+        this._data[offset + 2] = (value >> 16) & 255
+        this._data[offset + 3] = (value >> 24) & 255
+    }
+
+    /// Write an unsigned 32-bit integer (big-endian) at the given offset.
+    fun write_u32_be(offset: Int, value: Int) {
+        if (offset + 4 > this._length) {
+            throw "Buffer out of bounds: write_u32_be"
+        }
+        this._data[offset] = (value >> 24) & 255
+        this._data[offset + 1] = (value >> 16) & 255
+        this._data[offset + 2] = (value >> 8) & 255
+        this._data[offset + 3] = value & 255
+    }
+
+    // --- Signed integer writes (same bit pattern, just mask to width) ---
+
+    /// Write a signed 8-bit integer at the given offset.
+    fun write_i8(offset: Int, value: Int) {
+        this.write_u8(offset, value & 255)
+    }
+
+    /// Write a signed 16-bit integer (little-endian) at the given offset.
+    fun write_i16_le(offset: Int, value: Int) {
+        this.write_u16_le(offset, value & 65535)
+    }
+
+    /// Write a signed 16-bit integer (big-endian) at the given offset.
+    fun write_i16_be(offset: Int, value: Int) {
+        this.write_u16_be(offset, value & 65535)
+    }
+
+    /// Write a signed 32-bit integer (little-endian) at the given offset.
+    fun write_i32_le(offset: Int, value: Int) {
+        this.write_u32_le(offset, value & 4294967295)
+    }
+
+    /// Write a signed 32-bit integer (big-endian) at the given offset.
+    fun write_i32_be(offset: Int, value: Int) {
+        this.write_u32_be(offset, value & 4294967295)
+    }
+
+    // --- Conversion ---
+
+    /// Return the buffer contents as a List<Int> of byte values.
+    fun to_list(): List<Int> {
+        var result: List<Int> = []
+        var i: Int = 0
+        while (i < this._length) {
+            result.push(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Interpret the buffer contents as a UTF-8 string.
+    fun to_string(): String {
+        var result: String = ""
+        var i: Int = 0
+        while (i < this._length) {
+            result = result + _byte_to_char(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Encode the buffer contents as a lowercase hex string.
+    fun to_hex(): String {
+        var result: String = ""
+        var i: Int = 0
+        while (i < this._length) {
+            result = result + _byte_to_hex(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Encode the buffer contents as an uppercase hex string.
+    fun to_hex_upper(): String {
+        var result: String = ""
+        var i: Int = 0
+        while (i < this._length) {
+            result = result + _byte_to_hex_upper(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    // --- Bitwise bulk operations ---
+
+    /// XOR this buffer with another of equal length. Returns a new Buffer.
+    fun xor(other: Buffer): Buffer {
+        if (this._length != other.length()) {
+            throw "Buffer length mismatch: xor requires equal lengths"
+        }
+        var result: Buffer = Buffer(this._length)
+        var i: Int = 0
+        while (i < this._length) {
+            result.set(i, this._data[i] ^ other.get(i))
+            i = i + 1
+        }
+        return result
+    }
+
+    /// AND this buffer with another of equal length. Returns a new Buffer.
+    fun and_buf(other: Buffer): Buffer {
+        if (this._length != other.length()) {
+            throw "Buffer length mismatch: and_buf requires equal lengths"
+        }
+        var result: Buffer = Buffer(this._length)
+        var i: Int = 0
+        while (i < this._length) {
+            result.set(i, this._data[i] & other.get(i))
+            i = i + 1
+        }
+        return result
+    }
+
+    /// OR this buffer with another of equal length. Returns a new Buffer.
+    fun or_buf(other: Buffer): Buffer {
+        if (this._length != other.length()) {
+            throw "Buffer length mismatch: or_buf requires equal lengths"
+        }
+        var result: Buffer = Buffer(this._length)
+        var i: Int = 0
+        while (i < this._length) {
+            result.set(i, this._data[i] | other.get(i))
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Bitwise NOT every byte. Returns a new Buffer.
+    fun not_buf(): Buffer {
+        var result: Buffer = Buffer(this._length)
+        var i: Int = 0
+        while (i < this._length) {
+            result.set(i, this._data[i] ^ 255)
+            i = i + 1
+        }
+        return result
+    }
+}
+
+// --- Module-level construction helpers ---
+
+/// Allocate a zero-filled buffer of the given size.
+fun alloc(size: Int): Buffer {
+    return Buffer(size)
+}
+
+/// Create a Buffer from a list of byte values (each 0-255).
+fun from_list(bytes: List<Int>): Buffer {
+    var buf: Buffer = Buffer(bytes.length())
+    var i: Int = 0
+    while (i < bytes.length()) {
+        buf.set(i, bytes[i])
+        i = i + 1
+    }
+    return buf
+}
+
+/// Create a Buffer from a string's bytes (ASCII / UTF-8 byte values).
+fun from_string(s: String): Buffer {
+    var len: Int = s.length()
+    var buf: Buffer = Buffer(len)
+    var i: Int = 0
+    while (i < len) {
+        buf.set(i, _char_to_byte(s.char_at(i)))
+        i = i + 1
+    }
+    return buf
+}
+
+/// Decode a hex string into a Buffer.
+/// Throws if the string has odd length or invalid hex characters.
+fun from_hex(s: String): Buffer {
+    var len: Int = s.length()
+    if (len % 2 != 0) {
+        throw "Buffer.from_hex: hex string must have even length"
+    }
+    var buf: Buffer = Buffer(len / 2)
+    var i: Int = 0
+    var dst: Int = 0
+    while (i < len) {
+        var hi: Int = _hex_val(s.char_at(i))
+        var lo: Int = _hex_val(s.char_at(i + 1))
+        buf.set(dst, (hi << 4) | lo)
+        i = i + 2
+        dst = dst + 1
+    }
+    return buf
+}
+
+/// Concatenate a list of buffers into one new buffer.
+fun concat_list(bufs: List<Buffer>): Buffer {
+    var total: Int = 0
+    var i: Int = 0
+    while (i < bufs.length()) {
+        total = total + bufs[i].length()
+        i = i + 1
+    }
+    var result: Buffer = Buffer(total)
+    var offset: Int = 0
+    i = 0
+    while (i < bufs.length()) {
+        var src: Buffer = bufs[i]
+        var j: Int = 0
+        while (j < src.length()) {
+            result.set(offset, src.get(j))
+            j = j + 1
+            offset = offset + 1
+        }
+        i = i + 1
+    }
+    return result
+}
+
+// --- BufferReader ---
+
+/// Cursor-based sequential reader over a Buffer.
+/// Automatically advances the position after each read.
+class BufferReader {
+    var _buf: Buffer
+    var _pos: Int
+
+    fun init(buf: Buffer) {
+        this._buf = buf
+        this._pos = 0
+    }
+
+    /// Current byte offset.
+    fun position(): Int {
+        return this._pos
+    }
+
+    /// Bytes remaining until end.
+    fun remaining(): Int {
+        return this._buf.length() - this._pos
+    }
+
+    /// True if no bytes remain.
+    fun eof(): Bool {
+        return this._pos >= this._buf.length()
+    }
+
+    /// Jump to an absolute offset.
+    fun seek(offset: Int) {
+        this._pos = offset
+    }
+
+    /// Reset to beginning.
+    fun rewind() {
+        this._pos = 0
+    }
+
+    /// Skip n bytes.
+    fun skip(n: Int) {
+        this._pos = this._pos + n
+    }
+
+    // --- Typed reads (auto-advancing) ---
+
+    /// Read an unsigned 8-bit integer and advance by 1.
+    fun read_u8(): Int {
+        var val: Int = this._buf.read_u8(this._pos)
+        this._pos = this._pos + 1
+        return val
+    }
+
+    /// Read an unsigned 16-bit integer (little-endian) and advance by 2.
+    fun read_u16_le(): Int {
+        var val: Int = this._buf.read_u16_le(this._pos)
+        this._pos = this._pos + 2
+        return val
+    }
+
+    /// Read an unsigned 16-bit integer (big-endian) and advance by 2.
+    fun read_u16_be(): Int {
+        var val: Int = this._buf.read_u16_be(this._pos)
+        this._pos = this._pos + 2
+        return val
+    }
+
+    /// Read an unsigned 32-bit integer (little-endian) and advance by 4.
+    fun read_u32_le(): Int {
+        var val: Int = this._buf.read_u32_le(this._pos)
+        this._pos = this._pos + 4
+        return val
+    }
+
+    /// Read an unsigned 32-bit integer (big-endian) and advance by 4.
+    fun read_u32_be(): Int {
+        var val: Int = this._buf.read_u32_be(this._pos)
+        this._pos = this._pos + 4
+        return val
+    }
+
+    /// Read a signed 8-bit integer and advance by 1.
+    fun read_i8(): Int {
+        var val: Int = this._buf.read_i8(this._pos)
+        this._pos = this._pos + 1
+        return val
+    }
+
+    /// Read a signed 16-bit integer (little-endian) and advance by 2.
+    fun read_i16_le(): Int {
+        var val: Int = this._buf.read_i16_le(this._pos)
+        this._pos = this._pos + 2
+        return val
+    }
+
+    /// Read a signed 16-bit integer (big-endian) and advance by 2.
+    fun read_i16_be(): Int {
+        var val: Int = this._buf.read_i16_be(this._pos)
+        this._pos = this._pos + 2
+        return val
+    }
+
+    /// Read a signed 32-bit integer (little-endian) and advance by 4.
+    fun read_i32_le(): Int {
+        var val: Int = this._buf.read_i32_le(this._pos)
+        this._pos = this._pos + 4
+        return val
+    }
+
+    /// Read a signed 32-bit integer (big-endian) and advance by 4.
+    fun read_i32_be(): Int {
+        var val: Int = this._buf.read_i32_be(this._pos)
+        this._pos = this._pos + 4
+        return val
+    }
+
+    /// Read n bytes as a UTF-8 string and advance.
+    fun read_string(n: Int): String {
+        var sub: Buffer = this._buf.slice(this._pos, this._pos + n)
+        this._pos = this._pos + n
+        return sub.to_string()
+    }
+
+    /// Read n bytes as a new Buffer and advance.
+    fun read_bytes(n: Int): Buffer {
+        var sub: Buffer = this._buf.slice(this._pos, this._pos + n)
+        this._pos = this._pos + n
+        return sub
+    }
+
+    /// Peek at the next byte without advancing.
+    fun peek_u8(): Int {
+        return this._buf.read_u8(this._pos)
+    }
+
+    /// Peek at the next u16 (little-endian) without advancing.
+    fun peek_u16_le(): Int {
+        return this._buf.read_u16_le(this._pos)
+    }
+
+    /// Peek at the next u32 (little-endian) without advancing.
+    fun peek_u32_le(): Int {
+        return this._buf.read_u32_le(this._pos)
+    }
+}
+
+/// Create a BufferReader over the given buffer.
+fun reader(buf: Buffer): BufferReader {
+    return BufferReader(buf)
+}
+
+// --- BufferWriter ---
+
+/// Growable cursor-based writer that produces a Buffer on finalization.
+/// Starts with an initial capacity and grows as needed.
+class BufferWriter {
+    var _data: List<Int>
+    var _pos: Int
+
+    fun init(initial_capacity: Int) {
+        this._data = []
+        this._pos = 0
+        // Pre-allocate capacity (fill with zeros)
+        var i: Int = 0
+        while (i < initial_capacity) {
+            this._data.push(0)
+            i = i + 1
+        }
+    }
+
+    /// Current write position (number of bytes written).
+    fun position(): Int {
+        return this._pos
+    }
+
+    /// Current allocated capacity.
+    fun capacity(): Int {
+        return this._data.length()
+    }
+
+    /// Ensure there are at least `n` more bytes available.
+    fun _ensure(n: Int) {
+        while (this._pos + n > this._data.length()) {
+            this._data.push(0)
+        }
+    }
+
+    // --- Typed writes (auto-advancing) ---
+
+    /// Write an unsigned 8-bit integer and advance by 1.
+    fun write_u8(value: Int) {
+        this._ensure(1)
+        this._data[this._pos] = value & 255
+        this._pos = this._pos + 1
+    }
+
+    /// Write an unsigned 16-bit integer (little-endian) and advance by 2.
+    fun write_u16_le(value: Int) {
+        this._ensure(2)
+        this._data[this._pos] = value & 255
+        this._data[this._pos + 1] = (value >> 8) & 255
+        this._pos = this._pos + 2
+    }
+
+    /// Write an unsigned 16-bit integer (big-endian) and advance by 2.
+    fun write_u16_be(value: Int) {
+        this._ensure(2)
+        this._data[this._pos] = (value >> 8) & 255
+        this._data[this._pos + 1] = value & 255
+        this._pos = this._pos + 2
+    }
+
+    /// Write an unsigned 32-bit integer (little-endian) and advance by 4.
+    fun write_u32_le(value: Int) {
+        this._ensure(4)
+        this._data[this._pos] = value & 255
+        this._data[this._pos + 1] = (value >> 8) & 255
+        this._data[this._pos + 2] = (value >> 16) & 255
+        this._data[this._pos + 3] = (value >> 24) & 255
+        this._pos = this._pos + 4
+    }
+
+    /// Write an unsigned 32-bit integer (big-endian) and advance by 4.
+    fun write_u32_be(value: Int) {
+        this._ensure(4)
+        this._data[this._pos] = (value >> 24) & 255
+        this._data[this._pos + 1] = (value >> 16) & 255
+        this._data[this._pos + 2] = (value >> 8) & 255
+        this._data[this._pos + 3] = value & 255
+        this._pos = this._pos + 4
+    }
+
+    /// Write a signed 8-bit integer and advance by 1.
+    fun write_i8(value: Int) {
+        this.write_u8(value & 255)
+    }
+
+    /// Write a signed 16-bit integer (little-endian) and advance by 2.
+    fun write_i16_le(value: Int) {
+        this.write_u16_le(value & 65535)
+    }
+
+    /// Write a signed 16-bit integer (big-endian) and advance by 2.
+    fun write_i16_be(value: Int) {
+        this.write_u16_be(value & 65535)
+    }
+
+    /// Write a signed 32-bit integer (little-endian) and advance by 4.
+    fun write_i32_le(value: Int) {
+        this.write_u32_le(value & 4294967295)
+    }
+
+    /// Write a signed 32-bit integer (big-endian) and advance by 4.
+    fun write_i32_be(value: Int) {
+        this.write_u32_be(value & 4294967295)
+    }
+
+    /// Write the bytes of a string and advance.
+    fun write_string(s: String) {
+        var len: Int = s.length()
+        var i: Int = 0
+        while (i < len) {
+            this.write_u8(_char_to_byte(s.char_at(i)))
+            i = i + 1
+        }
+    }
+
+    /// Write the contents of a Buffer and advance.
+    fun write_bytes(buf: Buffer) {
+        var i: Int = 0
+        while (i < buf.length()) {
+            this.write_u8(buf.get(i))
+            i = i + 1
+        }
+    }
+
+    /// Write n zero bytes and advance.
+    fun write_zeros(n: Int) {
+        var i: Int = 0
+        while (i < n) {
+            this.write_u8(0)
+            i = i + 1
+        }
+    }
+
+    /// Pad with zeros to the next boundary-aligned position.
+    fun align(boundary: Int) {
+        var rem: Int = this._pos % boundary
+        if (rem != 0) {
+            this.write_zeros(boundary - rem)
+        }
+    }
+
+    /// Finalize and return a fixed-size Buffer containing all written bytes.
+    fun to_buffer(): Buffer {
+        var buf: Buffer = Buffer(this._pos)
+        var i: Int = 0
+        while (i < this._pos) {
+            buf.set(i, this._data[i])
+            i = i + 1
+        }
+        return buf
+    }
+}
+
+/// Create a BufferWriter with the given initial capacity.
+fun writer(initial_capacity: Int): BufferWriter {
+    return BufferWriter(initial_capacity)
+}

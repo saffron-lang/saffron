@@ -541,9 +541,9 @@ class NullChecker {
                 }
             }
             VarDecl(n, t, i, d) => {}
-            ExprStmt(e) => {}
+            ExprStmt(_e) => {}
             Return(v) => {}
-            If(c, t, e) => {}
+            If(c, t, _e2) => {}
             While(c, b) => {}
             Block(s) => {}
             Break => {}
@@ -928,7 +928,7 @@ class NullChecker {
             Logical(left, op, right) => AST.Type.BoolType
             MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
-            EnumConstruct(e, v, a) => AST.Type.EnumType(e)
+            EnumConstruct(ename, v, a) => AST.Type.EnumType(ename)
             Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
             GetField(obj, field) => AST.Type.AnyType
             SetField(obj, field, value) => this.infer_type(value)
@@ -1016,7 +1016,7 @@ class NullChecker {
                 Logical(l, o, r) => ""
                 MemberAccess(o, f) => ""
                 Match(s, a) => ""
-                EnumConstruct(e, v, a) => ""
+                EnumConstruct(ename, v, a) => ""
                 Lambda(p, r, b) => ""
                 GetField(o, f) => ""
                 SetField(o, f, v) => ""

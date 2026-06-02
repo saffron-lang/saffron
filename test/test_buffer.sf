@@ -1,0 +1,403 @@
+//! Tests for the @buffer module.
+//! Note: hex literals (0x...) are broken at runtime in the current compiler,
+//! so all values are expressed in decimal.
+
+import "@test" as T
+import "@buffer" as Buffer
+
+// === Buffer creation and basic access ===
+
+T.section("Buffer.alloc and basic access")
+
+var buf = Buffer.alloc(8)
+T.assert_eq(buf.length(), 8, "alloc creates buffer of correct size")
+T.assert_eq(buf.get(0), 0, "alloc fills with zeros")
+T.assert_eq(buf.get(7), 0, "last byte is also zero")
+
+buf.set(0, 171)   // 0xAB
+T.assert_eq(buf.get(0), 171, "set/get roundtrip")
+
+buf.set(3, 255)
+T.assert_eq(buf.get(3), 255, "set/get max byte value")
+
+buf.set(1, 256)
+T.assert_eq(buf.get(1), 0, "set masks to 255 (256 -> 0)")
+
+// Negative indexing
+buf.set(0, 42)
+buf.set(-1, 99)
+T.assert_eq(buf.get(-1), 99, "negative index get")
+T.assert_eq(buf.get(7), 99, "negative set writes correct position")
+
+// === Buffer.from_list ===
+
+T.section("Buffer.from_list")
+
+// "Hello" = [72, 101, 108, 108, 111]
+var buf2 = Buffer.from_list([72, 101, 108, 108, 111])
+T.assert_eq(buf2.length(), 5, "from_list correct length")
+T.assert_eq(buf2.get(0), 72, "from_list byte 0")
+T.assert_eq(buf2.get(4), 111, "from_list byte 4")
+
+// === Buffer.from_string ===
+
+T.section("Buffer.from_string")
+
+var buf3 = Buffer.from_string("Hello")
+T.assert_eq(buf3.length(), 5, "from_string correct length")
+T.assert_eq(buf3.get(0), 72, "from_string byte 0 is 'H'")
+T.assert_eq(buf3.get(1), 101, "from_string byte 1 is 'e'")
+T.assert_eq(buf3.get(4), 111, "from_string byte 4 is 'o'")
+
+// === Buffer.from_hex ===
+
+T.section("Buffer.from_hex")
+
+var buf4 = Buffer.from_hex("48656c6c6f")
+T.assert_eq(buf4.length(), 5, "from_hex correct length")
+T.assert_eq(buf4.get(0), 72, "from_hex byte 0")
+T.assert_eq(buf4.get(1), 101, "from_hex byte 1")
+T.assert_eq(buf4.get(4), 111, "from_hex byte 4")
+
+// === to_hex ===
+
+T.section("to_hex conversion")
+
+// 0xDE=222, 0xAD=173, 0xBE=190, 0xEF=239
+var hex_buf = Buffer.from_list([222, 173, 190, 239])
+T.assert_eq(hex_buf.to_hex(), "deadbeef", "to_hex lowercase")
+T.assert_eq(hex_buf.to_hex_upper(), "DEADBEEF", "to_hex_upper uppercase")
+
+// === to_list ===
+
+T.section("to_list conversion")
+
+var list_buf = Buffer.from_list([1, 2, 3])
+var list_result = list_buf.to_list()
+T.assert_eq(list_result.length(), 3, "to_list correct length")
+T.assert_eq(list_result[0], 1, "to_list element 0")
+T.assert_eq(list_result[2], 3, "to_list element 2")
+
+// === to_string ===
+
+T.section("to_string conversion")
+
+// "Hi" = [72, 105]
+var str_buf = Buffer.from_list([72, 105])
+T.assert_eq(str_buf.to_string(), "Hi", "to_string decodes ASCII")
+
+// === Hex roundtrip ===
+
+T.section("Hex roundtrip")
+
+var original = Buffer.from_list([0, 127, 255, 128, 1])
+var hex_str = original.to_hex()
+var decoded = Buffer.from_hex(hex_str)
+T.assert(original.equals(decoded), "hex encode/decode roundtrip")
+
+// === Slice ===
+
+T.section("Buffer.slice")
+
+var slice_buf = Buffer.from_list([10, 20, 30, 40, 50])
+var sliced = slice_buf.slice(1, 4)
+T.assert_eq(sliced.length(), 3, "slice correct length")
+T.assert_eq(sliced.get(0), 20, "slice byte 0")
+T.assert_eq(sliced.get(2), 40, "slice byte 2")
+
+// === Fill ===
+
+T.section("Buffer.fill")
+
+var fill_buf = Buffer.alloc(4)
+fill_buf.fill(170)  // 0xAA
+T.assert_eq(fill_buf.get(0), 170, "fill byte 0")
+T.assert_eq(fill_buf.get(3), 170, "fill byte 3")
+
+fill_buf.fill_range(187, 1, 3)  // 0xBB = 187
+T.assert_eq(fill_buf.get(0), 170, "fill_range leaves byte 0")
+T.assert_eq(fill_buf.get(1), 187, "fill_range sets byte 1")
+T.assert_eq(fill_buf.get(2), 187, "fill_range sets byte 2")
+T.assert_eq(fill_buf.get(3), 170, "fill_range leaves byte 3")
+
+// === Copy ===
+
+T.section("Buffer.copy_from")
+
+var src = Buffer.from_list([1, 2, 3, 4, 5])
+var dst = Buffer.alloc(5)
+dst.copy_from(src, 1, 2, 3)
+T.assert_eq(dst.get(0), 0, "copy_from leaves prefix")
+T.assert_eq(dst.get(1), 0, "copy_from leaves byte 1")
+T.assert_eq(dst.get(2), 2, "copy_from writes at dst_offset")
+T.assert_eq(dst.get(3), 3, "copy_from writes byte 3")
+T.assert_eq(dst.get(4), 4, "copy_from writes byte 4")
+
+// === Equals ===
+
+T.section("Buffer.equals")
+
+var eq1 = Buffer.from_list([1, 2, 3])
+var eq2 = Buffer.from_list([1, 2, 3])
+var eq3 = Buffer.from_list([1, 2, 4])
+var eq4 = Buffer.from_list([1, 2])
+T.assert(eq1.equals(eq2), "equals: same content")
+T.assert(!eq1.equals(eq3), "equals: different content")
+T.assert(!eq1.equals(eq4), "equals: different length")
+
+// === Concat ===
+
+T.section("Buffer.concat")
+
+var c1 = Buffer.from_list([1, 2])
+var c2 = Buffer.from_list([3, 4, 5])
+var c3 = c1.concat(c2)
+T.assert_eq(c3.length(), 5, "concat length")
+T.assert_eq(c3.get(0), 1, "concat byte 0")
+T.assert_eq(c3.get(2), 3, "concat byte 2")
+T.assert_eq(c3.get(4), 5, "concat byte 4")
+
+// === concat_list ===
+
+T.section("Buffer.concat_list")
+
+var cl = Buffer.concat_list([
+    Buffer.from_list([1, 2]),
+    Buffer.from_list([3]),
+    Buffer.from_list([4, 5, 6])
+])
+T.assert_eq(cl.length(), 6, "concat_list length")
+T.assert_eq(cl.get(2), 3, "concat_list byte 2")
+T.assert_eq(cl.get(5), 6, "concat_list byte 5")
+
+// === Multi-byte reads (little-endian) ===
+
+T.section("Multi-byte reads (little-endian)")
+
+// 0x1234 = 4660, stored LE as [0x34, 0x12] = [52, 18]
+// 0x5678 = 22136, stored LE as [0x78, 0x56] = [120, 86]
+var le_buf = Buffer.from_list([52, 18, 120, 86, 0, 0, 0, 0])
+T.assert_eq(le_buf.read_u16_le(0), 4660, "read_u16_le")
+T.assert_eq(le_buf.read_u16_le(2), 22136, "read_u16_le offset 2")
+// 0x56781234 = 1450770996
+T.assert_eq(le_buf.read_u32_le(0), 1450770996, "read_u32_le")
+
+// === Multi-byte reads (big-endian) ===
+
+T.section("Multi-byte reads (big-endian)")
+
+// [0x12, 0x34, 0x56, 0x78] = [18, 52, 86, 120]
+var be_buf = Buffer.from_list([18, 52, 86, 120])
+T.assert_eq(be_buf.read_u16_be(0), 4660, "read_u16_be")
+T.assert_eq(be_buf.read_u16_be(2), 22136, "read_u16_be offset 2")
+// 0x12345678 = 305419896
+T.assert_eq(be_buf.read_u32_be(0), 305419896, "read_u32_be")
+
+// === Multi-byte writes ===
+
+T.section("Multi-byte writes")
+
+var wr_buf = Buffer.alloc(8)
+// write_u16_le(0, 0x1234) should store [0x34, 0x12] = [52, 18]
+wr_buf.write_u16_le(0, 4660)
+T.assert_eq(wr_buf.get(0), 52, "write_u16_le low byte")
+T.assert_eq(wr_buf.get(1), 18, "write_u16_le high byte")
+
+// write_u16_be(2, 0xABCD) = 43981 -> [0xAB, 0xCD] = [171, 205]
+wr_buf.write_u16_be(2, 43981)
+T.assert_eq(wr_buf.get(2), 171, "write_u16_be high byte")
+T.assert_eq(wr_buf.get(3), 205, "write_u16_be low byte")
+
+// write_u32_le(4, 0xDEADBEEF) = 3735928559 -> [0xEF, 0xBE, 0xAD, 0xDE] = [239, 190, 173, 222]
+wr_buf.write_u32_le(4, 3735928559)
+T.assert_eq(wr_buf.get(4), 239, "write_u32_le byte 0")
+T.assert_eq(wr_buf.get(5), 190, "write_u32_le byte 1")
+T.assert_eq(wr_buf.get(6), 173, "write_u32_le byte 2")
+T.assert_eq(wr_buf.get(7), 222, "write_u32_le byte 3")
+
+// === Signed reads ===
+
+T.section("Signed reads")
+
+// 0xFF=255, 0x80=128, 0x7F=127
+var signed_buf = Buffer.from_list([255, 128, 127, 0])
+T.assert_eq(signed_buf.read_i8(0), -1, "read_i8 of 255 is -1")
+T.assert_eq(signed_buf.read_i8(1), -128, "read_i8 of 128 is -128")
+T.assert_eq(signed_buf.read_i8(2), 127, "read_i8 of 127 is 127")
+T.assert_eq(signed_buf.read_i8(3), 0, "read_i8 of 0 is 0")
+
+// i16_le: [0x00, 0x80] = [0, 128] -> 0x8000 = 32768 -> signed = -32768
+// i16_le: [0xFF, 0x7F] = [255, 127] -> 0x7FFF = 32767
+var signed16 = Buffer.from_list([0, 128, 255, 127])
+T.assert_eq(signed16.read_i16_le(0), -32768, "read_i16_le of 0x8000 is -32768")
+T.assert_eq(signed16.read_i16_le(2), 32767, "read_i16_le of 0x7FFF is 32767")
+
+// === Bitwise bulk operations ===
+
+T.section("Bitwise bulk operations")
+
+// 0xFF=255, 0x00=0, 0xAA=170, 0x55=85
+// 0x0F=15, 0xF0=240
+var xor_a = Buffer.from_list([255, 0, 170, 85])
+var xor_b = Buffer.from_list([15, 240, 85, 170])
+var xor_result = xor_a.xor(xor_b)
+// 255^15=240, 0^240=240, 170^85=255, 85^170=255
+T.assert_eq(xor_result.get(0), 240, "xor byte 0")
+T.assert_eq(xor_result.get(1), 240, "xor byte 1")
+T.assert_eq(xor_result.get(2), 255, "xor byte 2")
+T.assert_eq(xor_result.get(3), 255, "xor byte 3")
+
+var and_result = xor_a.and_buf(xor_b)
+// 255&15=15, 0&240=0
+T.assert_eq(and_result.get(0), 15, "and_buf byte 0")
+T.assert_eq(and_result.get(1), 0, "and_buf byte 1")
+
+var or_result = xor_a.or_buf(xor_b)
+// 255|15=255, 0|240=240
+T.assert_eq(or_result.get(0), 255, "or_buf byte 0")
+T.assert_eq(or_result.get(1), 240, "or_buf byte 1")
+
+// not: 0^255=255, 255^255=0, 15^255=240, 240^255=15
+var not_input = Buffer.from_list([0, 255, 15, 240])
+var not_result = not_input.not_buf()
+T.assert_eq(not_result.get(0), 255, "not_buf of 0")
+T.assert_eq(not_result.get(1), 0, "not_buf of 255")
+T.assert_eq(not_result.get(2), 240, "not_buf of 15")
+T.assert_eq(not_result.get(3), 15, "not_buf of 240")
+
+// === BufferReader ===
+
+T.section("BufferReader sequential access")
+
+// [1, 2, 3, 52, 18, 120, 86, 52, 18]
+// u16_le at offset 3: [52, 18] = 4660
+// u32_le at offset 5: [120, 86, 52, 18] = 0x12345678 = 305419896
+var reader_data = Buffer.from_list([1, 2, 3, 52, 18, 120, 86, 52, 18])
+var r = Buffer.reader(reader_data)
+
+T.assert_eq(r.position(), 0, "reader starts at 0")
+T.assert_eq(r.remaining(), 9, "reader remaining at start")
+T.assert(!r.eof(), "reader not eof at start")
+
+T.assert_eq(r.read_u8(), 1, "reader read_u8 first")
+T.assert_eq(r.read_u8(), 2, "reader read_u8 second")
+T.assert_eq(r.position(), 2, "reader position after 2 reads")
+
+r.skip(1)
+T.assert_eq(r.position(), 3, "reader position after skip")
+
+T.assert_eq(r.read_u16_le(), 4660, "reader read_u16_le")
+T.assert_eq(r.position(), 5, "reader position after u16")
+
+T.assert_eq(r.read_u32_le(), 305419896, "reader read_u32_le")
+T.assert_eq(r.position(), 9, "reader position after u32")
+T.assert(r.eof(), "reader eof after reading all")
+
+r.rewind()
+T.assert_eq(r.position(), 0, "reader rewind resets to 0")
+T.assert_eq(r.peek_u8(), 1, "reader peek_u8 does not advance")
+T.assert_eq(r.position(), 0, "reader position unchanged after peek")
+
+// Reader: read_string
+var str_reader_buf = Buffer.from_string("ABCD")
+var sr = Buffer.reader(str_reader_buf)
+T.assert_eq(sr.read_string(2), "AB", "reader read_string(2)")
+T.assert_eq(sr.read_string(2), "CD", "reader read_string(2) continued")
+
+// Reader: read_bytes
+var bytes_reader_buf = Buffer.from_list([10, 20, 30, 40, 50])
+var br = Buffer.reader(bytes_reader_buf)
+br.skip(1)
+var sub = br.read_bytes(3)
+T.assert_eq(sub.length(), 3, "reader read_bytes length")
+T.assert_eq(sub.get(0), 20, "reader read_bytes byte 0")
+T.assert_eq(sub.get(2), 40, "reader read_bytes byte 2")
+
+// === BufferWriter ===
+
+T.section("BufferWriter")
+
+var w = Buffer.writer(16)
+w.write_u8(170)          // 0xAA
+w.write_u16_le(4660)     // 0x1234
+w.write_u32_be(3735928559)  // 0xDEADBEEF
+T.assert_eq(w.position(), 7, "writer position after writes")
+
+var w_buf = w.to_buffer()
+T.assert_eq(w_buf.length(), 7, "writer to_buffer length")
+T.assert_eq(w_buf.get(0), 170, "writer byte 0")
+T.assert_eq(w_buf.get(1), 52, "writer byte 1 (u16_le low)")
+T.assert_eq(w_buf.get(2), 18, "writer byte 2 (u16_le high)")
+T.assert_eq(w_buf.get(3), 222, "writer byte 3 (u32_be byte 0)")
+T.assert_eq(w_buf.get(4), 173, "writer byte 4 (u32_be byte 1)")
+T.assert_eq(w_buf.get(5), 190, "writer byte 5 (u32_be byte 2)")
+T.assert_eq(w_buf.get(6), 239, "writer byte 6 (u32_be byte 3)")
+
+// Writer: write_string
+var w2 = Buffer.writer(8)
+w2.write_string("Hi")
+var w2_buf = w2.to_buffer()
+T.assert_eq(w2_buf.length(), 2, "write_string length")
+T.assert_eq(w2_buf.get(0), 72, "write_string byte 0 is 'H'")
+T.assert_eq(w2_buf.get(1), 105, "write_string byte 1 is 'i'")
+
+// Writer: write_bytes
+var w3 = Buffer.writer(8)
+w3.write_u8(255)
+w3.write_bytes(Buffer.from_list([1, 2, 3]))
+var w3_buf = w3.to_buffer()
+T.assert_eq(w3_buf.length(), 4, "write_bytes total length")
+T.assert_eq(w3_buf.get(0), 255, "write_bytes prefix byte")
+T.assert_eq(w3_buf.get(1), 1, "write_bytes content 0")
+T.assert_eq(w3_buf.get(3), 3, "write_bytes content 2")
+
+// Writer: write_zeros
+var w4 = Buffer.writer(8)
+w4.write_u8(1)
+w4.write_zeros(3)
+w4.write_u8(2)
+var w4_buf = w4.to_buffer()
+T.assert_eq(w4_buf.length(), 5, "write_zeros total length")
+T.assert_eq(w4_buf.get(0), 1, "write_zeros prefix")
+T.assert_eq(w4_buf.get(1), 0, "write_zeros byte 0")
+T.assert_eq(w4_buf.get(3), 0, "write_zeros byte 2")
+T.assert_eq(w4_buf.get(4), 2, "write_zeros suffix")
+
+// Writer: align
+var w5 = Buffer.writer(16)
+w5.write_u8(1)
+w5.align(4)
+T.assert_eq(w5.position(), 4, "align pads to boundary")
+w5.write_u8(2)
+w5.align(4)
+T.assert_eq(w5.position(), 8, "align from position 5 to 8")
+
+// Writer: grow beyond initial capacity
+var w6 = Buffer.writer(2)
+w6.write_u32_le(305419896)  // 0x12345678
+T.assert_eq(w6.position(), 4, "writer grows beyond initial capacity")
+var w6_buf = w6.to_buffer()
+T.assert_eq(w6_buf.read_u32_le(0), 305419896, "grown writer has correct data")
+
+// === Write/read roundtrip ===
+
+T.section("Write/read roundtrip")
+
+var rt_writer = Buffer.writer(32)
+rt_writer.write_u8(66)           // 0x42
+rt_writer.write_u16_le(51966)    // 0xCAFE
+rt_writer.write_u32_be(305419896)  // 0x12345678
+rt_writer.write_string("OK")
+
+var rt_buf = rt_writer.to_buffer()
+var rt_reader = Buffer.reader(rt_buf)
+
+T.assert_eq(rt_reader.read_u8(), 66, "roundtrip u8")
+T.assert_eq(rt_reader.read_u16_le(), 51966, "roundtrip u16_le")
+T.assert_eq(rt_reader.read_u32_be(), 305419896, "roundtrip u32_be")
+T.assert_eq(rt_reader.read_string(2), "OK", "roundtrip string")
+T.assert(rt_reader.eof(), "roundtrip consumed all bytes")
+
+// === Summary ===
+
+T.summary()

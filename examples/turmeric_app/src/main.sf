@@ -3,7 +3,6 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { cx } from "turmeric/style"
 import { Event } from "turmeric/events"
-import { each } from "turmeric/reconcile"
 
 // =============================================================================
 // Global State
@@ -184,7 +183,10 @@ fun TodoPage() {
         }
 
         ul(cls="todo-list") {
-            each(todos.get()) { todo =>
+            var items = todos.get()
+            var ti = 0
+            while (ti < items.length()) {
+                var todo: String = items[ti]
                 li(cls="todo-item") {
                     span(cls="todo-text") { todo }
                     button(cls="btn-icon danger-text", on_click=fun (e: Event) => {
@@ -203,6 +205,7 @@ fun TodoPage() {
                         "x"
                     }
                 }
+                ti = ti + 1
             }
         }
 
@@ -293,7 +296,7 @@ fun TimerPage() {
         div(cls="timer-milestones") {
             h3 { "Milestones" }
             div(cls="milestone-grid") {
-                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 10})) {
+                var ms10 = div(cls="milestone") {
                     span(cls="milestone-icon") {
                         reactive(fun () => {
                             if (timer_ticks.get() >= 10) { return "[*]" }
@@ -302,7 +305,9 @@ fun TimerPage() {
                     }
                     span { "10 seconds" }
                 }
-                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 60})) {
+                reactive_class(ms10, fun () => cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 10}))
+
+                var ms60 = div(cls="milestone") {
                     span(cls="milestone-icon") {
                         reactive(fun () => {
                             if (timer_ticks.get() >= 60) { return "[*]" }
@@ -311,7 +316,9 @@ fun TimerPage() {
                     }
                     span { "1 minute" }
                 }
-                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 300})) {
+                reactive_class(ms60, fun () => cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 60}))
+
+                var ms300 = div(cls="milestone") {
                     span(cls="milestone-icon") {
                         reactive(fun () => {
                             if (timer_ticks.get() >= 300) { return "[*]" }
@@ -320,7 +327,9 @@ fun TimerPage() {
                     }
                     span { "5 minutes" }
                 }
-                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 600})) {
+                reactive_class(ms300, fun () => cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 300}))
+
+                var ms600 = div(cls="milestone") {
                     span(cls="milestone-icon") {
                         reactive(fun () => {
                             if (timer_ticks.get() >= 600) { return "[*]" }
@@ -329,6 +338,7 @@ fun TimerPage() {
                     }
                     span { "10 minutes" }
                 }
+                reactive_class(ms600, fun () => cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 600}))
             }
         }
 
@@ -359,26 +369,28 @@ fun ThemePage() {
         div(cls="theme-controls") {
             h3 { "Theme Mode" }
             div(cls="theme-toggle-row") {
-                button(
-                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "dark"}),
-                    on_click=fun (e: Event) => theme.set("dark")
-                ) { "Dark" }
-                button(
-                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "light"}),
-                    on_click=fun (e: Event) => theme.set("light")
-                ) { "Light" }
-                button(
-                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "midnight"}),
-                    on_click=fun (e: Event) => theme.set("midnight")
-                ) { "Midnight" }
+                var btn_dark = button(cls="btn theme-btn active", on_click=fun (e: Event) => theme.set("dark")) { "Dark" }
+                reactive_class(btn_dark, fun () => cx({"btn": true, "theme-btn": true, "active": theme.get() == "dark"}))
+
+                var btn_light = button(cls="btn theme-btn", on_click=fun (e: Event) => theme.set("light")) { "Light" }
+                reactive_class(btn_light, fun () => cx({"btn": true, "theme-btn": true, "active": theme.get() == "light"}))
+
+                var btn_midnight = button(cls="btn theme-btn", on_click=fun (e: Event) => theme.set("midnight")) { "Midnight" }
+                reactive_class(btn_midnight, fun () => cx({"btn": true, "theme-btn": true, "active": theme.get() == "midnight"}))
             }
 
             div(cls="theme-preview") {
                 p { reactive(fun () => "Current theme: " + theme.get()) }
-                div(cls=cx({"preview-box": true, "dark-preview": theme.get() == "dark", "light-preview": theme.get() == "light", "midnight-preview": theme.get() == "midnight"})) {
+                var preview = div(cls="preview-box dark-preview") {
                     p { "This box changes with the theme" }
                     button(cls="btn primary") { "Sample Button" }
                 }
+                reactive_class(preview, fun () => cx({
+                    "preview-box": true,
+                    "dark-preview": theme.get() == "dark",
+                    "light-preview": theme.get() == "light",
+                    "midnight-preview": theme.get() == "midnight"
+                }))
             }
         }
 
@@ -466,24 +478,27 @@ fun FormPage() {
                     p { reactive(fun () => "Name: " + form_name.get()) }
                     p { reactive(fun () => "Email: " + form_email.get()) }
                     p { reactive(fun () => "Message: " + form_message.get()) }
-                    p(cls=cx({"form-valid": valid.get(), "form-invalid": !valid.get()})) {
+                    var valid_p = p(cls="form-invalid") {
                         reactive(fun () => {
                             if (valid.get()) { return "Form is valid" }
                             return "Please fill required fields"
                         })
                     }
+                    reactive_class(valid_p, fun () => cx({"form-valid": valid.get(), "form-invalid": !valid.get()}))
                 }
             }
 
             div(cls="button-row") {
-                button(
-                    cls=cx({"btn": true, "primary": valid.get(), "disabled-btn": !valid.get()}),
+                var submit_btn = button(
+                    cls="btn primary",
                     on_click=fun (e: Event) => {
                         if (valid.get()) {
                             form_submitted.set(true)
                         }
                     }
                 ) { "Submit" }
+                reactive_class(submit_btn, fun () => cx({"btn": true, "primary": valid.get(), "disabled-btn": !valid.get()}))
+
                 button(cls="btn secondary", on_click=fun (e: Event) => {
                     form_name.set("")
                     form_email.set("")
@@ -492,9 +507,10 @@ fun FormPage() {
                 }) { "Clear" }
             }
 
-            div(cls=cx({"success-banner": true, "visible": form_submitted.get()})) {
+            var banner = div(cls="success-banner") {
                 p { "Form submitted successfully!" }
             }
+            reactive_class(banner, fun () => cx({"success-banner": true, "visible": form_submitted.get()}))
         }
 
         div(cls="code-sample") {
@@ -581,43 +597,39 @@ fun FeaturesPage() {
             h3 { "Interactive Accordion" }
 
             div(cls="accordion-group") {
-                button(
-                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "signals"}),
-                    on_click=fun (e: Event) => accordion_open.set("signals")
-                ) { "Signals & Reactivity" }
-                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "signals"})) {
+                var ah1 = button(cls="accordion-header open", on_click=fun (e: Event) => accordion_open.set("signals")) { "Signals & Reactivity" }
+                reactive_class(ah1, fun () => cx({"accordion-header": true, "open": accordion_open.get() == "signals"}))
+                var ab1 = div(cls="accordion-body visible") {
                     p { "Signals are the core primitive. Call .get() to read (tracks dependency), .set() to write (notifies subscribers). Computed values derive from signals automatically." }
                 }
+                reactive_class(ab1, fun () => cx({"accordion-body": true, "visible": accordion_open.get() == "signals"}))
             }
 
             div(cls="accordion-group") {
-                button(
-                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "dom"}),
-                    on_click=fun (e: Event) => accordion_open.set("dom")
-                ) { "DOM & Elements" }
-                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "dom"})) {
+                var ah2 = button(cls="accordion-header", on_click=fun (e: Event) => accordion_open.set("dom")) { "DOM & Elements" }
+                reactive_class(ah2, fun () => cx({"accordion-header": true, "open": accordion_open.get() == "dom"}))
+                var ab2 = div(cls="accordion-body") {
                     p { "Elements are plain functions with named args: div(cls=\"foo\", id=\"bar\") { children }. Trailing closures define children. Text in closures auto-desugars to text() nodes." }
                 }
+                reactive_class(ab2, fun () => cx({"accordion-body": true, "visible": accordion_open.get() == "dom"}))
             }
 
             div(cls="accordion-group") {
-                button(
-                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "events"}),
-                    on_click=fun (e: Event) => accordion_open.set("events")
-                ) { "Event System" }
-                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "events"})) {
+                var ah3 = button(cls="accordion-header", on_click=fun (e: Event) => accordion_open.set("events")) { "Event System" }
+                reactive_class(ah3, fun () => cx({"accordion-header": true, "open": accordion_open.get() == "events"}))
+                var ab3 = div(cls="accordion-body") {
                     p { "Events are a typed enum: Click(data), KeyDown(data), Input(data), etc. Pattern match on event variants to access typed fields like key, clientX, value." }
                 }
+                reactive_class(ab3, fun () => cx({"accordion-body": true, "visible": accordion_open.get() == "events"}))
             }
 
             div(cls="accordion-group") {
-                button(
-                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "wasm"}),
-                    on_click=fun (e: Event) => accordion_open.set("wasm")
-                ) { "WASM Compilation" }
-                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "wasm"})) {
+                var ah4 = button(cls="accordion-header", on_click=fun (e: Event) => accordion_open.set("wasm")) { "WASM Compilation" }
+                reactive_class(ah4, fun () => cx({"accordion-header": true, "open": accordion_open.get() == "wasm"}))
+                var ab4 = div(cls="accordion-body") {
                     p { "Saffron compiles to LLVM IR targeting wasm32. The pantry build tool links with turmeric's runtime, producing a single .wasm binary served with a tiny JS loader." }
                 }
+                reactive_class(ab4, fun () => cx({"accordion-body": true, "visible": accordion_open.get() == "wasm"}))
             }
         }
     }
@@ -628,77 +640,87 @@ fun FeaturesPage() {
 // =============================================================================
 
 fun App() {
-    div(cls=cx({"app-shell": true, "theme-dark": theme.get() == "dark", "theme-light": theme.get() == "light", "theme-midnight": theme.get() == "midnight"})) {
-        header(cls="app-header") {
-            div(cls="header-left") {
-                h1(cls="logo") { "Turmeric" }
-                span(cls="logo-tag") { "v0.1" }
-            }
+    var shell = div(cls="app-shell theme-dark")
+    reactive_class(shell, fun () => cx({
+        "app-shell": true,
+        "theme-dark": theme.get() == "dark",
+        "theme-light": theme.get() == "light",
+        "theme-midnight": theme.get() == "midnight"
+    }))
 
-            nav(cls="nav") {
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "counter"}),
-                    on_click=fun (e: Event) => page.set("counter")
-                ) { "Counter" }
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "todos"}),
-                    on_click=fun (e: Event) => page.set("todos")
-                ) { "Todos" }
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "timer"}),
-                    on_click=fun (e: Event) => page.set("timer")
-                ) { "Timer" }
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "theme"}),
-                    on_click=fun (e: Event) => page.set("theme")
-                ) { "Theme" }
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "form"}),
-                    on_click=fun (e: Event) => page.set("form")
-                ) { "Forms" }
-                button(
-                    cls=cx({"nav-link": true, "active": page.get() == "features"}),
-                    on_click=fun (e: Event) => page.set("features")
-                ) { "Features" }
-            }
+    _tc_push(shell)
 
-            button(
-                cls="btn theme-toggle",
-                on_click=fun (e: Event) => {
-                    if (theme.get() == "dark") { theme.set("light") }
-                    else { theme.set("dark") }
-                }
-            ) {
-                reactive(fun () => {
-                    if (theme.get() == "dark") { return "Light Mode" }
-                    return "Dark Mode"
-                })
-            }
+    header(cls="app-header") {
+        div(cls="header-left") {
+            h1(cls="logo") { "Turmeric" }
+            span(cls="logo-tag") { "v0.1" }
         }
 
-        main(cls="content") {
-            // Page routing via match on signal
-            match (page.get()) {
-                "counter" => CounterPage()
-                "todos" => TodoPage()
-                "timer" => TimerPage()
-                "theme" => ThemePage()
-                "form" => FormPage()
-                "features" => FeaturesPage()
-                _ => section { p { "404 - Page Not Found" } }
-            }
+        nav(cls="nav") {
+            var nav_counter = button(cls="nav-link active", on_click=fun (e: Event) => page.set("counter")) { "Counter" }
+            reactive_class(nav_counter, fun () => cx({"nav-link": true, "active": page.get() == "counter"}))
+
+            var nav_todos = button(cls="nav-link", on_click=fun (e: Event) => page.set("todos")) { "Todos" }
+            reactive_class(nav_todos, fun () => cx({"nav-link": true, "active": page.get() == "todos"}))
+
+            var nav_timer = button(cls="nav-link", on_click=fun (e: Event) => page.set("timer")) { "Timer" }
+            reactive_class(nav_timer, fun () => cx({"nav-link": true, "active": page.get() == "timer"}))
+
+            var nav_theme = button(cls="nav-link", on_click=fun (e: Event) => page.set("theme")) { "Theme" }
+            reactive_class(nav_theme, fun () => cx({"nav-link": true, "active": page.get() == "theme"}))
+
+            var nav_form = button(cls="nav-link", on_click=fun (e: Event) => page.set("form")) { "Forms" }
+            reactive_class(nav_form, fun () => cx({"nav-link": true, "active": page.get() == "form"}))
+
+            var nav_features = button(cls="nav-link", on_click=fun (e: Event) => page.set("features")) { "Features" }
+            reactive_class(nav_features, fun () => cx({"nav-link": true, "active": page.get() == "features"}))
         }
 
-        footer(cls="app-footer") {
-            div(cls="footer-content") {
-                p(cls="footer-brand") { "Built with Saffron + Turmeric" }
-                p(cls="footer-tech") { "Signals | Computed | Effects | WASM32 | No VDOM" }
-                p(cls="footer-stats") {
-                    reactive(fun () => "Page: " + page.get() + " | Theme: " + theme.get())
-                }
+        button(
+            cls="btn theme-toggle",
+            on_click=fun (e: Event) => {
+                if (theme.get() == "dark") { theme.set("light") }
+                else { theme.set("dark") }
+            }
+        ) {
+            reactive(fun () => {
+                if (theme.get() == "dark") { return "Light Mode" }
+                return "Dark Mode"
+            })
+        }
+    }
+
+    main(cls="content") {
+        var pg_counter = div() { CounterPage() }
+        reactive_show(pg_counter, fun () => page.get() == "counter")
+
+        var pg_todos = div() { TodoPage() }
+        reactive_show(pg_todos, fun () => page.get() == "todos")
+
+        var pg_timer = div() { TimerPage() }
+        reactive_show(pg_timer, fun () => page.get() == "timer")
+
+        var pg_theme = div() { ThemePage() }
+        reactive_show(pg_theme, fun () => page.get() == "theme")
+
+        var pg_form = div() { FormPage() }
+        reactive_show(pg_form, fun () => page.get() == "form")
+
+        var pg_features = div() { FeaturesPage() }
+        reactive_show(pg_features, fun () => page.get() == "features")
+    }
+
+    footer(cls="app-footer") {
+        div(cls="footer-content") {
+            p(cls="footer-brand") { "Built with Saffron + Turmeric" }
+            p(cls="footer-tech") { "Signals | Computed | Effects | WASM32 | No VDOM" }
+            p(cls="footer-stats") {
+                reactive(fun () => "Page: " + page.get() + " | Theme: " + theme.get())
             }
         }
     }
+
+    _tc_pop()
 }
 
 // =============================================================================

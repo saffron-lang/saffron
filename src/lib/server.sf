@@ -1,0 +1,68 @@
+//! Async TCP server API.
+//! Provides bind/listen/accept for building network servers in Saffron.
+//!
+//! ```saffron
+//! import "@server" as Server
+//!
+//! var srv = Server.listen("0.0.0.0", 8080)
+//! IO.println("Listening on :8080")
+//! while (true) {
+//!     var client = srv.accept()
+//!     if (client >= 0) {
+//!         var req = Socket.read(client, 4096)
+//!         Socket.write(client, "HTTP/1.1 200 OK\r\n\r\nHello!")
+//!         Socket.close(client)
+//!     }
+//! }
+//! ```
+
+import "@socket" as Socket
+
+@extern("i64 sf_tcp_bind(i8*, i64)") fun tcp_bind_raw(host: Int, port: Int): Int
+@extern("i64 sf_tcp_listen(i64, i64)") fun tcp_listen_raw(fd: Int, backlog: Int): Int
+@extern("i64 sf_tcp_accept(i64)") fun tcp_accept_raw(fd: Int): Int
+
+@intrinsic fun __suspend(reason: Int, arg: Int)
+
+class Listener {
+    var fd: Int
+    var host: String
+    var port: Int
+
+    fun init(fd: Int, host: String, port: Int) {
+        this.fd = fd
+        this.host = host
+        this.port = port
+    }
+
+    fun accept(): Int {
+        while (true) {
+            var client: Int = tcp_accept_raw(this.fd)
+            if (client >= 0) { return client }
+            if (client == -1) {
+                __suspend(2, this.fd)
+            } else {
+                return -1
+            }
+        }
+        return -1
+    }
+
+    fun close() {
+        Socket.tcp_close_raw(this.fd)
+    }
+}
+
+fun listen(host: String, port: Int): Listener {
+    Socket.socket_init()
+    var fd: Int = tcp_bind_raw(host, port)
+    if (fd < 0) {
+        throw "server: failed to bind to ${host}:${port}"
+    }
+    var result: Int = tcp_listen_raw(fd, 128)
+    if (result < 0) {
+        Socket.tcp_close_raw(fd)
+        throw "server: failed to listen on ${host}:${port}"
+    }
+    return Listener(fd, host, port)
+}

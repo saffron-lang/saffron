@@ -1047,6 +1047,7 @@
         var exc_val: String = this.fresh_local()
         this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
         this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.typed_vars.set(catch_name, AST.Type.StringType)
         this.gen_stmts(catch_body)
         if (!this.block_terminated) {
             if (has_finally) {

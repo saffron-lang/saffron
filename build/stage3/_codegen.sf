@@ -1107,7 +1107,7 @@ class Codegen {
                     this.last_type = AST.Type.IntType
                 }
                 // Error check: undefined variable
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this" and name != "super") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
@@ -1889,7 +1889,7 @@ class Codegen {
                 this.last_type = AST.Type.IntType
             }
             // Error check: undefined variable
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super") {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
@@ -2396,17 +2396,22 @@ class Codegen {
                     __di = __di + 1
                 }
             }
-            if (this.called_function_arity.has(resolved_callee)) {
-                var expected: Float = this.called_function_arity.get(resolved_callee)
-                if (args.length() != expected and expected > 0 and !has_real_defs) {
-                    IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-                    this.has_errors = true
-                }
-            } else if (this.func_param_count.has(resolved_callee)) {
-                var expected: Float = this.func_param_count.get(resolved_callee)
-                if (args.length() != expected and expected > 0 and !has_real_defs) {
-                    IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-                    this.has_errors = true
+            // Only error on arity for functions defined in same compilation unit
+            // (not imported via named imports), to avoid false positives from pipe |>
+            var is_named_import: Bool = this.named_imports.has(callee_name)
+            if (!is_named_import) {
+                if (this.called_function_arity.has(resolved_callee)) {
+                    var expected: Float = this.called_function_arity.get(resolved_callee)
+                    if (args.length() != expected and expected > 0 and !has_real_defs) {
+                        IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                        this.has_errors = true
+                    }
+                } else if (this.func_param_count.has(resolved_callee)) {
+                    var expected: Float = this.func_param_count.get(resolved_callee)
+                    if (args.length() != expected and expected > 0 and !has_real_defs) {
+                        IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                        this.has_errors = true
+                    }
                 }
             }
         }
@@ -3167,8 +3172,8 @@ class Codegen {
             _ => ""
         }
 
-        // Check if this is a string literal match (LiteralPattern gives first_variant == "")
-        if (first_variant == "") {
+        // Check if this is a string literal match (prefix "__strpat:")
+        if (first_variant.starts_with("__strpat:")) {
             // String literal match — generate if/else chain with __string_eq
             var end_label: String = this.fresh_label("match.end")
             var match_result_type: AST.Type = AST.Type.StringType
@@ -3181,28 +3186,19 @@ class Codegen {
                 var arm_body: AST.Expr = match (arm) { Arm(p, b) => b
                     _ => AST.Expr.NilLit
                 }
-                // Extract string value from LiteralPattern(StringLit(s))
-                var lit_expr: AST.Expr = match (arm_pattern) { LiteralPattern(v) => v
-                    _ => AST.Expr.NilLit
-                }
-                var str_val: String = match (lit_expr) { StringLit(s) => s
-                    _ => ""
-                }
-                // Check if this is a wildcard arm (VariantPattern("_", []) or non-string)
-                var is_wildcard: Bool = false
                 var arm_vname: String = match (arm_pattern) { VariantPattern(v, b) => v
                     _ => ""
                 }
-                if (arm_vname == "_") { is_wildcard = true }
 
-                if (is_wildcard) {
-                    // Default arm — just generate body
+                if (arm_vname == "_") {
+                    // Default/wildcard arm — just generate body
                     var val: String = this.gen_arg_value(arm_body)
                     if (i == 0) { match_result_type = this.last_type }
                     this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
                     this.emit_terminator("br label %" + end_label)
-                } else {
+                } else if (arm_vname.starts_with("__strpat:")) {
                     // String pattern arm — compare with __string_eq
+                    var str_val: String = arm_vname.slice(9, arm_vname.length())
                     var const_name: String = this.add_string_constant(str_val)
                     var len: Float = str_val.length() + 1
                     var gep: String = this.fresh_local()
@@ -5319,6 +5315,7 @@ class Codegen {
         var exc_val: String = this.fresh_local()
         this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
         this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
+        this.typed_vars.set(catch_name, AST.Type.StringType)
         this.gen_stmts(catch_body)
         if (!this.block_terminated) {
             if (has_finally) {
@@ -8567,6 +8564,22 @@ class Codegen {
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
+        // Error check: verify method actually exists on the class
+        var __method_exists: Bool = false
+        var __full_method_name: String = class_name + "__" + method
+        if (this.known_functions.contains(__full_method_name)) { __method_exists = true }
+        if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + __full_method_name)) { __method_exists = true }
+        if (this.func_prefix_map.has(__full_method_name)) { __method_exists = true }
+        if (this.class_methods.has(class_name)) {
+            var __cm: List = this.class_methods.get(class_name)
+            if (__cm.contains(method)) { __method_exists = true }
+        }
+        if (!__method_exists) {
+            IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
+            this.has_errors = true
+            this.last_type = AST.Type.IntType
+            return "0"
+        }
         var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
         // Resolve generic type parameter in return type (e.g. T -> String)
         var ns_ret_str: String = this.type_to_string(this.last_type)
@@ -8608,8 +8621,13 @@ class Codegen {
         this.last_type = AST.Type.StringType
         return ts_local
     }
-    // Error: method not found on a known type
-    if (obj_type != "Any" and obj_type != "Int" and obj_type.length() > 0) {
+    // Error: method not found on a known user-defined class type
+    // Skip for builtin types (String, List, Map, etc.) which have runtime methods
+    var is_builtin_type: Bool = false
+    if (obj_type == "Any" or obj_type == "Int" or obj_type == "Float" or obj_type == "Bool" or obj_type == "String" or obj_type == "Nil") { is_builtin_type = true }
+    if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { is_builtin_type = true }
+    if (obj_type == "StringBuilder" or obj_type == "SB") { is_builtin_type = true }
+    if (!is_builtin_type and obj_type.length() > 0 and this.class_fields.has(obj_type)) {
         IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
         this.has_errors = true
     }
@@ -8723,8 +8741,13 @@ class Codegen {
         if (fp[0] == field) return i
         i = i + 1
     }
-    // Field not found on known class
-    if (class_name.length() > 0 and parts.length() > 0) {
+    // Field not found on known class — but suppress if it's actually a method
+    var is_method: Bool = false
+    if (this.class_methods.has(class_name)) {
+        var __methods: List = this.class_methods.get(class_name)
+        if (__methods.contains(field)) { is_method = true }
+    }
+    if (class_name.length() > 0 and parts.length() > 0 and !is_method) {
         IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")
         this.has_errors = true
     }
