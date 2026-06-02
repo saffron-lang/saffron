@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Turmeric App</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+        #app { min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        const decoder = new TextDecoder();
+        const handles = [null]; // index 0 unused
+        let instance;
+
+        function allocHandle(el) { handles.push(el); return handles.length - 1; }
+        function getHandle(id) { return handles[Number(id)]; }
+        function readCString(ptr) {
+            const p = Number(ptr);
+            if (p === 0) return "";
+            const b = new Uint8Array(instance.exports.memory.buffer);
+            let e = p;
+            while (e < b.length && b[e] !== 0) e++;
+            return decoder.decode(b.slice(p, e));
+        }
+
+        const imports = { env: new Proxy({
+            // I/O
+            js_log_str: (ptr) => console.log(readCString(ptr)),
+            js_log_int: (n) => console.log(Number(n)),
+            js_log_bool: (b) => console.log(Number(b) ? "true" : "false"),
+            js_log_nil: () => console.log("nil"),
+
+            // DOM
+            js_dom_create_element: (tagPtr) => {
+                const tag = readCString(tagPtr);
+                const el = document.createElement(tag);
+                return BigInt(allocHandle(el));
+            },
+            js_dom_set_text: (handle, textPtr) => {
+                const el = getHandle(handle);
+                if (el) el.textContent = readCString(textPtr);
+            },
+            js_dom_set_attr: (handle, namePtr, valuePtr) => {
+                const el = getHandle(handle);
+                if (!el) return;
+                const name = readCString(namePtr);
+                const value = readCString(valuePtr);
+                if (name === 'style') el.style.cssText = value;
+                else if (name === 'class') el.className = value;
+                else el.setAttribute(name, value);
+            },
+            js_dom_append_child: (parentHandle, childHandle) => {
+                const parent = getHandle(parentHandle);
+                const child = getHandle(childHandle);
+                if (parent && child) parent.appendChild(child);
+            },
+            js_dom_remove_child: (parentHandle, childHandle) => {
+                const parent = getHandle(parentHandle);
+                const child = getHandle(childHandle);
+                if (parent && child) parent.removeChild(child);
+            },
+            js_dom_query_selector: (selectorPtr) => {
+                const sel = readCString(selectorPtr);
+                const el = document.querySelector(sel);
+                return el ? BigInt(allocHandle(el)) : 0n;
+            },
+            js_dom_add_event: (handle, eventPtr, callbackId) => {
+                const el = getHandle(handle);
+                if (!el) return;
+                const event = readCString(eventPtr);
+                el.addEventListener(event, () => {
+                    if (instance.exports.__dispatch_event) {
+                        instance.exports.__dispatch_event(callbackId);
+                    }
+                });
+            },
+
+            // Memory
+            memcpy: (dst, src, len) => {
+                const b = new Uint8Array(instance.exports.memory.buffer);
+                b.copyWithin(Number(dst), Number(src), Number(src) + Number(len));
+                return dst;
+            },
+        }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
+
+        try {
+            const response = await fetch('./app.wasm');
+            const wasmBytes = await response.arrayBuffer();
+            const result = await WebAssembly.instantiate(wasmBytes, imports);
+            instance = result.instance;
+            instance.exports._start();
+            console.log("✓ Turmeric app running!");
+        } catch (e) {
+            console.error("Error:", e);
+            document.getElementById('app').innerHTML = `<pre style="color:red;padding:2rem">${e.message}</pre>`;
+        }
+    </script>
+</body>
+</html>
