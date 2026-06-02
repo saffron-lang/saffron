@@ -47,6 +47,7 @@
         IfExpr(c, tb, tv, eb, ev) => "if_expr"
         TryExpr(tb, tv, cn, cb, cv) => "try_expr"
         Yield(v) => "yield"
+        TupleLit(e) => "tuple_lit"
     }
     }
 
@@ -79,7 +80,8 @@
         IsCheck(val, t) => ""
         IfExpr(c, tb, tv, eb, ev) => ""
         TryExpr(tb, tv, cn, cb, cv) => ""
-        Yield(v) => ""    }
+        Yield(v) => ""
+        TupleLit(e) => ""    }
     return name
     }
 
@@ -105,6 +107,18 @@
             if (first_type == "Int" or first_type == "Float") return "List<Int>"
         }
         return "List<Any>"
+    }
+    if (ek == "tuple_lit") {
+        var tuple_elems: List<AST.Expr> = match (expr) { TupleLit(e) => e   _ => [] }
+        var tuple_str: String = "Tuple<"
+        var ti: Float = 0
+        while (ti < tuple_elems.length()) {
+            if (ti > 0) { tuple_str = tuple_str + "," }
+            tuple_str = tuple_str + this.get_expr_type(tuple_elems[ti])
+            ti = ti + 1
+        }
+        tuple_str = tuple_str + ">"
+        return tuple_str
     }
     if (ek == "map_lit") return "Map<String,String>"
     if (ek == "this") return this.current_class
