@@ -1,0 +1,1348 @@
+// AUTO-GENERATED from dom.generated.d.ts - Turmeric Prelude element functions
+// Run: saffron run tools/generate_types.sf
+// Provides fully typed per-element builder functions for direct DOM manipulation.
+//
+// Each function creates a DOM element with typed parameters derived from the
+// TypeScript DOM spec. Common params (cls, id, style) come first, followed by
+// element-specific attributes, event handlers, and an overflow attrs map.
+
+// =============================================================================
+// Element Builder Functions (typed per-element params)
+// =============================================================================
+
+fun a(cls: String = "", id: String = "", style: String = "",
+      download: String = "",
+      hreflang: String = "",
+      rel: String = "",
+      target: String = "",
+      type_: String = "",
+      href: String = "",
+      on_click: Any = nil,
+      attrs: Map<String, Any> = {},
+      block: Any = nil): Float {
+    var el: Float = _tc_create("a")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (download.length() > 0) { _tc_set_attr(el, "download", download) }
+    if (hreflang.length() > 0) { _tc_set_attr(el, "hreflang", hreflang) }
+    if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
+    if (target.length() > 0) { _tc_set_attr(el, "target", target) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (href.length() > 0) { _tc_set_attr(el, "href", href) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun abbr(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("abbr", cls, id, style, attrs, block)
+}
+
+fun address(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("address", cls, id, style, attrs, block)
+}
+
+fun area(cls: String = "", id: String = "", style: String = "",
+         alt: String = "",
+         download: String = "",
+         rel: String = "",
+         target: String = "",
+         href: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("area")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (alt.length() > 0) { _tc_set_attr(el, "alt", alt) }
+    if (download.length() > 0) { _tc_set_attr(el, "download", download) }
+    if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
+    if (target.length() > 0) { _tc_set_attr(el, "target", target) }
+    if (href.length() > 0) { _tc_set_attr(el, "href", href) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun article(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("article", cls, id, style, attrs, block)
+}
+
+fun aside(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("aside", cls, id, style, attrs, block)
+}
+
+fun audio(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("audio", cls, id, style, attrs, block)
+}
+
+fun b(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("b", cls, id, style, attrs, block)
+}
+
+fun base(cls: String = "", id: String = "", style: String = "",
+         href: String = "",
+         target: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("base")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (href.length() > 0) { _tc_set_attr(el, "href", href) }
+    if (target.length() > 0) { _tc_set_attr(el, "target", target) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun bdi(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("bdi", cls, id, style, attrs, block)
+}
+
+fun bdo(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("bdo", cls, id, style, attrs, block)
+}
+
+fun blockquote(cls: String = "", id: String = "", style: String = "",
+               cite: String = "",
+               on_click: Any = nil,
+               attrs: Map<String, Any> = {},
+               block: Any = nil): Float {
+    var el: Float = _tc_create("blockquote")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun br(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("br")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun button(cls: String = "", id: String = "", style: String = "",
+           disabled: Bool = false,
+           name: String = "",
+           value: String = "",
+           on_click: Any = nil,
+           on_submit: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("button")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun canvas(cls: String = "", id: String = "", style: String = "",
+           height: Float = 0,
+           width: Float = 0,
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("canvas")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
+    if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun caption(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("caption", cls, id, style, attrs, block)
+}
+
+fun cite(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("cite", cls, id, style, attrs, block)
+}
+
+fun code(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("code", cls, id, style, attrs, block)
+}
+
+fun col(cls: String = "", id: String = "", style: String = "",
+        span: Float = 0,
+        on_click: Any = nil,
+        attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("col")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (span != 0) { _tc_set_attr(el, "span", span.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun colgroup(cls: String = "", id: String = "", style: String = "",
+             span: Float = 0,
+             on_click: Any = nil,
+             attrs: Map<String, Any> = {},
+             block: Any = nil): Float {
+    var el: Float = _tc_create("colgroup")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (span != 0) { _tc_set_attr(el, "span", span.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun data(cls: String = "", id: String = "", style: String = "",
+         value: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {},
+         block: Any = nil): Float {
+    var el: Float = _tc_create("data")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun datalist(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("datalist", cls, id, style, attrs, block)
+}
+
+fun dd(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dd", cls, id, style, attrs, block)
+}
+
+fun del(cls: String = "", id: String = "", style: String = "",
+        cite: String = "",
+        date_time: String = "",
+        on_click: Any = nil,
+        attrs: Map<String, Any> = {},
+        block: Any = nil): Float {
+    var el: Float = _tc_create("del")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
+    if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun details(cls: String = "", id: String = "", style: String = "",
+            name: String = "",
+            open: Bool = false,
+            on_click: Any = nil,
+            on_toggle: Any = nil,
+            attrs: Map<String, Any> = {},
+            block: Any = nil): Float {
+    var el: Float = _tc_create("details")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (open) { _tc_set_attr(el, "open", "true") }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_toggle != nil) { _tc_add_event(el, "toggle", on_toggle) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun dfn(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dfn", cls, id, style, attrs, block)
+}
+
+fun dialog(cls: String = "", id: String = "", style: String = "",
+           closed_by: String = "",
+           open: Bool = false,
+           return_value: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("dialog")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (closed_by.length() > 0) { _tc_set_attr(el, "closedby", closed_by) }
+    if (open) { _tc_set_attr(el, "open", "true") }
+    if (return_value.length() > 0) { _tc_set_attr(el, "returnvalue", return_value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun div(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("div", cls, id, style, attrs, block)
+}
+
+fun dl(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dl", cls, id, style, attrs, block)
+}
+
+fun dt(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dt", cls, id, style, attrs, block)
+}
+
+fun em(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("em", cls, id, style, attrs, block)
+}
+
+fun embed(cls: String = "", id: String = "", style: String = "",
+          height: String = "",
+          src: String = "",
+          type_: String = "",
+          width: String = "",
+          on_click: Any = nil,
+          attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("embed")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (height.length() > 0) { _tc_set_attr(el, "height", height) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (width.length() > 0) { _tc_set_attr(el, "width", width) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun fieldset(cls: String = "", id: String = "", style: String = "",
+             disabled: Bool = false,
+             name: String = "",
+             on_click: Any = nil,
+             attrs: Map<String, Any> = {},
+             block: Any = nil): Float {
+    var el: Float = _tc_create("fieldset")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun figcaption(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+}
+
+fun figure(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("figure", cls, id, style, attrs, block)
+}
+
+fun footer(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("footer", cls, id, style, attrs, block)
+}
+
+fun form(cls: String = "", id: String = "", style: String = "",
+         action: String = "",
+         enctype: String = "",
+         method: String = "",
+         name: String = "",
+         no_validate: Bool = false,
+         rel: String = "",
+         target: String = "",
+         on_click: Any = nil,
+         on_submit: Any = nil,
+         on_reset: Any = nil,
+         attrs: Map<String, Any> = {},
+         block: Any = nil): Float {
+    var el: Float = _tc_create("form")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (action.length() > 0) { _tc_set_attr(el, "action", action) }
+    if (enctype.length() > 0) { _tc_set_attr(el, "enctype", enctype) }
+    if (method.length() > 0) { _tc_set_attr(el, "method", method) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (no_validate) { _tc_set_attr(el, "novalidate", "true") }
+    if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
+    if (target.length() > 0) { _tc_set_attr(el, "target", target) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
+    if (on_reset != nil) { _tc_add_event(el, "reset", on_reset) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun h1(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h1", cls, id, style, attrs, block)
+}
+
+fun h2(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h2", cls, id, style, attrs, block)
+}
+
+fun h3(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h3", cls, id, style, attrs, block)
+}
+
+fun h4(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h4", cls, id, style, attrs, block)
+}
+
+fun h5(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h5", cls, id, style, attrs, block)
+}
+
+fun h6(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h6", cls, id, style, attrs, block)
+}
+
+fun header(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("header", cls, id, style, attrs, block)
+}
+
+fun hgroup(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("hgroup", cls, id, style, attrs, block)
+}
+
+fun hr(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("hr")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun i(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("i", cls, id, style, attrs, block)
+}
+
+fun iframe(cls: String = "", id: String = "", style: String = "",
+           allow: String = "",
+           allow_fullscreen: Bool = false,
+           height: String = "",
+           name: String = "",
+           src: String = "",
+           width: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("iframe")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (allow.length() > 0) { _tc_set_attr(el, "allow", allow) }
+    if (allow_fullscreen) { _tc_set_attr(el, "allowfullscreen", "true") }
+    if (height.length() > 0) { _tc_set_attr(el, "height", height) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (width.length() > 0) { _tc_set_attr(el, "width", width) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun img(cls: String = "", id: String = "", style: String = "",
+        alt: String = "",
+        height: Float = 0,
+        name: String = "",
+        src: String = "",
+        width: Float = 0,
+        on_click: Any = nil,
+        attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("img")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (alt.length() > 0) { _tc_set_attr(el, "alt", alt) }
+    if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun input(cls: String = "", id: String = "", style: String = "",
+          alt: String = "",
+          checked: Bool = false,
+          disabled: Bool = false,
+          height: Float = 0,
+          max: String = "",
+          max_length: Float = 0,
+          min: String = "",
+          min_length: Float = 0,
+          multiple: Bool = false,
+          name: String = "",
+          pattern: String = "",
+          placeholder: String = "",
+          read_only: Bool = false,
+          required: Bool = false,
+          size: Float = 0,
+          src: String = "",
+          step: String = "",
+          type_: String = "",
+          value: String = "",
+          width: Float = 0,
+          on_click: Any = nil,
+          on_input: Any = nil,
+          on_change: Any = nil,
+          on_focus: Any = nil,
+          on_blur: Any = nil,
+          on_keydown: Any = nil,
+          attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("input")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (alt.length() > 0) { _tc_set_attr(el, "alt", alt) }
+    if (checked) { _tc_set_attr(el, "checked", "true") }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
+    if (max.length() > 0) { _tc_set_attr(el, "max", max) }
+    if (max_length != 0) { _tc_set_attr(el, "maxlength", max_length.to_string()) }
+    if (min.length() > 0) { _tc_set_attr(el, "min", min) }
+    if (min_length != 0) { _tc_set_attr(el, "minlength", min_length.to_string()) }
+    if (multiple) { _tc_set_attr(el, "multiple", "true") }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (pattern.length() > 0) { _tc_set_attr(el, "pattern", pattern) }
+    if (placeholder.length() > 0) { _tc_set_attr(el, "placeholder", placeholder) }
+    if (read_only) { _tc_set_attr(el, "readonly", "true") }
+    if (required) { _tc_set_attr(el, "required", "true") }
+    if (size != 0) { _tc_set_attr(el, "size", size.to_string()) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (step.length() > 0) { _tc_set_attr(el, "step", step) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
+    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun ins(cls: String = "", id: String = "", style: String = "",
+        cite: String = "",
+        date_time: String = "",
+        on_click: Any = nil,
+        attrs: Map<String, Any> = {},
+        block: Any = nil): Float {
+    var el: Float = _tc_create("ins")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
+    if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun kbd(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("kbd", cls, id, style, attrs, block)
+}
+
+fun label(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("label", cls, id, style, attrs, block)
+}
+
+fun legend(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("legend", cls, id, style, attrs, block)
+}
+
+fun li(cls: String = "", id: String = "", style: String = "",
+       value: Float = 0,
+       on_click: Any = nil,
+       attrs: Map<String, Any> = {},
+       block: Any = nil): Float {
+    var el: Float = _tc_create("li")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun link(cls: String = "", id: String = "", style: String = "",
+         as: String = "",
+         disabled: Bool = false,
+         href: String = "",
+         hreflang: String = "",
+         image_sizes: String = "",
+         image_srcset: String = "",
+         integrity: String = "",
+         media: String = "",
+         rel: String = "",
+         type_: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("link")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (as.length() > 0) { _tc_set_attr(el, "as", as) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (href.length() > 0) { _tc_set_attr(el, "href", href) }
+    if (hreflang.length() > 0) { _tc_set_attr(el, "hreflang", hreflang) }
+    if (image_sizes.length() > 0) { _tc_set_attr(el, "imagesizes", image_sizes) }
+    if (image_srcset.length() > 0) { _tc_set_attr(el, "imagesrcset", image_srcset) }
+    if (integrity.length() > 0) { _tc_set_attr(el, "integrity", integrity) }
+    if (media.length() > 0) { _tc_set_attr(el, "media", media) }
+    if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun main(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("main", cls, id, style, attrs, block)
+}
+
+fun map_el(cls: String = "", id: String = "", style: String = "",
+           name: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("map")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun mark(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("mark", cls, id, style, attrs, block)
+}
+
+fun menu(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("menu", cls, id, style, attrs, block)
+}
+
+fun meta(cls: String = "", id: String = "", style: String = "",
+         content: String = "",
+         http_equiv: String = "",
+         media: String = "",
+         name: String = "",
+         scheme: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("meta")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (content.length() > 0) { _tc_set_attr(el, "content", content) }
+    if (http_equiv.length() > 0) { _tc_set_attr(el, "httpequiv", http_equiv) }
+    if (media.length() > 0) { _tc_set_attr(el, "media", media) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (scheme.length() > 0) { _tc_set_attr(el, "scheme", scheme) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun meter(cls: String = "", id: String = "", style: String = "",
+          high: Float = 0,
+          low: Float = 0,
+          max: Float = 0,
+          min: Float = 0,
+          optimum: Float = 0,
+          value: Float = 0,
+          on_click: Any = nil,
+          attrs: Map<String, Any> = {},
+          block: Any = nil): Float {
+    var el: Float = _tc_create("meter")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (high != 0) { _tc_set_attr(el, "high", high.to_string()) }
+    if (low != 0) { _tc_set_attr(el, "low", low.to_string()) }
+    if (max != 0) { _tc_set_attr(el, "max", max.to_string()) }
+    if (min != 0) { _tc_set_attr(el, "min", min.to_string()) }
+    if (optimum != 0) { _tc_set_attr(el, "optimum", optimum.to_string()) }
+    if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun nav(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("nav", cls, id, style, attrs, block)
+}
+
+fun object(cls: String = "", id: String = "", style: String = "",
+           data: String = "",
+           height: String = "",
+           name: String = "",
+           type_: String = "",
+           width: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("object")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (data.length() > 0) { _tc_set_attr(el, "data", data) }
+    if (height.length() > 0) { _tc_set_attr(el, "height", height) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (width.length() > 0) { _tc_set_attr(el, "width", width) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun ol(cls: String = "", id: String = "", style: String = "",
+       reversed: Bool = false,
+       start: Float = 0,
+       type_: String = "",
+       on_click: Any = nil,
+       attrs: Map<String, Any> = {},
+       block: Any = nil): Float {
+    var el: Float = _tc_create("ol")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (reversed) { _tc_set_attr(el, "reversed", "true") }
+    if (start != 0) { _tc_set_attr(el, "start", start.to_string()) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun optgroup(cls: String = "", id: String = "", style: String = "",
+             disabled: Bool = false,
+             label: String = "",
+             on_click: Any = nil,
+             attrs: Map<String, Any> = {},
+             block: Any = nil): Float {
+    var el: Float = _tc_create("optgroup")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (label.length() > 0) { _tc_set_attr(el, "label", label) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun option(cls: String = "", id: String = "", style: String = "",
+           disabled: Bool = false,
+           label: String = "",
+           selected: Bool = false,
+           value: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("option")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (label.length() > 0) { _tc_set_attr(el, "label", label) }
+    if (selected) { _tc_set_attr(el, "selected", "true") }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun output(cls: String = "", id: String = "", style: String = "",
+           name: String = "",
+           value: String = "",
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("output")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun p(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("p", cls, id, style, attrs, block)
+}
+
+fun picture(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("picture", cls, id, style, attrs, block)
+}
+
+fun pre(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("pre", cls, id, style, attrs, block)
+}
+
+fun progress(cls: String = "", id: String = "", style: String = "",
+             max: Float = 0,
+             value: Float = 0,
+             on_click: Any = nil,
+             attrs: Map<String, Any> = {},
+             block: Any = nil): Float {
+    var el: Float = _tc_create("progress")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (max != 0) { _tc_set_attr(el, "max", max.to_string()) }
+    if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun q(cls: String = "", id: String = "", style: String = "",
+      cite: String = "",
+      on_click: Any = nil,
+      attrs: Map<String, Any> = {},
+      block: Any = nil): Float {
+    var el: Float = _tc_create("q")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun rp(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("rp", cls, id, style, attrs, block)
+}
+
+fun rt(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("rt", cls, id, style, attrs, block)
+}
+
+fun ruby(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("ruby", cls, id, style, attrs, block)
+}
+
+fun s(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("s", cls, id, style, attrs, block)
+}
+
+fun samp(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("samp", cls, id, style, attrs, block)
+}
+
+fun search(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("search", cls, id, style, attrs, block)
+}
+
+fun section(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("section", cls, id, style, attrs, block)
+}
+
+fun select(cls: String = "", id: String = "", style: String = "",
+           disabled: Bool = false,
+           multiple: Bool = false,
+           name: String = "",
+           required: Bool = false,
+           size: Float = 0,
+           value: String = "",
+           on_click: Any = nil,
+           on_change: Any = nil,
+           on_focus: Any = nil,
+           on_blur: Any = nil,
+           attrs: Map<String, Any> = {},
+           block: Any = nil): Float {
+    var el: Float = _tc_create("select")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (multiple) { _tc_set_attr(el, "multiple", "true") }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (required) { _tc_set_attr(el, "required", "true") }
+    if (size != 0) { _tc_set_attr(el, "size", size.to_string()) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun small(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("small", cls, id, style, attrs, block)
+}
+
+fun source(cls: String = "", id: String = "", style: String = "",
+           height: Float = 0,
+           media: String = "",
+           src: String = "",
+           type_: String = "",
+           width: Float = 0,
+           on_click: Any = nil,
+           attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("source")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
+    if (media.length() > 0) { _tc_set_attr(el, "media", media) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
+    if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun span(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("span", cls, id, style, attrs, block)
+}
+
+fun strong(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("strong", cls, id, style, attrs, block)
+}
+
+fun sub(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("sub", cls, id, style, attrs, block)
+}
+
+fun summary(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("summary", cls, id, style, attrs, block)
+}
+
+fun sup(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("sup", cls, id, style, attrs, block)
+}
+
+fun table(cls: String = "", id: String = "", style: String = "",
+          cell_padding: String = "",
+          cell_spacing: String = "",
+          frame: String = "",
+          rules: String = "",
+          summary: String = "",
+          width: String = "",
+          on_click: Any = nil,
+          attrs: Map<String, Any> = {},
+          block: Any = nil): Float {
+    var el: Float = _tc_create("table")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cell_padding.length() > 0) { _tc_set_attr(el, "cellpadding", cell_padding) }
+    if (cell_spacing.length() > 0) { _tc_set_attr(el, "cellspacing", cell_spacing) }
+    if (frame.length() > 0) { _tc_set_attr(el, "frame", frame) }
+    if (rules.length() > 0) { _tc_set_attr(el, "rules", rules) }
+    if (summary.length() > 0) { _tc_set_attr(el, "summary", summary) }
+    if (width.length() > 0) { _tc_set_attr(el, "width", width) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun tbody(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("tbody", cls, id, style, attrs, block)
+}
+
+fun td(cls: String = "", id: String = "", style: String = "",
+       abbr: String = "",
+       col_span: Float = 0,
+       headers: String = "",
+       row_span: Float = 0,
+       scope: String = "",
+       on_click: Any = nil,
+       attrs: Map<String, Any> = {},
+       block: Any = nil): Float {
+    var el: Float = _tc_create("td")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (abbr.length() > 0) { _tc_set_attr(el, "abbr", abbr) }
+    if (col_span != 0) { _tc_set_attr(el, "colspan", col_span.to_string()) }
+    if (headers.length() > 0) { _tc_set_attr(el, "headers", headers) }
+    if (row_span != 0) { _tc_set_attr(el, "rowspan", row_span.to_string()) }
+    if (scope.length() > 0) { _tc_set_attr(el, "scope", scope) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun textarea(cls: String = "", id: String = "", style: String = "",
+             cols: Float = 0,
+             disabled: Bool = false,
+             max_length: Float = 0,
+             min_length: Float = 0,
+             name: String = "",
+             placeholder: String = "",
+             read_only: Bool = false,
+             required: Bool = false,
+             rows: Float = 0,
+             value: String = "",
+             wrap: String = "",
+             on_click: Any = nil,
+             on_input: Any = nil,
+             on_change: Any = nil,
+             on_focus: Any = nil,
+             on_blur: Any = nil,
+             on_keydown: Any = nil,
+             attrs: Map<String, Any> = {},
+             block: Any = nil): Float {
+    var el: Float = _tc_create("textarea")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (cols != 0) { _tc_set_attr(el, "cols", cols.to_string()) }
+    if (disabled) { _tc_set_attr(el, "disabled", "true") }
+    if (max_length != 0) { _tc_set_attr(el, "maxlength", max_length.to_string()) }
+    if (min_length != 0) { _tc_set_attr(el, "minlength", min_length.to_string()) }
+    if (name.length() > 0) { _tc_set_attr(el, "name", name) }
+    if (placeholder.length() > 0) { _tc_set_attr(el, "placeholder", placeholder) }
+    if (read_only) { _tc_set_attr(el, "readonly", "true") }
+    if (required) { _tc_set_attr(el, "required", "true") }
+    if (rows != 0) { _tc_set_attr(el, "rows", rows.to_string()) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (wrap.length() > 0) { _tc_set_attr(el, "wrap", wrap) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
+    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun tfoot(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("tfoot", cls, id, style, attrs, block)
+}
+
+fun th(cls: String = "", id: String = "", style: String = "",
+       abbr: String = "",
+       col_span: Float = 0,
+       headers: String = "",
+       row_span: Float = 0,
+       scope: String = "",
+       on_click: Any = nil,
+       attrs: Map<String, Any> = {},
+       block: Any = nil): Float {
+    var el: Float = _tc_create("th")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (abbr.length() > 0) { _tc_set_attr(el, "abbr", abbr) }
+    if (col_span != 0) { _tc_set_attr(el, "colspan", col_span.to_string()) }
+    if (headers.length() > 0) { _tc_set_attr(el, "headers", headers) }
+    if (row_span != 0) { _tc_set_attr(el, "rowspan", row_span.to_string()) }
+    if (scope.length() > 0) { _tc_set_attr(el, "scope", scope) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun thead(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("thead", cls, id, style, attrs, block)
+}
+
+fun time(cls: String = "", id: String = "", style: String = "",
+         date_time: String = "",
+         on_click: Any = nil,
+         attrs: Map<String, Any> = {},
+         block: Any = nil): Float {
+    var el: Float = _tc_create("time")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun title(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("title", cls, id, style, attrs, block)
+}
+
+fun tr(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("tr", cls, id, style, attrs, block)
+}
+
+fun track(cls: String = "", id: String = "", style: String = "",
+          default: Bool = false,
+          kind: String = "",
+          label: String = "",
+          src: String = "",
+          srclang: String = "",
+          on_click: Any = nil,
+          attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("track")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (default) { _tc_set_attr(el, "default", "true") }
+    if (kind.length() > 0) { _tc_set_attr(el, "kind", kind) }
+    if (label.length() > 0) { _tc_set_attr(el, "label", label) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (srclang.length() > 0) { _tc_set_attr(el, "srclang", srclang) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun u(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("u", cls, id, style, attrs, block)
+}
+
+fun ul(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("ul", cls, id, style, attrs, block)
+}
+
+fun var_(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("var", cls, id, style, attrs, block)
+}
+
+fun video(cls: String = "", id: String = "", style: String = "",
+          disable_picture_in_picture: Bool = false,
+          height: Float = 0,
+          plays_inline: Bool = false,
+          poster: String = "",
+          width: Float = 0,
+          on_click: Any = nil,
+          on_play: Any = nil,
+          on_pause: Any = nil,
+          on_ended: Any = nil,
+          attrs: Map<String, Any> = {},
+          block: Any = nil): Float {
+    var el: Float = _tc_create("video")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disable_picture_in_picture) { _tc_set_attr(el, "disablepictureinpicture", "true") }
+    if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
+    if (plays_inline) { _tc_set_attr(el, "playsinline", "true") }
+    if (poster.length() > 0) { _tc_set_attr(el, "poster", poster) }
+    if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_play != nil) { _tc_add_event(el, "play", on_play) }
+    if (on_pause != nil) { _tc_add_event(el, "pause", on_pause) }
+    if (on_ended != nil) { _tc_add_event(el, "ended", on_ended) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun wbr(cls: String = "", id: String = "", style: String = "",
+       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("wbr")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
