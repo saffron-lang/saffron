@@ -1,0 +1,369 @@
+//! Full subprocess control — spawn, stream, and manage child processes.
+//!
+//! Provides structured process execution with access to exit codes, stderr,
+//! background processes, and environment control. Built on top of OS.exec()
+//! with shell wrappers until native subprocess syscalls are available.
+//!
+//! ```saffron
+//! import "@process" as Process
+//!
+//! var result = Process.run("ls -la")
+//! if (result.success) {
+//!     IO.println(result.stdout)
+//! } else {
+//!     IO.println("failed (exit ${result.exit_code}): ${result.stderr}")
+//! }
+//!
+//! var server = Process.spawn("python3 -m http.server 8080")
+//! // ... do work ...
+//! server.kill()
+//! ```
+
+import "os" as OS
+
+// ---------------------------------------------------------------------------
+// Internal helpers (defined first to avoid forward reference issues)
+// ---------------------------------------------------------------------------
+
+/// Parse exit code from a string. Returns 0 if parsing fails.
+fun _parse_exit_code(s: String): Number {
+    if (s.length() == 0) { return 0 }
+    try {
+        return s.to_number()
+    } catch (e) {
+        return 0
+    }
+}
+
+/// Escape a string for safe use in single-quoted shell context.
+/// Replaces ' with '\'' (end quote, escaped quote, start quote).
+fun _escape_single_quotes(s: String): String {
+    return s.replace("'", "'\\''")
+}
+
+/// Shell-escape a value by wrapping in single quotes.
+/// Handles embedded single quotes safely.
+fun _shell_escape(s: String): String {
+    return "'" + _escape_single_quotes(s) + "'"
+}
+
+/// Generate a pseudo-unique ID for temp files using the current PID and a counter.
+var _uid_counter = 0
+fun _unique_id(): String {
+    _uid_counter = _uid_counter + 1
+    var pid = OS.exec("echo $$").trim()
+    return "${pid}_${_uid_counter}"
+}
+
+// ---------------------------------------------------------------------------
+// ProcessResult — the outcome of a completed process
+// ---------------------------------------------------------------------------
+
+/// Result of a completed process, containing stdout, stderr, and exit code.
+class ProcessResult {
+    var stdout: String
+    var stderr: String
+    var exit_code: Number
+    var success: Bool
+
+    fun init(stdout: String, stderr: String, exit_code: Number) {
+        this.stdout = stdout
+        this.stderr = stderr
+        this.exit_code = exit_code
+        this.success = (exit_code == 0)
+    }
+
+    // Return a human-readable summary of the result.
+    fun to_string(): String {
+        if (this.success) {
+            return "ProcessResult(ok, stdout=${this.stdout.length()} bytes)"
+        }
+        return "ProcessResult(exit=${this.exit_code}, stderr=${this.stderr.length()} bytes)"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Internal: core captured execution (needs ProcessResult defined above)
+// ---------------------------------------------------------------------------
+
+/// Core implementation: run a command capturing stdout, stderr, and exit code.
+/// Uses a temp file for stderr since OS.exec() only returns stdout.
+fun _run_captured(cmd: String): ProcessResult {
+    // Strategy: redirect stderr to a temp file, run the command, append a
+    // delimiter and the exit code to stdout so we can parse it all from
+    // the single string OS.exec() returns.
+    //
+    // Format returned by the wrapper:
+    //   <stdout>\n__SF_EXIT__\n<exit_code>
+    //
+    // Stderr is captured to a temp file and read back.
+    var stderr_file = "/tmp/_sf_stderr_${_unique_id()}"
+    // Wrap user command in a subshell so stderr redirect captures all of it
+    var escaped_cmd = _escape_single_quotes(cmd)
+    var wrapper = "sh -c '(${escaped_cmd}) 2>${stderr_file}; SF_EC=$?; echo \"__SF_EXIT__\"; echo $SF_EC'"
+    var raw = OS.exec(wrapper)
+
+    // Parse stdout and exit code from the combined output
+    var stdout = ""
+    var exit_code = 0
+    var marker = "__SF_EXIT__"
+    var marker_pos = raw.index_of(marker)
+
+    if (marker_pos >= 0) {
+        stdout = raw.slice(0, marker_pos)
+        // Remove trailing newline from stdout
+        if (stdout.length() > 0 and stdout.char_at(stdout.length() - 1) == "\n") {
+            stdout = stdout.slice(0, stdout.length() - 1)
+        }
+        var after_marker = raw.slice(marker_pos + marker.length(), raw.length())
+        exit_code = _parse_exit_code(after_marker.trim())
+    } else {
+        // Fallback: marker not found, treat entire output as stdout
+        stdout = raw
+    }
+
+    // Read stderr from temp file
+    var stderr = ""
+    try {
+        stderr = OS.exec("cat ${stderr_file} 2>/dev/null")
+        OS.exec("rm -f ${stderr_file} 2>/dev/null")
+    } catch (e) {
+        // Temp file may not exist if command was extremely short-lived
+    }
+
+    return ProcessResult(stdout, stderr, exit_code)
+}
+
+// ---------------------------------------------------------------------------
+// Process — a running child process handle
+// ---------------------------------------------------------------------------
+
+/// A running child process handle. Obtained from spawn().
+class Process {
+    var pid: Number
+    var _cmd: String
+
+    fun init(pid: Number, cmd: String) {
+        this.pid = pid
+        this._cmd = cmd
+    }
+
+    // Wait for the process to complete and return its result.
+    fun wait(): ProcessResult {
+        // Use wait/waitpid via shell — wait for PID and capture exit code
+        var raw = OS.exec("wait ${this.pid} 2>/dev/null; echo $?")
+        var code = _parse_exit_code(raw.trim())
+        // After waiting, we can't recover stdout/stderr that already went
+        // to the terminal. Full capture requires native runtime support.
+        return ProcessResult("", "", code)
+    }
+
+    // Kill the process (SIGTERM).
+    fun kill() {
+        OS.exec("kill ${this.pid} 2>/dev/null")
+    }
+
+    // Forcefully kill the process (SIGKILL).
+    fun force_kill() {
+        OS.exec("kill -9 ${this.pid} 2>/dev/null")
+    }
+
+    // Check if the process is still running.
+    fun is_running(): Bool {
+        var raw = OS.exec("kill -0 ${this.pid} 2>/dev/null; echo $?")
+        return raw.trim() == "0"
+    }
+
+    // Write to the process's stdin.
+    // NOTE: Requires native subprocess support. Throws with current OS.exec backend.
+    fun write_stdin(input: String) {
+        // Cannot pipe stdin to a background process with OS.exec alone.
+        // This requires native subprocess file descriptor management.
+        throw "process: write_stdin requires native subprocess support (not yet available)"
+    }
+
+    // Return a human-readable description.
+    fun to_string(): String {
+        return "Process(pid=${this.pid}, cmd=\"${this._cmd}\")"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — module-level functions
+// ---------------------------------------------------------------------------
+
+/// Run a command via the shell and wait for completion.
+/// Returns a ProcessResult with stdout, stderr, and exit code.
+///
+/// This is the primary replacement for OS.exec() when you need exit codes
+/// and stderr separation.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var result = Process.run("cargo build 2>&1")
+/// if (!result.success) {
+///     IO.println("Build failed (exit ${result.exit_code}):")
+///     IO.println(result.stderr)
+/// }
+/// ```
+///
+/// WORKS TODAY: Yes — uses OS.exec with temp file for stderr capture.
+fun run(cmd: String): ProcessResult {
+    return _run_captured(cmd)
+}
+
+/// Run a command with explicit arguments (no shell interpretation).
+/// Safer than run() for user-provided input — arguments are individually quoted.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var result = Process.exec("git", ["commit", "-m", "my message with spaces"])
+/// IO.println(result.exit_code)
+/// ```
+///
+/// WORKS TODAY: Yes — shell-escapes each argument.
+fun exec(program: String, args: List<String>): ProcessResult {
+    var cmd = _shell_escape(program)
+    var i = 0
+    while (i < args.length()) {
+        cmd = cmd + " " + _shell_escape(args[i])
+        i = i + 1
+    }
+    return _run_captured(cmd)
+}
+
+/// Spawn a background process. Returns immediately with a Process handle.
+/// The process runs asynchronously; use the returned handle to check status,
+/// wait, or kill it.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var server = Process.spawn("python3 -m http.server 8080")
+/// IO.println(server.pid)
+/// // ... do other work ...
+/// server.kill()
+/// ```
+///
+/// WORKS TODAY: Yes — uses shell backgrounding to obtain PID.
+fun spawn(cmd: String): Process {
+    // Launch the command in background and capture its PID.
+    // We use a pidfile approach: start the command with nohup in background,
+    // write its PID to a temp file, then read it back.
+    var pidfile = "/tmp/_sf_pid_${_unique_id()}"
+    var escaped = _escape_single_quotes(cmd)
+    OS.exec("sh -c 'nohup ${escaped} >/dev/null 2>&1 & echo $! > ${pidfile}'")
+    var raw = OS.exec("cat ${pidfile} 2>/dev/null")
+    OS.exec("rm -f ${pidfile} 2>/dev/null")
+    var pid = _parse_exit_code(raw.trim())
+    return Process(pid, cmd)
+}
+
+/// Run a command and return just the exit code.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var code = Process.status("test -f pantry.toml")
+/// if (code == 0) { IO.println("file exists") }
+/// ```
+///
+/// WORKS TODAY: Yes — uses OS.exec wrapper.
+fun status(cmd: String): Number {
+    var raw = OS.exec("sh -c '${_escape_single_quotes(cmd)}; echo $?'")
+    return _parse_exit_code(raw.trim())
+}
+
+/// Run a command, abort if it fails (non-zero exit).
+/// Throws an error containing stderr on failure.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// Process.run_or_fail("saffron build src/main.sf -o build/app")
+/// // If the command fails, throws with stderr content
+/// ```
+///
+/// WORKS TODAY: Yes — calls run() then throws on failure.
+fun run_or_fail(cmd: String): ProcessResult {
+    var result = run(cmd)
+    if (!result.success) {
+        var msg = "process: command failed (exit ${result.exit_code}): ${cmd}"
+        if (result.stderr.length() > 0) {
+            msg = msg + "\n" + result.stderr
+        }
+        throw msg
+    }
+    return result
+}
+
+/// Run a command with additional environment variables.
+/// The provided env map is exported before running the command.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var result = Process.run_with_env("node server.js", {"PORT": "3000", "DEBUG": "true"})
+/// ```
+///
+/// WORKS TODAY: Yes — prepends env var exports to the shell command.
+fun run_with_env(cmd: String, env: Map<String, String>): ProcessResult {
+    var exports = ""
+    var keys = env.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var k = "" + keys[i]
+        var v = "" + env.get(k)
+        // Use export so vars are visible to the command
+        exports = exports + "export " + k + "='" + _escape_single_quotes(v) + "'; "
+        i = i + 1
+    }
+    return _run_captured(exports + cmd)
+}
+
+/// Run a command in a specific working directory.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var result = Process.run_in("npm install", "../frontend")
+/// IO.println(result.success)
+/// ```
+///
+/// WORKS TODAY: Yes — wraps with cd.
+fun run_in(cmd: String, dir: String): ProcessResult {
+    return _run_captured("cd ${_shell_escape(dir)} && ${cmd}")
+}
+
+/// Pipe: run the first command, feed its stdout as stdin to the second.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// var result = Process.pipe("cat data.txt", "grep error")
+/// IO.println(result.stdout)
+/// ```
+///
+/// WORKS TODAY: Yes — uses shell pipe operator.
+fun pipe(cmd1: String, cmd2: String): ProcessResult {
+    return _run_captured("${cmd1} | ${cmd2}")
+}
+
+/// Check if a program is available on PATH.
+/// Returns the full path if found, or an empty string if not.
+///
+/// ```saffron
+/// import "@process" as Process
+///
+/// if (Process.which("git") != "") {
+///     IO.println("git is available")
+/// }
+/// ```
+///
+/// WORKS TODAY: Yes — uses which(1).
+fun which(program: String): String {
+    var raw = OS.exec("which ${_shell_escape(program)} 2>/dev/null")
+    return raw.trim()
+}

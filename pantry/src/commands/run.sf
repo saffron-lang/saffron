@@ -8,6 +8,7 @@ import "@args" as Args
 
 import "@os" as OS
 import "@toml" as TOML
+import "@process" as Process
 import "../config.sf" as Config
 
 /// Build a PATH prefix that includes all dep bin directories.
@@ -54,9 +55,16 @@ fun _exec_shell(cmd: String) {
     if (bin_path.length() > 0) {
         full_cmd = "PATH=${bin_path}:$PATH " + cmd
     }
-    var output: String = OS.exec(full_cmd)
-    if (output.length() > 0) {
-        IO.print(output)
+    var result: Process.ProcessResult = Process.run(full_cmd)
+    if (result.stdout.length() > 0) {
+        IO.print(result.stdout)
+    }
+    if (result.stderr.length() > 0) {
+        IO.print(result.stderr)
+    }
+    if (!(result.success)) {
+        IO.println("Command failed with exit code ${result.exit_code}")
+        OS.exit(result.exit_code)
     }
 }
 
