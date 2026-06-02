@@ -5120,21 +5120,34 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.5116 = private unnamed_addr constant [4 x i8] c".ll\00"
 @.str.5117 = private unnamed_addr constant [3 x i8] c"--\00"
 @.str.5118 = private unnamed_addr constant [12 x i8] c"/../src/lib\00"
-@.str.5119 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5120 = private unnamed_addr constant [12 x i8] c"/prelude.sf\00"
-@.str.5121 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5122 = private unnamed_addr constant [3 x i8] c"./\00"
-@.str.5123 = private unnamed_addr constant [2 x i8] c"@\00"
-@.str.5124 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.5125 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.5126 = private unnamed_addr constant [16 x i8] c"/src/prelude.sf\00"
-@.str.5127 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5128 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5129 = private unnamed_addr constant [2 x i8] c"|\00"
-@.str.5130 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5119 = private unnamed_addr constant [16 x i8] c"[DEBUG] start: \00"
+@.str.5120 = private unnamed_addr constant [18 x i8] c"[DEBUG] read done\00"
+@.str.5121 = private unnamed_addr constant [17 x i8] c"[DEBUG] lex done\00"
+@.str.5122 = private unnamed_addr constant [19 x i8] c"[DEBUG] parse done\00"
+@.str.5123 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5124 = private unnamed_addr constant [12 x i8] c"/prelude.sf\00"
+@.str.5125 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5126 = private unnamed_addr constant [3 x i8] c"./\00"
+@.str.5127 = private unnamed_addr constant [2 x i8] c"@\00"
+@.str.5128 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.5129 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.5130 = private unnamed_addr constant [16 x i8] c"/src/prelude.sf\00"
 @.str.5131 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5132 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.5133 = private unnamed_addr constant [39 x i8] c"Compilation failed with codegen errors\00"
+@.str.5132 = private unnamed_addr constant [20 x i8] c"[DEBUG] collecting \00"
+@.str.5133 = private unnamed_addr constant [9 x i8] c" imports\00"
+@.str.5134 = private unnamed_addr constant [17 x i8] c"[DEBUG] import: \00"
+@.str.5135 = private unnamed_addr constant [5 x i8] c" -> \00"
+@.str.5136 = private unnamed_addr constant [41 x i8] c"[DEBUG] import collection done, modules=\00"
+@.str.5137 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5138 = private unnamed_addr constant [2 x i8] c"|\00"
+@.str.5139 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5140 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5141 = private unnamed_addr constant [33 x i8] c"[DEBUG] starting codegen, stmts=\00"
+@.str.5142 = private unnamed_addr constant [13 x i8] c" boundaries=\00"
+@.str.5143 = private unnamed_addr constant [18 x i8] c"[DEBUG] prefixes=\00"
+@.str.5144 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.5145 = private unnamed_addr constant [21 x i8] c"[DEBUG] codegen done\00"
+@.str.5146 = private unnamed_addr constant [39 x i8] c"Compilation failed with codegen errors\00"
 
 %Addable = type {  }
 %Subtractable = type {  }
@@ -131733,166 +131746,189 @@ then9802:
 else9803:
   br label %endif9801
 endif9801:
-  %t262 = load i64, i64* %input_path
-  %t263 = call i64 @__io_read_file(i64 %t262)
-  store i64 %t263, i64* %source
-  %t264 = load i64, i64* %source
-  %t265 = call i64 @lexer_lex(i64 %t264)
-  store i64 %t265, i64* %tokens
-  %t266 = load i64, i64* %tokens
-  %t267 = load i64, i64* %source
-  %t268 = call i64 @parser_parse_with_source(i64 %t266, i64 %t267)
-  store i64 %t268, i64* %program
-  %t269 = call i64 @parser_had_error()
-  %t270 = trunc i64 %t269 to i1
-  br i1 %t270, label %then9805, label %else9806
+  %t262 = getelementptr [16 x i8], [16 x i8]* @.str.5119, i64 0, i64 0
+  %t263 = ptrtoint i8* %t262 to i64
+  %t264 = load i64, i64* %input_path
+  %t265 = inttoptr i64 %t263 to i8*
+  %t266 = inttoptr i64 %t264 to i8*
+  %t267 = call i64 @strlen(i8* %t265)
+  %t268 = call i64 @strlen(i8* %t266)
+  %t269 = add i64 %t267, %t268
+  %t270 = add i64 %t269, 1
+  %t271 = call i8* @malloc(i64 %t270)
+  call i8* @strcpy(i8* %t271, i8* %t265)
+  call i8* @strcat(i8* %t271, i8* %t266)
+  %t272 = ptrtoint i8* %t271 to i64
+  call void @__io_println_str(i64 %t272)
+  %t273 = load i64, i64* %input_path
+  %t274 = call i64 @__io_read_file(i64 %t273)
+  store i64 %t274, i64* %source
+  %t275 = getelementptr [18 x i8], [18 x i8]* @.str.5120, i64 0, i64 0
+  %t276 = ptrtoint i8* %t275 to i64
+  call void @__io_println_str(i64 %t276)
+  %t277 = load i64, i64* %source
+  %t278 = call i64 @lexer_lex(i64 %t277)
+  store i64 %t278, i64* %tokens
+  %t279 = getelementptr [17 x i8], [17 x i8]* @.str.5121, i64 0, i64 0
+  %t280 = ptrtoint i8* %t279 to i64
+  call void @__io_println_str(i64 %t280)
+  %t281 = load i64, i64* %tokens
+  %t282 = load i64, i64* %source
+  %t283 = call i64 @parser_parse_with_source(i64 %t281, i64 %t282)
+  store i64 %t283, i64* %program
+  %t284 = getelementptr [19 x i8], [19 x i8]* @.str.5122, i64 0, i64 0
+  %t285 = ptrtoint i8* %t284 to i64
+  call void @__io_println_str(i64 %t285)
+  %t286 = call i64 @parser_had_error()
+  %t287 = trunc i64 %t286 to i1
+  br i1 %t287, label %then9805, label %else9806
 then9805:
-  %t271 = add i64 0, 1
-  %t272 = trunc i64 %t271 to i32
-  call void @exit(i32 %t272)
+  %t288 = add i64 0, 1
+  %t289 = trunc i64 %t288 to i32
+  call void @exit(i32 %t289)
   br label %endif9804
 else9806:
   br label %endif9804
 endif9804:
-  %t273 = call i64 @__map_new()
-  store i64 %t273, i64* %resolved_aliases
-  %t274 = call i64 @__map_new()
-  store i64 %t274, i64* %path_to_prefix
-  %t275 = load i64, i64* %source
-  %t276 = call i64 @extract_import_aliases(i64 %t275)
-  store i64 %t276, i64* %alias_map
-  %t277 = load i64, i64* %alias_map
-  %t278 = call i64 @__map_keys(i64 %t277)
-  store i64 %t278, i64* %alias_keys
-  %t279 = load i64, i64* %source
-  %t280 = load i64, i64* %input_path
-  %t281 = call i64 @check_duplicate_aliases(i64 %t279, i64 %t280)
-  %t282 = add i64 0, 0
-  store i64 %t282, i64* %ak
+  %t290 = call i64 @__map_new()
+  store i64 %t290, i64* %resolved_aliases
+  %t291 = call i64 @__map_new()
+  store i64 %t291, i64* %path_to_prefix
+  %t292 = load i64, i64* %source
+  %t293 = call i64 @extract_import_aliases(i64 %t292)
+  store i64 %t293, i64* %alias_map
+  %t294 = load i64, i64* %alias_map
+  %t295 = call i64 @__map_keys(i64 %t294)
+  store i64 %t295, i64* %alias_keys
+  %t296 = load i64, i64* %source
+  %t297 = load i64, i64* %input_path
+  %t298 = call i64 @check_duplicate_aliases(i64 %t296, i64 %t297)
+  %t299 = add i64 0, 0
+  store i64 %t299, i64* %ak
   br label %while.cond9807
 while.cond9807:
-  %t283 = load i64, i64* %ak
-  %t284 = load i64, i64* %alias_keys
-  %t285 = call i64 @__list_length(i64 %t284)
-  %t287 = icmp slt i64 %t283, %t285
-  %t286 = zext i1 %t287 to i64
-  %t288 = trunc i64 %t286 to i1
-  br i1 %t288, label %while.body9808, label %while.end9809
+  %t300 = load i64, i64* %ak
+  %t301 = load i64, i64* %alias_keys
+  %t302 = call i64 @__list_length(i64 %t301)
+  %t304 = icmp slt i64 %t300, %t302
+  %t303 = zext i1 %t304 to i64
+  %t305 = trunc i64 %t303 to i1
+  br i1 %t305, label %while.body9808, label %while.end9809
 while.body9808:
-  %t289 = load i64, i64* %alias_keys
-  %t290 = load i64, i64* %ak
-  %t291 = icmp slt i64 %t290, 0
-  %t292 = call i64 @__list_length(i64 %t289)
-  %t293 = add i64 %t292, %t290
-  %t294 = select i1 %t291, i64 %t293, i64 %t290
-  %t295 = call i64 @__list_get(i64 %t289, i64 %t294)
-  store i64 %t295, i64* %alias
-  %t296 = load i64, i64* %alias_map
-  %t297 = load i64, i64* %alias
-  %t298 = call i64 @__map_get(i64 %t296, i64 %t297)
-  store i64 %t298, i64* %imp_path
-  %t299 = load i64, i64* %imp_path
-  %t300 = call i64 @is_builtin_module(i64 %t299)
-  %t301 = xor i64 %t300, 1
-  %t302 = trunc i64 %t301 to i1
-  br i1 %t302, label %then9811, label %else9812
-then9811:
-  %t303 = load i64, i64* %input_path
-  %t304 = load i64, i64* %imp_path
-  %t305 = load i64, i64* %stdlib_dir
-  %t306 = call i64 @resolve_import_path(i64 %t303, i64 %t304, i64 %t305)
-  store i64 %t306, i64* %full_imp_path
-  %t307 = getelementptr [1 x i8], [1 x i8]* @.str.5119, i64 0, i64 0
-  %t308 = ptrtoint i8* %t307 to i64
-  store i64 %t308, i64* %pprefix
-  %t309 = load i64, i64* %path_to_prefix
-  %t310 = load i64, i64* %full_imp_path
-  %t311 = call i64 @__map_has(i64 %t309, i64 %t310)
-  %t312 = trunc i64 %t311 to i1
-  br i1 %t312, label %then9814, label %else9815
-then9814:
-  %t313 = load i64, i64* %path_to_prefix
-  %t314 = load i64, i64* %full_imp_path
+  %t306 = load i64, i64* %alias_keys
+  %t307 = load i64, i64* %ak
+  %t308 = icmp slt i64 %t307, 0
+  %t309 = call i64 @__list_length(i64 %t306)
+  %t310 = add i64 %t309, %t307
+  %t311 = select i1 %t308, i64 %t310, i64 %t307
+  %t312 = call i64 @__list_get(i64 %t306, i64 %t311)
+  store i64 %t312, i64* %alias
+  %t313 = load i64, i64* %alias_map
+  %t314 = load i64, i64* %alias
   %t315 = call i64 @__map_get(i64 %t313, i64 %t314)
-  store i64 %t315, i64* %pprefix
+  store i64 %t315, i64* %imp_path
+  %t316 = load i64, i64* %imp_path
+  %t317 = call i64 @is_builtin_module(i64 %t316)
+  %t318 = xor i64 %t317, 1
+  %t319 = trunc i64 %t318 to i1
+  br i1 %t319, label %then9811, label %else9812
+then9811:
+  %t320 = load i64, i64* %input_path
+  %t321 = load i64, i64* %imp_path
+  %t322 = load i64, i64* %stdlib_dir
+  %t323 = call i64 @resolve_import_path(i64 %t320, i64 %t321, i64 %t322)
+  store i64 %t323, i64* %full_imp_path
+  %t324 = getelementptr [1 x i8], [1 x i8]* @.str.5123, i64 0, i64 0
+  %t325 = ptrtoint i8* %t324 to i64
+  store i64 %t325, i64* %pprefix
+  %t326 = load i64, i64* %path_to_prefix
+  %t327 = load i64, i64* %full_imp_path
+  %t328 = call i64 @__map_has(i64 %t326, i64 %t327)
+  %t329 = trunc i64 %t328 to i1
+  br i1 %t329, label %then9814, label %else9815
+then9814:
+  %t330 = load i64, i64* %path_to_prefix
+  %t331 = load i64, i64* %full_imp_path
+  %t332 = call i64 @__map_get(i64 %t330, i64 %t331)
+  store i64 %t332, i64* %pprefix
   br label %endif9813
 else9815:
-  %t316 = load i64, i64* %imp_path
-  %t317 = load i64, i64* %full_imp_path
-  %t318 = load i64, i64* %stdlib_dir
-  %t319 = call i64 @path_based_prefix(i64 %t316, i64 %t317, i64 %t318)
-  store i64 %t319, i64* %pprefix
-  %t320 = load i64, i64* %path_to_prefix
-  %t321 = load i64, i64* %full_imp_path
-  %t322 = load i64, i64* %pprefix
-  %t323 = call i64 @__map_set(i64 %t320, i64 %t321, i64 %t322)
+  %t333 = load i64, i64* %imp_path
+  %t334 = load i64, i64* %full_imp_path
+  %t335 = load i64, i64* %stdlib_dir
+  %t336 = call i64 @path_based_prefix(i64 %t333, i64 %t334, i64 %t335)
+  store i64 %t336, i64* %pprefix
+  %t337 = load i64, i64* %path_to_prefix
+  %t338 = load i64, i64* %full_imp_path
+  %t339 = load i64, i64* %pprefix
+  %t340 = call i64 @__map_set(i64 %t337, i64 %t338, i64 %t339)
   br label %endif9813
 endif9813:
-  %t324 = load i64, i64* %resolved_aliases
-  %t325 = load i64, i64* %alias
-  %t326 = load i64, i64* %pprefix
-  %t327 = call i64 @__map_set(i64 %t324, i64 %t325, i64 %t326)
+  %t341 = load i64, i64* %resolved_aliases
+  %t342 = load i64, i64* %alias
+  %t343 = load i64, i64* %pprefix
+  %t344 = call i64 @__map_set(i64 %t341, i64 %t342, i64 %t343)
   br label %endif9810
 else9812:
   br label %endif9810
 endif9810:
-  %t328 = load i64, i64* %ak
-  %t329 = add i64 0, 1
-  %t330 = add i64 %t328, %t329
-  store i64 %t330, i64* %ak
+  %t345 = load i64, i64* %ak
+  %t346 = add i64 0, 1
+  %t347 = add i64 %t345, %t346
+  store i64 %t347, i64* %ak
   br label %while.cond9807
 while.end9809:
-  %t331 = load i64, i64* %source
-  %t332 = call i64 @extract_named_imports(i64 %t331)
-  store i64 %t332, i64* %named_imports_raw_early
-  %t333 = load i64, i64* %named_imports_raw_early
-  %t334 = call i64 @__map_keys(i64 %t333)
-  store i64 %t334, i64* %ni_paths_early
-  %t335 = add i64 0, 0
-  store i64 %t335, i64* %npe
+  %t348 = load i64, i64* %source
+  %t349 = call i64 @extract_named_imports(i64 %t348)
+  store i64 %t349, i64* %named_imports_raw_early
+  %t350 = load i64, i64* %named_imports_raw_early
+  %t351 = call i64 @__map_keys(i64 %t350)
+  store i64 %t351, i64* %ni_paths_early
+  %t352 = add i64 0, 0
+  store i64 %t352, i64* %npe
   br label %while.cond9816
 while.cond9816:
-  %t336 = load i64, i64* %npe
-  %t337 = load i64, i64* %ni_paths_early
-  %t338 = call i64 @__list_length(i64 %t337)
-  %t340 = icmp slt i64 %t336, %t338
-  %t339 = zext i1 %t340 to i64
-  %t341 = trunc i64 %t339 to i1
-  br i1 %t341, label %while.body9817, label %while.end9818
+  %t353 = load i64, i64* %npe
+  %t354 = load i64, i64* %ni_paths_early
+  %t355 = call i64 @__list_length(i64 %t354)
+  %t357 = icmp slt i64 %t353, %t355
+  %t356 = zext i1 %t357 to i64
+  %t358 = trunc i64 %t356 to i1
+  br i1 %t358, label %while.body9817, label %while.end9818
 while.body9817:
-  %t342 = load i64, i64* %ni_paths_early
-  %t343 = load i64, i64* %npe
-  %t344 = icmp slt i64 %t343, 0
-  %t345 = call i64 @__list_length(i64 %t342)
-  %t346 = add i64 %t345, %t343
-  %t347 = select i1 %t344, i64 %t346, i64 %t343
-  %t348 = call i64 @__list_get(i64 %t342, i64 %t347)
-  store i64 %t348, i64* %ni_path_e
-  %t349 = load i64, i64* %ni_path_e
-  %t350 = call i64 @is_builtin_module(i64 %t349)
-  %t351 = xor i64 %t350, 1
-  %t352 = trunc i64 %t351 to i1
-  br i1 %t352, label %then9820, label %else9821
+  %t359 = load i64, i64* %ni_paths_early
+  %t360 = load i64, i64* %npe
+  %t361 = icmp slt i64 %t360, 0
+  %t362 = call i64 @__list_length(i64 %t359)
+  %t363 = add i64 %t362, %t360
+  %t364 = select i1 %t361, i64 %t363, i64 %t360
+  %t365 = call i64 @__list_get(i64 %t359, i64 %t364)
+  store i64 %t365, i64* %ni_path_e
+  %t366 = load i64, i64* %ni_path_e
+  %t367 = call i64 @is_builtin_module(i64 %t366)
+  %t368 = xor i64 %t367, 1
+  %t369 = trunc i64 %t368 to i1
+  br i1 %t369, label %then9820, label %else9821
 then9820:
-  %t353 = load i64, i64* %input_path
-  %t354 = load i64, i64* %ni_path_e
-  %t355 = load i64, i64* %stdlib_dir
-  %t356 = call i64 @resolve_import_path(i64 %t353, i64 %t354, i64 %t355)
-  store i64 %t356, i64* %ni_full_e
-  %t357 = load i64, i64* %path_to_prefix
-  %t358 = load i64, i64* %ni_full_e
-  %t359 = call i64 @__map_has(i64 %t357, i64 %t358)
-  %t360 = xor i64 %t359, 1
-  %t361 = trunc i64 %t360 to i1
-  br i1 %t361, label %then9823, label %else9824
+  %t370 = load i64, i64* %input_path
+  %t371 = load i64, i64* %ni_path_e
+  %t372 = load i64, i64* %stdlib_dir
+  %t373 = call i64 @resolve_import_path(i64 %t370, i64 %t371, i64 %t372)
+  store i64 %t373, i64* %ni_full_e
+  %t374 = load i64, i64* %path_to_prefix
+  %t375 = load i64, i64* %ni_full_e
+  %t376 = call i64 @__map_has(i64 %t374, i64 %t375)
+  %t377 = xor i64 %t376, 1
+  %t378 = trunc i64 %t377 to i1
+  br i1 %t378, label %then9823, label %else9824
 then9823:
-  %t362 = load i64, i64* %path_to_prefix
-  %t363 = load i64, i64* %ni_full_e
-  %t364 = load i64, i64* %ni_path_e
-  %t365 = load i64, i64* %ni_full_e
-  %t366 = load i64, i64* %stdlib_dir
-  %t367 = call i64 @path_based_prefix(i64 %t364, i64 %t365, i64 %t366)
-  %t368 = call i64 @__map_set(i64 %t362, i64 %t363, i64 %t367)
+  %t379 = load i64, i64* %path_to_prefix
+  %t380 = load i64, i64* %ni_full_e
+  %t381 = load i64, i64* %ni_path_e
+  %t382 = load i64, i64* %ni_full_e
+  %t383 = load i64, i64* %stdlib_dir
+  %t384 = call i64 @path_based_prefix(i64 %t381, i64 %t382, i64 %t383)
+  %t385 = call i64 @__map_set(i64 %t379, i64 %t380, i64 %t384)
   br label %endif9822
 else9824:
   br label %endif9822
@@ -131901,246 +131937,246 @@ endif9822:
 else9821:
   br label %endif9819
 endif9819:
-  %t369 = load i64, i64* %npe
-  %t370 = add i64 0, 1
-  %t371 = add i64 %t369, %t370
-  store i64 %t371, i64* %npe
+  %t386 = load i64, i64* %npe
+  %t387 = add i64 0, 1
+  %t388 = add i64 %t386, %t387
+  store i64 %t388, i64* %npe
   br label %while.cond9816
 while.end9818:
-  %t372 = load i64, i64* %stdlib_dir
-  %t373 = getelementptr [12 x i8], [12 x i8]* @.str.5120, i64 0, i64 0
-  %t374 = ptrtoint i8* %t373 to i64
-  %t375 = inttoptr i64 %t372 to i8*
-  %t376 = inttoptr i64 %t374 to i8*
-  %t377 = call i64 @strlen(i8* %t375)
-  %t378 = call i64 @strlen(i8* %t376)
-  %t379 = add i64 %t377, %t378
-  %t380 = add i64 %t379, 1
-  %t381 = call i8* @malloc(i64 %t380)
-  call i8* @strcpy(i8* %t381, i8* %t375)
-  call i8* @strcat(i8* %t381, i8* %t376)
-  %t382 = ptrtoint i8* %t381 to i64
-  store i64 %t382, i64* %prelude_path
-  %t383 = call i64 @__map_new()
-  store i64 %t383, i64* %visited
-  %t384 = call i64 @__list_new()
-  store i64 %t384, i64* %module_stmts
-  %t385 = call i64 @__list_new()
-  store i64 %t385, i64* %module_prefixes_list
-  %t386 = load i64, i64* %prelude_path
-  %t387 = call i64 @__io_file_exists(i64 %t386)
-  %t388 = trunc i64 %t387 to i1
-  br i1 %t388, label %then9826, label %else9827
+  %t389 = load i64, i64* %stdlib_dir
+  %t390 = getelementptr [12 x i8], [12 x i8]* @.str.5124, i64 0, i64 0
+  %t391 = ptrtoint i8* %t390 to i64
+  %t392 = inttoptr i64 %t389 to i8*
+  %t393 = inttoptr i64 %t391 to i8*
+  %t394 = call i64 @strlen(i8* %t392)
+  %t395 = call i64 @strlen(i8* %t393)
+  %t396 = add i64 %t394, %t395
+  %t397 = add i64 %t396, 1
+  %t398 = call i8* @malloc(i64 %t397)
+  call i8* @strcpy(i8* %t398, i8* %t392)
+  call i8* @strcat(i8* %t398, i8* %t393)
+  %t399 = ptrtoint i8* %t398 to i64
+  store i64 %t399, i64* %prelude_path
+  %t400 = call i64 @__map_new()
+  store i64 %t400, i64* %visited
+  %t401 = call i64 @__list_new()
+  store i64 %t401, i64* %module_stmts
+  %t402 = call i64 @__list_new()
+  store i64 %t402, i64* %module_prefixes_list
+  %t403 = load i64, i64* %prelude_path
+  %t404 = call i64 @__io_file_exists(i64 %t403)
+  %t405 = trunc i64 %t404 to i1
+  br i1 %t405, label %then9826, label %else9827
 then9826:
-  %t389 = load i64, i64* %prelude_path
-  %t390 = call i64 @__io_read_file(i64 %t389)
-  store i64 %t390, i64* %prelude_src
-  %t391 = load i64, i64* %prelude_src
-  %t392 = call i64 @lexer_lex(i64 %t391)
-  store i64 %t392, i64* %prelude_tokens
-  %t393 = load i64, i64* %prelude_tokens
-  %t394 = load i64, i64* %prelude_src
-  %t395 = call i64 @parser_parse_with_source(i64 %t393, i64 %t394)
-  store i64 %t395, i64* %prelude_program
-  %t396 = load i64, i64* %module_stmts
-  %t397 = load i64, i64* %prelude_program
-  %t398 = call i64 @__list_push(i64 %t396, i64 %t397)
-  %t399 = load i64, i64* %module_prefixes_list
-  %t400 = getelementptr [1 x i8], [1 x i8]* @.str.5121, i64 0, i64 0
-  %t401 = ptrtoint i8* %t400 to i64
-  %t402 = call i64 @__list_push(i64 %t399, i64 %t401)
-  %t403 = load i64, i64* %visited
-  %t404 = load i64, i64* %prelude_path
-  %t405 = add i64 0, 1
-  %t406 = call i64 @__map_set(i64 %t403, i64 %t404, i64 %t405)
+  %t406 = load i64, i64* %prelude_path
+  %t407 = call i64 @__io_read_file(i64 %t406)
+  store i64 %t407, i64* %prelude_src
+  %t408 = load i64, i64* %prelude_src
+  %t409 = call i64 @lexer_lex(i64 %t408)
+  store i64 %t409, i64* %prelude_tokens
+  %t410 = load i64, i64* %prelude_tokens
+  %t411 = load i64, i64* %prelude_src
+  %t412 = call i64 @parser_parse_with_source(i64 %t410, i64 %t411)
+  store i64 %t412, i64* %prelude_program
+  %t413 = load i64, i64* %module_stmts
+  %t414 = load i64, i64* %prelude_program
+  %t415 = call i64 @__list_push(i64 %t413, i64 %t414)
+  %t416 = load i64, i64* %module_prefixes_list
+  %t417 = getelementptr [1 x i8], [1 x i8]* @.str.5125, i64 0, i64 0
+  %t418 = ptrtoint i8* %t417 to i64
+  %t419 = call i64 @__list_push(i64 %t416, i64 %t418)
+  %t420 = load i64, i64* %visited
+  %t421 = load i64, i64* %prelude_path
+  %t422 = add i64 0, 1
+  %t423 = call i64 @__map_set(i64 %t420, i64 %t421, i64 %t422)
   br label %endif9825
 else9827:
   br label %endif9825
 endif9825:
-  %t407 = add i64 0, 0
-  store i64 %t407, i64* %lpi
+  %t424 = add i64 0, 0
+  store i64 %t424, i64* %lpi
   br label %while.cond9828
 while.cond9828:
-  %t408 = load i64, i64* %lpi
-  %t409 = load i64, i64* @__g__lib_paths
-  %t410 = call i64 @__list_length(i64 %t409)
-  %t412 = icmp slt i64 %t408, %t410
-  %t411 = zext i1 %t412 to i64
-  %t413 = trunc i64 %t411 to i1
-  br i1 %t413, label %while.body9829, label %while.end9830
+  %t425 = load i64, i64* %lpi
+  %t426 = load i64, i64* @__g__lib_paths
+  %t427 = call i64 @__list_length(i64 %t426)
+  %t429 = icmp slt i64 %t425, %t427
+  %t428 = zext i1 %t429 to i64
+  %t430 = trunc i64 %t428 to i1
+  br i1 %t430, label %while.body9829, label %while.end9830
 while.body9829:
-  %t414 = load i64, i64* @__g__lib_paths
-  %t415 = load i64, i64* %lpi
-  %t416 = icmp slt i64 %t415, 0
-  %t417 = call i64 @__list_length(i64 %t414)
-  %t418 = add i64 %t417, %t415
-  %t419 = select i1 %t416, i64 %t418, i64 %t415
-  %t420 = call i64 @__list_get(i64 %t414, i64 %t419)
-  store i64 %t420, i64* %lib_dir
-  %t421 = load i64, i64* %source
-  %t422 = call i64 @extract_imports(i64 %t421)
-  store i64 %t422, i64* %dep_imports
-  %t423 = add i64 0, 0
-  store i64 %t423, i64* %di
+  %t431 = load i64, i64* @__g__lib_paths
+  %t432 = load i64, i64* %lpi
+  %t433 = icmp slt i64 %t432, 0
+  %t434 = call i64 @__list_length(i64 %t431)
+  %t435 = add i64 %t434, %t432
+  %t436 = select i1 %t433, i64 %t435, i64 %t432
+  %t437 = call i64 @__list_get(i64 %t431, i64 %t436)
+  store i64 %t437, i64* %lib_dir
+  %t438 = load i64, i64* %source
+  %t439 = call i64 @extract_imports(i64 %t438)
+  store i64 %t439, i64* %dep_imports
+  %t440 = add i64 0, 0
+  store i64 %t440, i64* %di
   br label %while.cond9831
 while.cond9831:
-  %t424 = load i64, i64* %di
-  %t425 = load i64, i64* %dep_imports
-  %t426 = call i64 @__list_length(i64 %t425)
-  %t428 = icmp slt i64 %t424, %t426
-  %t427 = zext i1 %t428 to i64
-  %t429 = trunc i64 %t427 to i1
-  br i1 %t429, label %while.body9832, label %while.end9833
+  %t441 = load i64, i64* %di
+  %t442 = load i64, i64* %dep_imports
+  %t443 = call i64 @__list_length(i64 %t442)
+  %t445 = icmp slt i64 %t441, %t443
+  %t444 = zext i1 %t445 to i64
+  %t446 = trunc i64 %t444 to i1
+  br i1 %t446, label %while.body9832, label %while.end9833
 while.body9832:
-  %t430 = load i64, i64* %dep_imports
-  %t431 = load i64, i64* %di
-  %t432 = icmp slt i64 %t431, 0
-  %t433 = call i64 @__list_length(i64 %t430)
-  %t434 = add i64 %t433, %t431
-  %t435 = select i1 %t432, i64 %t434, i64 %t431
-  %t436 = call i64 @__list_get(i64 %t430, i64 %t435)
-  store i64 %t436, i64* %dep_path
-  %t437 = load i64, i64* %dep_path
-  %t438 = inttoptr i64 %t437 to i8*
-  %t439 = getelementptr [3 x i8], [3 x i8]* @.str.5122, i64 0, i64 0
-  %t440 = ptrtoint i8* %t439 to i64
-  %t441 = inttoptr i64 %t440 to i8*
-  %t442 = call i64 @strlen(i8* %t441)
-  %t443 = call i32 @strncmp(i8* %t438, i8* %t441, i64 %t442)
-  %t444 = icmp eq i32 %t443, 0
-  %t445 = zext i1 %t444 to i64
-  %t446 = xor i64 %t445, 1
-  %t447 = trunc i64 %t446 to i1
+  %t447 = load i64, i64* %dep_imports
+  %t448 = load i64, i64* %di
+  %t449 = icmp slt i64 %t448, 0
+  %t450 = call i64 @__list_length(i64 %t447)
+  %t451 = add i64 %t450, %t448
+  %t452 = select i1 %t449, i64 %t451, i64 %t448
+  %t453 = call i64 @__list_get(i64 %t447, i64 %t452)
+  store i64 %t453, i64* %dep_path
+  %t454 = load i64, i64* %dep_path
+  %t455 = inttoptr i64 %t454 to i8*
+  %t456 = getelementptr [3 x i8], [3 x i8]* @.str.5126, i64 0, i64 0
+  %t457 = ptrtoint i8* %t456 to i64
+  %t458 = inttoptr i64 %t457 to i8*
+  %t459 = call i64 @strlen(i8* %t458)
+  %t460 = call i32 @strncmp(i8* %t455, i8* %t458, i64 %t459)
+  %t461 = icmp eq i32 %t460, 0
+  %t462 = zext i1 %t461 to i64
+  %t463 = xor i64 %t462, 1
+  %t464 = trunc i64 %t463 to i1
   br label %logic.entry9835
 logic.entry9835:
-  br i1 %t447, label %rhs9836, label %end9837
+  br i1 %t464, label %rhs9836, label %end9837
 rhs9836:
-  %t448 = load i64, i64* %dep_path
-  %t449 = inttoptr i64 %t448 to i8*
-  %t450 = getelementptr [2 x i8], [2 x i8]* @.str.5123, i64 0, i64 0
-  %t451 = ptrtoint i8* %t450 to i64
-  %t452 = inttoptr i64 %t451 to i8*
-  %t453 = call i64 @strlen(i8* %t452)
-  %t454 = call i32 @strncmp(i8* %t449, i8* %t452, i64 %t453)
-  %t455 = icmp eq i32 %t454, 0
-  %t456 = zext i1 %t455 to i64
-  %t457 = xor i64 %t456, 1
-  %t458 = trunc i64 %t457 to i1
+  %t465 = load i64, i64* %dep_path
+  %t466 = inttoptr i64 %t465 to i8*
+  %t467 = getelementptr [2 x i8], [2 x i8]* @.str.5127, i64 0, i64 0
+  %t468 = ptrtoint i8* %t467 to i64
+  %t469 = inttoptr i64 %t468 to i8*
+  %t470 = call i64 @strlen(i8* %t469)
+  %t471 = call i32 @strncmp(i8* %t466, i8* %t469, i64 %t470)
+  %t472 = icmp eq i32 %t471, 0
+  %t473 = zext i1 %t472 to i64
+  %t474 = xor i64 %t473, 1
+  %t475 = trunc i64 %t474 to i1
   br label %end9837
 end9837:
-  %t459 = phi i1 [%t447, %logic.entry9835], [%t458, %rhs9836]
-  %t460 = zext i1 %t459 to i64
-  %t461 = trunc i64 %t460 to i1
-  br i1 %t461, label %then9838, label %else9839
+  %t476 = phi i1 [%t464, %logic.entry9835], [%t475, %rhs9836]
+  %t477 = zext i1 %t476 to i64
+  %t478 = trunc i64 %t477 to i1
+  br i1 %t478, label %then9838, label %else9839
 then9838:
-  %t462 = load i64, i64* %dep_path
-  store i64 %t462, i64* %pkg_name
-  %t463 = load i64, i64* %dep_path
-  %t464 = getelementptr [2 x i8], [2 x i8]* @.str.5124, i64 0, i64 0
-  %t465 = ptrtoint i8* %t464 to i64
-  %t466 = call i64 @rt_str_index_of(i64 %t463, i64 %t465)
-  store i64 %t466, i64* %slash
-  %t467 = load i64, i64* %slash
-  %t468 = add i64 0, 0
-  %t470 = icmp sgt i64 %t467, %t468
-  %t469 = zext i1 %t470 to i64
-  %t471 = trunc i64 %t469 to i1
-  br i1 %t471, label %then9841, label %else9842
+  %t479 = load i64, i64* %dep_path
+  store i64 %t479, i64* %pkg_name
+  %t480 = load i64, i64* %dep_path
+  %t481 = getelementptr [2 x i8], [2 x i8]* @.str.5128, i64 0, i64 0
+  %t482 = ptrtoint i8* %t481 to i64
+  %t483 = call i64 @rt_str_index_of(i64 %t480, i64 %t482)
+  store i64 %t483, i64* %slash
+  %t484 = load i64, i64* %slash
+  %t485 = add i64 0, 0
+  %t487 = icmp sgt i64 %t484, %t485
+  %t486 = zext i1 %t487 to i64
+  %t488 = trunc i64 %t486 to i1
+  br i1 %t488, label %then9841, label %else9842
 then9841:
-  %t472 = load i64, i64* %dep_path
-  %t473 = inttoptr i64 %t472 to i8*
-  %t474 = add i64 0, 0
-  %t475 = load i64, i64* %slash
-  %t476 = sub i64 %t475, %t474
-  %t477 = add i64 %t476, 1
-  %t478 = call i8* @malloc(i64 %t477)
-  %t479 = getelementptr i8, i8* %t473, i64 %t474
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t478, i8* %t479, i64 %t476, i1 false)
-  %t480 = getelementptr i8, i8* %t478, i64 %t476
-  store i8 0, i8* %t480
-  %t481 = ptrtoint i8* %t478 to i64
-  store i64 %t481, i64* %pkg_name
+  %t489 = load i64, i64* %dep_path
+  %t490 = inttoptr i64 %t489 to i8*
+  %t491 = add i64 0, 0
+  %t492 = load i64, i64* %slash
+  %t493 = sub i64 %t492, %t491
+  %t494 = add i64 %t493, 1
+  %t495 = call i8* @malloc(i64 %t494)
+  %t496 = getelementptr i8, i8* %t490, i64 %t491
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t495, i8* %t496, i64 %t493, i1 false)
+  %t497 = getelementptr i8, i8* %t495, i64 %t493
+  store i8 0, i8* %t497
+  %t498 = ptrtoint i8* %t495 to i64
+  store i64 %t498, i64* %pkg_name
   br label %endif9840
 else9842:
   br label %endif9840
 endif9840:
-  %t482 = load i64, i64* %lib_dir
-  %t483 = getelementptr [2 x i8], [2 x i8]* @.str.5125, i64 0, i64 0
-  %t484 = ptrtoint i8* %t483 to i64
-  %t485 = inttoptr i64 %t482 to i8*
-  %t486 = inttoptr i64 %t484 to i8*
-  %t487 = call i64 @strlen(i8* %t485)
-  %t488 = call i64 @strlen(i8* %t486)
-  %t489 = add i64 %t487, %t488
-  %t490 = add i64 %t489, 1
-  %t491 = call i8* @malloc(i64 %t490)
-  call i8* @strcpy(i8* %t491, i8* %t485)
-  call i8* @strcat(i8* %t491, i8* %t486)
-  %t492 = ptrtoint i8* %t491 to i64
-  %t493 = load i64, i64* %pkg_name
-  %t494 = inttoptr i64 %t492 to i8*
-  %t495 = inttoptr i64 %t493 to i8*
-  %t496 = call i64 @strlen(i8* %t494)
-  %t497 = call i64 @strlen(i8* %t495)
-  %t498 = add i64 %t496, %t497
-  %t499 = add i64 %t498, 1
-  %t500 = call i8* @malloc(i64 %t499)
-  call i8* @strcpy(i8* %t500, i8* %t494)
-  call i8* @strcat(i8* %t500, i8* %t495)
+  %t499 = load i64, i64* %lib_dir
+  %t500 = getelementptr [2 x i8], [2 x i8]* @.str.5129, i64 0, i64 0
   %t501 = ptrtoint i8* %t500 to i64
-  %t502 = getelementptr [16 x i8], [16 x i8]* @.str.5126, i64 0, i64 0
-  %t503 = ptrtoint i8* %t502 to i64
-  %t504 = inttoptr i64 %t501 to i8*
-  %t505 = inttoptr i64 %t503 to i8*
-  %t506 = call i64 @strlen(i8* %t504)
-  %t507 = call i64 @strlen(i8* %t505)
-  %t508 = add i64 %t506, %t507
-  %t509 = add i64 %t508, 1
-  %t510 = call i8* @malloc(i64 %t509)
-  call i8* @strcpy(i8* %t510, i8* %t504)
-  call i8* @strcat(i8* %t510, i8* %t505)
-  %t511 = ptrtoint i8* %t510 to i64
-  store i64 %t511, i64* %pkg_prelude
-  %t512 = load i64, i64* %pkg_prelude
-  %t513 = call i64 @__io_file_exists(i64 %t512)
-  %t514 = trunc i64 %t513 to i1
+  %t502 = inttoptr i64 %t499 to i8*
+  %t503 = inttoptr i64 %t501 to i8*
+  %t504 = call i64 @strlen(i8* %t502)
+  %t505 = call i64 @strlen(i8* %t503)
+  %t506 = add i64 %t504, %t505
+  %t507 = add i64 %t506, 1
+  %t508 = call i8* @malloc(i64 %t507)
+  call i8* @strcpy(i8* %t508, i8* %t502)
+  call i8* @strcat(i8* %t508, i8* %t503)
+  %t509 = ptrtoint i8* %t508 to i64
+  %t510 = load i64, i64* %pkg_name
+  %t511 = inttoptr i64 %t509 to i8*
+  %t512 = inttoptr i64 %t510 to i8*
+  %t513 = call i64 @strlen(i8* %t511)
+  %t514 = call i64 @strlen(i8* %t512)
+  %t515 = add i64 %t513, %t514
+  %t516 = add i64 %t515, 1
+  %t517 = call i8* @malloc(i64 %t516)
+  call i8* @strcpy(i8* %t517, i8* %t511)
+  call i8* @strcat(i8* %t517, i8* %t512)
+  %t518 = ptrtoint i8* %t517 to i64
+  %t519 = getelementptr [16 x i8], [16 x i8]* @.str.5130, i64 0, i64 0
+  %t520 = ptrtoint i8* %t519 to i64
+  %t521 = inttoptr i64 %t518 to i8*
+  %t522 = inttoptr i64 %t520 to i8*
+  %t523 = call i64 @strlen(i8* %t521)
+  %t524 = call i64 @strlen(i8* %t522)
+  %t525 = add i64 %t523, %t524
+  %t526 = add i64 %t525, 1
+  %t527 = call i8* @malloc(i64 %t526)
+  call i8* @strcpy(i8* %t527, i8* %t521)
+  call i8* @strcat(i8* %t527, i8* %t522)
+  %t528 = ptrtoint i8* %t527 to i64
+  store i64 %t528, i64* %pkg_prelude
+  %t529 = load i64, i64* %pkg_prelude
+  %t530 = call i64 @__io_file_exists(i64 %t529)
+  %t531 = trunc i64 %t530 to i1
   br label %logic.entry9844
 logic.entry9844:
-  br i1 %t514, label %rhs9845, label %end9846
+  br i1 %t531, label %rhs9845, label %end9846
 rhs9845:
-  %t515 = load i64, i64* %visited
-  %t516 = load i64, i64* %pkg_prelude
-  %t517 = call i64 @__map_has(i64 %t515, i64 %t516)
-  %t518 = xor i64 %t517, 1
-  %t519 = trunc i64 %t518 to i1
+  %t532 = load i64, i64* %visited
+  %t533 = load i64, i64* %pkg_prelude
+  %t534 = call i64 @__map_has(i64 %t532, i64 %t533)
+  %t535 = xor i64 %t534, 1
+  %t536 = trunc i64 %t535 to i1
   br label %end9846
 end9846:
-  %t520 = phi i1 [%t514, %logic.entry9844], [%t519, %rhs9845]
-  %t521 = zext i1 %t520 to i64
-  %t522 = trunc i64 %t521 to i1
-  br i1 %t522, label %then9847, label %else9848
+  %t537 = phi i1 [%t531, %logic.entry9844], [%t536, %rhs9845]
+  %t538 = zext i1 %t537 to i64
+  %t539 = trunc i64 %t538 to i1
+  br i1 %t539, label %then9847, label %else9848
 then9847:
-  %t523 = load i64, i64* %pkg_prelude
-  %t524 = call i64 @__io_read_file(i64 %t523)
-  store i64 %t524, i64* %dep_src
-  %t525 = load i64, i64* %dep_src
-  %t526 = call i64 @lexer_lex(i64 %t525)
-  store i64 %t526, i64* %dep_tokens
-  %t527 = load i64, i64* %dep_tokens
-  %t528 = load i64, i64* %dep_src
-  %t529 = call i64 @parser_parse_with_source(i64 %t527, i64 %t528)
-  store i64 %t529, i64* %dep_program
-  %t530 = load i64, i64* %module_stmts
-  %t531 = load i64, i64* %dep_program
-  %t532 = call i64 @__list_push(i64 %t530, i64 %t531)
-  %t533 = load i64, i64* %module_prefixes_list
-  %t534 = getelementptr [1 x i8], [1 x i8]* @.str.5127, i64 0, i64 0
-  %t535 = ptrtoint i8* %t534 to i64
-  %t536 = call i64 @__list_push(i64 %t533, i64 %t535)
-  %t537 = load i64, i64* %visited
-  %t538 = load i64, i64* %pkg_prelude
-  %t539 = add i64 0, 1
-  %t540 = call i64 @__map_set(i64 %t537, i64 %t538, i64 %t539)
+  %t540 = load i64, i64* %pkg_prelude
+  %t541 = call i64 @__io_read_file(i64 %t540)
+  store i64 %t541, i64* %dep_src
+  %t542 = load i64, i64* %dep_src
+  %t543 = call i64 @lexer_lex(i64 %t542)
+  store i64 %t543, i64* %dep_tokens
+  %t544 = load i64, i64* %dep_tokens
+  %t545 = load i64, i64* %dep_src
+  %t546 = call i64 @parser_parse_with_source(i64 %t544, i64 %t545)
+  store i64 %t546, i64* %dep_program
+  %t547 = load i64, i64* %module_stmts
+  %t548 = load i64, i64* %dep_program
+  %t549 = call i64 @__list_push(i64 %t547, i64 %t548)
+  %t550 = load i64, i64* %module_prefixes_list
+  %t551 = getelementptr [1 x i8], [1 x i8]* @.str.5131, i64 0, i64 0
+  %t552 = ptrtoint i8* %t551 to i64
+  %t553 = call i64 @__list_push(i64 %t550, i64 %t552)
+  %t554 = load i64, i64* %visited
+  %t555 = load i64, i64* %pkg_prelude
+  %t556 = add i64 0, 1
+  %t557 = call i64 @__map_set(i64 %t554, i64 %t555, i64 %t556)
   br label %endif9843
 else9848:
   br label %endif9843
@@ -132149,357 +132185,438 @@ endif9843:
 else9839:
   br label %endif9834
 endif9834:
-  %t541 = load i64, i64* %di
-  %t542 = add i64 0, 1
-  %t543 = add i64 %t541, %t542
-  store i64 %t543, i64* %di
+  %t558 = load i64, i64* %di
+  %t559 = add i64 0, 1
+  %t560 = add i64 %t558, %t559
+  store i64 %t560, i64* %di
   br label %while.cond9831
 while.end9833:
-  %t544 = load i64, i64* %lpi
-  %t545 = add i64 0, 1
-  %t546 = add i64 %t544, %t545
-  store i64 %t546, i64* %lpi
+  %t561 = load i64, i64* %lpi
+  %t562 = add i64 0, 1
+  %t563 = add i64 %t561, %t562
+  store i64 %t563, i64* %lpi
   br label %while.cond9828
 while.end9830:
-  %t547 = load i64, i64* %source
-  %t548 = call i64 @extract_imports(i64 %t547)
-  store i64 %t548, i64* %import_paths
-  %t549 = add i64 0, 0
-  store i64 %t549, i64* %pi
+  %t564 = load i64, i64* %source
+  %t565 = call i64 @extract_imports(i64 %t564)
+  store i64 %t565, i64* %import_paths
+  %t566 = getelementptr [20 x i8], [20 x i8]* @.str.5132, i64 0, i64 0
+  %t567 = ptrtoint i8* %t566 to i64
+  %t568 = load i64, i64* %import_paths
+  %t569 = call i64 @__list_length(i64 %t568)
+  %t570 = call i64 @__int_to_string(i64 %t569)
+  %t571 = inttoptr i64 %t567 to i8*
+  %t572 = inttoptr i64 %t570 to i8*
+  %t573 = call i64 @strlen(i8* %t571)
+  %t574 = call i64 @strlen(i8* %t572)
+  %t575 = add i64 %t573, %t574
+  %t576 = add i64 %t575, 1
+  %t577 = call i8* @malloc(i64 %t576)
+  call i8* @strcpy(i8* %t577, i8* %t571)
+  call i8* @strcat(i8* %t577, i8* %t572)
+  %t578 = ptrtoint i8* %t577 to i64
+  %t579 = getelementptr [9 x i8], [9 x i8]* @.str.5133, i64 0, i64 0
+  %t580 = ptrtoint i8* %t579 to i64
+  %t581 = inttoptr i64 %t578 to i8*
+  %t582 = inttoptr i64 %t580 to i8*
+  %t583 = call i64 @strlen(i8* %t581)
+  %t584 = call i64 @strlen(i8* %t582)
+  %t585 = add i64 %t583, %t584
+  %t586 = add i64 %t585, 1
+  %t587 = call i8* @malloc(i64 %t586)
+  call i8* @strcpy(i8* %t587, i8* %t581)
+  call i8* @strcat(i8* %t587, i8* %t582)
+  %t588 = ptrtoint i8* %t587 to i64
+  call void @__io_println_str(i64 %t588)
+  %t589 = add i64 0, 0
+  store i64 %t589, i64* %pi
   br label %while.cond9849
 while.cond9849:
-  %t550 = load i64, i64* %pi
-  %t551 = load i64, i64* %import_paths
-  %t552 = call i64 @__list_length(i64 %t551)
-  %t554 = icmp slt i64 %t550, %t552
-  %t553 = zext i1 %t554 to i64
-  %t555 = trunc i64 %t553 to i1
-  br i1 %t555, label %while.body9850, label %while.end9851
+  %t590 = load i64, i64* %pi
+  %t591 = load i64, i64* %import_paths
+  %t592 = call i64 @__list_length(i64 %t591)
+  %t594 = icmp slt i64 %t590, %t592
+  %t593 = zext i1 %t594 to i64
+  %t595 = trunc i64 %t593 to i1
+  br i1 %t595, label %while.body9850, label %while.end9851
 while.body9850:
-  %t556 = load i64, i64* %import_paths
-  %t557 = load i64, i64* %pi
-  %t558 = icmp slt i64 %t557, 0
-  %t559 = call i64 @__list_length(i64 %t556)
-  %t560 = add i64 %t559, %t557
-  %t561 = select i1 %t558, i64 %t560, i64 %t557
-  %t562 = call i64 @__list_get(i64 %t556, i64 %t561)
-  store i64 %t562, i64* %imp_path
-  %t563 = load i64, i64* %imp_path
-  %t564 = call i64 @is_builtin_module(i64 %t563)
-  %t565 = xor i64 %t564, 1
-  %t566 = trunc i64 %t565 to i1
-  br i1 %t566, label %then9853, label %else9854
+  %t596 = load i64, i64* %import_paths
+  %t597 = load i64, i64* %pi
+  %t598 = icmp slt i64 %t597, 0
+  %t599 = call i64 @__list_length(i64 %t596)
+  %t600 = add i64 %t599, %t597
+  %t601 = select i1 %t598, i64 %t600, i64 %t597
+  %t602 = call i64 @__list_get(i64 %t596, i64 %t601)
+  store i64 %t602, i64* %imp_path
+  %t603 = load i64, i64* %imp_path
+  %t604 = call i64 @is_builtin_module(i64 %t603)
+  %t605 = xor i64 %t604, 1
+  %t606 = trunc i64 %t605 to i1
+  br i1 %t606, label %then9853, label %else9854
 then9853:
-  %t567 = load i64, i64* %input_path
-  %t568 = load i64, i64* %imp_path
-  %t569 = load i64, i64* %stdlib_dir
-  %t570 = call i64 @resolve_import_path(i64 %t567, i64 %t568, i64 %t569)
-  store i64 %t570, i64* %full_path
-  %t571 = load i64, i64* %path_to_prefix
-  %t572 = load i64, i64* %full_path
-  %t573 = call i64 @__map_has(i64 %t571, i64 %t572)
-  %t574 = xor i64 %t573, 1
-  %t575 = trunc i64 %t574 to i1
-  br i1 %t575, label %then9856, label %else9857
+  %t607 = load i64, i64* %input_path
+  %t608 = load i64, i64* %imp_path
+  %t609 = load i64, i64* %stdlib_dir
+  %t610 = call i64 @resolve_import_path(i64 %t607, i64 %t608, i64 %t609)
+  store i64 %t610, i64* %full_path
+  %t611 = getelementptr [17 x i8], [17 x i8]* @.str.5134, i64 0, i64 0
+  %t612 = ptrtoint i8* %t611 to i64
+  %t613 = load i64, i64* %imp_path
+  %t614 = inttoptr i64 %t612 to i8*
+  %t615 = inttoptr i64 %t613 to i8*
+  %t616 = call i64 @strlen(i8* %t614)
+  %t617 = call i64 @strlen(i8* %t615)
+  %t618 = add i64 %t616, %t617
+  %t619 = add i64 %t618, 1
+  %t620 = call i8* @malloc(i64 %t619)
+  call i8* @strcpy(i8* %t620, i8* %t614)
+  call i8* @strcat(i8* %t620, i8* %t615)
+  %t621 = ptrtoint i8* %t620 to i64
+  %t622 = getelementptr [5 x i8], [5 x i8]* @.str.5135, i64 0, i64 0
+  %t623 = ptrtoint i8* %t622 to i64
+  %t624 = inttoptr i64 %t621 to i8*
+  %t625 = inttoptr i64 %t623 to i8*
+  %t626 = call i64 @strlen(i8* %t624)
+  %t627 = call i64 @strlen(i8* %t625)
+  %t628 = add i64 %t626, %t627
+  %t629 = add i64 %t628, 1
+  %t630 = call i8* @malloc(i64 %t629)
+  call i8* @strcpy(i8* %t630, i8* %t624)
+  call i8* @strcat(i8* %t630, i8* %t625)
+  %t631 = ptrtoint i8* %t630 to i64
+  %t632 = load i64, i64* %full_path
+  %t633 = inttoptr i64 %t631 to i8*
+  %t634 = inttoptr i64 %t632 to i8*
+  %t635 = call i64 @strlen(i8* %t633)
+  %t636 = call i64 @strlen(i8* %t634)
+  %t637 = add i64 %t635, %t636
+  %t638 = add i64 %t637, 1
+  %t639 = call i8* @malloc(i64 %t638)
+  call i8* @strcpy(i8* %t639, i8* %t633)
+  call i8* @strcat(i8* %t639, i8* %t634)
+  %t640 = ptrtoint i8* %t639 to i64
+  call void @__io_println_str(i64 %t640)
+  %t641 = load i64, i64* %path_to_prefix
+  %t642 = load i64, i64* %full_path
+  %t643 = call i64 @__map_has(i64 %t641, i64 %t642)
+  %t644 = xor i64 %t643, 1
+  %t645 = trunc i64 %t644 to i1
+  br i1 %t645, label %then9856, label %else9857
 then9856:
-  %t576 = load i64, i64* %path_to_prefix
-  %t577 = load i64, i64* %full_path
-  %t578 = load i64, i64* %imp_path
-  %t579 = load i64, i64* %full_path
-  %t580 = load i64, i64* %stdlib_dir
-  %t581 = call i64 @path_based_prefix(i64 %t578, i64 %t579, i64 %t580)
-  %t582 = call i64 @__map_set(i64 %t576, i64 %t577, i64 %t581)
+  %t646 = load i64, i64* %path_to_prefix
+  %t647 = load i64, i64* %full_path
+  %t648 = load i64, i64* %imp_path
+  %t649 = load i64, i64* %full_path
+  %t650 = load i64, i64* %stdlib_dir
+  %t651 = call i64 @path_based_prefix(i64 %t648, i64 %t649, i64 %t650)
+  %t652 = call i64 @__map_set(i64 %t646, i64 %t647, i64 %t651)
   br label %endif9855
 else9857:
   br label %endif9855
 endif9855:
-  %t583 = load i64, i64* %full_path
-  %t584 = load i64, i64* %stdlib_dir
-  %t585 = load i64, i64* %visited
-  %t586 = load i64, i64* %module_stmts
-  %t587 = load i64, i64* %module_prefixes_list
-  %t588 = load i64, i64* %resolved_aliases
-  %t589 = load i64, i64* %path_to_prefix
-  %t590 = call i64 @collect_modules(i64 %t583, i64 %t584, i64 %t585, i64 %t586, i64 %t587, i64 %t588, i64 %t589)
+  %t653 = load i64, i64* %full_path
+  %t654 = load i64, i64* %stdlib_dir
+  %t655 = load i64, i64* %visited
+  %t656 = load i64, i64* %module_stmts
+  %t657 = load i64, i64* %module_prefixes_list
+  %t658 = load i64, i64* %resolved_aliases
+  %t659 = load i64, i64* %path_to_prefix
+  %t660 = call i64 @collect_modules(i64 %t653, i64 %t654, i64 %t655, i64 %t656, i64 %t657, i64 %t658, i64 %t659)
   br label %endif9852
 else9854:
   br label %endif9852
 endif9852:
-  %t591 = load i64, i64* %pi
-  %t592 = add i64 0, 1
-  %t593 = add i64 %t591, %t592
-  store i64 %t593, i64* %pi
+  %t661 = load i64, i64* %pi
+  %t662 = add i64 0, 1
+  %t663 = add i64 %t661, %t662
+  store i64 %t663, i64* %pi
   br label %while.cond9849
 while.end9851:
-  %t594 = call i64 @parser_had_error()
-  %t595 = trunc i64 %t594 to i1
-  br i1 %t595, label %then9859, label %else9860
+  %t664 = getelementptr [41 x i8], [41 x i8]* @.str.5136, i64 0, i64 0
+  %t665 = ptrtoint i8* %t664 to i64
+  %t666 = load i64, i64* %module_stmts
+  %t667 = call i64 @__list_length(i64 %t666)
+  %t668 = call i64 @__int_to_string(i64 %t667)
+  %t669 = inttoptr i64 %t665 to i8*
+  %t670 = inttoptr i64 %t668 to i8*
+  %t671 = call i64 @strlen(i8* %t669)
+  %t672 = call i64 @strlen(i8* %t670)
+  %t673 = add i64 %t671, %t672
+  %t674 = add i64 %t673, 1
+  %t675 = call i8* @malloc(i64 %t674)
+  call i8* @strcpy(i8* %t675, i8* %t669)
+  call i8* @strcat(i8* %t675, i8* %t670)
+  %t676 = ptrtoint i8* %t675 to i64
+  call void @__io_println_str(i64 %t676)
+  %t677 = call i64 @parser_had_error()
+  %t678 = trunc i64 %t677 to i1
+  br i1 %t678, label %then9859, label %else9860
 then9859:
-  %t596 = add i64 0, 1
-  %t597 = trunc i64 %t596 to i32
-  call void @exit(i32 %t597)
+  %t679 = add i64 0, 1
+  %t680 = trunc i64 %t679 to i32
+  call void @exit(i32 %t680)
   br label %endif9858
 else9860:
   br label %endif9858
 endif9858:
-  %t598 = call i64 @__list_new()
-  store i64 %t598, i64* %all_import_stmts
-  %t599 = call i64 @__list_new()
-  store i64 %t599, i64* %module_boundaries
-  %t600 = getelementptr [1 x i8], [1 x i8]* @.str.5128, i64 0, i64 0
-  %t601 = ptrtoint i8* %t600 to i64
-  store i64 %t601, i64* %prefixes_joined
-  %t602 = add i64 0, 0
-  store i64 %t602, i64* %mfi
+  %t681 = call i64 @__list_new()
+  store i64 %t681, i64* %all_import_stmts
+  %t682 = call i64 @__list_new()
+  store i64 %t682, i64* %module_boundaries
+  %t683 = getelementptr [1 x i8], [1 x i8]* @.str.5137, i64 0, i64 0
+  %t684 = ptrtoint i8* %t683 to i64
+  store i64 %t684, i64* %prefixes_joined
+  %t685 = add i64 0, 0
+  store i64 %t685, i64* %mfi
   br label %while.cond9861
 while.cond9861:
-  %t603 = load i64, i64* %mfi
-  %t604 = load i64, i64* %module_stmts
-  %t605 = call i64 @__list_length(i64 %t604)
-  %t607 = icmp slt i64 %t603, %t605
-  %t606 = zext i1 %t607 to i64
-  %t608 = trunc i64 %t606 to i1
-  br i1 %t608, label %while.body9862, label %while.end9863
+  %t686 = load i64, i64* %mfi
+  %t687 = load i64, i64* %module_stmts
+  %t688 = call i64 @__list_length(i64 %t687)
+  %t690 = icmp slt i64 %t686, %t688
+  %t689 = zext i1 %t690 to i64
+  %t691 = trunc i64 %t689 to i1
+  br i1 %t691, label %while.body9862, label %while.end9863
 while.body9862:
-  %t609 = load i64, i64* %module_stmts
-  %t610 = load i64, i64* %mfi
-  %t611 = icmp slt i64 %t610, 0
-  %t612 = call i64 @__list_length(i64 %t609)
-  %t613 = add i64 %t612, %t610
-  %t614 = select i1 %t611, i64 %t613, i64 %t610
-  %t615 = call i64 @__list_get(i64 %t609, i64 %t614)
-  store i64 %t615, i64* %mod
-  %t616 = load i64, i64* %module_boundaries
-  %t617 = load i64, i64* %all_import_stmts
-  %t618 = call i64 @__list_length(i64 %t617)
-  %t619 = call i64 @__list_push(i64 %t616, i64 %t618)
-  %t620 = load i64, i64* %mfi
-  %t621 = add i64 0, 0
-  %t623 = icmp sgt i64 %t620, %t621
-  %t622 = zext i1 %t623 to i64
-  %t624 = trunc i64 %t622 to i1
-  br i1 %t624, label %then9865, label %else9866
+  %t692 = load i64, i64* %module_stmts
+  %t693 = load i64, i64* %mfi
+  %t694 = icmp slt i64 %t693, 0
+  %t695 = call i64 @__list_length(i64 %t692)
+  %t696 = add i64 %t695, %t693
+  %t697 = select i1 %t694, i64 %t696, i64 %t693
+  %t698 = call i64 @__list_get(i64 %t692, i64 %t697)
+  store i64 %t698, i64* %mod
+  %t699 = load i64, i64* %module_boundaries
+  %t700 = load i64, i64* %all_import_stmts
+  %t701 = call i64 @__list_length(i64 %t700)
+  %t702 = call i64 @__list_push(i64 %t699, i64 %t701)
+  %t703 = load i64, i64* %mfi
+  %t704 = add i64 0, 0
+  %t706 = icmp sgt i64 %t703, %t704
+  %t705 = zext i1 %t706 to i64
+  %t707 = trunc i64 %t705 to i1
+  br i1 %t707, label %then9865, label %else9866
 then9865:
-  %t625 = load i64, i64* %prefixes_joined
-  %t626 = getelementptr [2 x i8], [2 x i8]* @.str.5129, i64 0, i64 0
-  %t627 = ptrtoint i8* %t626 to i64
-  %t628 = inttoptr i64 %t625 to i8*
-  %t629 = inttoptr i64 %t627 to i8*
-  %t630 = call i64 @strlen(i8* %t628)
-  %t631 = call i64 @strlen(i8* %t629)
-  %t632 = add i64 %t630, %t631
-  %t633 = add i64 %t632, 1
-  %t634 = call i8* @malloc(i64 %t633)
-  call i8* @strcpy(i8* %t634, i8* %t628)
-  call i8* @strcat(i8* %t634, i8* %t629)
-  %t635 = ptrtoint i8* %t634 to i64
-  store i64 %t635, i64* %prefixes_joined
+  %t708 = load i64, i64* %prefixes_joined
+  %t709 = getelementptr [2 x i8], [2 x i8]* @.str.5138, i64 0, i64 0
+  %t710 = ptrtoint i8* %t709 to i64
+  %t711 = inttoptr i64 %t708 to i8*
+  %t712 = inttoptr i64 %t710 to i8*
+  %t713 = call i64 @strlen(i8* %t711)
+  %t714 = call i64 @strlen(i8* %t712)
+  %t715 = add i64 %t713, %t714
+  %t716 = add i64 %t715, 1
+  %t717 = call i8* @malloc(i64 %t716)
+  call i8* @strcpy(i8* %t717, i8* %t711)
+  call i8* @strcat(i8* %t717, i8* %t712)
+  %t718 = ptrtoint i8* %t717 to i64
+  store i64 %t718, i64* %prefixes_joined
   br label %endif9864
 else9866:
   br label %endif9864
 endif9864:
-  %t636 = load i64, i64* %prefixes_joined
-  %t637 = load i64, i64* %module_prefixes_list
-  %t638 = load i64, i64* %mfi
-  %t639 = icmp slt i64 %t638, 0
-  %t640 = call i64 @__list_length(i64 %t637)
-  %t641 = add i64 %t640, %t638
-  %t642 = select i1 %t639, i64 %t641, i64 %t638
-  %t643 = call i64 @__list_get(i64 %t637, i64 %t642)
-  %t644 = inttoptr i64 %t636 to i8*
-  %t645 = inttoptr i64 %t643 to i8*
-  %t646 = call i64 @strlen(i8* %t644)
-  %t647 = call i64 @strlen(i8* %t645)
-  %t648 = add i64 %t646, %t647
-  %t649 = add i64 %t648, 1
-  %t650 = call i8* @malloc(i64 %t649)
-  call i8* @strcpy(i8* %t650, i8* %t644)
-  call i8* @strcat(i8* %t650, i8* %t645)
-  %t651 = ptrtoint i8* %t650 to i64
-  store i64 %t651, i64* %prefixes_joined
-  %t652 = add i64 0, 0
-  store i64 %t652, i64* %msi
+  %t719 = load i64, i64* %prefixes_joined
+  %t720 = load i64, i64* %module_prefixes_list
+  %t721 = load i64, i64* %mfi
+  %t722 = icmp slt i64 %t721, 0
+  %t723 = call i64 @__list_length(i64 %t720)
+  %t724 = add i64 %t723, %t721
+  %t725 = select i1 %t722, i64 %t724, i64 %t721
+  %t726 = call i64 @__list_get(i64 %t720, i64 %t725)
+  %t727 = inttoptr i64 %t719 to i8*
+  %t728 = inttoptr i64 %t726 to i8*
+  %t729 = call i64 @strlen(i8* %t727)
+  %t730 = call i64 @strlen(i8* %t728)
+  %t731 = add i64 %t729, %t730
+  %t732 = add i64 %t731, 1
+  %t733 = call i8* @malloc(i64 %t732)
+  call i8* @strcpy(i8* %t733, i8* %t727)
+  call i8* @strcat(i8* %t733, i8* %t728)
+  %t734 = ptrtoint i8* %t733 to i64
+  store i64 %t734, i64* %prefixes_joined
+  %t735 = add i64 0, 0
+  store i64 %t735, i64* %msi
   br label %while.cond9867
 while.cond9867:
-  %t653 = load i64, i64* %msi
-  %t654 = load i64, i64* %mod
-  %t655 = call i64 @__list_length(i64 %t654)
-  %t657 = icmp slt i64 %t653, %t655
-  %t656 = zext i1 %t657 to i64
-  %t658 = trunc i64 %t656 to i1
-  br i1 %t658, label %while.body9868, label %while.end9869
+  %t736 = load i64, i64* %msi
+  %t737 = load i64, i64* %mod
+  %t738 = call i64 @__list_length(i64 %t737)
+  %t740 = icmp slt i64 %t736, %t738
+  %t739 = zext i1 %t740 to i64
+  %t741 = trunc i64 %t739 to i1
+  br i1 %t741, label %while.body9868, label %while.end9869
 while.body9868:
-  %t659 = load i64, i64* %all_import_stmts
-  %t660 = load i64, i64* %mod
-  %t661 = load i64, i64* %msi
-  %t662 = icmp slt i64 %t661, 0
-  %t663 = call i64 @__list_length(i64 %t660)
-  %t664 = add i64 %t663, %t661
-  %t665 = select i1 %t662, i64 %t664, i64 %t661
-  %t666 = call i64 @__list_get(i64 %t660, i64 %t665)
-  %t667 = call i64 @__list_push(i64 %t659, i64 %t666)
-  %t668 = load i64, i64* %msi
-  %t669 = add i64 0, 1
-  %t670 = add i64 %t668, %t669
-  store i64 %t670, i64* %msi
+  %t742 = load i64, i64* %all_import_stmts
+  %t743 = load i64, i64* %mod
+  %t744 = load i64, i64* %msi
+  %t745 = icmp slt i64 %t744, 0
+  %t746 = call i64 @__list_length(i64 %t743)
+  %t747 = add i64 %t746, %t744
+  %t748 = select i1 %t745, i64 %t747, i64 %t744
+  %t749 = call i64 @__list_get(i64 %t743, i64 %t748)
+  %t750 = call i64 @__list_push(i64 %t742, i64 %t749)
+  %t751 = load i64, i64* %msi
+  %t752 = add i64 0, 1
+  %t753 = add i64 %t751, %t752
+  store i64 %t753, i64* %msi
   br label %while.cond9867
 while.end9869:
-  %t671 = load i64, i64* %mfi
-  %t672 = add i64 0, 1
-  %t673 = add i64 %t671, %t672
-  store i64 %t673, i64* %mfi
+  %t754 = load i64, i64* %mfi
+  %t755 = add i64 0, 1
+  %t756 = add i64 %t754, %t755
+  store i64 %t756, i64* %mfi
   br label %while.cond9861
 while.end9863:
-  %t674 = load i64, i64* %module_boundaries
-  %t675 = load i64, i64* %all_import_stmts
-  %t676 = call i64 @__list_length(i64 %t675)
-  %t677 = call i64 @__list_push(i64 %t674, i64 %t676)
-  %t678 = load i64, i64* %source
-  %t679 = call i64 @extract_named_imports(i64 %t678)
-  store i64 %t679, i64* %named_imports_raw
-  %t680 = call i64 @__map_new()
-  store i64 %t680, i64* %named_imports
-  %t681 = load i64, i64* %named_imports_raw
-  %t682 = call i64 @__map_keys(i64 %t681)
-  store i64 %t682, i64* %ni_paths
-  %t683 = add i64 0, 0
-  store i64 %t683, i64* %npi
+  %t757 = load i64, i64* %module_boundaries
+  %t758 = load i64, i64* %all_import_stmts
+  %t759 = call i64 @__list_length(i64 %t758)
+  %t760 = call i64 @__list_push(i64 %t757, i64 %t759)
+  %t761 = load i64, i64* %source
+  %t762 = call i64 @extract_named_imports(i64 %t761)
+  store i64 %t762, i64* %named_imports_raw
+  %t763 = call i64 @__map_new()
+  store i64 %t763, i64* %named_imports
+  %t764 = load i64, i64* %named_imports_raw
+  %t765 = call i64 @__map_keys(i64 %t764)
+  store i64 %t765, i64* %ni_paths
+  %t766 = add i64 0, 0
+  store i64 %t766, i64* %npi
   br label %while.cond9870
 while.cond9870:
-  %t684 = load i64, i64* %npi
-  %t685 = load i64, i64* %ni_paths
-  %t686 = call i64 @__list_length(i64 %t685)
-  %t688 = icmp slt i64 %t684, %t686
-  %t687 = zext i1 %t688 to i64
-  %t689 = trunc i64 %t687 to i1
-  br i1 %t689, label %while.body9871, label %while.end9872
+  %t767 = load i64, i64* %npi
+  %t768 = load i64, i64* %ni_paths
+  %t769 = call i64 @__list_length(i64 %t768)
+  %t771 = icmp slt i64 %t767, %t769
+  %t770 = zext i1 %t771 to i64
+  %t772 = trunc i64 %t770 to i1
+  br i1 %t772, label %while.body9871, label %while.end9872
 while.body9871:
-  %t690 = load i64, i64* %ni_paths
-  %t691 = load i64, i64* %npi
-  %t692 = icmp slt i64 %t691, 0
-  %t693 = call i64 @__list_length(i64 %t690)
-  %t694 = add i64 %t693, %t691
-  %t695 = select i1 %t692, i64 %t694, i64 %t691
-  %t696 = call i64 @__list_get(i64 %t690, i64 %t695)
-  store i64 %t696, i64* %ni_path
-  %t697 = load i64, i64* %input_path
-  %t698 = load i64, i64* %ni_path
-  %t699 = load i64, i64* %stdlib_dir
-  %t700 = call i64 @resolve_import_path(i64 %t697, i64 %t698, i64 %t699)
-  store i64 %t700, i64* %ni_full_path
-  %t701 = getelementptr [1 x i8], [1 x i8]* @.str.5130, i64 0, i64 0
-  %t702 = ptrtoint i8* %t701 to i64
-  store i64 %t702, i64* %ni_prefix
-  %t703 = load i64, i64* %path_to_prefix
-  %t704 = load i64, i64* %ni_full_path
-  %t705 = call i64 @__map_has(i64 %t703, i64 %t704)
-  %t706 = trunc i64 %t705 to i1
-  br i1 %t706, label %then9874, label %else9875
+  %t773 = load i64, i64* %ni_paths
+  %t774 = load i64, i64* %npi
+  %t775 = icmp slt i64 %t774, 0
+  %t776 = call i64 @__list_length(i64 %t773)
+  %t777 = add i64 %t776, %t774
+  %t778 = select i1 %t775, i64 %t777, i64 %t774
+  %t779 = call i64 @__list_get(i64 %t773, i64 %t778)
+  store i64 %t779, i64* %ni_path
+  %t780 = load i64, i64* %input_path
+  %t781 = load i64, i64* %ni_path
+  %t782 = load i64, i64* %stdlib_dir
+  %t783 = call i64 @resolve_import_path(i64 %t780, i64 %t781, i64 %t782)
+  store i64 %t783, i64* %ni_full_path
+  %t784 = getelementptr [1 x i8], [1 x i8]* @.str.5139, i64 0, i64 0
+  %t785 = ptrtoint i8* %t784 to i64
+  store i64 %t785, i64* %ni_prefix
+  %t786 = load i64, i64* %path_to_prefix
+  %t787 = load i64, i64* %ni_full_path
+  %t788 = call i64 @__map_has(i64 %t786, i64 %t787)
+  %t789 = trunc i64 %t788 to i1
+  br i1 %t789, label %then9874, label %else9875
 then9874:
-  %t707 = load i64, i64* %path_to_prefix
-  %t708 = load i64, i64* %ni_full_path
-  %t709 = call i64 @__map_get(i64 %t707, i64 %t708)
-  store i64 %t709, i64* %ni_prefix
+  %t790 = load i64, i64* %path_to_prefix
+  %t791 = load i64, i64* %ni_full_path
+  %t792 = call i64 @__map_get(i64 %t790, i64 %t791)
+  store i64 %t792, i64* %ni_prefix
   br label %endif9873
 else9875:
-  %t710 = load i64, i64* %ni_path
-  %t711 = load i64, i64* %ni_full_path
-  %t712 = load i64, i64* %stdlib_dir
-  %t713 = call i64 @path_based_prefix(i64 %t710, i64 %t711, i64 %t712)
-  store i64 %t713, i64* %ni_prefix
+  %t793 = load i64, i64* %ni_path
+  %t794 = load i64, i64* %ni_full_path
+  %t795 = load i64, i64* %stdlib_dir
+  %t796 = call i64 @path_based_prefix(i64 %t793, i64 %t794, i64 %t795)
+  store i64 %t796, i64* %ni_prefix
   br label %endif9873
 endif9873:
-  %t714 = load i64, i64* %named_imports_raw
-  %t715 = load i64, i64* %ni_path
-  %t716 = call i64 @__map_get(i64 %t714, i64 %t715)
-  store i64 %t716, i64* %ni_names
-  %t717 = add i64 0, 0
-  store i64 %t717, i64* %nni
+  %t797 = load i64, i64* %named_imports_raw
+  %t798 = load i64, i64* %ni_path
+  %t799 = call i64 @__map_get(i64 %t797, i64 %t798)
+  store i64 %t799, i64* %ni_names
+  %t800 = add i64 0, 0
+  store i64 %t800, i64* %nni
   br label %while.cond9876
 while.cond9876:
-  %t718 = load i64, i64* %nni
-  %t719 = load i64, i64* %ni_names
-  %t720 = call i64 @__list_length(i64 %t719)
-  %t722 = icmp slt i64 %t718, %t720
-  %t721 = zext i1 %t722 to i64
-  %t723 = trunc i64 %t721 to i1
-  br i1 %t723, label %while.body9877, label %while.end9878
+  %t801 = load i64, i64* %nni
+  %t802 = load i64, i64* %ni_names
+  %t803 = call i64 @__list_length(i64 %t802)
+  %t805 = icmp slt i64 %t801, %t803
+  %t804 = zext i1 %t805 to i64
+  %t806 = trunc i64 %t804 to i1
+  br i1 %t806, label %while.body9877, label %while.end9878
 while.body9877:
-  %t724 = load i64, i64* %ni_names
-  %t725 = load i64, i64* %nni
-  %t726 = icmp slt i64 %t725, 0
-  %t727 = call i64 @__list_length(i64 %t724)
-  %t728 = add i64 %t727, %t725
-  %t729 = select i1 %t726, i64 %t728, i64 %t725
-  %t730 = call i64 @__list_get(i64 %t724, i64 %t729)
-  store i64 %t730, i64* %ni_name
-  %t731 = load i64, i64* %named_imports
-  %t732 = load i64, i64* %ni_name
-  %t733 = load i64, i64* %ni_prefix
-  %t734 = load i64, i64* %ni_name
-  %t735 = inttoptr i64 %t733 to i8*
-  %t736 = inttoptr i64 %t734 to i8*
-  %t737 = call i64 @strlen(i8* %t735)
-  %t738 = call i64 @strlen(i8* %t736)
-  %t739 = add i64 %t737, %t738
-  %t740 = add i64 %t739, 1
-  %t741 = call i8* @malloc(i64 %t740)
-  call i8* @strcpy(i8* %t741, i8* %t735)
-  call i8* @strcat(i8* %t741, i8* %t736)
-  %t742 = ptrtoint i8* %t741 to i64
-  %t743 = call i64 @__map_set(i64 %t731, i64 %t732, i64 %t742)
-  %t744 = load i64, i64* %nni
-  %t745 = add i64 0, 1
-  %t746 = add i64 %t744, %t745
-  store i64 %t746, i64* %nni
+  %t807 = load i64, i64* %ni_names
+  %t808 = load i64, i64* %nni
+  %t809 = icmp slt i64 %t808, 0
+  %t810 = call i64 @__list_length(i64 %t807)
+  %t811 = add i64 %t810, %t808
+  %t812 = select i1 %t809, i64 %t811, i64 %t808
+  %t813 = call i64 @__list_get(i64 %t807, i64 %t812)
+  store i64 %t813, i64* %ni_name
+  %t814 = load i64, i64* %named_imports
+  %t815 = load i64, i64* %ni_name
+  %t816 = load i64, i64* %ni_prefix
+  %t817 = load i64, i64* %ni_name
+  %t818 = inttoptr i64 %t816 to i8*
+  %t819 = inttoptr i64 %t817 to i8*
+  %t820 = call i64 @strlen(i8* %t818)
+  %t821 = call i64 @strlen(i8* %t819)
+  %t822 = add i64 %t820, %t821
+  %t823 = add i64 %t822, 1
+  %t824 = call i8* @malloc(i64 %t823)
+  call i8* @strcpy(i8* %t824, i8* %t818)
+  call i8* @strcat(i8* %t824, i8* %t819)
+  %t825 = ptrtoint i8* %t824 to i64
+  %t826 = call i64 @__map_set(i64 %t814, i64 %t815, i64 %t825)
+  %t827 = load i64, i64* %nni
+  %t828 = add i64 0, 1
+  %t829 = add i64 %t827, %t828
+  store i64 %t829, i64* %nni
   br label %while.cond9876
 while.end9878:
-  %t747 = load i64, i64* %npi
-  %t748 = add i64 0, 1
-  %t749 = add i64 %t747, %t748
-  store i64 %t749, i64* %npi
+  %t830 = load i64, i64* %npi
+  %t831 = add i64 0, 1
+  %t832 = add i64 %t830, %t831
+  store i64 %t832, i64* %npi
   br label %while.cond9870
 while.end9872:
-  %t750 = load i64, i64* %run_checker
-  %t751 = trunc i64 %t750 to i1
-  br i1 %t751, label %then9880, label %else9881
+  %t833 = load i64, i64* %run_checker
+  %t834 = trunc i64 %t833 to i1
+  br i1 %t834, label %then9880, label %else9881
 then9880:
-  %t752 = getelementptr [1 x i8], [1 x i8]* @.str.5131, i64 0, i64 0
-  %t753 = ptrtoint i8* %t752 to i64
-  store i64 %t753, i64* %checker_errors
-  %t754 = load i64, i64* %all_import_stmts
-  %t755 = call i64 @__list_length(i64 %t754)
-  %t756 = add i64 0, 0
-  %t758 = icmp sgt i64 %t755, %t756
-  %t757 = zext i1 %t758 to i64
-  %t759 = trunc i64 %t757 to i1
-  br i1 %t759, label %then9883, label %else9884
+  %t835 = getelementptr [1 x i8], [1 x i8]* @.str.5140, i64 0, i64 0
+  %t836 = ptrtoint i8* %t835 to i64
+  store i64 %t836, i64* %checker_errors
+  %t837 = load i64, i64* %all_import_stmts
+  %t838 = call i64 @__list_length(i64 %t837)
+  %t839 = add i64 0, 0
+  %t841 = icmp sgt i64 %t838, %t839
+  %t840 = zext i1 %t841 to i64
+  %t842 = trunc i64 %t840 to i1
+  br i1 %t842, label %then9883, label %else9884
 then9883:
-  %t760 = load i64, i64* %program
-  %t761 = load i64, i64* %all_import_stmts
-  %t762 = call i64 @checker_check_errors_with_imports(i64 %t760, i64 %t761)
-  store i64 %t762, i64* %checker_errors
+  %t843 = load i64, i64* %program
+  %t844 = load i64, i64* %all_import_stmts
+  %t845 = call i64 @checker_check_errors_with_imports(i64 %t843, i64 %t844)
+  store i64 %t845, i64* %checker_errors
   br label %endif9882
 else9884:
-  %t763 = load i64, i64* %program
-  %t764 = call i64 @checker_check_errors_only(i64 %t763)
-  store i64 %t764, i64* %checker_errors
+  %t846 = load i64, i64* %program
+  %t847 = call i64 @checker_check_errors_only(i64 %t846)
+  store i64 %t847, i64* %checker_errors
   br label %endif9882
 endif9882:
-  %t765 = load i64, i64* %checker_errors
-  %t766 = inttoptr i64 %t765 to i8*
-  %t767 = call i64 @strlen(i8* %t766)
-  %t768 = add i64 0, 0
-  %t770 = icmp sgt i64 %t767, %t768
-  %t769 = zext i1 %t770 to i64
-  %t771 = trunc i64 %t769 to i1
-  br i1 %t771, label %then9886, label %else9887
+  %t848 = load i64, i64* %checker_errors
+  %t849 = inttoptr i64 %t848 to i8*
+  %t850 = call i64 @strlen(i8* %t849)
+  %t851 = add i64 0, 0
+  %t853 = icmp sgt i64 %t850, %t851
+  %t852 = zext i1 %t853 to i64
+  %t854 = trunc i64 %t852 to i1
+  br i1 %t854, label %then9886, label %else9887
 then9886:
-  %t772 = load i64, i64* %checker_errors
-  call void @__io_println_str(i64 %t772)
-  %t773 = add i64 0, 1
-  %t774 = trunc i64 %t773 to i32
-  call void @exit(i32 %t774)
+  %t855 = load i64, i64* %checker_errors
+  call void @__io_println_str(i64 %t855)
+  %t856 = add i64 0, 1
+  %t857 = trunc i64 %t856 to i32
+  call void @exit(i32 %t857)
   br label %endif9885
 else9887:
   br label %endif9885
@@ -132508,55 +132625,113 @@ endif9885:
 else9881:
   br label %endif9879
 endif9879:
-  %t775 = getelementptr [1 x i8], [1 x i8]* @.str.5132, i64 0, i64 0
-  %t776 = ptrtoint i8* %t775 to i64
-  store i64 %t776, i64* %ir
-  %t777 = load i64, i64* %all_import_stmts
-  %t778 = call i64 @__list_length(i64 %t777)
-  %t779 = add i64 0, 0
-  %t781 = icmp sgt i64 %t778, %t779
-  %t780 = zext i1 %t781 to i64
-  %t782 = trunc i64 %t780 to i1
-  br i1 %t782, label %then9889, label %else9890
+  %t858 = getelementptr [33 x i8], [33 x i8]* @.str.5141, i64 0, i64 0
+  %t859 = ptrtoint i8* %t858 to i64
+  %t860 = load i64, i64* %all_import_stmts
+  %t861 = call i64 @__list_length(i64 %t860)
+  %t862 = call i64 @__int_to_string(i64 %t861)
+  %t863 = inttoptr i64 %t859 to i8*
+  %t864 = inttoptr i64 %t862 to i8*
+  %t865 = call i64 @strlen(i8* %t863)
+  %t866 = call i64 @strlen(i8* %t864)
+  %t867 = add i64 %t865, %t866
+  %t868 = add i64 %t867, 1
+  %t869 = call i8* @malloc(i64 %t868)
+  call i8* @strcpy(i8* %t869, i8* %t863)
+  call i8* @strcat(i8* %t869, i8* %t864)
+  %t870 = ptrtoint i8* %t869 to i64
+  %t871 = getelementptr [13 x i8], [13 x i8]* @.str.5142, i64 0, i64 0
+  %t872 = ptrtoint i8* %t871 to i64
+  %t873 = inttoptr i64 %t870 to i8*
+  %t874 = inttoptr i64 %t872 to i8*
+  %t875 = call i64 @strlen(i8* %t873)
+  %t876 = call i64 @strlen(i8* %t874)
+  %t877 = add i64 %t875, %t876
+  %t878 = add i64 %t877, 1
+  %t879 = call i8* @malloc(i64 %t878)
+  call i8* @strcpy(i8* %t879, i8* %t873)
+  call i8* @strcat(i8* %t879, i8* %t874)
+  %t880 = ptrtoint i8* %t879 to i64
+  %t881 = load i64, i64* %module_boundaries
+  %t882 = call i64 @__list_length(i64 %t881)
+  %t883 = call i64 @__int_to_string(i64 %t882)
+  %t884 = inttoptr i64 %t880 to i8*
+  %t885 = inttoptr i64 %t883 to i8*
+  %t886 = call i64 @strlen(i8* %t884)
+  %t887 = call i64 @strlen(i8* %t885)
+  %t888 = add i64 %t886, %t887
+  %t889 = add i64 %t888, 1
+  %t890 = call i8* @malloc(i64 %t889)
+  call i8* @strcpy(i8* %t890, i8* %t884)
+  call i8* @strcat(i8* %t890, i8* %t885)
+  %t891 = ptrtoint i8* %t890 to i64
+  call void @__io_println_str(i64 %t891)
+  %t892 = getelementptr [18 x i8], [18 x i8]* @.str.5143, i64 0, i64 0
+  %t893 = ptrtoint i8* %t892 to i64
+  %t894 = load i64, i64* %prefixes_joined
+  %t895 = inttoptr i64 %t893 to i8*
+  %t896 = inttoptr i64 %t894 to i8*
+  %t897 = call i64 @strlen(i8* %t895)
+  %t898 = call i64 @strlen(i8* %t896)
+  %t899 = add i64 %t897, %t898
+  %t900 = add i64 %t899, 1
+  %t901 = call i8* @malloc(i64 %t900)
+  call i8* @strcpy(i8* %t901, i8* %t895)
+  call i8* @strcat(i8* %t901, i8* %t896)
+  %t902 = ptrtoint i8* %t901 to i64
+  call void @__io_println_str(i64 %t902)
+  %t903 = getelementptr [1 x i8], [1 x i8]* @.str.5144, i64 0, i64 0
+  %t904 = ptrtoint i8* %t903 to i64
+  store i64 %t904, i64* %ir
+  %t905 = load i64, i64* %all_import_stmts
+  %t906 = call i64 @__list_length(i64 %t905)
+  %t907 = add i64 0, 0
+  %t909 = icmp sgt i64 %t906, %t907
+  %t908 = zext i1 %t909 to i64
+  %t910 = trunc i64 %t908 to i1
+  br i1 %t910, label %then9889, label %else9890
 then9889:
-  %t783 = load i64, i64* %program
-  %t784 = load i64, i64* %all_import_stmts
-  %t785 = load i64, i64* %module_boundaries
-  %t786 = load i64, i64* %prefixes_joined
-  %t787 = load i64, i64* %resolved_aliases
-  %t788 = load i64, i64* %target
-  %t789 = load i64, i64* %named_imports
-  %t790 = load i64, i64* %identity_mode
-  %t791 = call i64 @_codegen_generate_with_modules_flat_opts(i64 %t783, i64 %t784, i64 %t785, i64 %t786, i64 %t787, i64 %t788, i64 %t789, i64 %t790)
-  store i64 %t791, i64* %ir
+  %t911 = load i64, i64* %program
+  %t912 = load i64, i64* %all_import_stmts
+  %t913 = load i64, i64* %module_boundaries
+  %t914 = load i64, i64* %prefixes_joined
+  %t915 = load i64, i64* %resolved_aliases
+  %t916 = load i64, i64* %target
+  %t917 = load i64, i64* %named_imports
+  %t918 = load i64, i64* %identity_mode
+  %t919 = call i64 @_codegen_generate_with_modules_flat_opts(i64 %t911, i64 %t912, i64 %t913, i64 %t914, i64 %t915, i64 %t916, i64 %t917, i64 %t918)
+  store i64 %t919, i64* %ir
   br label %endif9888
 else9890:
-  %t792 = load i64, i64* %program
-  %t793 = load i64, i64* %target
-  %t794 = load i64, i64* %identity_mode
-  %t795 = call i64 @_codegen_generate_with_target_opts(i64 %t792, i64 %t793, i64 %t794)
-  store i64 %t795, i64* %ir
+  %t920 = load i64, i64* %program
+  %t921 = load i64, i64* %target
+  %t922 = load i64, i64* %identity_mode
+  %t923 = call i64 @_codegen_generate_with_target_opts(i64 %t920, i64 %t921, i64 %t922)
+  store i64 %t923, i64* %ir
   br label %endif9888
 endif9888:
-  %t796 = call i64 @_codegen_had_error()
-  %t797 = trunc i64 %t796 to i1
-  br i1 %t797, label %then9892, label %else9893
+  %t924 = getelementptr [21 x i8], [21 x i8]* @.str.5145, i64 0, i64 0
+  %t925 = ptrtoint i8* %t924 to i64
+  call void @__io_println_str(i64 %t925)
+  %t926 = call i64 @_codegen_had_error()
+  %t927 = trunc i64 %t926 to i1
+  br i1 %t927, label %then9892, label %else9893
 then9892:
-  %t798 = getelementptr [39 x i8], [39 x i8]* @.str.5133, i64 0, i64 0
-  %t799 = ptrtoint i8* %t798 to i64
-  call void @__io_println_str(i64 %t799)
-  %t800 = add i64 0, 1
-  %t801 = trunc i64 %t800 to i32
-  call void @exit(i32 %t801)
+  %t928 = getelementptr [39 x i8], [39 x i8]* @.str.5146, i64 0, i64 0
+  %t929 = ptrtoint i8* %t928 to i64
+  call void @__io_println_str(i64 %t929)
+  %t930 = add i64 0, 1
+  %t931 = trunc i64 %t930 to i32
+  call void @exit(i32 %t931)
   br label %endif9891
 else9893:
   br label %endif9891
 endif9891:
-  %t802 = load i64, i64* %output_path
-  %t803 = load i64, i64* %ir
-  %t804 = call i64 @__io_write_file(i64 %t802, i64 %t803)
-  %t805 = add i64 0, 0
-  ret i64 %t805
+  %t932 = load i64, i64* %output_path
+  %t933 = load i64, i64* %ir
+  %t934 = call i64 @__io_write_file(i64 %t932, i64 %t933)
+  %t935 = add i64 0, 0
+  ret i64 %t935
 }
 
 define i64 @__saffron_entry() {

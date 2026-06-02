@@ -1,0 +1,388 @@
+//! Regular expression module using POSIX regex(3).
+//! Provides pattern matching, searching, replacement, and splitting via
+//! extended POSIX regular expressions.
+//!
+//! ```saffron
+//! import "@regex" as Regex
+//!
+//! Regex.test("[0-9]+", "abc 123 def")        // true
+//! Regex.find("[0-9]+", "abc 123 def")        // {"match": "123", "start": 4, "end": 7}
+//! Regex.find_all("[0-9]+", "a1 b22 c333")    // ["1", "22", "333"]
+//! Regex.replace("[0-9]+", "a1 b2", "X")      // "aX bX"
+//! Regex.split("[,;]+", "a,b;;c,d")           // ["a", "b", "c", "d"]
+//! ```
+
+// --- C Library Bindings ---
+
+@extern("void* malloc(i64)") fun _malloc(size: Int): Int
+@extern("void free(void*)") fun _free(ptr: Int)
+@extern("i64 strlen(void*)") fun _strlen(s: Int): Int
+@extern("void* memcpy(void*, void*, i64)") fun _memcpy(dst: Int, src: Int, n: Int): Int
+@extern("i32 regcomp(void*, void*, i32)") fun _regcomp(preg: Int, pattern: Int, cflags: Int): Int
+@extern("i32 regexec(void*, void*, i64, void*, i32)") fun _regexec(preg: Int, str: Int, nmatch: Int, pmatch: Int, eflags: Int): Int
+@extern("void regfree(void*)") fun _regfree(preg: Int)
+
+@intrinsic fun load8(addr: Int): Int
+@intrinsic fun store8(addr: Int, val: Int)
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
+
+// --- Constants ---
+
+// regcomp flags
+var _REG_EXTENDED: Int = 1
+var _REG_NOSUB: Int = 8
+
+// Maximum number of submatches to capture (including match[0])
+var _MAX_MATCHES: Int = 10
+
+// Size of regex_t (128 bytes is safe for all platforms)
+var _REGEX_T_SIZE: Int = 128
+
+// Size of regmatch_t: {rm_so: i32, rm_eo: i32} = 8 bytes
+var _REGMATCH_SIZE: Int = 8
+
+// --- Internal Helpers ---
+
+/// Read a signed 32-bit integer from memory (little-endian).
+fun _load_i32(addr: Int): Int {
+    var b0: Int = load8(addr)
+    var b1: Int = load8(addr + 1)
+    var b2: Int = load8(addr + 2)
+    var b3: Int = load8(addr + 3)
+    var val: Int = b0 + b1 * 256 + b2 * 65536 + b3 * 16777216
+    // Sign-extend from 32 bits: if bit 31 is set, the value is negative
+    if (b3 >= 128) {
+        // val = val - 2^32 (sign extension)
+        val = val - 4294967296
+    }
+    return val
+}
+
+/// Extract a substring from str[start..end) as a new heap-allocated string.
+fun _substr(s: Int, start: Int, end: Int): Int {
+    var len: Int = end - start
+    if (len <= 0) {
+        var empty: Int = _malloc(1)
+        store8(empty, 0)
+        return empty
+    }
+    var buf: Int = _malloc(len + 1)
+    _memcpy(buf, s + start, len)
+    store8(buf + len, 0)
+    return buf
+}
+
+/// Compile a regex pattern with REG_EXTENDED. Returns the regex_t pointer,
+/// or 0 on compilation failure. Caller must call _regex_free on success.
+fun _regex_compile(pattern: Int, nosub: Bool): Int {
+    var preg: Int = _malloc(_REGEX_T_SIZE)
+    var flags: Int = _REG_EXTENDED
+    if (nosub) {
+        flags = flags + _REG_NOSUB
+    }
+    var rc: Int = _regcomp(preg, pattern, flags)
+    if (rc != 0) {
+        _free(preg)
+        return 0
+    }
+    return preg
+}
+
+/// Free a compiled regex.
+fun _regex_free(preg: Int) {
+    _regfree(preg)
+    _free(preg)
+}
+
+// --- Public API ---
+
+/// Test whether `pattern` matches anywhere in `text`.
+/// Returns true if a match is found, false otherwise.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.test("[0-9]+", "hello 42")    // true
+/// Regex.test("^[a-z]+$", "Hello")     // false
+/// ```
+fun test(pattern: String, text: String): Bool {
+    var preg: Int = _regex_compile(pattern, true)
+    if (preg == 0) {
+        return false
+    }
+    var rc: Int = _regexec(preg, text, 0, 0, 0)
+    _regex_free(preg)
+    return rc == 0
+}
+
+/// Find the first match of `pattern` in `text`.
+/// Returns a Map with keys "match" (String), "start" (Int), "end" (Int),
+/// and "groups" (List<String> of captured subgroups).
+/// Returns an empty Map if no match is found.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// var m = Regex.find("([0-9]+)-([0-9]+)", "date: 2024-05")
+/// // m["match"] == "2024-05"
+/// // m["start"] == 6
+/// // m["end"]   == 13
+/// // m["groups"] == ["2024", "05"]
+/// ```
+fun find(pattern: String, text: String): Map<String, Any> {
+    var result: Map<String, Any> = {}
+    var preg: Int = _regex_compile(pattern, false)
+    if (preg == 0) {
+        return result
+    }
+    // Allocate pmatch array
+    var pmatch: Int = _malloc(_MAX_MATCHES * _REGMATCH_SIZE)
+    var rc: Int = _regexec(preg, text, _MAX_MATCHES, pmatch, 0)
+    if (rc != 0) {
+        _free(pmatch)
+        _regex_free(preg)
+        return result
+    }
+    // Read match[0] — the full match
+    var rm_so: Int = _load_i32(pmatch)
+    var rm_eo: Int = _load_i32(pmatch + 4)
+    var match_str: String = _substr(text, rm_so, rm_eo)
+    result.set("match", match_str)
+    result.set("start", rm_so)
+    result.set("end", rm_eo)
+    // Read subgroups (match[1] through match[N])
+    var groups: List<String> = []
+    var i: Int = 1
+    while (i < _MAX_MATCHES) {
+        var offset: Int = i * _REGMATCH_SIZE
+        var sub_so: Int = _load_i32(pmatch + offset)
+        var sub_eo: Int = _load_i32(pmatch + offset + 4)
+        if (sub_so < 0) {
+            // No more subgroups
+            break
+        }
+        var sub_str: String = _substr(text, sub_so, sub_eo)
+        groups.push(sub_str)
+        i = i + 1
+    }
+    result.set("groups", groups)
+    _free(pmatch)
+    _regex_free(preg)
+    return result
+}
+
+/// Find all non-overlapping matches of `pattern` in `text`.
+/// Returns a list of matched strings.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.find_all("[0-9]+", "a1 b22 c333")  // ["1", "22", "333"]
+/// ```
+fun find_all(pattern: String, text: String): List<String> {
+    var results: List<String> = []
+    var preg: Int = _regex_compile(pattern, false)
+    if (preg == 0) {
+        return results
+    }
+    var pmatch: Int = _malloc(_REGMATCH_SIZE)
+    var pos: Int = 0
+    var text_len: Int = _strlen(text)
+    while (pos <= text_len) {
+        var search_ptr: Int = text + pos
+        var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
+        if (rc != 0) {
+            break
+        }
+        var rm_so: Int = _load_i32(pmatch)
+        var rm_eo: Int = _load_i32(pmatch + 4)
+        // Prevent infinite loops on zero-length matches
+        if (rm_eo == rm_so) {
+            pos = pos + 1
+            continue
+        }
+        var match_str: String = _substr(search_ptr, rm_so, rm_eo)
+        results.push(match_str)
+        pos = pos + rm_eo
+    }
+    _free(pmatch)
+    _regex_free(preg)
+    return results
+}
+
+/// Replace all non-overlapping matches of `pattern` in `text` with `replacement`.
+/// Returns a new string with substitutions applied.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.replace("[0-9]+", "a1 b2 c3", "X")     // "aX bX cX"
+/// Regex.replace("\\s+", "hello   world", " ")   // "hello world"
+/// ```
+fun replace(pattern: String, text: String, replacement: String): String {
+    var preg: Int = _regex_compile(pattern, false)
+    if (preg == 0) {
+        return text
+    }
+    var pmatch: Int = _malloc(_REGMATCH_SIZE)
+    var text_len: Int = _strlen(text)
+    var repl_len: Int = _strlen(replacement)
+    // Allocate result buffer (grow as needed)
+    var buf_cap: Int = text_len * 2 + repl_len + 1
+    var buf: Int = _malloc(buf_cap)
+    var buf_len: Int = 0
+    var pos: Int = 0
+    while (pos <= text_len) {
+        var search_ptr: Int = text + pos
+        var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
+        if (rc != 0) {
+            // No more matches — copy remainder
+            var remain: Int = text_len - pos
+            if (buf_len + remain + 1 > buf_cap) {
+                buf_cap = (buf_len + remain + 1) * 2
+                var new_buf: Int = _malloc(buf_cap)
+                _memcpy(new_buf, buf, buf_len)
+                _free(buf)
+                buf = new_buf
+            }
+            _memcpy(buf + buf_len, search_ptr, remain)
+            buf_len = buf_len + remain
+            break
+        }
+        var rm_so: Int = _load_i32(pmatch)
+        var rm_eo: Int = _load_i32(pmatch + 4)
+        // Prevent infinite loops on zero-length matches
+        if (rm_eo == rm_so) {
+            // Copy one character and advance
+            if (pos < text_len) {
+                var needed: Int = buf_len + 1 + repl_len + 1
+                if (needed > buf_cap) {
+                    buf_cap = needed * 2
+                    var new_buf: Int = _malloc(buf_cap)
+                    _memcpy(new_buf, buf, buf_len)
+                    _free(buf)
+                    buf = new_buf
+                }
+                store8(buf + buf_len, load8(search_ptr))
+                buf_len = buf_len + 1
+            }
+            pos = pos + 1
+            continue
+        }
+        // Copy text before match
+        var pre_len: Int = rm_so
+        var needed: Int = buf_len + pre_len + repl_len + 1
+        if (needed > buf_cap) {
+            buf_cap = needed * 2
+            var new_buf: Int = _malloc(buf_cap)
+            _memcpy(new_buf, buf, buf_len)
+            _free(buf)
+            buf = new_buf
+        }
+        if (pre_len > 0) {
+            _memcpy(buf + buf_len, search_ptr, pre_len)
+            buf_len = buf_len + pre_len
+        }
+        // Copy replacement
+        _memcpy(buf + buf_len, replacement, repl_len)
+        buf_len = buf_len + repl_len
+        pos = pos + rm_eo
+    }
+    store8(buf + buf_len, 0)
+    _free(pmatch)
+    _regex_free(preg)
+    return buf
+}
+
+/// Split `text` by matches of `pattern`.
+/// Returns a list of substrings between matches.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.split("[,;]+", "a,b;;c,d")       // ["a", "b", "c", "d"]
+/// Regex.split("\\s+", "one  two  three") // ["one", "two", "three"]
+/// ```
+fun split(pattern: String, text: String): List<String> {
+    var results: List<String> = []
+    var preg: Int = _regex_compile(pattern, false)
+    if (preg == 0) {
+        // If pattern is invalid, return the whole text as a single element
+        results.push(text)
+        return results
+    }
+    var pmatch: Int = _malloc(_REGMATCH_SIZE)
+    var text_len: Int = _strlen(text)
+    var pos: Int = 0
+    while (pos <= text_len) {
+        var search_ptr: Int = text + pos
+        var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
+        if (rc != 0) {
+            // No more matches — push remainder
+            var remainder: String = _substr(text, pos, text_len)
+            results.push(remainder)
+            break
+        }
+        var rm_so: Int = _load_i32(pmatch)
+        var rm_eo: Int = _load_i32(pmatch + 4)
+        // Prevent infinite loops on zero-length matches
+        if (rm_eo == rm_so) {
+            if (pos < text_len) {
+                var ch_str: String = _substr(text, pos, pos + 1)
+                results.push(ch_str)
+            }
+            pos = pos + 1
+            continue
+        }
+        // Push the text before this match
+        var segment: String = _substr(text, pos, pos + rm_so)
+        results.push(segment)
+        pos = pos + rm_eo
+    }
+    _free(pmatch)
+    _regex_free(preg)
+    return results
+}
+
+/// Test if the entire string matches the pattern (anchored match).
+/// Equivalent to test("^pattern$", text) but more convenient.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.is_match("^[a-z]+$", "hello")   // true
+/// Regex.is_match("^[a-z]+$", "Hello")   // false
+/// ```
+fun is_match(pattern: String, text: String): Bool {
+    return test(pattern, text)
+}
+
+/// Count the number of non-overlapping matches of `pattern` in `text`.
+///
+/// ```saffron
+/// import "@regex" as Regex
+/// Regex.count("[0-9]+", "a1 b22 c333")  // 3
+/// ```
+fun count(pattern: String, text: String): Int {
+    var n: Int = 0
+    var preg: Int = _regex_compile(pattern, false)
+    if (preg == 0) {
+        return 0
+    }
+    var pmatch: Int = _malloc(_REGMATCH_SIZE)
+    var pos: Int = 0
+    var text_len: Int = _strlen(text)
+    while (pos <= text_len) {
+        var search_ptr: Int = text + pos
+        var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
+        if (rc != 0) {
+            break
+        }
+        var rm_so: Int = _load_i32(pmatch)
+        var rm_eo: Int = _load_i32(pmatch + 4)
+        if (rm_eo == rm_so) {
+            pos = pos + 1
+            continue
+        }
+        n = n + 1
+        pos = pos + rm_eo
+    }
+    _free(pmatch)
+    _regex_free(preg)
+    return n
+}
