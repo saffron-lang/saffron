@@ -174,7 +174,7 @@
             linkage = "define linkonce_odr"
         }
         var coro_attr: String = ""
-        if (is_coro) { coro_attr = " presplitcoroutine" }
+        if (is_coro) { coro_attr = " noinline presplitcoroutine" }
         var ret_type_ll: String = ret_llvm
         if (is_coro) { ret_type_ll = "ptr" }
         this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")

@@ -101,17 +101,20 @@ void __sched_reset_yield(void) { __yield_reason = 0; __yield_arg = 0; }
 
 typedef void (*coro_fn_t)(void *);
 
-void __sched_coro_resume(void *hdl) {
+void __sched_coro_resume(int64_t hdl_i64) {
+    void *hdl = (void *)hdl_i64;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
     resume_fn(hdl);
 }
 
-int64_t __sched_coro_done(void *hdl) {
+int64_t __sched_coro_done(int64_t hdl_i64) {
+    void *hdl = (void *)hdl_i64;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
     return (resume_fn == (coro_fn_t)0) ? 1 : 0;
 }
 
-void __sched_coro_destroy(void *hdl) {
+void __sched_coro_destroy(int64_t hdl_i64) {
+    void *hdl = (void *)hdl_i64;
     coro_fn_t *fn_ptrs = (coro_fn_t *)hdl;
     coro_fn_t destroy_fn = fn_ptrs[1];
     destroy_fn(hdl);

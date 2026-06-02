@@ -423,21 +423,65 @@ extend fun Codegen.flatten_string_expr(expr: AST.Expr): String {
 
 extend fun Codegen.gen_func_ref(fn_name: String): String {
         this.last_type = AST.Type.IntType
-        var nparams: Float = 1
+        var nparams: Float = 0
         if (this.func_param_count.has(fn_name)) {
             nparams = this.func_param_count.get(fn_name)
         }
-        var ftype: String = "i64 ("
-        var fti: Float = 0
-        while (fti < nparams) {
-            if (fti > 0) { ftype = ftype + ", " }
-            ftype = ftype + "i64"
-            fti = fti + 1
+
+        // Generate a trampoline wrapper that accepts (i64 env, <original params>)
+        // and forwards to the real function (dropping env). This ensures the closure
+        // calling convention (env first) works for plain function references.
+        this.label_counter = this.label_counter + 1
+        var wrap_name: String = "__wrap_" + this.label_counter.floor().to_string() + "_" + this.sanitize_name(fn_name)
+
+        // Build trampoline param list: env + original params
+        var wrap_params: List<String> = []
+        wrap_params.push("i64 %__env.arg")
+        var fwd_args: List<String> = []
+        var pi: Float = 0
+        while (pi < nparams) {
+            var pname: String = "%__a" + pi.floor().to_string() + ".arg"
+            wrap_params.push("i64 " + pname)
+            fwd_args.push("i64 " + pname)
+            pi = pi + 1
         }
-        ftype = ftype + ")*"
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint " + ftype + " @" + fn_name + " to i64")
-        return local
+
+        // Build the trampoline function IR
+        var wrap_ir: String = "\ndefine linkonce_odr i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+        if (nparams == 0) {
+            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "()\n"
+        } else {
+            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
+        }
+        wrap_ir = wrap_ir + "  ret i64 %r\n}\n"
+        this.globals.push(wrap_ir)
+
+        // Build closure pair [trampoline_fn_ptr, 0] on the heap
+        var num_total_params: Float = nparams + 1
+        var fn_type_str: String = "i64 ("
+        var tti: Float = 0
+        while (tti < num_total_params) {
+            if (tti > 0) { fn_type_str = fn_type_str + ", " }
+            fn_type_str = fn_type_str + "i64"
+            tti = tti + 1
+        }
+        fn_type_str = fn_type_str + ")*"
+
+        var closure_raw: String = this.fresh_local()
+        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        var closure_ptr: String = this.fresh_local()
+        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        var fn_as_int: String = this.fresh_local()
+        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + wrap_name + " to i64")
+        var fn_slot: String = this.fresh_local()
+        this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+        this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
+        var env_slot: String = this.fresh_local()
+        this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+        this.emit_indent("store i64 0, i64* " + env_slot)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        return result
     }
 
 extend fun Codegen.gen_arg_value(expr: AST.Expr): String {
