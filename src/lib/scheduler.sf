@@ -1,0 +1,156 @@
+//! Cooperative task scheduler for native async.
+//! Manages run queue, sleep queue, and I/O wait queue.
+//! Driven by LLVM coroutine handles — each task is an opaque i64 (i8* handle).
+
+@extern("double sf_time_now()") fun time_now(): Number
+@extern("i64 sf_select_fds(i64*, i64, i64*, i64, i64)") fun select_fds(read_fds: Int, read_count: Int, write_fds: Int, write_count: Int, timeout_ms: Int): Int
+
+// Coroutine operations — these map to LLVM coro intrinsics at link time.
+// The codegen emits actual llvm.coro.resume / llvm.coro.done / llvm.coro.destroy
+// but the scheduler references them as normal function calls.
+@extern("void __sched_coro_resume(void*)") fun coro_resume(handle: Int)
+@extern("i64 __sched_coro_done(void*)") fun coro_done(handle: Int): Int
+@extern("void __sched_coro_destroy(void*)") fun coro_destroy(handle: Int)
+
+// Yield reason globals (written by coroutine before suspending, read by scheduler)
+@extern("i64 __yield_reason") var __yield_reason: Int
+@extern("i64 __yield_arg") var __yield_arg: Int
+
+// --- Scheduler State ---
+
+var run_queue: List<Int> = []
+var sleep_queue: List<Int> = []
+var sleep_times: List<Number> = []
+var io_read_queue: List<Int> = []
+var io_read_fds: List<Int> = []
+var io_write_queue: List<Int> = []
+var io_write_fds: List<Int> = []
+
+// --- Public API ---
+
+fun enqueue(handle: Int) {
+    run_queue.push(handle)
+}
+
+fun has_pending(): Bool {
+    return run_queue.length() > 0 or sleep_queue.length() > 0 or io_read_queue.length() > 0 or io_write_queue.length() > 0
+}
+
+fun scheduler_tick(): Bool {
+    // Wake expired sleepers
+    var now: Number = time_now()
+    var i: Int = 0
+    while (i < sleep_queue.length()) {
+        if (sleep_times[i] <= now) {
+            run_queue.push(sleep_queue[i])
+            sleep_queue.remove(i)
+            sleep_times.remove(i)
+        } else {
+            i = i + 1
+        }
+    }
+
+    // If nothing runnable, poll I/O
+    if (run_queue.length() == 0) {
+        if (io_read_queue.length() > 0 or io_write_queue.length() > 0) {
+            poll_io(200)
+        } else if (sleep_queue.length() > 0) {
+            // Only sleepers left — wait until nearest wake time
+            var nearest: Number = sleep_times[0]
+            var si: Int = 1
+            while (si < sleep_times.length()) {
+                if (sleep_times[si] < nearest) {
+                    nearest = sleep_times[si]
+                }
+                si = si + 1
+            }
+            var wait_ms: Int = ((nearest - now) * 1000).floor()
+            if (wait_ms < 1) { wait_ms = 1 }
+            if (wait_ms > 200) { wait_ms = 200 }
+            poll_io(wait_ms)
+        }
+        return has_pending()
+    }
+
+    // Run next task
+    var hdl: Int = run_queue[0]
+    run_queue.remove(0)
+    coro_resume(hdl)
+
+    if (coro_done(hdl) == 1) {
+        coro_destroy(hdl)
+    } else {
+        // Route by yield reason
+        var reason: Int = __yield_reason
+        __yield_reason = 0
+
+        if (reason == 0) {
+            // Bare yield — re-enqueue
+            run_queue.push(hdl)
+        } else if (reason == 1) {
+            // Sleep — park with wake time
+            var duration_bits: Int = __yield_arg
+            // duration_bits is a double reinterpreted as i64; cast back
+            var duration: Number = duration_bits.to_float()
+            sleep_queue.push(hdl)
+            sleep_times.push(now + duration)
+        } else if (reason == 2) {
+            // IO read wait
+            io_read_queue.push(hdl)
+            io_read_fds.push(__yield_arg)
+        } else if (reason == 4) {
+            // IO write wait
+            io_write_queue.push(hdl)
+            io_write_fds.push(__yield_arg)
+        }
+        __yield_arg = 0
+    }
+
+    return has_pending()
+}
+
+fun scheduler_run() {
+    while (scheduler_tick()) {}
+}
+
+// --- Internal ---
+
+fun poll_io(timeout_ms: Int) {
+    if (io_read_queue.length() == 0 and io_write_queue.length() == 0) {
+        // No fds to poll — just sleep for timeout
+        // (select with 0 fds acts as a millisecond sleep)
+        select_fds(0, 0, 0, 0, timeout_ms)
+        return
+    }
+
+    // Build fd arrays on the stack (as list internals)
+    // select_fds expects pointers to i64 arrays
+    var result: Int = select_fds(
+        io_read_fds.data_ptr(), io_read_fds.length(),
+        io_write_fds.data_ptr(), io_write_fds.length(),
+        timeout_ms
+    )
+
+    if (result <= 0) { return }
+
+    // Bits 0-31: ready read fds, bits 32-63: ready write fds
+    var i: Int = io_read_queue.length() - 1
+    while (i >= 0) {
+        if ((result >> i) & 1 == 1) {
+            run_queue.push(io_read_queue[i])
+            io_read_queue.remove(i)
+            io_read_fds.remove(i)
+        }
+        i = i - 1
+    }
+
+    var j: Int = io_write_queue.length() - 1
+    while (j >= 0) {
+        if ((result >> (32 + j)) & 1 == 1) {
+            run_queue.push(io_write_queue[j])
+            io_write_queue.remove(j)
+            io_write_fds.remove(j)
+        }
+        j = j - 1
+    }
+}

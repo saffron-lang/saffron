@@ -947,16 +947,24 @@
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
-        // Error check: argument count validation
-        if (this.called_function_arity.has(resolved_callee)) {
-            var expected: Float = this.called_function_arity.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-            }
-        } else if (this.func_param_count.has(resolved_callee)) {
-            var expected: Float = this.func_param_count.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+        // Error check: argument count validation (skip if named args present)
+        var has_named_check: Bool = false
+        var nac: Float = 0
+        while (nac < args.length()) {
+            if (this.classify_expr(args[nac]) == "assign") { has_named_check = true }
+            nac = nac + 1
+        }
+        if (!has_named_check) {
+            if (this.called_function_arity.has(resolved_callee)) {
+                var expected: Float = this.called_function_arity.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
+            } else if (this.func_param_count.has(resolved_callee)) {
+                var expected: Float = this.func_param_count.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
             }
         }
 
@@ -1027,10 +1035,80 @@
                     }
                 }
             }
+            // Named argument reordering: if any arg is an Assign node (named arg),
+            // reorder args to match parameter order instead of source order
+            var reordered_args: List<AST.Expr> = args
+            var has_named_args: Bool = false
+            var nai: Float = 0
+            while (nai < args.length()) {
+                if (this.classify_expr(args[nai]) == "assign") {
+                    has_named_args = true
+                }
+                nai = nai + 1
+            }
+            if (has_named_args and this.func_param_names.has(resolved_callee)) {
+                var param_names: List<String> = this.func_param_names.get(resolved_callee)
+                var new_args: List<AST.Expr> = []
+                var positional_idx: Float = 0
+                var pi: Float = 0
+                while (pi < param_names.length()) {
+                    var pname: String = param_names[pi]
+                    // Search for a named arg matching this param
+                    var found: Bool = false
+                    var si: Float = 0
+                    while (si < args.length()) {
+                        if (this.classify_expr(args[si]) == "assign") {
+                            var arg_name: String = match (args[si]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (arg_name == pname) {
+                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                new_args.push(arg_value)
+                                found = true
+                            }
+                        }
+                        si = si + 1
+                    }
+                    if (!found) {
+                        // Use positional arg (skip over named args in positional counting)
+                        var used_positional: Bool = false
+                        while (positional_idx < args.length() and !used_positional) {
+                            if (this.classify_expr(args[positional_idx]) != "assign") {
+                                new_args.push(args[positional_idx])
+                                positional_idx = positional_idx + 1
+                                used_positional = true
+                            } else {
+                                positional_idx = positional_idx + 1
+                            }
+                        }
+                        if (!used_positional) {
+                            // No positional arg available — use default (will be filled below)
+                            // Push a nil placeholder to signal "use default"
+                            new_args.push(AST.Expr.NilLit)
+                        }
+                    }
+                    pi = pi + 1
+                }
+                reordered_args = new_args
+            }
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
-                arg_strs.push("i64 " + val)
+            while (i < reordered_args.length()) {
+                // Skip nil placeholders that signal "use default"
+                var used_default: Bool = false
+                if (has_named_args and this.classify_expr(reordered_args[i]) == "nil" and this.func_defaults.has(resolved_callee)) {
+                    var defs: List<AST.Expr> = this.func_defaults.get(resolved_callee)
+                    if (i < defs.length() and this.classify_expr(defs[i]) != "nil") {
+                        var def_val: String = this.gen_arg_value(defs[i])
+                        arg_strs.push("i64 " + def_val)
+                        used_default = true
+                    }
+                }
+                if (!used_default) {
+                    var val: String = this.gen_arg_value(reordered_args[i])
+                    arg_strs.push("i64 " + val)
+                }
                 i = i + 1
             }
             // Fill missing args with default values
@@ -1084,10 +1162,63 @@
                 }
             }
             this.called_functions.push(emit_callee)
+            // Named argument reordering for fallback path
+            var reordered_args2: List<AST.Expr> = args
+            var has_named2: Bool = false
+            var nai2: Float = 0
+            while (nai2 < args.length()) {
+                if (this.classify_expr(args[nai2]) == "assign") {
+                    has_named2 = true
+                }
+                nai2 = nai2 + 1
+            }
+            if (has_named2 and this.func_param_names.has(emit_callee)) {
+                var param_names2: List<String> = this.func_param_names.get(emit_callee)
+                var new_args2: List<AST.Expr> = []
+                var positional_idx2: Float = 0
+                var pi2: Float = 0
+                while (pi2 < param_names2.length()) {
+                    var pname2: String = param_names2[pi2]
+                    var found2: Bool = false
+                    var si2: Float = 0
+                    while (si2 < args.length()) {
+                        if (this.classify_expr(args[si2]) == "assign") {
+                            var arg_name2: String = match (args[si2]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (arg_name2 == pname2) {
+                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                new_args2.push(arg_value2)
+                                found2 = true
+                            }
+                        }
+                        si2 = si2 + 1
+                    }
+                    if (!found2) {
+                        var used_pos2: Bool = false
+                        while (positional_idx2 < args.length() and !used_pos2) {
+                            if (this.classify_expr(args[positional_idx2]) != "assign") {
+                                new_args2.push(args[positional_idx2])
+                                positional_idx2 = positional_idx2 + 1
+                                used_pos2 = true
+                            } else {
+                                positional_idx2 = positional_idx2 + 1
+                            }
+                        }
+                        if (!used_pos2) {
+                            new_args2.push(AST.Expr.NilLit)
+                        }
+                    }
+                    pi2 = pi2 + 1
+                }
+                reordered_args2 = new_args2
+            }
             var arg_strs: List<String> = []
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
+            while (i < reordered_args2.length()) {
+                var val: String = this.gen_arg_value(reordered_args2[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }

@@ -36,6 +36,7 @@ class Codegen {
     var func_prefix_map: Map<String, String>
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
+    var func_param_names: Map<String, List<String>>
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var register_only: Bool
@@ -82,6 +83,7 @@ class Codegen {
         this.func_prefix_map = {}
         this.func_defaults = {}
         this.func_param_count = {}
+        this.func_param_names = {}
         this.current_prefix = ""
         this.module_globals = {}
         this.register_only = false
@@ -1961,10 +1963,80 @@ class Codegen {
                     }
                 }
             }
+            // Named argument reordering: if any arg is an Assign node (named arg),
+            // reorder args to match parameter order instead of source order
+            var reordered_args: List<AST.Expr> = args
+            var has_named_args: Bool = false
+            var nai: Float = 0
+            while (nai < args.length()) {
+                if (this.classify_expr(args[nai]) == "assign") {
+                    has_named_args = true
+                }
+                nai = nai + 1
+            }
+            if (has_named_args and this.func_param_names.has(resolved_callee)) {
+                var param_names: List<String> = this.func_param_names.get(resolved_callee)
+                var new_args: List<AST.Expr> = []
+                var positional_idx: Float = 0
+                var pi: Float = 0
+                while (pi < param_names.length()) {
+                    var pname: String = param_names[pi]
+                    // Search for a named arg matching this param
+                    var found: Bool = false
+                    var si: Float = 0
+                    while (si < args.length()) {
+                        if (this.classify_expr(args[si]) == "assign") {
+                            var arg_name: String = match (args[si]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (arg_name == pname) {
+                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                new_args.push(arg_value)
+                                found = true
+                            }
+                        }
+                        si = si + 1
+                    }
+                    if (!found) {
+                        // Use positional arg (skip over named args in positional counting)
+                        var used_positional: Bool = false
+                        while (positional_idx < args.length() and !used_positional) {
+                            if (this.classify_expr(args[positional_idx]) != "assign") {
+                                new_args.push(args[positional_idx])
+                                positional_idx = positional_idx + 1
+                                used_positional = true
+                            } else {
+                                positional_idx = positional_idx + 1
+                            }
+                        }
+                        if (!used_positional) {
+                            // No positional arg available — use default (will be filled below)
+                            // Push a nil placeholder to signal "use default"
+                            new_args.push(AST.Expr.NilLit)
+                        }
+                    }
+                    pi = pi + 1
+                }
+                reordered_args = new_args
+            }
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
-                arg_strs.push("i64 " + val)
+            while (i < reordered_args.length()) {
+                // Skip nil placeholders that signal "use default"
+                var used_default: Bool = false
+                if (has_named_args and this.classify_expr(reordered_args[i]) == "nil" and this.func_defaults.has(resolved_callee)) {
+                    var defs: List<AST.Expr> = this.func_defaults.get(resolved_callee)
+                    if (i < defs.length() and this.classify_expr(defs[i]) != "nil") {
+                        var def_val: String = this.gen_arg_value(defs[i])
+                        arg_strs.push("i64 " + def_val)
+                        used_default = true
+                    }
+                }
+                if (!used_default) {
+                    var val: String = this.gen_arg_value(reordered_args[i])
+                    arg_strs.push("i64 " + val)
+                }
                 i = i + 1
             }
             // Fill missing args with default values
@@ -2018,10 +2090,63 @@ class Codegen {
                 }
             }
             this.called_functions.push(emit_callee)
+            // Named argument reordering for fallback path
+            var reordered_args2: List<AST.Expr> = args
+            var has_named2: Bool = false
+            var nai2: Float = 0
+            while (nai2 < args.length()) {
+                if (this.classify_expr(args[nai2]) == "assign") {
+                    has_named2 = true
+                }
+                nai2 = nai2 + 1
+            }
+            if (has_named2 and this.func_param_names.has(emit_callee)) {
+                var param_names2: List<String> = this.func_param_names.get(emit_callee)
+                var new_args2: List<AST.Expr> = []
+                var positional_idx2: Float = 0
+                var pi2: Float = 0
+                while (pi2 < param_names2.length()) {
+                    var pname2: String = param_names2[pi2]
+                    var found2: Bool = false
+                    var si2: Float = 0
+                    while (si2 < args.length()) {
+                        if (this.classify_expr(args[si2]) == "assign") {
+                            var arg_name2: String = match (args[si2]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (arg_name2 == pname2) {
+                                var arg_value2: AST.Expr = match (args[si2]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                new_args2.push(arg_value2)
+                                found2 = true
+                            }
+                        }
+                        si2 = si2 + 1
+                    }
+                    if (!found2) {
+                        var used_pos2: Bool = false
+                        while (positional_idx2 < args.length() and !used_pos2) {
+                            if (this.classify_expr(args[positional_idx2]) != "assign") {
+                                new_args2.push(args[positional_idx2])
+                                positional_idx2 = positional_idx2 + 1
+                                used_pos2 = true
+                            } else {
+                                positional_idx2 = positional_idx2 + 1
+                            }
+                        }
+                        if (!used_pos2) {
+                            new_args2.push(AST.Expr.NilLit)
+                        }
+                    }
+                    pi2 = pi2 + 1
+                }
+                reordered_args2 = new_args2
+            }
             var arg_strs: List<String> = []
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
+            while (i < reordered_args2.length()) {
+                var val: String = this.gen_arg_value(reordered_args2[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }
@@ -3279,15 +3404,19 @@ class Codegen {
                     // Register default values for optional params
                     var emit_name: String = this.current_prefix + name
                     var defaults: List<AST.Expr> = []
+                    var param_names: List<String> = []
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
                         var dval: AST.Expr = match (p) { Param(n, t, d) => d }
+                        var pname: String = match (p) { Param(n, t, d) => n }
                         defaults.push(dval)
+                        param_names.push(pname)
                         pi = pi + 1
                     }
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
+                    this.func_param_names.set(emit_name, param_names)
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
@@ -3568,6 +3697,38 @@ class Codegen {
         this.called_function_arity.set(full_name, param_count)
         if (this.current_prefix.length() > 0) {
             this.called_function_arity.set(this.current_prefix + full_name, param_count)
+        }
+        // Register param names for named arg dispatch (self + method params)
+        var method_param_names: List<String> = []
+        method_param_names.push("self")
+        var mpi: Float = 0
+        while (mpi < mparams.length()) {
+            var mp: AST.Param = mparams[mpi]
+            var mpn: String = match (mp) { Param(n, t, d) => n }
+            method_param_names.push(mpn)
+            mpi = mpi + 1
+        }
+        this.func_param_names.set(full_name, method_param_names)
+        if (this.current_prefix.length() > 0) {
+            this.func_param_names.set(this.current_prefix + full_name, method_param_names)
+        }
+        // Register defaults for class methods
+        var method_defaults: List<AST.Expr> = []
+        method_defaults.push(AST.Expr.NilLit)
+        mpi = 0
+        while (mpi < mparams.length()) {
+            var mp: AST.Param = mparams[mpi]
+            var mdval: AST.Expr = match (mp) { Param(n, t, d) => d }
+            method_defaults.push(mdval)
+            mpi = mpi + 1
+        }
+        this.func_defaults.set(full_name, method_defaults)
+        if (this.current_prefix.length() > 0) {
+            this.func_defaults.set(this.current_prefix + full_name, method_defaults)
+        }
+        this.func_param_count.set(full_name, param_count)
+        if (this.current_prefix.length() > 0) {
+            this.func_param_count.set(this.current_prefix + full_name, param_count)
         }
         this.gen_function(full_name, full_params, mret, mbody)
     }
@@ -4690,6 +4851,15 @@ class Codegen {
             param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
+        // Register param names for named argument dispatch
+        var pnames_list: List<String> = []
+        var pni: Float = 0
+        while (pni < param_list.length()) {
+            var pnparts: List<String> = param_list[pni].split(":")
+            pnames_list.push(pnparts[0])
+            pni = pni + 1
+        }
+        this.func_param_names.set(emit_name, pnames_list)
 
         this.emit("")
         var linkage: String = "define"

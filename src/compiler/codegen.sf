@@ -37,6 +37,7 @@ class Codegen {
     var func_prefix_map: Map<String, String>
     var func_defaults: Map<String, List<AST.Expr>>
     var func_param_count: Map<String, Float>
+    var func_param_names: Map<String, List<String>>
     var current_prefix: String
     var module_globals: Map<String, Bool>
     var register_only: Bool
@@ -83,6 +84,7 @@ class Codegen {
         this.func_prefix_map = {}
         this.func_defaults = {}
         this.func_param_count = {}
+        this.func_param_names = {}
         this.current_prefix = ""
         this.module_globals = {}
         this.register_only = false
