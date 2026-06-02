@@ -547,12 +547,21 @@ do_push:
 define private i64 @__gc_is_heap_ptr(i64 %val) {
 entry:
   %is_zero = icmp eq i64 %val, 0
-  br i1 %is_zero, label %no, label %check_range
+  br i1 %is_zero, label %no, label %check_align
+
+check_align:
+  ; All GC user pointers are 8-byte aligned (malloc guarantee + 24-byte header).
+  ; Filter out non-pointer values (string lengths, counts, enum tags, etc.)
+  ; that would otherwise pass the range check and cause speculative load crashes.
+  %align_bits = and i64 %val, 7
+  %not_aligned = icmp ne i64 %align_bits, 0
+  br i1 %not_aligned, label %no, label %check_range
 
 check_range:
-  ; Quick sanity: heap pointers are above 64KB and below 2^48.
-  ; 65536 avoids speculative loads into unmapped low pages (arm64 has 16KB pages).
-  %too_low = icmp ult i64 %val, 65536
+  ; Quick sanity: heap pointers are above 4MB and below 2^48.
+  ; 4MB (4194304) avoids speculative loads into low address space regions that
+  ; may be partially mapped on arm64 macOS (16KB pages, guard pages at ~1MB).
+  %too_low = icmp ult i64 %val, 4194304
   br i1 %too_low, label %no, label %check_high
 
 check_high:
