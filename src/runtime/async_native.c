@@ -92,6 +92,31 @@ int64_t __sched_get_yield_arg(void) { return __yield_arg; }
 int64_t __sched_get_task_result(void) { return __task_result; }
 void __sched_reset_yield(void) { __yield_reason = 0; __yield_arg = 0; }
 
+// --- Per-task result storage ---
+// Fixed-size table of (handle, result) pairs.
+// The scheduler calls store_result when a task finishes.
+// task.await() / task.getResult() calls get_stored_result.
+#define MAX_TASK_RESULTS 256
+static struct { int64_t handle; int64_t value; } __task_results[MAX_TASK_RESULTS];
+static int __task_result_count = 0;
+
+void __sched_store_result(int64_t handle, int64_t value) {
+    if (__task_result_count < MAX_TASK_RESULTS) {
+        __task_results[__task_result_count].handle = handle;
+        __task_results[__task_result_count].value = value;
+        __task_result_count++;
+    }
+}
+
+int64_t __sched_get_stored_result(int64_t handle) {
+    for (int i = 0; i < __task_result_count; i++) {
+        if (__task_results[i].handle == handle) {
+            return __task_results[i].value;
+        }
+    }
+    return 0;
+}
+
 // Coroutine frame layout after LLVM CoroSplit:
 //   offset 0: resume function pointer (void (*)(ptr frame))
 //   offset 8: destroy function pointer (void (*)(ptr frame))

@@ -456,6 +456,35 @@
     }
 
     fun gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
+    // Check if 'method' is actually a function-type field (not a real method).
+    // e.g. this.compute() where compute is `var compute: () => T`
+    if (has_self and this.class_fields.has(ns)) {
+        var ft: String = this.get_field_type(ns, method)
+        if (ft.starts_with("Fun(")) {
+            // Check there's no actual method with this name
+            var full_check: String = ns + "__" + method
+            var has_method: Bool = this.known_functions.contains(full_check)
+            if (!has_method and this.current_prefix.length() > 0) {
+                has_method = this.known_functions.contains(this.current_prefix + full_check)
+            }
+            if (!has_method) {
+                // Load the field value (a closure pair) and call it indirectly
+                var struct_name: String = ns
+                if (this.class_struct_names.has(ns)) {
+                    struct_name = this.class_struct_names.get(ns)
+                }
+                var field_idx: Float = this.get_field_index(ns, method)
+                var obj_ptr: String = this.fresh_local()
+                this.emit_indent(obj_ptr + " = inttoptr i64 " + obj + " to %" + struct_name + "*")
+                var field_ptr: String = this.fresh_local()
+                this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
+                var field_val: String = this.fresh_local()
+                this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
+                return this.gen_indirect_call(field_val, args)
+            }
+        }
+    }
+
     var arg_strs: List<String> = []
     if (has_self) { arg_strs.push("i64 " + obj) }
     var i: Float = 0
@@ -1203,8 +1232,11 @@
             this.emit_indent("call void @__sched_coro_resume(i64 " + b_i64 + ")")
             this.emit_terminator("br label %" + ac)
             this.start_block(ad)
+            // Read the child coroutine's return value from @__task_result
+            var coro_result: String = this.fresh_local()
+            this.emit_indent(coro_result + " = load i64, i64* @__task_result")
             this.last_type = AST.Type.IntType
-            return "0"
+            return coro_result
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
