@@ -1810,6 +1810,25 @@ class Codegen {
                     }
                 }
             }
+            // General fallback: evaluate the object expression (e.g. IndexGet) and use last_type
+            var fb_val: String = this.gen_arg_value(m_obj)
+            var fb_type_str: String = this.type_to_string(this.last_type)
+            var fb_resolved: String = this.resolve_class_type(fb_type_str)
+            if (fb_resolved.length() > 0 and this.class_fields.has(fb_resolved)) {
+                var fb_struct: String = fb_resolved
+                if (this.class_struct_names.has(fb_resolved)) {
+                    fb_struct = this.class_struct_names.get(fb_resolved)
+                }
+                var fi: Float = this.get_field_index(fb_resolved, m_field)
+                var op: String = this.fresh_local()
+                this.emit_indent(op + " = inttoptr i64 " + fb_val + " to %" + fb_struct + "*")
+                var fp: String = this.fresh_local()
+                this.emit_indent(fp + " = getelementptr %" + fb_struct + ", %" + fb_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = load i64, i64* " + fp)
+                this.last_type = this.str_to_type(this.get_field_type(fb_resolved, m_field))
+                return result
+            }
             return "0"
         }
 
@@ -2109,7 +2128,12 @@ class Codegen {
                 // Read the child coroutine's return value from @__task_result
                 var coro_result: String = this.fresh_local()
                 this.emit_indent(coro_result + " = load i64, i64* @__task_result")
-                this.last_type = AST.Type.IntType
+                // Use the callee's return type
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
                 return coro_result
             }
         }
@@ -7055,6 +7079,47 @@ class Codegen {
 
     // --- Task.spawn(fn) ---
     if (method == "spawn" and obj_name == "Task") {
+        // Infer the task's result type from the lambda's return type
+        var task_result_type: String = "Int"
+        var spawn_expr_kind: String = this.classify_expr(args[0])
+        if (spawn_expr_kind == "lambda") {
+            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
+            if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
+                task_result_type = lambda_ret
+            } else {
+                // Infer from body: if body is [Return(Call(f, ...))] use f's return type
+                var lambda_body: List<AST.Stmt> = match (args[0]) { Lambda(p, r, b) => b   _ => [] }
+                if (lambda_body.length() == 1) {
+                    var lb_kind: String = this.classify_stmt(lambda_body[0])
+                    if (lb_kind == "return") {
+                        var ret_expr: AST.Expr = match (lambda_body[0]) { Return(v) => v   _ => AST.Expr.NilLit }
+                        var ret_ek: String = this.classify_expr(ret_expr)
+                        if (ret_ek == "call") {
+                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a) => c   _ => AST.Expr.NilLit }
+                            var ret_callee_name: String = this.get_variable_name(ret_callee)
+                            if (ret_callee_name.length() > 0) {
+                                var prefixed_callee: String = this.current_prefix + ret_callee_name
+                                if (this.func_ret_types.has(prefixed_callee)) {
+                                    task_result_type = this.func_ret_types.get(prefixed_callee)
+                                } else if (this.func_ret_types.has(ret_callee_name)) {
+                                    task_result_type = this.func_ret_types.get(ret_callee_name)
+                                }
+                            }
+                        } else if (ret_ek == "method_call") {
+                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
+                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
+                            var mc_ns: String = this.get_variable_name(mc_obj_expr)
+                            if (mc_ns.length() > 0 and this.module_prefixes.has(mc_ns)) {
+                                var mc_full: String = this.module_prefixes.get(mc_ns) + mc_method_name
+                                if (this.func_ret_types.has(mc_full)) {
+                                    task_result_type = this.func_ret_types.get(mc_full)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // Get the lambda as a function pointer (i64)
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
@@ -7090,6 +7155,22 @@ class Codegen {
         this.emit_indent(task_hdl + " = call ptr " + fn_ptr + "(i64 " + env_i64 + ")")
         var task_i64: String = this.fresh_local()
         this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+        // If the task completed synchronously (e.g. no real suspend points),
+        // save its result immediately before another spawn could overwrite @__task_result
+        var spawn_done: String = this.fresh_local()
+        this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
+        var spawn_done_cmp: String = this.fresh_local()
+        this.emit_indent(spawn_done_cmp + " = icmp eq i64 " + spawn_done + ", 1")
+        var spawn_save_label: String = this.fresh_label("spawn.save")
+        var spawn_cont_label: String = this.fresh_label("spawn.cont")
+        this.emit_terminator("br i1 " + spawn_done_cmp + ", label %" + spawn_save_label + ", label %" + spawn_cont_label)
+        this.start_block(spawn_save_label)
+        var spawn_res: String = this.fresh_local()
+        this.emit_indent(spawn_res + " = load i64, i64* @__task_result")
+        this.emit_indent("call void @__sched_store_result(i64 " + task_i64 + ", i64 " + spawn_res + ")")
+        this.called_functions.push("__sched_store_result")
+        this.emit_terminator("br label %" + spawn_cont_label)
+        this.start_block(spawn_cont_label)
         // Enqueue to scheduler
         var enqueue_name: String = "enqueue"
         if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
@@ -7097,7 +7178,7 @@ class Codegen {
         }
         this.emit_indent("call i64 @" + enqueue_name + "(i64 " + task_i64 + ")")
         this.called_functions.push(enqueue_name)
-        this.last_type = AST.Type.IntType
+        this.last_type = this.str_to_type(task_result_type)
         return task_i64
     }
 
@@ -7114,19 +7195,26 @@ class Codegen {
         return done_i64
     }
     if (method == "getResult") {
-        var task_val: String = this.gen_arg_value(object)
-        var get_result_name: String = "stdlib_scheduler_get_result"
-        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
-            get_result_name = "stdlib_scheduler_get_result"
+        var gr_obj_name: String = this.get_variable_name(object)
+        var gr_result_type: AST.Type = AST.Type.IntType
+        if (gr_obj_name.length() > 0 and this.typed_vars.has(gr_obj_name)) {
+            gr_result_type = this.typed_vars.get(gr_obj_name)
         }
+        var task_val: String = this.gen_arg_value(object)
         var result_val: String = this.fresh_local()
-        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
-        this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.emit_indent(result_val + " = call i64 @__sched_get_stored_result(i64 " + task_val + ")")
+        this.called_functions.push("__sched_get_stored_result")
+        this.last_type = gr_result_type
         return result_val
     }
     // task.await() — from top-level: run scheduler then read result
     if (method == "await" and !this.is_coroutine) {
+        // Determine the task's result type from the task variable's stored type
+        var await_obj_name: String = this.get_variable_name(object)
+        var await_result_type: AST.Type = AST.Type.IntType
+        if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
+            await_result_type = this.typed_vars.get(await_obj_name)
+        }
         var task_val: String = this.gen_arg_value(object)
         var sched_run_name: String = "scheduler_run"
         if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
@@ -7134,18 +7222,21 @@ class Codegen {
         }
         this.emit_indent("call i64 @" + sched_run_name + "()")
         this.called_functions.push(sched_run_name)
-        var get_result_name: String = "stdlib_scheduler_get_result"
-        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
-            get_result_name = "stdlib_scheduler_get_result"
-        }
+        // Use the C-level per-task result storage (handles multi-task races)
         var result_val: String = this.fresh_local()
-        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
-        this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.emit_indent(result_val + " = call i64 @__sched_get_stored_result(i64 " + task_val + ")")
+        this.called_functions.push("__sched_get_stored_result")
+        this.last_type = await_result_type
         return result_val
     }
     // task.await() — from coroutine: yield with reason=3, scheduler wakes us
     if (method == "await" and this.is_coroutine) {
+        // Determine the task's result type from the task variable's stored type
+        var await_obj_name: String = this.get_variable_name(object)
+        var await_result_type: AST.Type = AST.Type.IntType
+        if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
+            await_result_type = this.typed_vars.get(await_obj_name)
+        }
         var task_val: String = this.gen_arg_value(object)
         this.emit_indent("store i64 3, i64* @__yield_reason")
         this.emit_indent("store i64 " + task_val + ", i64* @__yield_arg")
@@ -7162,14 +7253,11 @@ class Codegen {
         this.emit_terminator("br label %__coro_cleanup")
         this.emit(await_resume + ":")
         this.block_terminated = false
-        var get_result_name: String = "stdlib_scheduler_get_result"
-        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
-            get_result_name = "stdlib_scheduler_get_result"
-        }
+        // Use the C-level per-task result storage
         var result_val: String = this.fresh_local()
-        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
-        this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.emit_indent(result_val + " = call i64 @__sched_get_stored_result(i64 " + task_val + ")")
+        this.called_functions.push("__sched_get_stored_result")
+        this.last_type = await_result_type
         return result_val
     }
 
@@ -7564,7 +7652,14 @@ class Codegen {
             // Read the child coroutine's return value from @__task_result
             var coro_result: String = this.fresh_local()
             this.emit_indent(coro_result + " = load i64, i64* @__task_result")
-            this.last_type = AST.Type.IntType
+            // Use the callee's return type (same as the non-coro path below)
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
             return coro_result
         }
         var local: String = this.fresh_local()
