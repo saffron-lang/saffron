@@ -43,9 +43,9 @@ Catch specific error types:
 
 ```saffron
 class HttpError {
-    var code: Int
+    var code: Number
     var message: String
-    fun init(code: Int, message: String) {
+    fun init(code: Number, message: String) {
         this.code = code
         this.message = message
     }
@@ -70,7 +70,7 @@ enum Result<T, E> {
     Err(error: E)
 }
 
-fun parse_int(s: String): Result<Int, String> {
+fun parse_int(s: String): Result<Number, String> {
     var n = s.to_number()
     if (n is Nil) {
         return Result.Err("not a number: ${s}")

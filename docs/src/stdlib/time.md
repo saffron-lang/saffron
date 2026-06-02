@@ -8,8 +8,8 @@ import "@time" as Time
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `Time.now()` | `Float` | Current Unix timestamp (seconds) |
-| `Time.clock()` | `Float` | Monotonic clock (seconds since start) |
+| `Time.now()` | `Number` | Current Unix timestamp (seconds) |
+| `Time.clock()` | `Number` | Monotonic clock (seconds since start) |
 | `Time.sleep(seconds)` | — | Block the current thread |
 
 ## Example: timing code

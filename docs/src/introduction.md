@@ -1,16 +1,18 @@
 # The Saffron Programming Language
 
-Saffron is a statically typed scripting language that compiles to bytecode and runs on a stack-based virtual machine. It's designed to be expressive, fast to write, and safe by default.
+Saffron is a statically typed scripting language designed to be expressive, fast to write, and safe by default. It ships with two runtimes: a bytecode interpreter (C VM with REPL) for scripting, and a self-hosted LLVM compiler for native binaries and WebAssembly.
 
 ## Features
 
 - **Static typing with inference** — catch errors at compile time without writing types everywhere
 - **Pattern matching** — enums with associated data and exhaustive `match` expressions
-- **Cooperative async** — lightweight tasks with `spawn`, `await`, and channels
-- **First-class functions** — lambdas, closures, and higher-order functions
+- **Cooperative async** — lightweight tasks with `spawn`, `await`, and `sleep`
+- **First-class functions** — lambdas, closures, trailing closures, and higher-order functions
 - **Iterators and pipes** — composable data transformations with `|>`
 - **Classes and interfaces** — single inheritance with multiple interface conformance
+- **FFI** — call C functions directly via `@extern` for system-level integration
 - **Garbage collected** — mark-sweep GC so you never manage memory manually
+- **Turmeric web framework** — reactive UI with signals, compiled to WASM
 
 ## A taste of Saffron
 

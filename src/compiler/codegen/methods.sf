@@ -904,7 +904,9 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         if (obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
         }
-        if (obj_type == "String") {
+        if (obj_type == "String" or obj_type == "Any") {
+            // For Any type, default to strlen (common case: untyped vars hold strings;
+            // also safer because __list_length on a NaN-boxed string would segfault)
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
             var local: String = this.fresh_local()

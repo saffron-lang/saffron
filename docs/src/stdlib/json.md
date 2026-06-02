@@ -22,7 +22,7 @@ JSON types map to Saffron types:
 - Object → `Map<String, Any>`
 - Array → `List`
 - String → `String`
-- Number → `Int` or `Float`
+- Number → `Number`
 - Boolean → `Bool`
 - null → `Nil`
 
@@ -36,7 +36,7 @@ var text = JSON.stringify(data)
 IO.println(text)  // {"name":"saffron","tags":["lang","typed"]}
 ```
 
-### `JSON.stringify(value, indent: Int): String`
+### `JSON.stringify(value, indent: Number): String`
 
 Pretty-print with indentation:
 

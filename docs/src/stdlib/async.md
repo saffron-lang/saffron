@@ -28,7 +28,7 @@ var result = Async.await(t)
 ```saffron
 import "@async" as Async
 
-fun fetch(id: Int): String {
+fun fetch(id: Number): String {
     Async.sleep(0.1)
     return "result_${id}"
 }

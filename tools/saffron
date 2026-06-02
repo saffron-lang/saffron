@@ -243,7 +243,8 @@ build_project() {
         }
     else
         local ASYNC_NATIVE="$SCRIPT_DIR/src/runtime/async_native.c"
-        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" "$ASYNC_NATIVE" || {
+        local SOCKET_NATIVE="$SCRIPT_DIR/src/runtime/socket_native.c"
+        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" "$ASYNC_NATIVE" "$SOCKET_NATIVE" -lssl -lcrypto || {
             echo "saffron: linking failed" >&2
             exit 1
         }

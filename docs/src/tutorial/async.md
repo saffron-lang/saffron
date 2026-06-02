@@ -24,7 +24,7 @@ Use `Async.await` to wait for a task to complete and get its return value:
 ```saffron
 import "@async" as Async
 
-fun compute(): Int {
+fun compute(): Number {
     Async.sleep(0.1)
     return 42
 }
@@ -41,7 +41,7 @@ IO.println(result)  // 42
 ```saffron
 import "@async" as Async
 
-fun worker(name: String, delay: Float): String {
+fun worker(name: String, delay: Number): String {
     Async.sleep(delay)
     return "${name} done"
 }
@@ -75,7 +75,7 @@ All three tasks run concurrently — total time is ~0.1s, not 0.3s.
 Use `yield` to explicitly give other tasks a chance to run without sleeping:
 
 ```saffron
-fun long_computation(): Int {
+fun long_computation(): Number {
     var sum = 0
     for (var i = 0; i < 1000000; i = i + 1) {
         sum = sum + i

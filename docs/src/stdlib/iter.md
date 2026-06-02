@@ -15,7 +15,7 @@ Functional utilities for working with iterables (lists, maps, strings, or any ty
 Apply a function to each element:
 
 ```saffron
-Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
+Iter.map([1, 2, 3], fun (x: Number): Number => x * 2)
 // [2, 4, 6]
 ```
 
@@ -24,7 +24,7 @@ Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
 Keep elements where the function returns true:
 
 ```saffron
-Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0)
+Iter.filter([1, 2, 3, 4], fun (x: Number): Bool => x % 2 == 0)
 // [2, 4]
 ```
 
@@ -33,7 +33,7 @@ Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0)
 Map and flatten one level:
 
 ```saffron
-Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Int>): List<Int> => x)
+Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Number>): List<Number> => x)
 // [1, 2, 3, 4]
 ```
 
@@ -44,11 +44,11 @@ Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Int>): List<Int> => x)
 Fold elements into a single value:
 
 ```saffron
-Iter.reduce([1, 2, 3, 4], fun (acc: Int, x: Int): Int => acc + x, 0)
+Iter.reduce([1, 2, 3, 4], fun (acc: Number, x: Number): Number => acc + x, 0)
 // 10
 ```
 
-### `sum(iterable) -> Int | Float`
+### `sum(iterable) -> Number`
 
 Sum all elements:
 
@@ -56,12 +56,12 @@ Sum all elements:
 Iter.sum([1, 2, 3])  // 6
 ```
 
-### `count(iterable, func) -> Int`
+### `count(iterable, func) -> Number`
 
 Count elements matching a predicate:
 
 ```saffron
-Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
+Iter.count([1, 2, 3, 4], fun (x: Number): Bool => x > 2)
 // 2
 ```
 
@@ -72,7 +72,7 @@ Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
 Return the first element matching a predicate (or nil):
 
 ```saffron
-Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1)
+Iter.find([1, 2, 3], fun (x: Number): Bool => x > 1)
 // 2
 ```
 
@@ -81,7 +81,7 @@ Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1)
 True if any element matches:
 
 ```saffron
-Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
+Iter.any([1, 2, 3], fun (x: Number): Bool => x > 2)  // true
 ```
 
 ### `all(iterable, func) -> Bool`
@@ -89,7 +89,7 @@ Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
 True if all elements match:
 
 ```saffron
-Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0)  // true
+Iter.all([2, 4, 6], fun (x: Number): Bool => x % 2 == 0)  // true
 ```
 
 ## Iteration

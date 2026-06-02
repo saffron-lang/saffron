@@ -20,13 +20,21 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 | `@time` | Time and date utilities |
 | `@os` | Operating system interaction |
 | `@json` | JSON parsing and serialization |
+| `@toml` | TOML parsing and serialization |
+| `@csv` | CSV parsing |
 | `@reflect` | Runtime type introspection |
 | `@random` | Random number generation |
 | `@test` | Test framework |
 | `@fmt` | String formatting |
-| `@collections` | Set, Queue, Stack, Deque |
-| `@csv` | CSV parsing |
+| `@set` | Set data structure |
 | `@path` | File path manipulation |
+| `@glob` | Glob pattern matching and file discovery |
+| `@url` | URL parsing and manipulation |
+| `@http` | HTTP client |
+| `@base64` | Base64 encoding/decoding |
+| `@uuid` | UUID generation and parsing |
+| `@semver` | Semantic version parsing and comparison |
+| `@log` | Structured logging |
 | `@async` | Async task utilities |
 | `@lexer` | Tokenize Saffron source |
 | `@parser` | Parse source into AST |
@@ -46,7 +54,7 @@ Import specific names directly from a module:
 ```saffron
 import { map, filter, reduce } from "@iter"
 
-var doubled = map([1, 2, 3], fun (x: Int): Int => x * 2)
+var doubled = map([1, 2, 3], fun (x: Number): Number => x * 2)
 ```
 
 ## Using imported modules
@@ -70,18 +78,18 @@ Any `.sf` file is a module. Top-level `fun`, `class`, `enum`, and `var` declarat
 
 ```saffron
 // geometry.sf
-fun circle_area(radius: Float): Float {
+fun circle_area(radius: Number): Number {
     return 3.14159 * radius * radius
 }
 
 class Rectangle {
-    var width: Float
-    var height: Float
-    fun init(w: Float, h: Float) {
+    var width: Number
+    var height: Number
+    fun init(w: Number, h: Number) {
         this.width = w
         this.height = h
     }
-    fun area(): Float {
+    fun area(): Number {
         return this.width * this.height
     }
 }

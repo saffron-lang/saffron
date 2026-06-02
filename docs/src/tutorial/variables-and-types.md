@@ -5,7 +5,7 @@
 Use `var` to declare a mutable variable:
 
 ```saffron
-var x: Int = 5
+var x: Number = 5
 var name: String = "saffron"
 ```
 
@@ -14,8 +14,8 @@ var name: String = "saffron"
 When the type is obvious from the initializer, you can omit the annotation:
 
 ```saffron
-var x = 5          // inferred as Int
-var pi = 3.14      // inferred as Float
+var x = 5          // inferred as Number
+var pi = 3.14      // inferred as Number
 var name = "hi"    // inferred as String
 var flag = true    // inferred as Bool
 ```
@@ -24,18 +24,19 @@ var flag = true    // inferred as Bool
 
 | Type | Description | Examples |
 |------|-------------|----------|
-| `Int` | 64-bit signed integer | `42`, `-1`, `0` |
-| `Float` | 64-bit floating point | `3.14`, `-0.5`, `1.0` |
+| `Number` | 64-bit floating-point number | `42`, `3.14`, `-1`, `0` |
 | `String` | UTF-8 text | `"hello"`, `""` |
 | `Bool` | Boolean | `true`, `false` |
 | `Nil` | Absence of value | `nil` |
+
+Saffron uses a single `Number` type for all numeric values (both integers and floating-point). The LLVM compiler backend also accepts `Int` and `Float` as type annotations, which are treated as distinct types internally for optimization, but semantically equivalent to `Number` in most code.
 
 ## Type checking
 
 Saffron validates types at compile time. This won't compile:
 
 ```saffron
-var x: Int = "hello"  // Error: expected Int, got String
+var x: Number = "hello"  // Error: expected Number, got String
 ```
 
 ## Methods on primitives
@@ -54,8 +55,7 @@ true.to_string() // "true"
 The `is` operator checks a value's type:
 
 ```saffron
-42 is Int         // true
-3.14 is Float     // true
+42 is Number      // true
 "hi" is String    // true
 nil is Nil        // true
 ```

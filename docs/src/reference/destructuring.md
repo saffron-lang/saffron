@@ -30,7 +30,7 @@ Extract fields from a known variant:
 
 ```saffron
 enum Point {
-    XY(x: Float, y: Float)
+    XY(x: Number, y: Number)
 }
 
 let XY(x, y) = Point.XY(3.0, 4.0)
@@ -56,11 +56,11 @@ Destructuring is the primary mechanism in `match`:
 
 ```saffron
 enum Expr {
-    Num(value: Float),
+    Num(value: Number),
     Add(left: Expr, right: Expr)
 }
 
-fun eval(expr: Expr): Float {
+fun eval(expr: Expr): Number {
     return match (expr) {
         Num(v) => v,
         Add(l, r) => eval(l) + eval(r)

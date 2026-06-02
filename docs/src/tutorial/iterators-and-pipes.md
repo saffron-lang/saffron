@@ -40,13 +40,13 @@ import "@iter" as Iter
 
 var numbers = [1, 2, 3, 4, 5]
 
-var doubled = Iter.map(numbers, fun (x: Int): Int => x * 2)
+var doubled = Iter.map(numbers, fun (x: Number): Number => x * 2)
 // [2, 4, 6, 8, 10]
 
-var evens = Iter.filter(numbers, fun (x: Int): Bool => x % 2 == 0)
+var evens = Iter.filter(numbers, fun (x: Number): Bool => x % 2 == 0)
 // [2, 4]
 
-var total = Iter.reduce(numbers, fun (acc: Int, x: Int): Int => acc + x, 0)
+var total = Iter.reduce(numbers, fun (acc: Number, x: Number): Number => acc + x, 0)
 // 15
 ```
 
@@ -59,7 +59,7 @@ Import specific functions directly:
 ```saffron
 import { map, filter, reduce } from "@iter"
 
-var result = filter([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
+var result = filter([1, 2, 3, 4], fun (x: Number): Bool => x > 2)
 // [3, 4]
 ```
 
@@ -71,8 +71,8 @@ The pipe operator `|>` passes the left-hand value as the first argument to the r
 import { map, filter } from "@iter"
 
 var result = [1, 2, 3, 4, 5]
-    |> filter(fun (x: Int): Bool => x % 2 == 0)
-    |> map(fun (x: Int): Int => x * 10)
+    |> filter(fun (x: Number): Bool => x % 2 == 0)
+    |> map(fun (x: Number): Number => x * 10)
 
 IO.println(result)  // [20, 40]
 ```
@@ -81,12 +81,12 @@ Pipes make chains of transformations read top-to-bottom instead of inside-out:
 
 ```saffron
 // Without pipes (hard to read):
-IO.println(map(filter([1,2,3,4,5], fun (x: Int): Bool => x > 2), fun (x: Int): Int => x * x))
+IO.println(map(filter([1,2,3,4,5], fun (x: Number): Bool => x > 2), fun (x: Number): Number => x * x))
 
 // With pipes (clear):
 [1, 2, 3, 4, 5]
-    |> filter(fun (x: Int): Bool => x > 2)
-    |> map(fun (x: Int): Int => x * x)
+    |> filter(fun (x: Number): Bool => x > 2)
+    |> map(fun (x: Number): Number => x * x)
     |> IO.println()
 ```
 
@@ -96,10 +96,10 @@ Make your own class iterable by implementing the protocol:
 
 ```saffron
 class Range {
-    var start: Int
-    var end: Int
+    var start: Number
+    var end: Number
 
-    fun init(start: Int, end: Int) {
+    fun init(start: Number, end: Number) {
         this.start = start
         this.end = end
     }
@@ -110,10 +110,10 @@ class Range {
 }
 
 class RangeIterator {
-    var current: Int
-    var end: Int
+    var current: Number
+    var end: Number
 
-    fun init(start: Int, end: Int) {
+    fun init(start: Number, end: Number) {
         this.current = start
         this.end = end
     }
@@ -122,7 +122,7 @@ class RangeIterator {
         return this.current < this.end
     }
 
-    fun next(): Int {
+    fun next(): Number {
         var value = this.current
         this.current = this.current + 1
         return value

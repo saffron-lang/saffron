@@ -10,6 +10,7 @@
 @extern("void __sched_reset_yield()") fun reset_yield()
 @extern("void __sched_store_result(i64, i64)") fun store_result(handle: Int, value: Int)
 @extern("i64 __sched_has_stored_result(i64)") fun has_stored_result(handle: Int): Int
+@extern("i64 sf_tcp_poll(i64, i64, i64)") fun tcp_poll(fd: Int, events: Int, timeout_ms: Int): Int
 
 var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
@@ -20,6 +21,11 @@ var result_values: List<Int> = []
 // Await waiters: task waiting for another task to complete
 var await_targets: List<Int> = []
 var await_waiters: List<Int> = []
+
+// IO waiters: tasks suspended on socket readiness
+var io_handles: List<Int> = []
+var io_fds: List<Int> = []
+var io_modes: List<Int> = []  // 0=read, 1=write
 
 fun get_result(handle: Int): Int {
     var i: Int = 0
@@ -40,6 +46,7 @@ fun has_pending(): Int {
     if (run_queue.length() > 0) { return 1 }
     if (sleep_queue.length() > 0) { return 1 }
     if (await_waiters.length() > 0) { return 1 }
+    if (io_handles.length() > 0) { return 1 }
     return 0
 }
 
@@ -55,6 +62,35 @@ fun wake_waiters(finished_handle: Int) {
     }
 }
 
+// Poll all parked IO fds for readiness.
+// Moves ready tasks back to the run queue.
+// timeout_ms: how long to block if nothing is immediately ready.
+fun poll_io(timeout_ms: Int) {
+    // First pass: check each fd with 0ms timeout (non-blocking)
+    var i: Int = io_handles.length() - 1
+    while (i >= 0) {
+        var ready: Int = tcp_poll(io_fds[i], io_modes[i], 0)
+        if (ready == 1) {
+            run_queue.push(io_handles[i])
+            io_handles.remove(i)
+            io_fds.remove(i)
+            io_modes.remove(i)
+        }
+        i = i - 1
+    }
+    // If nothing was ready and we still have waiting tasks, do a blocking
+    // poll on the first fd to avoid busy-spinning
+    if (run_queue.length() == 0 and io_handles.length() > 0 and timeout_ms > 0) {
+        var ready: Int = tcp_poll(io_fds[0], io_modes[0], timeout_ms)
+        if (ready == 1) {
+            run_queue.push(io_handles[0])
+            io_handles.remove(0)
+            io_fds.remove(0)
+            io_modes.remove(0)
+        }
+    }
+}
+
 fun scheduler_tick(): Int {
     var now: Number = time_now()
     var i: Int = sleep_queue.length() - 1
@@ -67,9 +103,15 @@ fun scheduler_tick(): Int {
         i = i - 1
     }
 
+    // Poll IO fds when run queue is empty but IO tasks are waiting
+    if (run_queue.length() == 0 and io_handles.length() > 0) {
+        poll_io(10)
+    }
+
     if (run_queue.length() == 0) {
         if (sleep_queue.length() > 0) { return 1 }
         if (await_waiters.length() > 0) { return 1 }
+        if (io_handles.length() > 0) { return 1 }
         return 0
     }
 
@@ -93,6 +135,12 @@ fun scheduler_tick(): Int {
             var duration: Number = get_yield_arg()
             sleep_queue.push(hdl)
             sleep_times.push(now + duration)
+        } else if (reason == 2) {
+            // IO read: park until fd is readable
+            var fd: Int = get_yield_arg()
+            io_handles.push(hdl)
+            io_fds.push(fd)
+            io_modes.push(0)
         } else if (reason == 3) {
             // Await: park this task until the target task finishes
             var target: Int = get_yield_arg()
@@ -103,6 +151,12 @@ fun scheduler_tick(): Int {
                 await_targets.push(target)
                 await_waiters.push(hdl)
             }
+        } else if (reason == 4) {
+            // IO write: park until fd is writable
+            var fd: Int = get_yield_arg()
+            io_handles.push(hdl)
+            io_fds.push(fd)
+            io_modes.push(1)
         }
         reset_yield()
     }
