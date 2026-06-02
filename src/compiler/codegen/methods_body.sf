@@ -140,6 +140,10 @@
         } else if (gf_obj_name.length() > 0) {
             gf_class = this.get_var_type_str(gf_obj_name)
         }
+        // Tuple field access: t._0, t._1 etc.
+        if (gf_class.starts_with("Tuple<") and gf_field.starts_with("_")) {
+            return this.get_field_type(gf_class, gf_field)
+        }
         var gf_resolved: String = this.resolve_class_type(gf_class)
         if (gf_resolved.length() > 0) {
             return this.get_field_type(gf_resolved, gf_field)
@@ -332,6 +336,13 @@
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
     var obj_name: String = this.get_variable_name(object)
+    // Block tuple indexing: must use ._0, ._1 etc.
+    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
+        if (ig_ttype.starts_with("Tuple<")) {
+            IO.println("[codegen] Error: use ._0, ._1 etc. to access tuple fields (not indexing)")
+        }
+    }
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
     var idx_tagged: String = this.gen_arg_value(index)
@@ -1661,6 +1672,11 @@
         this.last_type = AST.Type.StringType
         return ts_local
     }
+    // Error: method not found on a known type
+    if (obj_type != "Any" and obj_type != "Int" and obj_type.length() > 0) {
+        IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+        this.has_errors = true
+    }
     this.last_type = AST.Type.IntType
     return "0"
     }
@@ -1718,6 +1734,16 @@
     }
 
     fun get_field_type(class_name: String, field: String): String {
+    // Tuple field access: Tuple<T0,T1,...> with _0, _1, ...
+    if (class_name.starts_with("Tuple<") and field.starts_with("_") and field.length() >= 2) {
+        var gft_rest: String = field.slice(1, field.length())
+        var gft_idx: Float = gft_rest.to_number()
+        var gft_inner: String = class_name.slice(6, class_name.length() - 1)
+        var gft_args: List<String> = this.split_type_args(gft_inner)
+        if (gft_idx >= 0 and gft_idx < gft_args.length()) {
+            return gft_args[gft_idx]
+        }
+    }
     if (!this.class_fields.has(class_name)) return "Int"
     var fields: String = this.class_fields.get(class_name)
     if (fields.length() == 0) return "Int"
@@ -1760,6 +1786,11 @@
         var fp: List<String> = parts[i].split(":")
         if (fp[0] == field) return i
         i = i + 1
+    }
+    // Field not found on known class
+    if (class_name.length() > 0 and parts.length() > 0) {
+        IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")
+        this.has_errors = true
     }
     return 0
 }

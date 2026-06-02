@@ -202,6 +202,27 @@ class Parser {
                 } else if (this.match_kind_check("ident")) {
                     var part: String = this.expect_ident()
                     args = args + part
+                } else if (this.match_kind_check(".")) {
+                    args = args + "."
+                    this.advance()
+                } else if (this.match_kind_check("|")) {
+                    args = args + "|"
+                    this.advance()
+                } else if (this.match_kind_check("(")) {
+                    args = args + "("
+                    this.advance()
+                } else if (this.match_kind_check(")")) {
+                    args = args + ")"
+                    this.advance()
+                } else if (this.match_kind_check("=>")) {
+                    args = args + "=>"
+                    this.advance()
+                } else if (this.match_kind_check(":")) {
+                    args = args + ":"
+                    this.advance()
+                } else if (this.match_kind_check("?")) {
+                    args = args + "?"
+                    this.advance()
                 } else {
                     this.advance()
                 }
@@ -755,7 +776,7 @@ class Parser {
                 TkString(s) => s
                 _ => ""
             }
-            return AST.Pattern.VariantPattern(str_val, [])
+            return AST.Pattern.VariantPattern("__strpat:" + str_val, [])
         }
         var name: String = this.expect_ident()
         if (this.match_kind("(")) {
@@ -1462,6 +1483,9 @@ class Parser {
         this.consume("{")
         var variants: List<AST.Variant> = []
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+            // Skip doc comments inside enum body
+            this.collect_doc_comments()
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
             var vname: String = this.expect_ident()
             var fields: String = ""
             if (this.match_kind("(")) {
@@ -1624,6 +1648,9 @@ class Parser {
         while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
             while (this.match_kind(";")) {}
             if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+            // Consume doc comments inside class body (attach to next member)
+            var member_doc: String = this.collect_doc_comments()
+            if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
             if (this.match_kind_check("var")) {
                 // Field declaration: var name: Type  or  var name = default
                 this.advance()
@@ -1653,8 +1680,8 @@ class Parser {
                 }
                 fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit))
             } else if (this.match_kind_check("fun")) {
-                // Method declaration
-                methods.push(this.parse_fun_decl())
+                // Method declaration (doc comment passed via parse_fun_decl_with_doc)
+                methods.push(this.parse_fun_decl_with_doc(member_doc))
             }
         }
         this.consume("}")
