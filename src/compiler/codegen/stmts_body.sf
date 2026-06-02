@@ -964,6 +964,10 @@
         // Set current jmp_buf to our local buffer
         this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
 
+        // Save shadow stack depth so we can restore it on catch (longjmp skips pop_roots)
+        var saved_ss_depth: String = this.fresh_local()
+        this.emit_indent(saved_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+
         // setjmp returns 0 on first call, non-zero on longjmp
         var setjmp_result: String = this.fresh_local()
         this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
@@ -988,6 +992,12 @@
         this.start_block(catch_label)
         // Restore previous jmp_buf before running catch (so re-throws use outer handler)
         this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        // Restore shadow stack depth (longjmp skipped pop_roots in unwound frames)
+        var cur_ss_depth: String = this.fresh_local()
+        this.emit_indent(cur_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+        var ss_pop_n: String = this.fresh_local()
+        this.emit_indent(ss_pop_n + " = sub i64 " + cur_ss_depth + ", " + saved_ss_depth)
+        this.emit_indent("call void @__gc_pop_roots(i64 " + ss_pop_n + ")")
         // Load exception value into catch variable
         var exc_val: String = this.fresh_local()
         this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
