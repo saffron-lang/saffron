@@ -85,9 +85,11 @@ int64_t sf_select_fds(int64_t *read_fds, int64_t read_count,
 // These globals are defined in base.ll; we extern them here.
 extern int64_t __yield_reason;
 extern int64_t __yield_arg;
+extern int64_t __task_result;
 
 int64_t __sched_get_yield_reason(void) { return __yield_reason; }
 int64_t __sched_get_yield_arg(void) { return __yield_arg; }
+int64_t __sched_get_task_result(void) { return __task_result; }
 void __sched_reset_yield(void) { __yield_reason = 0; __yield_arg = 0; }
 
 // Coroutine frame layout after LLVM CoroSplit:
@@ -103,19 +105,24 @@ typedef void (*coro_fn_t)(void *);
 
 void __sched_coro_resume(int64_t hdl_i64) {
     void *hdl = (void *)hdl_i64;
+    if (!hdl) return;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
+    if (!resume_fn) return;
     resume_fn(hdl);
 }
 
 int64_t __sched_coro_done(int64_t hdl_i64) {
     void *hdl = (void *)hdl_i64;
+    if (!hdl) return 1;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
     return (resume_fn == (coro_fn_t)0) ? 1 : 0;
 }
 
 void __sched_coro_destroy(int64_t hdl_i64) {
     void *hdl = (void *)hdl_i64;
+    if (!hdl) return;
     coro_fn_t *fn_ptrs = (coro_fn_t *)hdl;
     coro_fn_t destroy_fn = fn_ptrs[1];
+    if (!destroy_fn) return;
     destroy_fn(hdl);
 }

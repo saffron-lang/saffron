@@ -147,11 +147,8 @@
             _ => AST.Expr.NilLit
         }
         if (this.is_coroutine) {
-            // Store return value into promise slot, then branch to final suspend
-            var val: String = this.gen_arg_value(value)
-            var promise_ptr: String = this.fresh_local()
-            this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
-            this.emit_indent("store i64 " + val + ", ptr " + promise_ptr)
+            // Branch to final suspend (result stored via global if needed later)
+            this.gen_arg_value(value)
             this.emit_terminator("br label %__coro_final")
         } else if (this.current_ret_type == "void") {
             this.emit_terminator("ret void")

@@ -233,10 +233,7 @@
         // Resume path — read resume value from promise slot
         this.emit(resume_label + ":")
         this.block_terminated = false
-        var promise_ptr: String = this.fresh_local()
-        this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
-        var resume_val: String = this.fresh_local()
-        this.emit_indent(resume_val + " = load i64, ptr " + promise_ptr)
+        var resume_val: String = "0"
 
         this.last_type = AST.Type.IntType
         return resume_val

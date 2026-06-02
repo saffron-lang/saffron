@@ -1,5 +1,5 @@
-target triple = "wasm64-unknown-unknown"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128-ni:1:10:20"
+target triple = "wasm32-unknown-unknown"
+target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128-ni:1:10:20"
 
 ; =============================================================================
 ; WASM Runtime Base
@@ -12,7 +12,10 @@ target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128-ni:1:10:20"
 
 ; --- Globals ---
 
-@__heap_ptr = global i64 65536  ; Start allocating at 64KB (leave room for stack)
+; __heap_base is a linker-provided symbol whose ADDRESS equals the first byte
+; after all static data.  We use ptrtoint on it (not a load) to get the value.
+@__heap_base = external global i8
+@__heap_ptr = global i64 0
 @__argc = weak global i32 0
 @__argv = weak global i8** null
 @__exception_value = weak global i64 0
@@ -502,12 +505,19 @@ entry:
 }
 
 ; --- Entry point wrapper ---
-; WASM entry point — calls the program's __saffron_entry function
+; WASM entry point — initializes heap, then calls __saffron_entry.
 
 declare i64 @__saffron_entry()
 
 define void @_start() {
 entry:
+  ; Initialize heap pointer from linker-provided __heap_base symbol.
+  ; The ADDRESS of __heap_base equals the first free byte after static data.
+  %hb_ptr = ptrtoint i8* @__heap_base to i64
+  ; Align to 8 bytes
+  %aligned = add i64 %hb_ptr, 7
+  %heap_start = and i64 %aligned, -8
+  store i64 %heap_start, i64* @__heap_ptr
   call i64 @__saffron_entry()
   ret void
 }

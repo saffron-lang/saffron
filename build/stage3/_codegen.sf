@@ -1174,10 +1174,7 @@ class Codegen {
         // Resume path — read resume value from promise slot
         this.emit(resume_label + ":")
         this.block_terminated = false
-        var promise_ptr: String = this.fresh_local()
-        this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
-        var resume_val: String = this.fresh_local()
-        this.emit_indent(resume_val + " = load i64, ptr " + promise_ptr)
+        var resume_val: String = "0"
 
         this.last_type = AST.Type.IntType
         return resume_val
@@ -3934,11 +3931,8 @@ class Codegen {
             _ => AST.Expr.NilLit
         }
         if (this.is_coroutine) {
-            // Store return value into promise slot, then branch to final suspend
-            var val: String = this.gen_arg_value(value)
-            var promise_ptr: String = this.fresh_local()
-            this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
-            this.emit_indent("store i64 " + val + ", ptr " + promise_ptr)
+            // Branch to final suspend (result stored via global if needed later)
+            this.gen_arg_value(value)
             this.emit_terminator("br label %__coro_final")
         } else if (this.current_ret_type == "void") {
             this.emit_terminator("ret void")
@@ -4840,6 +4834,30 @@ class Codegen {
         rt.append("declare i1 @__val_is_nil(i64)\n")
         rt.append("declare i1 @__val_is_list(i64)\n")
         rt.append("declare i1 @__val_is_map(i64)\n")
+        // GC runtime declarations
+        rt.append("\n; --- GC runtime ---\n")
+        rt.append("declare void @__gc_enable()\n")
+        rt.append("declare void @__gc_disable()\n")
+        rt.append("declare void @__gc_collect()\n")
+        rt.append("declare void @__gc_set_threshold(i64)\n")
+        rt.append("declare i64 @__gc_stat_alloc_count()\n")
+        rt.append("declare i64 @__gc_stat_total_bytes()\n")
+        rt.append("declare i64 @__gc_stat_collections()\n")
+        rt.append("declare i64 @__gc_stat_freed_bytes()\n")
+        rt.append("declare i64 @__gc_alloc(i64, i64)\n")
+        rt.append("declare i64 @__gc_alloc_zeroed(i64, i64)\n")
+        rt.append("declare i64 @__gc_realloc(i64, i64, i64)\n")
+        rt.append("declare void @__gc_push_root(i64)\n")
+        rt.append("declare void @__gc_pop_roots(i64)\n")
+        rt.append("declare i64 @__gc_shadow_stack_depth()\n")
+        rt.append("declare i64 @__gc_list_new()\n")
+        rt.append("declare void @__gc_list_push(i64, i64)\n")
+        rt.append("declare i64 @__gc_map_new()\n")
+        rt.append("declare i64 @__gc_stringbuilder_new()\n")
+        rt.append("declare i64 @__gc_string_alloc(i64)\n")
+        rt.append("declare i64 @__gc_closure_new(i64, i64)\n")
+        rt.append("declare i64 @__gc_env_alloc(i64)\n")
+        rt.append("declare i64 @__gc_instance_alloc(i64)\n")
         // Coroutine intrinsics
         if (this.coroutine_funcs.length() > 0) {
             rt.append("\n; --- Coroutine intrinsics ---\n")
@@ -4853,9 +4871,9 @@ class Codegen {
             rt.append("declare void @llvm.coro.resume(ptr)\n")
             rt.append("declare i1 @llvm.coro.done(ptr)\n")
             rt.append("declare void @llvm.coro.destroy(ptr)\n")
-            rt.append("declare ptr @llvm.coro.promise(ptr, i32, i1)\n")
             rt.append("\n@__yield_reason = external global i64\n")
             rt.append("@__yield_arg = external global i64\n")
+            rt.append("@__task_result = external global i64\n")
         }
         return rt.to_string()
     }
@@ -5742,6 +5760,29 @@ class Codegen {
         this.known_functions.push("__runtime_error_fatal")
         this.known_functions.push("__null_pointer_error")
         this.known_functions.push("__division_error")
+        // GC runtime functions
+        this.known_functions.push("__gc_enable")
+        this.known_functions.push("__gc_disable")
+        this.known_functions.push("__gc_collect")
+        this.known_functions.push("__gc_set_threshold")
+        this.known_functions.push("__gc_stat_alloc_count")
+        this.known_functions.push("__gc_stat_total_bytes")
+        this.known_functions.push("__gc_stat_collections")
+        this.known_functions.push("__gc_stat_freed_bytes")
+        this.known_functions.push("__gc_alloc")
+        this.known_functions.push("__gc_alloc_zeroed")
+        this.known_functions.push("__gc_realloc")
+        this.known_functions.push("__gc_push_root")
+        this.known_functions.push("__gc_pop_roots")
+        this.known_functions.push("__gc_shadow_stack_depth")
+        this.known_functions.push("__gc_list_new")
+        this.known_functions.push("__gc_list_push")
+        this.known_functions.push("__gc_map_new")
+        this.known_functions.push("__gc_stringbuilder_new")
+        this.known_functions.push("__gc_string_alloc")
+        this.known_functions.push("__gc_closure_new")
+        this.known_functions.push("__gc_env_alloc")
+        this.known_functions.push("__gc_instance_alloc")
         this.func_ret_types.set("StringBuilder", "StringBuilder")
 
         // Pre-scan: register extension methods before compilation
@@ -6735,12 +6776,63 @@ class Codegen {
     }
     if (method == "getResult") {
         var task_val: String = this.gen_arg_value(object)
-        var task_ptr: String = this.fresh_local()
-        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
-        var promise: String = this.fresh_local()
-        this.emit_indent(promise + " = call ptr @llvm.coro.promise(ptr " + task_ptr + ", i32 8, i1 false)")
+        var get_result_name: String = "get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
         var result_val: String = this.fresh_local()
-        this.emit_indent(result_val + " = load i64, ptr " + promise)
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
+        this.last_type = AST.Type.IntType
+        return result_val
+    }
+    // task.await() — from top-level: run scheduler then read result
+    if (method == "await" and !this.is_coroutine) {
+        var task_val: String = this.gen_arg_value(object)
+        var sched_run_name: String = "scheduler_run"
+        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+            sched_run_name = "stdlib_scheduler_scheduler_run"
+        }
+        this.emit_indent("call i64 @" + sched_run_name + "()")
+        this.called_functions.push(sched_run_name)
+        var get_result_name: String = "get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
+        this.last_type = AST.Type.IntType
+        return result_val
+    }
+    // task.await() — from coroutine: yield with reason=3, scheduler wakes us
+    if (method == "await" and this.is_coroutine) {
+        var task_val: String = this.gen_arg_value(object)
+        this.emit_indent("store i64 3, i64* @__yield_reason")
+        this.emit_indent("store i64 " + task_val + ", i64* @__yield_arg")
+        var save_tok: String = this.fresh_local()
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+        var susp: String = this.fresh_local()
+        this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+        var await_resume: String = this.fresh_label("task.await.resume")
+        var await_suspend: String = this.fresh_label("task.await.suspend")
+        var await_cleanup: String = this.fresh_label("task.await.cleanup")
+        this.emit_terminator("switch i8 " + susp + ", label %" + await_suspend + " [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
+        this.emit(await_suspend + ":")
+        this.block_terminated = false
+        this.emit_terminator("ret ptr %__coro_hdl")
+        this.emit(await_cleanup + ":")
+        this.block_terminated = false
+        this.emit_terminator("br label %__coro_cleanup")
+        this.emit(await_resume + ":")
+        this.block_terminated = false
+        var get_result_name: String = "get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
         this.last_type = AST.Type.IntType
         return result_val
     }

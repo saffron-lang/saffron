@@ -13,6 +13,7 @@ VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
 RUNTIME_BASE="$ROOT/src/runtime/base.ll"
+RUNTIME_GC="$ROOT/src/runtime/gc.ll"
 BUILD_DIR="$ROOT/build"
 GEN2="$BUILD_DIR/stage2/saffronc"
 
@@ -82,6 +83,7 @@ if [[ "$FULL" == true ]]; then
         "$BUILD_DIR/stage2/codegen.ll" \
         "$BUILD_DIR/stage2/runtime.ll" \
         "$RUNTIME_BASE" \
+        "$RUNTIME_GC" \
         || fail "FULL" "Linking gen2 failed"
 
     pass "FULL" "gen2 rebuilt: $GEN2"
@@ -159,6 +161,7 @@ if [[ "$GEN2_OK" == false ]]; then
         "$BUILD_DIR/stage3/main.ll" \
         "$BUILD_DIR/stage3/runtime.ll" \
         "$RUNTIME_BASE" \
+        "$RUNTIME_GC" \
         || fail "STAGE 1" "Linking gen3 from .ll artifacts failed"
     GEN3="$BUILD_DIR/saffronc"
 
@@ -194,6 +197,7 @@ clang -O2 -w -Wl,-stack_size,0x10000000 -o "$BUILD_DIR/saffronc" \
     "$BUILD_DIR/stage3/main.ll" \
     "$BUILD_DIR/stage3/runtime.ll" \
     "$RUNTIME_BASE" \
+    "$RUNTIME_GC" \
     || fail "STAGE 1" "Linking gen3 failed"
 
 pass "STAGE 1" "gen3 saffronc built: $BUILD_DIR/saffronc"
@@ -218,7 +222,7 @@ EOF
 "$BUILD_DIR/saffronc" "$EXAMPLE" "$BUILD_DIR/hello_bootstrap.ll" \
     || fail "TEST" "gen3 failed to compile example"
 
-clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$BUILD_DIR/stage3/runtime.ll" "$RUNTIME_BASE" \
+clang -O2 -w -o "$BUILD_DIR/hello_bootstrap" "$BUILD_DIR/hello_bootstrap.ll" "$BUILD_DIR/stage3/runtime.ll" "$RUNTIME_BASE" "$RUNTIME_GC" \
     || fail "TEST" "Linking example failed"
 
 echo ""
