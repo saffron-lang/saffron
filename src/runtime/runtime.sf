@@ -116,6 +116,21 @@ fun __list_pop(list: Int): Int {
     return load64(data + new_count * 8)
 }
 
+fun __list_remove(list: Int, index: Int): Int {
+    if (list == 0) { return 0 }
+    var count: Int = load64(list)
+    if (index < 0 or index >= count) { return 0 }
+    var data: Int = load64(list + 16)
+    var removed: Int = load64(data + index * 8)
+    var i: Int = index
+    while (i < count - 1) {
+        store64(data + i * 8, load64(data + (i + 1) * 8))
+        i = i + 1
+    }
+    store64(list, count - 1)
+    return removed
+}
+
 // =============================================================================
 // StringBuilder: { len@0, cap@8, buf*@16 } — 24 bytes
 // =============================================================================

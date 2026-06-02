@@ -11,6 +11,7 @@ target triple = "arm64-apple-macosx14.0.0"
 ; Async scheduler state
 @__yield_reason = global i64 0
 @__yield_arg = global i64 0
+@__task_result = global i64 0
 
 declare double @sf_time_now()
 declare i64 @sf_select_fds(i64*, i64, i64*, i64, i64)

@@ -1,0 +1,632 @@
+// Saffron Garbage Collector — Mark-and-Sweep with Shadow Stack
+//
+// NOTE: This file is a DESIGN REFERENCE only. The actual GC implementation
+// is in gc.ll (hand-written LLVM IR) because this file cannot be compiled
+// as a library module (module-level vars cause a main() to be emitted).
+// The gc.ll file is directly linked alongside base.ll and runtime.ll.
+//
+// Design:
+//   - All heap objects get a GC header: { mark: i8, type_tag: i8, padding: i16, next_lo: i32, next_hi: i32, size: i64 }
+//   - Header is 24 bytes, placed BEFORE the user-visible pointer
+//   - A linked list of all GC objects is maintained via next pointers in headers
+//   - A shadow stack tracks roots (local variables holding pointers to GC objects)
+//   - Mark phase: walk shadow stack roots, recursively mark reachable objects
+//   - Sweep phase: walk allocation list, free unmarked objects
+//
+// Type tags:
+//   0 = raw (opaque buffer, no inner pointers)
+//   1 = string (raw bytes, no inner pointers)
+//   2 = list { count@0, capacity@8, data_ptr@16 } — data array has `count` i64 entries
+//   3 = map { count@0, capacity@8, keys_ptr@16, values_ptr@24 }
+//   4 = closure { fn_ptr@0, env_ptr@8 }
+//   5 = class instance (N fields, all i64, scanned conservatively)
+//   6 = stringbuilder { len@0, cap@8, buf_ptr@16 }
+//   7 = data array (inner buffer of list — elements are values, scanned)
+//   8 = key/value array (inner buffer of map — may contain pointers)
+//   9 = env (closure environment — all slots are values, scanned)
+//
+// GC Header layout (24 bytes):
+//   offset 0:  mark bit (i8) — 0=unmarked, 1=marked
+//   offset 1:  type_tag (i8) — object type for traversal
+//   offset 2:  padding (i16) — reserved
+//   offset 4:  next_lo (i32) — low 32 bits of next pointer
+//   offset 8:  next_hi (i32) — high 32 bits of next pointer (to handle 64-bit)
+//   offset 12: padding (i32) — align to 8
+//   offset 16: size (i64) — allocation size (user-visible portion)
+//
+// Actually, simpler: just use i64 fields.
+// GC Header (24 bytes):
+//   offset 0:  next (i64) — pointer to next GC object header (or 0)
+//   offset 8:  size_and_tag (i64) — upper 8 bits = type_tag, bit 0 = mark, rest = size
+//   offset 16: (reserved for future use / alignment)
+//
+// Even simpler — let's use a layout that's easy with our i64 load/store:
+// GC Header (24 bytes, 3 x i64):
+//   offset 0: next_ptr (i64) — pointer to next allocation's header (linked list)
+//   offset 8: info (i64) — [ mark_bit (bit 0) | type_tag (bits 8-15) | user_size (bits 16-63) ]
+//   offset 16: (padding/future use)
+//
+// User pointer = header_ptr + 24
+// Header_ptr = user_ptr - 24
+
+@extern("void* malloc(i64)") fun rt_malloc(size: Int): Int
+@extern("void* realloc(void*, i64)") fun rt_realloc(ptr: Int, size: Int): Int
+@extern("void free(void*)") fun rt_free(ptr: Int)
+@extern("i64 write(i32, void*, i64)") fun rt_write(fd: Int, buf: Int, len: Int): Int
+@extern("i64 strlen(void*)") fun rt_strlen(s: Int): Int
+
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
+@intrinsic fun load8(addr: Int): Int
+@intrinsic fun store8(addr: Int, val: Int)
+
+// =============================================================================
+// GC Constants
+// =============================================================================
+
+// Type tags (constants — used as immediate values)
+// TAG_RAW = 0, TAG_STRING = 1, TAG_LIST = 2, TAG_MAP = 3,
+// TAG_CLOSURE = 4, TAG_INSTANCE = 5, TAG_STRINGBUILDER = 6,
+// TAG_DATA_ARRAY = 7, TAG_KV_ARRAY = 8, TAG_ENV = 9
+
+// GC header size: 3 x i64 = 24 bytes (constant)
+// 24 = 24
+
+// GC state — all default to 0 (LLVM global i64 0)
+var __gc_head: Int = 0           // Head of the allocation linked list
+var __gc_alloc_count: Int = 0    // Number of live allocations
+var __gc_total_bytes: Int = 0    // Total bytes allocated (including headers)
+var __gc_threshold: Int = 0      // Bytes before triggering collection (set in __gc_enable)
+var __gc_enabled: Int = 0        // 0=disabled, 1=enabled (disabled by default for bootstrap safety)
+
+// Shadow stack: array of root pointers
+// Layout: { count@0, capacity@8, data_ptr@16 } — same as a list but for GC roots
+var __gc_shadow_stack: Int = 0   // Pointer to shadow stack structure
+var __gc_shadow_stack_inited: Int = 0
+
+// Statistics
+var __gc_collections: Int = 0    // Number of collections performed
+var __gc_freed_bytes: Int = 0    // Total bytes freed
+
+// =============================================================================
+// GC Header Access
+// =============================================================================
+
+// Given a user pointer (what the program sees), get the header pointer
+fun __gc_header_from_user(user_ptr: Int): Int {
+    return user_ptr - 24
+}
+
+// Given a header pointer, get the user pointer
+fun __gc_user_from_header(header_ptr: Int): Int {
+    return header_ptr + 24
+}
+
+// Read the 'next' field from a header
+fun __gc_header_next(header: Int): Int {
+    return load64(header)
+}
+
+// Write the 'next' field in a header
+fun __gc_header_set_next(header: Int, next: Int) {
+    store64(header, next)
+}
+
+// Read info field: contains mark bit, type tag, and size
+fun __gc_header_info(header: Int): Int {
+    return load64(header + 8)
+}
+
+// Set info field
+fun __gc_header_set_info(header: Int, info: Int) {
+    store64(header + 8, info)
+}
+
+// Pack info: mark_bit (bit 0), type_tag (bits 8-15), user_size (bits 16+)
+fun __gc_pack_info(mark: Int, tag: Int, size: Int): Int {
+    return (mark) + (tag * 256) + (size * 65536)
+}
+
+// Unpack mark bit from info
+fun __gc_info_mark(info: Int): Int {
+    return info - ((info / 2) * 2)
+}
+
+// Unpack type tag from info
+fun __gc_info_tag(info: Int): Int {
+    return (info / 256) - ((info / 65536) * 256)
+}
+
+// Unpack size from info
+fun __gc_info_size(info: Int): Int {
+    return info / 65536
+}
+
+// Set mark bit on a header
+fun __gc_mark_header(header: Int) {
+    var info: Int = load64(header + 8)
+    var mark: Int = __gc_info_mark(info)
+    if (mark == 0) {
+        store64(header + 8, info + 1)
+    }
+}
+
+// Clear mark bit on a header
+fun __gc_unmark_header(header: Int) {
+    var info: Int = load64(header + 8)
+    var mark: Int = __gc_info_mark(info)
+    if (mark == 1) {
+        store64(header + 8, info - 1)
+    }
+}
+
+// Check if header is marked
+fun __gc_is_marked(header: Int): Int {
+    var info: Int = load64(header + 8)
+    return __gc_info_mark(info)
+}
+
+// =============================================================================
+// Shadow Stack
+// =============================================================================
+
+fun __gc_init_shadow_stack() {
+    if (__gc_shadow_stack_inited != 0) { return }
+    // Shadow stack: { count@0, capacity@8, data_ptr@16 }
+    __gc_shadow_stack = rt_malloc(24)
+    store64(__gc_shadow_stack, 0)          // count = 0
+    store64(__gc_shadow_stack + 8, 256)    // capacity = 256 slots
+    store64(__gc_shadow_stack + 16, rt_malloc(256 * 8))  // data array
+    __gc_shadow_stack_inited = 1
+}
+
+// Push a root address onto the shadow stack.
+// `root_addr` is the ADDRESS of a local variable (i.e., the alloca pointer),
+// not the value itself. This allows the GC to read the current value at mark time.
+fun __gc_push_root(root_addr: Int) {
+    if (__gc_shadow_stack_inited == 0) { __gc_init_shadow_stack() }
+    var count: Int = load64(__gc_shadow_stack)
+    var cap: Int = load64(__gc_shadow_stack + 8)
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        var old_data: Int = load64(__gc_shadow_stack + 16)
+        var new_data: Int = rt_realloc(old_data, new_cap * 8)
+        if (new_data != 0) {
+            store64(__gc_shadow_stack + 8, new_cap)
+            store64(__gc_shadow_stack + 16, new_data)
+        }
+    }
+    var data: Int = load64(__gc_shadow_stack + 16)
+    store64(data + count * 8, root_addr)
+    store64(__gc_shadow_stack, count + 1)
+}
+
+// Pop N roots from the shadow stack (used at scope exit)
+fun __gc_pop_roots(n: Int) {
+    if (__gc_shadow_stack_inited == 0) { return }
+    var count: Int = load64(__gc_shadow_stack)
+    var new_count: Int = count - n
+    if (new_count < 0) { new_count = 0 }
+    store64(__gc_shadow_stack, new_count)
+}
+
+// Get current shadow stack depth (for save/restore around calls)
+fun __gc_shadow_stack_depth(): Int {
+    if (__gc_shadow_stack_inited == 0) { return 0 }
+    return load64(__gc_shadow_stack)
+}
+
+// =============================================================================
+// GC Allocation
+// =============================================================================
+
+// Allocate a GC-tracked object. Returns the user pointer (header is hidden).
+// type_tag: one of __GC_TAG_* constants
+// size: user-visible allocation size in bytes
+fun __gc_alloc(size: Int, type_tag: Int): Int {
+    // Check if we should collect (only if enabled)
+    if (__gc_enabled != 0) {
+        if (__gc_total_bytes >= __gc_threshold) {
+            __gc_collect()
+            // Grow threshold if we're still using > 50% after collection
+            if (__gc_total_bytes > __gc_threshold / 2) {
+                __gc_threshold = __gc_threshold * 2
+            }
+        }
+    }
+
+    var total: Int = size + 24
+    var raw: Int = rt_malloc(total)
+    if (raw == 0) { return 0 }
+
+    // Initialize header
+    store64(raw, __gc_head)                              // next = old head
+    store64(raw + 8, __gc_pack_info(0, type_tag, size))  // info: unmarked
+    store64(raw + 16, 0)                                 // reserved
+
+    // Update linked list head
+    __gc_head = raw
+    __gc_alloc_count = __gc_alloc_count + 1
+    __gc_total_bytes = __gc_total_bytes + total
+
+    // Return user pointer (past the header)
+    return raw + 24
+}
+
+// Allocate a GC-tracked object with zeroed memory
+fun __gc_alloc_zeroed(size: Int, type_tag: Int): Int {
+    var ptr: Int = __gc_alloc(size, type_tag)
+    if (ptr == 0) { return 0 }
+    // Zero the user portion
+    var i: Int = 0
+    while (i < size) {
+        store8(ptr + i, 0)
+        i = i + 1
+    }
+    return ptr
+}
+
+// Reallocate a GC-tracked data array (for list/map growth).
+// This creates a new allocation and copies data — the old one will be swept.
+// Returns new user pointer.
+fun __gc_realloc(old_user_ptr: Int, new_size: Int, type_tag: Int): Int {
+    var new_ptr: Int = __gc_alloc(new_size, type_tag)
+    if (new_ptr == 0) { return old_user_ptr }
+    if (old_user_ptr == 0) { return new_ptr }
+
+    // Copy from old to new (copy the minimum of old size and new size)
+    var old_header: Int = __gc_header_from_user(old_user_ptr)
+    var old_info: Int = __gc_header_info(old_header)
+    var old_size: Int = __gc_info_size(old_info)
+    var copy_size: Int = old_size
+    if (new_size < copy_size) { copy_size = new_size }
+
+    var i: Int = 0
+    while (i < copy_size) {
+        store8(new_ptr + i, load8(old_user_ptr + i))
+        i = i + 1
+    }
+    return new_ptr
+}
+
+// =============================================================================
+// Mark Phase
+// =============================================================================
+
+// Check if a value looks like a valid GC pointer.
+// In identity mode, we validate by walking the allocation list.
+// This is O(n) — for production, we'd use a hash set or sorted array.
+// For now, we use a simpler heuristic: check if the pointer falls in heap range
+// and has a valid header signature.
+fun __gc_is_heap_ptr(val: Int): Int {
+    if (val == 0) { return 0 }
+    // In identity mode, any non-zero value could be a pointer.
+    // We validate by checking if (val - 24) is in our allocation list.
+    // This is expensive, so we use a faster check:
+    // A valid GC pointer's header should have a type_tag in range [0..9]
+    // and a plausible size.
+    var header: Int = val - 24
+    // Basic sanity: header address should be positive and aligned
+    if (header <= 0) { return 0 }
+
+    // Read info and check type_tag is valid
+    var info: Int = load64(header + 8)
+    var tag: Int = __gc_info_tag(info)
+    if (tag < 0 or tag > 9) { return 0 }
+
+    // Check size is reasonable (less than 1GB)
+    var size: Int = __gc_info_size(info)
+    if (size <= 0 or size > 1073741824) { return 0 }
+
+    // Additional check: verify this header is actually in our list.
+    // We skip this for performance — the heuristic above is good enough
+    // for identity mode where we control all allocations.
+    return 1
+}
+
+// Mark a single object and recursively mark objects it references
+fun __gc_mark_object(user_ptr: Int) {
+    if (user_ptr == 0) { return }
+    if (__gc_is_heap_ptr(user_ptr) == 0) { return }
+
+    var header: Int = __gc_header_from_user(user_ptr)
+    // Already marked? Stop (prevents cycles)
+    if (__gc_is_marked(header) != 0) { return }
+
+    // Mark this object
+    __gc_mark_header(header)
+
+    // Now trace inner pointers based on type tag
+    var info: Int = __gc_header_info(header)
+    var tag: Int = __gc_info_tag(info)
+    var size: Int = __gc_info_size(info)
+
+    if (tag == 0 or tag == 1) {
+        // RAW or STRING: no inner pointers
+        return
+    }
+
+    if (tag == 2) {
+        // LIST: { count@0, capacity@8, data_ptr@16 }
+        var data_ptr: Int = load64(user_ptr + 16)
+        __gc_mark_object(data_ptr)
+        // Also scan list elements
+        var count: Int = load64(user_ptr)
+        var i: Int = 0
+        while (i < count) {
+            var elem: Int = load64(data_ptr + i * 8)
+            __gc_mark_object(elem)
+            i = i + 1
+        }
+        return
+    }
+
+    if (tag == 3) {
+        // MAP: { count@0, capacity@8, keys_ptr@16, values_ptr@24 }
+        var keys_ptr: Int = load64(user_ptr + 16)
+        var vals_ptr: Int = load64(user_ptr + 24)
+        __gc_mark_object(keys_ptr)
+        __gc_mark_object(vals_ptr)
+        // Scan key and value entries
+        var count: Int = load64(user_ptr)
+        var i: Int = 0
+        while (i < count) {
+            __gc_mark_object(load64(keys_ptr + i * 8))
+            __gc_mark_object(load64(vals_ptr + i * 8))
+            i = i + 1
+        }
+        return
+    }
+
+    if (tag == 4) {
+        // CLOSURE: { fn_ptr@0, env_ptr@8 }
+        // fn_ptr is a function pointer, not a GC object — skip
+        var env_ptr: Int = load64(user_ptr + 8)
+        __gc_mark_object(env_ptr)
+        return
+    }
+
+    if (tag == 5) {
+        // CLASS INSTANCE: N fields, all i64 — scan all as potential pointers
+        var num_fields: Int = size / 8
+        var i: Int = 0
+        while (i < num_fields) {
+            var field_val: Int = load64(user_ptr + i * 8)
+            __gc_mark_object(field_val)
+            i = i + 1
+        }
+        return
+    }
+
+    if (tag == 6) {
+        // STRINGBUILDER: { len@0, cap@8, buf_ptr@16 }
+        var buf_ptr: Int = load64(user_ptr + 16)
+        __gc_mark_object(buf_ptr)
+        return
+    }
+
+    if (tag == 7 or tag == 8) {
+        // DATA_ARRAY or KV_ARRAY: flat array of i64 values
+        // Scan all entries as potential pointers
+        var num_entries: Int = size / 8
+        var i: Int = 0
+        while (i < num_entries) {
+            var entry: Int = load64(user_ptr + i * 8)
+            __gc_mark_object(entry)
+            i = i + 1
+        }
+        return
+    }
+
+    if (tag == 9) {
+        // ENV (closure environment): all slots are captured values
+        var num_slots: Int = size / 8
+        var i: Int = 0
+        while (i < num_slots) {
+            var slot_val: Int = load64(user_ptr + i * 8)
+            __gc_mark_object(slot_val)
+            i = i + 1
+        }
+        return
+    }
+}
+
+// Mark phase: scan all roots from the shadow stack
+fun __gc_mark() {
+    if (__gc_shadow_stack_inited == 0) { return }
+    var count: Int = load64(__gc_shadow_stack)
+    var data: Int = load64(__gc_shadow_stack + 16)
+    var i: Int = 0
+    while (i < count) {
+        // Each entry is the ADDRESS of a variable (e.g., alloca).
+        // Read the value AT that address to get the actual pointer.
+        var root_addr: Int = load64(data + i * 8)
+        if (root_addr != 0) {
+            var val: Int = load64(root_addr)
+            __gc_mark_object(val)
+        }
+        i = i + 1
+    }
+}
+
+// =============================================================================
+// Sweep Phase
+// =============================================================================
+
+fun __gc_sweep() {
+    var prev_header: Int = 0
+    var current: Int = __gc_head
+    var freed_count: Int = 0
+
+    while (current != 0) {
+        var next: Int = load64(current)         // next ptr
+        var info: Int = load64(current + 8)     // info field
+        var mark: Int = __gc_info_mark(info)
+
+        if (mark == 0) {
+            // Unmarked — free this allocation
+            var size: Int = __gc_info_size(info)
+            var total: Int = size + 24
+
+            // Remove from linked list
+            if (prev_header == 0) {
+                __gc_head = next
+            } else {
+                store64(prev_header, next)
+            }
+
+            __gc_alloc_count = __gc_alloc_count - 1
+            __gc_total_bytes = __gc_total_bytes - total
+            __gc_freed_bytes = __gc_freed_bytes + total
+            freed_count = freed_count + 1
+
+            rt_free(current)
+        } else {
+            // Marked — clear the mark for next cycle
+            store64(current + 8, info - 1)
+            prev_header = current
+        }
+
+        current = next
+    }
+}
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+// Run a full mark-and-sweep collection
+fun __gc_collect() {
+    __gc_mark()
+    __gc_sweep()
+    __gc_collections = __gc_collections + 1
+}
+
+// Enable automatic GC (collection triggers when threshold is exceeded)
+fun __gc_enable() {
+    __gc_enabled = 1
+    if (__gc_threshold == 0) {
+        __gc_threshold = 65536
+    }
+    if (__gc_shadow_stack_inited == 0) {
+        __gc_init_shadow_stack()
+    }
+}
+
+// Disable automatic GC
+fun __gc_disable() {
+    __gc_enabled = 0
+}
+
+// Get statistics
+fun __gc_stat_alloc_count(): Int { return __gc_alloc_count }
+fun __gc_stat_total_bytes(): Int { return __gc_total_bytes }
+fun __gc_stat_collections(): Int { return __gc_collections }
+fun __gc_stat_freed_bytes(): Int { return __gc_freed_bytes }
+fun __gc_stat_threshold(): Int { return __gc_threshold }
+
+// Set the collection threshold (bytes)
+fun __gc_set_threshold(bytes: Int) {
+    __gc_threshold = bytes
+}
+
+// =============================================================================
+// GC-Aware Allocation Wrappers (drop-in replacements for runtime.sf)
+// =============================================================================
+
+// Allocate a new list using the GC
+fun __gc_list_new(): Int {
+    var list: Int = __gc_alloc(24, 2)  // LIST tag
+    store64(list, 0)                    // count = 0
+    store64(list + 8, 8)               // capacity = 8
+    var data: Int = __gc_alloc(64, 7)   // DATA_ARRAY tag, 8 * 8 bytes
+    store64(list + 16, data)
+    return list
+}
+
+// Allocate a new map using the GC
+fun __gc_map_new(): Int {
+    var raw: Int = __gc_alloc(32, 3)   // MAP tag
+    store64(raw, 0)                     // count = 0
+    store64(raw + 8, 16)               // capacity = 16
+    var keys: Int = __gc_alloc(128, 8)  // KV_ARRAY tag
+    var vals: Int = __gc_alloc(128, 8)  // KV_ARRAY tag
+    store64(raw + 16, keys)
+    store64(raw + 24, vals)
+    return raw
+}
+
+// Allocate a new StringBuilder using the GC
+fun __gc_stringbuilder_new(): Int {
+    var raw: Int = __gc_alloc(24, 6)    // STRINGBUILDER tag
+    store64(raw, 0)                      // len = 0
+    store64(raw + 8, 1024)              // cap = 1024
+    var buf: Int = __gc_alloc(1024, 1)   // STRING tag (raw bytes)
+    store8(buf, 0)
+    store64(raw + 16, buf)
+    return raw
+}
+
+// Allocate a string buffer using the GC
+fun __gc_string_alloc(size: Int): Int {
+    return __gc_alloc(size, 1)  // STRING tag
+}
+
+// Allocate a closure pair using the GC
+fun __gc_closure_new(fn_ptr: Int, env_ptr: Int): Int {
+    var raw: Int = __gc_alloc(16, 4)   // CLOSURE tag
+    store64(raw, fn_ptr)
+    store64(raw + 8, env_ptr)
+    return raw
+}
+
+// Allocate a closure environment using the GC
+fun __gc_env_alloc(num_slots: Int): Int {
+    return __gc_alloc_zeroed(num_slots * 8, 9)  // ENV tag
+}
+
+// Allocate a class instance using the GC
+fun __gc_instance_alloc(num_fields: Int): Int {
+    return __gc_alloc_zeroed(num_fields * 8, 5)  // INSTANCE tag
+}
+
+// =============================================================================
+// GC-Aware List Operations (using GC realloc)
+// =============================================================================
+
+fun __gc_list_push(list: Int, value: Int) {
+    if (list == 0) { return }
+    var count: Int = load64(list)
+    var cap: Int = load64(list + 8)
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        var old_data: Int = load64(list + 16)
+        var new_data: Int = __gc_realloc(old_data, new_cap * 8, 7)
+        store64(list + 8, new_cap)
+        store64(list + 16, new_data)
+    }
+    var data: Int = load64(list + 16)
+    store64(data + count * 8, value)
+    store64(list, count + 1)
+}
+
+// =============================================================================
+// Debug: Print GC stats
+// =============================================================================
+
+fun __gc_debug_stats() {
+    // Using rt_write to stderr for debugging
+    // Print: "GC: allocs=N, bytes=N, collections=N, freed=N\n"
+    // For simplicity, just output a marker
+    var msg: Int = rt_malloc(64)
+    store8(msg, 71)       // G
+    store8(msg + 1, 67)   // C
+    store8(msg + 2, 58)   // :
+    store8(msg + 3, 32)   // space
+    store8(msg + 4, 111)  // o
+    store8(msg + 5, 107)  // k
+    store8(msg + 6, 10)   // \n
+    store8(msg + 7, 0)
+    rt_write(2, msg, 7)
+    rt_free(msg)
+}

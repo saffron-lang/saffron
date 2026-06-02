@@ -709,12 +709,63 @@
     }
     if (method == "getResult") {
         var task_val: String = this.gen_arg_value(object)
-        var task_ptr: String = this.fresh_local()
-        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
-        var promise: String = this.fresh_local()
-        this.emit_indent(promise + " = call ptr @llvm.coro.promise(ptr " + task_ptr + ", i32 8, i1 false)")
+        var get_result_name: String = "stdlib_scheduler_get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
         var result_val: String = this.fresh_local()
-        this.emit_indent(result_val + " = load i64, ptr " + promise)
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
+        this.last_type = AST.Type.IntType
+        return result_val
+    }
+    // task.await() — from top-level: run scheduler then read result
+    if (method == "await" and !this.is_coroutine) {
+        var task_val: String = this.gen_arg_value(object)
+        var sched_run_name: String = "scheduler_run"
+        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+            sched_run_name = "stdlib_scheduler_scheduler_run"
+        }
+        this.emit_indent("call i64 @" + sched_run_name + "()")
+        this.called_functions.push(sched_run_name)
+        var get_result_name: String = "stdlib_scheduler_get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
+        this.last_type = AST.Type.IntType
+        return result_val
+    }
+    // task.await() — from coroutine: yield with reason=3, scheduler wakes us
+    if (method == "await" and this.is_coroutine) {
+        var task_val: String = this.gen_arg_value(object)
+        this.emit_indent("store i64 3, i64* @__yield_reason")
+        this.emit_indent("store i64 " + task_val + ", i64* @__yield_arg")
+        var save_tok: String = this.fresh_local()
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+        var susp: String = this.fresh_local()
+        this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+        var await_resume: String = this.fresh_label("task.await.resume")
+        var await_suspend: String = this.fresh_label("task.await.suspend")
+        var await_cleanup: String = this.fresh_label("task.await.cleanup")
+        this.emit_terminator("switch i8 " + susp + ", label %" + await_suspend + " [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
+        this.emit(await_suspend + ":")
+        this.block_terminated = false
+        this.emit_terminator("ret ptr %__coro_hdl")
+        this.emit(await_cleanup + ":")
+        this.block_terminated = false
+        this.emit_terminator("br label %__coro_cleanup")
+        this.emit(await_resume + ":")
+        this.block_terminated = false
+        var get_result_name: String = "stdlib_scheduler_get_result"
+        if (this.known_functions.contains("stdlib_scheduler_get_result")) {
+            get_result_name = "stdlib_scheduler_get_result"
+        }
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
+        this.called_functions.push(get_result_name)
         this.last_type = AST.Type.IntType
         return result_val
     }

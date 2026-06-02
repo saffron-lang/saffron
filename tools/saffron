@@ -15,6 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SAFFRONC="${SAFFRONC:-$SCRIPT_DIR/build/saffronc}"
 RUNTIME="${SAFFRON_RUNTIME:-$SCRIPT_DIR/build/stage3/runtime.ll}"
 RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base.ll}"
+RUNTIME_GC="${SAFFRON_RUNTIME_GC:-$SCRIPT_DIR/src/runtime/gc.ll}"
 
 usage() {
     echo "saffron — The Saffron Programming Language"
@@ -210,12 +211,12 @@ build_project() {
         fi
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
             -Wl,--no-entry -Wl,--export-all -Wl,--allow-multiple-definition -Wl,--allow-undefined \
-            -o "$output" "$ll_path" "$RUNTIME" "$WASM_BASE" || {
+            -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$WASM_BASE" || {
             echo "saffron: wasm linking failed" >&2
             exit 1
         }
     else
-        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_BASE" || {
+        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" || {
             echo "saffron: linking failed" >&2
             exit 1
         }

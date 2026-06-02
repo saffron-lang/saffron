@@ -400,14 +400,14 @@ class Parser {
     }
 
     fun parse_primary(): AST.Expr {
-        // yield / yield expr
-        if (this.match_kind_check("yield")) {
+        // yield / yield [reason, arg]
+        if (this.match_kind_check("yield") or this.is_ident_named("yield")) {
             this.advance()
-            if (this.match_kind_check(";") or this.match_kind_check("}") or this.match_kind_check("eof") or this.match_kind_check("newline")) {
-                return AST.Expr.Yield(AST.Expr.NilLit)
+            if (this.match_kind_check("[")) {
+                var yval: AST.Expr = this.parse_expr()
+                return AST.Expr.Yield(yval)
             }
-            var yval: AST.Expr = this.parse_expr()
-            return AST.Expr.Yield(yval)
+            return AST.Expr.Yield(AST.Expr.NilLit)
         }
         // HTML element expression: <tag attrs...>children</tag>
         if (this.match_kind_check("<") and this.peek_is_html_start()) {
