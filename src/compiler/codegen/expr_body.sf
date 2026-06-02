@@ -42,7 +42,8 @@
                 // Error check: undefined variable
                 if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this") {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    
+                    this.has_errors = true
+                    return "0"
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 if (this.known_functions.contains(name)) {
@@ -106,6 +107,27 @@
                 }
                 // Check if object is a variable of class type -> field access
                 var obj_name: String = this.get_variable_name(object)
+                // Tuple field access: t._0, t._1, etc.
+                if (obj_name.length() > 0 and field.starts_with("_") and field.length() >= 2) {
+                    var tf_vtype: String = this.get_var_type_str(obj_name)
+                    if (tf_vtype.starts_with("Tuple<")) {
+                        var tf_rest: String = field.slice(1, field.length())
+                        var tf_idx: Float = tf_rest.to_number()
+                        var tf_obj: String = this.gen_arg_value(object)
+                        var tf_idx_val: String = this.fresh_local()
+                        this.emit_indent(tf_idx_val + " = add i64 0, " + tf_idx.floor().to_string())
+                        var tf_result: String = this.fresh_local()
+                        this.emit_indent(tf_result + " = call i64 @__list_get(i64 " + tf_obj + ", i64 " + tf_idx_val + ")")
+                        var tf_inner: String = tf_vtype.slice(6, tf_vtype.length() - 1)
+                        var tf_args: List<String> = this.split_type_args(tf_inner)
+                        if (tf_idx >= 0 and tf_idx < tf_args.length()) {
+                            this.last_type = this.str_to_type(tf_args[tf_idx])
+                        } else {
+                            this.last_type = AST.Type.AnyType
+                        }
+                        return tf_result
+                    }
+                }
                 if (obj_name.length() > 0) {
                     // Check enum first
                     var key: String = obj_name + "." + field
@@ -799,6 +821,12 @@
             } else {
                 this.last_type = AST.Type.IntType
             }
+            // Error check: undefined variable
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this") {
+                IO.println("[codegen] Error: undefined variable '" + vname + "'")
+                this.has_errors = true
+                return "0"
+            }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
@@ -819,8 +847,29 @@
             if (obj_kind == "this") {
                 return this.gen_get_field(m_obj, m_field)
             }
-            // Handle as field access on class instance or enum
+            // Tuple field access: t._0, t._1, etc.
             var mn: String = this.get_variable_name(m_obj)
+            if (mn.length() > 0 and m_field.starts_with("_") and m_field.length() >= 2) {
+                var tf_vtype2: String = this.get_var_type_str(mn)
+                if (tf_vtype2.starts_with("Tuple<")) {
+                    var tf_rest2: String = m_field.slice(1, m_field.length())
+                    var tf_idx2: Float = tf_rest2.to_number()
+                    var tf_obj2: String = this.gen_arg_value(m_obj)
+                    var tf_idx_val2: String = this.fresh_local()
+                    this.emit_indent(tf_idx_val2 + " = add i64 0, " + tf_idx2.floor().to_string())
+                    var tf_result2: String = this.fresh_local()
+                    this.emit_indent(tf_result2 + " = call i64 @__list_get(i64 " + tf_obj2 + ", i64 " + tf_idx_val2 + ")")
+                    var tf_inner2: String = tf_vtype2.slice(6, tf_vtype2.length() - 1)
+                    var tf_args2: List<String> = this.split_type_args(tf_inner2)
+                    if (tf_idx2 >= 0 and tf_idx2 < tf_args2.length()) {
+                        this.last_type = this.str_to_type(tf_args2[tf_idx2])
+                    } else {
+                        this.last_type = AST.Type.AnyType
+                    }
+                    return tf_result2
+                }
+            }
+            // Handle as field access on class instance or enum
             var vt: String = ""
             if (mn.length() > 0) {
                 vt = this.get_var_type_str(mn)
@@ -1271,16 +1320,26 @@
             nac = nac + 1
         }
         if (!has_named_check) {
-            var has_defs: Bool = this.func_defaults.has(resolved_callee)
+            var has_real_defs: Bool = false
+            if (this.func_defaults.has(resolved_callee)) {
+                var __defs: List<AST.Expr> = this.func_defaults.get(resolved_callee)
+                var __di: Float = 0
+                while (__di < __defs.length()) {
+                    if (this.classify_expr(__defs[__di]) != "nil") { has_real_defs = true }
+                    __di = __di + 1
+                }
+            }
             if (this.called_function_arity.has(resolved_callee)) {
                 var expected: Float = this.called_function_arity.get(resolved_callee)
-                if (args.length() != expected and expected > 0 and !has_defs) {
-                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                if (args.length() != expected and expected > 0 and !has_real_defs) {
+                    IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                    this.has_errors = true
                 }
             } else if (this.func_param_count.has(resolved_callee)) {
                 var expected: Float = this.func_param_count.get(resolved_callee)
-                if (args.length() != expected and expected > 0 and !has_defs) {
-                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                if (args.length() != expected and expected > 0 and !has_real_defs) {
+                    IO.println("[codegen] Error: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                    this.has_errors = true
                 }
             }
         }
