@@ -421,6 +421,7 @@
             TryCatch(t, n, c, f) => false
             Throw(v) => false
             LetPattern(p, v) => false
+            TypeAlias(n, t) => true
         }
     }
 

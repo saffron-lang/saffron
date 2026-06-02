@@ -46,7 +46,8 @@
         IsCheck(val, t) => "is_check"
         IfExpr(c, tb, tv, eb, ev) => "if_expr"
         TryExpr(tb, tv, cn, cb, cv) => "try_expr"
-        Yield(v) => "yield"
+        Yield(v) => "yield"\
+        TupleLit(e) => "tuple_lit"
         TupleLit(e) => "tuple_lit"
     }
     }
@@ -364,6 +365,26 @@
         this.last_type = idx_elem_type
     } else {
         this.last_type = AST.Type.AnyType
+    }
+    // Tuple type: extract Nth element type from Tuple<T1,T2,...>
+    var obj_type_str: String = this.type_to_string(obj_type)
+    if (obj_type_str.starts_with("Tuple") or (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.type_to_string(this.typed_vars.get(obj_name)).starts_with("Tuple<"))) {
+        var full_type: String = obj_type_str
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            full_type = this.type_to_string(this.typed_vars.get(obj_name))
+        }
+        if (full_type.starts_with("Tuple<") and full_type.ends_with(">")) {
+            var tuple_inner: String = full_type.slice(6, full_type.length() - 1)
+            var tuple_args: List<String> = this.split_type_args(tuple_inner)
+            var ct_idx: Float = -1
+            var idx_ek: String = this.classify_expr(index)
+            if (idx_ek == "int") {
+                ct_idx = match (index) { IntLit(v) => v   _ => -1 }
+            }
+            if (ct_idx >= 0 and ct_idx < tuple_args.length()) {
+                this.last_type = this.str_to_type(tuple_args[ct_idx])
+            }
+        }
     }
     return local
     }
@@ -1617,6 +1638,7 @@
         IfExpr(c, tb, tv, eb, ev) => "other"
         TryExpr(tb, tv, cn, cb, cv) => "other"
         Yield(v) => "other"
+        TupleLit(e) => "other"
     }
     return kind == "this"
     }
