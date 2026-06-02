@@ -66,30 +66,30 @@ fun find_manifest(): String {
 
 /// Load a manifest from a specific path.
 fun load_from(path: String): Manifest {
-    var toml_data = TOML.parse_file(path)
+    var config: TOML.TomlTable = TOML.load(path)
     var manifest = Manifest()
-    manifest.raw = toml_data
+    manifest.raw = config.to_map()
 
-    if (toml_data.has("package")) {
-        var pkg = toml_data.get("package")
-        if (pkg.has("name")) { manifest.name = pkg.get("name") }
-        if (pkg.has("version")) { manifest.version = pkg.get("version") }
-        if (pkg.has("description")) { manifest.description = pkg.get("description") }
-        if (pkg.has("license")) { manifest.license = pkg.get("license") }
-        if (pkg.has("entry")) { manifest.entry = pkg.get("entry") }
-        if (pkg.has("authors")) { manifest.authors = pkg.get("authors") }
+    if (config.has("package")) {
+        var pkg: TOML.TomlTable = config.table("package")
+        manifest.name = pkg.string_or("name", "")
+        manifest.version = pkg.string_or("version", "0.1.0")
+        manifest.description = pkg.string_or("description", "")
+        manifest.license = pkg.string_or("license", "")
+        manifest.entry = pkg.string_or("entry", "src/main.sf")
+        if (pkg.has("authors")) {
+            manifest.authors = pkg.list("authors")
+        }
     }
 
-    if (toml_data.has("dependencies")) {
-        manifest.dependencies = toml_data.get("dependencies")
+    if (config.has("dependencies")) {
+        manifest.dependencies = config.table("dependencies").to_map()
     }
-
-    if (toml_data.has("dev-dependencies")) {
-        manifest.dev_dependencies = toml_data.get("dev-dependencies")
+    if (config.has("dev-dependencies")) {
+        manifest.dev_dependencies = config.table("dev-dependencies").to_map()
     }
-
-    if (toml_data.has("scripts")) {
-        manifest.scripts = toml_data.get("scripts")
+    if (config.has("scripts")) {
+        manifest.scripts = config.table("scripts").to_map()
     }
 
     return manifest
