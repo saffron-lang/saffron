@@ -147,13 +147,21 @@
             _ => AST.Expr.NilLit
         }
         if (this.is_coroutine) {
-            // Branch to final suspend (result stored via global if needed later)
-            this.gen_arg_value(value)
+            var val: String = this.gen_arg_value(value)
+            this.emit_indent("store i64 " + val + ", i64* @__task_result")
             this.emit_terminator("br label %__coro_final")
         } else if (this.current_ret_type == "void") {
+            // Pop GC roots before returning
+            if (this.gc_root_count > 0) {
+                this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
+            }
             this.emit_terminator("ret void")
         } else {
             var val: String = this.gen_arg_value(value)
+            // Pop GC roots before returning
+            if (this.gc_root_count > 0) {
+                this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
+            }
             this.emit_terminator("ret i64 " + val)
         }
     }

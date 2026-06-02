@@ -6,11 +6,25 @@
 @extern("void __sched_coro_destroy(i64)") fun coro_destroy(handle: Int)
 @extern("i64 __sched_get_yield_reason()") fun get_yield_reason(): Int
 @extern("i64 __sched_get_yield_arg()") fun get_yield_arg(): Int
+@extern("i64 __sched_get_task_result()") fun get_task_result_global(): Int
 @extern("void __sched_reset_yield()") fun reset_yield()
 
 var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
 var sleep_times: List<Number> = []
+var result_handles: List<Int> = []
+var result_values: List<Int> = []
+
+fun get_result(handle: Int): Int {
+    var i: Int = 0
+    while (i < result_handles.length()) {
+        if (result_handles[i] == handle) {
+            return result_values[i]
+        }
+        i = i + 1
+    }
+    return 0
+}
 
 fun enqueue(handle: Int) {
     run_queue.push(handle)
@@ -43,6 +57,9 @@ fun scheduler_tick(): Int {
     coro_resume(hdl)
 
     if (coro_done(hdl) == 1) {
+        var res: Int = get_task_result_global()
+        result_handles.push(hdl)
+        result_values.push(res)
         coro_destroy(hdl)
     } else {
         var reason: Int = get_yield_reason()
@@ -61,6 +78,4 @@ fun scheduler_tick(): Int {
 
 fun scheduler_run() {
     while (scheduler_tick() == 1) {}
-    // Ensure get_result is compiled (called externally by task.await)
-    get_result(0)
 }

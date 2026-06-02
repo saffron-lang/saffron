@@ -43,10 +43,10 @@
 // =============================================================================
 
 fun __list_new(): Int {
-    var raw: Int = rt_malloc(24)
+    var raw: Int = __gc_alloc(24, 2)
     store64(raw, 0)
     store64(raw + 8, 8)
-    store64(raw + 16, rt_malloc(64))
+    store64(raw + 16, __gc_alloc(64, 7))
     return raw
 }
 
@@ -57,7 +57,7 @@ fun __list_push(list: Int, value: Int) {
     if (count >= cap) {
         var new_cap: Int = cap * 2
         var old_data: Int = load64(list + 16)
-        var new_data: Int = rt_realloc(old_data, new_cap * 8)
+        var new_data: Int = __gc_realloc(old_data, new_cap * 8, 7)
         if (new_data != 0) {
             store64(list + 8, new_cap)
             store64(list + 16, new_data)
