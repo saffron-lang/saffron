@@ -115,14 +115,14 @@ fun resolve_path_dep(name: String, dep_path: String, from_dir: String): Resolved
         throw "pantry: path dependency '${name}' has no pantry.toml at: ${abs_path}"
     }
 
-    var dep_toml: Map<String, Any> = TOML.parse_file(dep_manifest_path)
+    var dep_config: TOML.TomlTable = TOML.load(dep_manifest_path)
     var dep_version: String = "0.0.0"
     var dep_entry: String = "src/main.sf"
 
-    if (dep_toml.has("package")) {
-        var pkg: Map<String, Any> = dep_toml.get("package")
-        if (pkg.has("version")) { dep_version = pkg.get("version") }
-        if (pkg.has("entry")) { dep_entry = pkg.get("entry") }
+    if (dep_config.has("package")) {
+        var pkg: TOML.TomlTable = dep_config.table("package")
+        dep_version = pkg.string_or("version", "0.0.0")
+        dep_entry = pkg.string_or("entry", "src/main.sf")
     }
 
     return ResolvedDep(name, dep_version, "path", abs_path, dep_entry)
@@ -173,11 +173,11 @@ fun resolve_git_dep(name: String, spec: Map<String, String>, manifest_dir: Strin
     var dep_entry: String = "src/main.sf"
 
     if (OS.file_exists(dep_manifest_path)) {
-        var dep_toml: Map<String, Any> = TOML.parse_file(dep_manifest_path)
-        if (dep_toml.has("package")) {
-            var pkg: Map<String, Any> = dep_toml.get("package")
-            if (pkg.has("version")) { dep_version = pkg.get("version") }
-            if (pkg.has("entry")) { dep_entry = pkg.get("entry") }
+        var dep_config: TOML.TomlTable = TOML.load(dep_manifest_path)
+        if (dep_config.has("package")) {
+            var pkg: TOML.TomlTable = dep_config.table("package")
+            dep_version = pkg.string_or("version", "0.0.0")
+            dep_entry = pkg.string_or("entry", "src/main.sf")
         }
     }
 
