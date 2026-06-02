@@ -1,0 +1,154 @@
+//! NaN-boxing helpers for Saffron's runtime value representation.
+//! All runtime values are i64 — pointers, floats, bools, and nil are
+//! encoded with tag bits.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+import "./block.sf" as Block
+
+/// High-level NaN-boxing operations that emit correct instruction sequences
+/// for tagging and untagging runtime values.
+class NanBox {
+    var bb: Block.BlockBuilder
+    var target: String
+
+    fun init(bb: Block.BlockBuilder, target: String) {
+        this.bb = bb
+        this.target = target
+    }
+
+    /// Update the block builder (e.g., after a suspend point changes blocks).
+    fun set_block(new_bb: Block.BlockBuilder) {
+        this.bb = new_bb
+    }
+
+    // ==================== Integer tagging ====================
+
+    /// Tag an integer value (calls runtime __val_tag_int).
+    fun tag_int(raw: Types.Value): Types.Value {
+        return this.bb.call("__val_tag_int", Types.Type.I64, [raw])
+    }
+
+    /// Untag an integer value.
+    fun untag_int(boxed: Types.Value): Types.Value {
+        return this.bb.call("__val_untag_int", Types.Type.I64, [boxed])
+    }
+
+    // ==================== Pointer tagging ====================
+
+    /// Tag a pointer as a value.
+    fun tag_ptr(ptr: Types.Value): Types.Value {
+        return this.bb.call("__val_tag_ptr", Types.Type.I64, [ptr])
+    }
+
+    /// Untag a pointer from a value.
+    fun untag_ptr(boxed: Types.Value): Types.Value {
+        return this.bb.call("__val_untag_ptr", Types.Type.Ptr, [boxed])
+    }
+
+    // ==================== Float tagging ====================
+
+    /// Tag a float (double -> i64 NaN-boxed).
+    fun tag_float(f: Types.Value): Types.Value {
+        return this.bb.call("__val_tag_float", Types.Type.I64, [f])
+    }
+
+    /// Untag a float.
+    fun untag_float(boxed: Types.Value): Types.Value {
+        return this.bb.call("__val_untag_float", Types.Type.Float64, [boxed])
+    }
+
+    // ==================== Bool tagging ====================
+
+    /// Tag a boolean.
+    fun tag_bool(b: Types.Value): Types.Value {
+        return this.bb.call("__val_tag_bool", Types.Type.I64, [b])
+    }
+
+    /// Untag a boolean.
+    fun untag_bool(boxed: Types.Value): Types.Value {
+        return this.bb.call("__val_untag_bool", Types.Type.I64, [boxed])
+    }
+
+    // ==================== Nil ====================
+
+    /// Produce the nil constant value.
+    fun nil(): Types.Value {
+        return this.bb.call("__val_nil", Types.Type.I64, [])
+    }
+
+    // ==================== Platform-aware pointer conversion ====================
+
+    /// Convert a pointer to an i64 value.
+    /// On wasm32: ptrtoint to i32, then zext to i64.
+    /// On native: direct ptrtoint to i64.
+    fun ptr_to_val(ptr: Types.Value): Types.Value {
+        if (this.target == "wasm32") {
+            var i32_val: Types.Value = this.bb.ptrtoint(ptr, Types.Type.I32)
+            return this.bb.zext(i32_val, Types.Type.I64)
+        }
+        return this.bb.ptrtoint(ptr, Types.Type.I64)
+    }
+
+    /// Convert an i64 value back to a pointer.
+    /// On wasm32: trunc to i32, then inttoptr.
+    /// On native: direct inttoptr.
+    fun val_to_ptr(val: Types.Value): Types.Value {
+        if (this.target == "wasm32") {
+            var i32_val: Types.Value = this.bb.trunc(val, Types.Type.I32)
+            return this.bb.inttoptr(i32_val, Types.Type.Ptr)
+        }
+        return this.bb.inttoptr(val, Types.Type.Ptr)
+    }
+
+    // ==================== Enum tag operations ====================
+
+    /// Extract the tag byte from a simple enum encoding: (tag << 56) | payload.
+    /// Returns an i8 value.
+    fun extract_simple_tag(val: Types.Value): Types.Value {
+        var shifted: Types.Value = this.bb.lshr(val, Types.Value.Constant(Types.int_const(56)))
+        return this.bb.trunc(shifted, Types.Type.I8)
+    }
+
+    /// Extract the payload from a simple enum encoding.
+    /// Masks out the top byte: value & 0x00FFFFFFFFFFFFFF.
+    fun extract_simple_payload(val: Types.Value): Types.Value {
+        var mask: Types.Value = Types.Value.Constant(Types.Const.Int(72057594037927935, 64))
+        return this.bb.and_op(val, mask)
+    }
+
+    /// Build a simple enum value: (tag << 56) | payload.
+    fun build_simple_enum(tag: Float, payload: Types.Value): Types.Value {
+        var tag_val: Types.Value = Types.Value.Constant(Types.int_const(tag))
+        var shift_amount: Types.Value = Types.Value.Constant(Types.int_const(56))
+        var tag_shifted: Types.Value = this.bb.shl(tag_val, shift_amount)
+        return this.bb.or_op(tag_shifted, payload)
+    }
+
+    /// Build a simple enum with no payload (tag only).
+    fun build_simple_enum_no_payload(tag: Float): Types.Value {
+        var tag_val: Types.Value = Types.Value.Constant(Types.int_const(tag))
+        var shift_amount: Types.Value = Types.Value.Constant(Types.int_const(56))
+        return this.bb.shl(tag_val, shift_amount)
+    }
+
+    // ==================== Multi-field enum (heap-allocated) ====================
+
+    /// Extract the tag from a heap-allocated enum (first i64 element of the array).
+    fun extract_heap_tag(val: Types.Value): Types.Value {
+        var ptr: Types.Value = this.val_to_ptr(val)
+        var tag_i64: Types.Value = this.bb.load(Types.Type.I64, ptr)
+        return this.bb.trunc(tag_i64, Types.Type.I8)
+    }
+
+    /// Extract a field from a heap-allocated enum by index (0-based, after the tag slot).
+    fun extract_heap_field(val: Types.Value, field_idx: Float): Types.Value {
+        var ptr: Types.Value = this.val_to_ptr(val)
+        var actual_idx: Float = field_idx + 1
+        var idx_val: Types.Value = Types.Value.Constant(Types.Const.Int(actual_idx, 64))
+        var arr_ty: Types.Type = Types.Type.I64
+        var field_ptr: Types.Value = this.bb.gep(arr_ty, ptr, [idx_val])
+        return this.bb.load(Types.Type.I64, field_ptr)
+    }
+}

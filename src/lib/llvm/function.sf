@@ -1,0 +1,135 @@
+//! LLVM function definition and builder.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+
+/// A function parameter.
+class Param {
+    var name: String
+    var ty: Types.Type
+
+    fun init(name: String, ty: Types.Type) {
+        this.name = name
+        this.ty = ty
+    }
+}
+
+/// A basic block within a function.
+class BasicBlock {
+    var label: String
+    var instructions: List<Instructions.Instruction>
+    var terminator: Instructions.Terminator
+    var is_terminated: Bool
+
+    fun init(label: String) {
+        this.label = label
+        this.instructions = []
+        this.terminator = Instructions.Terminator.None
+        this.is_terminated = false
+    }
+}
+
+/// A complete function definition (or declaration).
+class FunctionDef {
+    var name: String
+    var ret_type: Types.Type
+    var params: List<Param>
+    var blocks: List<BasicBlock>
+    var linkage: Types.Linkage
+    var attributes: List<String>
+    var is_declaration: Bool
+    var is_variadic: Bool
+
+    fun init(name: String, ret_type: Types.Type, params: List<Param>) {
+        this.name = name
+        this.ret_type = ret_type
+        this.params = params
+        this.blocks = []
+        this.linkage = Types.Linkage.Default
+        this.attributes = []
+        this.is_declaration = false
+        this.is_variadic = false
+    }
+}
+
+/// Builder for constructing a function with blocks and instructions.
+class FunctionBuilder {
+    var func: FunctionDef
+    var local_counter: Float
+    var block_counter: Float
+
+    fun init(name: String, ret_type: Types.Type, params: List<Param>) {
+        this.func = FunctionDef(name, ret_type, params)
+        this.local_counter = 0
+        this.block_counter = 0
+        // Create entry block
+        var entry: BasicBlock = BasicBlock("entry")
+        this.func.blocks.push(entry)
+    }
+
+    /// Add a function attribute (e.g., "noinline", "optnone").
+    fun add_attribute(attr: String): FunctionBuilder {
+        this.func.attributes.push(attr)
+        return this
+    }
+
+    /// Set function linkage.
+    fun set_linkage(l: Types.Linkage): FunctionBuilder {
+        this.func.linkage = l
+        return this
+    }
+
+    /// Mark this function as variadic.
+    fun set_variadic(): FunctionBuilder {
+        this.func.is_variadic = true
+        return this
+    }
+
+    /// Get the entry block.
+    fun entry_block(): BasicBlock {
+        return this.func.blocks[0]
+    }
+
+    /// Create a new named basic block.
+    fun new_block(name: String): BasicBlock {
+        this.block_counter = this.block_counter + 1
+        var label: String = name
+        var block: BasicBlock = BasicBlock(label)
+        this.func.blocks.push(block)
+        return block
+    }
+
+    /// Generate a fresh local SSA name.
+    fun fresh_local(ty: Types.Type): Types.Value {
+        this.local_counter = this.local_counter + 1
+        var counter_str: String = this.local_counter.to_string().split(".")[0]
+        var name: String = "%t${counter_str}"
+        return Types.Value.Instruction(name, ty)
+    }
+
+    /// Generate a fresh named local.
+    fun fresh_named(base_name: String, ty: Types.Type): Types.Value {
+        this.local_counter = this.local_counter + 1
+        var counter_str: String = this.local_counter.to_string().split(".")[0]
+        var name: String = "%${base_name}.${counter_str}"
+        return Types.Value.Instruction(name, ty)
+    }
+
+    /// Create a named local with an exact name (no counter suffix).
+    /// Use this for allocas that should match codegen's naming (e.g., %a, %result).
+    /// Does NOT increment the local counter.
+    fun named_local(name: String, ty: Types.Type): Types.Value {
+        return Types.Value.Instruction("%${name}", ty)
+    }
+
+    /// Get a function parameter as a Value.
+    fun param_value(index: Float): Types.Value {
+        var p: Param = this.func.params[index]
+        return Types.Value.Argument(p.name, p.ty, index)
+    }
+
+    /// Finalize and return the function definition.
+    fun build(): FunctionDef {
+        return this.func
+    }
+}

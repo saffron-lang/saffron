@@ -1,0 +1,387 @@
+//! LLVM Module — top-level container for a compilation unit.
+//! Holds globals, functions, type definitions, string constants,
+//! and provides emit_ir() to serialize to LLVM IR text.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+import "./block.sf" as Block
+
+/// A global variable definition.
+class GlobalDef {
+    var name: String
+    var ty: Types.Type
+    var initializer: Types.Const
+    var is_constant: Bool
+    var linkage: Types.Linkage
+
+    fun init(name: String, ty: Types.Type, initializer: Types.Const) {
+        this.name = name
+        this.ty = ty
+        this.initializer = initializer
+        this.is_constant = false
+        this.linkage = Types.Linkage.Default
+    }
+}
+
+/// A named type definition (struct type).
+class TypeDef {
+    var name: String
+    var fields: List<Types.Type>
+
+    fun init(name: String, fields: List<Types.Type>) {
+        this.name = name
+        this.fields = fields
+    }
+}
+
+/// A string constant entry.
+class StringConst {
+    var index: Float
+    var value: String
+
+    fun init(index: Float, value: String) {
+        this.index = index
+        this.value = value
+    }
+}
+
+/// The top-level LLVM module.
+class Module {
+    var name: String
+    var target_triple: String
+    var data_layout: String
+    var globals: List<GlobalDef>
+    var functions: List<Func.FunctionDef>
+    var type_defs: List<TypeDef>
+    var string_constants: List<StringConst>
+    var string_counter: Float
+
+    fun init(name: String) {
+        this.name = name
+        this.target_triple = ""
+        this.data_layout = ""
+        this.globals = []
+        this.functions = []
+        this.type_defs = []
+        this.string_constants = []
+        this.string_counter = 0
+    }
+
+    /// Set the target triple (e.g., "arm64-apple-macosx15.0.0").
+    fun set_target_triple(triple: String) {
+        this.target_triple = triple
+    }
+
+    /// Set the data layout string.
+    fun set_data_layout(layout: String) {
+        this.data_layout = layout
+    }
+
+    /// Add a global variable.
+    fun add_global(name: String, ty: Types.Type, initializer: Types.Const): GlobalDef {
+        var g: GlobalDef = GlobalDef(name, ty, initializer)
+        this.globals.push(g)
+        return g
+    }
+
+    /// Add a global constant.
+    fun add_constant(name: String, ty: Types.Type, initializer: Types.Const): GlobalDef {
+        var g: GlobalDef = GlobalDef(name, ty, initializer)
+        g.is_constant = true
+        this.globals.push(g)
+        return g
+    }
+
+    /// Add a string constant and return its index.
+    fun add_string_constant(value: String): Float {
+        var idx: Float = this.string_counter
+        this.string_constants.push(StringConst(idx, value))
+        this.string_counter = this.string_counter + 1
+        return idx
+    }
+
+    /// Get a Value reference to a string constant by index.
+    fun string_ref(index: Float): Types.Value {
+        return Types.Value.Constant(Types.Const.StringLit("", index))
+    }
+
+    /// Add a named type definition.
+    fun add_type_def(name: String, fields: List<Types.Type>) {
+        this.type_defs.push(TypeDef(name, fields))
+    }
+
+    /// Create a new function builder and register it with the module.
+    fun add_function(name: String, ret_type: Types.Type, params: List<Func.Param>): Func.FunctionBuilder {
+        var fb: Func.FunctionBuilder = Func.FunctionBuilder(name, ret_type, params)
+        this.functions.push(fb.func)
+        return fb
+    }
+
+    /// Add an external function declaration.
+    fun add_declaration(name: String, ret_type: Types.Type, params: List<Func.Param>): Func.FunctionDef {
+        var decl: Func.FunctionDef = Func.FunctionDef(name, ret_type, params)
+        decl.is_declaration = true
+        this.functions.push(decl)
+        return decl
+    }
+
+    /// Add a variadic external function declaration.
+    fun add_declaration_variadic(name: String, ret_type: Types.Type, params: List<Func.Param>): Func.FunctionDef {
+        var decl: Func.FunctionDef = Func.FunctionDef(name, ret_type, params)
+        decl.is_declaration = true
+        decl.is_variadic = true
+        this.functions.push(decl)
+        return decl
+    }
+
+    /// Add the standard Saffron runtime preamble (all declare statements).
+    /// Call this to produce IR that matches the current codegen's declaration block.
+    fun add_runtime_preamble() {
+        // C library
+        this.add_declaration_variadic("printf", Types.Type.I32, [Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("malloc", Types.Type.Ptr, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("realloc", Types.Type.Ptr, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.I64)])
+        this.add_declaration("free", Types.Type.Void, [Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("strlen", Types.Type.I64, [Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("strcpy", Types.Type.Ptr, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("strcat", Types.Type.Ptr, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("strcmp", Types.Type.I32, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("exit", Types.Type.Void, [Func.Param("", Types.Type.I32)])
+
+        // IO
+        this.add_declaration("__io_println_str", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__io_println_int", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__io_print_str", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+
+        // NaN-boxing
+        this.add_declaration("__val_tag_int", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__val_untag_int", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__val_tag_ptr", Types.Type.I64, [Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("__val_untag_ptr", Types.Type.Ptr, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__val_tag_bool", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__val_untag_bool", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__val_nil", Types.Type.I64, [])
+        this.add_declaration("__int_to_string", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__float_to_string", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__bool_to_string", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__string_eq", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__string_ne", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+
+        // Errors
+        this.add_declaration("__division_error", Types.Type.I64, [])
+        this.add_declaration("__runtime_error", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+
+        // List operations
+        this.add_declaration("__list_new", Types.Type.I64, [])
+        this.add_declaration("__list_push", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__list_get", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__list_set", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__list_length", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__list_pop", Types.Type.I64, [Func.Param("", Types.Type.I64)])
+
+        // Map operations
+        this.add_declaration("__map_new", Types.Type.I64, [])
+        this.add_declaration("__map_set", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__map_get", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+        this.add_declaration("__map_has", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+
+        // GC
+        this.add_declaration("__gc_push_root", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__gc_pop_roots", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+        this.add_declaration("__gc_shadow_stack_depth", Types.Type.I64, [])
+        this.add_declaration("__gc_alloc", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+
+        // Exception handling
+        this.add_declaration("setjmp", Types.Type.I32, [Func.Param("", Types.Type.Ptr)])
+        this.add_declaration("longjmp", Types.Type.Void, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.I32)])
+    }
+
+    /// Serialize the entire module to LLVM IR text.
+    fun emit_ir(): String {
+        var sb: StringBuilder = StringBuilder()
+        this.emit_header(sb)
+        this.emit_type_definitions(sb)
+        this.emit_string_constants(sb)
+        this.emit_globals(sb)
+        this.emit_declarations(sb)
+        this.emit_function_defs(sb)
+        return sb.to_string()
+    }
+
+    fun emit_header(sb: StringBuilder) {
+        sb.append("; Generated by Saffron @llvm library\n")
+        if (this.target_triple.length() > 0) {
+            sb.append("target triple = \"${this.target_triple}\"\n")
+        }
+        if (this.data_layout.length() > 0) {
+            sb.append("target datalayout = \"${this.data_layout}\"\n")
+        }
+        sb.append("\n")
+    }
+
+    fun emit_type_definitions(sb: StringBuilder) {
+        if (this.type_defs.length() == 0) { return nil }
+        var i: Float = 0
+        while (i < this.type_defs.length()) {
+            var td: TypeDef = this.type_defs[i]
+            var field_parts: List<String> = []
+            var j: Float = 0
+            while (j < td.fields.length()) {
+                field_parts.push(Types.format_type(td.fields[j]))
+                j = j + 1
+            }
+            sb.append("%${td.name} = type { ${field_parts.join(", ")} }\n")
+            i = i + 1
+        }
+        sb.append("\n")
+    }
+
+    fun emit_string_constants(sb: StringBuilder) {
+        if (this.string_constants.length() == 0) { return nil }
+        var i: Float = 0
+        while (i < this.string_constants.length()) {
+            var sc: StringConst = this.string_constants[i]
+            var escaped: String = escape_string(sc.value)
+            var len: Float = sc.value.length() + 1
+            var len_str: String = len.to_string().split(".")[0]
+            var idx_str: String = sc.index.to_string().split(".")[0]
+            sb.append("@.str.${idx_str} = private unnamed_addr constant [${len_str} x i8] c\"${escaped}\\00\"\n")
+            i = i + 1
+        }
+        sb.append("\n")
+    }
+
+    fun emit_globals(sb: StringBuilder) {
+        if (this.globals.length() == 0) { return nil }
+        var i: Float = 0
+        while (i < this.globals.length()) {
+            var g: GlobalDef = this.globals[i]
+            var linkage_str: String = Types.format_linkage(g.linkage)
+            var kind: String = "global"
+            if (g.is_constant) { kind = "constant" }
+            var ty_str: String = Types.format_type(g.ty)
+            var init_str: String = Types.format_const(g.initializer)
+            sb.append("${g.name} = ${linkage_str}${kind} ${ty_str} ${init_str}\n")
+            i = i + 1
+        }
+        sb.append("\n")
+    }
+
+    fun emit_declarations(sb: StringBuilder) {
+        var has_decl: Bool = false
+        var i: Float = 0
+        while (i < this.functions.length()) {
+            var func: Func.FunctionDef = this.functions[i]
+            if (func.is_declaration) {
+                has_decl = true
+                var param_parts: List<String> = []
+                var j: Float = 0
+                while (j < func.params.length()) {
+                    var p: Func.Param = func.params[j]
+                    param_parts.push(Types.format_type(p.ty))
+                    j = j + 1
+                }
+                if (func.is_variadic) {
+                    param_parts.push("...")
+                }
+                var ret_str: String = Types.format_type(func.ret_type)
+                sb.append("declare ${ret_str} @${func.name}(${param_parts.join(", ")})\n")
+            }
+            i = i + 1
+        }
+        if (has_decl) { sb.append("\n") }
+    }
+
+    fun emit_function_defs(sb: StringBuilder) {
+        var i: Float = 0
+        while (i < this.functions.length()) {
+            var func: Func.FunctionDef = this.functions[i]
+            if (!func.is_declaration) {
+                this.emit_function(sb, func)
+                sb.append("\n")
+            }
+            i = i + 1
+        }
+    }
+
+    fun emit_function(sb: StringBuilder, func: Func.FunctionDef) {
+        var linkage_str: String = Types.format_linkage(func.linkage)
+        var ret_str: String = Types.format_type(func.ret_type)
+
+        // Build parameter list
+        var param_parts: List<String> = []
+        var j: Float = 0
+        while (j < func.params.length()) {
+            var p: Func.Param = func.params[j]
+            param_parts.push("${Types.format_type(p.ty)} ${p.name}")
+            j = j + 1
+        }
+        if (func.is_variadic) {
+            param_parts.push("...")
+        }
+
+        // Build attributes
+        var attr_str: String = ""
+        if (func.attributes.length() > 0) {
+            attr_str = " " + func.attributes.join(" ")
+        }
+
+        sb.append("define ${linkage_str}${ret_str} @${func.name}(${param_parts.join(", ")})${attr_str} {\n")
+
+        // Emit each basic block
+        var k: Float = 0
+        while (k < func.blocks.length()) {
+            var block: Func.BasicBlock = func.blocks[k]
+            sb.append("${block.label}:\n")
+
+            // Emit instructions
+            var m: Float = 0
+            while (m < block.instructions.length()) {
+                var inst: Instructions.Instruction = block.instructions[m]
+                var inst_str: String = Instructions.format_instruction(inst)
+                if (inst_str.length() > 0) {
+                    sb.append("${inst_str}\n")
+                }
+                m = m + 1
+            }
+
+            // Emit terminator
+            if (block.is_terminated) {
+                var term_str: String = Instructions.format_terminator(block.terminator)
+                if (term_str.length() > 0) {
+                    sb.append("${term_str}\n")
+                }
+            }
+
+            k = k + 1
+        }
+
+        sb.append("}\n")
+    }
+}
+
+/// Escape a string for LLVM IR string constants.
+/// Converts special characters to \\xx hex escapes.
+fun escape_string(s: String): String {
+    var result: StringBuilder = StringBuilder()
+    var i: Float = 0
+    while (i < s.length()) {
+        var ch: String = s[i]
+        if (ch == "\n") {
+            result.append("\\0A")
+        } else if (ch == "\r") {
+            result.append("\\0D")
+        } else if (ch == "\t") {
+            result.append("\\09")
+        } else if (ch == "\"") {
+            result.append("\\22")
+        } else if (ch == "\\") {
+            result.append("\\5C")
+        } else {
+            result.append(ch)
+        }
+        i = i + 1
+    }
+    return result.to_string()
+}

@@ -1,0 +1,85 @@
+//! GC root management helpers for Saffron's shadow-stack GC.
+//! Manages push_root/pop_roots around function bodies to keep
+//! the garbage collector informed of live heap references.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+import "./block.sf" as Block
+
+/// Manages GC shadow stack entries for a function scope.
+/// Push roots for each heap-typed local; pop all before return.
+class GCRoots {
+    var bb: Block.BlockBuilder
+    var root_count: Float
+    var identity_mode: Bool
+
+    fun init(bb: Block.BlockBuilder, identity_mode: Bool) {
+        this.bb = bb
+        this.root_count = 0
+        this.identity_mode = identity_mode
+    }
+
+    /// Update the block builder (e.g., when emitting into a different block).
+    fun set_block(new_bb: Block.BlockBuilder) {
+        this.bb = new_bb
+    }
+
+    /// Register a local variable's alloca as a GC root.
+    /// The pointer is converted to i64 and passed to __gc_push_root.
+    fun push_root(alloca_ptr: Types.Value) {
+        if (this.identity_mode) { return nil }
+        var as_int: Types.Value = this.bb.ptrtoint(alloca_ptr, Types.Type.I64)
+        this.bb.call_void("__gc_push_root", [as_int])
+        this.root_count = this.root_count + 1
+    }
+
+    /// Pop all roots registered by this function (call before every ret).
+    fun pop_all() {
+        if (this.identity_mode) { return nil }
+        if (this.root_count == 0) { return nil }
+        var count_val: Types.Value = Types.Value.Constant(Types.int_const(this.root_count))
+        this.bb.call_void("__gc_pop_roots", [count_val])
+    }
+
+    /// Pop a specific number of roots (for early returns in loops, etc.).
+    fun pop_n(n: Float) {
+        if (this.identity_mode) { return nil }
+        if (n == 0) { return nil }
+        var count_val: Types.Value = Types.Value.Constant(Types.int_const(n))
+        this.bb.call_void("__gc_pop_roots", [count_val])
+    }
+
+    /// Enable the GC (called at program entry / main).
+    fun enable() {
+        if (this.identity_mode) { return nil }
+        this.bb.call_void("__gc_enable", [])
+    }
+
+    /// Disable the GC (for critical sections).
+    fun disable() {
+        if (this.identity_mode) { return nil }
+        this.bb.call_void("__gc_disable", [])
+    }
+
+    /// GC-aware allocation: allocates memory tracked by the collector.
+    fun alloc(size: Types.Value): Types.Value {
+        return this.bb.call("__gc_alloc", Types.Type.Ptr, [size])
+    }
+
+    /// GC-aware zeroed allocation.
+    fun alloc_zeroed(size: Types.Value): Types.Value {
+        return this.bb.call("__gc_alloc_zeroed", Types.Type.Ptr, [size])
+    }
+
+    /// Zero-initialize an alloca slot (prevents GC from scanning garbage pointers).
+    fun zero_init(alloca_ptr: Types.Value) {
+        var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+        this.bb.store(zero, alloca_ptr)
+    }
+
+    /// Get the current root count (useful for nested scopes).
+    fun get_root_count(): Float {
+        return this.root_count
+    }
+}

@@ -1135,12 +1135,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 var pr_fname: String = gen.get_fun_name(all_stmts[pr_si])
                 if (pr_fname.length() > 0) {
                     var pr_emit: String = pr_prefix + pr_fname
-                    if (pr_emit == "on_click") { IO.println("[DEBUG-KF] pre-reg pushing on_click emit, fname=" + pr_fname + " prefix=" + pr_prefix) }
                     if (!gen.known_functions.contains(pr_emit)) {
                         gen.known_functions.push(pr_emit)
                     }
                     if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
-                        if (pr_fname == "on_click") { IO.println("[DEBUG-KF] pre-reg pushing on_click fname") }
                         gen.known_functions.push(pr_fname)
                     }
                 }

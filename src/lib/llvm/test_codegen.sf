@@ -1,0 +1,420 @@
+//! Test: Verify the @llvm library can produce IR matching the current codegen output.
+//! For each test case, we construct a Module using the library API, emit IR, and print it.
+//! Compare output against expected .ll files from the real compiler.
+//!
+//! Run with: tools/saffron run src/lib/llvm/test_codegen.sf
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+import "./block.sf" as Block
+import "./module.sf" as Mod
+
+// ============================================================================
+// Test 1: Simple add function
+//   fun add(a: Number, b: Number): Number { return a + b }
+//
+// Expected IR (function body):
+//   define i64 @add(i64 %a.arg, i64 %b.arg) {
+//   entry:
+//     %a = alloca i64
+//     %b = alloca i64
+//     store i64 %a.arg, i64* %a
+//     store i64 %b.arg, i64* %b
+//     %t1 = load i64, i64* %a
+//     %t2 = load i64, i64* %b
+//     %t3 = add i64 %t1, %t2
+//     ret i64 %t3
+//   }
+// ============================================================================
+fun test_add(): String {
+    var m: Mod.Module = Mod.Module("test_add")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    var params: List<Func.Param> = []
+    params.push(Func.Param("%a.arg", Types.Type.I64))
+    params.push(Func.Param("%b.arg", Types.Type.I64))
+
+    var fb: Func.FunctionBuilder = m.add_function("add", Types.Type.I64, params)
+    var entry: Func.BasicBlock = fb.entry_block()
+    var bb: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+    // Alloca for params
+    var a_ptr: Types.Value = bb.alloca(Types.Type.I64, "a")
+    var b_ptr: Types.Value = bb.alloca(Types.Type.I64, "b")
+
+    // Store args into allocas
+    bb.store(fb.param_value(0), a_ptr)
+    bb.store(fb.param_value(1), b_ptr)
+
+    // Load them back
+    var a_val: Types.Value = bb.load(Types.Type.I64, a_ptr)
+    var b_val: Types.Value = bb.load(Types.Type.I64, b_ptr)
+
+    // Add
+    var result: Types.Value = bb.add(a_val, b_val)
+
+    // Return
+    bb.ret(result)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Test 2: List literal construction
+//   fun make_list(): List<Number> { var items = [10, 20, 30]; return items }
+//
+// Expected IR (body only):
+//   %t2 = call i64 @__list_new()
+//   %t3 = add i64 0, 10
+//   %t4 = call i64 @__list_push(i64 %t2, i64 %t3)
+//   ...
+// ============================================================================
+fun test_list_lit(): String {
+    var m: Mod.Module = Mod.Module("test_list")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    // Declare runtime functions
+    m.add_declaration("__list_new", Types.Type.I64, [])
+    m.add_declaration("__list_push", Types.Type.I64, [Func.Param("", Types.Type.I64), Func.Param("", Types.Type.I64)])
+    m.add_declaration("__gc_push_root", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+    m.add_declaration("__gc_pop_roots", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+
+    var params: List<Func.Param> = []
+    var fb: Func.FunctionBuilder = m.add_function("make_list", Types.Type.I64, params)
+    var entry: Func.BasicBlock = fb.entry_block()
+    var bb: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+    // %items = alloca i64
+    var items_ptr: Types.Value = bb.alloca(Types.Type.I64, "items")
+
+    // store i64 0, i64* %items (zero init)
+    var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+    bb.store(zero, items_ptr)
+
+    // GC push root
+    var as_int: Types.Value = bb.ptrtoint(items_ptr, Types.Type.I64)
+    bb.call_void("__gc_push_root", [as_int])
+
+    // %list = call i64 @__list_new()
+    var list_val: Types.Value = bb.call("__list_new", Types.Type.I64, [])
+
+    // Push elements: 10, 20, 30
+    // Codegen uses: %t3 = add i64 0, 10
+    var c10: Types.Value = Types.Value.Constant(Types.int_const(10))
+    var ten_val: Types.Value = bb.add(zero, c10)
+    bb.call("__list_push", Types.Type.I64, [list_val, ten_val])
+
+    var c20: Types.Value = Types.Value.Constant(Types.int_const(20))
+    var twenty_val: Types.Value = bb.add(zero, c20)
+    bb.call("__list_push", Types.Type.I64, [list_val, twenty_val])
+
+    var c30: Types.Value = Types.Value.Constant(Types.int_const(30))
+    var thirty_val: Types.Value = bb.add(zero, c30)
+    bb.call("__list_push", Types.Type.I64, [list_val, thirty_val])
+
+    // store list_val into items, then load and return
+    bb.store(list_val, items_ptr)
+    var loaded: Types.Value = bb.load(Types.Type.I64, items_ptr)
+
+    // GC pop roots
+    var one: Types.Value = Types.Value.Constant(Types.int_const(1))
+    bb.call_void("__gc_pop_roots", [one])
+
+    bb.ret(loaded)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Test 3: If/else (comparison + conditional branch)
+//   fun max(a: Number, b: Number): Number {
+//     if (a > b) { return a } else { return b }
+//   }
+// ============================================================================
+fun test_if_else(): String {
+    var m: Mod.Module = Mod.Module("test_if")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    var params: List<Func.Param> = []
+    params.push(Func.Param("%a.arg", Types.Type.I64))
+    params.push(Func.Param("%b.arg", Types.Type.I64))
+
+    var fb: Func.FunctionBuilder = m.add_function("max", Types.Type.I64, params)
+    var entry: Func.BasicBlock = fb.entry_block()
+    var bb: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+    // Alloca for params
+    var a_ptr: Types.Value = bb.alloca(Types.Type.I64, "a")
+    var b_ptr: Types.Value = bb.alloca(Types.Type.I64, "b")
+    bb.store(fb.param_value(0), a_ptr)
+    bb.store(fb.param_value(1), b_ptr)
+
+    // Load
+    var a_val: Types.Value = bb.load(Types.Type.I64, a_ptr)
+    var b_val: Types.Value = bb.load(Types.Type.I64, b_ptr)
+
+    // Compare: icmp sgt, then zext->trunc pattern (matches current codegen)
+    var cmp: Types.Value = bb.icmp_sgt(a_val, b_val)
+    var cmp_ext: Types.Value = bb.zext(cmp, Types.Type.I64)
+    var cond: Types.Value = bb.trunc(cmp_ext, Types.Type.I1)
+
+    // Create then/else/end blocks
+    var then_bb: Func.BasicBlock = fb.new_block("then2")
+    var else_bb: Func.BasicBlock = fb.new_block("else3")
+    var end_bb: Func.BasicBlock = fb.new_block("endif1")
+
+    bb.cond_br(cond, then_bb, else_bb)
+
+    // Then block: return a
+    var bb_then: Block.BlockBuilder = Block.BlockBuilder(fb, then_bb)
+    var a_ret: Types.Value = bb_then.load(Types.Type.I64, a_ptr)
+    bb_then.ret(a_ret)
+
+    // Else block: return b
+    var bb_else: Block.BlockBuilder = Block.BlockBuilder(fb, else_bb)
+    var b_ret: Types.Value = bb_else.load(Types.Type.I64, b_ptr)
+    bb_else.ret(b_ret)
+
+    // End block (dead code but codegen emits it)
+    var bb_end: Block.BlockBuilder = Block.BlockBuilder(fb, end_bb)
+    var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+    bb_end.ret(zero)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Test 4: While loop
+//   fun sum_to(n: Number): Number {
+//     var total = 0; var i = 1
+//     while (i <= n) { total = total + i; i = i + 1 }
+//     return total
+//   }
+// ============================================================================
+fun test_while_loop(): String {
+    var m: Mod.Module = Mod.Module("test_while")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    var params: List<Func.Param> = []
+    params.push(Func.Param("%n.arg", Types.Type.I64))
+
+    var fb: Func.FunctionBuilder = m.add_function("sum_to", Types.Type.I64, params)
+    var entry: Func.BasicBlock = fb.entry_block()
+    var bb: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+    var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+    var one: Types.Value = Types.Value.Constant(Types.int_const(1))
+
+    // Allocas
+    var n_ptr: Types.Value = bb.alloca(Types.Type.I64, "n")
+    var total_ptr: Types.Value = bb.alloca(Types.Type.I64, "total")
+    var i_ptr: Types.Value = bb.alloca(Types.Type.I64, "i")
+
+    // Store param and init vars
+    bb.store(fb.param_value(0), n_ptr)
+    var zero_init: Types.Value = bb.add(zero, zero)
+    bb.store(zero_init, total_ptr)
+    var one_init: Types.Value = bb.add(zero, one)
+    bb.store(one_init, i_ptr)
+
+    // Branch to condition
+    var cond_bb: Func.BasicBlock = fb.new_block("while.cond1")
+    var body_bb: Func.BasicBlock = fb.new_block("while.body2")
+    var end_bb: Func.BasicBlock = fb.new_block("while.end3")
+    bb.br(cond_bb)
+
+    // Condition block: i <= n
+    var bb_cond: Block.BlockBuilder = Block.BlockBuilder(fb, cond_bb)
+    var i_val: Types.Value = bb_cond.load(Types.Type.I64, i_ptr)
+    var n_val: Types.Value = bb_cond.load(Types.Type.I64, n_ptr)
+    var cmp: Types.Value = bb_cond.icmp_sle(i_val, n_val)
+    var cmp_ext: Types.Value = bb_cond.zext(cmp, Types.Type.I64)
+    var cond_i1: Types.Value = bb_cond.trunc(cmp_ext, Types.Type.I1)
+    bb_cond.cond_br(cond_i1, body_bb, end_bb)
+
+    // Body block: total = total + i; i = i + 1; br cond
+    var bb_body: Block.BlockBuilder = Block.BlockBuilder(fb, body_bb)
+    var total_val: Types.Value = bb_body.load(Types.Type.I64, total_ptr)
+    var i_body: Types.Value = bb_body.load(Types.Type.I64, i_ptr)
+    var sum: Types.Value = bb_body.add(total_val, i_body)
+    bb_body.store(sum, total_ptr)
+    var i_load2: Types.Value = bb_body.load(Types.Type.I64, i_ptr)
+    var one_body: Types.Value = bb_body.add(zero, one)
+    var i_inc: Types.Value = bb_body.add(i_load2, one_body)
+    bb_body.store(i_inc, i_ptr)
+    bb_body.br(cond_bb)
+
+    // End block: return total
+    var bb_end: Block.BlockBuilder = Block.BlockBuilder(fb, end_bb)
+    var result: Types.Value = bb_end.load(Types.Type.I64, total_ptr)
+    bb_end.ret(result)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Test 5: Function call
+//   fun double(x: Number): Number { return x * 2 }
+//   fun apply_twice(x: Number): Number {
+//     var first = double(x); var second = double(first); return second
+//   }
+// ============================================================================
+fun test_function_call(): String {
+    var m: Mod.Module = Mod.Module("test_call")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+
+    // --- double(x) ---
+    var params_d: List<Func.Param> = []
+    params_d.push(Func.Param("%x.arg", Types.Type.I64))
+    var fb_d: Func.FunctionBuilder = m.add_function("double", Types.Type.I64, params_d)
+    var entry_d: Func.BasicBlock = fb_d.entry_block()
+    var bb_d: Block.BlockBuilder = Block.BlockBuilder(fb_d, entry_d)
+
+    var x_ptr: Types.Value = bb_d.alloca(Types.Type.I64, "x")
+    bb_d.store(fb_d.param_value(0), x_ptr)
+    var x_val: Types.Value = bb_d.load(Types.Type.I64, x_ptr)
+    var two: Types.Value = Types.Value.Constant(Types.int_const(2))
+    var two_val: Types.Value = bb_d.add(zero, two)
+    var mul_result: Types.Value = bb_d.mul(x_val, two_val)
+    bb_d.ret(mul_result)
+
+    // --- apply_twice(x) ---
+    var params_a: List<Func.Param> = []
+    params_a.push(Func.Param("%x.arg", Types.Type.I64))
+    var fb_a: Func.FunctionBuilder = m.add_function("apply_twice", Types.Type.I64, params_a)
+    var entry_a: Func.BasicBlock = fb_a.entry_block()
+    var bb_a: Block.BlockBuilder = Block.BlockBuilder(fb_a, entry_a)
+
+    var x_ptr2: Types.Value = bb_a.alloca(Types.Type.I64, "x")
+    var first_ptr: Types.Value = bb_a.alloca(Types.Type.I64, "first")
+    var second_ptr: Types.Value = bb_a.alloca(Types.Type.I64, "second")
+    bb_a.store(fb_a.param_value(0), x_ptr2)
+
+    // first = double(x)
+    var x_load: Types.Value = bb_a.load(Types.Type.I64, x_ptr2)
+    var call1: Types.Value = bb_a.call("double", Types.Type.I64, [x_load])
+    bb_a.store(call1, first_ptr)
+
+    // second = double(first)
+    var first_load: Types.Value = bb_a.load(Types.Type.I64, first_ptr)
+    var call2: Types.Value = bb_a.call("double", Types.Type.I64, [first_load])
+    bb_a.store(call2, second_ptr)
+
+    // return second
+    var second_load: Types.Value = bb_a.load(Types.Type.I64, second_ptr)
+    bb_a.ret(second_load)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Test 6: String constant + string concatenation (ptr arithmetic)
+//   fun greet(name: String): String { return "hello " + name }
+// ============================================================================
+fun test_string_concat(): String {
+    var m: Mod.Module = Mod.Module("test_string")
+    m.set_target_triple("arm64-apple-macosx15.0.0")
+
+    // String constants
+    var idx0: Float = m.add_string_constant("hello ")
+
+    // Declare runtime functions
+    m.add_declaration("strlen", Types.Type.I64, [Func.Param("", Types.Type.Ptr)])
+    m.add_declaration("malloc", Types.Type.Ptr, [Func.Param("", Types.Type.I64)])
+    m.add_declaration("strcpy", Types.Type.Ptr, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.Ptr)])
+    m.add_declaration("strcat", Types.Type.Ptr, [Func.Param("", Types.Type.Ptr), Func.Param("", Types.Type.Ptr)])
+    m.add_declaration("__gc_push_root", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+    m.add_declaration("__gc_pop_roots", Types.Type.Void, [Func.Param("", Types.Type.I64)])
+
+    var params: List<Func.Param> = []
+    params.push(Func.Param("%name.arg", Types.Type.I64))
+    var fb: Func.FunctionBuilder = m.add_function("greet", Types.Type.I64, params)
+    var entry: Func.BasicBlock = fb.entry_block()
+    var bb: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+    // %name = alloca i64; store %name.arg -> %name
+    var name_ptr: Types.Value = bb.alloca(Types.Type.I64, "name")
+    bb.store(fb.param_value(0), name_ptr)
+
+    // GC push root
+    var name_as_int: Types.Value = bb.ptrtoint(name_ptr, Types.Type.I64)
+    bb.call_void("__gc_push_root", [name_as_int])
+
+    // Get pointer to "hello " string constant
+    // Current codegen: getelementptr [7 x i8], [7 x i8]* @.str.0, i64 0, i64 0
+    var str0_ref: Types.Value = Types.Value.Global("@.str.0", Types.Type.Ptr)
+    var hello_len_ty: Types.Type = Types.array_type(Types.Type.I8, 7)
+    var zero_idx: Types.Value = Types.Value.Constant(Types.Const.Int(0, 64))
+    var hello_ptr: Types.Value = bb.gep(hello_len_ty, str0_ref, [zero_idx, zero_idx])
+
+    // ptrtoint hello_ptr to i64
+    var hello_i64: Types.Value = bb.ptrtoint(hello_ptr, Types.Type.I64)
+
+    // Load name value
+    var name_val: Types.Value = bb.load(Types.Type.I64, name_ptr)
+
+    // inttoptr both to ptr (i8*)
+    var lptr: Types.Value = bb.inttoptr(hello_i64, Types.Type.Ptr)
+    var rptr: Types.Value = bb.inttoptr(name_val, Types.Type.Ptr)
+
+    // strlen(lptr), strlen(rptr)
+    var llen: Types.Value = bb.call("strlen", Types.Type.I64, [lptr])
+    var rlen: Types.Value = bb.call("strlen", Types.Type.I64, [rptr])
+
+    // total = llen + rlen + 1
+    var total: Types.Value = bb.add(llen, rlen)
+    var one: Types.Value = Types.Value.Constant(Types.int_const(1))
+    var total1: Types.Value = bb.add(total, one)
+
+    // buf = malloc(total1)
+    var buf: Types.Value = bb.call("malloc", Types.Type.Ptr, [total1])
+
+    // strcpy(buf, lptr), strcat(buf, rptr)
+    bb.call("strcpy", Types.Type.Ptr, [buf, lptr])
+    bb.call("strcat", Types.Type.Ptr, [buf, rptr])
+
+    // ptrtoint buf to i64
+    var result: Types.Value = bb.ptrtoint(buf, Types.Type.I64)
+
+    // GC pop
+    var one_gc: Types.Value = Types.Value.Constant(Types.int_const(1))
+    bb.call_void("__gc_pop_roots", [one_gc])
+
+    bb.ret(result)
+
+    return m.emit_ir()
+}
+
+// ============================================================================
+// Main: run all tests, print the IR
+// ============================================================================
+fun main() {
+    IO.println("=== Test 1: add function ===")
+    var ir1: String = test_add()
+    IO.println(ir1)
+
+    IO.println("=== Test 2: list literal ===")
+    var ir2: String = test_list_lit()
+    IO.println(ir2)
+
+    IO.println("=== Test 3: if/else ===")
+    var ir3: String = test_if_else()
+    IO.println(ir3)
+
+    IO.println("=== Test 4: while loop ===")
+    var ir4: String = test_while_loop()
+    IO.println(ir4)
+
+    IO.println("=== Test 5: function call ===")
+    var ir5: String = test_function_call()
+    IO.println(ir5)
+
+    IO.println("=== Test 6: string concat ===")
+    var ir6: String = test_string_concat()
+    IO.println(ir6)
+
+    IO.println("=== ALL TESTS EMITTED ===")
+}

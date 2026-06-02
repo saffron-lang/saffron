@@ -52,6 +52,7 @@
 - [Lexer](./stdlib/lexer.md)
 - [Parser](./stdlib/parser.md)
 - [AST](./stdlib/ast.md)
+- [LLVM](./stdlib/llvm.md)
 
 # Turmeric (Web Framework)
 

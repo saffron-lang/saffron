@@ -1572,7 +1572,19 @@
                     emit_callee = this.func_prefix_map.get(callee_name)
                 } else {
                     // Warning: calling undefined function
-                    IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    // Suppress if it's a known class method (ClassName__method pattern)
+                    var is_known_method: Bool = false
+                    var kfi: Float = 0
+                    while (kfi < this.known_functions.length()) {
+                        if (this.known_functions[kfi].ends_with("__" + callee_name)) {
+                            is_known_method = true
+                            kfi = this.known_functions.length()
+                        }
+                        kfi = kfi + 1
+                    }
+                    if (!is_known_method) {
+                        IO.println("[codegen] Warning: calling undefined function '" + callee_name + "'")
+                    }
 
                 }
             }

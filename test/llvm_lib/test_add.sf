@@ -1,0 +1,8 @@
+fun add(a: Number, b: Number): Number {
+    return a + b
+}
+
+fun main() {
+    var result: Number = add(3, 4)
+    IO.println(result)
+}

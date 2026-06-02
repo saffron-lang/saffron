@@ -700,3 +700,161 @@ fun stringify(table_data: Any): String {
     write_table(table_data, "")
     return sb.to_string()
 }
+
+// =============================================================================
+// TomlTable — typed wrapper around parsed TOML data
+// =============================================================================
+
+/// A typed wrapper around a parsed TOML table.
+///
+/// ```saffron
+/// import "@toml" as TOML
+/// var config = TOML.load("pantry.toml")
+/// var pkg = config.table("package")
+/// var name: String = pkg.string("name")
+/// var version: String = pkg.string_or("version", "0.1.0")
+/// ```
+class TomlTable {
+    var data: Map<String, Any>
+
+    fun init(data: Map<String, Any>) {
+        this.data = data
+    }
+
+    fun has(key: String): Bool {
+        return this.data.has(key)
+    }
+
+    fun keys(): List<String> {
+        return this.data.keys()
+    }
+
+    fun to_map(): Map<String, Any> {
+        return this.data
+    }
+
+    fun string(key: String): String {
+        if (!this.data.has(key)) {
+            throw "TOML: missing key '${key}'"
+        }
+        var val = this.data.get(key)
+        if (!(val is String)) {
+            throw "TOML: expected string for key '${key}'"
+        }
+        return val
+    }
+
+    fun string_or(key: String, default: String): String {
+        if (!this.data.has(key)) { return default }
+        var val = this.data.get(key)
+        if (!(val is String)) {
+            throw "TOML: expected string for key '${key}'"
+        }
+        return val
+    }
+
+    fun number(key: String): Number {
+        if (!this.data.has(key)) {
+            throw "TOML: missing key '${key}'"
+        }
+        var val = this.data.get(key)
+        if (!(val is Number)) {
+            throw "TOML: expected number for key '${key}'"
+        }
+        return val
+    }
+
+    fun number_or(key: String, default: Number): Number {
+        if (!this.data.has(key)) { return default }
+        var val = this.data.get(key)
+        if (!(val is Number)) {
+            throw "TOML: expected number for key '${key}'"
+        }
+        return val
+    }
+
+    fun bool(key: String): Bool {
+        if (!this.data.has(key)) {
+            throw "TOML: missing key '${key}'"
+        }
+        var val = this.data.get(key)
+        if (!(val is Bool)) {
+            throw "TOML: expected bool for key '${key}'"
+        }
+        return val
+    }
+
+    fun bool_or(key: String, default: Bool): Bool {
+        if (!this.data.has(key)) { return default }
+        var val = this.data.get(key)
+        if (!(val is Bool)) {
+            throw "TOML: expected bool for key '${key}'"
+        }
+        return val
+    }
+
+    fun table(key: String): TomlTable {
+        if (!this.data.has(key)) {
+            throw "TOML: missing key '${key}'"
+        }
+        var val = this.data.get(key)
+        if (!(val is Map)) {
+            throw "TOML: expected table for key '${key}'"
+        }
+        return TomlTable(val)
+    }
+
+    fun table_or(key: String): TomlTable {
+        if (!this.data.has(key)) { return TomlTable({}) }
+        var val = this.data.get(key)
+        if (!(val is Map)) {
+            throw "TOML: expected table for key '${key}'"
+        }
+        return TomlTable(val)
+    }
+
+    fun list(key: String): List<Any> {
+        if (!this.data.has(key)) {
+            throw "TOML: missing key '${key}'"
+        }
+        var val = this.data.get(key)
+        if (!(val is List)) {
+            throw "TOML: expected array for key '${key}'"
+        }
+        return val
+    }
+
+    fun list_or(key: String): List<Any> {
+        if (!this.data.has(key)) { return [] }
+        var val = this.data.get(key)
+        if (!(val is List)) {
+            throw "TOML: expected array for key '${key}'"
+        }
+        return val
+    }
+
+    fun get(key: String): Any {
+        return this.data.get(key)
+    }
+}
+
+/// Parse a TOML string and return a typed TomlTable wrapper.
+///
+/// ```saffron
+/// var config = TOML.load_string("[package]\nname = \"saffron\"")
+/// config.table("package").string("name")  // "saffron"
+/// ```
+fun load_string(source: String): TomlTable {
+    return TomlTable(parse(source))
+}
+
+/// Parse a TOML file and return a typed TomlTable wrapper.
+///
+/// ```saffron
+/// var config = TOML.load("pantry.toml")
+/// var pkg = config.table("package")
+/// var name: String = pkg.string("name")
+/// ```
+fun load(path: String): TomlTable {
+    return TomlTable(parse_file(path))
+}

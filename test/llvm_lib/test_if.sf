@@ -1,0 +1,12 @@
+fun max(a: Number, b: Number): Number {
+    if (a > b) {
+        return a
+    } else {
+        return b
+    }
+}
+
+fun main() {
+    var result: Number = max(5, 10)
+    IO.println(result)
+}
