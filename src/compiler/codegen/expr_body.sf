@@ -1285,8 +1285,8 @@
             }
         }
 
-        if (this.known_functions.contains(resolved_callee)) {
-            // Direct call to known function
+        if (this.known_functions.contains(resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+            // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
             if (callee_name == "main" and this.defined_funcs.contains("__saffron_main")) {
                 call_target = "__saffron_main"
