@@ -1426,24 +1426,37 @@ class Parser {
             var value: AST.Expr = this.parse_expr()
             return AST.Stmt.ExprStmt(AST.Expr.SetField(AST.Expr.This, field, value))
         }
-        // Build the initial expression and continue chaining
+        // Build the initial expression and continue chaining (dots, indexes, calls)
         var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field)
-        // Continue parsing any chained .field or .method(args) calls
-        while (this.match_kind_check(".")) {
-            this.advance()
-            var next_field: String = this.expect_ident()
-            if (this.match_kind("(")) {
-                var args: List<AST.Expr> = []
-                if (!this.match_kind_check(")")) {
-                    args.push(this.parse_call_arg())
-                    while (this.match_kind(",")) {
-                        args.push(this.parse_call_arg())
-                    }
+        while (this.match_kind_check(".") or this.match_kind_check("[")) {
+            if (this.match_kind_check("[")) {
+                this.advance()
+                var idx: AST.Expr = this.parse_expr()
+                this.consume("]")
+                if (this.match_kind("=")) {
+                    var value: AST.Expr = this.parse_expr()
+                    return AST.Stmt.ExprStmt(AST.Expr.IndexSet(expr, idx, value))
                 }
-                this.consume(")")
-                expr = AST.Expr.MethodCall(expr, next_field, args)
+                expr = AST.Expr.IndexGet(expr, idx)
             } else {
-                expr = AST.Expr.MemberAccess(expr, next_field)
+                this.advance()
+                var next_field: String = this.expect_ident()
+                if (this.match_kind("(")) {
+                    var args: List<AST.Expr> = []
+                    if (!this.match_kind_check(")")) {
+                        args.push(this.parse_call_arg())
+                        while (this.match_kind(",")) {
+                            args.push(this.parse_call_arg())
+                        }
+                    }
+                    this.consume(")")
+                    expr = AST.Expr.MethodCall(expr, next_field, args)
+                } else if (this.match_kind("=")) {
+                    var value: AST.Expr = this.parse_expr()
+                    return AST.Stmt.ExprStmt(AST.Expr.SetField(expr, next_field, value))
+                } else {
+                    expr = AST.Expr.MemberAccess(expr, next_field)
+                }
             }
         }
         // Check for direct method call: this.method(args)

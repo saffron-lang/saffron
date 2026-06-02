@@ -726,6 +726,47 @@
 
     // --- Task.spawn(fn) ---
     if (method == "spawn" and obj_name == "Task") {
+        // Infer the task's result type from the lambda's return type
+        var task_result_type: String = "Int"
+        var spawn_expr_kind: String = this.classify_expr(args[0])
+        if (spawn_expr_kind == "lambda") {
+            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
+            if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
+                task_result_type = lambda_ret
+            } else {
+                // Infer from body: if body is [Return(Call(f, ...))] use f's return type
+                var lambda_body: List<AST.Stmt> = match (args[0]) { Lambda(p, r, b) => b   _ => [] }
+                if (lambda_body.length() == 1) {
+                    var lb_kind: String = this.classify_stmt(lambda_body[0])
+                    if (lb_kind == "return") {
+                        var ret_expr: AST.Expr = match (lambda_body[0]) { Return(v) => v   _ => AST.Expr.NilLit }
+                        var ret_ek: String = this.classify_expr(ret_expr)
+                        if (ret_ek == "call") {
+                            var ret_callee: AST.Expr = match (ret_expr) { Call(c, a) => c   _ => AST.Expr.NilLit }
+                            var ret_callee_name: String = this.get_variable_name(ret_callee)
+                            if (ret_callee_name.length() > 0) {
+                                var prefixed_callee: String = this.current_prefix + ret_callee_name
+                                if (this.func_ret_types.has(prefixed_callee)) {
+                                    task_result_type = this.func_ret_types.get(prefixed_callee)
+                                } else if (this.func_ret_types.has(ret_callee_name)) {
+                                    task_result_type = this.func_ret_types.get(ret_callee_name)
+                                }
+                            }
+                        } else if (ret_ek == "method_call") {
+                            var mc_method_name: String = match (ret_expr) { MethodCall(o, m, a) => m   _ => "" }
+                            var mc_obj_expr: AST.Expr = match (ret_expr) { MethodCall(o, m, a) => o   _ => AST.Expr.NilLit }
+                            var mc_ns: String = this.get_variable_name(mc_obj_expr)
+                            if (mc_ns.length() > 0 and this.module_prefixes.has(mc_ns)) {
+                                var mc_full: String = this.module_prefixes.get(mc_ns) + mc_method_name
+                                if (this.func_ret_types.has(mc_full)) {
+                                    task_result_type = this.func_ret_types.get(mc_full)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // Get the lambda as a function pointer (i64)
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
@@ -768,7 +809,7 @@
         }
         this.emit_indent("call i64 @" + enqueue_name + "(i64 " + task_i64 + ")")
         this.called_functions.push(enqueue_name)
-        this.last_type = AST.Type.IntType
+        this.last_type = this.str_to_type(task_result_type)
         return task_i64
     }
 
@@ -785,6 +826,11 @@
         return done_i64
     }
     if (method == "getResult") {
+        var gr_obj_name: String = this.get_variable_name(object)
+        var gr_result_type: AST.Type = AST.Type.IntType
+        if (gr_obj_name.length() > 0 and this.typed_vars.has(gr_obj_name)) {
+            gr_result_type = this.typed_vars.get(gr_obj_name)
+        }
         var task_val: String = this.gen_arg_value(object)
         var get_result_name: String = "stdlib_scheduler_get_result"
         if (this.known_functions.contains("stdlib_scheduler_get_result")) {
@@ -793,11 +839,17 @@
         var result_val: String = this.fresh_local()
         this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
         this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.last_type = gr_result_type
         return result_val
     }
     // task.await() — from top-level: run scheduler then read result
     if (method == "await" and !this.is_coroutine) {
+        // Determine the task's result type from the task variable's stored type
+        var await_obj_name: String = this.get_variable_name(object)
+        var await_result_type: AST.Type = AST.Type.IntType
+        if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
+            await_result_type = this.typed_vars.get(await_obj_name)
+        }
         var task_val: String = this.gen_arg_value(object)
         var sched_run_name: String = "scheduler_run"
         if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
@@ -812,11 +864,17 @@
         var result_val: String = this.fresh_local()
         this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
         this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.last_type = await_result_type
         return result_val
     }
     // task.await() — from coroutine: yield with reason=3, scheduler wakes us
     if (method == "await" and this.is_coroutine) {
+        // Determine the task's result type from the task variable's stored type
+        var await_obj_name: String = this.get_variable_name(object)
+        var await_result_type: AST.Type = AST.Type.IntType
+        if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
+            await_result_type = this.typed_vars.get(await_obj_name)
+        }
         var task_val: String = this.gen_arg_value(object)
         this.emit_indent("store i64 3, i64* @__yield_reason")
         this.emit_indent("store i64 " + task_val + ", i64* @__yield_arg")
@@ -840,7 +898,7 @@
         var result_val: String = this.fresh_local()
         this.emit_indent(result_val + " = call i64 @" + get_result_name + "(i64 " + task_val + ")")
         this.called_functions.push(get_result_name)
-        this.last_type = AST.Type.IntType
+        this.last_type = await_result_type
         return result_val
     }
 
@@ -1235,7 +1293,14 @@
             // Read the child coroutine's return value from @__task_result
             var coro_result: String = this.fresh_local()
             this.emit_indent(coro_result + " = load i64, i64* @__task_result")
-            this.last_type = AST.Type.IntType
+            // Use the callee's return type (same as the non-coro path below)
+            if (this.func_ret_types.has(prefixed_name)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
+            } else if (this.func_ret_types.has(method)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
             return coro_result
         }
         var local: String = this.fresh_local()

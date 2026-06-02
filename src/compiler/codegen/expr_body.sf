@@ -867,6 +867,25 @@
                     }
                 }
             }
+            // General fallback: evaluate the object expression (e.g. IndexGet) and use last_type
+            var fb_val: String = this.gen_arg_value(m_obj)
+            var fb_type_str: String = this.type_to_string(this.last_type)
+            var fb_resolved: String = this.resolve_class_type(fb_type_str)
+            if (fb_resolved.length() > 0 and this.class_fields.has(fb_resolved)) {
+                var fb_struct: String = fb_resolved
+                if (this.class_struct_names.has(fb_resolved)) {
+                    fb_struct = this.class_struct_names.get(fb_resolved)
+                }
+                var fi: Float = this.get_field_index(fb_resolved, m_field)
+                var op: String = this.fresh_local()
+                this.emit_indent(op + " = inttoptr i64 " + fb_val + " to %" + fb_struct + "*")
+                var fp: String = this.fresh_local()
+                this.emit_indent(fp + " = getelementptr %" + fb_struct + ", %" + fb_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = load i64, i64* " + fp)
+                this.last_type = this.str_to_type(this.get_field_type(fb_resolved, m_field))
+                return result
+            }
             return "0"
         }
 
@@ -1166,7 +1185,12 @@
                 // Read the child coroutine's return value from @__task_result
                 var coro_result: String = this.fresh_local()
                 this.emit_indent(coro_result + " = load i64, i64* @__task_result")
-                this.last_type = AST.Type.IntType
+                // Use the callee's return type
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
                 return coro_result
             }
         }
