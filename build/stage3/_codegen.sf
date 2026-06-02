@@ -597,6 +597,33 @@ class Codegen {
         return result
     }
 
+    fun split_type_args(s: String): List<String> {
+        var result: List<String> = []
+        var current: String = ""
+        var depth: Float = 0
+        var i: Float = 0
+        while (i < s.length()) {
+            var ch: String = s.char_at(i)
+            if (ch == "<" or ch == "(") {
+                depth = depth + 1
+                current = current + ch
+            } else if (ch == ">" or ch == ")") {
+                depth = depth - 1
+                current = current + ch
+            } else if (ch == "," and depth == 0) {
+                result.push(current)
+                current = ""
+            } else {
+                current = current + ch
+            }
+            i = i + 1
+        }
+        if (current.length() > 0) {
+            result.push(current)
+        }
+        return result
+    }
+
     fun generic_type_string(base: String, args: List<AST.Type>): String {
         if (args.length() > 1) {
             var sb: StringBuilder = StringBuilder()
@@ -1249,6 +1276,20 @@ class Codegen {
             Yield(value) => {
                 this.gen_yield(value)
             }
+            TupleLit(elements) => {
+                var result: String = this.gen_list_lit(elements)
+                var tuple_type_str: String = "Tuple<"
+                var tti: Float = 0
+                while (tti < elements.length()) {
+                    if (tti > 0) { tuple_type_str = tuple_type_str + "," }
+                    var elem_type: String = this.get_expr_type(elements[tti])
+                    tuple_type_str = tuple_type_str + elem_type
+                    tti = tti + 1
+                }
+                tuple_type_str = tuple_type_str + ">"
+                this.last_type = this.str_to_type(tuple_type_str)
+                result
+            }
         }
     }
 
@@ -1730,6 +1771,23 @@ class Codegen {
                 _ => []
             }
             return this.gen_list_lit(elems)
+        }
+        if (expr_kind == "tuple_lit") {
+            var elems: List<AST.Expr> = match (expr) { TupleLit(e) => e
+                _ => []
+            }
+            var result: String = this.gen_list_lit(elems)
+            var tuple_type_str: String = "Tuple<"
+            var tti: Float = 0
+            while (tti < elems.length()) {
+                if (tti > 0) { tuple_type_str = tuple_type_str + "," }
+                var elem_type: String = this.get_expr_type(elems[tti])
+                tuple_type_str = tuple_type_str + elem_type
+                tti = tti + 1
+            }
+            tuple_type_str = tuple_type_str + ">"
+            this.last_type = this.str_to_type(tuple_type_str)
+            return result
         }
         if (expr_kind == "index_get") {
             var ig_obj: AST.Expr = match (expr) { IndexGet(o, i) => o
@@ -2870,6 +2928,7 @@ class Codegen {
             IfExpr(c, tb, tv, eb, ev) => "no"
             TryExpr(tb, tv, cn, cb, cv) => "no"
             Yield(v) => "no"
+            TupleLit(e) => "no"
         }
         return kind == "yes"
     }
@@ -2899,6 +2958,7 @@ class Codegen {
             IfExpr(c, tb, tv, eb, ev) => ""
             TryExpr(tb, tv, cn, cb, cv) => ""
             Yield(v) => ""
+            TupleLit(e) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -2950,6 +3010,7 @@ class Codegen {
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
             Yield(v) => "other"
+            TupleLit(e) => "other"
         }
         return kind == "string"
     }
@@ -3649,7 +3710,6 @@ class Codegen {
             }
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
-                this.find_free_vars_expr(value, bound, free)
             }
         }
     }
@@ -3818,6 +3878,13 @@ class Codegen {
             }
             Yield(v) => {
                 this.find_free_vars_expr(v, bound, free)
+            }
+            TupleLit(elements) => {
+                var tli: Float = 0
+                while (tli < elements.length()) {
+                    this.find_free_vars_expr(elements[tli], bound, free)
+                    tli = tli + 1
+                }
             }
             This => {
                 if (!bound.contains("self") and !free.contains("self")) {
@@ -5367,7 +5434,6 @@ class Codegen {
                 this.collect_vars_expr(value, names, types)
             }
             LetPattern(pattern, value) => {
-                this.collect_vars_expr(value, names, types)
             }
         }
     }
@@ -5464,6 +5530,7 @@ class Codegen {
             IfExpr(c, tb, tv, eb, ev) => {}
             TryExpr(tb, tv, cn, cb, cv) => {}
             Yield(v) => { this.collect_vars_expr(v, names, types) }
+            TupleLit(e) => {}
         }
     }
 
@@ -5538,6 +5605,7 @@ class Codegen {
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
             Yield(v) => "other"
+            TupleLit(e) => "other"
         }
         return kind == "match"
     }
@@ -5669,7 +5737,6 @@ class Codegen {
                 this.collect_calls_from_stmts(eb, calls)
                 this.collect_calls_from_expr(ev, calls)
             }
-            _ => {}
         }
     }
 
@@ -5710,7 +5777,6 @@ class Codegen {
                 this.collect_calls_from_stmts(f, calls)
             }
             Throw(v) => { this.collect_calls_from_expr(v, calls) }
-            _ => {}
         }
     }
 
@@ -5875,7 +5941,7 @@ class Codegen {
                 var pp2: List<String> = all_params[pi3].split(":")
                 if (pi3 < captures.length()) {
                     // Capture params are POINTERS — reconstruct via inttoptr
-                    if (this.target == "wasm32") {
+                    if (this.target == "wasm32" or this.target == "wasm") {
                         var __cap_i32: String = this.fresh_local()
                         this.emit_indent(__cap_i32 + " = trunc i64 %" + this.sanitize_name(pp2[0]) + ".arg to i32")
                         this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i32 " + __cap_i32 + " to i64*")
@@ -6412,10 +6478,10 @@ class Codegen {
         // Build final output with proper ordering
         var out: StringBuilder = StringBuilder()
         out.append("; Generated by Saffron LLVM compiler\n")
-        if (this.target == "wasm32") {
+        if (this.target == "wasm32" or this.target == "wasm") {
             out.append("target triple = \"wasm32-unknown-unknown\"\n")
             out.append("target datalayout = \"e-m:e-p:32:32-i64:64-n32:64-S128\"\n\n")
-        } else if (this.target == "wasm" or this.target == "wasm64") {
+        } else if (this.target == "wasm64") {
             out.append("target triple = \"wasm64-unknown-unknown\"\n")
             out.append("target datalayout = \"e-m:e-p:64:64-i64:64-n32:64-S128-ni:1:10:20\"\n\n")
         } else {
@@ -6683,7 +6749,8 @@ class Codegen {
         IsCheck(val, t) => "is_check"
         IfExpr(c, tb, tv, eb, ev) => "if_expr"
         TryExpr(tb, tv, cn, cb, cv) => "try_expr"
-        Yield(v) => "yield"
+        Yield(v) => "yield"\
+        TupleLit(e) => "tuple_lit"
     }
     }
 
@@ -6716,7 +6783,8 @@ class Codegen {
         IsCheck(val, t) => ""
         IfExpr(c, tb, tv, eb, ev) => ""
         TryExpr(tb, tv, cn, cb, cv) => ""
-        Yield(v) => ""    }
+        Yield(v) => ""
+        TupleLit(e) => ""    }
     return name
     }
 
@@ -6742,6 +6810,18 @@ class Codegen {
             if (first_type == "Int" or first_type == "Float") return "List<Int>"
         }
         return "List<Any>"
+    }
+    if (ek == "tuple_lit") {
+        var tuple_elems: List<AST.Expr> = match (expr) { TupleLit(e) => e   _ => [] }
+        var tuple_str: String = "Tuple<"
+        var ti: Float = 0
+        while (ti < tuple_elems.length()) {
+            if (ti > 0) { tuple_str = tuple_str + "," }
+            tuple_str = tuple_str + this.get_expr_type(tuple_elems[ti])
+            ti = ti + 1
+        }
+        tuple_str = tuple_str + ">"
+        return tuple_str
     }
     if (ek == "map_lit") return "Map<String,String>"
     if (ek == "this") return this.current_class
@@ -6987,6 +7067,26 @@ class Codegen {
         this.last_type = idx_elem_type
     } else {
         this.last_type = AST.Type.AnyType
+    }
+    // Tuple type: extract Nth element type from Tuple<T1,T2,...>
+    var obj_type_str: String = this.type_to_string(obj_type)
+    if (obj_type_str.starts_with("Tuple") or (obj_name.length() > 0 and this.typed_vars.has(obj_name) and this.type_to_string(this.typed_vars.get(obj_name)).starts_with("Tuple<"))) {
+        var full_type: String = obj_type_str
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            full_type = this.type_to_string(this.typed_vars.get(obj_name))
+        }
+        if (full_type.starts_with("Tuple<") and full_type.ends_with(">")) {
+            var tuple_inner: String = full_type.slice(6, full_type.length() - 1)
+            var tuple_args: List<String> = this.split_type_args(tuple_inner)
+            var ct_idx: Float = -1
+            var idx_ek: String = this.classify_expr(index)
+            if (idx_ek == "int") {
+                ct_idx = match (index) { IntLit(v) => v   _ => -1 }
+            }
+            if (ct_idx >= 0 and ct_idx < tuple_args.length()) {
+                this.last_type = this.str_to_type(tuple_args[ct_idx])
+            }
+        }
     }
     return local
     }
@@ -8240,6 +8340,7 @@ class Codegen {
         IfExpr(c, tb, tv, eb, ev) => "other"
         TryExpr(tb, tv, cn, cb, cv) => "other"
         Yield(v) => "other"
+        TupleLit(e) => "other"
     }
     return kind == "this"
     }

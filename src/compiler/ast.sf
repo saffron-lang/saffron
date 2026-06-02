@@ -73,7 +73,8 @@ enum Stmt {
     Continue,
     TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>, finally_body: List<Stmt>),
     Throw(value: Expr),
-    LetPattern(pattern: Pattern, value: Expr)
+    LetPattern(pattern: Pattern, value: Expr),
+    TypeAlias(name: String, target: String)
 }
 
 enum Variant {

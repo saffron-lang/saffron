@@ -41,7 +41,8 @@ enum Expr {
     IsCheck(value: Expr, type_name: String),
     IfExpr(cond: Expr, then_stmts: List<Stmt>, then_val: Expr, else_stmts: List<Stmt>, else_val: Expr),
     TryExpr(try_stmts: List<Stmt>, try_val: Expr, catch_name: String, catch_stmts: List<Stmt>, catch_val: Expr),
-    Yield(value: Expr)
+    Yield(value: Expr),
+    TupleLit(elements: List<Expr>)
 }
 
 enum MatchArm {
@@ -72,7 +73,8 @@ enum Stmt {
     Continue,
     TryCatch(try_body: List<Stmt>, catch_name: String, catch_body: List<Stmt>, finally_body: List<Stmt>),
     Throw(value: Expr),
-    LetPattern(pattern: Pattern, value: Expr)
+    LetPattern(pattern: Pattern, value: Expr),
+    TypeAlias(name: String, target: String)
 }
 
 enum Variant {

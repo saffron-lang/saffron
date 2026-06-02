@@ -48,7 +48,6 @@
         TryExpr(tb, tv, cn, cb, cv) => "try_expr"
         Yield(v) => "yield"\
         TupleLit(e) => "tuple_lit"
-        TupleLit(e) => "tuple_lit"
     }
     }
 
