@@ -2474,10 +2474,10 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.2470 = private unnamed_addr constant [8 x i8] c"entry:\0A\00"
 @.str.2471 = private unnamed_addr constant [33 x i8] c"  store i32 %argc, i32* @__argc\0A\00"
 @.str.2472 = private unnamed_addr constant [35 x i8] c"  store i8** %argv, i8*** @__argv\0A\00"
-@.str.2473 = private unnamed_addr constant [8 x i8] c"enqueue\00"
+@.str.2473 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
 @.str.2474 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
 @.str.2475 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
-@.str.2476 = private unnamed_addr constant [14 x i8] c"scheduler_run\00"
+@.str.2476 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2477 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2478 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2479 = private unnamed_addr constant [46 x i8] c"  %__entry_hdl = call ptr @__saffron_entry()\0A\00"
@@ -2492,10 +2492,10 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.2488 = private unnamed_addr constant [13 x i8] c"  call i64 @\00"
 @.str.2489 = private unnamed_addr constant [4 x i8] c"()\0A\00"
 @.str.2490 = private unnamed_addr constant [15 x i8] c"__saffron_main\00"
-@.str.2491 = private unnamed_addr constant [8 x i8] c"enqueue\00"
+@.str.2491 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
 @.str.2492 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
 @.str.2493 = private unnamed_addr constant [25 x i8] c"stdlib_scheduler_enqueue\00"
-@.str.2494 = private unnamed_addr constant [14 x i8] c"scheduler_run\00"
+@.str.2494 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2495 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2496 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.2497 = private unnamed_addr constant [44 x i8] c"  %__main_hdl = call ptr @__saffron_main()\0A\00"
@@ -65266,7 +65266,7 @@ end3831:
   %t2427 = trunc i64 %t2426 to i1
   br i1 %t2427, label %then3832, label %else3833
 then3832:
-  %t2428 = getelementptr [8 x i8], [8 x i8]* @.str.2473, i64 0, i64 0
+  %t2428 = getelementptr [25 x i8], [25 x i8]* @.str.2473, i64 0, i64 0
   %t2429 = ptrtoint i8* %t2428 to i64
   store i64 %t2429, i64* %enqueue_fn
   %t2430 = load i64, i64* %self
@@ -65286,7 +65286,7 @@ then3835:
 else3836:
   br label %endif3834
 endif3834:
-  %t2440 = getelementptr [14 x i8], [14 x i8]* @.str.2476, i64 0, i64 0
+  %t2440 = getelementptr [31 x i8], [31 x i8]* @.str.2476, i64 0, i64 0
   %t2441 = ptrtoint i8* %t2440 to i64
   store i64 %t2441, i64* %sched_fn
   %t2442 = load i64, i64* %self
@@ -65471,7 +65471,7 @@ while.end3844:
   %t2588 = trunc i64 %t2587 to i1
   br i1 %t2588, label %then3846, label %else3847
 then3846:
-  %t2589 = getelementptr [8 x i8], [8 x i8]* @.str.2491, i64 0, i64 0
+  %t2589 = getelementptr [25 x i8], [25 x i8]* @.str.2491, i64 0, i64 0
   %t2590 = ptrtoint i8* %t2589 to i64
   store i64 %t2590, i64* %enqueue_fn2
   %t2591 = load i64, i64* %self
@@ -65491,7 +65491,7 @@ then3849:
 else3850:
   br label %endif3848
 endif3848:
-  %t2601 = getelementptr [14 x i8], [14 x i8]* @.str.2494, i64 0, i64 0
+  %t2601 = getelementptr [31 x i8], [31 x i8]* @.str.2494, i64 0, i64 0
   %t2602 = ptrtoint i8* %t2601 to i64
   store i64 %t2602, i64* %sched_fn2
   %t2603 = load i64, i64* %self

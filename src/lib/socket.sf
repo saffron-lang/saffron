@@ -2,6 +2,8 @@
 //! All I/O operations yield to the scheduler when they would block,
 //! allowing other tasks to run while waiting for data.
 
+import "@scheduler" as Scheduler
+
 @extern("void sf_socket_init()") fun socket_init()
 @extern("i64 sf_tcp_connect(i8*, i64)") fun tcp_connect_raw(host: Int, port: Int): Int
 @extern("i64 sf_tcp_read(i64, i8*, i64)") fun tcp_read_raw(fd: Int, buf: Int, len: Int): Int
@@ -63,10 +65,11 @@ fun read(fd: Int, max_bytes: Int): String {
 // Async write: yields to scheduler when socket would block.
 // Returns number of bytes written.
 fun write(fd: Int, data: String): Int {
-    var len: Int = sock_strlen(data)
+    var ptr: Int = data
+    var len: Int = sock_strlen(ptr)
     var written: Int = 0
     while (written < len) {
-        var n: Int = tcp_write_raw(fd, data + written, len - written)
+        var n: Int = tcp_write_raw(fd, ptr + written, len - written)
         if (n > 0) {
             written = written + n
         } else if (n == -1) {
@@ -106,10 +109,11 @@ fun tls_read(handle: Int, max_bytes: Int): String {
 fun tls_write(handle: Int, data: String): Int {
     var fd: Int = handle & 0xFFFFFFFF
     var tls: Int = handle >> 32
-    var len: Int = sock_strlen(data)
+    var ptr: Int = data
+    var len: Int = sock_strlen(ptr)
     var written: Int = 0
     while (written < len) {
-        var n: Int = tls_write_raw(tls, data + written, len - written)
+        var n: Int = tls_write_raw(tls, ptr + written, len - written)
         if (n > 0) {
             written = written + n
         } else if (n == -1) {
