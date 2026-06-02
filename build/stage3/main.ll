@@ -3939,7 +3939,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.3935 = private unnamed_addr constant [12 x i8] c" = zext i1 \00"
 @.str.3936 = private unnamed_addr constant [8 x i8] c" to i64\00"
 @.str.3937 = private unnamed_addr constant [10 x i8] c"getResult\00"
-@.str.3938 = private unnamed_addr constant [11 x i8] c"get_result\00"
+@.str.3938 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3939 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3940 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3941 = private unnamed_addr constant [14 x i8] c" = call i64 @\00"
@@ -3951,7 +3951,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.3947 = private unnamed_addr constant [31 x i8] c"stdlib_scheduler_scheduler_run\00"
 @.str.3948 = private unnamed_addr constant [11 x i8] c"call i64 @\00"
 @.str.3949 = private unnamed_addr constant [3 x i8] c"()\00"
-@.str.3950 = private unnamed_addr constant [11 x i8] c"get_result\00"
+@.str.3950 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3951 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3952 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3953 = private unnamed_addr constant [14 x i8] c" = call i64 @\00"
@@ -3977,7 +3977,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.3973 = private unnamed_addr constant [2 x i8] c":\00"
 @.str.3974 = private unnamed_addr constant [25 x i8] c"br label %__coro_cleanup\00"
 @.str.3975 = private unnamed_addr constant [2 x i8] c":\00"
-@.str.3976 = private unnamed_addr constant [11 x i8] c"get_result\00"
+@.str.3976 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3977 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3978 = private unnamed_addr constant [28 x i8] c"stdlib_scheduler_get_result\00"
 @.str.3979 = private unnamed_addr constant [14 x i8] c" = call i64 @\00"
@@ -98616,7 +98616,7 @@ then7163:
   %t1826 = load i64, i64* %object
   %t1827 = call i64 @_codegen_Codegen__gen_arg_value(i64 %t1825, i64 %t1826)
   store i64 %t1827, i64* %task_val
-  %t1828 = getelementptr [11 x i8], [11 x i8]* @.str.3938, i64 0, i64 0
+  %t1828 = getelementptr [28 x i8], [28 x i8]* @.str.3938, i64 0, i64 0
   %t1829 = ptrtoint i8* %t1828 to i64
   store i64 %t1829, i64* %get_result_name
   %t1830 = load i64, i64* %self
@@ -98803,7 +98803,7 @@ endif7174:
   %t1966 = load volatile i64, i64* %t1965
   %t1967 = load i64, i64* %sched_run_name
   %t1968 = call i64 @__list_push(i64 %t1966, i64 %t1967)
-  %t1969 = getelementptr [11 x i8], [11 x i8]* @.str.3950, i64 0, i64 0
+  %t1969 = getelementptr [28 x i8], [28 x i8]* @.str.3950, i64 0, i64 0
   %t1970 = ptrtoint i8* %t1969 to i64
   store i64 %t1970, i64* %get_result_name
   %t1971 = load i64, i64* %self
@@ -99205,7 +99205,7 @@ then7184:
   %t2293 = inttoptr i64 %t2291 to %_codegen_Codegen*
   %t2294 = getelementptr %_codegen_Codegen, %_codegen_Codegen* %t2293, i32 0, i32 5
   store volatile i64 %t2292, i64* %t2294
-  %t2295 = getelementptr [11 x i8], [11 x i8]* @.str.3976, i64 0, i64 0
+  %t2295 = getelementptr [28 x i8], [28 x i8]* @.str.3976, i64 0, i64 0
   %t2296 = ptrtoint i8* %t2295 to i64
   store i64 %t2296, i64* %get_result_name
   %t2297 = load i64, i64* %self

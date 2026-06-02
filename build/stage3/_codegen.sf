@@ -6776,7 +6776,7 @@ class Codegen {
     }
     if (method == "getResult") {
         var task_val: String = this.gen_arg_value(object)
-        var get_result_name: String = "get_result"
+        var get_result_name: String = "stdlib_scheduler_get_result"
         if (this.known_functions.contains("stdlib_scheduler_get_result")) {
             get_result_name = "stdlib_scheduler_get_result"
         }
@@ -6795,7 +6795,7 @@ class Codegen {
         }
         this.emit_indent("call i64 @" + sched_run_name + "()")
         this.called_functions.push(sched_run_name)
-        var get_result_name: String = "get_result"
+        var get_result_name: String = "stdlib_scheduler_get_result"
         if (this.known_functions.contains("stdlib_scheduler_get_result")) {
             get_result_name = "stdlib_scheduler_get_result"
         }
@@ -6826,7 +6826,7 @@ class Codegen {
         this.emit_terminator("br label %__coro_cleanup")
         this.emit(await_resume + ":")
         this.block_terminated = false
-        var get_result_name: String = "get_result"
+        var get_result_name: String = "stdlib_scheduler_get_result"
         if (this.known_functions.contains("stdlib_scheduler_get_result")) {
             get_result_name = "stdlib_scheduler_get_result"
         }
