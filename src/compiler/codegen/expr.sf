@@ -15,7 +15,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.IntType
+                this.last_type = AST.Type.BoolType
                 var local: String = this.fresh_local()
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
@@ -306,7 +306,7 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
                 }
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
-                this.last_type = AST.Type.IntType
+                this.last_type = AST.Type.BoolType
                 return local
             }
 
@@ -316,7 +316,7 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
             this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.BoolType
             return local
         }
 
@@ -387,7 +387,7 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
         else if (op == "<<") { this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs) }
         else if (op == ">>") { this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs) }
         else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.BoolType
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else if (op == "!=") { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }

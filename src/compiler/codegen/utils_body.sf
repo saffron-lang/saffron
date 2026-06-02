@@ -133,7 +133,7 @@
         // Extend back to i64 for uniform value type
         var result: String = this.fresh_local()
         this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
-        this.last_type = AST.Type.IntType
+        this.last_type = AST.Type.BoolType
         return result
     }
 

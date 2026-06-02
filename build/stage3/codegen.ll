@@ -13642,7 +13642,7 @@ match.arm616:
   %t60 = call i8* @malloc(i64 8)
   %t61 = bitcast i8* %t60 to [1 x i64]*
   %t62 = getelementptr [1 x i64], [1 x i64]* %t61, i64 0, i64 0
-  store i64 0, i64* %t62
+  store i64 2, i64* %t62
   %t63 = ptrtoint [1 x i64]* %t61 to i64
   %t64 = inttoptr i64 %t59 to %Codegen*
   %t65 = getelementptr %Codegen, %Codegen* %t64, i32 0, i32 18
@@ -18107,7 +18107,7 @@ endif862:
   %t490 = call i8* @malloc(i64 8)
   %t491 = bitcast i8* %t490 to [1 x i64]*
   %t492 = getelementptr [1 x i64], [1 x i64]* %t491, i64 0, i64 0
-  store i64 0, i64* %t492
+  store i64 2, i64* %t492
   %t493 = ptrtoint [1 x i64]* %t491 to i64
   %t494 = inttoptr i64 %t489 to %Codegen*
   %t495 = getelementptr %Codegen, %Codegen* %t494, i32 0, i32 18
@@ -18278,7 +18278,7 @@ endif865:
   %t625 = call i8* @malloc(i64 8)
   %t626 = bitcast i8* %t625 to [1 x i64]*
   %t627 = getelementptr [1 x i64], [1 x i64]* %t626, i64 0, i64 0
-  store i64 0, i64* %t627
+  store i64 2, i64* %t627
   %t628 = ptrtoint [1 x i64]* %t626 to i64
   %t629 = inttoptr i64 %t624 to %Codegen*
   %t630 = getelementptr %Codegen, %Codegen* %t629, i32 0, i32 18
@@ -19664,7 +19664,7 @@ then923:
   %t1720 = call i8* @malloc(i64 8)
   %t1721 = bitcast i8* %t1720 to [1 x i64]*
   %t1722 = getelementptr [1 x i64], [1 x i64]* %t1721, i64 0, i64 0
-  store i64 0, i64* %t1722
+  store i64 2, i64* %t1722
   %t1723 = ptrtoint [1 x i64]* %t1721 to i64
   %t1724 = inttoptr i64 %t1719 to %Codegen*
   %t1725 = getelementptr %Codegen, %Codegen* %t1724, i32 0, i32 18
@@ -53138,7 +53138,7 @@ endif2901:
   %t297 = call i8* @malloc(i64 8)
   %t298 = bitcast i8* %t297 to [1 x i64]*
   %t299 = getelementptr [1 x i64], [1 x i64]* %t298, i64 0, i64 0
-  store i64 0, i64* %t299
+  store i64 2, i64* %t299
   %t300 = ptrtoint [1 x i64]* %t298 to i64
   %t301 = inttoptr i64 %t296 to %Codegen*
   %t302 = getelementptr %Codegen, %Codegen* %t301, i32 0, i32 18
