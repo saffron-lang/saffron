@@ -187,7 +187,11 @@ extend fun Codegen.get_expr_type(expr: AST.Expr): String {
             }
         }
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
-        if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "slice" or mc_method == "char_at") return "String"
+        if (mc_method == "slice") {
+            if (mc_obj_type.starts_with("List")) { return mc_obj_type }
+            return "String"
+        }
+        if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "char_at") return "String"
         if (mc_method == "split" or mc_method == "keys") return "List<String>"
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
