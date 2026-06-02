@@ -1,5 +1,8 @@
-; Manual LLVM coroutine test
-; Validates that the coro pass pipeline works with our clang.
+; Manual coroutine test — pre-split (mimics C++ frontend output)
+; Uses the same frame layout as C++ coroutines:
+;   frame[0] = resume function pointer
+;   frame[1] = destroy function pointer
+;   frame[2] = state index (i32 padded to i64 for alignment)
 ;
 ; Expected output:
 ;   before yield
@@ -9,97 +12,116 @@
 
 target triple = "arm64-apple-macosx15.0.0"
 
-declare i32 @puts(i8*)
-declare i8* @malloc(i64)
-declare void @free(i8*)
+declare i32 @puts(ptr)
+declare ptr @malloc(i64)
+declare void @free(ptr)
 
 @.str.before = private unnamed_addr constant [13 x i8] c"before yield\00"
 @.str.after = private unnamed_addr constant [12 x i8] c"after yield\00"
 @.str.resumed = private unnamed_addr constant [13 x i8] c"resumed once\00"
 @.str.done = private unnamed_addr constant [5 x i8] c"done\00"
 
-define i8* @my_coroutine() #0 {
+; Frame: { ptr resume_fn, ptr destroy_fn, i32 state }
+%CoroFrame = type { ptr, ptr, i32 }
+
+; --- Create the coroutine (initial call) ---
+; Returns the frame pointer. State starts at 0 (initial suspend).
+define ptr @my_coroutine() {
 entry:
-  %id = call token @llvm.coro.id(i32 0, i8* null, i8* null, i8* null)
-  %need = call i64 @llvm.coro.size.i64()
-  %mem = call i8* @malloc(i64 %need)
-  %hdl = call i8* @llvm.coro.begin(token %id, i8* %mem)
-
-  ; Print "before yield"
-  %s1 = getelementptr [13 x i8], [13 x i8]* @.str.before, i64 0, i64 0
-  call i32 @puts(i8* %s1)
-
-  ; --- Suspend (yield) ---
-  %tok1 = call token @llvm.coro.save(i8* %hdl)
-  %susp1 = call i8 @llvm.coro.suspend(token %tok1, i1 false)
-  switch i8 %susp1, label %suspend [
-    i8 0, label %resume
-    i8 1, label %cleanup
-  ]
-
-resume:
-  ; Print "after yield"
-  %s2 = getelementptr [12 x i8], [12 x i8]* @.str.after, i64 0, i64 0
-  call i32 @puts(i8* %s2)
-
-  ; --- Final suspend ---
-  %tok2 = call token @llvm.coro.save(i8* %hdl)
-  %susp2 = call i8 @llvm.coro.suspend(token %tok2, i1 true)
-  switch i8 %susp2, label %suspend [
-    i8 0, label %unreachable_bb
-    i8 1, label %cleanup
-  ]
-
-unreachable_bb:
-  unreachable
-
-cleanup:
-  %mem2 = call i8* @llvm.coro.free(token %id, i8* %hdl)
-  call void @free(i8* %mem2)
-  br label %exit
-
-exit:
-  %unused = call i1 @llvm.coro.end(i8* %hdl, i1 false, token none)
-  ret i8* %hdl
-
-suspend:
-  ret i8* %hdl
+  %frame = call ptr @malloc(i64 24)
+  ; Store resume and destroy function pointers
+  %resume_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 0
+  store ptr @my_coroutine.resume, ptr %resume_slot
+  %destroy_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 1
+  store ptr @my_coroutine.destroy, ptr %destroy_slot
+  ; State 0 = suspended at initial point
+  %state_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 2
+  store i32 0, ptr %state_slot
+  ret ptr %frame
 }
 
+; --- Resume function (called via handle.resume()) ---
+define void @my_coroutine.resume(ptr %frame) {
+entry:
+  %state_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 2
+  %state = load i32, ptr %state_slot
+  switch i32 %state, label %unreachable [
+    i32 0, label %state0
+    i32 1, label %state1
+  ]
+
+state0:
+  ; First resume: print "before yield", suspend at state 1
+  call i32 @puts(ptr @.str.before)
+  store i32 1, ptr %state_slot
+  ret void
+
+state1:
+  ; Second resume: print "after yield", mark done (state 2)
+  call i32 @puts(ptr @.str.after)
+  store i32 2, ptr %state_slot
+  ret void
+
+unreachable:
+  ret void
+}
+
+; --- Destroy function (frees the frame) ---
+define void @my_coroutine.destroy(ptr %frame) {
+entry:
+  call void @free(ptr %frame)
+  ret void
+}
+
+; --- Helper: check if coroutine is done (state == 2) ---
+define i1 @coro_done(ptr %frame) {
+entry:
+  %state_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 2
+  %state = load i32, ptr %state_slot
+  %done = icmp eq i32 %state, 2
+  ret i1 %done
+}
+
+; --- Helper: resume via function pointer in frame ---
+define void @coro_resume(ptr %frame) {
+entry:
+  %fn_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 0
+  %fn = load ptr, ptr %fn_slot
+  call void %fn(ptr %frame)
+  ret void
+}
+
+; --- Helper: destroy via function pointer in frame ---
+define void @coro_destroy(ptr %frame) {
+entry:
+  %fn_slot = getelementptr %CoroFrame, ptr %frame, i32 0, i32 1
+  %fn = load ptr, ptr %fn_slot
+  call void %fn(ptr %frame)
+  ret void
+}
+
+; --- Main ---
 define i32 @main() {
 entry:
-  ; Start coroutine — runs until first suspend, returns handle
-  %hdl = call i8* @my_coroutine()
+  %hdl = call ptr @my_coroutine()
 
-  ; Print "resumed once"
-  %s3 = getelementptr [13 x i8], [13 x i8]* @.str.resumed, i64 0, i64 0
-  call i32 @puts(i8* %s3)
+  ; First resume: runs state0 (prints "before yield")
+  call void @coro_resume(ptr %hdl)
 
-  ; Resume — runs from resume label to final suspend
-  call void @llvm.coro.resume(i8* %hdl)
+  call i32 @puts(ptr @.str.resumed)
 
-  ; After final suspend, coro.done should return true
-  %is_done = call i1 @llvm.coro.done(i8* %hdl)
-  br i1 %is_done, label %yes_done, label %not_done
+  ; Second resume: runs state1 (prints "after yield")
+  call void @coro_resume(ptr %hdl)
 
-yes_done:
-  %s4 = getelementptr [5 x i8], [5 x i8]* @.str.done, i64 0, i64 0
-  call i32 @puts(i8* %s4)
-  ; Destroy the coroutine (triggers cleanup path)
-  call void @llvm.coro.destroy(i8* %hdl)
+  ; Check done
+  %done = call i1 @coro_done(ptr %hdl)
+  br i1 %done, label %yes, label %no
+
+yes:
+  call i32 @puts(ptr @.str.done)
+  call void @coro_destroy(ptr %hdl)
   ret i32 0
 
-not_done:
+no:
   ret i32 1
 }
-
-declare token @llvm.coro.id(i32, i8*, i8*, i8*)
-declare i64 @llvm.coro.size.i64()
-declare i8* @llvm.coro.begin(token, i8*)
-declare token @llvm.coro.save(i8*)
-declare i8 @llvm.coro.suspend(token, i1)
-declare i8* @llvm.coro.free(token, i8*)
-declare i1 @llvm.coro.end(i8*, i1, token)
-declare void @llvm.coro.resume(i8*)
-declare i1 @llvm.coro.done(i8*)
-declare void @llvm.coro.destroy(i8*)
