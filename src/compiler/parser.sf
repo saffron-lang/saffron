@@ -599,22 +599,8 @@ class Parser {
             TkIdent(name) => AST.Expr.Variable(name)
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
-                if (this.match_kind(",")) {
-                    // Tuple literal: (expr, expr, ...)
-                    var elems: List<AST.Expr> = [expr]
-                    if (!this.match_kind_check(")")) {
-                        elems.push(this.parse_expr())
-                        while (this.match_kind(",")) {
-                            if (this.match_kind_check(")")) { break }
-                            elems.push(this.parse_expr())
-                        }
-                    }
-                    this.consume(")")
-                    AST.Expr.TupleLit(elems)
-                } else {
-                    this.consume(")")
-                    expr
-                }
+                this.consume(")")
+                expr
             }
         }
     }
@@ -1099,7 +1085,7 @@ class Parser {
             var alias_name: String = this.expect_ident()
             this.consume("=")
             var alias_target: String = this.parse_type()
-            return AST.Stmt.TypeAlias(alias_name, alias_target)
+            return AST.Stmt.VarDecl(alias_name, alias_target, AST.Expr.NilLit, "@type_alias")
         }
 
         // Extension methods: extend fun ClassName.method(params): RetType { body }

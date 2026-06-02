@@ -29,7 +29,6 @@
                 this.gen_throw(value)
             }
             LetPattern(pattern, value) => {
-            TypeAlias(ta_name, ta_target) => {}
                 this.gen_let_pattern(pattern, value)
             }
             FunDecl(name, params, ret_type, body, doc) => {
@@ -805,7 +804,6 @@
             TryCatch(t, n, c, f) => {}
             Throw(v) => {}
             LetPattern(p, v) => {}
-            TypeAlias(n, t) => {}
         }
     }
 
@@ -920,7 +918,6 @@
             TryCatch(t, n, c, f) => "try"
             Throw(v) => "throw"
             LetPattern(p, v) => "let_pattern"
-            TypeAlias(n, t) => "type_alias"
         }
     }
 
@@ -940,7 +937,6 @@
             TryCatch(t, n, c, f) => "other"
             Throw(v) => "other"
             LetPattern(p, v) => "other"
-            TypeAlias(n, t) => "other"
         }
         return kind == "if"
     }
