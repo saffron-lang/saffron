@@ -130,21 +130,40 @@ class Parser {
     }
 
     fun parse_single_type(): String {
-        // Function types: (ParamType, ...) => ReturnType
+        // Parenthesized types: function type or tuple type
         if (this.match_kind_check("(")) {
             this.advance()
-            var fun_type: String = "Fun("
+            var inner_types: List<String> = []
             if (!this.match_kind_check(")")) {
-                fun_type = fun_type + this.parse_type()
+                inner_types.push(this.parse_type())
                 while (this.match_kind(",")) {
-                    fun_type = fun_type + "," + this.parse_type()
+                    inner_types.push(this.parse_type())
                 }
             }
             this.consume(")")
-            fun_type = fun_type + ")"
-            this.consume("=>")
-            fun_type = fun_type + ":" + this.parse_type()
-            return fun_type
+            if (this.match_kind_check("=>")) {
+                // Function type: (ParamType, ...) => ReturnType
+                this.advance()
+                var fun_type: String = "Fun("
+                var fi: Float = 0
+                while (fi < inner_types.length()) {
+                    if (fi > 0) { fun_type = fun_type + "," }
+                    fun_type = fun_type + inner_types[fi]
+                    fi = fi + 1
+                }
+                fun_type = fun_type + "):" + this.parse_type()
+                return fun_type
+            }
+            // Tuple type: (Int, String) => "Tuple<Int,String>"
+            var tuple_type: String = "Tuple<"
+            var ti: Float = 0
+            while (ti < inner_types.length()) {
+                if (ti > 0) { tuple_type = tuple_type + "," }
+                tuple_type = tuple_type + inner_types[ti]
+                ti = ti + 1
+            }
+            tuple_type = tuple_type + ">"
+            return tuple_type
         }
         var name: String = this.expect_ident()
         // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
@@ -333,6 +352,14 @@ class Parser {
         while (true) {
             if (this.match_kind_check(".")) {
                 this.advance()
+                // Numeric dot access: tuple.0, tuple.1
+                if (this.match_kind_check("int")) {
+                    var idx_kind: Lexer.TokenKind = this.current_kind()
+                    var idx_val: Float = match (idx_kind) { TkInt(v) => v   _ => 0 }
+                    this.advance()
+                    expr = AST.Expr.IndexGet(expr, AST.Expr.IntLit(idx_val))
+                    continue
+                }
                 var field: String = this.expect_ident()
                 if (this.match_kind_check("(")) {
                     // Method call: obj.method(args)
@@ -572,8 +599,22 @@ class Parser {
             TkIdent(name) => AST.Expr.Variable(name)
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
-                this.consume(")")
-                expr
+                if (this.match_kind(",")) {
+                    // Tuple literal: (expr, expr, ...)
+                    var elems: List<AST.Expr> = [expr]
+                    if (!this.match_kind_check(")")) {
+                        elems.push(this.parse_expr())
+                        while (this.match_kind(",")) {
+                            if (this.match_kind_check(")")) { break }
+                            elems.push(this.parse_expr())
+                        }
+                    }
+                    this.consume(")")
+                    AST.Expr.TupleLit(elems)
+                } else {
+                    this.consume(")")
+                    expr
+                }
             }
         }
     }
@@ -1228,6 +1269,10 @@ class Parser {
         if (this.match_kind_check("[")) {
             return this.parse_destructure()
         }
+        // Tuple destructuring: let (a, b) = expr
+        if (this.match_kind_check("(")) {
+            return this.parse_tuple_destructure()
+        }
         var name: String = this.expect_ident()
         // Variant pattern: let Some(x) = expr
         if (this.match_kind_check("(")) {
@@ -1291,6 +1336,30 @@ class Parser {
                 [AST.Expr.IntLit(names.length()), AST.Expr.MethodCall(AST.Expr.Variable(tmp_name), "length", [])]
             )
             stmts.push(AST.Stmt.VarDecl(rest_name, "Any", slice_expr, ""))
+        }
+        return AST.Stmt.Block(stmts)
+    }
+
+    fun parse_tuple_destructure(): AST.Stmt {
+        this.advance() // consume (
+        var names: List<String> = []
+        if (!this.match_kind_check(")")) {
+            names.push(this.expect_ident())
+            while (this.match_kind(",")) {
+                names.push(this.expect_ident())
+            }
+        }
+        this.consume(")")
+        this.consume("=")
+        var init: AST.Expr = this.parse_expr()
+        var stmts: List<AST.Stmt> = []
+        var tmp_name: String = "__destruct"
+        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
+        var i: Float = 0
+        while (i < names.length()) {
+            var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
+            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
+            i = i + 1
         }
         return AST.Stmt.Block(stmts)
     }
