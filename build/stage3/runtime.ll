@@ -60,6 +60,7 @@ declare double @llvm.floor.f64(double)
 ; --- Runtime declarations ---
 %SB = type { i64, i64, i8* }
 
+declare i64 @__list_slice(i64, i64, i64)
 declare i1 @__val_is_int(i64)
 declare i1 @__val_is_float(i64)
 declare i1 @__val_is_string(i64)
