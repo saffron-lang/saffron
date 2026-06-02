@@ -592,6 +592,7 @@ entry:
 }
 
 ; --- List slice (hand-written to avoid NaN boxing loop arithmetic issues) ---
+@.slice_dbg = private constant [25 x i8] c"SLICE s=%ld e=%ld c=%ld\0A\00"
 declare i64 @__list_new()
 declare i64 @__list_length(i64)
 declare i64 @__list_get(i64, i64)
@@ -607,11 +608,16 @@ return_empty:
   ret i64 %empty
 
 check_bounds:
-  %count = call i64 @__list_length(i64 %list)
-  %s_neg = icmp slt i64 %start, 0
-  %s = select i1 %s_neg, i64 0, i64 %start
-  %e_over = icmp sgt i64 %end, %count
-  %e = select i1 %e_over, i64 %count, i64 %end
+  %count_raw = call i64 @__list_length(i64 %list)
+  %count = call i64 @__val_untag_int(i64 %count_raw)
+  %start_raw = call i64 @__val_untag_int(i64 %start)
+  %end_raw = call i64 @__val_untag_int(i64 %end)
+  %dbg_fmt = getelementptr [30 x i8], [25 x i8]* @.slice_dbg, i64 0, i64 0
+  call i32 (i8*, ...) @printf(i8* %dbg_fmt, i64 %start_raw, i64 %end_raw, i64 %count)
+  %s_neg = icmp slt i64 %start_raw, 0
+  %s = select i1 %s_neg, i64 0, i64 %start_raw
+  %e_over = icmp sgt i64 %end_raw, %count
+  %e = select i1 %e_over, i64 %count, i64 %end_raw
   %result = call i64 @__list_new()
   br label %loop_cond
 
@@ -621,7 +627,8 @@ loop_cond:
   br i1 %done, label %loop_end, label %loop_body
 
 loop_body:
-  %elem = call i64 @__list_get(i64 %list, i64 %i)
+  %i_tagged = call i64 @__val_tag_int(i64 %i)
+  %elem = call i64 @__list_get(i64 %list, i64 %i_tagged)
   call i64 @__list_push(i64 %result, i64 %elem)
   %i_next = add i64 %i, 1
   br label %loop_cond
