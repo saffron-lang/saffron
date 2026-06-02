@@ -970,8 +970,21 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         pri = pri + 1
     }
 
-    // Coroutine detection: scan all stmts with correct prefix
-    gen.mark_coroutines(all_stmts)
+    // Coroutine detection: scan each module's stmts with correct prefix
+    var cmi: Float = 0
+    while (cmi < prefixes.length()) {
+        gen.current_prefix = prefixes[cmi]
+        var cmi_start: Float = boundaries[cmi]
+        var cmi_end: Float = boundaries[cmi + 1]
+        var cmi_stmts: List<AST.Stmt> = []
+        var cmi_si: Float = cmi_start
+        while (cmi_si < cmi_end) {
+            cmi_stmts.push(all_stmts[cmi_si])
+            cmi_si = cmi_si + 1
+        }
+        gen.mark_coroutines(cmi_stmts)
+        cmi = cmi + 1
+    }
     gen.current_prefix = ""
     gen.mark_coroutines(program)
 

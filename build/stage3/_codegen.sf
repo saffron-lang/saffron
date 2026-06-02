@@ -6722,6 +6722,14 @@ class Codegen {
         if (mc_obj_name.length() > 0) {
             mc_obj_type = this.get_var_type_str(mc_obj_name)
         }
+        // Fallback: if receiver is a complex expression (e.g. another method call),
+        // recursively infer its type
+        if (mc_obj_type.length() == 0 and mc_obj_name.length() == 0) {
+            var mc_obj_kind: String = this.classify_expr(mc_obj)
+            if (mc_obj_kind == "method_call" or mc_obj_kind == "call" or mc_obj_kind == "index_get") {
+                mc_obj_type = this.get_expr_type(mc_obj)
+            }
+        }
         if (mc_obj_type.length() == 0 and this.classify_expr(mc_obj) == "this") {
             mc_obj_type = this.current_class
         } else if (this.classify_expr(mc_obj) == "get_field" or this.classify_expr(mc_obj) == "member") {
@@ -6788,6 +6796,11 @@ class Codegen {
                 return pop_inner
             }
             return "Int"
+        }
+        // reverse/copy/sort return the same list type as the receiver
+        if (mc_method == "reverse" or mc_method == "copy" or mc_method == "sort") {
+            if (mc_obj_type.starts_with("List")) { return mc_obj_type }
+            return "List<Any>"
         }
     }
     if (ek == "call") {
@@ -7283,9 +7296,7 @@ class Codegen {
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
             this.start_block(ay)
-            // Reset yield_reason before suspending so the scheduler sees reason=0
-            // (the child coroutine may have set reason=3 during its execution)
-            this.emit_indent("store i64 0, i64* @__yield_reason")
+            // Propagate child's yield_reason/yield_arg — don't overwrite
             var st: String = this.fresh_local()
             this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
             var sr: String = this.fresh_local()
@@ -7597,9 +7608,11 @@ class Codegen {
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
+        // Save receiver type before builtin dispatch clobbers last_type
+        var pre_dispatch_type: AST.Type = this.last_type
         var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
-        // Override result type for pop() based on list element type
-        if (method == "pop" and obj_name.length() > 0) {
+        // Override result type for pop/remove based on list element type
+        if ((method == "pop" or method == "remove") and obj_name.length() > 0) {
             var pop_list_type: AST.Type = AST.Type.AnyType
             if (this.typed_vars.has(obj_name)) {
                 pop_list_type = this.typed_vars.get(obj_name)
@@ -7607,6 +7620,16 @@ class Codegen {
             var pop_elem: AST.Type = this.get_list_element_type(pop_list_type)
             if (this.type_to_string(pop_elem) != "Any") {
                 this.last_type = pop_elem
+            }
+        }
+        // Override result type for reverse/copy/sort: preserve receiver list type
+        if (method == "reverse" or method == "copy" or method == "sort") {
+            var recv_type: AST.Type = pre_dispatch_type
+            if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+                recv_type = this.typed_vars.get(obj_name)
+            }
+            if (this.type_to_string(recv_type) != "Any") {
+                this.last_type = recv_type
             }
         }
         return bd_result
@@ -7742,12 +7765,19 @@ class Codegen {
     }
     if (!is_user_class and method == "slice" and args.length() > 0) {
         var slice_obj_type: String = this.type_to_string(this.last_type)
+        var slice_saved_type: AST.Type = this.last_type
+        // Prefer typed_vars for more precise element type
+        if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+            slice_saved_type = this.typed_vars.get(obj_name)
+            slice_obj_type = this.type_to_string(slice_saved_type)
+        }
         if (slice_obj_type.starts_with("List")) {
             var sl_start: String = this.gen_arg_value(args[0])
             var sl_end: String = this.gen_arg_value(args[1])
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__list_slice(i64 " + obj + ", i64 " + sl_start + ", i64 " + sl_end + ")")
-            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
+            // Preserve element type from the receiver list
+            this.last_type = slice_saved_type
             return local
         }
         var str_ptr: String = this.emit_untag_ptr(obj)
@@ -7989,8 +8019,7 @@ class Codegen {
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
             this.start_block(ay)
-            // Reset yield_reason before suspending so the scheduler sees reason=0
-            this.emit_indent("store i64 0, i64* @__yield_reason")
+            // Propagate child's yield_reason/yield_arg — don't overwrite
             var st: String = this.fresh_local()
             this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
             var sr: String = this.fresh_local()

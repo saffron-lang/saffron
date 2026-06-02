@@ -81,7 +81,9 @@ fun scheduler_tick(): Int {
         result_values.push(res)
         store_result(hdl, res)
         wake_waiters(hdl)
-        coro_destroy(hdl)
+        // Note: do NOT coro_destroy here — other coroutines may still
+        // call coro_done(hdl) to check completion (e.g. gather/await).
+        // The GC will reclaim the coroutine frame when no longer referenced.
     } else {
         var reason: Int = get_yield_reason()
         if (reason == 0) {

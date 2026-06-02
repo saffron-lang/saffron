@@ -1193,6 +1193,51 @@
             }
         }
 
+        // Sync-calls-coro: non-coroutine calling a coroutine directly — drive to completion
+        if (!this.is_coroutine) {
+            var is_sync_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
+            if (!is_sync_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+                is_sync_coro_callee = true
+                resolved_callee = this.current_prefix + resolved_callee
+            }
+            if (is_sync_coro_callee) {
+                this.called_functions.push(resolved_callee)
+                var sync_arg_strs: List<String> = []
+                var sai: Float = 0
+                while (sai < args.length()) {
+                    var val: String = this.gen_arg_value(args[sai])
+                    sync_arg_strs.push("i64 " + val)
+                    sai = sai + 1
+                }
+                var s_hdl: String = this.fresh_local()
+                this.emit_indent(s_hdl + " = call ptr @" + resolved_callee + "(" + sync_arg_strs.join(", ") + ")")
+                var s_i64: String = this.fresh_local()
+                this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+                var sc: String = this.fresh_label("sync.check")
+                var sl: String = this.fresh_label("sync.loop")
+                var sd: String = this.fresh_label("sync.done")
+                this.emit_terminator("br label %" + sc)
+                this.start_block(sc)
+                var s_done: String = this.fresh_local()
+                this.emit_indent(s_done + " = call i64 @__sched_coro_done(i64 " + s_i64 + ")")
+                var s_cmp: String = this.fresh_local()
+                this.emit_indent(s_cmp + " = icmp eq i64 " + s_done + ", 1")
+                this.emit_terminator("br i1 " + s_cmp + ", label %" + sd + ", label %" + sl)
+                this.start_block(sl)
+                this.emit_indent("call void @__sched_coro_resume(i64 " + s_i64 + ")")
+                this.emit_terminator("br label %" + sc)
+                this.start_block(sd)
+                var s_result: String = this.fresh_local()
+                this.emit_indent(s_result + " = load i64, i64* @__task_result")
+                if (this.func_ret_types.has(resolved_callee)) {
+                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return s_result
+            }
+        }
+
         // Error check: argument count validation (skip if named args present)
         var has_named_check: Bool = false
         var nac: Float = 0

@@ -825,9 +825,26 @@
                         out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
                         mi3 = mi3 + 1
                     }
-                    out.append("  %main_ret = call i64 @__saffron_main()\n")
-                    out.append("  %exit_code = trunc i64 %main_ret to i32\n")
-                    out.append("  ret i32 %exit_code\n")
+                    if (this.coroutine_funcs.contains("__saffron_main")) {
+                        // Async main: __saffron_main is a coroutine — enqueue and run scheduler
+                        var enqueue_fn2: String = "enqueue"
+                        if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                            enqueue_fn2 = "stdlib_scheduler_enqueue"
+                        }
+                        var sched_fn2: String = "scheduler_run"
+                        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                            sched_fn2 = "stdlib_scheduler_scheduler_run"
+                        }
+                        out.append("  %__main_hdl = call ptr @__saffron_main()\n")
+                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
+                        out.append("  call i64 @" + sched_fn2 + "()\n")
+                        out.append("  ret i32 0\n")
+                    } else {
+                        out.append("  %main_ret = call i64 @__saffron_main()\n")
+                        out.append("  %exit_code = trunc i64 %main_ret to i32\n")
+                        out.append("  ret i32 %exit_code\n")
+                    }
                 }
                 out.append("}\n")
             }
