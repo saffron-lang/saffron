@@ -69,6 +69,34 @@
             this.last_type = AST.Type.IntType
             return result
         }
+        // __suspend(reason, arg) — async suspend point
+        // Emits coro.save/coro.suspend/switch. Makes containing function a coroutine.
+        if (name.ends_with("__suspend")) {
+            var reason: String = this.gen_arg_value(args[0])
+            this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
+            if (args.length() >= 2) {
+                var arg: String = this.gen_arg_value(args[1])
+                this.emit_indent("store i64 " + arg + ", i64* @__yield_arg")
+            }
+            var save_tok: String = this.fresh_local()
+            this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var susp_result: String = this.fresh_local()
+            this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+            var resume_label: String = this.fresh_label("suspend.resume")
+            var suspend_label: String = this.fresh_label("suspend.ret")
+            var cleanup_label: String = this.fresh_label("suspend.cleanup")
+            this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+            this.emit(suspend_label + ":")
+            this.block_terminated = false
+            this.emit_terminator("ret ptr %__coro_hdl")
+            this.emit(cleanup_label + ":")
+            this.block_terminated = false
+            this.emit_terminator("br label %__coro_cleanup")
+            this.emit(resume_label + ":")
+            this.block_terminated = false
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
         return "0"
     }
 

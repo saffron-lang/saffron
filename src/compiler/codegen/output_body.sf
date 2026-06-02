@@ -166,6 +166,10 @@
 
         // Check if this function is a coroutine
         var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        if (!is_coro) { is_coro = this.stmts_have_yield(body) }
+        if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
+            this.coroutine_funcs.push(emit_name)
+        }
         this.is_coroutine = is_coro
 
         this.emit("")
@@ -426,6 +430,8 @@
         this.known_functions.push("__gc_stat_total_bytes")
         this.known_functions.push("__gc_stat_collections")
         this.known_functions.push("__gc_stat_freed_bytes")
+        this.known_functions.push("__gc_stat_threshold")
+        this.known_functions.push("__gc_debug_stats")
         this.known_functions.push("__gc_alloc")
         this.known_functions.push("__gc_alloc_zeroed")
         this.known_functions.push("__gc_realloc")

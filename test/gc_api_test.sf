@@ -1,0 +1,25 @@
+// GC API Test — Tests the user-facing GC module
+// Uses GC.collect(), GC.enable(), GC.disable(), GC.alloc_count(), etc.
+
+IO.println("=== GC API Test ===")
+
+IO.println("allocs: " + GC.alloc_count().to_string())
+var list = [1, 2, 3, 4, 5]
+IO.println("after list: " + GC.alloc_count().to_string())
+
+IO.println("total bytes: " + GC.total_bytes().to_string())
+IO.println("threshold: " + GC.threshold().to_string())
+
+GC.set_threshold(32768)
+IO.println("new threshold: " + GC.threshold().to_string())
+
+list = []
+GC.collect()
+IO.println("after collect: " + GC.alloc_count().to_string())
+
+GC.disable()
+IO.println("GC disabled")
+GC.enable()
+IO.println("GC re-enabled")
+
+IO.println("=== GC API Test Complete ===")

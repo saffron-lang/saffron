@@ -98,34 +98,41 @@ declare i32 @mkdir(i8*, i32)
 declare i8* @getcwd(i8*, i64)
 declare i8* @getenv(i8*)
 declare i64 @write(i32, i8*, i64)
+@__g_SLOT_SIZE = global i64 0
 
 define i64 @__list_new() {
 entry:
   %raw = alloca i64
-  %t1 = add i64 0, 24
-  %t2 = add i64 0, 2
-  %t3 = call i64 @__gc_alloc(i64 %t1, i64 %t2)
-  store i64 %t3, i64* %raw
-  %t4 = load i64, i64* %raw
-  %t5 = add i64 0, 0
-  %t6 = inttoptr i64 %t4 to i64*
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %raw
-  %t8 = add i64 0, 8
-  %t9 = add i64 %t7, %t8
-  %t10 = add i64 0, 8
-  %t11 = inttoptr i64 %t9 to i64*
-  store i64 %t10, i64* %t11
-  %t12 = load i64, i64* %raw
-  %t13 = add i64 0, 16
-  %t14 = add i64 %t12, %t13
-  %t15 = add i64 0, 64
-  %t16 = add i64 0, 7
-  %t17 = call i64 @__gc_alloc(i64 %t15, i64 %t16)
-  %t18 = inttoptr i64 %t14 to i64*
-  store i64 %t17, i64* %t18
-  %t19 = load i64, i64* %raw
-  ret i64 %t19
+  %t1 = load i64, i64* @__g_SLOT_SIZE
+  %t2 = add i64 0, 3
+  %t3 = mul i64 %t1, %t2
+  %t4 = add i64 0, 2
+  %t5 = call i64 @__gc_alloc(i64 %t3, i64 %t4)
+  store i64 %t5, i64* %raw
+  %t6 = load i64, i64* %raw
+  %t7 = add i64 0, 0
+  %t8 = inttoptr i64 %t6 to i64*
+  store i64 %t7, i64* %t8
+  %t9 = load i64, i64* %raw
+  %t10 = load i64, i64* @__g_SLOT_SIZE
+  %t11 = add i64 %t9, %t10
+  %t12 = add i64 0, 8
+  %t13 = inttoptr i64 %t11 to i64*
+  store i64 %t12, i64* %t13
+  %t14 = load i64, i64* %raw
+  %t15 = load i64, i64* @__g_SLOT_SIZE
+  %t16 = add i64 0, 2
+  %t17 = mul i64 %t15, %t16
+  %t18 = add i64 %t14, %t17
+  %t19 = load i64, i64* @__g_SLOT_SIZE
+  %t20 = add i64 0, 8
+  %t21 = mul i64 %t19, %t20
+  %t22 = add i64 0, 7
+  %t23 = call i64 @__gc_alloc(i64 %t21, i64 %t22)
+  %t24 = inttoptr i64 %t18 to i64*
+  store i64 %t23, i64* %t24
+  %t25 = load i64, i64* %raw
+  ret i64 %t25
 }
 
 define i64 @__list_push(i64 %list.arg, i64 %value.arg) {
@@ -157,7 +164,7 @@ endif1:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %list
-  %t11 = add i64 0, 8
+  %t11 = load i64, i64* @__g_SLOT_SIZE
   %t12 = add i64 %t10, %t11
   %t13 = inttoptr i64 %t12 to i64*
   %t14 = load i64, i64* %t13
@@ -174,37 +181,41 @@ then5:
   %t22 = mul i64 %t20, %t21
   store i64 %t22, i64* %new_cap
   %t23 = load i64, i64* %list
-  %t24 = add i64 0, 16
-  %t25 = add i64 %t23, %t24
-  %t26 = inttoptr i64 %t25 to i64*
-  %t27 = load i64, i64* %t26
-  store i64 %t27, i64* %old_data
-  %t28 = load i64, i64* %old_data
-  %t29 = load i64, i64* %new_cap
-  %t30 = add i64 0, 8
-  %t31 = mul i64 %t29, %t30
-  %t32 = add i64 0, 7
-  %t33 = call i64 @__gc_realloc(i64 %t28, i64 %t31, i64 %t32)
-  store i64 %t33, i64* %new_data
-  %t34 = load i64, i64* %new_data
-  %t35 = add i64 0, 0
-  %t37 = icmp ne i64 %t34, %t35
-  %t36 = zext i1 %t37 to i64
-  %t38 = trunc i64 %t36 to i1
-  br i1 %t38, label %then8, label %else9
+  %t24 = load i64, i64* @__g_SLOT_SIZE
+  %t25 = add i64 0, 2
+  %t26 = mul i64 %t24, %t25
+  %t27 = add i64 %t23, %t26
+  %t28 = inttoptr i64 %t27 to i64*
+  %t29 = load i64, i64* %t28
+  store i64 %t29, i64* %old_data
+  %t30 = load i64, i64* %old_data
+  %t31 = load i64, i64* %new_cap
+  %t32 = load i64, i64* @__g_SLOT_SIZE
+  %t33 = mul i64 %t31, %t32
+  %t34 = add i64 0, 7
+  %t35 = call i64 @__gc_realloc(i64 %t30, i64 %t33, i64 %t34)
+  store i64 %t35, i64* %new_data
+  %t36 = load i64, i64* %new_data
+  %t37 = add i64 0, 0
+  %t39 = icmp ne i64 %t36, %t37
+  %t38 = zext i1 %t39 to i64
+  %t40 = trunc i64 %t38 to i1
+  br i1 %t40, label %then8, label %else9
 then8:
-  %t39 = load i64, i64* %list
-  %t40 = add i64 0, 8
-  %t41 = add i64 %t39, %t40
-  %t42 = load i64, i64* %new_cap
-  %t43 = inttoptr i64 %t41 to i64*
-  store i64 %t42, i64* %t43
-  %t44 = load i64, i64* %list
-  %t45 = add i64 0, 16
-  %t46 = add i64 %t44, %t45
-  %t47 = load i64, i64* %new_data
-  %t48 = inttoptr i64 %t46 to i64*
-  store i64 %t47, i64* %t48
+  %t41 = load i64, i64* %list
+  %t42 = load i64, i64* @__g_SLOT_SIZE
+  %t43 = add i64 %t41, %t42
+  %t44 = load i64, i64* %new_cap
+  %t45 = inttoptr i64 %t43 to i64*
+  store i64 %t44, i64* %t45
+  %t46 = load i64, i64* %list
+  %t47 = load i64, i64* @__g_SLOT_SIZE
+  %t48 = add i64 0, 2
+  %t49 = mul i64 %t47, %t48
+  %t50 = add i64 %t46, %t49
+  %t51 = load i64, i64* %new_data
+  %t52 = inttoptr i64 %t50 to i64*
+  store i64 %t51, i64* %t52
   br label %endif7
 else9:
   br label %endif7
@@ -213,26 +224,28 @@ endif7:
 else6:
   br label %endif4
 endif4:
-  %t49 = load i64, i64* %list
-  %t50 = add i64 0, 16
-  %t51 = add i64 %t49, %t50
-  %t52 = inttoptr i64 %t51 to i64*
-  %t53 = load i64, i64* %t52
-  store i64 %t53, i64* %data
-  %t54 = load i64, i64* %data
-  %t55 = load i64, i64* %count
-  %t56 = add i64 0, 8
-  %t57 = mul i64 %t55, %t56
-  %t58 = add i64 %t54, %t57
-  %t59 = load i64, i64* %value
-  %t60 = inttoptr i64 %t58 to i64*
-  store i64 %t59, i64* %t60
-  %t61 = load i64, i64* %list
-  %t62 = load i64, i64* %count
-  %t63 = add i64 0, 1
-  %t64 = add i64 %t62, %t63
-  %t65 = inttoptr i64 %t61 to i64*
-  store i64 %t64, i64* %t65
+  %t53 = load i64, i64* %list
+  %t54 = load i64, i64* @__g_SLOT_SIZE
+  %t55 = add i64 0, 2
+  %t56 = mul i64 %t54, %t55
+  %t57 = add i64 %t53, %t56
+  %t58 = inttoptr i64 %t57 to i64*
+  %t59 = load i64, i64* %t58
+  store i64 %t59, i64* %data
+  %t60 = load i64, i64* %data
+  %t61 = load i64, i64* %count
+  %t62 = load i64, i64* @__g_SLOT_SIZE
+  %t63 = mul i64 %t61, %t62
+  %t64 = add i64 %t60, %t63
+  %t65 = load i64, i64* %value
+  %t66 = inttoptr i64 %t64 to i64*
+  store i64 %t65, i64* %t66
+  %t67 = load i64, i64* %list
+  %t68 = load i64, i64* %count
+  %t69 = add i64 0, 1
+  %t70 = add i64 %t68, %t69
+  %t71 = inttoptr i64 %t67 to i64*
+  store i64 %t70, i64* %t71
   ret i64 0
 }
 
@@ -308,19 +321,21 @@ else21:
   br label %endif16
 endif16:
   %t36 = load i64, i64* %list
-  %t37 = add i64 0, 16
-  %t38 = add i64 %t36, %t37
-  %t39 = inttoptr i64 %t38 to i64*
-  %t40 = load i64, i64* %t39
-  store i64 %t40, i64* %data
-  %t41 = load i64, i64* %data
-  %t42 = load i64, i64* %actual_idx
-  %t43 = add i64 0, 8
-  %t44 = mul i64 %t42, %t43
-  %t45 = add i64 %t41, %t44
-  %t46 = inttoptr i64 %t45 to i64*
-  %t47 = load i64, i64* %t46
-  ret i64 %t47
+  %t37 = load i64, i64* @__g_SLOT_SIZE
+  %t38 = add i64 0, 2
+  %t39 = mul i64 %t37, %t38
+  %t40 = add i64 %t36, %t39
+  %t41 = inttoptr i64 %t40 to i64*
+  %t42 = load i64, i64* %t41
+  store i64 %t42, i64* %data
+  %t43 = load i64, i64* %data
+  %t44 = load i64, i64* %actual_idx
+  %t45 = load i64, i64* @__g_SLOT_SIZE
+  %t46 = mul i64 %t44, %t45
+  %t47 = add i64 %t43, %t46
+  %t48 = inttoptr i64 %t47 to i64*
+  %t49 = load i64, i64* %t48
+  ret i64 %t49
 }
 
 define i64 @__list_set(i64 %list.arg, i64 %index.arg, i64 %value.arg) {
@@ -396,19 +411,21 @@ else33:
   br label %endif28
 endif28:
   %t35 = load i64, i64* %list
-  %t36 = add i64 0, 16
-  %t37 = add i64 %t35, %t36
-  %t38 = inttoptr i64 %t37 to i64*
-  %t39 = load i64, i64* %t38
-  store i64 %t39, i64* %data
-  %t40 = load i64, i64* %data
-  %t41 = load i64, i64* %actual_idx
-  %t42 = add i64 0, 8
-  %t43 = mul i64 %t41, %t42
-  %t44 = add i64 %t40, %t43
-  %t45 = load i64, i64* %value
-  %t46 = inttoptr i64 %t44 to i64*
-  store i64 %t45, i64* %t46
+  %t36 = load i64, i64* @__g_SLOT_SIZE
+  %t37 = add i64 0, 2
+  %t38 = mul i64 %t36, %t37
+  %t39 = add i64 %t35, %t38
+  %t40 = inttoptr i64 %t39 to i64*
+  %t41 = load i64, i64* %t40
+  store i64 %t41, i64* %data
+  %t42 = load i64, i64* %data
+  %t43 = load i64, i64* %actual_idx
+  %t44 = load i64, i64* @__g_SLOT_SIZE
+  %t45 = mul i64 %t43, %t44
+  %t46 = add i64 %t42, %t45
+  %t47 = load i64, i64* %value
+  %t48 = inttoptr i64 %t46 to i64*
+  store i64 %t47, i64* %t48
   ret i64 0
 }
 
@@ -481,19 +498,21 @@ endif40:
   %t24 = inttoptr i64 %t22 to i64*
   store i64 %t23, i64* %t24
   %t25 = load i64, i64* %list
-  %t26 = add i64 0, 16
-  %t27 = add i64 %t25, %t26
-  %t28 = inttoptr i64 %t27 to i64*
-  %t29 = load i64, i64* %t28
-  store i64 %t29, i64* %data
-  %t30 = load i64, i64* %data
-  %t31 = load i64, i64* %new_count
-  %t32 = add i64 0, 8
-  %t33 = mul i64 %t31, %t32
-  %t34 = add i64 %t30, %t33
-  %t35 = inttoptr i64 %t34 to i64*
-  %t36 = load i64, i64* %t35
-  ret i64 %t36
+  %t26 = load i64, i64* @__g_SLOT_SIZE
+  %t27 = add i64 0, 2
+  %t28 = mul i64 %t26, %t27
+  %t29 = add i64 %t25, %t28
+  %t30 = inttoptr i64 %t29 to i64*
+  %t31 = load i64, i64* %t30
+  store i64 %t31, i64* %data
+  %t32 = load i64, i64* %data
+  %t33 = load i64, i64* %new_count
+  %t34 = load i64, i64* @__g_SLOT_SIZE
+  %t35 = mul i64 %t33, %t34
+  %t36 = add i64 %t32, %t35
+  %t37 = inttoptr i64 %t36 to i64*
+  %t38 = load i64, i64* %t37
+  ret i64 %t38
 }
 
 define i64 @__list_remove(i64 %list.arg, i64 %index.arg) {
@@ -549,99 +568,105 @@ else51:
   br label %endif46
 endif46:
   %t24 = load i64, i64* %list
-  %t25 = add i64 0, 16
-  %t26 = add i64 %t24, %t25
-  %t27 = inttoptr i64 %t26 to i64*
-  %t28 = load i64, i64* %t27
-  store i64 %t28, i64* %data
-  %t29 = load i64, i64* %data
-  %t30 = load i64, i64* %index
-  %t31 = add i64 0, 8
-  %t32 = mul i64 %t30, %t31
-  %t33 = add i64 %t29, %t32
-  %t34 = inttoptr i64 %t33 to i64*
-  %t35 = load i64, i64* %t34
-  store i64 %t35, i64* %removed
-  %t36 = load i64, i64* %index
-  store i64 %t36, i64* %i
+  %t25 = load i64, i64* @__g_SLOT_SIZE
+  %t26 = add i64 0, 2
+  %t27 = mul i64 %t25, %t26
+  %t28 = add i64 %t24, %t27
+  %t29 = inttoptr i64 %t28 to i64*
+  %t30 = load i64, i64* %t29
+  store i64 %t30, i64* %data
+  %t31 = load i64, i64* %data
+  %t32 = load i64, i64* %index
+  %t33 = load i64, i64* @__g_SLOT_SIZE
+  %t34 = mul i64 %t32, %t33
+  %t35 = add i64 %t31, %t34
+  %t36 = inttoptr i64 %t35 to i64*
+  %t37 = load i64, i64* %t36
+  store i64 %t37, i64* %removed
+  %t38 = load i64, i64* %index
+  store i64 %t38, i64* %i
   br label %while.cond52
 while.cond52:
-  %t37 = load i64, i64* %i
-  %t38 = load i64, i64* %count
-  %t39 = add i64 0, 1
-  %t40 = sub i64 %t38, %t39
-  %t42 = icmp slt i64 %t37, %t40
-  %t41 = zext i1 %t42 to i64
-  %t43 = trunc i64 %t41 to i1
-  br i1 %t43, label %while.body53, label %while.end54
+  %t39 = load i64, i64* %i
+  %t40 = load i64, i64* %count
+  %t41 = add i64 0, 1
+  %t42 = sub i64 %t40, %t41
+  %t44 = icmp slt i64 %t39, %t42
+  %t43 = zext i1 %t44 to i64
+  %t45 = trunc i64 %t43 to i1
+  br i1 %t45, label %while.body53, label %while.end54
 while.body53:
-  %t44 = load i64, i64* %data
-  %t45 = load i64, i64* %i
-  %t46 = add i64 0, 8
-  %t47 = mul i64 %t45, %t46
-  %t48 = add i64 %t44, %t47
-  %t49 = load i64, i64* %data
-  %t50 = load i64, i64* %i
-  %t51 = add i64 0, 1
-  %t52 = add i64 %t50, %t51
-  %t53 = add i64 0, 8
-  %t54 = mul i64 %t52, %t53
-  %t55 = add i64 %t49, %t54
-  %t56 = inttoptr i64 %t55 to i64*
-  %t57 = load i64, i64* %t56
-  %t58 = inttoptr i64 %t48 to i64*
-  store i64 %t57, i64* %t58
-  %t59 = load i64, i64* %i
-  %t60 = add i64 0, 1
-  %t61 = add i64 %t59, %t60
-  store i64 %t61, i64* %i
+  %t46 = load i64, i64* %data
+  %t47 = load i64, i64* %i
+  %t48 = load i64, i64* @__g_SLOT_SIZE
+  %t49 = mul i64 %t47, %t48
+  %t50 = add i64 %t46, %t49
+  %t51 = load i64, i64* %data
+  %t52 = load i64, i64* %i
+  %t53 = add i64 0, 1
+  %t54 = add i64 %t52, %t53
+  %t55 = load i64, i64* @__g_SLOT_SIZE
+  %t56 = mul i64 %t54, %t55
+  %t57 = add i64 %t51, %t56
+  %t58 = inttoptr i64 %t57 to i64*
+  %t59 = load i64, i64* %t58
+  %t60 = inttoptr i64 %t50 to i64*
+  store i64 %t59, i64* %t60
+  %t61 = load i64, i64* %i
+  %t62 = add i64 0, 1
+  %t63 = add i64 %t61, %t62
+  store i64 %t63, i64* %i
   br label %while.cond52
 while.end54:
-  %t62 = load i64, i64* %list
-  %t63 = load i64, i64* %count
-  %t64 = add i64 0, 1
-  %t65 = sub i64 %t63, %t64
-  %t66 = inttoptr i64 %t62 to i64*
-  store i64 %t65, i64* %t66
-  %t67 = load i64, i64* %removed
-  ret i64 %t67
+  %t64 = load i64, i64* %list
+  %t65 = load i64, i64* %count
+  %t66 = add i64 0, 1
+  %t67 = sub i64 %t65, %t66
+  %t68 = inttoptr i64 %t64 to i64*
+  store i64 %t67, i64* %t68
+  %t69 = load i64, i64* %removed
+  ret i64 %t69
 }
 
 define i64 @StringBuilder() {
 entry:
   %raw = alloca i64
   %buf = alloca i64
-  %t1 = add i64 0, 24
-  %t2 = add i64 0, 6
-  %t3 = call i64 @__gc_alloc(i64 %t1, i64 %t2)
-  store i64 %t3, i64* %raw
-  %t4 = load i64, i64* %raw
-  %t5 = add i64 0, 0
-  %t6 = inttoptr i64 %t4 to i64*
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %raw
-  %t8 = add i64 0, 8
-  %t9 = add i64 %t7, %t8
-  %t10 = add i64 0, 1024
-  %t11 = inttoptr i64 %t9 to i64*
-  store i64 %t10, i64* %t11
+  %t1 = load i64, i64* @__g_SLOT_SIZE
+  %t2 = add i64 0, 3
+  %t3 = mul i64 %t1, %t2
+  %t4 = add i64 0, 6
+  %t5 = call i64 @__gc_alloc(i64 %t3, i64 %t4)
+  store i64 %t5, i64* %raw
+  %t6 = load i64, i64* %raw
+  %t7 = add i64 0, 0
+  %t8 = inttoptr i64 %t6 to i64*
+  store i64 %t7, i64* %t8
+  %t9 = load i64, i64* %raw
+  %t10 = load i64, i64* @__g_SLOT_SIZE
+  %t11 = add i64 %t9, %t10
   %t12 = add i64 0, 1024
-  %t13 = add i64 0, 0
-  %t14 = call i64 @__gc_alloc(i64 %t12, i64 %t13)
-  store i64 %t14, i64* %buf
-  %t15 = load i64, i64* %buf
-  %t16 = add i64 0, 0
-  %t17 = trunc i64 %t16 to i8
-  %t18 = inttoptr i64 %t15 to i8*
-  store i8 %t17, i8* %t18
-  %t19 = load i64, i64* %raw
-  %t20 = add i64 0, 16
-  %t21 = add i64 %t19, %t20
-  %t22 = load i64, i64* %buf
-  %t23 = inttoptr i64 %t21 to i64*
-  store i64 %t22, i64* %t23
-  %t24 = load i64, i64* %raw
-  ret i64 %t24
+  %t13 = inttoptr i64 %t11 to i64*
+  store i64 %t12, i64* %t13
+  %t14 = add i64 0, 1024
+  %t15 = add i64 0, 0
+  %t16 = call i64 @__gc_alloc(i64 %t14, i64 %t15)
+  store i64 %t16, i64* %buf
+  %t17 = load i64, i64* %buf
+  %t18 = add i64 0, 0
+  %t19 = trunc i64 %t18 to i8
+  %t20 = inttoptr i64 %t17 to i8*
+  store i8 %t19, i8* %t20
+  %t21 = load i64, i64* %raw
+  %t22 = load i64, i64* @__g_SLOT_SIZE
+  %t23 = add i64 0, 2
+  %t24 = mul i64 %t22, %t23
+  %t25 = add i64 %t21, %t24
+  %t26 = load i64, i64* %buf
+  %t27 = inttoptr i64 %t25 to i64*
+  store i64 %t26, i64* %t27
+  %t28 = load i64, i64* %raw
+  ret i64 %t28
 }
 
 define i64 @__sb_append(i64 %sb.arg, i64 %str.arg) {
@@ -674,64 +699,68 @@ endif55:
   %t8 = load i64, i64* %t7
   store i64 %t8, i64* %len
   %t9 = load i64, i64* %sb
-  %t10 = add i64 0, 8
+  %t10 = load i64, i64* @__g_SLOT_SIZE
   %t11 = add i64 %t9, %t10
   %t12 = inttoptr i64 %t11 to i64*
   %t13 = load i64, i64* %t12
   store i64 %t13, i64* %cap
   %t14 = load i64, i64* %sb
-  %t15 = add i64 0, 16
-  %t16 = add i64 %t14, %t15
-  %t17 = inttoptr i64 %t16 to i64*
-  %t18 = load i64, i64* %t17
-  store i64 %t18, i64* %buf
-  %t19 = load i64, i64* %str
-  %t20 = inttoptr i64 %t19 to i8*
-  %t21 = call i64 @strlen(i8* %t20)
-  store i64 %t21, i64* %slen
-  %t22 = load i64, i64* %len
-  %t23 = load i64, i64* %slen
-  %t24 = add i64 %t22, %t23
-  %t25 = add i64 0, 1
+  %t15 = load i64, i64* @__g_SLOT_SIZE
+  %t16 = add i64 0, 2
+  %t17 = mul i64 %t15, %t16
+  %t18 = add i64 %t14, %t17
+  %t19 = inttoptr i64 %t18 to i64*
+  %t20 = load i64, i64* %t19
+  store i64 %t20, i64* %buf
+  %t21 = load i64, i64* %str
+  %t22 = inttoptr i64 %t21 to i8*
+  %t23 = call i64 @strlen(i8* %t22)
+  store i64 %t23, i64* %slen
+  %t24 = load i64, i64* %len
+  %t25 = load i64, i64* %slen
   %t26 = add i64 %t24, %t25
-  store i64 %t26, i64* %needed
-  %t27 = load i64, i64* %needed
-  %t28 = load i64, i64* %cap
-  %t30 = icmp sge i64 %t27, %t28
-  %t29 = zext i1 %t30 to i64
-  %t31 = trunc i64 %t29 to i1
-  br i1 %t31, label %then59, label %else60
+  %t27 = add i64 0, 1
+  %t28 = add i64 %t26, %t27
+  store i64 %t28, i64* %needed
+  %t29 = load i64, i64* %needed
+  %t30 = load i64, i64* %cap
+  %t32 = icmp sge i64 %t29, %t30
+  %t31 = zext i1 %t32 to i64
+  %t33 = trunc i64 %t31 to i1
+  br i1 %t33, label %then59, label %else60
 then59:
-  %t32 = load i64, i64* %needed
-  %t33 = add i64 0, 2
-  %t34 = mul i64 %t32, %t33
-  store i64 %t34, i64* %new_cap
-  %t35 = load i64, i64* %buf
-  %t36 = load i64, i64* %new_cap
-  %t37 = add i64 0, 0
-  %t38 = call i64 @__gc_realloc(i64 %t35, i64 %t36, i64 %t37)
-  store i64 %t38, i64* %new_buf
-  %t39 = load i64, i64* %new_buf
-  %t40 = add i64 0, 0
-  %t42 = icmp ne i64 %t39, %t40
-  %t41 = zext i1 %t42 to i64
-  %t43 = trunc i64 %t41 to i1
-  br i1 %t43, label %then62, label %else63
+  %t34 = load i64, i64* %needed
+  %t35 = add i64 0, 2
+  %t36 = mul i64 %t34, %t35
+  store i64 %t36, i64* %new_cap
+  %t37 = load i64, i64* %buf
+  %t38 = load i64, i64* %new_cap
+  %t39 = add i64 0, 0
+  %t40 = call i64 @__gc_realloc(i64 %t37, i64 %t38, i64 %t39)
+  store i64 %t40, i64* %new_buf
+  %t41 = load i64, i64* %new_buf
+  %t42 = add i64 0, 0
+  %t44 = icmp ne i64 %t41, %t42
+  %t43 = zext i1 %t44 to i64
+  %t45 = trunc i64 %t43 to i1
+  br i1 %t45, label %then62, label %else63
 then62:
-  %t44 = load i64, i64* %new_buf
-  store i64 %t44, i64* %buf
-  %t45 = load i64, i64* %sb
-  %t46 = add i64 0, 8
-  %t47 = add i64 %t45, %t46
-  %t48 = load i64, i64* %new_cap
-  %t49 = inttoptr i64 %t47 to i64*
-  store i64 %t48, i64* %t49
-  %t50 = load i64, i64* %sb
-  %t51 = add i64 0, 16
-  %t52 = add i64 %t50, %t51
-  %t53 = load i64, i64* %buf
-  %t54 = inttoptr i64 %t52 to i64*
-  store i64 %t53, i64* %t54
+  %t46 = load i64, i64* %new_buf
+  store i64 %t46, i64* %buf
+  %t47 = load i64, i64* %sb
+  %t48 = load i64, i64* @__g_SLOT_SIZE
+  %t49 = add i64 %t47, %t48
+  %t50 = load i64, i64* %new_cap
+  %t51 = inttoptr i64 %t49 to i64*
+  store i64 %t50, i64* %t51
+  %t52 = load i64, i64* %sb
+  %t53 = load i64, i64* @__g_SLOT_SIZE
+  %t54 = add i64 0, 2
+  %t55 = mul i64 %t53, %t54
+  %t56 = add i64 %t52, %t55
+  %t57 = load i64, i64* %buf
+  %t58 = inttoptr i64 %t56 to i64*
+  store i64 %t57, i64* %t58
   br label %endif61
 else63:
   br label %endif61
@@ -740,30 +769,30 @@ endif61:
 else60:
   br label %endif58
 endif58:
-  %t55 = load i64, i64* %buf
-  %t56 = load i64, i64* %len
-  %t57 = add i64 %t55, %t56
-  %t58 = inttoptr i64 %t57 to i8*
-  %t59 = load i64, i64* %str
-  %t60 = inttoptr i64 %t59 to i8*
-  %t61 = load i64, i64* %slen
-  %t62 = call i8* @memcpy(i8* %t58, i8* %t60, i64 %t61)
-  %t63 = ptrtoint i8* %t62 to i64
-  %t64 = load i64, i64* %len
+  %t59 = load i64, i64* %buf
+  %t60 = load i64, i64* %len
+  %t61 = add i64 %t59, %t60
+  %t62 = inttoptr i64 %t61 to i8*
+  %t63 = load i64, i64* %str
+  %t64 = inttoptr i64 %t63 to i8*
   %t65 = load i64, i64* %slen
-  %t66 = add i64 %t64, %t65
-  store i64 %t66, i64* %new_len
-  %t67 = load i64, i64* %sb
-  %t68 = load i64, i64* %new_len
-  %t69 = inttoptr i64 %t67 to i64*
-  store i64 %t68, i64* %t69
-  %t70 = load i64, i64* %buf
-  %t71 = load i64, i64* %new_len
-  %t72 = add i64 %t70, %t71
-  %t73 = add i64 0, 0
-  %t74 = trunc i64 %t73 to i8
-  %t75 = inttoptr i64 %t72 to i8*
-  store i8 %t74, i8* %t75
+  %t66 = call i8* @memcpy(i8* %t62, i8* %t64, i64 %t65)
+  %t67 = ptrtoint i8* %t66 to i64
+  %t68 = load i64, i64* %len
+  %t69 = load i64, i64* %slen
+  %t70 = add i64 %t68, %t69
+  store i64 %t70, i64* %new_len
+  %t71 = load i64, i64* %sb
+  %t72 = load i64, i64* %new_len
+  %t73 = inttoptr i64 %t71 to i64*
+  store i64 %t72, i64* %t73
+  %t74 = load i64, i64* %buf
+  %t75 = load i64, i64* %new_len
+  %t76 = add i64 %t74, %t75
+  %t77 = add i64 0, 0
+  %t78 = trunc i64 %t77 to i8
+  %t79 = inttoptr i64 %t76 to i8*
+  store i8 %t78, i8* %t79
   ret i64 0
 }
 
@@ -772,11 +801,13 @@ entry:
   %sb = alloca i64
   store i64 %sb.arg, i64* %sb
   %t1 = load i64, i64* %sb
-  %t2 = add i64 0, 16
-  %t3 = add i64 %t1, %t2
-  %t4 = inttoptr i64 %t3 to i64*
-  %t5 = load i64, i64* %t4
-  ret i64 %t5
+  %t2 = load i64, i64* @__g_SLOT_SIZE
+  %t3 = add i64 0, 2
+  %t4 = mul i64 %t2, %t3
+  %t5 = add i64 %t1, %t4
+  %t6 = inttoptr i64 %t5 to i64*
+  %t7 = load i64, i64* %t6
+  ret i64 %t7
 }
 
 define i64 @__safe_strcmp(i64 %a.arg, i64 %b.arg) {
@@ -821,38 +852,44 @@ endif67:
 define i64 @__map_new() {
 entry:
   %raw = alloca i64
-  %t1 = add i64 0, 32
-  %t2 = add i64 0, 3
-  %t3 = call i64 @__gc_alloc(i64 %t1, i64 %t2)
-  store i64 %t3, i64* %raw
-  %t4 = load i64, i64* %raw
-  %t5 = add i64 0, 0
-  %t6 = inttoptr i64 %t4 to i64*
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %raw
-  %t8 = add i64 0, 8
-  %t9 = add i64 %t7, %t8
-  %t10 = add i64 0, 16
-  %t11 = inttoptr i64 %t9 to i64*
-  store i64 %t10, i64* %t11
-  %t12 = load i64, i64* %raw
-  %t13 = add i64 0, 16
-  %t14 = add i64 %t12, %t13
-  %t15 = add i64 0, 128
-  %t16 = add i64 0, 8
-  %t17 = call i64 @__gc_alloc(i64 %t15, i64 %t16)
-  %t18 = inttoptr i64 %t14 to i64*
-  store i64 %t17, i64* %t18
-  %t19 = load i64, i64* %raw
-  %t20 = add i64 0, 24
-  %t21 = add i64 %t19, %t20
-  %t22 = add i64 0, 128
-  %t23 = add i64 0, 8
-  %t24 = call i64 @__gc_alloc(i64 %t22, i64 %t23)
-  %t25 = inttoptr i64 %t21 to i64*
-  store i64 %t24, i64* %t25
-  %t26 = load i64, i64* %raw
-  ret i64 %t26
+  %t1 = load i64, i64* @__g_SLOT_SIZE
+  %t2 = add i64 0, 4
+  %t3 = mul i64 %t1, %t2
+  %t4 = add i64 0, 3
+  %t5 = call i64 @__gc_alloc(i64 %t3, i64 %t4)
+  store i64 %t5, i64* %raw
+  %t6 = load i64, i64* %raw
+  %t7 = add i64 0, 0
+  %t8 = inttoptr i64 %t6 to i64*
+  store i64 %t7, i64* %t8
+  %t9 = load i64, i64* %raw
+  %t10 = load i64, i64* @__g_SLOT_SIZE
+  %t11 = add i64 %t9, %t10
+  %t12 = add i64 0, 16
+  %t13 = inttoptr i64 %t11 to i64*
+  store i64 %t12, i64* %t13
+  %t14 = load i64, i64* %raw
+  %t15 = load i64, i64* @__g_SLOT_SIZE
+  %t16 = add i64 0, 2
+  %t17 = mul i64 %t15, %t16
+  %t18 = add i64 %t14, %t17
+  %t19 = add i64 0, 128
+  %t20 = add i64 0, 8
+  %t21 = call i64 @__gc_alloc(i64 %t19, i64 %t20)
+  %t22 = inttoptr i64 %t18 to i64*
+  store i64 %t21, i64* %t22
+  %t23 = load i64, i64* %raw
+  %t24 = load i64, i64* @__g_SLOT_SIZE
+  %t25 = add i64 0, 3
+  %t26 = mul i64 %t24, %t25
+  %t27 = add i64 %t23, %t26
+  %t28 = add i64 0, 128
+  %t29 = add i64 0, 8
+  %t30 = call i64 @__gc_alloc(i64 %t28, i64 %t29)
+  %t31 = inttoptr i64 %t27 to i64*
+  store i64 %t30, i64* %t31
+  %t32 = load i64, i64* %raw
+  ret i64 %t32
 }
 
 define i64 @__map_set(i64 %map.arg, i64 %key.arg, i64 %value.arg) {
@@ -892,133 +929,141 @@ endif70:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %map
-  %t11 = add i64 0, 8
+  %t11 = load i64, i64* @__g_SLOT_SIZE
   %t12 = add i64 %t10, %t11
   %t13 = inttoptr i64 %t12 to i64*
   %t14 = load i64, i64* %t13
   store i64 %t14, i64* %cap
   %t15 = load i64, i64* %map
-  %t16 = add i64 0, 16
-  %t17 = add i64 %t15, %t16
-  %t18 = inttoptr i64 %t17 to i64*
-  %t19 = load i64, i64* %t18
-  store i64 %t19, i64* %keys
-  %t20 = load i64, i64* %map
-  %t21 = add i64 0, 24
-  %t22 = add i64 %t20, %t21
-  %t23 = inttoptr i64 %t22 to i64*
-  %t24 = load i64, i64* %t23
-  store i64 %t24, i64* %vals
-  %t25 = add i64 0, 0
-  store i64 %t25, i64* %i
+  %t16 = load i64, i64* @__g_SLOT_SIZE
+  %t17 = add i64 0, 2
+  %t18 = mul i64 %t16, %t17
+  %t19 = add i64 %t15, %t18
+  %t20 = inttoptr i64 %t19 to i64*
+  %t21 = load i64, i64* %t20
+  store i64 %t21, i64* %keys
+  %t22 = load i64, i64* %map
+  %t23 = load i64, i64* @__g_SLOT_SIZE
+  %t24 = add i64 0, 3
+  %t25 = mul i64 %t23, %t24
+  %t26 = add i64 %t22, %t25
+  %t27 = inttoptr i64 %t26 to i64*
+  %t28 = load i64, i64* %t27
+  store i64 %t28, i64* %vals
+  %t29 = add i64 0, 0
+  store i64 %t29, i64* %i
   br label %while.cond73
 while.cond73:
-  %t26 = load i64, i64* %i
-  %t27 = load i64, i64* %count
-  %t29 = icmp slt i64 %t26, %t27
-  %t28 = zext i1 %t29 to i64
-  %t30 = trunc i64 %t28 to i1
-  br i1 %t30, label %while.body74, label %while.end75
+  %t30 = load i64, i64* %i
+  %t31 = load i64, i64* %count
+  %t33 = icmp slt i64 %t30, %t31
+  %t32 = zext i1 %t33 to i64
+  %t34 = trunc i64 %t32 to i1
+  br i1 %t34, label %while.body74, label %while.end75
 while.body74:
-  %t31 = load i64, i64* %keys
-  %t32 = load i64, i64* %i
-  %t33 = add i64 0, 8
-  %t34 = mul i64 %t32, %t33
-  %t35 = add i64 %t31, %t34
-  %t36 = inttoptr i64 %t35 to i64*
-  %t37 = load i64, i64* %t36
-  store i64 %t37, i64* %kval
-  %t38 = load i64, i64* %key
-  %t39 = load i64, i64* %kval
-  %t40 = call i64 @__safe_strcmp(i64 %t38, i64 %t39)
-  %t41 = add i64 0, 0
-  %t43 = icmp eq i64 %t40, %t41
-  %t42 = zext i1 %t43 to i64
-  %t44 = trunc i64 %t42 to i1
-  br i1 %t44, label %then77, label %else78
+  %t35 = load i64, i64* %keys
+  %t36 = load i64, i64* %i
+  %t37 = add i64 0, 8
+  %t38 = mul i64 %t36, %t37
+  %t39 = add i64 %t35, %t38
+  %t40 = inttoptr i64 %t39 to i64*
+  %t41 = load i64, i64* %t40
+  store i64 %t41, i64* %kval
+  %t42 = load i64, i64* %key
+  %t43 = load i64, i64* %kval
+  %t44 = call i64 @__safe_strcmp(i64 %t42, i64 %t43)
+  %t45 = add i64 0, 0
+  %t47 = icmp eq i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then77, label %else78
 then77:
-  %t45 = load i64, i64* %vals
-  %t46 = load i64, i64* %i
-  %t47 = add i64 0, 8
-  %t48 = mul i64 %t46, %t47
-  %t49 = add i64 %t45, %t48
-  %t50 = load i64, i64* %value
-  %t51 = inttoptr i64 %t49 to i64*
-  store i64 %t50, i64* %t51
+  %t49 = load i64, i64* %vals
+  %t50 = load i64, i64* %i
+  %t51 = add i64 0, 8
+  %t52 = mul i64 %t50, %t51
+  %t53 = add i64 %t49, %t52
+  %t54 = load i64, i64* %value
+  %t55 = inttoptr i64 %t53 to i64*
+  store i64 %t54, i64* %t55
   ret i64 0
 else78:
   br label %endif76
 endif76:
-  %t52 = load i64, i64* %i
-  %t53 = add i64 0, 1
-  %t54 = add i64 %t52, %t53
-  store i64 %t54, i64* %i
+  %t56 = load i64, i64* %i
+  %t57 = add i64 0, 1
+  %t58 = add i64 %t56, %t57
+  store i64 %t58, i64* %i
   br label %while.cond73
 while.end75:
-  %t55 = load i64, i64* %count
-  %t56 = load i64, i64* %cap
-  %t58 = icmp sge i64 %t55, %t56
-  %t57 = zext i1 %t58 to i64
-  %t59 = trunc i64 %t57 to i1
-  br i1 %t59, label %then80, label %else81
-then80:
+  %t59 = load i64, i64* %count
   %t60 = load i64, i64* %cap
-  %t61 = add i64 0, 2
-  %t62 = mul i64 %t60, %t61
-  store i64 %t62, i64* %new_cap
-  %t63 = load i64, i64* %new_cap
-  %t64 = add i64 0, 8
-  %t65 = mul i64 %t63, %t64
-  store i64 %t65, i64* %new_bytes
-  %t66 = load i64, i64* %keys
-  %t67 = load i64, i64* %new_bytes
+  %t62 = icmp sge i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then80, label %else81
+then80:
+  %t64 = load i64, i64* %cap
+  %t65 = add i64 0, 2
+  %t66 = mul i64 %t64, %t65
+  store i64 %t66, i64* %new_cap
+  %t67 = load i64, i64* %new_cap
   %t68 = add i64 0, 8
-  %t69 = call i64 @__gc_realloc(i64 %t66, i64 %t67, i64 %t68)
-  store i64 %t69, i64* %new_keys
-  %t70 = load i64, i64* %vals
+  %t69 = mul i64 %t67, %t68
+  store i64 %t69, i64* %new_bytes
+  %t70 = load i64, i64* %keys
   %t71 = load i64, i64* %new_bytes
   %t72 = add i64 0, 8
   %t73 = call i64 @__gc_realloc(i64 %t70, i64 %t71, i64 %t72)
-  store i64 %t73, i64* %new_vals
-  %t74 = load i64, i64* %new_keys
-  %t75 = add i64 0, 0
-  %t77 = icmp ne i64 %t74, %t75
-  %t76 = zext i1 %t77 to i64
-  %t78 = trunc i64 %t76 to i1
+  store i64 %t73, i64* %new_keys
+  %t74 = load i64, i64* %vals
+  %t75 = load i64, i64* %new_bytes
+  %t76 = add i64 0, 8
+  %t77 = call i64 @__gc_realloc(i64 %t74, i64 %t75, i64 %t76)
+  store i64 %t77, i64* %new_vals
+  %t78 = load i64, i64* %new_keys
+  %t79 = add i64 0, 0
+  %t81 = icmp ne i64 %t78, %t79
+  %t80 = zext i1 %t81 to i64
+  %t82 = trunc i64 %t80 to i1
   br label %logic.entry83
 logic.entry83:
-  br i1 %t78, label %rhs84, label %end85
+  br i1 %t82, label %rhs84, label %end85
 rhs84:
-  %t79 = load i64, i64* %new_vals
-  %t80 = add i64 0, 0
-  %t82 = icmp ne i64 %t79, %t80
-  %t81 = zext i1 %t82 to i64
-  %t83 = trunc i64 %t81 to i1
+  %t83 = load i64, i64* %new_vals
+  %t84 = add i64 0, 0
+  %t86 = icmp ne i64 %t83, %t84
+  %t85 = zext i1 %t86 to i64
+  %t87 = trunc i64 %t85 to i1
   br label %end85
 end85:
-  %t84 = phi i1 [%t78, %logic.entry83], [%t83, %rhs84]
-  %t85 = zext i1 %t84 to i64
-  %t86 = trunc i64 %t85 to i1
-  br i1 %t86, label %then86, label %else87
+  %t88 = phi i1 [%t82, %logic.entry83], [%t87, %rhs84]
+  %t89 = zext i1 %t88 to i64
+  %t90 = trunc i64 %t89 to i1
+  br i1 %t90, label %then86, label %else87
 then86:
-  %t87 = load i64, i64* %map
-  %t88 = add i64 0, 8
-  %t89 = add i64 %t87, %t88
-  %t90 = load i64, i64* %new_cap
-  %t91 = inttoptr i64 %t89 to i64*
-  store i64 %t90, i64* %t91
-  %t92 = load i64, i64* %map
-  %t93 = add i64 0, 16
-  %t94 = add i64 %t92, %t93
-  %t95 = load i64, i64* %new_keys
-  %t96 = inttoptr i64 %t94 to i64*
-  store i64 %t95, i64* %t96
-  %t97 = load i64, i64* %map
-  %t98 = add i64 0, 24
-  %t99 = add i64 %t97, %t98
-  %t100 = load i64, i64* %new_vals
-  %t101 = inttoptr i64 %t99 to i64*
-  store i64 %t100, i64* %t101
+  %t91 = load i64, i64* %map
+  %t92 = load i64, i64* @__g_SLOT_SIZE
+  %t93 = add i64 %t91, %t92
+  %t94 = load i64, i64* %new_cap
+  %t95 = inttoptr i64 %t93 to i64*
+  store i64 %t94, i64* %t95
+  %t96 = load i64, i64* %map
+  %t97 = load i64, i64* @__g_SLOT_SIZE
+  %t98 = add i64 0, 2
+  %t99 = mul i64 %t97, %t98
+  %t100 = add i64 %t96, %t99
+  %t101 = load i64, i64* %new_keys
+  %t102 = inttoptr i64 %t100 to i64*
+  store i64 %t101, i64* %t102
+  %t103 = load i64, i64* %map
+  %t104 = load i64, i64* @__g_SLOT_SIZE
+  %t105 = add i64 0, 3
+  %t106 = mul i64 %t104, %t105
+  %t107 = add i64 %t103, %t106
+  %t108 = load i64, i64* %new_vals
+  %t109 = inttoptr i64 %t107 to i64*
+  store i64 %t108, i64* %t109
   br label %endif82
 else87:
   br label %endif82
@@ -1027,40 +1072,44 @@ endif82:
 else81:
   br label %endif79
 endif79:
-  %t102 = load i64, i64* %map
-  %t103 = add i64 0, 16
-  %t104 = add i64 %t102, %t103
-  %t105 = inttoptr i64 %t104 to i64*
-  %t106 = load i64, i64* %t105
-  store i64 %t106, i64* %cur_keys
-  %t107 = load i64, i64* %map
-  %t108 = add i64 0, 24
-  %t109 = add i64 %t107, %t108
-  %t110 = inttoptr i64 %t109 to i64*
-  %t111 = load i64, i64* %t110
-  store i64 %t111, i64* %cur_vals
-  %t112 = load i64, i64* %cur_keys
-  %t113 = load i64, i64* %count
-  %t114 = add i64 0, 8
-  %t115 = mul i64 %t113, %t114
-  %t116 = add i64 %t112, %t115
-  %t117 = load i64, i64* %key
-  %t118 = inttoptr i64 %t116 to i64*
-  store i64 %t117, i64* %t118
-  %t119 = load i64, i64* %cur_vals
-  %t120 = load i64, i64* %count
-  %t121 = add i64 0, 8
-  %t122 = mul i64 %t120, %t121
-  %t123 = add i64 %t119, %t122
-  %t124 = load i64, i64* %value
-  %t125 = inttoptr i64 %t123 to i64*
-  store i64 %t124, i64* %t125
-  %t126 = load i64, i64* %map
-  %t127 = load i64, i64* %count
-  %t128 = add i64 0, 1
-  %t129 = add i64 %t127, %t128
-  %t130 = inttoptr i64 %t126 to i64*
+  %t110 = load i64, i64* %map
+  %t111 = load i64, i64* @__g_SLOT_SIZE
+  %t112 = add i64 0, 2
+  %t113 = mul i64 %t111, %t112
+  %t114 = add i64 %t110, %t113
+  %t115 = inttoptr i64 %t114 to i64*
+  %t116 = load i64, i64* %t115
+  store i64 %t116, i64* %cur_keys
+  %t117 = load i64, i64* %map
+  %t118 = load i64, i64* @__g_SLOT_SIZE
+  %t119 = add i64 0, 3
+  %t120 = mul i64 %t118, %t119
+  %t121 = add i64 %t117, %t120
+  %t122 = inttoptr i64 %t121 to i64*
+  %t123 = load i64, i64* %t122
+  store i64 %t123, i64* %cur_vals
+  %t124 = load i64, i64* %cur_keys
+  %t125 = load i64, i64* %count
+  %t126 = add i64 0, 8
+  %t127 = mul i64 %t125, %t126
+  %t128 = add i64 %t124, %t127
+  %t129 = load i64, i64* %key
+  %t130 = inttoptr i64 %t128 to i64*
   store i64 %t129, i64* %t130
+  %t131 = load i64, i64* %cur_vals
+  %t132 = load i64, i64* %count
+  %t133 = add i64 0, 8
+  %t134 = mul i64 %t132, %t133
+  %t135 = add i64 %t131, %t134
+  %t136 = load i64, i64* %value
+  %t137 = inttoptr i64 %t135 to i64*
+  store i64 %t136, i64* %t137
+  %t138 = load i64, i64* %map
+  %t139 = load i64, i64* %count
+  %t140 = add i64 0, 1
+  %t141 = add i64 %t139, %t140
+  %t142 = inttoptr i64 %t138 to i64*
+  store i64 %t141, i64* %t142
   ret i64 0
 }
 
@@ -1092,64 +1141,68 @@ endif88:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %map
-  %t11 = add i64 0, 16
-  %t12 = add i64 %t10, %t11
-  %t13 = inttoptr i64 %t12 to i64*
-  %t14 = load i64, i64* %t13
-  store i64 %t14, i64* %keys
-  %t15 = load i64, i64* %map
-  %t16 = add i64 0, 24
-  %t17 = add i64 %t15, %t16
-  %t18 = inttoptr i64 %t17 to i64*
-  %t19 = load i64, i64* %t18
-  store i64 %t19, i64* %vals
-  %t20 = add i64 0, 0
-  store i64 %t20, i64* %i
+  %t11 = load i64, i64* @__g_SLOT_SIZE
+  %t12 = add i64 0, 2
+  %t13 = mul i64 %t11, %t12
+  %t14 = add i64 %t10, %t13
+  %t15 = inttoptr i64 %t14 to i64*
+  %t16 = load i64, i64* %t15
+  store i64 %t16, i64* %keys
+  %t17 = load i64, i64* %map
+  %t18 = load i64, i64* @__g_SLOT_SIZE
+  %t19 = add i64 0, 3
+  %t20 = mul i64 %t18, %t19
+  %t21 = add i64 %t17, %t20
+  %t22 = inttoptr i64 %t21 to i64*
+  %t23 = load i64, i64* %t22
+  store i64 %t23, i64* %vals
+  %t24 = add i64 0, 0
+  store i64 %t24, i64* %i
   br label %while.cond91
 while.cond91:
-  %t21 = load i64, i64* %i
-  %t22 = load i64, i64* %count
-  %t24 = icmp slt i64 %t21, %t22
-  %t23 = zext i1 %t24 to i64
-  %t25 = trunc i64 %t23 to i1
-  br i1 %t25, label %while.body92, label %while.end93
+  %t25 = load i64, i64* %i
+  %t26 = load i64, i64* %count
+  %t28 = icmp slt i64 %t25, %t26
+  %t27 = zext i1 %t28 to i64
+  %t29 = trunc i64 %t27 to i1
+  br i1 %t29, label %while.body92, label %while.end93
 while.body92:
-  %t26 = load i64, i64* %keys
-  %t27 = load i64, i64* %i
-  %t28 = add i64 0, 8
-  %t29 = mul i64 %t27, %t28
-  %t30 = add i64 %t26, %t29
-  %t31 = inttoptr i64 %t30 to i64*
-  %t32 = load i64, i64* %t31
-  store i64 %t32, i64* %kval
-  %t33 = load i64, i64* %key
-  %t34 = load i64, i64* %kval
-  %t35 = call i64 @__safe_strcmp(i64 %t33, i64 %t34)
-  %t36 = add i64 0, 0
-  %t38 = icmp eq i64 %t35, %t36
-  %t37 = zext i1 %t38 to i64
-  %t39 = trunc i64 %t37 to i1
-  br i1 %t39, label %then95, label %else96
+  %t30 = load i64, i64* %keys
+  %t31 = load i64, i64* %i
+  %t32 = add i64 0, 8
+  %t33 = mul i64 %t31, %t32
+  %t34 = add i64 %t30, %t33
+  %t35 = inttoptr i64 %t34 to i64*
+  %t36 = load i64, i64* %t35
+  store i64 %t36, i64* %kval
+  %t37 = load i64, i64* %key
+  %t38 = load i64, i64* %kval
+  %t39 = call i64 @__safe_strcmp(i64 %t37, i64 %t38)
+  %t40 = add i64 0, 0
+  %t42 = icmp eq i64 %t39, %t40
+  %t41 = zext i1 %t42 to i64
+  %t43 = trunc i64 %t41 to i1
+  br i1 %t43, label %then95, label %else96
 then95:
-  %t40 = load i64, i64* %vals
-  %t41 = load i64, i64* %i
-  %t42 = add i64 0, 8
-  %t43 = mul i64 %t41, %t42
-  %t44 = add i64 %t40, %t43
-  %t45 = inttoptr i64 %t44 to i64*
-  %t46 = load i64, i64* %t45
-  ret i64 %t46
+  %t44 = load i64, i64* %vals
+  %t45 = load i64, i64* %i
+  %t46 = add i64 0, 8
+  %t47 = mul i64 %t45, %t46
+  %t48 = add i64 %t44, %t47
+  %t49 = inttoptr i64 %t48 to i64*
+  %t50 = load i64, i64* %t49
+  ret i64 %t50
 else96:
   br label %endif94
 endif94:
-  %t47 = load i64, i64* %i
-  %t48 = add i64 0, 1
-  %t49 = add i64 %t47, %t48
-  store i64 %t49, i64* %i
+  %t51 = load i64, i64* %i
+  %t52 = add i64 0, 1
+  %t53 = add i64 %t51, %t52
+  store i64 %t53, i64* %i
   br label %while.cond91
 while.end93:
-  %t50 = add i64 0, 0
-  ret i64 %t50
+  %t54 = add i64 0, 0
+  ret i64 %t54
 }
 
 define i64 @__map_has(i64 %map.arg, i64 %key.arg) {
@@ -1179,52 +1232,54 @@ endif97:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %map
-  %t11 = add i64 0, 16
-  %t12 = add i64 %t10, %t11
-  %t13 = inttoptr i64 %t12 to i64*
-  %t14 = load i64, i64* %t13
-  store i64 %t14, i64* %keys
-  %t15 = add i64 0, 0
-  store i64 %t15, i64* %i
+  %t11 = load i64, i64* @__g_SLOT_SIZE
+  %t12 = add i64 0, 2
+  %t13 = mul i64 %t11, %t12
+  %t14 = add i64 %t10, %t13
+  %t15 = inttoptr i64 %t14 to i64*
+  %t16 = load i64, i64* %t15
+  store i64 %t16, i64* %keys
+  %t17 = add i64 0, 0
+  store i64 %t17, i64* %i
   br label %while.cond100
 while.cond100:
-  %t16 = load i64, i64* %i
-  %t17 = load i64, i64* %count
-  %t19 = icmp slt i64 %t16, %t17
-  %t18 = zext i1 %t19 to i64
-  %t20 = trunc i64 %t18 to i1
-  br i1 %t20, label %while.body101, label %while.end102
+  %t18 = load i64, i64* %i
+  %t19 = load i64, i64* %count
+  %t21 = icmp slt i64 %t18, %t19
+  %t20 = zext i1 %t21 to i64
+  %t22 = trunc i64 %t20 to i1
+  br i1 %t22, label %while.body101, label %while.end102
 while.body101:
-  %t21 = load i64, i64* %keys
-  %t22 = load i64, i64* %i
-  %t23 = add i64 0, 8
-  %t24 = mul i64 %t22, %t23
-  %t25 = add i64 %t21, %t24
-  %t26 = inttoptr i64 %t25 to i64*
-  %t27 = load i64, i64* %t26
-  store i64 %t27, i64* %kval
-  %t28 = load i64, i64* %key
-  %t29 = load i64, i64* %kval
-  %t30 = call i64 @__safe_strcmp(i64 %t28, i64 %t29)
-  %t31 = add i64 0, 0
-  %t33 = icmp eq i64 %t30, %t31
-  %t32 = zext i1 %t33 to i64
-  %t34 = trunc i64 %t32 to i1
-  br i1 %t34, label %then104, label %else105
+  %t23 = load i64, i64* %keys
+  %t24 = load i64, i64* %i
+  %t25 = add i64 0, 8
+  %t26 = mul i64 %t24, %t25
+  %t27 = add i64 %t23, %t26
+  %t28 = inttoptr i64 %t27 to i64*
+  %t29 = load i64, i64* %t28
+  store i64 %t29, i64* %kval
+  %t30 = load i64, i64* %key
+  %t31 = load i64, i64* %kval
+  %t32 = call i64 @__safe_strcmp(i64 %t30, i64 %t31)
+  %t33 = add i64 0, 0
+  %t35 = icmp eq i64 %t32, %t33
+  %t34 = zext i1 %t35 to i64
+  %t36 = trunc i64 %t34 to i1
+  br i1 %t36, label %then104, label %else105
 then104:
-  %t35 = add i64 0, 1
-  ret i64 %t35
+  %t37 = add i64 0, 1
+  ret i64 %t37
 else105:
   br label %endif103
 endif103:
-  %t36 = load i64, i64* %i
-  %t37 = add i64 0, 1
-  %t38 = add i64 %t36, %t37
-  store i64 %t38, i64* %i
+  %t38 = load i64, i64* %i
+  %t39 = add i64 0, 1
+  %t40 = add i64 %t38, %t39
+  store i64 %t40, i64* %i
   br label %while.cond100
 while.end102:
-  %t39 = add i64 0, 0
-  ret i64 %t39
+  %t41 = add i64 0, 0
+  ret i64 %t41
 }
 
 define i64 @__map_keys(i64 %map.arg) {
@@ -1252,41 +1307,43 @@ endif106:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %map
-  %t11 = add i64 0, 16
-  %t12 = add i64 %t10, %t11
-  %t13 = inttoptr i64 %t12 to i64*
-  %t14 = load i64, i64* %t13
-  store i64 %t14, i64* %kp
-  %t15 = call i64 @__list_new()
-  store i64 %t15, i64* %list
-  %t16 = add i64 0, 0
-  store i64 %t16, i64* %i
+  %t11 = load i64, i64* @__g_SLOT_SIZE
+  %t12 = add i64 0, 2
+  %t13 = mul i64 %t11, %t12
+  %t14 = add i64 %t10, %t13
+  %t15 = inttoptr i64 %t14 to i64*
+  %t16 = load i64, i64* %t15
+  store i64 %t16, i64* %kp
+  %t17 = call i64 @__list_new()
+  store i64 %t17, i64* %list
+  %t18 = add i64 0, 0
+  store i64 %t18, i64* %i
   br label %while.cond109
 while.cond109:
-  %t17 = load i64, i64* %i
-  %t18 = load i64, i64* %count
-  %t20 = icmp slt i64 %t17, %t18
-  %t19 = zext i1 %t20 to i64
-  %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %while.body110, label %while.end111
+  %t19 = load i64, i64* %i
+  %t20 = load i64, i64* %count
+  %t22 = icmp slt i64 %t19, %t20
+  %t21 = zext i1 %t22 to i64
+  %t23 = trunc i64 %t21 to i1
+  br i1 %t23, label %while.body110, label %while.end111
 while.body110:
-  %t22 = load i64, i64* %list
-  %t23 = load i64, i64* %kp
-  %t24 = load i64, i64* %i
-  %t25 = add i64 0, 8
-  %t26 = mul i64 %t24, %t25
-  %t27 = add i64 %t23, %t26
-  %t28 = inttoptr i64 %t27 to i64*
-  %t29 = load i64, i64* %t28
-  %t30 = call i64 @__list_push(i64 %t22, i64 %t29)
-  %t31 = load i64, i64* %i
-  %t32 = add i64 0, 1
-  %t33 = add i64 %t31, %t32
-  store i64 %t33, i64* %i
+  %t24 = load i64, i64* %list
+  %t25 = load i64, i64* %kp
+  %t26 = load i64, i64* %i
+  %t27 = add i64 0, 8
+  %t28 = mul i64 %t26, %t27
+  %t29 = add i64 %t25, %t28
+  %t30 = inttoptr i64 %t29 to i64*
+  %t31 = load i64, i64* %t30
+  %t32 = call i64 @__list_push(i64 %t24, i64 %t31)
+  %t33 = load i64, i64* %i
+  %t34 = add i64 0, 1
+  %t35 = add i64 %t33, %t34
+  store i64 %t35, i64* %i
   br label %while.cond109
 while.end111:
-  %t34 = load i64, i64* %list
-  ret i64 %t34
+  %t36 = load i64, i64* %list
+  ret i64 %t36
 }
 
 define i64 @__int_to_string(i64 %val.arg) {
@@ -1398,124 +1455,126 @@ endif112:
   %t28 = load i64, i64* %t27
   store i64 %t28, i64* %count
   %t29 = load i64, i64* %list
-  %t30 = add i64 0, 16
-  %t31 = add i64 %t29, %t30
-  %t32 = inttoptr i64 %t31 to i64*
-  %t33 = load i64, i64* %t32
-  store i64 %t33, i64* %data
-  %t34 = load i64, i64* %count
-  %t35 = add i64 0, 22
-  %t36 = mul i64 %t34, %t35
-  %t37 = add i64 0, 3
-  %t38 = add i64 %t36, %t37
-  store i64 %t38, i64* %buf_size
-  %t39 = load i64, i64* %buf_size
-  %t40 = add i64 0, 1
-  %t41 = call i64 @__gc_alloc(i64 %t39, i64 %t40)
-  store i64 %t41, i64* %buf
-  %t42 = load i64, i64* %buf
-  %t43 = add i64 0, 91
-  %t44 = trunc i64 %t43 to i8
-  %t45 = inttoptr i64 %t42 to i8*
-  store i8 %t44, i8* %t45
-  %t46 = add i64 0, 1
-  store i64 %t46, i64* %pos
-  %t47 = add i64 0, 0
-  store i64 %t47, i64* %i
+  %t30 = load i64, i64* @__g_SLOT_SIZE
+  %t31 = add i64 0, 2
+  %t32 = mul i64 %t30, %t31
+  %t33 = add i64 %t29, %t32
+  %t34 = inttoptr i64 %t33 to i64*
+  %t35 = load i64, i64* %t34
+  store i64 %t35, i64* %data
+  %t36 = load i64, i64* %count
+  %t37 = add i64 0, 22
+  %t38 = mul i64 %t36, %t37
+  %t39 = add i64 0, 3
+  %t40 = add i64 %t38, %t39
+  store i64 %t40, i64* %buf_size
+  %t41 = load i64, i64* %buf_size
+  %t42 = add i64 0, 1
+  %t43 = call i64 @__gc_alloc(i64 %t41, i64 %t42)
+  store i64 %t43, i64* %buf
+  %t44 = load i64, i64* %buf
+  %t45 = add i64 0, 91
+  %t46 = trunc i64 %t45 to i8
+  %t47 = inttoptr i64 %t44 to i8*
+  store i8 %t46, i8* %t47
+  %t48 = add i64 0, 1
+  store i64 %t48, i64* %pos
+  %t49 = add i64 0, 0
+  store i64 %t49, i64* %i
   br label %while.cond115
 while.cond115:
-  %t48 = load i64, i64* %i
-  %t49 = load i64, i64* %count
-  %t51 = icmp slt i64 %t48, %t49
-  %t50 = zext i1 %t51 to i64
-  %t52 = trunc i64 %t50 to i1
-  br i1 %t52, label %while.body116, label %while.end117
+  %t50 = load i64, i64* %i
+  %t51 = load i64, i64* %count
+  %t53 = icmp slt i64 %t50, %t51
+  %t52 = zext i1 %t53 to i64
+  %t54 = trunc i64 %t52 to i1
+  br i1 %t54, label %while.body116, label %while.end117
 while.body116:
-  %t53 = load i64, i64* %i
-  %t54 = add i64 0, 0
-  %t56 = icmp sgt i64 %t53, %t54
-  %t55 = zext i1 %t56 to i64
-  %t57 = trunc i64 %t55 to i1
-  br i1 %t57, label %then119, label %else120
+  %t55 = load i64, i64* %i
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then119, label %else120
 then119:
-  %t58 = load i64, i64* %buf
-  %t59 = load i64, i64* %pos
-  %t60 = add i64 %t58, %t59
-  %t61 = add i64 0, 44
-  %t62 = trunc i64 %t61 to i8
-  %t63 = inttoptr i64 %t60 to i8*
-  store i8 %t62, i8* %t63
-  %t64 = load i64, i64* %pos
-  %t65 = add i64 0, 1
-  %t66 = add i64 %t64, %t65
-  store i64 %t66, i64* %pos
-  %t67 = load i64, i64* %buf
-  %t68 = load i64, i64* %pos
-  %t69 = add i64 %t67, %t68
-  %t70 = add i64 0, 32
-  %t71 = trunc i64 %t70 to i8
-  %t72 = inttoptr i64 %t69 to i8*
-  store i8 %t71, i8* %t72
-  %t73 = load i64, i64* %pos
-  %t74 = add i64 0, 1
-  %t75 = add i64 %t73, %t74
-  store i64 %t75, i64* %pos
+  %t60 = load i64, i64* %buf
+  %t61 = load i64, i64* %pos
+  %t62 = add i64 %t60, %t61
+  %t63 = add i64 0, 44
+  %t64 = trunc i64 %t63 to i8
+  %t65 = inttoptr i64 %t62 to i8*
+  store i8 %t64, i8* %t65
+  %t66 = load i64, i64* %pos
+  %t67 = add i64 0, 1
+  %t68 = add i64 %t66, %t67
+  store i64 %t68, i64* %pos
+  %t69 = load i64, i64* %buf
+  %t70 = load i64, i64* %pos
+  %t71 = add i64 %t69, %t70
+  %t72 = add i64 0, 32
+  %t73 = trunc i64 %t72 to i8
+  %t74 = inttoptr i64 %t71 to i8*
+  store i8 %t73, i8* %t74
+  %t75 = load i64, i64* %pos
+  %t76 = add i64 0, 1
+  %t77 = add i64 %t75, %t76
+  store i64 %t77, i64* %pos
   br label %endif118
 else120:
   br label %endif118
 endif118:
-  %t76 = load i64, i64* %data
-  %t77 = load i64, i64* %i
-  %t78 = add i64 0, 8
-  %t79 = mul i64 %t77, %t78
-  %t80 = add i64 %t76, %t79
-  %t81 = inttoptr i64 %t80 to i64*
-  %t82 = load i64, i64* %t81
-  store i64 %t82, i64* %elem
-  %t83 = load i64, i64* %elem
-  %t84 = call i64 @__int_to_string(i64 %t83)
-  store i64 %t84, i64* %elem_str
-  %t85 = load i64, i64* %elem_str
-  %t86 = inttoptr i64 %t85 to i8*
-  %t87 = call i64 @strlen(i8* %t86)
-  store i64 %t87, i64* %elen
-  %t88 = load i64, i64* %buf
-  %t89 = load i64, i64* %pos
-  %t90 = add i64 %t88, %t89
-  %t91 = inttoptr i64 %t90 to i8*
-  %t92 = load i64, i64* %elem_str
+  %t78 = load i64, i64* %data
+  %t79 = load i64, i64* %i
+  %t80 = load i64, i64* @__g_SLOT_SIZE
+  %t81 = mul i64 %t79, %t80
+  %t82 = add i64 %t78, %t81
+  %t83 = inttoptr i64 %t82 to i64*
+  %t84 = load i64, i64* %t83
+  store i64 %t84, i64* %elem
+  %t85 = load i64, i64* %elem
+  %t86 = call i64 @__int_to_string(i64 %t85)
+  store i64 %t86, i64* %elem_str
+  %t87 = load i64, i64* %elem_str
+  %t88 = inttoptr i64 %t87 to i8*
+  %t89 = call i64 @strlen(i8* %t88)
+  store i64 %t89, i64* %elen
+  %t90 = load i64, i64* %buf
+  %t91 = load i64, i64* %pos
+  %t92 = add i64 %t90, %t91
   %t93 = inttoptr i64 %t92 to i8*
-  %t94 = load i64, i64* %elen
-  %t95 = call i8* @memcpy(i8* %t91, i8* %t93, i64 %t94)
-  %t96 = ptrtoint i8* %t95 to i64
-  %t97 = load i64, i64* %pos
-  %t98 = load i64, i64* %elen
-  %t99 = add i64 %t97, %t98
-  store i64 %t99, i64* %pos
-  %t100 = load i64, i64* %i
-  %t101 = add i64 0, 1
-  %t102 = add i64 %t100, %t101
-  store i64 %t102, i64* %i
+  %t94 = load i64, i64* %elem_str
+  %t95 = inttoptr i64 %t94 to i8*
+  %t96 = load i64, i64* %elen
+  %t97 = call i8* @memcpy(i8* %t93, i8* %t95, i64 %t96)
+  %t98 = ptrtoint i8* %t97 to i64
+  %t99 = load i64, i64* %pos
+  %t100 = load i64, i64* %elen
+  %t101 = add i64 %t99, %t100
+  store i64 %t101, i64* %pos
+  %t102 = load i64, i64* %i
+  %t103 = add i64 0, 1
+  %t104 = add i64 %t102, %t103
+  store i64 %t104, i64* %i
   br label %while.cond115
 while.end117:
-  %t103 = load i64, i64* %buf
-  %t104 = load i64, i64* %pos
-  %t105 = add i64 %t103, %t104
-  %t106 = add i64 0, 93
-  %t107 = trunc i64 %t106 to i8
-  %t108 = inttoptr i64 %t105 to i8*
-  store i8 %t107, i8* %t108
-  %t109 = load i64, i64* %buf
-  %t110 = load i64, i64* %pos
-  %t111 = add i64 %t109, %t110
-  %t112 = add i64 0, 1
+  %t105 = load i64, i64* %buf
+  %t106 = load i64, i64* %pos
+  %t107 = add i64 %t105, %t106
+  %t108 = add i64 0, 93
+  %t109 = trunc i64 %t108 to i8
+  %t110 = inttoptr i64 %t107 to i8*
+  store i8 %t109, i8* %t110
+  %t111 = load i64, i64* %buf
+  %t112 = load i64, i64* %pos
   %t113 = add i64 %t111, %t112
-  %t114 = add i64 0, 0
-  %t115 = trunc i64 %t114 to i8
-  %t116 = inttoptr i64 %t113 to i8*
-  store i8 %t115, i8* %t116
-  %t117 = load i64, i64* %buf
-  ret i64 %t117
+  %t114 = add i64 0, 1
+  %t115 = add i64 %t113, %t114
+  %t116 = add i64 0, 0
+  %t117 = trunc i64 %t116 to i8
+  %t118 = inttoptr i64 %t115 to i8*
+  store i8 %t117, i8* %t118
+  %t119 = load i64, i64* %buf
+  ret i64 %t119
 }
 
 define i64 @__runtime_error(i64 %msg.arg) {
@@ -3121,128 +3180,130 @@ endif166:
   %t16 = load i64, i64* %t15
   store i64 %t16, i64* %count
   %t17 = load i64, i64* %list
-  %t18 = add i64 0, 16
-  %t19 = add i64 %t17, %t18
-  %t20 = inttoptr i64 %t19 to i64*
-  %t21 = load i64, i64* %t20
-  store i64 %t21, i64* %data
-  %t22 = add i64 0, 0
-  store i64 %t22, i64* %sep_len
-  %t23 = load i64, i64* %sep
+  %t18 = load i64, i64* @__g_SLOT_SIZE
+  %t19 = add i64 0, 2
+  %t20 = mul i64 %t18, %t19
+  %t21 = add i64 %t17, %t20
+  %t22 = inttoptr i64 %t21 to i64*
+  %t23 = load i64, i64* %t22
+  store i64 %t23, i64* %data
   %t24 = add i64 0, 0
-  %t26 = icmp ne i64 %t23, %t24
-  %t25 = zext i1 %t26 to i64
-  %t27 = trunc i64 %t25 to i1
-  br i1 %t27, label %then170, label %else171
+  store i64 %t24, i64* %sep_len
+  %t25 = load i64, i64* %sep
+  %t26 = add i64 0, 0
+  %t28 = icmp ne i64 %t25, %t26
+  %t27 = zext i1 %t28 to i64
+  %t29 = trunc i64 %t27 to i1
+  br i1 %t29, label %then170, label %else171
 then170:
-  %t28 = load i64, i64* %sep
-  %t29 = inttoptr i64 %t28 to i8*
-  %t30 = call i64 @strlen(i8* %t29)
-  store i64 %t30, i64* %sep_len
+  %t30 = load i64, i64* %sep
+  %t31 = inttoptr i64 %t30 to i8*
+  %t32 = call i64 @strlen(i8* %t31)
+  store i64 %t32, i64* %sep_len
   br label %endif169
 else171:
   br label %endif169
 endif169:
-  %t31 = add i64 0, 8
-  %t32 = call i8* @malloc(i64 %t31)
-  %t33 = ptrtoint i8* %t32 to i64
-  store i64 %t33, i64* %buf_p
-  %t34 = add i64 0, 8
-  %t35 = call i8* @malloc(i64 %t34)
-  %t36 = ptrtoint i8* %t35 to i64
-  store i64 %t36, i64* %len_p
-  %t37 = add i64 0, 8
-  %t38 = call i8* @malloc(i64 %t37)
-  %t39 = ptrtoint i8* %t38 to i64
-  store i64 %t39, i64* %cap_p
-  %t40 = add i64 0, 1024
-  %t41 = add i64 0, 1
-  %t42 = call i64 @__gc_alloc(i64 %t40, i64 %t41)
-  store i64 %t42, i64* %init_buf
-  %t43 = load i64, i64* %init_buf
-  %t44 = add i64 0, 0
-  %t45 = trunc i64 %t44 to i8
-  %t46 = inttoptr i64 %t43 to i8*
-  store i8 %t45, i8* %t46
-  %t47 = load i64, i64* %buf_p
-  %t48 = load i64, i64* %init_buf
-  %t49 = inttoptr i64 %t47 to i64*
-  store i64 %t48, i64* %t49
-  %t50 = load i64, i64* %len_p
-  %t51 = add i64 0, 0
-  %t52 = inttoptr i64 %t50 to i64*
-  store i64 %t51, i64* %t52
-  %t53 = load i64, i64* %cap_p
-  %t54 = add i64 0, 1024
-  %t55 = inttoptr i64 %t53 to i64*
-  store i64 %t54, i64* %t55
-  %t56 = add i64 0, 0
-  store i64 %t56, i64* %i
+  %t33 = add i64 0, 8
+  %t34 = call i8* @malloc(i64 %t33)
+  %t35 = ptrtoint i8* %t34 to i64
+  store i64 %t35, i64* %buf_p
+  %t36 = add i64 0, 8
+  %t37 = call i8* @malloc(i64 %t36)
+  %t38 = ptrtoint i8* %t37 to i64
+  store i64 %t38, i64* %len_p
+  %t39 = add i64 0, 8
+  %t40 = call i8* @malloc(i64 %t39)
+  %t41 = ptrtoint i8* %t40 to i64
+  store i64 %t41, i64* %cap_p
+  %t42 = add i64 0, 1024
+  %t43 = add i64 0, 1
+  %t44 = call i64 @__gc_alloc(i64 %t42, i64 %t43)
+  store i64 %t44, i64* %init_buf
+  %t45 = load i64, i64* %init_buf
+  %t46 = add i64 0, 0
+  %t47 = trunc i64 %t46 to i8
+  %t48 = inttoptr i64 %t45 to i8*
+  store i8 %t47, i8* %t48
+  %t49 = load i64, i64* %buf_p
+  %t50 = load i64, i64* %init_buf
+  %t51 = inttoptr i64 %t49 to i64*
+  store i64 %t50, i64* %t51
+  %t52 = load i64, i64* %len_p
+  %t53 = add i64 0, 0
+  %t54 = inttoptr i64 %t52 to i64*
+  store i64 %t53, i64* %t54
+  %t55 = load i64, i64* %cap_p
+  %t56 = add i64 0, 1024
+  %t57 = inttoptr i64 %t55 to i64*
+  store i64 %t56, i64* %t57
+  %t58 = add i64 0, 0
+  store i64 %t58, i64* %i
   br label %while.cond172
 while.cond172:
-  %t57 = load i64, i64* %i
-  %t58 = load i64, i64* %count
-  %t60 = icmp slt i64 %t57, %t58
-  %t59 = zext i1 %t60 to i64
-  %t61 = trunc i64 %t59 to i1
-  br i1 %t61, label %while.body173, label %while.end174
+  %t59 = load i64, i64* %i
+  %t60 = load i64, i64* %count
+  %t62 = icmp slt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %while.body173, label %while.end174
 while.body173:
-  %t62 = load i64, i64* %i
-  %t63 = add i64 0, 0
-  %t65 = icmp sgt i64 %t62, %t63
-  %t64 = zext i1 %t65 to i64
-  %t66 = trunc i64 %t64 to i1
-  br i1 %t66, label %then176, label %else177
+  %t64 = load i64, i64* %i
+  %t65 = add i64 0, 0
+  %t67 = icmp sgt i64 %t64, %t65
+  %t66 = zext i1 %t67 to i64
+  %t68 = trunc i64 %t66 to i1
+  br i1 %t68, label %then176, label %else177
 then176:
-  %t67 = load i64, i64* %buf_p
-  %t68 = load i64, i64* %len_p
-  %t69 = load i64, i64* %cap_p
-  %t70 = load i64, i64* %sep
-  %t71 = load i64, i64* %sep_len
-  %t72 = call i64 @__join_append(i64 %t67, i64 %t68, i64 %t69, i64 %t70, i64 %t71)
+  %t69 = load i64, i64* %buf_p
+  %t70 = load i64, i64* %len_p
+  %t71 = load i64, i64* %cap_p
+  %t72 = load i64, i64* %sep
+  %t73 = load i64, i64* %sep_len
+  %t74 = call i64 @__join_append(i64 %t69, i64 %t70, i64 %t71, i64 %t72, i64 %t73)
   br label %endif175
 else177:
   br label %endif175
 endif175:
-  %t73 = load i64, i64* %data
-  %t74 = load i64, i64* %i
-  %t75 = add i64 0, 8
-  %t76 = mul i64 %t74, %t75
-  %t77 = add i64 %t73, %t76
-  %t78 = inttoptr i64 %t77 to i64*
-  %t79 = load i64, i64* %t78
-  store i64 %t79, i64* %elem
-  %t80 = load i64, i64* %elem
-  %t81 = add i64 0, 0
-  %t83 = icmp ne i64 %t80, %t81
-  %t82 = zext i1 %t83 to i64
-  %t84 = trunc i64 %t82 to i1
-  br i1 %t84, label %then179, label %else180
+  %t75 = load i64, i64* %data
+  %t76 = load i64, i64* %i
+  %t77 = load i64, i64* @__g_SLOT_SIZE
+  %t78 = mul i64 %t76, %t77
+  %t79 = add i64 %t75, %t78
+  %t80 = inttoptr i64 %t79 to i64*
+  %t81 = load i64, i64* %t80
+  store i64 %t81, i64* %elem
+  %t82 = load i64, i64* %elem
+  %t83 = add i64 0, 0
+  %t85 = icmp ne i64 %t82, %t83
+  %t84 = zext i1 %t85 to i64
+  %t86 = trunc i64 %t84 to i1
+  br i1 %t86, label %then179, label %else180
 then179:
-  %t85 = load i64, i64* %elem
-  %t86 = inttoptr i64 %t85 to i8*
-  %t87 = call i64 @strlen(i8* %t86)
-  store i64 %t87, i64* %elem_len
-  %t88 = load i64, i64* %buf_p
-  %t89 = load i64, i64* %len_p
-  %t90 = load i64, i64* %cap_p
-  %t91 = load i64, i64* %elem
-  %t92 = load i64, i64* %elem_len
-  %t93 = call i64 @__join_append(i64 %t88, i64 %t89, i64 %t90, i64 %t91, i64 %t92)
+  %t87 = load i64, i64* %elem
+  %t88 = inttoptr i64 %t87 to i8*
+  %t89 = call i64 @strlen(i8* %t88)
+  store i64 %t89, i64* %elem_len
+  %t90 = load i64, i64* %buf_p
+  %t91 = load i64, i64* %len_p
+  %t92 = load i64, i64* %cap_p
+  %t93 = load i64, i64* %elem
+  %t94 = load i64, i64* %elem_len
+  %t95 = call i64 @__join_append(i64 %t90, i64 %t91, i64 %t92, i64 %t93, i64 %t94)
   br label %endif178
 else180:
   br label %endif178
 endif178:
-  %t94 = load i64, i64* %i
-  %t95 = add i64 0, 1
-  %t96 = add i64 %t94, %t95
-  store i64 %t96, i64* %i
+  %t96 = load i64, i64* %i
+  %t97 = add i64 0, 1
+  %t98 = add i64 %t96, %t97
+  store i64 %t98, i64* %i
   br label %while.cond172
 while.end174:
-  %t97 = load i64, i64* %buf_p
-  %t98 = inttoptr i64 %t97 to i64*
-  %t99 = load i64, i64* %t98
-  ret i64 %t99
+  %t99 = load i64, i64* %buf_p
+  %t100 = inttoptr i64 %t99 to i64*
+  %t101 = load i64, i64* %t100
+  ret i64 %t101
 }
 
 define i64 @__list_contains(i64 %list.arg, i64 %val.arg) {
@@ -3272,52 +3333,54 @@ endif181:
   %t9 = load i64, i64* %t8
   store i64 %t9, i64* %count
   %t10 = load i64, i64* %list
-  %t11 = add i64 0, 16
-  %t12 = add i64 %t10, %t11
-  %t13 = inttoptr i64 %t12 to i64*
-  %t14 = load i64, i64* %t13
-  store i64 %t14, i64* %data
-  %t15 = add i64 0, 0
-  store i64 %t15, i64* %i
+  %t11 = load i64, i64* @__g_SLOT_SIZE
+  %t12 = add i64 0, 2
+  %t13 = mul i64 %t11, %t12
+  %t14 = add i64 %t10, %t13
+  %t15 = inttoptr i64 %t14 to i64*
+  %t16 = load i64, i64* %t15
+  store i64 %t16, i64* %data
+  %t17 = add i64 0, 0
+  store i64 %t17, i64* %i
   br label %while.cond184
 while.cond184:
-  %t16 = load i64, i64* %i
-  %t17 = load i64, i64* %count
-  %t19 = icmp slt i64 %t16, %t17
-  %t18 = zext i1 %t19 to i64
-  %t20 = trunc i64 %t18 to i1
-  br i1 %t20, label %while.body185, label %while.end186
+  %t18 = load i64, i64* %i
+  %t19 = load i64, i64* %count
+  %t21 = icmp slt i64 %t18, %t19
+  %t20 = zext i1 %t21 to i64
+  %t22 = trunc i64 %t20 to i1
+  br i1 %t22, label %while.body185, label %while.end186
 while.body185:
-  %t21 = load i64, i64* %data
-  %t22 = load i64, i64* %i
-  %t23 = add i64 0, 8
-  %t24 = mul i64 %t22, %t23
-  %t25 = add i64 %t21, %t24
-  %t26 = inttoptr i64 %t25 to i64*
-  %t27 = load i64, i64* %t26
-  store i64 %t27, i64* %elem
-  %t28 = load i64, i64* %val
-  %t29 = load i64, i64* %elem
-  %t30 = call i64 @__safe_strcmp(i64 %t28, i64 %t29)
-  %t31 = add i64 0, 0
-  %t33 = icmp eq i64 %t30, %t31
-  %t32 = zext i1 %t33 to i64
-  %t34 = trunc i64 %t32 to i1
-  br i1 %t34, label %then188, label %else189
+  %t23 = load i64, i64* %data
+  %t24 = load i64, i64* %i
+  %t25 = load i64, i64* @__g_SLOT_SIZE
+  %t26 = mul i64 %t24, %t25
+  %t27 = add i64 %t23, %t26
+  %t28 = inttoptr i64 %t27 to i64*
+  %t29 = load i64, i64* %t28
+  store i64 %t29, i64* %elem
+  %t30 = load i64, i64* %val
+  %t31 = load i64, i64* %elem
+  %t32 = call i64 @__safe_strcmp(i64 %t30, i64 %t31)
+  %t33 = add i64 0, 0
+  %t35 = icmp eq i64 %t32, %t33
+  %t34 = zext i1 %t35 to i64
+  %t36 = trunc i64 %t34 to i1
+  br i1 %t36, label %then188, label %else189
 then188:
-  %t35 = add i64 0, 1
-  ret i64 %t35
+  %t37 = add i64 0, 1
+  ret i64 %t37
 else189:
   br label %endif187
 endif187:
-  %t36 = load i64, i64* %i
-  %t37 = add i64 0, 1
-  %t38 = add i64 %t36, %t37
-  store i64 %t38, i64* %i
+  %t38 = load i64, i64* %i
+  %t39 = add i64 0, 1
+  %t40 = add i64 %t38, %t39
+  store i64 %t40, i64* %i
   br label %while.cond184
 while.end186:
-  %t39 = add i64 0, 0
-  ret i64 %t39
+  %t41 = add i64 0, 0
+  ret i64 %t41
 }
 
 define i64 @__io_read_file(i64 %path.arg) {
@@ -5136,5 +5199,21 @@ while.end351:
   %t58 = load i64, i64* %copy
   ret i64 %t58
 }
+
+define i64 @__saffron_entry() {
+entry:
+  %SLOT_SIZE = alloca i64
+  %t1 = add i64 0, 8
+  store i64 %t1, i64* @__g_SLOT_SIZE
+  ret i64 0
+}
 declare i64 @__rt_tag_ptr(i64)
 
+
+define i32 @main(i32 %argc, i8** %argv) {
+entry:
+  store i32 %argc, i32* @__argc
+  store i8** %argv, i8*** @__argv
+  call i64 @__saffron_entry()
+  ret i32 0
+}

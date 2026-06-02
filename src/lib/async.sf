@@ -1,14 +1,9 @@
-//! Cooperative async primitives for sleeping and awaiting spawned tasks.
+//! Async primitives for cooperative concurrency.
+//! Users import this for sleep/timing. task.await() is a method, not here.
+
+@intrinsic fun __suspend(reason: Int, arg: Int)
 
 /// Suspend the current task for the given duration in seconds.
 fun sleep(duration: Number) {
-    yield [1, duration]
-}
-
-/// Block until a spawned task completes and return its result.
-fun await(task: Task) {
-    while (!task.isReady()) {
-        yield
-    }
-    return task.getResult()
+    __suspend(1, duration)
 }

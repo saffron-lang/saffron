@@ -29,6 +29,8 @@
         rt.append("declare i64 @__gc_stat_total_bytes()\n")
         rt.append("declare i64 @__gc_stat_collections()\n")
         rt.append("declare i64 @__gc_stat_freed_bytes()\n")
+        rt.append("declare i64 @__gc_stat_threshold()\n")
+        rt.append("declare void @__gc_debug_stats()\n")
         rt.append("declare i64 @__gc_alloc(i64, i64)\n")
         rt.append("declare i64 @__gc_alloc_zeroed(i64, i64)\n")
         rt.append("declare i64 @__gc_realloc(i64, i64, i64)\n")
@@ -385,7 +387,7 @@
             Yield(v) => true
             Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             Unary(o, r) => this.expr_has_yield(r)
-            Call(c, a) => this.exprs_have_yield(a)
+            Call(c, a) => this.call_is_suspend(c) or this.exprs_have_yield(a)
             Assign(n, v) => this.expr_has_yield(v)
             Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             MethodCall(o, m, a) => this.expr_has_yield(o) or this.exprs_have_yield(a)
@@ -403,6 +405,11 @@
             TryExpr(tb, tv, cn, cb, cv) => this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(cb) or this.expr_has_yield(cv)
             _ => false
         }
+    }
+
+    fun call_is_suspend(callee: AST.Expr): Bool {
+        var name: String = this.get_variable_name(callee)
+        return name == "__suspend" or name.ends_with("__suspend")
     }
 
     fun exprs_have_yield(exprs: List<AST.Expr>): Bool {
@@ -546,6 +553,9 @@
                 func_bodies.push(body)
                 if (this.stmts_have_yield(body)) {
                     this.coroutine_funcs.push(full_name)
+                    if (name != full_name) {
+                        this.coroutine_funcs.push(name)
+                    }
                 }
             }
             i = i + 1

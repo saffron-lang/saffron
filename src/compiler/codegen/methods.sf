@@ -454,7 +454,7 @@ extend fun Codegen.resolve_namespace(obj_name: String, object: AST.Expr): String
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
     }
-    if (obj_name == "IO" or obj_name == "OS") { return obj_name }
+    if (obj_name == "IO" or obj_name == "OS" or obj_name == "GC") { return obj_name }
     if (this.module_prefixes.has(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
@@ -559,10 +559,58 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
 
+    // Check for GC module calls
+    if (obj_name == "GC") {
+        if (method == "collect") {
+            this.emit_indent("call void @__gc_collect()")
+            this.set_last_type(AST.Type.NilType)
+            return "0"
+        }
+        if (method == "enable") {
+            this.emit_indent("call void @__gc_enable()")
+            this.set_last_type(AST.Type.NilType)
+            return "0"
+        }
+        if (method == "disable") {
+            this.emit_indent("call void @__gc_disable()")
+            this.set_last_type(AST.Type.NilType)
+            return "0"
+        }
+        if (method == "stats") {
+            this.emit_indent("call void @__gc_debug_stats()")
+            this.set_last_type(AST.Type.NilType)
+            return "0"
+        }
+        if (method == "alloc_count") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_alloc_count()")
+            this.set_last_type(AST.Type.IntType)
+            return local
+        }
+        if (method == "total_bytes") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_total_bytes()")
+            this.set_last_type(AST.Type.IntType)
+            return local
+        }
+        if (method == "threshold") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_threshold()")
+            this.set_last_type(AST.Type.IntType)
+            return local
+        }
+        if (method == "set_threshold") {
+            var arg: String = this.gen_arg_value(args[0])
+            this.emit_indent("call void @__gc_set_threshold(i64 " + arg + ")")
+            this.set_last_type(AST.Type.NilType)
+            return "0"
+        }
+    }
+
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and this.module_prefixes.has(obj_name)) {
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -879,7 +927,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     // (enum check moved above builtin dispatch)
 
     // Check for imported module function calls (module alias or unknown name)
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
