@@ -52,71 +52,54 @@ fun main() {
         return
     }
 
-    var command = positional[0]
+    var command: String = positional[0]
 
-    if (command == "init") {
-        Init.run(parsed)
-    } else if (command == "run") {
-        if (positional.length() < 2) {
-            IO.println("pantry run: missing script name")
-            IO.println("Usage: pantry run <script_name>")
-            OS.exit(1)
-        }
-        Run.run(positional[1], parsed)
-    } else if (command == "build") {
-        Build.run(parsed)
-    } else if (command == "test") {
-        TestCmd.run(parsed)
-    } else if (command == "add") {
-        if (positional.length() < 2) {
-            IO.println("pantry add: missing package name")
-            IO.println("Usage: pantry add <package> [--version <constraint>]")
-            OS.exit(1)
-        }
-        Add.run(positional[1], parsed)
-    } else if (command == "remove") {
-        if (positional.length() < 2) {
-            IO.println("pantry remove: missing package name")
-            IO.println("Usage: pantry remove <package>")
-            OS.exit(1)
-        }
-        Remove.run(positional[1], parsed)
-    } else if (command == "install") {
-        Install.run(parsed)
-    } else if (command == "list") {
-        ListCmd.run(parsed)
-    } else if (command == "clean") {
-        Clean.run(parsed)
-    } else if (command == "script") {
-        if (positional.length() < 2) {
-            IO.println("pantry script: missing command")
-            OS.exit(1)
-        }
-        Run.run_raw(positional[1], parsed)
-    } else if (command == "version" or command == "--version") {
-        IO.println("pantry 0.1.0")
-    } else {
-        // Detect pointer values from OS.args() bug
-        if (command.length() > 5 and !(command.contains("-"))) {
-            var is_numeric: Bool = true
-            var ci: Int = 0
-            while (ci < command.length()) {
-                var ch: String = command.char_at(ci)
-                if (!(ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9")) {
-                    is_numeric = false
-                }
-                ci = ci + 1
-            }
-            if (is_numeric) {
-                IO.println("pantry: OS.args() returned raw pointer values instead of strings.")
-                IO.println("This is a known runtime bug. Try rebuilding with: ./bootstrap.sh")
+    match (command) {
+        "init" => Init.run(parsed)
+        "build" => Build.run(parsed)
+        "test" => TestCmd.run(parsed)
+        "install" => Install.run(parsed)
+        "list" => ListCmd.run(parsed)
+        "clean" => Clean.run(parsed)
+        "version" => IO.println("pantry 0.1.0")
+        "--version" => IO.println("pantry 0.1.0")
+        "run" => {
+            if (positional.length() < 2) {
+                IO.println("pantry run: missing script name")
+                IO.println("Usage: pantry run <script_name>")
                 OS.exit(1)
             }
+            Run.run(positional[1], parsed)
         }
-        IO.println("pantry: unknown command '${command}'")
-        IO.println("  To run a script: pantry run ${command}")
-        IO.println("  For help: pantry --help")
-        OS.exit(1)
+        "add" => {
+            if (positional.length() < 2) {
+                IO.println("pantry add: missing package name")
+                IO.println("Usage: pantry add <package> [--version <constraint>]")
+                OS.exit(1)
+            }
+            Add.run(positional[1], parsed)
+        }
+        "remove" => {
+            if (positional.length() < 2) {
+                IO.println("pantry remove: missing package name")
+                IO.println("Usage: pantry remove <package>")
+                OS.exit(1)
+            }
+            Remove.run(positional[1], parsed)
+        }
+        "script" => {
+            if (positional.length() < 2) {
+                IO.println("pantry script: missing command")
+                OS.exit(1)
+            }
+            Run.run_raw(positional[1], parsed)
+        }
+        _ => {
+            IO.println("pantry: unknown command '" + command + "'")
+            IO.println("  To run a script: pantry run " + command)
+            IO.println("  For help: pantry --help")
+            OS.exit(1)
+        }
     }
 }
 
