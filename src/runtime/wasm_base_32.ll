@@ -3,17 +3,29 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 
 ; =============================================================================
 ; WASM32 Runtime Base
-; Same as wasm_base.ll but targets wasm32. Pointers are 32-bit, values are i64.
-; The key difference: ptrtoint/inttoptr operations truncate/zero-extend between
-; 32-bit pointers and i64 values. This is safe because heap addresses < 4GB.
+; Pointers are 32-bit, values are i64.
+; Function signatures MUST match what the compiler (saffronc --target wasm32)
+; emits in its 'declare' statements, otherwise wasm-ld inserts trapping stubs.
+;
+; Compiler ABI (from generated .ll):
+;   malloc(i64) -> i8*           (size truncated to i32 internally)
+;   realloc(i8*, i64) -> i8*     (size truncated to i32 internally)
+;   strlen(i8*) -> i64
+;   strncmp(i8*, i8*, i64) -> i32
+;   snprintf(i8*, i64, i8*, ...) -> i32
+;   fread(i8*, i64, i64, i8*) -> i64
+;   fwrite(i8*, i64, i64, i8*) -> i64
+;   fseek(i8*, i64, i32) -> i32
+;   ftell(i8*) -> i64
+;
+; Internally, @__heap_ptr is i32 (pointer-sized on wasm32).
+; All pointer arithmetic uses i32. Values stored in list/map slots are i64.
 ; =============================================================================
 
 ; --- Globals ---
 
-; __heap_base is a linker-provided symbol whose ADDRESS equals the first byte
-; after all static data.  We use ptrtoint on it (not a load) to get the value.
 @__heap_base = external global i8
-@__heap_ptr = global i64 0
+@__heap_ptr = global i32 0
 @__argc = weak global i32 0
 @__argv = weak global i8** null
 @__exception_value = weak global i64 0
@@ -24,7 +36,6 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 @__g_SLOT_SIZE = global i64 8
 
 ; --- JS Imports ---
-; These are provided by the JS glue code via WebAssembly.imports
 
 declare void @js_log_str(i8*)
 declare void @js_log_int(i64)
@@ -43,54 +54,50 @@ declare i64 @js_dom_query_selector(i8*)
 declare void @js_dom_add_event_listener(i64, i8*, i64)
 
 ; --- Memory Allocator (bump allocator) ---
-; Simple and fast. No free. Suitable for short-lived WASM modules.
 
 define i8* @malloc(i64 %size) {
 entry:
-  ; Align to 8 bytes
-  %aligned = add i64 %size, 7
-  %mask = and i64 %aligned, -8
-  ; Load current heap pointer
-  %heap = load i64, i64* @__heap_ptr
-  %ptr = inttoptr i64 %heap to i8*
-  ; Bump heap pointer
-  %new_heap = add i64 %heap, %mask
-  store i64 %new_heap, i64* @__heap_ptr
-  ret i8* %ptr
-}
-
-define i8* @calloc(i64 %num, i64 %size) {
-entry:
-  %total = mul i64 %num, %size
-  %ptr = call i8* @malloc(i64 %total)
-  ; Zero the memory
-  br label %loop
-loop:
-  %i = phi i64 [0, %entry], [%next, %body]
-  %done = icmp uge i64 %i, %total
-  br i1 %done, label %end, label %body
-body:
-  %p = getelementptr i8, i8* %ptr, i64 %i
-  store i8 0, i8* %p
-  %next = add i64 %i, 1
-  br label %loop
-end:
+  %size32 = trunc i64 %size to i32
+  %aligned = add i32 %size32, 7
+  %mask = and i32 %aligned, -8
+  %heap = load i32, i32* @__heap_ptr
+  %ptr = inttoptr i32 %heap to i8*
+  %new_heap = add i32 %heap, %mask
+  store i32 %new_heap, i32* @__heap_ptr
   ret i8* %ptr
 }
 
 define i8* @realloc(i8* %old_ptr, i64 %new_size) {
 entry:
-  ; Bump allocator: just allocate new block and copy
   %new_ptr = call i8* @malloc(i64 %new_size)
-  ; Copy old data (conservatively copy new_size bytes)
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %new_ptr, i8* %old_ptr, i64 %new_size, i1 false)
   ret i8* %new_ptr
 }
 
 define void @free(i8* %ptr) {
 entry:
-  ; No-op in bump allocator
   ret void
+}
+
+; Internal helper: calloc with i64 sizes
+define internal i8* @__calloc_internal(i64 %num, i64 %size) {
+entry:
+  %total = mul i64 %num, %size
+  %ptr = call i8* @malloc(i64 %total)
+  ; Zero the memory
+  %total32 = trunc i64 %total to i32
+  br label %loop
+loop:
+  %i = phi i32 [0, %entry], [%next, %body]
+  %done = icmp uge i32 %i, %total32
+  br i1 %done, label %end, label %body
+body:
+  %p = getelementptr i8, i8* %ptr, i32 %i
+  store i8 0, i8* %p
+  %next = add i32 %i, 1
+  br label %loop
+end:
+  ret i8* %ptr
 }
 
 ; --- String Operations ---
@@ -233,7 +240,8 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
 
 define void @__io_println_str(i64 %s) {
 entry:
-  %ptr = inttoptr i64 %s to i8*
+  %s32 = trunc i64 %s to i32
+  %ptr = inttoptr i32 %s32 to i8*
   call void @js_log_str(i8* %ptr)
   ret void
 }
@@ -258,7 +266,8 @@ entry:
 
 define void @__io_print_str(i64 %s) {
 entry:
-  %ptr = inttoptr i64 %s to i8*
+  %s32 = trunc i64 %s to i32
+  %ptr = inttoptr i32 %s32 to i8*
   call void @js_log_str(i8* %ptr)
   ret void
 }
@@ -277,16 +286,15 @@ entry:
   ret i32 0
 }
 
-; --- printf stub (only handles %ld and %s for now) ---
+; --- printf stub ---
 
 define i32 @printf(i8* %fmt, ...) {
 entry:
-  ; Minimal stub -- just logs the format string
   call void @js_log_str(i8* %fmt)
   ret i32 0
 }
 
-; --- snprintf stub (handles %ld only) ---
+; --- snprintf stub ---
 
 define i32 @snprintf(i8* %buf, i64 %size, i8* %fmt, ...) {
 entry:
@@ -296,13 +304,14 @@ entry:
   ret i32 %len32
 }
 
-; --- Override __int_to_string for WASM (avoids snprintf) ---
+; --- __int_to_string ---
 
 define i64 @__int_to_string(i64 %val) {
 entry:
   %buf = call i8* @malloc(i64 24)
   call void @__wasm_int_to_str(i64 %val, i8* %buf)
-  %result = ptrtoint i8* %buf to i64
+  %ptr_i32 = ptrtoint i8* %buf to i32
+  %result = zext i32 %ptr_i32 to i64
   ret i64 %result
 }
 
@@ -333,7 +342,6 @@ zero:
   store i8 0, i8* %term0
   ret void
 nonzero:
-  ; Write digits in reverse into temp buffer
   %tmp = alloca [21 x i8]
   %tmp_ptr = getelementptr [21 x i8], [21 x i8]* %tmp, i64 0, i64 0
   br label %loop
@@ -350,7 +358,6 @@ loop:
   %done = icmp eq i64 %next_val, 0
   br i1 %done, label %reverse, label %loop
 reverse:
-  ; Copy reversed digits to output buf
   %len = phi i64 [%next_idx, %loop]
   br label %rev_loop
 rev_loop:
@@ -383,8 +390,8 @@ loop:
   %is_zero = icmp eq i8 %ch, 0
   br i1 %is_zero, label %end, label %check
 check:
-  %is_digit = icmp uge i8 %ch, 48  ; '0'
-  %le_nine = icmp ule i8 %ch, 57   ; '9'
+  %is_digit = icmp uge i8 %ch, 48
+  %le_nine = icmp ule i8 %ch, 57
   %valid = and i1 %is_digit, %le_nine
   br i1 %valid, label %digit, label %end
 digit:
@@ -402,7 +409,6 @@ end:
 
 define double @strtod(i8* %s, i8* %endptr) {
 entry:
-  ; Minimal stub: convert integer portion only
   %ival = call i64 @atol(i8* %s)
   %fval = sitofp i64 %ival to double
   ret double %fval
@@ -509,7 +515,7 @@ entry:
 }
 
 ; =============================================================================
-; NaN-Boxing Value Helpers (identity mode -- matches base.ll)
+; NaN-Boxing Value Helpers
 ; =============================================================================
 
 define i64 @__val_tag_int(i64 %n) {
@@ -524,13 +530,15 @@ entry:
 
 define i64 @__val_tag_ptr(i8* %ptr) {
 entry:
-  %r = ptrtoint i8* %ptr to i64
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
-  %ptr = inttoptr i64 %v to i8*
+  %v32 = trunc i64 %v to i32
+  %ptr = inttoptr i32 %v32 to i8*
   ret i8* %ptr
 }
 
@@ -631,19 +639,22 @@ entry:
   %is_true = icmp ne i64 %b, 0
   br i1 %is_true, label %yes, label %no
 yes:
-  %t = getelementptr [5 x i8], [5 x i8]* @.str.true, i64 0, i64 0
-  %r1 = ptrtoint i8* %t to i64
+  %t = getelementptr [5 x i8], [5 x i8]* @.str.true, i32 0, i32 0
+  %t32 = ptrtoint i8* %t to i32
+  %r1 = zext i32 %t32 to i64
   ret i64 %r1
 no:
-  %f = getelementptr [6 x i8], [6 x i8]* @.str.false, i64 0, i64 0
-  %r2 = ptrtoint i8* %f to i64
+  %f = getelementptr [6 x i8], [6 x i8]* @.str.false, i32 0, i32 0
+  %f32 = ptrtoint i8* %f to i32
+  %r2 = zext i32 %f32 to i64
   ret i64 %r2
 }
 
 define i64 @__nil_to_string() {
 entry:
-  %s = getelementptr [4 x i8], [4 x i8]* @.str.nil, i64 0, i64 0
-  %r = ptrtoint i8* %s to i64
+  %s = getelementptr [4 x i8], [4 x i8]* @.str.nil, i32 0, i32 0
+  %s32 = ptrtoint i8* %s to i32
+  %r = zext i32 %s32 to i64
   ret i64 %r
 }
 
@@ -658,7 +669,8 @@ entry:
 ; Wrapper: tag a raw pointer as a Saffron string value (i64 -> i64)
 define i64 @__rt_tag_ptr(i64 %raw) {
 entry:
-  %ptr = inttoptr i64 %raw to i8*
+  %raw32 = trunc i64 %raw to i32
+  %ptr = inttoptr i32 %raw32 to i8*
   %tagged = call i64 @__val_tag_ptr(i8* %ptr)
   ret i64 %tagged
 }
@@ -711,41 +723,49 @@ entry:
 define i64 @__gc_alloc(i64 %size, i64 %type_tag) {
 entry:
   %ptr = call i8* @malloc(i64 %size)
-  %r = ptrtoint i8* %ptr to i64
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
 ; __gc_alloc_zeroed: calloc equivalent
 define i64 @__gc_alloc_zeroed(i64 %size, i64 %type_tag) {
 entry:
-  %ptr = call i8* @calloc(i64 1, i64 %size)
-  %r = ptrtoint i8* %ptr to i64
+  %ptr = call i8* @__calloc_internal(i64 1, i64 %size)
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
 ; __gc_realloc: simple realloc
 define i64 @__gc_realloc(i64 %old_ptr, i64 %new_size, i64 %type_tag) {
 entry:
-  %old_p = inttoptr i64 %old_ptr to i8*
+  %old_i32 = trunc i64 %old_ptr to i32
+  %old_p = inttoptr i32 %old_i32 to i8*
   %new_p = call i8* @realloc(i8* %old_p, i64 %new_size)
-  %r = ptrtoint i8* %new_p to i64
+  %new_i32 = ptrtoint i8* %new_p to i32
+  %r = zext i32 %new_i32 to i64
   ret i64 %r
 }
 
 ; __gc_list_new: allocate a list { count@0, capacity@8, data_ptr@16 }
 define i64 @__gc_list_new() {
 entry:
-  %list_raw = call i8* @calloc(i64 1, i64 24)
-  %list = ptrtoint i8* %list_raw to i64
+  %list_raw = call i8* @__calloc_internal(i64 1, i64 24)
+  %list_i32 = ptrtoint i8* %list_raw to i32
+  %list = zext i32 %list_i32 to i64
   ; capacity = 8
   %cap_addr = add i64 %list, 8
-  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  %cap_addr32 = trunc i64 %cap_addr to i32
+  %cap_ptr = inttoptr i32 %cap_addr32 to i64*
   store i64 8, i64* %cap_ptr
   ; data = calloc(64) for 8 slots
-  %data_raw = call i8* @calloc(i64 1, i64 64)
-  %data = ptrtoint i8* %data_raw to i64
+  %data_raw = call i8* @__calloc_internal(i64 1, i64 64)
+  %data_i32 = ptrtoint i8* %data_raw to i32
+  %data = zext i32 %data_i32 to i64
   %data_addr = add i64 %list, 16
-  %data_ptr = inttoptr i64 %data_addr to i64*
+  %data_addr32 = trunc i64 %data_addr to i32
+  %data_ptr = inttoptr i32 %data_addr32 to i64*
   store i64 %data, i64* %data_ptr
   ret i64 %list
 }
@@ -756,32 +776,36 @@ entry:
   %is_null = icmp eq i64 %list, 0
   br i1 %is_null, label %done, label %check
 check:
-  %count_ptr = inttoptr i64 %list to i64*
+  %list32 = trunc i64 %list to i32
+  %count_ptr = inttoptr i32 %list32 to i64*
   %count = load i64, i64* %count_ptr
-  %cap_addr = add i64 %list, 8
-  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  %cap_addr = add i32 %list32, 8
+  %cap_ptr = inttoptr i32 %cap_addr to i64*
   %cap = load i64, i64* %cap_ptr
   %need_grow = icmp uge i64 %count, %cap
   br i1 %need_grow, label %grow, label %store
 grow:
   %new_cap = shl i64 %cap, 1
   %new_bytes = shl i64 %new_cap, 3
-  %data_addr_g = add i64 %list, 16
-  %data_ptr_g = inttoptr i64 %data_addr_g to i64*
+  %data_addr_g = add i32 %list32, 16
+  %data_ptr_g = inttoptr i32 %data_addr_g to i64*
   %old_data = load i64, i64* %data_ptr_g
-  %old_data_p = inttoptr i64 %old_data to i8*
+  %old_data_i32 = trunc i64 %old_data to i32
+  %old_data_p = inttoptr i32 %old_data_i32 to i8*
   %new_data_p = call i8* @realloc(i8* %old_data_p, i64 %new_bytes)
-  %new_data = ptrtoint i8* %new_data_p to i64
+  %new_data_i32 = ptrtoint i8* %new_data_p to i32
+  %new_data = zext i32 %new_data_i32 to i64
   store i64 %new_cap, i64* %cap_ptr
   store i64 %new_data, i64* %data_ptr_g
   br label %store
 store:
-  %data_addr_s = add i64 %list, 16
-  %data_ptr_s = inttoptr i64 %data_addr_s to i64*
+  %data_addr_s = add i32 %list32, 16
+  %data_ptr_s = inttoptr i32 %data_addr_s to i64*
   %data = load i64, i64* %data_ptr_s
   %offset = shl i64 %count, 3
   %slot = add i64 %data, %offset
-  %slot_ptr = inttoptr i64 %slot to i64*
+  %slot32 = trunc i64 %slot to i32
+  %slot_ptr = inttoptr i32 %slot32 to i64*
   store i64 %value, i64* %slot_ptr
   %new_count = add i64 %count, 1
   store i64 %new_count, i64* %count_ptr
@@ -793,23 +817,29 @@ done:
 ; __gc_map_new: allocate a map { count@0, capacity@8, keys_ptr@16, values_ptr@24 }
 define i64 @__gc_map_new() {
 entry:
-  %map_raw = call i8* @calloc(i64 1, i64 32)
-  %map = ptrtoint i8* %map_raw to i64
+  %map_raw = call i8* @__calloc_internal(i64 1, i64 32)
+  %map_i32 = ptrtoint i8* %map_raw to i32
+  %map = zext i32 %map_i32 to i64
   ; capacity = 16
   %cap_addr = add i64 %map, 8
-  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  %cap_addr32 = trunc i64 %cap_addr to i32
+  %cap_ptr = inttoptr i32 %cap_addr32 to i64*
   store i64 16, i64* %cap_ptr
   ; keys = calloc(128)
-  %keys_raw = call i8* @calloc(i64 1, i64 128)
-  %keys = ptrtoint i8* %keys_raw to i64
+  %keys_raw = call i8* @__calloc_internal(i64 1, i64 128)
+  %keys_i32 = ptrtoint i8* %keys_raw to i32
+  %keys = zext i32 %keys_i32 to i64
   %keys_addr = add i64 %map, 16
-  %keys_ptr = inttoptr i64 %keys_addr to i64*
+  %keys_addr32 = trunc i64 %keys_addr to i32
+  %keys_ptr = inttoptr i32 %keys_addr32 to i64*
   store i64 %keys, i64* %keys_ptr
   ; values = calloc(128)
-  %vals_raw = call i8* @calloc(i64 1, i64 128)
-  %vals = ptrtoint i8* %vals_raw to i64
+  %vals_raw = call i8* @__calloc_internal(i64 1, i64 128)
+  %vals_i32 = ptrtoint i8* %vals_raw to i32
+  %vals = zext i32 %vals_i32 to i64
   %vals_addr = add i64 %map, 24
-  %vals_ptr = inttoptr i64 %vals_addr to i64*
+  %vals_addr32 = trunc i64 %vals_addr to i32
+  %vals_ptr = inttoptr i32 %vals_addr32 to i64*
   store i64 %vals, i64* %vals_ptr
   ret i64 %map
 }
@@ -817,17 +847,21 @@ entry:
 ; __gc_stringbuilder_new: allocate a StringBuilder { len@0, cap@8, buf_ptr@16 }
 define i64 @__gc_stringbuilder_new() {
 entry:
-  %sb_raw = call i8* @calloc(i64 1, i64 24)
-  %sb = ptrtoint i8* %sb_raw to i64
+  %sb_raw = call i8* @__calloc_internal(i64 1, i64 24)
+  %sb_i32 = ptrtoint i8* %sb_raw to i32
+  %sb = zext i32 %sb_i32 to i64
   ; cap = 1024
   %cap_addr = add i64 %sb, 8
-  %cap_ptr = inttoptr i64 %cap_addr to i64*
+  %cap_addr32 = trunc i64 %cap_addr to i32
+  %cap_ptr = inttoptr i32 %cap_addr32 to i64*
   store i64 1024, i64* %cap_ptr
   ; buf = calloc(1024)
-  %buf_raw = call i8* @calloc(i64 1, i64 1024)
-  %buf = ptrtoint i8* %buf_raw to i64
+  %buf_raw = call i8* @__calloc_internal(i64 1, i64 1024)
+  %buf_i32 = ptrtoint i8* %buf_raw to i32
+  %buf = zext i32 %buf_i32 to i64
   %buf_addr = add i64 %sb, 16
-  %buf_ptr = inttoptr i64 %buf_addr to i64*
+  %buf_addr32 = trunc i64 %buf_addr to i32
+  %buf_ptr = inttoptr i32 %buf_addr32 to i64*
   store i64 %buf, i64* %buf_ptr
   ret i64 %sb
 }
@@ -836,7 +870,8 @@ entry:
 define i64 @__gc_string_alloc(i64 %size) {
 entry:
   %ptr = call i8* @malloc(i64 %size)
-  %r = ptrtoint i8* %ptr to i64
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
@@ -844,11 +879,14 @@ entry:
 define i64 @__gc_closure_new(i64 %fn_ptr, i64 %env_ptr) {
 entry:
   %raw_p = call i8* @malloc(i64 16)
-  %raw = ptrtoint i8* %raw_p to i64
-  %fn_slot = inttoptr i64 %raw to i64*
+  %raw_i32 = ptrtoint i8* %raw_p to i32
+  %raw = zext i32 %raw_i32 to i64
+  %fn_slot_i32 = trunc i64 %raw to i32
+  %fn_slot = inttoptr i32 %fn_slot_i32 to i64*
   store i64 %fn_ptr, i64* %fn_slot
   %env_addr = add i64 %raw, 8
-  %env_slot = inttoptr i64 %env_addr to i64*
+  %env_addr32 = trunc i64 %env_addr to i32
+  %env_slot = inttoptr i32 %env_addr32 to i64*
   store i64 %env_ptr, i64* %env_slot
   ret i64 %raw
 }
@@ -857,8 +895,9 @@ entry:
 define i64 @__gc_env_alloc(i64 %num_slots) {
 entry:
   %size = shl i64 %num_slots, 3
-  %ptr = call i8* @calloc(i64 1, i64 %size)
-  %r = ptrtoint i8* %ptr to i64
+  %ptr = call i8* @__calloc_internal(i64 1, i64 %size)
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
@@ -866,8 +905,9 @@ entry:
 define i64 @__gc_instance_alloc(i64 %num_fields) {
 entry:
   %size = shl i64 %num_fields, 3
-  %ptr = call i8* @calloc(i64 1, i64 %size)
-  %r = ptrtoint i8* %ptr to i64
+  %ptr = call i8* @__calloc_internal(i64 1, i64 %size)
+  %ptr_i32 = ptrtoint i8* %ptr to i32
+  %r = zext i32 %ptr_i32 to i64
   ret i64 %r
 }
 
@@ -899,19 +939,16 @@ entry:
 
 ; =============================================================================
 ; Entry point wrapper
-; WASM entry point -- initializes heap, then calls __saffron_entry.
 ; =============================================================================
 
 declare i64 @__saffron_entry()
 
 define void @_start() {
 entry:
-  ; Initialize heap pointer from linker-provided __heap_base symbol.
-  %hb_ptr = ptrtoint i8* @__heap_base to i64
-  ; Align to 8 bytes
-  %aligned = add i64 %hb_ptr, 7
-  %heap_start = and i64 %aligned, -8
-  store i64 %heap_start, i64* @__heap_ptr
+  %hb_ptr = ptrtoint i8* @__heap_base to i32
+  %aligned = add i32 %hb_ptr, 7
+  %heap_start = and i32 %aligned, -8
+  store i32 %heap_start, i32* @__heap_ptr
   call i64 @__saffron_entry()
   ret void
 }
