@@ -139,6 +139,7 @@
         this.in_function = true
         var saved_vt: Map<String, String> = this.var_types
         var saved_tv: Map<String, AST.Type> = this.typed_vars
+        var saved_is_coro: Bool = this.is_coroutine
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -380,7 +381,7 @@
         this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
-        this.is_coroutine = false
+        this.is_coroutine = saved_is_coro
     }
 
     // --- Top-level ---

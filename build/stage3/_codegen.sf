@@ -5600,6 +5600,17 @@ class Codegen {
                     if (name != full_name) {
                         this.coroutine_funcs.push(name)
                     }
+                    // Also push all possible module-prefixed forms
+                    var mp_keys: List<String> = this.module_prefixes.keys()
+                    var mpi: Float = 0
+                    while (mpi < mp_keys.length()) {
+                        var mp_prefix: String = this.module_prefixes.get(mp_keys[mpi])
+                        var mp_name: String = mp_prefix + name
+                        if (!this.coroutine_funcs.contains(mp_name)) {
+                            this.coroutine_funcs.push(mp_name)
+                        }
+                        mpi = mpi + 1
+                    }
                 }
             }
             i = i + 1
@@ -5776,6 +5787,7 @@ class Codegen {
         this.in_function = true
         var saved_vt: Map<String, String> = this.var_types
         var saved_tv: Map<String, AST.Type> = this.typed_vars
+        var saved_is_coro: Bool = this.is_coroutine
         this.reset_locals()
         this.string_vars = []
         this.var_types = {}
@@ -6017,7 +6029,7 @@ class Codegen {
         this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
-        this.is_coroutine = false
+        this.is_coroutine = saved_is_coro
     }
 
     // --- Top-level ---
@@ -7806,7 +7818,21 @@ class Codegen {
         // Coro-calls-coro: if this is a coroutine calling another, emit await loop
         var is_coro_callee: Bool = this.coroutine_funcs.contains(prefixed_name)
         if (!is_coro_callee) {
-            // Check suffix: "stdlib_async_gather" ends with "gather" which may be in coroutine_funcs
+            is_coro_callee = this.coroutine_funcs.contains(method)
+        }
+        // Definitive check: if the function is already defined and is in coroutine_funcs
+        if (!is_coro_callee and this.coroutine_funcs.length() > 0) {
+            var cfi: Float = 0
+            while (cfi < this.coroutine_funcs.length()) {
+                var cf: String = this.coroutine_funcs[cfi]
+                if (cf == prefixed_name or cf == method or prefixed_name.ends_with("_" + cf)) {
+                    is_coro_callee = true
+                    cfi = this.coroutine_funcs.length()
+                }
+                cfi = cfi + 1
+            }
+        }
+        if (!is_coro_callee) {
             var cfi: Float = 0
             while (cfi < this.coroutine_funcs.length()) {
                 var cf: String = this.coroutine_funcs[cfi]
