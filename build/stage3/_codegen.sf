@@ -1286,6 +1286,10 @@ class Codegen {
         this.emit_indent(saved_jmp + " = load i8*, i8** @__jmp_buf_current")
         this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
 
+        // Save shadow stack depth for restoration on catch
+        var saved_ss_depth: String = this.fresh_local()
+        this.emit_indent(saved_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+
         // setjmp
         var setjmp_result: String = this.fresh_local()
         this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
@@ -1304,6 +1308,12 @@ class Codegen {
         // Catch body
         this.start_block(catch_label)
         this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        // Restore shadow stack depth (longjmp skipped pop_roots)
+        var cur_ss_depth: String = this.fresh_local()
+        this.emit_indent(cur_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+        var ss_pop_n: String = this.fresh_local()
+        this.emit_indent(ss_pop_n + " = sub i64 " + cur_ss_depth + ", " + saved_ss_depth)
+        this.emit_indent("call void @__gc_pop_roots(i64 " + ss_pop_n + ")")
         var exc_val: String = this.fresh_local()
         this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
         this.emit_indent("store i64 " + exc_val + ", i64* %" + this.sanitize_name(catch_name))
@@ -2041,7 +2051,6 @@ class Codegen {
                 // Await loop: resume child until done, yielding ourselves each iteration
                 var await_loop: String = this.fresh_label("await.loop")
                 var await_yield: String = this.fresh_label("await.yield")
-                var await_suspend: String = this.fresh_label("await.suspend")
                 var await_cleanup: String = this.fresh_label("await.cleanup")
                 var await_done: String = this.fresh_label("await.done")
 
@@ -2059,10 +2068,8 @@ class Codegen {
                 this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
                 var susp_result: String = this.fresh_local()
                 this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
-                this.emit_terminator("switch i8 " + susp_result + ", label %" + await_suspend + " [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
-
-                this.start_block(await_suspend)
-                this.emit_terminator("ret ptr %__coro_hdl")
+                // Default (suspend) case branches to the shared __coro_suspend block.
+                this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
 
                 this.start_block(await_cleanup)
                 this.emit_terminator("br label %__coro_cleanup")
@@ -3660,12 +3667,10 @@ class Codegen {
             var susp_result: String = this.fresh_local()
             this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
             var resume_label: String = this.fresh_label("suspend.resume")
-            var suspend_label: String = this.fresh_label("suspend.ret")
             var cleanup_label: String = this.fresh_label("suspend.cleanup")
-            this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
-            this.emit(suspend_label + ":")
-            this.block_terminated = false
-            this.emit_terminator("ret ptr %__coro_hdl")
+            // Default (suspend) case branches to the shared __coro_suspend block.
+            // CoroSplit requires all suspend points to share a single suspend/ret block.
+            this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
             this.emit(cleanup_label + ":")
             this.block_terminated = false
             this.emit_terminator("br label %__coro_cleanup")
@@ -4775,6 +4780,10 @@ class Codegen {
         // Set current jmp_buf to our local buffer
         this.emit_indent("store i8* " + jmp_buf_ptr + ", i8** @__jmp_buf_current")
 
+        // Save shadow stack depth so we can restore it on catch (longjmp skips pop_roots)
+        var saved_ss_depth: String = this.fresh_local()
+        this.emit_indent(saved_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+
         // setjmp returns 0 on first call, non-zero on longjmp
         var setjmp_result: String = this.fresh_local()
         this.emit_indent(setjmp_result + " = call i32 @setjmp(i8* " + jmp_buf_ptr + ")")
@@ -4799,6 +4808,12 @@ class Codegen {
         this.start_block(catch_label)
         // Restore previous jmp_buf before running catch (so re-throws use outer handler)
         this.emit_indent("store i8* " + saved_jmp + ", i8** @__jmp_buf_current")
+        // Restore shadow stack depth (longjmp skipped pop_roots in unwound frames)
+        var cur_ss_depth: String = this.fresh_local()
+        this.emit_indent(cur_ss_depth + " = call i64 @__gc_shadow_stack_depth()")
+        var ss_pop_n: String = this.fresh_local()
+        this.emit_indent(ss_pop_n + " = sub i64 " + cur_ss_depth + ", " + saved_ss_depth)
+        this.emit_indent("call void @__gc_pop_roots(i64 " + ss_pop_n + ")")
         // Load exception value into catch variable
         var exc_val: String = this.fresh_local()
         this.emit_indent(exc_val + " = load i64, i64* @__exception_value")
@@ -5303,6 +5318,13 @@ class Codegen {
                 this.collect_calls_from_exprs(args, calls)
             }
             MethodCall(o, m, a) => {
+                // Extract module-qualified call: Async.sleep → stdlib_async_sleep
+                var obj_name: String = this.get_variable_name(o)
+                if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
+                    var prefix: String = this.module_prefixes.get(obj_name)
+                    calls.push(prefix + m)
+                }
+                calls.push(m)
                 this.collect_calls_from_expr(o, calls)
                 this.collect_calls_from_exprs(a, calls)
             }
@@ -5607,9 +5629,23 @@ class Codegen {
         }
         this.func_param_names.set(emit_name, pnames_list)
 
-        // Check if this function is a coroutine
+        // Check if this function is a coroutine (direct or transitive)
         var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
+        if (!is_coro) {
+            // Check if body calls any known coroutine (transitive)
+            var body_calls: List<String> = []
+            this.collect_calls_from_stmts(body, body_calls)
+            var bci: Float = 0
+            while (bci < body_calls.length()) {
+                var bc: String = body_calls[bci]
+                if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
+                    is_coro = true
+                    bci = body_calls.length()
+                }
+                bci = bci + 1
+            }
+        }
         if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
             this.coroutine_funcs.push(emit_name)
         }
@@ -6990,12 +7026,9 @@ class Codegen {
         var susp: String = this.fresh_local()
         this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
         var await_resume: String = this.fresh_label("task.await.resume")
-        var await_suspend: String = this.fresh_label("task.await.suspend")
         var await_cleanup: String = this.fresh_label("task.await.cleanup")
-        this.emit_terminator("switch i8 " + susp + ", label %" + await_suspend + " [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
-        this.emit(await_suspend + ":")
-        this.block_terminated = false
-        this.emit_terminator("ret ptr %__coro_hdl")
+        // Default (suspend) case branches to the shared __coro_suspend block.
+        this.emit_terminator("switch i8 " + susp + ", label %__coro_suspend [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
         this.emit(await_cleanup + ":")
         this.block_terminated = false
         this.emit_terminator("br label %__coro_cleanup")

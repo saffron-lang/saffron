@@ -796,12 +796,9 @@
         var susp: String = this.fresh_local()
         this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
         var await_resume: String = this.fresh_label("task.await.resume")
-        var await_suspend: String = this.fresh_label("task.await.suspend")
         var await_cleanup: String = this.fresh_label("task.await.cleanup")
-        this.emit_terminator("switch i8 " + susp + ", label %" + await_suspend + " [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
-        this.emit(await_suspend + ":")
-        this.block_terminated = false
-        this.emit_terminator("ret ptr %__coro_hdl")
+        // Default (suspend) case branches to the shared __coro_suspend block.
+        this.emit_terminator("switch i8 " + susp + ", label %__coro_suspend [i8 0, label %" + await_resume + " i8 1, label %" + await_cleanup + "]")
         this.emit(await_cleanup + ":")
         this.block_terminated = false
         this.emit_terminator("br label %__coro_cleanup")

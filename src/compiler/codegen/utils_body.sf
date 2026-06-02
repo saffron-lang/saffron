@@ -453,6 +453,13 @@
                 this.collect_calls_from_exprs(args, calls)
             }
             MethodCall(o, m, a) => {
+                // Extract module-qualified call: Async.sleep → stdlib_async_sleep
+                var obj_name: String = this.get_variable_name(o)
+                if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
+                    var prefix: String = this.module_prefixes.get(obj_name)
+                    calls.push(prefix + m)
+                }
+                calls.push(m)
                 this.collect_calls_from_expr(o, calls)
                 this.collect_calls_from_exprs(a, calls)
             }

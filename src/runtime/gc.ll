@@ -1774,10 +1774,39 @@ done:
   ret void
 }
 
-; Set the nursery size (call before __gc_enable)
+; Set the nursery size. If nursery is already initialized, re-allocate it.
 define void @__gc_set_nursery_size(i64 %bytes) {
 entry:
   store i64 %bytes, i64* @__gc_nursery_size
+  ; If nursery already initialized, re-initialize with new size
+  %inited = load i64, i64* @__gc_nursery_inited
+  %is_inited = icmp ne i64 %inited, 0
+  br i1 %is_inited, label %reinit, label %done
+
+reinit:
+  ; Free old arena
+  %old_start = load i64, i64* @__gc_nursery_start
+  %old_ptr = inttoptr i64 %old_start to i8*
+  call void @free(i8* %old_ptr)
+  ; Allocate new arena
+  %arena_raw = call i8* @malloc(i64 %bytes)
+  %arena = ptrtoint i8* %arena_raw to i64
+  %is_null = icmp eq i64 %arena, 0
+  br i1 %is_null, label %disable_nursery, label %update_arena
+
+update_arena:
+  store i64 %arena, i64* @__gc_nursery_start
+  store i64 %arena, i64* @__gc_nursery_ptr
+  %end_addr = add i64 %arena, %bytes
+  store i64 %end_addr, i64* @__gc_nursery_end
+  br label %done
+
+disable_nursery:
+  ; malloc failed, disable nursery
+  store i64 0, i64* @__gc_nursery_inited
+  br label %done
+
+done:
   ret void
 }
 
