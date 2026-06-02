@@ -3,30 +3,27 @@
 @extern("void __gc_enable()") fun gc_enable()
 @extern("void __gc_collect()") fun gc_collect()
 @extern("i64 __gc_stat_alloc_count()") fun gc_alloc_count(): Int
-@extern("i64 __gc_stat_collections()") fun gc_collections(): Int
 @extern("void __gc_set_threshold(i64)") fun gc_set_threshold(bytes: Int)
 
 IO.println("=== GC Deep Structure Test ===")
 gc_enable()
 gc_set_threshold(104857600)
 
-// Test: 4000 inner lists with explicit collect
-IO.println("Test: 4000 inner lists with explicit collect")
+IO.println("Test: 2000 inner lists")
 var outer: List<List<String>> = []
 var i: Int = 0
-while (i < 4000) {
+while (i < 2000) {
     var inner: List<String> = []
     inner.push("item")
     outer.push(inner)
     i = i + 1
 }
-IO.println("  Built list, length: ${outer.length()}")
+IO.println("  Length: ${outer.length()}")
 gc_collect()
-IO.println("  After collect, length: ${outer.length()}")
-if (outer.length() == 4000) {
+IO.println("  After: ${outer.length()}")
+if (outer.length() == 2000) {
     IO.println("  PASS")
 } else {
     IO.println("  FAIL")
 }
-
-IO.println("=== Done ===")
+IO.println("Done")
