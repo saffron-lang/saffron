@@ -171,36 +171,37 @@ fun _rest_after_first(s: String): String {
     return s.slice(space_idx, s.length())
 }
 
-/// Execute a command string, expanding script references.
-/// Matches full segment first, then first-word for bin scripts with args.
+/// Execute a command string, expanding script name references.
+/// Only expands if the ENTIRE command matches a script name, or if the
+/// first word matches. Otherwise passes the full command to the shell
+/// (preserving && short-circuit semantics).
 fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
     if (depth > 10) {
         throw "pantry: script recursion depth exceeded (circular reference?)"
     }
 
-    var segments: List<String> = cmd.split("&&")
-    var i: Int = 0
-    while (i < segments.length()) {
-        var segment: String = segments[i].trim()
-        if (segment.length() > 0) {
-            if (scripts.has(segment)) {
-                // Exact match — expand recursively
-                var expanded: String = scripts.get(segment)
-                _exec_command(expanded, scripts, depth + 1)
-            } else {
-                // Check first word against scripts (for "sfx arg1 arg2")
-                var first: String = _first_word(segment)
-                if (scripts.has(first)) {
-                    var replacement: String = scripts.get(first)
-                    var args: String = _rest_after_first(segment)
-                    _exec_shell(replacement + args)
-                } else {
-                    _exec_shell(segment)
-                }
-            }
-        }
-        i = i + 1
+    var trimmed: String = cmd.trim()
+
+    // Exact match — the whole command is a script name
+    if (scripts.has(trimmed)) {
+        var expanded: String = scripts.get(trimmed)
+        _exec_command(expanded, scripts, depth + 1)
+        return
     }
+
+    // Check first word — for "sfx arg1 arg2" where sfx is a bin script
+    var first: String = _first_word(trimmed)
+    if (scripts.has(first)) {
+        var replacement: String = scripts.get(first)
+        var args: String = _rest_after_first(trimmed)
+        // If the replacement itself contains &&, let the shell handle it
+        _exec_shell(replacement + args)
+        return
+    }
+
+    // No expansion needed — pass the entire command to the shell as-is
+    // This preserves && short-circuit, ||, pipes, etc.
+    _exec_shell(trimmed)
 }
 
 /// Run a named script from the [scripts] section (or dep bin scripts).
