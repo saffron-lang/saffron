@@ -414,15 +414,16 @@ git commit -m "Promote gen2: <new capability enabled>"
 
 ### Known gen2 pitfalls
 
-These are bugs in the current gen2 binary that constrain what you can write in the compiler source:
+The previous gen2 had several NaN-boxing and struct-layout bugs (arithmetic in list indices, pos-1 crashes, method addition causing linker errors). These are all **fixed** in the current promoted gen2 (June 2026). The compiler source now freely uses `this.tokens[this.pos + 1]`, `this.pos - 1`, 100+ methods on Parser, `parse_block_stmts()` as a helper, and `peek_is(...)` without issue.
+
+**Current gen2 limitations** (constraints on what you can write in compiler source):
 
 | Issue | Symptom | Workaround |
 |-------|---------|------------|
-| NaN-boxed arithmetic in list index | `this.tokens[this.pos + 1]` segfaults — adds 1 to tagged value before untagging | Save pos to variable, use `advance()`, restore saved pos |
-| `pos - 1` arithmetic | `this.pos = this.pos - 1` crashes | Save pos before consuming, restore the saved variable |
-| Adding methods to Parser class | Unrelated `%TypeEnv` linker error (struct layout shift) | Inline logic instead of adding helper methods |
-| `parse_block_stmts()` inside `{` handler | Expects opening `{` but it was already consumed | Parse statements inline with `while (!match_kind_check("}")) { ... }` |
-| `peek_is("=>")` | Returns false for TkFatArrow despite correct token | Use speculative advance: consume ident, check `match_kind("=>")`, restore pos on failure |
+| No tuple literal syntax in compiler source | `var t = (1, 2, 3)` parse error — gen2 has the `TupleLit` enum variant but can't parse tuple creation syntax | Use lists or multiple variables; tuple syntax works in user programs compiled by gen3 |
+| Cross-module enum construction in class methods | `AST.Type.SimpleType("Int")` emits `load i64, i64* %AST` (undefined) | Use helper functions defined in the same module to construct enum values (see `codegen.sf` line 164) |
+
+**Note:** The cross-module enum construction issue affects ALL compiler generations (not just gen2). It is a codegen limitation in how qualified enum constructors (`Module.Enum.Variant(...)`) are compiled inside class methods.
 
 ### Bootstrap file layout
 
