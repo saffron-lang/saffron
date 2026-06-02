@@ -647,6 +647,54 @@
         }
     }
 
+    // --- Task.spawn(fn) ---
+    if (method == "spawn" and obj_name == "Task") {
+        // Get the lambda as a function pointer (i64)
+        var spawn_arg: String = this.gen_arg_value(args[0])
+        // Check if the lambda/function is a coroutine
+        // Lambda names start with __lambda — check if in coroutine_funcs
+        var spawn_fn_name: String = this.get_variable_name(args[0])
+        var is_coro_spawn: Bool = false
+        if (spawn_fn_name.length() > 0 and this.coroutine_funcs.contains(spawn_fn_name)) {
+            is_coro_spawn = true
+        }
+        // Also check the last-generated lambda
+        if (!is_coro_spawn) {
+            var li: Float = this.coroutine_funcs.length() - 1
+            while (li >= 0) {
+                var cf: String = this.coroutine_funcs[li]
+                if (cf.starts_with("__lambda")) { is_coro_spawn = true; li = -1 }
+                li = li - 1
+            }
+        }
+        // spawn_arg is a closure: [fn_ptr, env_ptr] packed as [2 x i64]*
+        var closure_ptr: String = this.fresh_local()
+        this.emit_indent(closure_ptr + " = inttoptr i64 " + spawn_arg + " to [2 x i64]*")
+        var fn_slot: String = this.fresh_local()
+        this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+        var fn_i64: String = this.fresh_local()
+        this.emit_indent(fn_i64 + " = load i64, i64* " + fn_slot)
+        var env_slot: String = this.fresh_local()
+        this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+        var env_i64: String = this.fresh_local()
+        this.emit_indent(env_i64 + " = load i64, i64* " + env_slot)
+        var fn_ptr: String = this.fresh_local()
+        this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_i64 + " to ptr")
+        var task_hdl: String = this.fresh_local()
+        this.emit_indent(task_hdl + " = call ptr " + fn_ptr + "(i64 " + env_i64 + ")")
+        var task_i64: String = this.fresh_local()
+        this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+        // Enqueue to scheduler
+        var enqueue_name: String = "enqueue"
+        if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+            enqueue_name = "stdlib_scheduler_enqueue"
+        }
+        this.emit_indent("call i64 @" + enqueue_name + "(i64 " + task_i64 + ")")
+        this.called_functions.push(enqueue_name)
+        this.last_type = AST.Type.IntType
+        return task_i64
+    }
+
     // --- Task methods: isReady() and getResult() ---
     if (method == "isReady") {
         var task_val: String = this.gen_arg_value(object)

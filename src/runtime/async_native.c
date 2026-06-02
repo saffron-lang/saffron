@@ -80,3 +80,39 @@ int64_t sf_select_fds(int64_t *read_fds, int64_t read_count,
 
     return result;
 }
+
+// --- Yield reason globals and coro stubs ---
+// These globals are defined in base.ll; we extern them here.
+extern int64_t __yield_reason;
+extern int64_t __yield_arg;
+
+int64_t __sched_get_yield_reason(void) { return __yield_reason; }
+int64_t __sched_get_yield_arg(void) { return __yield_arg; }
+void __sched_reset_yield(void) { __yield_reason = 0; __yield_arg = 0; }
+
+// Coroutine frame layout after LLVM CoroSplit:
+//   offset 0: resume function pointer (void (*)(ptr frame))
+//   offset 8: destroy function pointer (void (*)(ptr frame))
+// After final suspend, the resume pointer is set to a special value
+// and the "done" bit is indicated by the index field.
+//
+// LLVM's coro.done checks if frame->resume == nullptr (or a sentinel).
+// We match that behavior.
+
+typedef void (*coro_fn_t)(void *);
+
+void __sched_coro_resume(void *hdl) {
+    coro_fn_t resume_fn = *(coro_fn_t *)hdl;
+    resume_fn(hdl);
+}
+
+int64_t __sched_coro_done(void *hdl) {
+    coro_fn_t resume_fn = *(coro_fn_t *)hdl;
+    return (resume_fn == (coro_fn_t)0) ? 1 : 0;
+}
+
+void __sched_coro_destroy(void *hdl) {
+    coro_fn_t *fn_ptrs = (coro_fn_t *)hdl;
+    coro_fn_t destroy_fn = fn_ptrs[1];
+    destroy_fn(hdl);
+}

@@ -1,77 +1,25 @@
-// Test 1: paren-free, no params
-fun greet(block: Any) {
-    block()
+// Test Kotlin-style trailing closure semantics
+// Trailing closure ALWAYS maps to the LAST parameter
+
+fun render(cls: String = "", id: String = "", block: Any = nil) {
+    IO.println("cls=" + cls)
+    if (block != nil) { block() }
 }
 
-greet {
-    IO.println("1: paren-free")
+// Test 1: render() { block } - block goes to last param, others get defaults
+render() { IO.println("in block!") }
+
+// Test 2: render("x") { block } - "x" is first positional, block to last
+render("test") { IO.println("with cls!") }
+
+// Test 3: render(cls="x") { block } - cls matched by name, block to last
+render(cls="named") { IO.println("with named cls!") }
+
+// Test 4: h1-like pattern with 5 params, only trailing closure
+fun h1(cls: String = "", id: String = "", style: String = "", attrs: String = "", block: Any = nil) {
+    IO.println("h1 cls=" + cls + " id=" + id)
+    if (block != nil) { block() }
 }
 
-// Test 2: with args + trailing closure
-fun repeat(n: Float, block: Any) {
-    var i: Float = 0
-    while (i < n) {
-        block()
-        i = i + 1
-    }
-}
-
-repeat(3) {
-    IO.println("2: repeated")
-}
-
-// Test 3: single param trailing closure
-fun each(items: Any, block: Any) {
-    var i: Float = 0
-    var len: Float = items.length()
-    while (i < len) {
-        block(items[i])
-        i = i + 1
-    }
-}
-
-each(["a", "b", "c"]) { item =>
-    IO.println("3: " + item)
-}
-
-// Test 4: multi-param trailing closure
-fun map_pairs(keys: Any, vals: Any, block: Any) {
-    var i: Float = 0
-    while (i < keys.length()) {
-        block(keys[i], vals[i])
-        i = i + 1
-    }
-}
-
-map_pairs(["x", "y"], [1, 2]) { key, val =>
-    IO.println("4: " + key + "=" + val.to_string())
-}
-
-// Test 5: paren-free with param
-fun with_value(block: Any) {
-    block(42)
-}
-
-with_value { v =>
-    IO.println("5: got " + v.to_string())
-}
-
-// Test 6: method trailing closure with param
-class Builder {
-    var items: Any
-    fun init() {
-        this.items = [10, 20, 30]
-    }
-    fun each(block: Any) {
-        var i: Float = 0
-        while (i < this.items.length()) {
-            block(this.items[i])
-            i = i + 1
-        }
-    }
-}
-
-var b = Builder()
-b.each() { item =>
-    IO.println("6: " + item.to_string())
-}
+h1 { IO.println("Counter") }
+h1(cls="title") { IO.println("Title") }

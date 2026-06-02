@@ -15,6 +15,22 @@
         this.label_counter = this.label_counter + 1
         var lambda_name: String = "__lambda_" + this.label_counter.floor().to_string()
 
+        // Check if this lambda is a coroutine (contains yield or calls a coroutine)
+        if (this.stmts_have_yield(body)) {
+            this.coroutine_funcs.push(lambda_name)
+        } else {
+            var lambda_calls: List<String> = []
+            this.collect_calls_from_stmts(body, lambda_calls)
+            var lci: Float = 0
+            while (lci < lambda_calls.length()) {
+                if (this.coroutine_funcs.contains(lambda_calls[lci]) or this.coroutine_funcs.contains(this.current_prefix + lambda_calls[lci])) {
+                    this.coroutine_funcs.push(lambda_name)
+                    lci = lambda_calls.length()
+                }
+                lci = lci + 1
+            }
+        }
+
         // Build the lambda's params: env pointer (if captures) + original params
         var params_str: String = this.params_to_string(params)
         var lambda_params: String = ""
