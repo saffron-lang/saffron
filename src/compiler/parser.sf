@@ -1298,30 +1298,14 @@ class Parser {
         }
         this.consume("(")
         var params: List<AST.Param> = []
+        var pattern_prepend: List<AST.Stmt> = []
+        var param_idx: Float = 0
         if (!this.match_kind_check(")")) {
-            var pname: String = this.expect_ident()
-            if (!this.match_kind_check(":")) {
-                this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
-            } else {
-                this.consume(":")
-                var ptype: String = this.parse_type()
-                var pdefault: AST.Expr = AST.Expr.NilLit
-                if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
-            }
+            this.parse_one_param(params, pattern_prepend, param_idx)
+            param_idx = param_idx + 1
             while (this.match_kind(",")) {
-                pname = this.expect_ident()
-                if (!this.match_kind_check(":")) {
-                    this.parse_error("Parameter '" + pname + "' requires a type annotation")
-                    params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
-                } else {
-                    this.consume(":")
-                    var ptype: String = this.parse_type()
-                    var pdefault: AST.Expr = AST.Expr.NilLit
-                    if (this.match_kind("=")) { pdefault = this.parse_expr() }
-                    params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
-                }
+                this.parse_one_param(params, pattern_prepend, param_idx)
+                param_idx = param_idx + 1
             }
         }
         this.consume(")")
@@ -1333,7 +1317,47 @@ class Parser {
         if (this.match_kind_check("{")) {
             body = this.parse_block_stmts()
         }
+        if (pattern_prepend.length() > 0) {
+            var new_body: List<AST.Stmt> = []
+            var ppi: Float = 0
+            while (ppi < pattern_prepend.length()) { new_body.push(pattern_prepend[ppi]); ppi = ppi + 1 }
+            ppi = 0
+            while (ppi < body.length()) { new_body.push(body[ppi]); ppi = ppi + 1 }
+            body = new_body
+        }
         return AST.Stmt.FunDecl(name, params, ret_type, body, docstring)
+    }
+
+    fun parse_one_param(params: List<AST.Param>, pattern_prepend: List<AST.Stmt>, idx: Float) {
+        var pname: String = this.expect_ident()
+        if (this.match_kind_check("(")) {
+            this.advance()
+            var pb: List<String> = []
+            if (!this.match_kind_check(")")) {
+                pb.push(this.expect_ident())
+                while (this.match_kind(",")) { pb.push(this.expect_ident()) }
+            }
+            this.consume(")")
+            this.consume(":")
+            var ptype: String = this.parse_type()
+            var syn_name: String = "__p" + idx.floor().to_string()
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+            pattern_prepend.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(pname, pb), AST.Expr.Variable(syn_name)))
+        } else if (pname == "_") {
+            this.consume(":")
+            var ptype: String = this.parse_type()
+            var syn_name: String = "__p" + idx.floor().to_string()
+            params.push(AST.Param.Param(syn_name, this.parse_type_ast(ptype), AST.Expr.NilLit))
+        } else if (!this.match_kind_check(":")) {
+            this.parse_error("Parameter '" + pname + "' requires a type annotation")
+            params.push(AST.Param.Param(pname, AST.Type.AnyType, AST.Expr.NilLit))
+        } else {
+            this.consume(":")
+            var ptype: String = this.parse_type()
+            var pdefault: AST.Expr = AST.Expr.NilLit
+            if (this.match_kind("=")) { pdefault = this.parse_expr() }
+            params.push(AST.Param.Param(pname, this.parse_type_ast(ptype), pdefault))
+        }
     }
 
     fun parse_enum_decl(): AST.Stmt {
@@ -1685,8 +1709,50 @@ class Parser {
             stmts.push(AST.Stmt.While(cond, body))
             return AST.Stmt.Block(stmts)
         }
-        // Check for for-in: for (name in expr)
+        // Array pattern: for ([a, b] in list)
+        if (this.match_kind_check("[")) {
+            this.advance()
+            var pat_names: List<String> = []
+            if (!this.match_kind_check("]")) {
+                pat_names.push(this.expect_ident())
+                while (this.match_kind(",")) { pat_names.push(this.expect_ident()) }
+            }
+            this.consume("]")
+            this.consume("in")
+            var pat_iter: AST.Expr = this.parse_expr()
+            this.consume(")")
+            var pat_body: List<AST.Stmt> = this.parse_block_stmts()
+            var desugar_body: List<AST.Stmt> = []
+            var pdi: Float = 0
+            while (pdi < pat_names.length()) {
+                desugar_body.push(AST.Stmt.VarDecl(pat_names[pdi], "Any", AST.Expr.IndexGet(AST.Expr.Variable("__for_item"), AST.Expr.IntLit(pdi)), ""))
+                pdi = pdi + 1
+            }
+            pdi = 0
+            while (pdi < pat_body.length()) { desugar_body.push(pat_body[pdi]); pdi = pdi + 1 }
+            return this.desugar_for_in("__for_item", pat_iter, desugar_body)
+        }
+        // Check for for-in: for (name in expr) or for (Variant(x) in list)
         var name: String = this.expect_ident()
+        if (this.match_kind_check("(")) {
+            // Variant pattern: for (Some(x) in list)
+            this.advance()
+            var vp_bindings: List<String> = []
+            if (!this.match_kind_check(")")) {
+                vp_bindings.push(this.expect_ident())
+                while (this.match_kind(",")) { vp_bindings.push(this.expect_ident()) }
+            }
+            this.consume(")")
+            this.consume("in")
+            var vp_iter: AST.Expr = this.parse_expr()
+            this.consume(")")
+            var vp_body: List<AST.Stmt> = this.parse_block_stmts()
+            var vp_desugar: List<AST.Stmt> = []
+            vp_desugar.push(AST.Stmt.LetPattern(AST.Pattern.VariantPattern(name, vp_bindings), AST.Expr.Variable("__for_item")))
+            var vpi: Float = 0
+            while (vpi < vp_body.length()) { vp_desugar.push(vp_body[vpi]); vpi = vpi + 1 }
+            return this.desugar_for_in("__for_item", vp_iter, vp_desugar)
+        }
         if (this.match_kind("in")) {
             return this.parse_for_in(name)
         }
@@ -1750,6 +1816,26 @@ class Parser {
         }
 
         // Build block: list init + idx init + while
+        var stmts: List<AST.Stmt> = []
+        stmts.push(init_list)
+        stmts.push(init_idx)
+        stmts.push(AST.Stmt.While(cond, while_body))
+        return AST.Stmt.Block(stmts)
+    }
+
+    fun desugar_for_in(item_name: String, iter_expr: AST.Expr, body: List<AST.Stmt>): AST.Stmt {
+        var list_var: String = "__for_list"
+        var idx_var: String = "__for_i"
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
+        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
+        var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
+        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any", AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
+        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var, AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
+        var while_body: List<AST.Stmt> = []
+        while_body.push(item_init)
+        while_body.push(increment)
+        var bi: Float = 0
+        while (bi < body.length()) { while_body.push(body[bi]); bi = bi + 1 }
         var stmts: List<AST.Stmt> = []
         stmts.push(init_list)
         stmts.push(init_idx)
