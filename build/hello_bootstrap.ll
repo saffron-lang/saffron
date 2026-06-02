@@ -155,67 +155,72 @@ define i64 @__saffron_entry() {
 entry:
   %name = alloca i64
   %version = alloca i64
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  store i64 %t2, i64* @__g_name
-  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
+  call void @__gc_enable()
+  %t1 = ptrtoint i64* @__g_name to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = ptrtoint i64* @__g_version to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = getelementptr [8 x i8], [8 x i8]* @.str.0, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  store i64 %t4, i64* @__g_version
-  %t5 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
+  store i64 %t4, i64* @__g_name
+  %t5 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
-  %t7 = load i64, i64* @__g_name
-  %t8 = inttoptr i64 %t6 to i8*
-  %t9 = inttoptr i64 %t7 to i8*
-  %t10 = call i64 @strlen(i8* %t8)
-  %t11 = call i64 @strlen(i8* %t9)
-  %t12 = add i64 %t10, %t11
-  %t13 = add i64 %t12, 1
-  %t14 = call i8* @malloc(i64 %t13)
-  call i8* @strcpy(i8* %t14, i8* %t8)
-  call i8* @strcat(i8* %t14, i8* %t9)
-  %t15 = ptrtoint i8* %t14 to i64
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
+  store i64 %t6, i64* @__g_version
+  %t7 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  %t9 = load i64, i64* @__g_name
+  %t10 = inttoptr i64 %t8 to i8*
+  %t11 = inttoptr i64 %t9 to i8*
+  %t12 = call i64 @strlen(i8* %t10)
+  %t13 = call i64 @strlen(i8* %t11)
+  %t14 = add i64 %t12, %t13
+  %t15 = add i64 %t14, 1
+  %t16 = call i8* @malloc(i64 %t15)
+  call i8* @strcpy(i8* %t16, i8* %t10)
+  call i8* @strcat(i8* %t16, i8* %t11)
   %t17 = ptrtoint i8* %t16 to i64
-  %t18 = inttoptr i64 %t15 to i8*
-  %t19 = inttoptr i64 %t17 to i8*
-  %t20 = call i64 @strlen(i8* %t18)
-  %t21 = call i64 @strlen(i8* %t19)
-  %t22 = add i64 %t20, %t21
-  %t23 = add i64 %t22, 1
-  %t24 = call i8* @malloc(i64 %t23)
-  call i8* @strcpy(i8* %t24, i8* %t18)
-  call i8* @strcat(i8* %t24, i8* %t19)
-  %t25 = ptrtoint i8* %t24 to i64
-  %t26 = load i64, i64* @__g_version
-  %t27 = inttoptr i64 %t25 to i8*
-  %t28 = inttoptr i64 %t26 to i8*
-  %t29 = call i64 @strlen(i8* %t27)
-  %t30 = call i64 @strlen(i8* %t28)
-  %t31 = add i64 %t29, %t30
-  %t32 = add i64 %t31, 1
-  %t33 = call i8* @malloc(i64 %t32)
-  call i8* @strcpy(i8* %t33, i8* %t27)
-  call i8* @strcat(i8* %t33, i8* %t28)
-  %t34 = ptrtoint i8* %t33 to i64
-  %t35 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
+  %t19 = ptrtoint i8* %t18 to i64
+  %t20 = inttoptr i64 %t17 to i8*
+  %t21 = inttoptr i64 %t19 to i8*
+  %t22 = call i64 @strlen(i8* %t20)
+  %t23 = call i64 @strlen(i8* %t21)
+  %t24 = add i64 %t22, %t23
+  %t25 = add i64 %t24, 1
+  %t26 = call i8* @malloc(i64 %t25)
+  call i8* @strcpy(i8* %t26, i8* %t20)
+  call i8* @strcat(i8* %t26, i8* %t21)
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = load i64, i64* @__g_version
+  %t29 = inttoptr i64 %t27 to i8*
+  %t30 = inttoptr i64 %t28 to i8*
+  %t31 = call i64 @strlen(i8* %t29)
+  %t32 = call i64 @strlen(i8* %t30)
+  %t33 = add i64 %t31, %t32
+  %t34 = add i64 %t33, 1
+  %t35 = call i8* @malloc(i64 %t34)
+  call i8* @strcpy(i8* %t35, i8* %t29)
+  call i8* @strcat(i8* %t35, i8* %t30)
   %t36 = ptrtoint i8* %t35 to i64
-  %t37 = inttoptr i64 %t34 to i8*
-  %t38 = inttoptr i64 %t36 to i8*
-  %t39 = call i64 @strlen(i8* %t37)
-  %t40 = call i64 @strlen(i8* %t38)
-  %t41 = add i64 %t39, %t40
-  %t42 = add i64 %t41, 1
-  %t43 = call i8* @malloc(i64 %t42)
-  call i8* @strcpy(i8* %t43, i8* %t37)
-  call i8* @strcat(i8* %t43, i8* %t38)
-  %t44 = ptrtoint i8* %t43 to i64
-  call void @__io_println_str(i64 %t44)
-  %t45 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
+  %t37 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
+  %t38 = ptrtoint i8* %t37 to i64
+  %t39 = inttoptr i64 %t36 to i8*
+  %t40 = inttoptr i64 %t38 to i8*
+  %t41 = call i64 @strlen(i8* %t39)
+  %t42 = call i64 @strlen(i8* %t40)
+  %t43 = add i64 %t41, %t42
+  %t44 = add i64 %t43, 1
+  %t45 = call i8* @malloc(i64 %t44)
+  call i8* @strcpy(i8* %t45, i8* %t39)
+  call i8* @strcat(i8* %t45, i8* %t40)
   %t46 = ptrtoint i8* %t45 to i64
   call void @__io_println_str(i64 %t46)
-  %t47 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
+  %t47 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
   call void @__io_println_str(i64 %t48)
+  %t49 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  call void @__io_println_str(i64 %t50)
   ret i64 0
 }
 
