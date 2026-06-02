@@ -1,0 +1,191 @@
+// Saffron Runtime: Queue and Deque
+// Linked-list-based FIFO queue and double-ended queue for the async scheduler.
+
+// --- C Library Bindings ---
+
+@extern("void* malloc(i64)") fun rt_malloc(size: Int): Int
+@extern("void free(void*)") fun rt_free(ptr: Int)
+
+// --- Intrinsics ---
+
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
+
+// =============================================================================
+// Queue (singly-linked FIFO)
+// Node layout: { value@0, next@8 } — 16 bytes
+// Queue layout: { head@0, tail@8, count@16 } — 24 bytes
+// =============================================================================
+
+fun __queue_new(): Int {
+    var q: Int = rt_malloc(24)
+    store64(q, 0)
+    store64(q + 8, 0)
+    store64(q + 16, 0)
+    return q
+}
+
+fun __queue_push(queue: Int, value: Int) {
+    var node: Int = rt_malloc(16)
+    store64(node, value)
+    store64(node + 8, 0)
+    var tail: Int = load64(queue + 8)
+    if (tail == 0) {
+        store64(queue, node)
+        store64(queue + 8, node)
+    } else {
+        store64(tail + 8, node)
+        store64(queue + 8, node)
+    }
+    var count: Int = load64(queue + 16)
+    store64(queue + 16, count + 1)
+}
+
+fun __queue_pop(queue: Int): Int {
+    var head: Int = load64(queue)
+    if (head == 0) {
+        return 0
+    }
+    var value: Int = load64(head)
+    var next: Int = load64(head + 8)
+    store64(queue, next)
+    if (next == 0) {
+        store64(queue + 8, 0)
+    }
+    var count: Int = load64(queue + 16)
+    store64(queue + 16, count - 1)
+    rt_free(head)
+    return value
+}
+
+fun __queue_peek(queue: Int): Int {
+    var head: Int = load64(queue)
+    if (head == 0) {
+        return 0
+    }
+    return load64(head)
+}
+
+fun __queue_length(queue: Int): Int {
+    return load64(queue + 16)
+}
+
+fun __queue_is_empty(queue: Int): Int {
+    if (load64(queue + 16) == 0) {
+        return 1
+    }
+    return 0
+}
+
+// =============================================================================
+// Deque (doubly-linked)
+// Node layout: { value@0, next@8, prev@16 } — 24 bytes
+// Deque layout: { head@0, tail@8, count@16 } — 24 bytes
+// =============================================================================
+
+fun __deque_new(): Int {
+    var d: Int = rt_malloc(24)
+    store64(d, 0)
+    store64(d + 8, 0)
+    store64(d + 16, 0)
+    return d
+}
+
+fun __deque_push_back(deque: Int, value: Int) {
+    var node: Int = rt_malloc(24)
+    store64(node, value)
+    store64(node + 8, 0)
+    var tail: Int = load64(deque + 8)
+    store64(node + 16, tail)
+    if (tail == 0) {
+        store64(deque, node)
+        store64(deque + 8, node)
+    } else {
+        store64(tail + 8, node)
+        store64(deque + 8, node)
+    }
+    var count: Int = load64(deque + 16)
+    store64(deque + 16, count + 1)
+}
+
+fun __deque_push_front(deque: Int, value: Int) {
+    var node: Int = rt_malloc(24)
+    store64(node, value)
+    store64(node + 16, 0)
+    var head: Int = load64(deque)
+    store64(node + 8, head)
+    if (head == 0) {
+        store64(deque, node)
+        store64(deque + 8, node)
+    } else {
+        store64(head + 16, node)
+        store64(deque, node)
+    }
+    var count: Int = load64(deque + 16)
+    store64(deque + 16, count + 1)
+}
+
+fun __deque_pop_front(deque: Int): Int {
+    var head: Int = load64(deque)
+    if (head == 0) {
+        return 0
+    }
+    var value: Int = load64(head)
+    var next: Int = load64(head + 8)
+    store64(deque, next)
+    if (next == 0) {
+        store64(deque + 8, 0)
+    } else {
+        store64(next + 16, 0)
+    }
+    var count: Int = load64(deque + 16)
+    store64(deque + 16, count - 1)
+    rt_free(head)
+    return value
+}
+
+fun __deque_pop_back(deque: Int): Int {
+    var tail: Int = load64(deque + 8)
+    if (tail == 0) {
+        return 0
+    }
+    var value: Int = load64(tail)
+    var prev: Int = load64(tail + 16)
+    store64(deque + 8, prev)
+    if (prev == 0) {
+        store64(deque, 0)
+    } else {
+        store64(prev + 8, 0)
+    }
+    var count: Int = load64(deque + 16)
+    store64(deque + 16, count - 1)
+    rt_free(tail)
+    return value
+}
+
+fun __deque_peek_front(deque: Int): Int {
+    var head: Int = load64(deque)
+    if (head == 0) {
+        return 0
+    }
+    return load64(head)
+}
+
+fun __deque_peek_back(deque: Int): Int {
+    var tail: Int = load64(deque + 8)
+    if (tail == 0) {
+        return 0
+    }
+    return load64(tail)
+}
+
+fun __deque_length(deque: Int): Int {
+    return load64(deque + 16)
+}
+
+fun __deque_is_empty(deque: Int): Int {
+    if (load64(deque + 16) == 0) {
+        return 1
+    }
+    return 0
+}

@@ -1,0 +1,163 @@
+// Min-Heap Priority Queue
+// Used by the async scheduler for ordering sleep timers by wake time.
+// Entry layout: { priority@0, value@8 } — 16 bytes per entry
+// Heap layout: { count@0, capacity@8, data@16 } — 24 bytes
+
+@extern("void* malloc(i64)") fun rt_malloc(size: Int): Int
+@extern("void* realloc(void*, i64)") fun rt_realloc(ptr: Int, size: Int): Int
+@extern("void free(void*)") fun rt_free(ptr: Int)
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
+
+// =============================================================================
+// Internal helpers
+// =============================================================================
+
+fun __heap_entry_addr(data: Int, index: Int): Int {
+    return data + index * 16
+}
+
+fun __heap_get_priority(data: Int, index: Int): Int {
+    return load64(data + index * 16)
+}
+
+fun __heap_get_value(data: Int, index: Int): Int {
+    return load64(data + index * 16 + 8)
+}
+
+fun __heap_set_entry(data: Int, index: Int, priority: Int, value: Int) {
+    var addr: Int = data + index * 16
+    store64(addr, priority)
+    store64(addr + 8, value)
+}
+
+fun __heap_swap(data: Int, i: Int, j: Int) {
+    var pi: Int = load64(data + i * 16)
+    var vi: Int = load64(data + i * 16 + 8)
+    var pj: Int = load64(data + j * 16)
+    var vj: Int = load64(data + j * 16 + 8)
+    store64(data + i * 16, pj)
+    store64(data + i * 16 + 8, vj)
+    store64(data + j * 16, pi)
+    store64(data + j * 16 + 8, vi)
+}
+
+fun __heap_sift_up(data: Int, index: Int) {
+    var i: Int = index
+    while (i > 0) {
+        var parent: Int = (i - 1) / 2
+        var ip: Int = __heap_get_priority(data, i)
+        var pp: Int = __heap_get_priority(data, parent)
+        if (ip < pp) {
+            __heap_swap(data, i, parent)
+            i = parent
+        } else {
+            break
+        }
+    }
+}
+
+fun __heap_sift_down(data: Int, count: Int, index: Int) {
+    var i: Int = index
+    while (1) {
+        var left: Int = 2 * i + 1
+        var right: Int = 2 * i + 2
+        var smallest: Int = i
+
+        if (left < count) {
+            if (__heap_get_priority(data, left) < __heap_get_priority(data, smallest)) {
+                smallest = left
+            }
+        }
+        if (right < count) {
+            if (__heap_get_priority(data, right) < __heap_get_priority(data, smallest)) {
+                smallest = right
+            }
+        }
+
+        if (smallest != i) {
+            __heap_swap(data, i, smallest)
+            i = smallest
+        } else {
+            break
+        }
+    }
+}
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+fun __heap_new(): Int {
+    var heap: Int = rt_malloc(24)
+    store64(heap, 0)
+    store64(heap + 8, 16)
+    store64(heap + 16, rt_malloc(16 * 16))
+    return heap
+}
+
+fun __heap_push(heap: Int, priority: Int, value: Int) {
+    var count: Int = load64(heap)
+    var cap: Int = load64(heap + 8)
+    if (count >= cap) {
+        var new_cap: Int = cap * 2
+        var old_data: Int = load64(heap + 16)
+        var new_data: Int = rt_realloc(old_data, new_cap * 16)
+        if (new_data != 0) {
+            store64(heap + 8, new_cap)
+            store64(heap + 16, new_data)
+        }
+    }
+    var data: Int = load64(heap + 16)
+    __heap_set_entry(data, count, priority, value)
+    store64(heap, count + 1)
+    __heap_sift_up(data, count)
+}
+
+fun __heap_pop(heap: Int): Int {
+    var count: Int = load64(heap)
+    if (count == 0) {
+        return 0
+    }
+    var data: Int = load64(heap + 16)
+    var result: Int = __heap_get_value(data, 0)
+    var new_count: Int = count - 1
+    store64(heap, new_count)
+    if (new_count > 0) {
+        // Move last entry to root
+        var last_p: Int = __heap_get_priority(data, new_count)
+        var last_v: Int = __heap_get_value(data, new_count)
+        __heap_set_entry(data, 0, last_p, last_v)
+        __heap_sift_down(data, new_count, 0)
+    }
+    return result
+}
+
+fun __heap_peek_priority(heap: Int): Int {
+    var count: Int = load64(heap)
+    if (count == 0) {
+        return 0
+    }
+    var data: Int = load64(heap + 16)
+    return __heap_get_priority(data, 0)
+}
+
+fun __heap_peek_value(heap: Int): Int {
+    var count: Int = load64(heap)
+    if (count == 0) {
+        return 0
+    }
+    var data: Int = load64(heap + 16)
+    return __heap_get_value(data, 0)
+}
+
+fun __heap_length(heap: Int): Int {
+    return load64(heap)
+}
+
+fun __heap_is_empty(heap: Int): Int {
+    if (load64(heap) == 0) {
+        return 1
+    }
+    return 0
+}
