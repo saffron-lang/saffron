@@ -541,9 +541,9 @@ class NullChecker {
                 }
             }
             VarDecl(n, t, i, d) => {}
-            ExprStmt(_e) => {}
+            ExprStmt(e) => {}
             Return(v) => {}
-            If(c, t, _e2) => {}
+            If(c, t, e) => {}
             While(c, b) => {}
             Block(s) => {}
             Break => {}
@@ -928,7 +928,7 @@ class NullChecker {
             Logical(left, op, right) => AST.Type.BoolType
             MemberAccess(obj, field) => this.parse_type_node(this.infer_member_access(obj, field))
             Match(subject, arms) => this.parse_type_node(this.infer_match(subject, arms))
-            EnumConstruct(ename, v, a) => AST.Type.EnumType(ename)
+            EnumConstruct(e, v, a) => AST.Type.EnumType(e)
             Lambda(p, r, b) => AST.Type.FuncType([], AST.Type.AnyType)
             GetField(obj, field) => AST.Type.AnyType
             SetField(obj, field, value) => this.infer_type(value)
@@ -1016,7 +1016,7 @@ class NullChecker {
                 Logical(l, o, r) => ""
                 MemberAccess(o, f) => ""
                 Match(s, a) => ""
-                EnumConstruct(ename, v, a) => ""
+                EnumConstruct(e, v, a) => ""
                 Lambda(p, r, b) => ""
                 GetField(o, f) => ""
                 SetField(o, f, v) => ""
@@ -1525,9 +1525,7 @@ class NullChecker {
     fun check_let_pattern(pattern: AST.Pattern, val_type: String) {
         var pat_kind: String = match (pattern) {
             VariantPattern(v, b) => "variant"
-            ArrayPattern(elems, rest) => "array"
             WildcardPattern => "wildcard"
-            NamedWildcard(n) => "named"
             _ => "other"
         }
         if (pat_kind == "variant") {
@@ -1558,25 +1556,6 @@ class NullChecker {
                 this.env.define_var(bindings[bi], field_type)
                 bi = bi + 1
             }
-        } else if (pat_kind == "array") {
-            var elems: List<String> = match (pattern) { ArrayPattern(e, r) => e   _ => [] }
-            if (!val_type.starts_with("List")) {
-                if (val_type != "Any") {
-                    this.error("let [...]: cannot destructure " + val_type + " (expected List)")
-                }
-            }
-            var elem_type: String = "Any"
-            if (val_type.starts_with("List<") and val_type.ends_with(">")) {
-                elem_type = val_type.slice(5, val_type.length() - 1)
-            }
-            var ei: Float = 0
-            while (ei < elems.length()) {
-                this.env.define_var(elems[ei], elem_type)
-                ei = ei + 1
-            }
-        } else if (pat_kind == "named") {
-            var wc_name: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
-            this.env.define_var(wc_name, val_type)
         }
     }
 
