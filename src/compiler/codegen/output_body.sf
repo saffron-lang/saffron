@@ -457,8 +457,12 @@
             }
             // Run the scheduler if any coroutines were spawned
             if (this.coroutine_funcs.length() > 0 and !this.block_terminated) {
-                this.emit_indent("call i64 @scheduler_run()")
-                this.called_functions.push("scheduler_run")
+                var sched_run_name: String = "scheduler_run"
+                if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                    sched_run_name = "stdlib_scheduler_scheduler_run"
+                }
+                this.emit_indent("call i64 @" + sched_run_name + "()")
+                this.called_functions.push(sched_run_name)
             }
             if (!this.block_terminated) {
                 this.emit_terminator("ret i64 0")

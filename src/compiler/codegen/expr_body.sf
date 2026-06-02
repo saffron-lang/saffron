@@ -1101,14 +1101,15 @@
             nac = nac + 1
         }
         if (!has_named_check) {
+            var has_defs: Bool = this.func_defaults.has(resolved_callee)
             if (this.called_function_arity.has(resolved_callee)) {
                 var expected: Float = this.called_function_arity.get(resolved_callee)
-                if (args.length() != expected and expected > 0) {
+                if (args.length() != expected and expected > 0 and !has_defs) {
                     IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                 }
             } else if (this.func_param_count.has(resolved_callee)) {
                 var expected: Float = this.func_param_count.get(resolved_callee)
-                if (args.length() != expected and expected > 0) {
+                if (args.length() != expected and expected > 0 and !has_defs) {
                     IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
                 }
             }
@@ -1185,6 +1186,89 @@
             // reorder args to match parameter order instead of source order
             var reordered_args: List<AST.Expr> = args
             var has_named_args: Bool = false
+            var trailing_closure_applied: Bool = false
+            // Trailing closure: if last arg is a lambda and fewer args than params,
+            // place it at the last param position (Kotlin-style trailing closure)
+            if (this.func_param_names.has(resolved_callee) and args.length() > 0) {
+                var tc_pnames: List<String> = this.func_param_names.get(resolved_callee)
+                var tc_last: AST.Expr = args[args.length() - 1]
+                if (this.classify_expr(tc_last) == "lambda" and args.length() < tc_pnames.length()) {
+                    // Separate non-trailing args from the trailing closure
+                    var tc_args: List<AST.Expr> = []
+                    var tc_i: Float = 0
+                    while (tc_i < args.length() - 1) {
+                        tc_args.push(args[tc_i])
+                        tc_i = tc_i + 1
+                    }
+                    // Check if non-trailing args have named args
+                    var tc_has_named: Bool = false
+                    var tc_ni: Float = 0
+                    while (tc_ni < tc_args.length()) {
+                        if (this.classify_expr(tc_args[tc_ni]) == "assign") {
+                            tc_has_named = true
+                        }
+                        tc_ni = tc_ni + 1
+                    }
+                    // Build reordered args: handle named args among non-trailing args
+                    var tc_new: List<AST.Expr> = []
+                    if (tc_has_named) {
+                        // Named arg reordering for params before the last one
+                        var positional_idx: Float = 0
+                        var pi: Float = 0
+                        while (pi < tc_pnames.length() - 1) {
+                            var pname: String = tc_pnames[pi]
+                            var found: Bool = false
+                            var si: Float = 0
+                            while (si < tc_args.length()) {
+                                if (this.classify_expr(tc_args[si]) == "assign") {
+                                    var arg_name: String = match (tc_args[si]) { Assign(n, v) => n
+                                        _ => ""
+                                    }
+                                    if (arg_name == pname) {
+                                        var arg_value: AST.Expr = match (tc_args[si]) { Assign(n, v) => v
+                                            _ => AST.Expr.NilLit
+                                        }
+                                        tc_new.push(arg_value)
+                                        found = true
+                                    }
+                                }
+                                si = si + 1
+                            }
+                            if (!found) {
+                                var used_pos: Bool = false
+                                while (positional_idx < tc_args.length() and !used_pos) {
+                                    if (this.classify_expr(tc_args[positional_idx]) != "assign") {
+                                        tc_new.push(tc_args[positional_idx])
+                                        positional_idx = positional_idx + 1
+                                        used_pos = true
+                                    } else {
+                                        positional_idx = positional_idx + 1
+                                    }
+                                }
+                                if (!used_pos) {
+                                    tc_new.push(AST.Expr.NilLit)
+                                }
+                            }
+                            pi = pi + 1
+                        }
+                    } else {
+                        // No named args, just copy positional args and fill gaps
+                        tc_i = 0
+                        while (tc_i < tc_args.length()) {
+                            tc_new.push(tc_args[tc_i])
+                            tc_i = tc_i + 1
+                        }
+                        while (tc_new.length() < tc_pnames.length() - 1) {
+                            tc_new.push(AST.Expr.NilLit)
+                        }
+                    }
+                    // Place trailing closure at the end
+                    tc_new.push(tc_last)
+                    reordered_args = tc_new
+                    has_named_args = true
+                    trailing_closure_applied = true
+                }
+            }
             var nai: Float = 0
             while (nai < args.length()) {
                 if (this.classify_expr(args[nai]) == "assign") {
@@ -1192,7 +1276,7 @@
                 }
                 nai = nai + 1
             }
-            if (has_named_args and this.func_param_names.has(resolved_callee)) {
+            if (has_named_args and this.func_param_names.has(resolved_callee) and !trailing_closure_applied) {
                 var param_names: List<String> = this.func_param_names.get(resolved_callee)
                 var new_args: List<AST.Expr> = []
                 var positional_idx: Float = 0
@@ -1311,6 +1395,82 @@
             // Named argument reordering for fallback path
             var reordered_args2: List<AST.Expr> = args
             var has_named2: Bool = false
+            var tc_applied2: Bool = false
+            // Trailing closure for fallback path
+            if (this.func_param_names.has(emit_callee) and args.length() > 0) {
+                var tc_pnames2: List<String> = this.func_param_names.get(emit_callee)
+                var tc_last2: AST.Expr = args[args.length() - 1]
+                if (this.classify_expr(tc_last2) == "lambda" and args.length() < tc_pnames2.length()) {
+                    var tc_args2: List<AST.Expr> = []
+                    var tc_i2: Float = 0
+                    while (tc_i2 < args.length() - 1) {
+                        tc_args2.push(args[tc_i2])
+                        tc_i2 = tc_i2 + 1
+                    }
+                    var tc_has_named2: Bool = false
+                    var tc_ni2: Float = 0
+                    while (tc_ni2 < tc_args2.length()) {
+                        if (this.classify_expr(tc_args2[tc_ni2]) == "assign") {
+                            tc_has_named2 = true
+                        }
+                        tc_ni2 = tc_ni2 + 1
+                    }
+                    var tc_new2: List<AST.Expr> = []
+                    if (tc_has_named2) {
+                        var positional_idx2: Float = 0
+                        var pi2: Float = 0
+                        while (pi2 < tc_pnames2.length() - 1) {
+                            var pname2: String = tc_pnames2[pi2]
+                            var found2: Bool = false
+                            var si2: Float = 0
+                            while (si2 < tc_args2.length()) {
+                                if (this.classify_expr(tc_args2[si2]) == "assign") {
+                                    var arg_name2: String = match (tc_args2[si2]) { Assign(n, v) => n
+                                        _ => ""
+                                    }
+                                    if (arg_name2 == pname2) {
+                                        var arg_value2: AST.Expr = match (tc_args2[si2]) { Assign(n, v) => v
+                                            _ => AST.Expr.NilLit
+                                        }
+                                        tc_new2.push(arg_value2)
+                                        found2 = true
+                                    }
+                                }
+                                si2 = si2 + 1
+                            }
+                            if (!found2) {
+                                var used_pos2: Bool = false
+                                while (positional_idx2 < tc_args2.length() and !used_pos2) {
+                                    if (this.classify_expr(tc_args2[positional_idx2]) != "assign") {
+                                        tc_new2.push(tc_args2[positional_idx2])
+                                        positional_idx2 = positional_idx2 + 1
+                                        used_pos2 = true
+                                    } else {
+                                        positional_idx2 = positional_idx2 + 1
+                                    }
+                                }
+                                if (!used_pos2) {
+                                    tc_new2.push(AST.Expr.NilLit)
+                                }
+                            }
+                            pi2 = pi2 + 1
+                        }
+                    } else {
+                        tc_i2 = 0
+                        while (tc_i2 < tc_args2.length()) {
+                            tc_new2.push(tc_args2[tc_i2])
+                            tc_i2 = tc_i2 + 1
+                        }
+                        while (tc_new2.length() < tc_pnames2.length() - 1) {
+                            tc_new2.push(AST.Expr.NilLit)
+                        }
+                    }
+                    tc_new2.push(tc_last2)
+                    reordered_args2 = tc_new2
+                    has_named2 = true
+                    tc_applied2 = true
+                }
+            }
             var nai2: Float = 0
             while (nai2 < args.length()) {
                 if (this.classify_expr(args[nai2]) == "assign") {
@@ -1318,7 +1478,7 @@
                 }
                 nai2 = nai2 + 1
             }
-            if (has_named2 and this.func_param_names.has(emit_callee)) {
+            if (has_named2 and this.func_param_names.has(emit_callee) and !tc_applied2) {
                 var param_names2: List<String> = this.func_param_names.get(emit_callee)
                 var new_args2: List<AST.Expr> = []
                 var positional_idx2: Float = 0
@@ -1364,9 +1524,34 @@
             var arg_strs: List<String> = []
             var i: Float = 0
             while (i < reordered_args2.length()) {
-                var val: String = this.gen_arg_value(reordered_args2[i])
-                arg_strs.push("i64 " + val)
+                var used_default2: Bool = false
+                if (has_named2 and this.classify_expr(reordered_args2[i]) == "nil" and this.func_defaults.has(emit_callee)) {
+                    var defs2: List<AST.Expr> = this.func_defaults.get(emit_callee)
+                    if (i < defs2.length() and this.classify_expr(defs2[i]) != "nil") {
+                        var def_val2: String = this.gen_arg_value(defs2[i])
+                        arg_strs.push("i64 " + def_val2)
+                        used_default2 = true
+                    }
+                }
+                if (!used_default2) {
+                    var val: String = this.gen_arg_value(reordered_args2[i])
+                    arg_strs.push("i64 " + val)
+                }
                 i = i + 1
+            }
+            // Fill missing args with default values
+            if (this.func_defaults.has(emit_callee)) {
+                var defaults2: List<AST.Expr> = this.func_defaults.get(emit_callee)
+                var param_count2: Float = defaults2.length()
+                while (i < param_count2) {
+                    var def_expr2: AST.Expr = defaults2[i]
+                    var is_nil2: Bool = this.classify_expr(def_expr2) == "nil"
+                    if (!is_nil2) {
+                        var def_val2b: String = this.gen_arg_value(def_expr2)
+                        arg_strs.push("i64 " + def_val2b)
+                    }
+                    i = i + 1
+                }
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
