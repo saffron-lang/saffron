@@ -61,4 +61,6 @@ fun scheduler_tick(): Int {
 
 fun scheduler_run() {
     while (scheduler_tick() == 1) {}
+    // Ensure get_result is compiled (called externally by task.await)
+    get_result(0)
 }
