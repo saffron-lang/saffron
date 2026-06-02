@@ -568,6 +568,17 @@
                     if (name != full_name) {
                         this.coroutine_funcs.push(name)
                     }
+                    // Also push all possible module-prefixed forms
+                    var mp_keys: List<String> = this.module_prefixes.keys()
+                    var mpi: Float = 0
+                    while (mpi < mp_keys.length()) {
+                        var mp_prefix: String = this.module_prefixes.get(mp_keys[mpi])
+                        var mp_name: String = mp_prefix + name
+                        if (!this.coroutine_funcs.contains(mp_name)) {
+                            this.coroutine_funcs.push(mp_name)
+                        }
+                        mpi = mpi + 1
+                    }
                 }
             }
             i = i + 1
