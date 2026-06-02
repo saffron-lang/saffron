@@ -1111,28 +1111,36 @@
                 var await_cleanup: String = this.fresh_label("await.cleanup")
                 var await_done: String = this.fresh_label("await.done")
 
-                this.emit_terminator("br label %" + await_loop)
+                // Await pattern using opaque calls (defeats CoroElide):
+                // check done → yield → resume child → loop
+                // Use __sched_coro_* functions (opaque to LLVM) instead of intrinsics
+                var b_hdl_i64: String = this.fresh_local()
+                this.emit_indent(b_hdl_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+                var await_check: String = this.fresh_label("await.check")
+                this.emit_terminator("br label %" + await_check)
 
-                this.start_block(await_loop)
-                this.emit_indent("call void @llvm.coro.resume(ptr " + b_hdl + ")")
+                this.start_block(await_check)
                 var b_done: String = this.fresh_local()
-                this.emit_indent(b_done + " = call i1 @llvm.coro.done(ptr " + b_hdl + ")")
-                this.emit_terminator("br i1 " + b_done + ", label %" + await_done + ", label %" + await_yield)
+                this.emit_indent(b_done + " = call i64 @__sched_coro_done(i64 " + b_hdl_i64 + ")")
+                var b_done_cmp: String = this.fresh_local()
+                this.emit_indent(b_done_cmp + " = icmp eq i64 " + b_done + ", 1")
+                this.emit_terminator("br i1 " + b_done_cmp + ", label %" + await_done + ", label %" + await_yield)
 
                 this.start_block(await_yield)
-                // Propagate suspension: yield ourselves (bare yield, no reason/arg)
                 var save_tok: String = this.fresh_local()
                 this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
                 var susp_result: String = this.fresh_local()
                 this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
-                // Default (suspend) case branches to the shared __coro_suspend block.
                 this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
 
                 this.start_block(await_cleanup)
                 this.emit_terminator("br label %__coro_cleanup")
 
+                this.start_block(await_loop)
+                this.emit_indent("call void @__sched_coro_resume(i64 " + b_hdl_i64 + ")")
+                this.emit_terminator("br label %" + await_check)
+
                 this.start_block(await_done)
-                this.emit_indent("call void @llvm.coro.destroy(ptr " + b_hdl + ")")
                 this.last_type = AST.Type.IntType
                 return "0"
             }

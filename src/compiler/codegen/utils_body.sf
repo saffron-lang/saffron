@@ -61,6 +61,7 @@
             rt.append("\n@__yield_reason = external global i64\n")
             rt.append("@__yield_arg = external global i64\n")
             rt.append("@__task_result = external global i64\n")
+            rt.append("@__coro_escape_sink = external global ptr\n")
         }
         return rt.to_string()
     }

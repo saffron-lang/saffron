@@ -461,8 +461,84 @@ ret_old:
 }
 
 ; =============================================================================
-; Mark Phase
+; Mark Phase — Iterative Worklist
 ; =============================================================================
+;
+; Instead of recursive marking (which overflows the C stack on deep object
+; graphs), we use an explicit mark stack (worklist). __gc_mark_object just
+; validates and pushes onto the worklist. __gc_mark_drain processes items
+; iteratively, pushing children as it goes.
+
+; Mark stack globals
+@__gc_mark_stack = private global i64 0       ; pointer to i64 array
+@__gc_mark_stack_count = private global i64 0
+@__gc_mark_stack_cap = private global i64 0
+
+; Initialize the mark stack (called lazily on first push)
+define private void @__gc_mark_stack_init() {
+entry:
+  %cap = load i64, i64* @__gc_mark_stack_cap
+  %already = icmp ne i64 %cap, 0
+  br i1 %already, label %done, label %do_init
+
+do_init:
+  ; Start with 4096 entries (32KB)
+  %init_cap = add i64 4096, 0
+  %bytes = shl i64 %init_cap, 3
+  %raw = call i8* @malloc(i64 %bytes)
+  %ptr = ptrtoint i8* %raw to i64
+  store i64 %ptr, i64* @__gc_mark_stack
+  store i64 0, i64* @__gc_mark_stack_count
+  store i64 %init_cap, i64* @__gc_mark_stack_cap
+  br label %done
+
+done:
+  ret void
+}
+
+; Push a value onto the mark stack
+define private void @__gc_mark_push(i64 %val) {
+entry:
+  %cap = load i64, i64* @__gc_mark_stack_cap
+  %need_init = icmp eq i64 %cap, 0
+  br i1 %need_init, label %init, label %check_grow
+
+init:
+  call void @__gc_mark_stack_init()
+  br label %check_grow
+
+check_grow:
+  %count = load i64, i64* @__gc_mark_stack_count
+  %cap2 = load i64, i64* @__gc_mark_stack_cap
+  %full = icmp uge i64 %count, %cap2
+  br i1 %full, label %grow, label %do_push
+
+grow:
+  %new_cap = shl i64 %cap2, 1
+  %new_bytes = shl i64 %new_cap, 3
+  %old_ptr = load i64, i64* @__gc_mark_stack
+  %old_raw = inttoptr i64 %old_ptr to i8*
+  %new_raw = call i8* @realloc(i8* %old_raw, i64 %new_bytes)
+  %new_ptr = ptrtoint i8* %new_raw to i64
+  %realloc_ok = icmp ne i64 %new_ptr, 0
+  br i1 %realloc_ok, label %update_cap, label %do_push
+
+update_cap:
+  store i64 %new_ptr, i64* @__gc_mark_stack
+  store i64 %new_cap, i64* @__gc_mark_stack_cap
+  br label %do_push
+
+do_push:
+  %count2 = load i64, i64* @__gc_mark_stack_count
+  %stack = load i64, i64* @__gc_mark_stack
+  %offset = shl i64 %count2, 3
+  %slot_addr = add i64 %stack, %offset
+  %slot_ptr = inttoptr i64 %slot_addr to i64*
+  store i64 %val, i64* %slot_ptr
+  %new_count = add i64 %count2, 1
+  store i64 %new_count, i64* @__gc_mark_stack_count
+  ret void
+}
 
 ; Check if a value is a valid GC heap pointer.
 ; We use a magic number stored in the reserved field (header + 16) to quickly
@@ -500,7 +576,8 @@ no:
   ret i64 0
 }
 
-; Mark a single object and recursively trace its references
+; Mark a single object: validate, set mark bit, push onto worklist.
+; Does NOT recurse — children are processed by __gc_mark_drain.
 define void @__gc_mark_object(i64 %user_ptr) {
 entry:
   %is_zero = icmp eq i64 %user_ptr, 0
@@ -524,19 +601,50 @@ do_mark:
   ; Set mark bit
   %marked_info = or i64 %info, 1
   store i64 %marked_info, i64* %info_ptr
-  ; Dispatch based on type tag
+  ; Push onto worklist for iterative processing
+  call void @__gc_mark_push(i64 %user_ptr)
+  br label %done
+
+done:
+  ret void
+}
+
+; Drain the mark worklist: pop objects and trace their children iteratively.
+define private void @__gc_mark_drain() {
+entry:
+  br label %loop
+
+loop:
+  %count = load i64, i64* @__gc_mark_stack_count
+  %empty = icmp eq i64 %count, 0
+  br i1 %empty, label %done, label %pop
+
+pop:
+  ; Pop from top of stack
+  %new_count = sub i64 %count, 1
+  store i64 %new_count, i64* @__gc_mark_stack_count
+  %stack = load i64, i64* @__gc_mark_stack
+  %offset = shl i64 %new_count, 3
+  %slot_addr = add i64 %stack, %offset
+  %slot_ptr = inttoptr i64 %slot_addr to i64*
+  %user_ptr = load i64, i64* %slot_ptr
+  ; Read object info to dispatch by type tag
+  %header = sub i64 %user_ptr, 24
+  %info_addr = add i64 %header, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
   %tag = call i64 @__gc_info_tag(i64 %info)
   %size = call i64 @__gc_info_size(i64 %info)
-  switch i64 %tag, label %done [
-    i64 0, label %done           ; raw - no inner ptrs
-    i64 1, label %done           ; string - no inner ptrs
+  switch i64 %tag, label %loop [
+    i64 0, label %loop           ; raw - no inner ptrs
+    i64 1, label %loop           ; string - no inner ptrs
     i64 2, label %trace_list
     i64 3, label %trace_map
     i64 4, label %trace_closure
     i64 5, label %trace_instance
     i64 6, label %trace_sb
-    i64 7, label %done           ; data array - scanned by parent list
-    i64 8, label %done           ; kv array - scanned by parent map
+    i64 7, label %loop           ; data array - scanned by parent list
+    i64 8, label %loop           ; kv array - scanned by parent map
     i64 9, label %trace_array    ; env - scan all slots
   ]
 
@@ -555,7 +663,7 @@ trace_list:
 list_loop:
   %li = phi i64 [0, %trace_list], [%li_next, %list_body]
   %list_done = icmp uge i64 %li, %list_count
-  br i1 %list_done, label %done, label %list_body
+  br i1 %list_done, label %loop, label %list_body
 
 list_body:
   %elem_offset = shl i64 %li, 3
@@ -584,7 +692,7 @@ trace_map:
 map_loop:
   %mi = phi i64 [0, %trace_map], [%mi_next, %map_body]
   %map_done = icmp uge i64 %mi, %map_count
-  br i1 %map_done, label %done, label %map_body
+  br i1 %map_done, label %loop, label %map_body
 
 map_body:
   %mk_offset = shl i64 %mi, 3
@@ -606,7 +714,7 @@ trace_closure:
   %env_ptr_c = inttoptr i64 %env_addr to i64*
   %env_val = load i64, i64* %env_ptr_c
   call void @__gc_mark_object(i64 %env_val)
-  br label %done
+  br label %loop
 
 trace_instance:
   ; Class instance: N fields (size/8 slots), all scanned
@@ -616,7 +724,7 @@ trace_instance:
 inst_loop:
   %ii = phi i64 [0, %trace_instance], [%ii_next, %inst_body]
   %inst_done = icmp uge i64 %ii, %inst_num_fields
-  br i1 %inst_done, label %done, label %inst_body
+  br i1 %inst_done, label %loop, label %inst_body
 
 inst_body:
   %field_offset = shl i64 %ii, 3
@@ -633,7 +741,7 @@ trace_sb:
   %sb_buf_ptr = inttoptr i64 %sb_buf_addr to i64*
   %sb_buf = load i64, i64* %sb_buf_ptr
   call void @__gc_mark_object(i64 %sb_buf)
-  br label %done
+  br label %loop
 
 trace_array:
   ; Data/KV/Env arrays: flat array of i64, scan all
@@ -643,7 +751,7 @@ trace_array:
 arr_loop:
   %ai = phi i64 [0, %trace_array], [%ai_next, %arr_body]
   %arr_done = icmp uge i64 %ai, %arr_num
-  br i1 %arr_done, label %done, label %arr_body
+  br i1 %arr_done, label %loop, label %arr_body
 
 arr_body:
   %arr_offset = shl i64 %ai, 3
@@ -658,12 +766,14 @@ done:
   ret void
 }
 
-; Mark phase: scan all roots from shadow stack
+; Mark phase: scan all roots from shadow stack, then drain the worklist
 define private void @__gc_mark() {
 entry:
+  ; Reset mark stack count (reuse existing allocation)
+  store i64 0, i64* @__gc_mark_stack_count
   %inited = load i64, i64* @__gc_shadow_stack_inited
   %not_inited = icmp eq i64 %inited, 0
-  br i1 %not_inited, label %done, label %scan
+  br i1 %not_inited, label %drain, label %scan
 
 scan:
   %ss = load i64, i64* @__gc_shadow_stack
@@ -677,7 +787,7 @@ scan:
 loop:
   %i = phi i64 [0, %scan], [%i_next, %next]
   %loop_done = icmp uge i64 %i, %count
-  br i1 %loop_done, label %done, label %loop_body
+  br i1 %loop_done, label %drain, label %loop_body
 
 loop_body:
   ; Each entry is the address of a variable. Read the value at that address.
@@ -697,6 +807,11 @@ deref:
 next:
   %i_next = add i64 %i, 1
   br label %loop
+
+drain:
+  ; After all roots are pushed, iteratively process the worklist
+  call void @__gc_mark_drain()
+  br label %done
 
 done:
   ret void

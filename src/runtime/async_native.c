@@ -103,7 +103,7 @@ void __sched_reset_yield(void) { __yield_reason = 0; __yield_arg = 0; }
 
 typedef void (*coro_fn_t)(void *);
 
-void __sched_coro_resume(int64_t hdl_i64) {
+__attribute__((noinline)) void __sched_coro_resume(int64_t hdl_i64) {
     void *hdl = (void *)hdl_i64;
     if (!hdl) return;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
@@ -111,7 +111,7 @@ void __sched_coro_resume(int64_t hdl_i64) {
     resume_fn(hdl);
 }
 
-int64_t __sched_coro_done(int64_t hdl_i64) {
+__attribute__((noinline)) int64_t __sched_coro_done(int64_t hdl_i64) {
     void *hdl = (void *)hdl_i64;
     if (!hdl) return 1;
     coro_fn_t resume_fn = *(coro_fn_t *)hdl;
