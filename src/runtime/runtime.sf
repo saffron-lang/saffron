@@ -43,33 +43,40 @@
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
 
+// --- Platform Constants ---
+// SLOT_SIZE: size of one value slot in bytes (always 8, since all values are i64)
+// All struct layouts use SLOT_SIZE for field offsets.
+// On wasm32: pointers are 32-bit but stored in 64-bit slots (zero-extended)
+// On wasm64/native: pointers and values are both 64-bit
+var SLOT_SIZE: Int = 8
+
 // =============================================================================
-// List: { count@0, capacity@8, data*@16 } — 24 bytes
+// List: { count@0, capacity@SLOT_SIZE, data*@SLOT_SIZE*2 } — SLOT_SIZE*3 bytes
 // =============================================================================
 
 fun __list_new(): Int {
-    var raw: Int = __gc_alloc(24, 2)
-    store64(raw, 0)
-    store64(raw + 8, 8)
-    store64(raw + 16, __gc_alloc(64, 7))
+    var raw: Int = __gc_alloc(SLOT_SIZE * 3, 2)
+    store64(raw, 0)                              // count = 0
+    store64(raw + SLOT_SIZE, 8)                  // capacity = 8
+    store64(raw + SLOT_SIZE * 2, __gc_alloc(SLOT_SIZE * 8, 7))  // data ptr
     return raw
 }
 
 fun __list_push(list: Int, value: Int) {
     if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
-    var cap: Int = load64(list + 8)
+    var cap: Int = load64(list + SLOT_SIZE)
     if (count >= cap) {
         var new_cap: Int = cap * 2
-        var old_data: Int = load64(list + 16)
-        var new_data: Int = __gc_realloc(old_data, new_cap * 8, 7)
+        var old_data: Int = load64(list + SLOT_SIZE * 2)
+        var new_data: Int = __gc_realloc(old_data, new_cap * SLOT_SIZE, 7)
         if (new_data != 0) {
-            store64(list + 8, new_cap)
-            store64(list + 16, new_data)
+            store64(list + SLOT_SIZE, new_cap)
+            store64(list + SLOT_SIZE * 2, new_data)
         }
     }
-    var data: Int = load64(list + 16)
-    store64(data + count * 8, value)
+    var data: Int = load64(list + SLOT_SIZE * 2)
+    store64(data + count * SLOT_SIZE, value)
     store64(list, count + 1)
 }
 
@@ -84,8 +91,8 @@ fun __list_get(list: Int, index: Int): Int {
         __index_error(index, count)
         return 0
     }
-    var data: Int = load64(list + 16)
-    return load64(data + actual_idx * 8)
+    var data: Int = load64(list + SLOT_SIZE * 2)
+    return load64(data + actual_idx * SLOT_SIZE)
 }
 
 fun __list_set(list: Int, index: Int, value: Int) {
@@ -99,8 +106,8 @@ fun __list_set(list: Int, index: Int, value: Int) {
         __index_error(index, count)
         return
     }
-    var data: Int = load64(list + 16)
-    store64(data + actual_idx * 8, value)
+    var data: Int = load64(list + SLOT_SIZE * 2)
+    store64(data + actual_idx * SLOT_SIZE, value)
 }
 
 fun __list_length(list: Int): Int {
@@ -117,19 +124,19 @@ fun __list_pop(list: Int): Int {
     }
     var new_count: Int = count - 1
     store64(list, new_count)
-    var data: Int = load64(list + 16)
-    return load64(data + new_count * 8)
+    var data: Int = load64(list + SLOT_SIZE * 2)
+    return load64(data + new_count * SLOT_SIZE)
 }
 
 fun __list_remove(list: Int, index: Int): Int {
     if (list == 0) { return 0 }
     var count: Int = load64(list)
     if (index < 0 or index >= count) { return 0 }
-    var data: Int = load64(list + 16)
-    var removed: Int = load64(data + index * 8)
+    var data: Int = load64(list + SLOT_SIZE * 2)
+    var removed: Int = load64(data + index * SLOT_SIZE)
     var i: Int = index
     while (i < count - 1) {
-        store64(data + i * 8, load64(data + (i + 1) * 8))
+        store64(data + i * SLOT_SIZE, load64(data + (i + 1) * SLOT_SIZE))
         i = i + 1
     }
     store64(list, count - 1)
@@ -141,20 +148,20 @@ fun __list_remove(list: Int, index: Int): Int {
 // =============================================================================
 
 fun StringBuilder(): Int {
-    var raw: Int = __gc_alloc(24, 6)
+    var raw: Int = __gc_alloc(SLOT_SIZE * 3, 6)
     store64(raw, 0)
-    store64(raw + 8, 1024)
+    store64(raw + SLOT_SIZE, 1024)
     var buf: Int = __gc_alloc(1024, 0)
     store8(buf, 0)
-    store64(raw + 16, buf)
+    store64(raw + SLOT_SIZE * 2, buf)
     return raw
 }
 
 fun __sb_append(sb: Int, str: Int) {
     if (str == 0) { return }
     var len: Int = load64(sb)
-    var cap: Int = load64(sb + 8)
-    var buf: Int = load64(sb + 16)
+    var cap: Int = load64(sb + SLOT_SIZE)
+    var buf: Int = load64(sb + SLOT_SIZE * 2)
     var slen: Int = rt_strlen(str)
     var needed: Int = len + slen + 1
     if (needed >= cap) {
@@ -162,8 +169,8 @@ fun __sb_append(sb: Int, str: Int) {
         var new_buf: Int = __gc_realloc(buf, new_cap, 0)
         if (new_buf != 0) {
             buf = new_buf
-            store64(sb + 8, new_cap)
-            store64(sb + 16, buf)
+            store64(sb + SLOT_SIZE, new_cap)
+            store64(sb + SLOT_SIZE * 2, buf)
         }
     }
     rt_memcpy(buf + len, str, slen)
@@ -173,7 +180,7 @@ fun __sb_append(sb: Int, str: Int) {
 }
 
 fun __sb_to_string(sb: Int): Int {
-    return load64(sb + 16)
+    return load64(sb + SLOT_SIZE * 2)
 }
 
 // =============================================================================
@@ -187,20 +194,20 @@ fun __safe_strcmp(a: Int, b: Int): Int {
 }
 
 fun __map_new(): Int {
-    var raw: Int = __gc_alloc(32, 3)
+    var raw: Int = __gc_alloc(SLOT_SIZE * 4, 3)
     store64(raw, 0)
-    store64(raw + 8, 16)
-    store64(raw + 16, __gc_alloc(128, 8))
-    store64(raw + 24, __gc_alloc(128, 8))
+    store64(raw + SLOT_SIZE, 16)
+    store64(raw + SLOT_SIZE * 2, __gc_alloc(128, 8))
+    store64(raw + SLOT_SIZE * 3, __gc_alloc(128, 8))
     return raw
 }
 
 fun __map_set(map: Int, key: Int, value: Int) {
     if (map == 0) { __null_pointer_error() }
     var count: Int = load64(map)
-    var cap: Int = load64(map + 8)
-    var keys: Int = load64(map + 16)
-    var vals: Int = load64(map + 24)
+    var cap: Int = load64(map + SLOT_SIZE)
+    var keys: Int = load64(map + SLOT_SIZE * 2)
+    var vals: Int = load64(map + SLOT_SIZE * 3)
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
@@ -216,13 +223,13 @@ fun __map_set(map: Int, key: Int, value: Int) {
         var new_keys: Int = __gc_realloc(keys, new_bytes, 8)
         var new_vals: Int = __gc_realloc(vals, new_bytes, 8)
         if (new_keys != 0 and new_vals != 0) {
-            store64(map + 8, new_cap)
-            store64(map + 16, new_keys)
-            store64(map + 24, new_vals)
+            store64(map + SLOT_SIZE, new_cap)
+            store64(map + SLOT_SIZE * 2, new_keys)
+            store64(map + SLOT_SIZE * 3, new_vals)
         }
     }
-    var cur_keys: Int = load64(map + 16)
-    var cur_vals: Int = load64(map + 24)
+    var cur_keys: Int = load64(map + SLOT_SIZE * 2)
+    var cur_vals: Int = load64(map + SLOT_SIZE * 3)
     store64(cur_keys + count * 8, key)
     store64(cur_vals + count * 8, value)
     store64(map, count + 1)
@@ -231,8 +238,8 @@ fun __map_set(map: Int, key: Int, value: Int) {
 fun __map_get(map: Int, key: Int): Int {
     if (map == 0) { return 0 }
     var count: Int = load64(map)
-    var keys: Int = load64(map + 16)
-    var vals: Int = load64(map + 24)
+    var keys: Int = load64(map + SLOT_SIZE * 2)
+    var vals: Int = load64(map + SLOT_SIZE * 3)
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
@@ -247,7 +254,7 @@ fun __map_get(map: Int, key: Int): Int {
 fun __map_has(map: Int, key: Int): Int {
     if (map == 0) { return 0 }
     var count: Int = load64(map)
-    var keys: Int = load64(map + 16)
+    var keys: Int = load64(map + SLOT_SIZE * 2)
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
@@ -262,7 +269,7 @@ fun __map_has(map: Int, key: Int): Int {
 fun __map_keys(map: Int): Int {
     if (map == 0) { return __list_new() }
     var count: Int = load64(map)
-    var kp: Int = load64(map + 16)
+    var kp: Int = load64(map + SLOT_SIZE * 2)
     var list: Int = __list_new()
     var i: Int = 0
     while (i < count) {
@@ -297,7 +304,7 @@ fun __list_to_string(list: Int): Int {
         return nil_s
     }
     var count: Int = load64(list)
-    var data: Int = load64(list + 16)
+    var data: Int = load64(list + SLOT_SIZE * 2)
     // Estimate buffer size: each element up to 20 chars + ", " + "[]"
     var buf_size: Int = count * 22 + 3
     var buf: Int = __gc_alloc(buf_size, 1)
@@ -311,7 +318,7 @@ fun __list_to_string(list: Int): Int {
             store8(buf + pos, 32)
             pos = pos + 1
         }
-        var elem: Int = load64(data + i * 8)
+        var elem: Int = load64(data + i * SLOT_SIZE)
         var elem_str: Int = __int_to_string(elem)
         var elen: Int = rt_strlen(elem_str)
         rt_memcpy(buf + pos, elem_str, elen)
@@ -604,7 +611,7 @@ fun __list_join(list: Int, sep: Int): Int {
         return empty
     }
     var count: Int = load64(list)
-    var data: Int = load64(list + 16)
+    var data: Int = load64(list + SLOT_SIZE * 2)
     var sep_len: Int = 0
     if (sep != 0) {
         sep_len = rt_strlen(sep)
@@ -622,7 +629,7 @@ fun __list_join(list: Int, sep: Int): Int {
         if (i > 0) {
             __join_append(buf_p, len_p, cap_p, sep, sep_len)
         }
-        var elem: Int = load64(data + i * 8)
+        var elem: Int = load64(data + i * SLOT_SIZE)
         if (elem != 0) {
             var elem_len: Int = rt_strlen(elem)
             __join_append(buf_p, len_p, cap_p, elem, elem_len)
@@ -635,10 +642,10 @@ fun __list_join(list: Int, sep: Int): Int {
 fun __list_contains(list: Int, val: Int): Int {
     if (list == 0) { return 0 }
     var count: Int = load64(list)
-    var data: Int = load64(list + 16)
+    var data: Int = load64(list + SLOT_SIZE * 2)
     var i: Int = 0
     while (i < count) {
-        var elem: Int = load64(data + i * 8)
+        var elem: Int = load64(data + i * SLOT_SIZE)
         if (__safe_strcmp(val, elem) == 0) {
             return 1
         }

@@ -1159,14 +1159,11 @@ class Codegen {
 
         var resume_label: String = this.fresh_label("yield.resume")
         var cleanup_label: String = this.fresh_label("yield.cleanup")
-        var suspend_label: String = this.fresh_label("yield.suspend")
 
-        this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
-
-        // Suspend path (returns handle to caller)
-        this.emit(suspend_label + ":")
-        this.block_terminated = false
-        this.emit_terminator("ret ptr %__coro_hdl")
+        // Default (suspend) case branches to the shared __coro_suspend block.
+        // CoroSplit requires all suspend points to share a single suspend/ret block;
+        // per-yield suspend blocks become unreachable in the .resume function.
+        this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
 
         // Cleanup path (coroutine destroyed while suspended)
         this.emit(cleanup_label + ":")
@@ -3649,6 +3646,34 @@ class Codegen {
             this.last_type = AST.Type.IntType
             return result
         }
+        // __suspend(reason, arg) — async suspend point
+        // Emits coro.save/coro.suspend/switch. Makes containing function a coroutine.
+        if (name.ends_with("__suspend")) {
+            var reason: String = this.gen_arg_value(args[0])
+            this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
+            if (args.length() >= 2) {
+                var arg: String = this.gen_arg_value(args[1])
+                this.emit_indent("store i64 " + arg + ", i64* @__yield_arg")
+            }
+            var save_tok: String = this.fresh_local()
+            this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var susp_result: String = this.fresh_local()
+            this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+            var resume_label: String = this.fresh_label("suspend.resume")
+            var suspend_label: String = this.fresh_label("suspend.ret")
+            var cleanup_label: String = this.fresh_label("suspend.cleanup")
+            this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+            this.emit(suspend_label + ":")
+            this.block_terminated = false
+            this.emit_terminator("ret ptr %__coro_hdl")
+            this.emit(cleanup_label + ":")
+            this.block_terminated = false
+            this.emit_terminator("br label %__coro_cleanup")
+            this.emit(resume_label + ":")
+            this.block_terminated = false
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
         return "0"
     }
 
@@ -4854,6 +4879,8 @@ class Codegen {
         rt.append("declare i64 @__gc_stat_total_bytes()\n")
         rt.append("declare i64 @__gc_stat_collections()\n")
         rt.append("declare i64 @__gc_stat_freed_bytes()\n")
+        rt.append("declare i64 @__gc_stat_threshold()\n")
+        rt.append("declare void @__gc_debug_stats()\n")
         rt.append("declare i64 @__gc_alloc(i64, i64)\n")
         rt.append("declare i64 @__gc_alloc_zeroed(i64, i64)\n")
         rt.append("declare i64 @__gc_realloc(i64, i64, i64)\n")
@@ -5210,7 +5237,7 @@ class Codegen {
             Yield(v) => true
             Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             Unary(o, r) => this.expr_has_yield(r)
-            Call(c, a) => this.exprs_have_yield(a)
+            Call(c, a) => this.call_is_suspend(c) or this.exprs_have_yield(a)
             Assign(n, v) => this.expr_has_yield(v)
             Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
             MethodCall(o, m, a) => this.expr_has_yield(o) or this.exprs_have_yield(a)
@@ -5228,6 +5255,11 @@ class Codegen {
             TryExpr(tb, tv, cn, cb, cv) => this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(cb) or this.expr_has_yield(cv)
             _ => false
         }
+    }
+
+    fun call_is_suspend(callee: AST.Expr): Bool {
+        var name: String = this.get_variable_name(callee)
+        return name == "__suspend" or name.ends_with("__suspend")
     }
 
     fun exprs_have_yield(exprs: List<AST.Expr>): Bool {
@@ -5371,6 +5403,9 @@ class Codegen {
                 func_bodies.push(body)
                 if (this.stmts_have_yield(body)) {
                     this.coroutine_funcs.push(full_name)
+                    if (name != full_name) {
+                        this.coroutine_funcs.push(name)
+                    }
                 }
             }
             i = i + 1
@@ -5574,6 +5609,10 @@ class Codegen {
 
         // Check if this function is a coroutine
         var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        if (!is_coro) { is_coro = this.stmts_have_yield(body) }
+        if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
+            this.coroutine_funcs.push(emit_name)
+        }
         this.is_coroutine = is_coro
 
         this.emit("")
@@ -5834,6 +5873,8 @@ class Codegen {
         this.known_functions.push("__gc_stat_total_bytes")
         this.known_functions.push("__gc_stat_collections")
         this.known_functions.push("__gc_stat_freed_bytes")
+        this.known_functions.push("__gc_stat_threshold")
+        this.known_functions.push("__gc_debug_stats")
         this.known_functions.push("__gc_alloc")
         this.known_functions.push("__gc_alloc_zeroed")
         this.known_functions.push("__gc_realloc")
@@ -6641,7 +6682,7 @@ class Codegen {
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
     }
-    if (obj_name == "IO" or obj_name == "OS") { return obj_name }
+    if (obj_name == "IO" or obj_name == "OS" or obj_name == "GC") { return obj_name }
     if (this.module_prefixes.has(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
@@ -6746,10 +6787,58 @@ class Codegen {
         }
     }
 
+    // Check for GC module calls
+    if (obj_name == "GC") {
+        if (method == "collect") {
+            this.emit_indent("call void @__gc_collect()")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "enable") {
+            this.emit_indent("call void @__gc_enable()")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "disable") {
+            this.emit_indent("call void @__gc_disable()")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "stats") {
+            this.emit_indent("call void @__gc_debug_stats()")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+        if (method == "alloc_count") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_alloc_count()")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "total_bytes") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_total_bytes()")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "threshold") {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__gc_stat_threshold()")
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        if (method == "set_threshold") {
+            var arg: String = this.gen_arg_value(args[0])
+            this.emit_indent("call void @__gc_set_threshold(i64 " + arg + ")")
+            this.last_type = AST.Type.NilType
+            return "0"
+        }
+    }
+
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and this.module_prefixes.has(obj_name)) {
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -7260,7 +7349,7 @@ class Codegen {
     // (enum check moved above builtin dispatch)
 
     // Check for imported module function calls (module alias or unknown name)
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
+    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -7633,6 +7722,16 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         mi2 = mi2 + 1
     }
 
+    // Coroutine detection across all modules
+    var cmi: Float = 0
+    while (cmi < module_stmts.length()) {
+        gen.current_prefix = module_prefixes_list[cmi]
+        gen.mark_coroutines(module_stmts[cmi])
+        cmi = cmi + 1
+    }
+    gen.current_prefix = ""
+    gen.mark_coroutines(program)
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -7968,6 +8067,11 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         }
         pri = pri + 1
     }
+
+    // Coroutine detection: scan all stmts with correct prefix
+    gen.mark_coroutines(all_stmts)
+    gen.current_prefix = ""
+    gen.mark_coroutines(program)
 
     // Compile each module's declarations
     var module_init_names: List<String> = []

@@ -216,14 +216,11 @@
 
         var resume_label: String = this.fresh_label("yield.resume")
         var cleanup_label: String = this.fresh_label("yield.cleanup")
-        var suspend_label: String = this.fresh_label("yield.suspend")
 
-        this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
-
-        // Suspend path (returns handle to caller)
-        this.emit(suspend_label + ":")
-        this.block_terminated = false
-        this.emit_terminator("ret ptr %__coro_hdl")
+        // Default (suspend) case branches to the shared __coro_suspend block.
+        // CoroSplit requires all suspend points to share a single suspend/ret block;
+        // per-yield suspend blocks become unreachable in the .resume function.
+        this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
 
         // Cleanup path (coroutine destroyed while suspended)
         this.emit(cleanup_label + ":")
