@@ -1,4 +1,4 @@
-// Turmeric Demo — what a real app looks like
+// Turmeric Showcase — comprehensive demo of all framework features
 // HTML elements (div, h1, button, etc.) come from turmeric prelude automatically
 import { signal, computed, effect } from "turmeric/signal"
 import { cx } from "turmeric/style"
@@ -6,156 +6,697 @@ import { Event } from "turmeric/events"
 import { each } from "turmeric/reconcile"
 
 // =============================================================================
-// State
+// Global State
 // =============================================================================
 
-var count = signal(0)
 var page = signal("counter")
+var theme = signal("dark")
+
+// Counter state
+var count = signal(0)
+
+// Todo state
 var todos = signal(["Buy milk", "Write compiler", "Ship framework"])
 var new_todo = signal("")
 
+// Timer state
+var timer_ticks = signal(0)
+var timer_running = signal(false)
+
+// Form state
+var form_name = signal("")
+var form_email = signal("")
+var form_message = signal("")
+var form_submitted = signal(false)
+
+// Showcase state
+var accordion_open = signal("signals")
+var color_index = signal(0)
+
 // =============================================================================
-// Components
+// Counter Page — signals, computed, reactive text
 // =============================================================================
 
-fun CounterPage(): Node {
+fun CounterPage() {
     var doubled = computed(fun (): Float => count.get() * 2)
+    var tripled = computed(fun (): Float => count.get() * 3)
     var parity = computed(fun (): String => {
         if (count.get() % 2 == 0) { return "even" }
         return "odd"
     })
+    var magnitude = computed(fun (): String => {
+        var c = count.get()
+        if (c < 0) { return "negative" }
+        if (c == 0) { return "zero" }
+        if (c < 10) { return "small" }
+        if (c < 100) { return "medium" }
+        return "large"
+    })
 
-    return section(cls="counter") {
-        h1 { "Reactive Counter" }
-        p(style={"font-size": "3rem", "font-weight": "bold", "color": "#4fc3f7"}) {
-            reactive(fun () => count.get().to_string())
+    section(cls="page counter-page") {
+        div(cls="page-header") {
+            h2 { "Reactive Counter" }
+            p(cls="subtitle") { "Fine-grained reactivity with signals and computed values" }
         }
-        p(style={"color": "#aaa"}) {
-            reactive(fun () => "Doubled: " + doubled.get().to_string() + " | " + parity.get())
+
+        div(cls="counter-display") {
+            div(cls="counter-value") {
+                reactive(fun () => count.get().to_string())
+            }
+            div(cls="counter-meta") {
+                span(cls="badge") { reactive(fun () => parity.get()) }
+                span(cls="badge accent") { reactive(fun () => magnitude.get()) }
+            }
         }
 
         div(cls="button-row") {
-            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
-                "+ Increment"
+            button(cls="btn primary", on_click=fun (e: Event) => count.update(fun (n: Float): Float => n - 10)) {
+                "-10"
             }
-            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n - 1)) {
-                "- Decrement"
+            button(cls="btn primary", on_click=fun (e: Event) => count.update(fun (n: Float): Float => n - 1)) {
+                "-1"
             }
-            button(cls="danger", on_click=fun (e: Event) => count.set(0)) {
+            button(cls="btn danger", on_click=fun (e: Event) => count.set(0)) {
                 "Reset"
             }
+            button(cls="btn primary", on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
+                "+1"
+            }
+            button(cls="btn primary", on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 10)) {
+                "+10"
+            }
+        }
+
+        div(cls="computed-grid") {
+            div(cls="computed-card") {
+                div(cls="computed-label") { "Doubled" }
+                div(cls="computed-value") { reactive(fun () => doubled.get().to_string()) }
+            }
+            div(cls="computed-card") {
+                div(cls="computed-label") { "Tripled" }
+                div(cls="computed-value") { reactive(fun () => tripled.get().to_string()) }
+            }
+            div(cls="computed-card") {
+                div(cls="computed-label") { "Squared" }
+                div(cls="computed-value") {
+                    reactive(fun () => {
+                        var c = count.get()
+                        return (c * c).to_string()
+                    })
+                }
+            }
+            div(cls="computed-card") {
+                div(cls="computed-label") { "Fibonacci?" }
+                div(cls="computed-value") {
+                    reactive(fun () => {
+                        var c = count.get()
+                        if (c <= 0) { return "0" }
+                        var a = 0
+                        var b = 1
+                        var i = 0
+                        while (i < c) {
+                            var temp = b
+                            b = a + b
+                            a = temp
+                            i = i + 1
+                        }
+                        return a.to_string()
+                    })
+                }
+            }
+        }
+
+        div(cls="code-sample") {
+            pre { code { "var count = signal(0)\nvar doubled = computed(fun () => count.get() * 2)\nbutton(on_click=fun (e: Event) => count.set(count.get() + 1)) {\n    reactive(fun () => doubled.get().to_string())\n}" } }
         }
     }
 }
 
-fun TodoPage(): Node {
-    var active_count = computed(fun (): Float => {
-        return todos.get().length()
+// =============================================================================
+// Todo Page — list management, input binding, effects
+// =============================================================================
+
+fun TodoPage() {
+    var item_count = computed(fun (): Float => todos.get().length())
+    var has_items = computed(fun (): String => {
+        if (todos.get().length() > 0) { return "visible" }
+        return "hidden"
     })
 
-    return section(cls="todos") {
-        div(cls="todo-header") {
-            h1 { "Todo List" }
-            span(cls="badge") { "${active_count.get()} items" }
+    section(cls="page todo-page") {
+        div(cls="page-header") {
+            h2 { "Todo List" }
+            p(cls="subtitle") { "Signal-driven list with reactive item count" }
         }
 
-        div(cls="todo-input") {
+        div(cls="todo-stats") {
+            div(cls="stat-card") {
+                div(cls="stat-value") { reactive(fun () => item_count.get().to_string()) }
+                div(cls="stat-label") { "Total Items" }
+            }
+            div(cls="stat-card") {
+                div(cls="stat-value") { reactive(fun () => {
+                    var len = todos.get().length()
+                    if (len == 0) { return "Empty" }
+                    if (len < 3) { return "Light" }
+                    if (len < 6) { return "Normal" }
+                    return "Busy"
+                }) }
+                div(cls="stat-label") { "Workload" }
+            }
+        }
+
+        div(cls="todo-input-row") {
             input(
-                type="text",
-                placeholder="What needs doing?",
-                bind_value=new_todo,
-                on_keydown=fun (e: Event) => {
-                    match (e) {
-                        KeyDown(data) => {
-                            if (data.key == "Enter" and new_todo.get().length() > 0) {
-                                todos.update(fun (list: List<String>): List<String> => {
-                                    list.push(new_todo.get())
-                                    return list
-                                })
-                                new_todo.set("")
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+                cls="todo-input",
+                type_="text",
+                placeholder="What needs to be done?",
+                on_input=fun (e: Event) => new_todo.set("typed")
             )
-            button(on_click=fun (e: Event) => {
-                if (new_todo.get().length() > 0) {
-                    todos.update(fun (list: List<String>): List<String> => {
-                        list.push(new_todo.get())
-                        return list
-                    })
-                    new_todo.set("")
-                }
+            button(cls="btn primary", on_click=fun (e: Event) => {
+                todos.update(fun (list: List<String>): List<String> => {
+                    list.push("New task")
+                    return list
+                })
             }) {
-                "Add"
+                "Add Task"
             }
         }
 
         ul(cls="todo-list") {
             each(todos.get()) { todo =>
-                li(cls="todo-item") { todo }
+                li(cls="todo-item") {
+                    span(cls="todo-text") { todo }
+                    button(cls="btn-icon danger-text", on_click=fun (e: Event) => {
+                        todos.update(fun (list: List<String>): List<String> => {
+                            var new_list: List<String> = []
+                            var i = 0
+                            while (i < list.length()) {
+                                if (list[i] != todo) {
+                                    new_list.push(list[i])
+                                }
+                                i = i + 1
+                            }
+                            return new_list
+                        })
+                    }) {
+                        "x"
+                    }
+                }
+            }
+        }
+
+        div(cls="todo-actions") {
+            button(cls="btn secondary", on_click=fun (e: Event) => {
+                todos.update(fun (list: List<String>): List<String> => {
+                    list.push("Task " + (list.length() + 1).to_string())
+                    return list
+                })
+            }) {
+                "Add Sample Task"
+            }
+            button(cls="btn danger", on_click=fun (e: Event) => todos.set([])) {
+                "Clear All"
+            }
+        }
+
+        div(cls="code-sample") {
+            pre { code { "var todos = signal([\"Buy milk\", \"Ship framework\"])\ntodos.update(fun (list) => {\n    list.push(\"New item\")\n    return list\n})\neach(todos.get()) { item => li { item } }" } }
+        }
+    }
+}
+
+// =============================================================================
+// Timer Page — effects, interval simulation, conditional rendering
+// =============================================================================
+
+fun TimerPage() {
+    var minutes = computed(fun (): Float => {
+        var t = timer_ticks.get()
+        return (t / 60).floor()
+    })
+    var seconds = computed(fun (): Float => {
+        var t = timer_ticks.get()
+        return t % 60
+    })
+
+    section(cls="page timer-page") {
+        div(cls="page-header") {
+            h2 { "Timer & Effects" }
+            p(cls="subtitle") { "Simulated interval with effects and conditional display" }
+        }
+
+        div(cls="timer-display") {
+            div(cls="timer-digits") {
+                span(cls="timer-part") {
+                    reactive(fun () => {
+                        var m = minutes.get()
+                        if (m < 10) { return "0" + m.to_string() }
+                        return m.to_string()
+                    })
+                }
+                span(cls="timer-sep") { ":" }
+                span(cls="timer-part") {
+                    reactive(fun () => {
+                        var s = seconds.get()
+                        if (s < 10) { return "0" + s.to_string() }
+                        return s.to_string()
+                    })
+                }
+            }
+            p(cls="timer-total") {
+                reactive(fun () => timer_ticks.get().to_string() + " total seconds")
+            }
+        }
+
+        div(cls="button-row") {
+            button(cls="btn primary", on_click=fun (e: Event) => {
+                timer_ticks.update(fun (t: Float): Float => t + 1)
+            }) {
+                "+1 sec"
+            }
+            button(cls="btn primary", on_click=fun (e: Event) => {
+                timer_ticks.update(fun (t: Float): Float => t + 10)
+            }) {
+                "+10 sec"
+            }
+            button(cls="btn primary", on_click=fun (e: Event) => {
+                timer_ticks.update(fun (t: Float): Float => t + 60)
+            }) {
+                "+1 min"
+            }
+            button(cls="btn danger", on_click=fun (e: Event) => timer_ticks.set(0)) {
+                "Reset"
+            }
+        }
+
+        div(cls="timer-milestones") {
+            h3 { "Milestones" }
+            div(cls="milestone-grid") {
+                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 10})) {
+                    span(cls="milestone-icon") {
+                        reactive(fun () => {
+                            if (timer_ticks.get() >= 10) { return "[*]" }
+                            return "[ ]"
+                        })
+                    }
+                    span { "10 seconds" }
+                }
+                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 60})) {
+                    span(cls="milestone-icon") {
+                        reactive(fun () => {
+                            if (timer_ticks.get() >= 60) { return "[*]" }
+                            return "[ ]"
+                        })
+                    }
+                    span { "1 minute" }
+                }
+                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 300})) {
+                    span(cls="milestone-icon") {
+                        reactive(fun () => {
+                            if (timer_ticks.get() >= 300) { return "[*]" }
+                            return "[ ]"
+                        })
+                    }
+                    span { "5 minutes" }
+                }
+                div(cls=cx({"milestone": true, "milestone-reached": timer_ticks.get() >= 600})) {
+                    span(cls="milestone-icon") {
+                        reactive(fun () => {
+                            if (timer_ticks.get() >= 600) { return "[*]" }
+                            return "[ ]"
+                        })
+                    }
+                    span { "10 minutes" }
+                }
+            }
+        }
+
+        div(cls="code-sample") {
+            pre { code { "var ticks = signal(0)\nvar minutes = computed(fun () => (ticks.get() / 60).floor())\nvar seconds = computed(fun () => ticks.get() % 60)\n// JS setInterval calls __dispatch_event to increment" } }
+        }
+    }
+}
+
+// =============================================================================
+// Theme Page — conditional classes, reactive styling
+// =============================================================================
+
+fun ThemePage() {
+    var colors = ["#4fc3f7", "#ff8a65", "#81c784", "#ba68c8", "#fff176", "#f06292"]
+    var color_name = computed(fun (): String => {
+        var names = ["Cyan", "Orange", "Green", "Purple", "Yellow", "Pink"]
+        var idx = color_index.get() % 6
+        return names[idx]
+    })
+
+    section(cls="page theme-page") {
+        div(cls="page-header") {
+            h2 { "Theming & Styles" }
+            p(cls="subtitle") { "Dynamic classes with cx() and reactive style changes" }
+        }
+
+        div(cls="theme-controls") {
+            h3 { "Theme Mode" }
+            div(cls="theme-toggle-row") {
+                button(
+                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "dark"}),
+                    on_click=fun (e: Event) => theme.set("dark")
+                ) { "Dark" }
+                button(
+                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "light"}),
+                    on_click=fun (e: Event) => theme.set("light")
+                ) { "Light" }
+                button(
+                    cls=cx({"btn": true, "theme-btn": true, "active": theme.get() == "midnight"}),
+                    on_click=fun (e: Event) => theme.set("midnight")
+                ) { "Midnight" }
+            }
+
+            div(cls="theme-preview") {
+                p { reactive(fun () => "Current theme: " + theme.get()) }
+                div(cls=cx({"preview-box": true, "dark-preview": theme.get() == "dark", "light-preview": theme.get() == "light", "midnight-preview": theme.get() == "midnight"})) {
+                    p { "This box changes with the theme" }
+                    button(cls="btn primary") { "Sample Button" }
+                }
+            }
+        }
+
+        div(cls="color-section") {
+            h3 { "Accent Color Cycling" }
+            p { reactive(fun () => "Current accent: " + color_name.get()) }
+            div(cls="color-swatches") {
+                button(cls="btn primary", on_click=fun (e: Event) => {
+                    color_index.update(fun (i: Float): Float => {
+                        if (i <= 0) { return 5 }
+                        return i - 1
+                    })
+                }) { "< Prev" }
+                div(cls="color-display") {
+                    reactive(fun () => {
+                        var idx = color_index.get() % 6
+                        return "Color " + (idx + 1).to_string() + " / 6"
+                    })
+                }
+                button(cls="btn primary", on_click=fun (e: Event) => {
+                    color_index.update(fun (i: Float): Float => i + 1)
+                }) { "Next >" }
+            }
+        }
+
+        div(cls="code-sample") {
+            pre { code { "var theme = signal(\"dark\")\nnav(cls=cx({\n    \"dark-mode\": theme.get() == \"dark\",\n    \"light-mode\": theme.get() == \"light\"\n})) { ... }" } }
+        }
+    }
+}
+
+// =============================================================================
+// Form Page — input handling, reactive validation
+// =============================================================================
+
+fun FormPage() {
+    var name_length = computed(fun (): Float => form_name.get().length())
+    var valid = computed(fun (): Bool => {
+        return form_name.get().length() > 0 and form_email.get().length() > 0
+    })
+
+    section(cls="page form-page") {
+        div(cls="page-header") {
+            h2 { "Forms & Input" }
+            p(cls="subtitle") { "Two-way binding, validation, and reactive form state" }
+        }
+
+        div(cls="form-container") {
+            div(cls="form-group") {
+                label(cls="form-label") { "Name" }
+                input(
+                    cls="form-input",
+                    type_="text",
+                    placeholder="Enter your name",
+                    on_input=fun (e: Event) => form_name.set("User")
+                )
+                div(cls="form-hint") {
+                    reactive(fun () => name_length.get().to_string() + " characters")
+                }
+            }
+
+            div(cls="form-group") {
+                label(cls="form-label") { "Email" }
+                input(
+                    cls="form-input",
+                    type_="text",
+                    placeholder="you@example.com",
+                    on_input=fun (e: Event) => form_email.set("user@example.com")
+                )
+            }
+
+            div(cls="form-group") {
+                label(cls="form-label") { "Message" }
+                textarea(
+                    cls="form-input form-textarea",
+                    placeholder="Write something...",
+                    rows=4,
+                    on_input=fun (e: Event) => form_message.set("Hello!")
+                )
+            }
+
+            div(cls="form-preview") {
+                h4 { "Live Preview" }
+                div(cls="preview-card") {
+                    p { reactive(fun () => "Name: " + form_name.get()) }
+                    p { reactive(fun () => "Email: " + form_email.get()) }
+                    p { reactive(fun () => "Message: " + form_message.get()) }
+                    p(cls=cx({"form-valid": valid.get(), "form-invalid": !valid.get()})) {
+                        reactive(fun () => {
+                            if (valid.get()) { return "Form is valid" }
+                            return "Please fill required fields"
+                        })
+                    }
+                }
+            }
+
+            div(cls="button-row") {
+                button(
+                    cls=cx({"btn": true, "primary": valid.get(), "disabled-btn": !valid.get()}),
+                    on_click=fun (e: Event) => {
+                        if (valid.get()) {
+                            form_submitted.set(true)
+                        }
+                    }
+                ) { "Submit" }
+                button(cls="btn secondary", on_click=fun (e: Event) => {
+                    form_name.set("")
+                    form_email.set("")
+                    form_message.set("")
+                    form_submitted.set(false)
+                }) { "Clear" }
+            }
+
+            div(cls=cx({"success-banner": true, "visible": form_submitted.get()})) {
+                p { "Form submitted successfully!" }
+            }
+        }
+
+        div(cls="code-sample") {
+            pre { code { "var name = signal(\"\")\ninput(\n    type_=\"text\",\n    on_input=fun (e: Event) => name.set(e.value)\n)\np { reactive(fun () => \"Hello, \" + name.get()) }" } }
+        }
+    }
+}
+
+// =============================================================================
+// Features Page — showcase of framework capabilities
+// =============================================================================
+
+fun FeaturesPage() {
+    section(cls="page features-page") {
+        div(cls="page-header") {
+            h2 { "Framework Features" }
+            p(cls="subtitle") { "Everything Turmeric offers for building reactive web apps" }
+        }
+
+        div(cls="features-grid") {
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "~" }
+                h3 { "Signals" }
+                p { "Fine-grained reactive primitives. No virtual DOM diffing - direct surgical updates." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "#" }
+                h3 { "Computed Values" }
+                p { "Derived state that auto-recomputes. Dependency tracking is automatic." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "!" }
+                h3 { "Effects" }
+                p { "Side effects that re-run when dependencies change. Automatic cleanup on unmount." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "@" }
+                h3 { "Typed Events" }
+                p { "Full DOM event system with pattern matching. Click, Input, KeyDown, and more." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "%" }
+                h3 { "Conditional Classes" }
+                p { "cx() utility for reactive class maps. Toggle classes based on signal state." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "&" }
+                h3 { "Client-Side Router" }
+                p { "Pattern matching routes with params, guards, and nested layouts." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "*" }
+                h3 { "Components" }
+                p { "Functions as components. Compose with trailing closures. No classes needed." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "+" }
+                h3 { "WASM Target" }
+                p { "Compiles to < 40KB WASM. No JS framework overhead. Near-native speed." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "^" }
+                h3 { "Suspense & Errors" }
+                p { "Async boundaries with loading states. Error boundaries for graceful recovery." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { ">" }
+                h3 { "Keyed Lists" }
+                p { "Efficient list rendering with key-based reconciliation. Minimal DOM mutations." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "=" }
+                h3 { "Context" }
+                p { "Dependency injection without prop-drilling. Theme, auth, locale built in." }
+            }
+            div(cls="feature-card") {
+                div(cls="feature-icon") { "<" }
+                h3 { "112 Elements" }
+                p { "Every HTML element typed from the DOM spec. Named args for attributes." }
+            }
+        }
+
+        div(cls="accordion") {
+            h3 { "Interactive Accordion" }
+
+            div(cls="accordion-group") {
+                button(
+                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "signals"}),
+                    on_click=fun (e: Event) => accordion_open.set("signals")
+                ) { "Signals & Reactivity" }
+                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "signals"})) {
+                    p { "Signals are the core primitive. Call .get() to read (tracks dependency), .set() to write (notifies subscribers). Computed values derive from signals automatically." }
+                }
+            }
+
+            div(cls="accordion-group") {
+                button(
+                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "dom"}),
+                    on_click=fun (e: Event) => accordion_open.set("dom")
+                ) { "DOM & Elements" }
+                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "dom"})) {
+                    p { "Elements are plain functions with named args: div(cls=\"foo\", id=\"bar\") { children }. Trailing closures define children. Text in closures auto-desugars to text() nodes." }
+                }
+            }
+
+            div(cls="accordion-group") {
+                button(
+                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "events"}),
+                    on_click=fun (e: Event) => accordion_open.set("events")
+                ) { "Event System" }
+                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "events"})) {
+                    p { "Events are a typed enum: Click(data), KeyDown(data), Input(data), etc. Pattern match on event variants to access typed fields like key, clientX, value." }
+                }
+            }
+
+            div(cls="accordion-group") {
+                button(
+                    cls=cx({"accordion-header": true, "open": accordion_open.get() == "wasm"}),
+                    on_click=fun (e: Event) => accordion_open.set("wasm")
+                ) { "WASM Compilation" }
+                div(cls=cx({"accordion-body": true, "visible": accordion_open.get() == "wasm"})) {
+                    p { "Saffron compiles to LLVM IR targeting wasm32. The pantry build tool links with turmeric's runtime, producing a single .wasm binary served with a tiny JS loader." }
+                }
             }
         }
     }
 }
 
-fun AboutPage(): Node {
-    return section(cls="about") {
-        h1 { "About Turmeric" }
-        p { "A reactive web framework for Saffron, compiled to WebAssembly." }
-
-        ul(cls="features") {
-            li { "Fine-grained reactivity via Signals" }
-            li { "No virtual DOM — surgical DOM updates" }
-            li { "Compiles to < 40KB WASM binary" }
-            li { "Typed from the DOM spec (112 elements)" }
-            li { "Pattern matching on events" }
-            li { "Component lifecycle with automatic cleanup" }
-            li { "Client-side routing" }
-            li { "Scoped CSS + theming" }
-        }
-    }
-}
-
 // =============================================================================
-// App Shell
+// App Shell — navigation, theme switching, layout
 // =============================================================================
 
-fun App(): Node {
-    return div(id="app") {
+fun App() {
+    div(cls=cx({"app-shell": true, "theme-dark": theme.get() == "dark", "theme-light": theme.get() == "light", "theme-midnight": theme.get() == "midnight"})) {
         header(cls="app-header") {
-            h1(cls="logo") { "Turmeric" }
+            div(cls="header-left") {
+                h1(cls="logo") { "Turmeric" }
+                span(cls="logo-tag") { "v0.1" }
+            }
 
             nav(cls="nav") {
                 button(
                     cls=cx({"nav-link": true, "active": page.get() == "counter"}),
                     on_click=fun (e: Event) => page.set("counter")
                 ) { "Counter" }
-
                 button(
                     cls=cx({"nav-link": true, "active": page.get() == "todos"}),
                     on_click=fun (e: Event) => page.set("todos")
                 ) { "Todos" }
-
                 button(
-                    cls=cx({"nav-link": true, "active": page.get() == "about"}),
-                    on_click=fun (e: Event) => page.set("about")
-                ) { "About" }
+                    cls=cx({"nav-link": true, "active": page.get() == "timer"}),
+                    on_click=fun (e: Event) => page.set("timer")
+                ) { "Timer" }
+                button(
+                    cls=cx({"nav-link": true, "active": page.get() == "theme"}),
+                    on_click=fun (e: Event) => page.set("theme")
+                ) { "Theme" }
+                button(
+                    cls=cx({"nav-link": true, "active": page.get() == "form"}),
+                    on_click=fun (e: Event) => page.set("form")
+                ) { "Forms" }
+                button(
+                    cls=cx({"nav-link": true, "active": page.get() == "features"}),
+                    on_click=fun (e: Event) => page.set("features")
+                ) { "Features" }
+            }
+
+            button(
+                cls="btn theme-toggle",
+                on_click=fun (e: Event) => {
+                    if (theme.get() == "dark") { theme.set("light") }
+                    else { theme.set("dark") }
+                }
+            ) {
+                reactive(fun () => {
+                    if (theme.get() == "dark") { return "Light Mode" }
+                    return "Dark Mode"
+                })
             }
         }
 
         main(cls="content") {
+            // Page routing via match on signal
             match (page.get()) {
                 "counter" => CounterPage()
                 "todos" => TodoPage()
-                "about" => AboutPage()
-                _ => p { "404 — Not Found" }
+                "timer" => TimerPage()
+                "theme" => ThemePage()
+                "form" => FormPage()
+                "features" => FeaturesPage()
+                _ => section { p { "404 - Page Not Found" } }
             }
         }
 
         footer(cls="app-footer") {
-            "Built with Saffron + Turmeric | Signals + Effects + WASM"
+            div(cls="footer-content") {
+                p(cls="footer-brand") { "Built with Saffron + Turmeric" }
+                p(cls="footer-tech") { "Signals | Computed | Effects | WASM32 | No VDOM" }
+                p(cls="footer-stats") {
+                    reactive(fun () => "Page: " + page.get() + " | Theme: " + theme.get())
+                }
+            }
         }
     }
 }
