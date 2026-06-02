@@ -892,6 +892,34 @@ class NullChecker {
                 this.infer_expr(value)
                 AST.Type.BoolType
             }
+            IfExpr(cond, then_body, then_val, else_body, else_val) => {
+                this.infer_expr(cond)
+                this.check_stmts(then_body)
+                var then_type: AST.Type = this.infer_type(then_val)
+                this.check_stmts(else_body)
+                var else_type: AST.Type = this.infer_type(else_val)
+                var then_str: String = this.type_to_str(then_type)
+                var else_str: String = this.type_to_str(else_type)
+                if (then_str != else_str and then_str != "Any" and else_str != "Any" and then_str != "Nil" and else_str != "Nil") {
+                    this.error("if-expression branches have incompatible types: " + then_str + " vs " + else_str)
+                }
+                then_type
+            }
+            TryExpr(try_body, try_val, catch_name, catch_body, catch_val) => {
+                this.check_stmts(try_body)
+                var try_type: AST.Type = this.infer_type(try_val)
+                this.env.push_scope()
+                this.env.define_var(catch_name, "String")
+                this.check_stmts(catch_body)
+                var catch_type: AST.Type = this.infer_type(catch_val)
+                this.env.pop_scope()
+                var try_str: String = this.type_to_str(try_type)
+                var catch_str: String = this.type_to_str(catch_type)
+                if (try_str != catch_str and try_str != "Any" and catch_str != "Any" and try_str != "Nil" and catch_str != "Nil") {
+                    this.error("try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
+                }
+                try_type
+            }
         }
     }
 

@@ -96,7 +96,6 @@
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             // Store fn ptr
-            var fn_as_int: String = this.fresh_local()
             var num_params: Float = param_names.length() + 1
             var ret_ty: String = "i64"
             if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
@@ -108,19 +107,17 @@
                 ti = ti + 1
             }
             fn_type_str = fn_type_str + ")*"
-            this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+            var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + lambda_name)
             var fn_slot: String = this.fresh_local()
             this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
             // Store env ptr
-            var env_as_int: String = this.fresh_local()
-            this.emit_indent(env_as_int + " = ptrtoint [" + env_size.floor().to_string() + " x i64]* " + env_ptr + " to i64")
+            var env_as_int: String = this.typed_ptr_to_val(env_ptr, "[" + env_size.floor().to_string() + " x i64]*")
             var env_slot: String = this.fresh_local()
             this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
             this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
             // Return closure pointer as i64
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+            var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
             return result
         }
 
@@ -172,16 +169,14 @@
             tti = tti + 1
         }
         fn_type_str = fn_type_str + ")*"
-        var fn_as_int: String = this.fresh_local()
-        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + lambda_name + " to i64")
+        var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + lambda_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
 
@@ -246,8 +241,7 @@
         var env_size: Float = captures.length()
         var env_int: String = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
-        var env_ptr: String = this.fresh_local()
-        this.emit_indent(env_ptr + " = inttoptr i64 " + env_int + " to [" + env_size.floor().to_string() + " x i64]*")
+        var env_ptr: String = this.val_to_typed_ptr(env_int, "[" + env_size.floor().to_string() + " x i64]*")
         var ci: Float = 0
         while (ci < captures.length()) {
             var cap_name: String = captures[ci]

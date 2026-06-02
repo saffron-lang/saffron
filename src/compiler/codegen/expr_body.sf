@@ -26,8 +26,7 @@
                 var gep: String = this.fresh_local()
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+                var local: String = this.ptr_to_val(gep)
                 local
             }
             NilLit => {
@@ -465,10 +464,8 @@
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
-                var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
-                var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                var lptr: String = this.val_to_ptr(lhs)
+                var rptr: String = this.val_to_ptr(rhs)
                 var cmp: String = this.fresh_local()
                 this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
                 var cmp_result: String = this.fresh_local()
@@ -505,10 +502,8 @@
             if (left_type == "String" or right_type == "String") {
                 // String concatenation
                 this.last_type = AST.Type.StringType
-                var lptr: String = this.fresh_local()
-                this.emit_indent(lptr + " = inttoptr i64 " + lhs + " to i8*")
-                var rptr: String = this.fresh_local()
-                this.emit_indent(rptr + " = inttoptr i64 " + rhs + " to i8*")
+                var lptr: String = this.val_to_ptr(lhs)
+                var rptr: String = this.val_to_ptr(rhs)
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -518,11 +513,10 @@
                 var total1: String = this.fresh_local()
                 this.emit_indent(total1 + " = add i64 " + total + ", 1")
                 var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
+                this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-                var result: String = this.fresh_local()
-                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+                var result: String = this.ptr_to_val(buf)
                 return result
             }
 
@@ -581,8 +575,7 @@
         var gep: String = this.fresh_local()
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+        var local: String = this.ptr_to_val(gep)
         return local
     }
 
@@ -644,16 +637,14 @@
         this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
-        var fn_as_int: String = this.fresh_local()
-        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + wrap_name + " to i64")
+        var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
         var fn_slot: String = this.fresh_local()
         this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
         this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
         var env_slot: String = this.fresh_local()
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
         return result
     }
 
@@ -897,8 +888,7 @@
             var gep: String = this.fresh_local()
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = ptrtoint i8* " + gep + " to i64")
+            var local: String = this.ptr_to_val(gep)
             return local
         }
         return this.gen_expr(expr)
@@ -916,8 +906,7 @@
         }
         // Variable or expression: gen_expr gives i64, convert to i8*
         var val: String = this.gen_arg_value(expr)
-        var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+        var ptr: String = this.val_to_ptr(val)
         return ptr
     }
 
@@ -936,13 +925,12 @@
         this.emit_indent(total1 + " = add i64 " + total + ", 1")
         // Malloc
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
+        this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
         // Return as i64
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        var result: String = this.ptr_to_val(buf)
         return result
     }
 
@@ -1712,8 +1700,7 @@
         // 2. A closure pair pointer: [fn_ptr, env_ptr]
         // We use the closure calling convention for all indirect calls:
         // Unpack [fn_ptr, env_ptr], call fn(env, args...)
-        var closure_ptr: String = this.fresh_local()
-        this.emit_indent(closure_ptr + " = inttoptr i64 " + ptr_val + " to [2 x i64]*")
+        var closure_ptr: String = this.val_to_typed_ptr(ptr_val, "[2 x i64]*")
 
         // Load fn_ptr from slot 0
         var fn_slot: String = this.fresh_local()
@@ -1748,8 +1735,7 @@
         var fn_type: String = "i64 (" + type_parts.join(", ") + ")*"
 
         // Cast and call
-        var fn_ptr: String = this.fresh_local()
-        this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_int + " to " + fn_type)
+        var fn_ptr: String = this.val_to_fn_ptr(fn_int, fn_type)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 " + fn_ptr + "(" + arg_strs.join(", ") + ")")
         return local
@@ -1910,8 +1896,7 @@
             var tag_slot: String = this.fresh_local()
             this.emit_indent(tag_slot + " = getelementptr [1 x i64], [1 x i64]* " + arr_ptr + ", i64 0, i64 0")
             this.emit_indent("store i64 " + tag.floor().to_string() + ", i64* " + tag_slot)
-            var as_int: String = this.fresh_local()
-            this.emit_indent(as_int + " = ptrtoint [1 x i64]* " + arr_ptr + " to i64")
+            var as_int: String = this.typed_ptr_to_val(arr_ptr, "[1 x i64]*")
             this.last_type = AST.Type.EnumType(enum_name); return as_int
         }
 
@@ -1938,8 +1923,7 @@
             i = i + 1
         }
         // Cast pointer to i64 for storage
-        var as_int: String = this.fresh_local()
-        this.emit_indent(as_int + " = ptrtoint [" + num_slots.to_string() + " x i64]* " + arr_ptr + " to i64")
+        var as_int: String = this.typed_ptr_to_val(arr_ptr, "[" + num_slots.to_string() + " x i64]*")
         this.last_type = AST.Type.EnumType(enum_name); return as_int
     }
 

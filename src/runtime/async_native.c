@@ -109,7 +109,9 @@ void __sched_store_result(int64_t handle, int64_t value) {
 }
 
 int64_t __sched_get_stored_result(int64_t handle) {
-    for (int i = 0; i < __task_result_count; i++) {
+    // Search from the end so the most recent store wins.
+    // This handles handle reuse (after coro_destroy + malloc reuse).
+    for (int i = __task_result_count - 1; i >= 0; i--) {
         if (__task_results[i].handle == handle) {
             return __task_results[i].value;
         }
