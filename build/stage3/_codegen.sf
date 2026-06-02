@@ -7804,7 +7804,20 @@ class Codegen {
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another, emit await loop
-        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        var is_coro_callee: Bool = this.coroutine_funcs.contains(prefixed_name)
+        if (!is_coro_callee) {
+            // Check suffix: "stdlib_async_gather" ends with "gather" which may be in coroutine_funcs
+            var cfi: Float = 0
+            while (cfi < this.coroutine_funcs.length()) {
+                var cf: String = this.coroutine_funcs[cfi]
+                if (prefixed_name.ends_with("_" + cf) or prefixed_name == cf) {
+                    is_coro_callee = true
+                    cfi = this.coroutine_funcs.length()
+                }
+                cfi = cfi + 1
+            }
+        }
+        if (this.is_coroutine and is_coro_callee) {
             var b_hdl: String = this.fresh_local()
             this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
             var b_i64: String = this.fresh_local()
