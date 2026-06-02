@@ -1345,14 +1345,29 @@
             if (this.func_defaults.has(resolved_callee)) {
                 var defaults: List<AST.Expr> = this.func_defaults.get(resolved_callee)
                 var param_count: Float = defaults.length()
+                if (this.func_param_names.has(resolved_callee)) {
+                    var pc2: Float = this.func_param_names.get(resolved_callee).length()
+                    if (pc2 > param_count) { param_count = pc2 }
+                }
                 while (i < param_count) {
-                    var def_expr: AST.Expr = defaults[i]
-                    var is_nil: Bool = this.classify_expr(def_expr) == "nil"
-                    if (!is_nil) {
-                        var def_val: String = this.gen_arg_value(def_expr)
-                        arg_strs.push("i64 " + def_val)
+                    if (i < defaults.length()) {
+                        var def_expr: AST.Expr = defaults[i]
+                        var is_nil: Bool = this.classify_expr(def_expr) == "nil"
+                        if (!is_nil) {
+                            var def_val: String = this.gen_arg_value(def_expr)
+                            arg_strs.push("i64 " + def_val)
+                        } else {
+                            arg_strs.push("i64 0")
+                        }
+                    } else {
+                        arg_strs.push("i64 0")
                     }
                     i = i + 1
+                }
+            } else if (this.func_param_names.has(resolved_callee)) {
+                var param_count: Float = this.func_param_names.get(resolved_callee).length()
+                while (arg_strs.length() < param_count) {
+                    arg_strs.push("i64 0")
                 }
             }
             var local: String = this.fresh_local()
@@ -1543,14 +1558,29 @@
             if (this.func_defaults.has(emit_callee)) {
                 var defaults2: List<AST.Expr> = this.func_defaults.get(emit_callee)
                 var param_count2: Float = defaults2.length()
+                if (this.func_param_names.has(emit_callee)) {
+                    var pc2b: Float = this.func_param_names.get(emit_callee).length()
+                    if (pc2b > param_count2) { param_count2 = pc2b }
+                }
                 while (i < param_count2) {
-                    var def_expr2: AST.Expr = defaults2[i]
-                    var is_nil2: Bool = this.classify_expr(def_expr2) == "nil"
-                    if (!is_nil2) {
-                        var def_val2b: String = this.gen_arg_value(def_expr2)
-                        arg_strs.push("i64 " + def_val2b)
+                    if (i < defaults2.length()) {
+                        var def_expr2: AST.Expr = defaults2[i]
+                        var is_nil2: Bool = this.classify_expr(def_expr2) == "nil"
+                        if (!is_nil2) {
+                            var def_val2b: String = this.gen_arg_value(def_expr2)
+                            arg_strs.push("i64 " + def_val2b)
+                        } else {
+                            arg_strs.push("i64 0")
+                        }
+                    } else {
+                        arg_strs.push("i64 0")
                     }
                     i = i + 1
+                }
+            } else if (this.func_param_names.has(emit_callee)) {
+                var param_count2: Float = this.func_param_names.get(emit_callee).length()
+                while (arg_strs.length() < param_count2) {
+                    arg_strs.push("i64 0")
                 }
             }
             var local: String = this.fresh_local()

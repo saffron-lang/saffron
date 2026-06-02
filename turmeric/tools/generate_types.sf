@@ -714,14 +714,14 @@ fun generate_prelude_fn(sb: StringBuilder, tag: String, fn_name: String,
     var ei: Float = 0
     while (ei < events.length()) {
         var ev: List<String> = events[ei]
-        sb.append(",\n           " + ev[0] + ": Any = nil")
+        sb.append(",\n           " + ev[0] + ": (Event) => Nil = nil")
         ei = ei + 1
     }
 
     // Overflow attrs + block
     sb.append(",\n           attrs: Map<String, Any> = {}")
     if (!is_void) {
-        sb.append(", block: Any = nil")
+        sb.append(", block: () => Nil = nil")
     }
     sb.append("): Float {\n")
 
