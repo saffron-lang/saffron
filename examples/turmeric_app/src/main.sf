@@ -1,9 +1,8 @@
 // Turmeric Demo — what a real app looks like
+// HTML elements (div, h1, button, etc.) come from turmeric prelude automatically
 import { signal, computed, effect } from "turmeric/signal"
-import { Node, mount, text } from "turmeric/element"
-import { div, span, button, section, h1, p, ul, li, input, nav, header, footer, a, main_el } from "turmeric/generated_types"
 import { cx } from "turmeric/style"
-import { Event, on_click, on_keydown, bind_value } from "turmeric/events"
+import { Event } from "turmeric/events"
 import { each } from "turmeric/reconcile"
 
 // =============================================================================
@@ -144,7 +143,7 @@ fun App(): Node {
             }
         }
 
-        main_el(cls="content") {
+        main(cls="content") {
             match (page.get()) {
                 "counter" => CounterPage()
                 "todos" => TodoPage()
