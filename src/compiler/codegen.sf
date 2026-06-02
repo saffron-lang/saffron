@@ -6,6 +6,7 @@ import "./codegen/methods.sf" as Methods
 // Runtime function prefix — change this to avoid collisions with user code.
 // Currently "__" (e.g., __list_new, __map_get). Could become "__sf_" later.
 var RT_PREFIX: String = "__"
+var __codegen_errors: Bool = false
 
 class Codegen {
     var sb: StringBuilder
@@ -423,7 +424,7 @@ class Codegen {
 fun generate(program: List<AST.Stmt>): String {
     var gen: Codegen = Codegen()
     var result: String = gen.generate(program)
-    
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
@@ -431,7 +432,7 @@ fun generate_with_target(program: List<AST.Stmt>, target: String): String {
     var gen: Codegen = Codegen()
     gen.target = target
     var result: String = gen.generate(program)
-
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
@@ -440,7 +441,7 @@ fun generate_with_target_opts(program: List<AST.Stmt>, target: String, identity_
     gen.target = target
     gen.identity_mode = identity_mode
     var result: String = gen.generate(program)
-
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
@@ -459,7 +460,7 @@ fun generate_with_imports(program: List<AST.Stmt>, imports: List<AST.Stmt>): Str
     }
     var gen: Codegen = Codegen()
     var result: String = gen.generate(all_stmts)
-    
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
@@ -868,7 +869,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.current_prefix = ""
     gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
-    
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
@@ -1369,12 +1370,12 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.current_prefix = ""
     gen.module_init_names = module_init_names
     var result: String = gen.generate(program)
-
+    if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
 
 
 fun had_error(): Bool {
-    return false
+    return __codegen_errors
 }

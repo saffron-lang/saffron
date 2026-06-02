@@ -1631,6 +1631,22 @@
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
+        // Error check: verify method actually exists on the class
+        var __method_exists: Bool = false
+        var __full_method_name: String = class_name + "__" + method
+        if (this.known_functions.contains(__full_method_name)) { __method_exists = true }
+        if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + __full_method_name)) { __method_exists = true }
+        if (this.func_prefix_map.has(__full_method_name)) { __method_exists = true }
+        if (this.class_methods.has(class_name)) {
+            var __cm: List = this.class_methods.get(class_name)
+            if (__cm.contains(method)) { __method_exists = true }
+        }
+        if (!__method_exists) {
+            IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
+            this.has_errors = true
+            this.last_type = AST.Type.IntType
+            return "0"
+        }
         var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
         // Resolve generic type parameter in return type (e.g. T -> String)
         var ns_ret_str: String = this.type_to_string(this.last_type)
@@ -1672,8 +1688,13 @@
         this.last_type = AST.Type.StringType
         return ts_local
     }
-    // Error: method not found on a known type
-    if (obj_type != "Any" and obj_type != "Int" and obj_type.length() > 0) {
+    // Error: method not found on a known user-defined class type
+    // Skip for builtin types (String, List, Map, etc.) which have runtime methods
+    var is_builtin_type: Bool = false
+    if (obj_type == "Any" or obj_type == "Int" or obj_type == "Float" or obj_type == "Bool" or obj_type == "String" or obj_type == "Nil") { is_builtin_type = true }
+    if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { is_builtin_type = true }
+    if (obj_type == "StringBuilder" or obj_type == "SB") { is_builtin_type = true }
+    if (!is_builtin_type and obj_type.length() > 0 and this.class_fields.has(obj_type)) {
         IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
         this.has_errors = true
     }
@@ -1787,8 +1808,13 @@
         if (fp[0] == field) return i
         i = i + 1
     }
-    // Field not found on known class
-    if (class_name.length() > 0 and parts.length() > 0) {
+    // Field not found on known class — but suppress if it's actually a method
+    var is_method: Bool = false
+    if (this.class_methods.has(class_name)) {
+        var __methods: List = this.class_methods.get(class_name)
+        if (__methods.contains(field)) { is_method = true }
+    }
+    if (class_name.length() > 0 and parts.length() > 0 and !is_method) {
         IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")
         this.has_errors = true
     }

@@ -1,0 +1,42 @@
+//! Comprehensive mini-test of buffer features.
+
+import "@buffer" as Buffer
+
+// from_string + to_string
+var b1 = Buffer.from_string("Hello")
+IO.println(b1.to_string())
+
+// from_hex + to_string
+var b2 = Buffer.from_hex("576f726c64")
+IO.println(b2.to_string())
+
+// to_hex
+IO.println(b1.to_hex())
+
+// concat (intra-class)
+var b3 = b1.concat(b2)
+IO.println(b3.to_string())
+
+// concat_list (module-level)
+var b4 = Buffer.concat_list([b1, Buffer.from_string(" "), b2])
+IO.println(b4.to_string())
+
+// slice
+var b5 = b4.slice(0, 5)
+IO.println(b5.to_string())
+
+// writer
+var w = Buffer.writer(16)
+w.write_string("OK")
+w.write_u16_le(4660)
+var wb = w.to_buffer()
+IO.println(wb.get(0))
+IO.println(wb.get(1))
+IO.println(wb.read_u16_le(2))
+
+// reader
+var r = Buffer.reader(wb)
+IO.println(r.read_string(2))
+IO.println(r.read_u16_le())
+
+IO.println("done")

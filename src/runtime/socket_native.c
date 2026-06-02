@@ -451,6 +451,112 @@ void sf_tls_close(int64_t tls_handle) {
     tls_table_free(tls_handle);
 }
 
+/* ===== TCP Server API ===== */
+
+/*
+ * Create a TCP socket, set SO_REUSEADDR, bind to host:port, and set non-blocking.
+ * Use host "0.0.0.0" to bind on all interfaces.
+ *
+ * Returns: fd on success, -1 on error.
+ */
+int64_t sf_tcp_bind(const char *host, int64_t port) {
+    if (host == NULL) return -1;
+    if (port < 0 || port > 65535) return -1;
+
+    /* Convert port to string for getaddrinfo */
+    char port_str[8];
+    snprintf(port_str, sizeof(port_str), "%d", (int)port);
+
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;        /* IPv4 */
+    hints.ai_socktype = SOCK_STREAM;  /* TCP */
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE;      /* For bind */
+
+    struct addrinfo *result = NULL;
+    int gai_err = getaddrinfo(host, port_str, &hints, &result);
+    if (gai_err != 0 || result == NULL) {
+        return -1;
+    }
+
+    int fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (fd < 0) {
+        freeaddrinfo(result);
+        return -1;
+    }
+
+    /* Allow address reuse to avoid "address already in use" on restart */
+    int opt = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    if (bind(fd, result->ai_addr, result->ai_addrlen) != 0) {
+        close(fd);
+        freeaddrinfo(result);
+        return -1;
+    }
+
+    freeaddrinfo(result);
+
+    if (set_nonblocking(fd) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    return (int64_t)fd;
+}
+
+/*
+ * Start listening on a bound TCP socket with the given backlog.
+ *
+ * Returns: 0 on success, -1 on error.
+ */
+int64_t sf_tcp_listen(int64_t fd, int64_t backlog) {
+    if (fd < 0) return -1;
+    if (backlog <= 0) backlog = 128;  /* Sensible default */
+
+    int ret = listen((int)fd, (int)backlog);
+    return (ret == 0) ? 0 : -1;
+}
+
+/*
+ * Non-blocking accept on a listening TCP socket.
+ * If a connection is pending, accepts it, sets the new fd to non-blocking
+ * (with SO_NOSIGPIPE on macOS), and returns the new fd.
+ *
+ * Returns:
+ *   >= 0 : new client fd (accepted successfully)
+ *   -1   : would block (no pending connection)
+ *   -2   : error
+ */
+int64_t sf_tcp_accept(int64_t fd) {
+    if (fd < 0) return -2;
+
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+
+    int client_fd = accept((int)fd, (struct sockaddr *)&client_addr, &addr_len);
+    if (client_fd >= 0) {
+        /* Set the new client socket to non-blocking */
+        if (set_nonblocking(client_fd) != 0) {
+            close(client_fd);
+            return -2;
+        }
+
+#ifdef __APPLE__
+        /* Prevent SIGPIPE on write to closed socket */
+        int opt = 1;
+        setsockopt(client_fd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
+#endif
+
+        return (int64_t)client_fd;
+    }
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return -1;
+    if (errno == EINTR) return -1;  /* Treat interrupt as would_block */
+    return -2;
+}
+
 /* ===== UDP Socket API ===== */
 
 /*

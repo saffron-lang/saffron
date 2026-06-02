@@ -1,0 +1,62 @@
+//! File system watcher using kqueue (macOS) or inotify (Linux).
+//! Watches files and directories for modifications.
+//!
+//! ```saffron
+//! import "@watch" as Watch
+//!
+//! var w = Watch.create()
+//! w.add("src/")
+//! w.add("public/")
+//!
+//! while (true) {
+//!     var changed = w.poll(1000)
+//!     if (changed) {
+//!         IO.println("File changed! Rebuilding...")
+//!         // trigger rebuild
+//!     }
+//! }
+//! ```
+
+@extern("i64 sf_watch_init()") fun watch_init_raw(): Int
+@extern("i64 sf_watch_add(i64, i8*)") fun watch_add_raw(kq: Int, path: Int): Int
+@extern("i64 sf_watch_poll(i64, i64)") fun watch_poll_raw(kq: Int, timeout_ms: Int): Int
+@extern("void sf_watch_remove(i64, i64)") fun watch_remove_raw(kq: Int, watch_fd: Int)
+
+class Watcher {
+    var kq: Int
+    var watches: List<Int>
+
+    fun init(kq: Int) {
+        this.kq = kq
+        this.watches = []
+    }
+
+    fun add(path: String): Bool {
+        var fd: Int = watch_add_raw(this.kq, path)
+        if (fd < 0) { return false }
+        this.watches.push(fd)
+        return true
+    }
+
+    fun poll(timeout_ms: Int): Bool {
+        var result: Int = watch_poll_raw(this.kq, timeout_ms)
+        return result > 0
+    }
+
+    fun close() {
+        var i = 0
+        while (i < this.watches.length()) {
+            watch_remove_raw(this.kq, this.watches[i])
+            i = i + 1
+        }
+        this.watches = []
+    }
+}
+
+fun create(): Watcher {
+    var kq: Int = watch_init_raw()
+    if (kq < 0) {
+        throw "watch: failed to create watcher (kqueue/inotify init failed)"
+    }
+    return Watcher(kq)
+}

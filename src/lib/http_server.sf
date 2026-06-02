@@ -1,0 +1,222 @@
+//! Minimal HTTP/1.1 server built on `@server` and `@socket`.
+//! Single-threaded, async-compatible.
+//!
+//! ```saffron
+//! import "@http_server" as HttpServer
+//!
+//! var app = HttpServer.create(8080)
+//! app.get("/", fun (req: HttpServer.Request): HttpServer.Response => {
+//!     return HttpServer.html("<h1>Hello from Saffron!</h1>")
+//! })
+//! app.serve()
+//! ```
+
+import "@server" as Server
+import "@socket" as Socket
+
+class Request {
+    var method: String
+    var path: String
+    var headers: Map<String, String>
+    var body: String
+    var query: String
+
+    fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
+        this.method = method
+        this.path = path
+        this.headers = headers
+        this.body = body
+        this.query = query
+    }
+}
+
+class Response {
+    var status: Number
+    var status_text: String
+    var headers: Map<String, String>
+    var body: String
+
+    fun init(status: Number, status_text: String, headers: Map<String, String>, body: String) {
+        this.status = status
+        this.status_text = status_text
+        this.headers = headers
+        this.body = body
+    }
+
+    fun to_http(): String {
+        var lines: List<String> = []
+        lines.push("HTTP/1.1 " + this.status.to_string() + " " + this.status_text)
+        lines.push("Content-Length: " + this.body.length().to_string())
+        var keys = this.headers.keys()
+        var i = 0
+        while (i < keys.length()) {
+            lines.push(keys[i] + ": " + this.headers.get(keys[i]))
+            i = i + 1
+        }
+        lines.push("Connection: close")
+        lines.push("")
+        lines.push(this.body)
+        var result = ""
+        i = 0
+        while (i < lines.length()) {
+            if (i > 0) { result = result + "\r\n" }
+            result = result + lines[i]
+            i = i + 1
+        }
+        return result
+    }
+}
+
+fun ok(body: String): Response {
+    var h: Map<String, String> = {}
+    h.set("Content-Type", "text/plain")
+    return Response(200, "OK", h, body)
+}
+
+fun html(body: String): Response {
+    var h: Map<String, String> = {}
+    h.set("Content-Type", "text/html; charset=utf-8")
+    return Response(200, "OK", h, body)
+}
+
+fun json(body: String): Response {
+    var h: Map<String, String> = {}
+    h.set("Content-Type", "application/json")
+    return Response(200, "OK", h, body)
+}
+
+fun file(content: String, mime: String): Response {
+    var h: Map<String, String> = {}
+    h.set("Content-Type", mime)
+    return Response(200, "OK", h, content)
+}
+
+fun not_found(): Response {
+    var h: Map<String, String> = {}
+    h.set("Content-Type", "text/plain")
+    return Response(404, "Not Found", h, "404 Not Found")
+}
+
+class Route {
+    var method: String
+    var path: String
+    var handler: (Request) => Response
+
+    fun init(method: String, path: String, handler: (Request) => Response) {
+        this.method = method
+        this.path = path
+        this.handler = handler
+    }
+}
+
+class HttpApp {
+    var host: String
+    var port: Number
+    var routes: List<Route>
+    var fallback: (Request) => Response
+
+    fun init(host: String, port: Number) {
+        this.host = host
+        this.port = port
+        this.routes = []
+        this.fallback = fun (req: Request): Response => not_found()
+    }
+
+    fun get(path: String, handler: (Request) => Response) {
+        this.routes.push(Route("GET", path, handler))
+    }
+
+    fun post(path: String, handler: (Request) => Response) {
+        this.routes.push(Route("POST", path, handler))
+    }
+
+    fun all(path: String, handler: (Request) => Response) {
+        this.routes.push(Route("*", path, handler))
+    }
+
+    fun serve() {
+        var listener = Server.listen(this.host, this.port)
+        IO.println("Listening on " + this.host + ":" + this.port.to_string())
+        while (true) {
+            var client: Int = listener.accept()
+            if (client >= 0) {
+                this.handle_client(client)
+            }
+        }
+    }
+
+    fun handle_client(client: Int) {
+        var raw: String = Socket.read(client, 8192)
+        var req: Request = parse_request(raw)
+        var resp: Response = this.route(req)
+        Socket.write(client, resp.to_http())
+        Socket.close(client)
+    }
+
+    fun route(req: Request): Response {
+        var i = 0
+        while (i < this.routes.length()) {
+            var r: Route = this.routes[i]
+            if ((r.method == "*" or r.method == req.method) and r.path == req.path) {
+                return r.handler(req)
+            }
+            i = i + 1
+        }
+        return this.fallback(req)
+    }
+}
+
+fun create(port: Number): HttpApp {
+    return HttpApp("0.0.0.0", port)
+}
+
+fun create_on(host: String, port: Number): HttpApp {
+    return HttpApp(host, port)
+}
+
+fun parse_request(raw: String): Request {
+    var header_end = raw.index_of("\r\n\r\n")
+    var body = ""
+    var header_section = raw
+    if (header_end >= 0) {
+        header_section = raw.slice(0, header_end)
+        body = raw.slice(header_end + 4, raw.length())
+    }
+
+    var lines = header_section.split("\r\n")
+    if (lines.length() == 0) {
+        return Request("GET", "/", {}, "", "")
+    }
+
+    var request_line = lines[0]
+    var parts = request_line.split(" ")
+    var method = "GET"
+    var full_path = "/"
+    if (parts.length() >= 2) {
+        method = parts[0]
+        full_path = parts[1]
+    }
+
+    var path = full_path
+    var query = ""
+    var qmark = full_path.index_of("?")
+    if (qmark >= 0) {
+        path = full_path.slice(0, qmark)
+        query = full_path.slice(qmark + 1, full_path.length())
+    }
+
+    var headers: Map<String, String> = {}
+    var i = 1
+    while (i < lines.length()) {
+        var line = lines[i]
+        var colon = line.index_of(":")
+        if (colon > 0) {
+            var key = line.slice(0, colon).trim()
+            var value = line.slice(colon + 1, line.length()).trim()
+            headers.set(key, value)
+        }
+        i = i + 1
+    }
+
+    return Request(method, path, headers, body, query)
+}

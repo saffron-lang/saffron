@@ -1,0 +1,111 @@
+//! Turmeric Dev Server — serves static files with SSE hot reload.
+//!
+//! ```saffron
+//! import "@dev_server" as DevServer
+//!
+//! DevServer.serve("build/", 8080, ["src/", "build/"])
+//! ```
+//!
+//! Injects a reload script into HTML files. When watched files change,
+//! sends an SSE event that triggers browser reload.
+
+import "@server" as Server
+import "@socket" as Socket
+import "@watch" as Watch
+
+var _sse_clients: List<Int> = []
+var _reload_pending: Bool = false
+
+fun mime_for(path: String): String {
+    if (path.ends_with(".html")) { return "text/html; charset=utf-8" }
+    if (path.ends_with(".js")) { return "application/javascript" }
+    if (path.ends_with(".mjs")) { return "application/javascript" }
+    if (path.ends_with(".css")) { return "text/css" }
+    if (path.ends_with(".wasm")) { return "application/wasm" }
+    if (path.ends_with(".json")) { return "application/json" }
+    if (path.ends_with(".png")) { return "image/png" }
+    if (path.ends_with(".svg")) { return "image/svg+xml" }
+    if (path.ends_with(".ico")) { return "image/x-icon" }
+    return "application/octet-stream"
+}
+
+var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
+
+fun serve_file(build_dir: String, path: String): String {
+    var file_path: String = build_dir + path
+    if (path == "/" or path == "") {
+        file_path = build_dir + "/index.html"
+    }
+    if (!IO.file_exists(file_path)) {
+        file_path = build_dir + "/index.html"
+    }
+    if (!IO.file_exists(file_path)) {
+        return "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nConnection: close\r\n\r\nNot Found"
+    }
+    var content: String = IO.read_file(file_path)
+    var mime: String = mime_for(file_path)
+    if (mime.starts_with("text/html")) {
+        content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
+    }
+    var resp: String = "HTTP/1.1 200 OK\r\nContent-Type: " + mime + "\r\nContent-Length: " + content.length().to_string() + "\r\nConnection: close\r\n\r\n" + content
+    return resp
+}
+
+fun handle_sse(client: Int) {
+    var headers: String = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\ndata: connected\n\n"
+    Socket.write(client, headers)
+    _sse_clients.push(client)
+}
+
+fun notify_reload() {
+    var i = 0
+    while (i < _sse_clients.length()) {
+        Socket.write(_sse_clients[i], "data: reload\n\n")
+        Socket.close(_sse_clients[i])
+        i = i + 1
+    }
+    _sse_clients = []
+}
+
+fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
+    var watcher = Watch.create()
+    var wi = 0
+    while (wi < watch_dirs.length()) {
+        watcher.add(watch_dirs[wi])
+        wi = wi + 1
+    }
+
+    var listener = Server.listen("0.0.0.0", port)
+    IO.println("")
+    IO.println("  Turmeric dev server (Saffron)")
+    IO.println("  http://localhost:" + port.to_string())
+    IO.println("  Watching: " + watch_dirs.join(", "))
+    IO.println("  Press Ctrl+C to stop")
+    IO.println("")
+
+    while (true) {
+        if (watcher.poll(0)) {
+            IO.println("  [reload] file changed")
+            notify_reload()
+        }
+
+        var client: Int = listener.accept()
+        if (client >= 0) {
+            var raw: String = Socket.read(client, 4096)
+            var first_line: String = raw.split("\r\n")[0]
+            var parts = first_line.split(" ")
+            var path = "/"
+            if (parts.length() >= 2) {
+                path = parts[1]
+            }
+
+            if (path == "/__reload") {
+                handle_sse(client)
+            } else {
+                var resp: String = serve_file(build_dir, path)
+                Socket.write(client, resp)
+                Socket.close(client)
+            }
+        }
+    }
+}
