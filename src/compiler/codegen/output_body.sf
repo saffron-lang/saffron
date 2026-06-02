@@ -503,6 +503,78 @@
             ei = ei + 1
         }
 
+        // Pre-registration pass: add all declaration names to known_functions
+        // BEFORE compiling any bodies, so forward references don't trigger warnings
+        var pri: Float = 0
+        while (pri < program.length()) {
+            var pr_stmt: AST.Stmt = program[pri]
+            match (pr_stmt) {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
+                    if (pr_name.length() > 0) {
+                        var pr_emit: String = this.current_prefix + pr_name
+                        if (!this.known_functions.contains(pr_emit)) {
+                            this.known_functions.push(pr_emit)
+                        }
+                        if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
+                            this.known_functions.push(pr_name)
+                        }
+                    }
+                }
+                ClassDecl(pr_cname, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                    // Register the class constructor name
+                    var pr_type_name: String = pr_cname
+                    if (this.current_prefix.length() > 0) {
+                        pr_type_name = this.current_prefix + pr_cname
+                    }
+                    if (!this.known_functions.contains(pr_type_name)) {
+                        this.known_functions.push(pr_type_name)
+                    }
+                    if (!this.known_functions.contains(pr_cname)) {
+                        this.known_functions.push(pr_cname)
+                    }
+                    // Register all method names as ClassName__method
+                    var pr_mi: Float = 0
+                    while (pr_mi < pr_methods.length()) {
+                        var pr_mname: String = this.get_fun_name(pr_methods[pr_mi])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = this.current_prefix + pr_full
+                            if (!this.known_functions.contains(pr_full)) {
+                                this.known_functions.push(pr_full)
+                            }
+                            if (!this.known_functions.contains(pr_prefixed)) {
+                                this.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mi = pr_mi + 1
+                    }
+                }
+                EnumDecl(pr_ename, pr_variants, pr_edoc) => {
+                    // Register enum variant constructor names
+                    var pr_vi: Float = 0
+                    while (pr_vi < pr_variants.length()) {
+                        var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
+                        if (pr_vname.length() > 0 and !this.known_functions.contains(pr_vname)) {
+                            this.known_functions.push(pr_vname)
+                        }
+                        pr_vi = pr_vi + 1
+                    }
+                }
+                VarDecl(n, t, init, d) => {}
+                ExprStmt(e) => {}
+                Return(v) => {}
+                If(c, t, e) => {}
+                While(c, b) => {}
+                Block(s) => {}
+                Break => {}
+                Continue => {}
+                TryCatch(t, n, c, f) => {}
+                Throw(v) => {}
+                LetPattern(p, v) => {}
+            }
+            pri = pri + 1
+        }
+
         // Coroutine detection: mark functions containing yield (direct or transitive)
         this.mark_coroutines(program)
 
@@ -699,6 +771,8 @@
         out.append("declare i64 @__bool_to_string(i64)\n")
         out.append("declare i64 @__nil_to_string()\n\n")
         out.append("declare i64 @__float_to_string(i64)\n")
+        out.append("declare i64 @__string_eq(i64, i64)\n")
+        out.append("declare i64 @__string_ne(i64, i64)\n")
         if (!this.identity_mode) {
             out.append("; --- NaN-boxing value helpers ---\n")
             out.append("declare i64 @__val_tag_int(i64)\n")

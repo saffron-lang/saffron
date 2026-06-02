@@ -1542,18 +1542,12 @@ class Codegen {
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
-                var lptr: String = this.val_to_ptr(lhs)
-                var rptr: String = this.val_to_ptr(rhs)
-                var cmp: String = this.fresh_local()
-                this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
-                var cmp_result: String = this.fresh_local()
-                if (op == "==") {
-                    this.emit_indent(cmp_result + " = icmp eq i32 " + cmp + ", 0")
-                } else {
-                    this.emit_indent(cmp_result + " = icmp ne i32 " + cmp + ", 0")
-                }
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
+                if (op == "==") {
+                    this.emit_indent(local + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(local + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
                 this.last_type = AST.Type.BoolType
                 return local
             }
@@ -6348,6 +6342,78 @@ class Codegen {
             ei = ei + 1
         }
 
+        // Pre-registration pass: add all declaration names to known_functions
+        // BEFORE compiling any bodies, so forward references don't trigger warnings
+        var pri: Float = 0
+        while (pri < program.length()) {
+            var pr_stmt: AST.Stmt = program[pri]
+            match (pr_stmt) {
+                FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
+                    if (pr_name.length() > 0) {
+                        var pr_emit: String = this.current_prefix + pr_name
+                        if (!this.known_functions.contains(pr_emit)) {
+                            this.known_functions.push(pr_emit)
+                        }
+                        if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
+                            this.known_functions.push(pr_name)
+                        }
+                    }
+                }
+                ClassDecl(pr_cname, pr_parent, pr_fields, pr_methods, pr_doc) => {
+                    // Register the class constructor name
+                    var pr_type_name: String = pr_cname
+                    if (this.current_prefix.length() > 0) {
+                        pr_type_name = this.current_prefix + pr_cname
+                    }
+                    if (!this.known_functions.contains(pr_type_name)) {
+                        this.known_functions.push(pr_type_name)
+                    }
+                    if (!this.known_functions.contains(pr_cname)) {
+                        this.known_functions.push(pr_cname)
+                    }
+                    // Register all method names as ClassName__method
+                    var pr_mi: Float = 0
+                    while (pr_mi < pr_methods.length()) {
+                        var pr_mname: String = this.get_fun_name(pr_methods[pr_mi])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = this.current_prefix + pr_full
+                            if (!this.known_functions.contains(pr_full)) {
+                                this.known_functions.push(pr_full)
+                            }
+                            if (!this.known_functions.contains(pr_prefixed)) {
+                                this.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mi = pr_mi + 1
+                    }
+                }
+                EnumDecl(pr_ename, pr_variants, pr_edoc) => {
+                    // Register enum variant constructor names
+                    var pr_vi: Float = 0
+                    while (pr_vi < pr_variants.length()) {
+                        var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
+                        if (pr_vname.length() > 0 and !this.known_functions.contains(pr_vname)) {
+                            this.known_functions.push(pr_vname)
+                        }
+                        pr_vi = pr_vi + 1
+                    }
+                }
+                VarDecl(n, t, init, d) => {}
+                ExprStmt(e) => {}
+                Return(v) => {}
+                If(c, t, e) => {}
+                While(c, b) => {}
+                Block(s) => {}
+                Break => {}
+                Continue => {}
+                TryCatch(t, n, c, f) => {}
+                Throw(v) => {}
+                LetPattern(p, v) => {}
+            }
+            pri = pri + 1
+        }
+
         // Coroutine detection: mark functions containing yield (direct or transitive)
         this.mark_coroutines(program)
 
@@ -6544,6 +6610,8 @@ class Codegen {
         out.append("declare i64 @__bool_to_string(i64)\n")
         out.append("declare i64 @__nil_to_string()\n\n")
         out.append("declare i64 @__float_to_string(i64)\n")
+        out.append("declare i64 @__string_eq(i64, i64)\n")
+        out.append("declare i64 @__string_ne(i64, i64)\n")
         if (!this.identity_mode) {
             out.append("; --- NaN-boxing value helpers ---\n")
             out.append("declare i64 @__val_tag_int(i64)\n")
@@ -7768,6 +7836,15 @@ class Codegen {
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
+        // Warn when dispatching on untyped value
+        var bd_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var bd_ot: String = this.get_var_type_str(obj_name)
+            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
+        }
+        if (bd_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching '" + method + "' on untyped value (type inference failed)")
+        }
         // Save receiver type before builtin dispatch clobbers last_type
         var pre_dispatch_type: AST.Type = this.last_type
         var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
@@ -7810,6 +7887,9 @@ class Codegen {
             var sot: String = this.get_var_type_str(obj_name)
             if (sot.length() > 0) { set_obj_type = sot }
         }
+        if (set_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'set' on untyped value (type inference failed)")
+        }
         if (set_obj_type == "List" or set_obj_type.starts_with("List<")) {
             // List.set(index, value) -> __list_set
             var idx_tagged: String = this.gen_arg_value(args[0])
@@ -7829,6 +7909,14 @@ class Codegen {
         return "0"
     }
     if (!is_user_class and method == "has" and args.length() > 0) {
+        var has_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var has_ot: String = this.get_var_type_str(obj_name)
+            if (has_ot.length() > 0) { has_obj_type = has_ot }
+        }
+        if (has_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
+        }
         var key_val: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_val + ")")
@@ -7837,6 +7925,14 @@ class Codegen {
         return local
     }
     if (!is_user_class and method == "get" and args.length() > 0) {
+        var get_recv_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var get_ot: String = this.get_var_type_str(obj_name)
+            if (get_ot.length() > 0) { get_recv_type = get_ot }
+        }
+        if (get_recv_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
+        }
         var key_val: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_val + ")")
@@ -7931,7 +8027,11 @@ class Codegen {
             slice_saved_type = this.typed_vars.get(obj_name)
             slice_obj_type = this.type_to_string(slice_saved_type)
         }
-        if (slice_obj_type.starts_with("List")) {
+        if (slice_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'slice' on untyped value (type inference failed)")
+        }
+        if (slice_obj_type.starts_with("List") or slice_obj_type == "Any") {
+            // For Any type, default to list slice (safer than string slice which dereferences a pointer)
             var sl_start: String = this.gen_arg_value(args[0])
             var sl_end: String = this.gen_arg_value(args[1])
             var local: String = this.fresh_local()
@@ -7970,6 +8070,9 @@ class Codegen {
     }
 
     if (!is_user_class and method == "length") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+        }
         if (obj_type == "String") {
             var str_ptr: String = this.emit_untag_ptr(obj)
             var local: String = this.fresh_local()
@@ -7984,6 +8087,9 @@ class Codegen {
         }
     }
     if (!is_user_class and method == "contains" and args.length() > 0) {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'contains' on untyped value (type inference failed)")
+        }
         var contains_arg_type: String = this.get_expr_type(args[0])
         if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
@@ -8008,6 +8114,9 @@ class Codegen {
         }
     }
     if (!is_user_class and method == "to_number") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'to_number' on untyped value (type inference failed)")
+        }
         var str_ptr: String = this.emit_untag_ptr(obj)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
@@ -8024,6 +8133,9 @@ class Codegen {
         return local
     }
     if (!is_user_class and method == "to_string") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'to_string' on untyped value (type inference failed)")
+        }
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
@@ -8075,6 +8187,9 @@ class Codegen {
         }
     }
     if (!is_user_class and method == "floor") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'floor' on untyped value (type inference failed)")
+        }
         if (obj_type == "Float") {
             // Actual float: untag as double, floor, convert to int, retag
             var dbl: String = this.emit_untag_float(obj)
@@ -8617,6 +8732,140 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.current_prefix = ""
     gen.mark_coroutines(program)
 
+    // Pre-registration pass: add all declaration names to known_functions
+    // BEFORE compiling any bodies, so forward references don't trigger warnings
+    var pr_mi: Float = 0
+    while (pr_mi < module_stmts.length()) {
+        var pr_prefix: String = module_prefixes_list[pr_mi]
+        var pr_stmts: List<AST.Stmt> = module_stmts[pr_mi]
+        var pr_si: Float = 0
+        while (pr_si < pr_stmts.length()) {
+            var pr_kind: String = gen.classify_stmt(pr_stmts[pr_si])
+            if (pr_kind == "fun") {
+                var pr_fname: String = gen.get_fun_name(pr_stmts[pr_si])
+                if (pr_fname.length() > 0) {
+                    var pr_emit: String = pr_prefix + pr_fname
+                    if (!gen.known_functions.contains(pr_emit)) {
+                        gen.known_functions.push(pr_emit)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                        gen.known_functions.push(pr_fname)
+                    }
+                }
+            } else if (pr_kind == "class") {
+                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                if (pr_cname.length() > 0) {
+                    var pr_type_name: String = pr_cname
+                    if (pr_prefix.length() > 0) {
+                        pr_type_name = pr_prefix + pr_cname
+                    }
+                    if (!gen.known_functions.contains(pr_type_name)) {
+                        gen.known_functions.push(pr_type_name)
+                    }
+                    if (!gen.known_functions.contains(pr_cname)) {
+                        gen.known_functions.push(pr_cname)
+                    }
+                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => m
+                        _ => []
+                    }
+                    var pr_mj: Float = 0
+                    while (pr_mj < pr_methods.length()) {
+                        var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = pr_prefix + pr_full
+                            if (!gen.known_functions.contains(pr_full)) {
+                                gen.known_functions.push(pr_full)
+                            }
+                            if (!gen.known_functions.contains(pr_prefixed)) {
+                                gen.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mj = pr_mj + 1
+                    }
+                }
+            } else if (pr_kind == "enum") {
+                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                    _ => ""
+                }
+                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                    _ => []
+                }
+                if (pr_ename.length() > 0) {
+                    if (!gen.known_functions.contains(pr_ename)) {
+                        gen.known_functions.push(pr_ename)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                        gen.known_functions.push(pr_prefix + pr_ename)
+                    }
+                }
+                var pr_vi: Float = 0
+                while (pr_vi < pr_variants.length()) {
+                    var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                        gen.known_functions.push(pr_vname)
+                    }
+                    pr_vi = pr_vi + 1
+                }
+            }
+            pr_si = pr_si + 1
+        }
+        pr_mi = pr_mi + 1
+    }
+    // Also pre-register main program's declarations
+    var pr_pi: Float = 0
+    while (pr_pi < program.length()) {
+        var pr_pk: String = gen.classify_stmt(program[pr_pi])
+        if (pr_pk == "fun") {
+            var pr_fname2: String = gen.get_fun_name(program[pr_pi])
+            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+                gen.known_functions.push(pr_fname2)
+            }
+        } else if (pr_pk == "class") {
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+                gen.known_functions.push(pr_cname2)
+            }
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var pr_mj2: Float = 0
+            while (pr_mj2 < pr_methods2.length()) {
+                var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
+                if (pr_mname2.length() > 0) {
+                    var pr_full2: String = pr_cname2 + "__" + pr_mname2
+                    if (!gen.known_functions.contains(pr_full2)) {
+                        gen.known_functions.push(pr_full2)
+                    }
+                }
+                pr_mj2 = pr_mj2 + 1
+            }
+        } else if (pr_pk == "enum") {
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+                _ => ""
+            }
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+                _ => []
+            }
+            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+                gen.known_functions.push(pr_ename2)
+            }
+            var pr_vi2: Float = 0
+            while (pr_vi2 < pr_variants2.length()) {
+                var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                    gen.known_functions.push(pr_vname2)
+                }
+                pr_vi2 = pr_vi2 + 1
+            }
+        }
+        pr_pi = pr_pi + 1
+    }
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -8985,6 +9234,142 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     }
     gen.current_prefix = ""
     gen.mark_coroutines(program)
+
+    // Pre-registration pass: add all declaration names to known_functions
+    // BEFORE compiling any bodies, so forward references don't trigger warnings
+    var pr_mi: Float = 0
+    while (pr_mi < prefixes.length()) {
+        var pr_prefix: String = prefixes[pr_mi]
+        var pr_start: Float = boundaries[pr_mi]
+        var pr_end: Float = boundaries[pr_mi + 1]
+        var pr_si: Float = pr_start
+        while (pr_si < pr_end) {
+            var pr_kind: String = gen.classify_stmt(all_stmts[pr_si])
+            if (pr_kind == "fun") {
+                var pr_fname: String = gen.get_fun_name(all_stmts[pr_si])
+                if (pr_fname.length() > 0) {
+                    var pr_emit: String = pr_prefix + pr_fname
+                    if (!gen.known_functions.contains(pr_emit)) {
+                        gen.known_functions.push(pr_emit)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                        gen.known_functions.push(pr_fname)
+                    }
+                }
+            } else if (pr_kind == "class") {
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                if (pr_cname.length() > 0) {
+                    var pr_type_name: String = pr_cname
+                    if (pr_prefix.length() > 0) {
+                        pr_type_name = pr_prefix + pr_cname
+                    }
+                    if (!gen.known_functions.contains(pr_type_name)) {
+                        gen.known_functions.push(pr_type_name)
+                    }
+                    if (!gen.known_functions.contains(pr_cname)) {
+                        gen.known_functions.push(pr_cname)
+                    }
+                    // Register all method names as ClassName__method
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => m
+                        _ => []
+                    }
+                    var pr_mj: Float = 0
+                    while (pr_mj < pr_methods.length()) {
+                        var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = pr_prefix + pr_full
+                            if (!gen.known_functions.contains(pr_full)) {
+                                gen.known_functions.push(pr_full)
+                            }
+                            if (!gen.known_functions.contains(pr_prefixed)) {
+                                gen.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mj = pr_mj + 1
+                    }
+                }
+            } else if (pr_kind == "enum") {
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                    _ => ""
+                }
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                    _ => []
+                }
+                if (pr_ename.length() > 0) {
+                    if (!gen.known_functions.contains(pr_ename)) {
+                        gen.known_functions.push(pr_ename)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                        gen.known_functions.push(pr_prefix + pr_ename)
+                    }
+                }
+                var pr_vi: Float = 0
+                while (pr_vi < pr_variants.length()) {
+                    var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                        gen.known_functions.push(pr_vname)
+                    }
+                    pr_vi = pr_vi + 1
+                }
+            }
+            pr_si = pr_si + 1
+        }
+        pr_mi = pr_mi + 1
+    }
+    // Also pre-register main program's declarations
+    var pr_pi: Float = 0
+    while (pr_pi < program.length()) {
+        var pr_pk: String = gen.classify_stmt(program[pr_pi])
+        if (pr_pk == "fun") {
+            var pr_fname2: String = gen.get_fun_name(program[pr_pi])
+            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+                gen.known_functions.push(pr_fname2)
+            }
+        } else if (pr_pk == "class") {
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+                gen.known_functions.push(pr_cname2)
+            }
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var pr_mj2: Float = 0
+            while (pr_mj2 < pr_methods2.length()) {
+                var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
+                if (pr_mname2.length() > 0) {
+                    var pr_full2: String = pr_cname2 + "__" + pr_mname2
+                    if (!gen.known_functions.contains(pr_full2)) {
+                        gen.known_functions.push(pr_full2)
+                    }
+                }
+                pr_mj2 = pr_mj2 + 1
+            }
+        } else if (pr_pk == "enum") {
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+                _ => ""
+            }
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+                _ => []
+            }
+            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+                gen.known_functions.push(pr_ename2)
+            }
+            var pr_vi2: Float = 0
+            while (pr_vi2 < pr_variants2.length()) {
+                var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                    gen.known_functions.push(pr_vname2)
+                }
+                pr_vi2 = pr_vi2 + 1
+            }
+        }
+        pr_pi = pr_pi + 1
+    }
 
     // Compile each module's declarations
     var module_init_names: List<String> = []

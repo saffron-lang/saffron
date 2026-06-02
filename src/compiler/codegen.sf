@@ -618,6 +618,140 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.current_prefix = ""
     gen.mark_coroutines(program)
 
+    // Pre-registration pass: add all declaration names to known_functions
+    // BEFORE compiling any bodies, so forward references don't trigger warnings
+    var pr_mi: Float = 0
+    while (pr_mi < module_stmts.length()) {
+        var pr_prefix: String = module_prefixes_list[pr_mi]
+        var pr_stmts: List<AST.Stmt> = module_stmts[pr_mi]
+        var pr_si: Float = 0
+        while (pr_si < pr_stmts.length()) {
+            var pr_kind: String = gen.classify_stmt(pr_stmts[pr_si])
+            if (pr_kind == "fun") {
+                var pr_fname: String = gen.get_fun_name(pr_stmts[pr_si])
+                if (pr_fname.length() > 0) {
+                    var pr_emit: String = pr_prefix + pr_fname
+                    if (!gen.known_functions.contains(pr_emit)) {
+                        gen.known_functions.push(pr_emit)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                        gen.known_functions.push(pr_fname)
+                    }
+                }
+            } else if (pr_kind == "class") {
+                var pr_cname: String = match (pr_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                if (pr_cname.length() > 0) {
+                    var pr_type_name: String = pr_cname
+                    if (pr_prefix.length() > 0) {
+                        pr_type_name = pr_prefix + pr_cname
+                    }
+                    if (!gen.known_functions.contains(pr_type_name)) {
+                        gen.known_functions.push(pr_type_name)
+                    }
+                    if (!gen.known_functions.contains(pr_cname)) {
+                        gen.known_functions.push(pr_cname)
+                    }
+                    var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => m
+                        _ => []
+                    }
+                    var pr_mj: Float = 0
+                    while (pr_mj < pr_methods.length()) {
+                        var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = pr_prefix + pr_full
+                            if (!gen.known_functions.contains(pr_full)) {
+                                gen.known_functions.push(pr_full)
+                            }
+                            if (!gen.known_functions.contains(pr_prefixed)) {
+                                gen.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mj = pr_mj + 1
+                    }
+                }
+            } else if (pr_kind == "enum") {
+                var pr_ename: String = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                    _ => ""
+                }
+                var pr_variants: List<AST.Variant> = match (pr_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                    _ => []
+                }
+                if (pr_ename.length() > 0) {
+                    if (!gen.known_functions.contains(pr_ename)) {
+                        gen.known_functions.push(pr_ename)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                        gen.known_functions.push(pr_prefix + pr_ename)
+                    }
+                }
+                var pr_vi: Float = 0
+                while (pr_vi < pr_variants.length()) {
+                    var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                        gen.known_functions.push(pr_vname)
+                    }
+                    pr_vi = pr_vi + 1
+                }
+            }
+            pr_si = pr_si + 1
+        }
+        pr_mi = pr_mi + 1
+    }
+    // Also pre-register main program's declarations
+    var pr_pi: Float = 0
+    while (pr_pi < program.length()) {
+        var pr_pk: String = gen.classify_stmt(program[pr_pi])
+        if (pr_pk == "fun") {
+            var pr_fname2: String = gen.get_fun_name(program[pr_pi])
+            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+                gen.known_functions.push(pr_fname2)
+            }
+        } else if (pr_pk == "class") {
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+                gen.known_functions.push(pr_cname2)
+            }
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var pr_mj2: Float = 0
+            while (pr_mj2 < pr_methods2.length()) {
+                var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
+                if (pr_mname2.length() > 0) {
+                    var pr_full2: String = pr_cname2 + "__" + pr_mname2
+                    if (!gen.known_functions.contains(pr_full2)) {
+                        gen.known_functions.push(pr_full2)
+                    }
+                }
+                pr_mj2 = pr_mj2 + 1
+            }
+        } else if (pr_pk == "enum") {
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+                _ => ""
+            }
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+                _ => []
+            }
+            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+                gen.known_functions.push(pr_ename2)
+            }
+            var pr_vi2: Float = 0
+            while (pr_vi2 < pr_variants2.length()) {
+                var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                    gen.known_functions.push(pr_vname2)
+                }
+                pr_vi2 = pr_vi2 + 1
+            }
+        }
+        pr_pi = pr_pi + 1
+    }
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -986,6 +1120,142 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     }
     gen.current_prefix = ""
     gen.mark_coroutines(program)
+
+    // Pre-registration pass: add all declaration names to known_functions
+    // BEFORE compiling any bodies, so forward references don't trigger warnings
+    var pr_mi: Float = 0
+    while (pr_mi < prefixes.length()) {
+        var pr_prefix: String = prefixes[pr_mi]
+        var pr_start: Float = boundaries[pr_mi]
+        var pr_end: Float = boundaries[pr_mi + 1]
+        var pr_si: Float = pr_start
+        while (pr_si < pr_end) {
+            var pr_kind: String = gen.classify_stmt(all_stmts[pr_si])
+            if (pr_kind == "fun") {
+                var pr_fname: String = gen.get_fun_name(all_stmts[pr_si])
+                if (pr_fname.length() > 0) {
+                    var pr_emit: String = pr_prefix + pr_fname
+                    if (!gen.known_functions.contains(pr_emit)) {
+                        gen.known_functions.push(pr_emit)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                        gen.known_functions.push(pr_fname)
+                    }
+                }
+            } else if (pr_kind == "class") {
+                var pr_cname: String = match (all_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                if (pr_cname.length() > 0) {
+                    var pr_type_name: String = pr_cname
+                    if (pr_prefix.length() > 0) {
+                        pr_type_name = pr_prefix + pr_cname
+                    }
+                    if (!gen.known_functions.contains(pr_type_name)) {
+                        gen.known_functions.push(pr_type_name)
+                    }
+                    if (!gen.known_functions.contains(pr_cname)) {
+                        gen.known_functions.push(pr_cname)
+                    }
+                    // Register all method names as ClassName__method
+                    var pr_methods: List<AST.Stmt> = match (all_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => m
+                        _ => []
+                    }
+                    var pr_mj: Float = 0
+                    while (pr_mj < pr_methods.length()) {
+                        var pr_mname: String = gen.get_fun_name(pr_methods[pr_mj])
+                        if (pr_mname.length() > 0) {
+                            var pr_full: String = pr_cname + "__" + pr_mname
+                            var pr_prefixed: String = pr_prefix + pr_full
+                            if (!gen.known_functions.contains(pr_full)) {
+                                gen.known_functions.push(pr_full)
+                            }
+                            if (!gen.known_functions.contains(pr_prefixed)) {
+                                gen.known_functions.push(pr_prefixed)
+                            }
+                        }
+                        pr_mj = pr_mj + 1
+                    }
+                }
+            } else if (pr_kind == "enum") {
+                var pr_ename: String = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => n
+                    _ => ""
+                }
+                var pr_variants: List<AST.Variant> = match (all_stmts[pr_si]) { EnumDecl(n, v, d) => v
+                    _ => []
+                }
+                if (pr_ename.length() > 0) {
+                    if (!gen.known_functions.contains(pr_ename)) {
+                        gen.known_functions.push(pr_ename)
+                    }
+                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                        gen.known_functions.push(pr_prefix + pr_ename)
+                    }
+                }
+                var pr_vi: Float = 0
+                while (pr_vi < pr_variants.length()) {
+                    var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                        gen.known_functions.push(pr_vname)
+                    }
+                    pr_vi = pr_vi + 1
+                }
+            }
+            pr_si = pr_si + 1
+        }
+        pr_mi = pr_mi + 1
+    }
+    // Also pre-register main program's declarations
+    var pr_pi: Float = 0
+    while (pr_pi < program.length()) {
+        var pr_pk: String = gen.classify_stmt(program[pr_pi])
+        if (pr_pk == "fun") {
+            var pr_fname2: String = gen.get_fun_name(program[pr_pi])
+            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+                gen.known_functions.push(pr_fname2)
+            }
+        } else if (pr_pk == "class") {
+            var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+                gen.known_functions.push(pr_cname2)
+            }
+            var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var pr_mj2: Float = 0
+            while (pr_mj2 < pr_methods2.length()) {
+                var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
+                if (pr_mname2.length() > 0) {
+                    var pr_full2: String = pr_cname2 + "__" + pr_mname2
+                    if (!gen.known_functions.contains(pr_full2)) {
+                        gen.known_functions.push(pr_full2)
+                    }
+                }
+                pr_mj2 = pr_mj2 + 1
+            }
+        } else if (pr_pk == "enum") {
+            var pr_ename2: String = match (program[pr_pi]) { EnumDecl(n, v, d) => n
+                _ => ""
+            }
+            var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
+                _ => []
+            }
+            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+                gen.known_functions.push(pr_ename2)
+            }
+            var pr_vi2: Float = 0
+            while (pr_vi2 < pr_variants2.length()) {
+                var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                    gen.known_functions.push(pr_vname2)
+                }
+                pr_vi2 = pr_vi2 + 1
+            }
+        }
+        pr_pi = pr_pi + 1
+    }
 
     // Compile each module's declarations
     var module_init_names: List<String> = []

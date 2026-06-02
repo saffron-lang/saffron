@@ -7,10 +7,12 @@ import "./ast.sf" as AST
 class Scope {
     var vars: Map<String, String>
     var narrowed: Map<String, String>
+    var used: Map<String, Bool>
 
     fun init() {
         this.vars = {}
         this.narrowed = {}
+        this.used = {}
     }
 }
 
@@ -72,6 +74,18 @@ class TypeEnv {
         scope.narrowed.set(name, typ)
     }
 
+    fun mark_used(name: String) {
+        var i: Float = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: Scope = this.scopes[i]
+            if (scope.vars.has(name)) {
+                scope.used.set(name, true)
+                return
+            }
+            i = i - 1
+        }
+    }
+
     fun clear_narrowing() {
         var scope: Scope = this.current_scope()
         scope.narrowed = {}
@@ -125,6 +139,19 @@ class NullChecker {
 
     fun warn(msg: String) {
         this.warnings.push(msg)
+    }
+
+    fun check_unused_in_scope() {
+        var scope: Scope = this.env.scopes[this.env.scopes.length() - 1]
+        var declared: List<String> = scope.vars.keys()
+        var i: Float = 0
+        while (i < declared.length()) {
+            var name: String = declared[i]
+            if (!name.starts_with("_") and (!scope.used.has(name) or !scope.used.get(name))) {
+                this.warn("unused variable '" + name + "'")
+            }
+            i = i + 1
+        }
     }
 
     fun params_list_to_string(params: List<AST.Param>): String {
@@ -599,6 +626,7 @@ class NullChecker {
                     j = j + 1
                 }
                 this.check_stmts(body)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
                 this.current_func_ret = old_ret
             }
@@ -616,17 +644,20 @@ class NullChecker {
                 this.env.push_scope()
                 this.apply_narrowing(cond)
                 this.check_stmts(then_branch)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
                 // Else-branch: apply inverse narrowing
                 this.env.push_scope()
                 this.apply_inverse_narrowing(cond)
                 this.check_stmts(else_branch)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
             }
             While(cond, body) => {
                 this.infer_expr(cond)
                 this.env.push_scope()
                 this.check_stmts(body)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
             }
             ExprStmt(expr) => {
@@ -635,6 +666,7 @@ class NullChecker {
             Block(stmts) => {
                 this.env.push_scope()
                 this.check_stmts(stmts)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
             }
             ClassDecl(name, parent, fields, methods, doc) => {
@@ -650,13 +682,16 @@ class NullChecker {
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
                 this.env.push_scope()
                 this.check_stmts(try_body)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
                 this.env.push_scope()
                 this.env.define_var(catch_name, "String")
                 this.check_stmts(catch_body)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
                 this.env.push_scope()
                 this.check_stmts(finally_body)
+                this.check_unused_in_scope()
                 this.env.pop_scope()
             }
             Throw(value) => {
@@ -882,7 +917,10 @@ class NullChecker {
             BoolLit(v) => AST.Type.BoolType
             StringLit(s) => AST.Type.StringType
             NilLit => AST.Type.NilType
-            Variable(name) => this.parse_type_node(this.env.get_var(name))
+            Variable(name) => {
+                this.env.mark_used(name)
+                this.parse_type_node(this.env.get_var(name))
+            }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
             Unary(op, right) => this.infer_type(right)
             Call(callee, args) => this.parse_type_node(this.infer_call(callee, args))
@@ -1407,6 +1445,7 @@ class NullChecker {
             }
 
             var arm_type: String = this.infer_expr(body)
+            this.check_unused_in_scope()
             this.env.pop_scope()
 
             if (i == 0) {
