@@ -1,0 +1,35 @@
+// Test string literal patterns in match expressions
+
+fun dispatch(cmd: String): String {
+    return match (cmd) {
+        "build" => "building"
+        "run" => "running"
+        "test" => "testing"
+        _ => "unknown"
+    }
+}
+
+IO.println(dispatch("build"))
+IO.println(dispatch("run"))
+IO.println(dispatch("test"))
+IO.println(dispatch("xyz"))
+
+// Test match as expression
+var lang: String = "fr"
+var greeting: String = match (lang) {
+    "en" => "Hello"
+    "fr" => "Bonjour"
+    "ja" => "Konnichiwa"
+    _ => "Hi"
+}
+IO.println(greeting)
+
+// Test empty string pattern
+fun check_empty(s: String): String {
+    return match (s) {
+        "" => "empty"
+        _ => "non-empty"
+    }
+}
+IO.println(check_empty(""))
+IO.println(check_empty("x"))
