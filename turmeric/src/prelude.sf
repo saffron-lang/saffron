@@ -55,9 +55,13 @@ fun _tc_apply_attrs(el: Float, attrs: Map<String, Any>) {
     }
 }
 
-// --- Element builder: creates element, applies attrs, pushes as parent, calls block, pops ---
-fun _tc_el(tag: String, attrs: Map<String, Any>, block: Any): Float {
+// --- Common attribute helper: creates element, sets typed common attrs, applies overflow, nests block ---
+fun _tc_el_with_common(tag: String, cls: String, id: String, style: String,
+                       attrs: Map<String, Any>, block: Any): Float {
     var el: Float = _tc_create(tag)
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -69,74 +73,401 @@ fun _tc_el(tag: String, attrs: Map<String, Any>, block: Any): Float {
     return el
 }
 
-// --- HTML elements ---
-fun div(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("div", attrs, block) }
-fun span(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("span", attrs, block) }
-fun p(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("p", attrs, block) }
-fun a(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("a", attrs, block) }
-fun h1(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h1", attrs, block) }
-fun h2(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h2", attrs, block) }
-fun h3(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h3", attrs, block) }
-fun h4(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h4", attrs, block) }
-fun h5(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h5", attrs, block) }
-fun h6(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h6", attrs, block) }
-fun button(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("button", attrs, block) }
-fun input(attrs: Map<String, Any> = {}): Float { return _tc_el("input", attrs, nil) }
-fun textarea(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("textarea", attrs, block) }
-fun select(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("select", attrs, block) }
-fun option(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("option", attrs, block) }
-fun form(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("form", attrs, block) }
-fun label(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("label", attrs, block) }
-fun fieldset(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("fieldset", attrs, block) }
-fun legend(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("legend", attrs, block) }
-fun ul(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ul", attrs, block) }
-fun ol(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ol", attrs, block) }
-fun li(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("li", attrs, block) }
-fun dl(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dl", attrs, block) }
-fun dt(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dt", attrs, block) }
-fun dd(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dd", attrs, block) }
-fun table(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("table", attrs, block) }
-fun thead(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("thead", attrs, block) }
-fun tbody(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("tbody", attrs, block) }
-fun tr(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("tr", attrs, block) }
-fun th(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("th", attrs, block) }
-fun td(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("td", attrs, block) }
-fun nav(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("nav", attrs, block) }
-fun header(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("header", attrs, block) }
-fun footer(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("footer", attrs, block) }
-fun section(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("section", attrs, block) }
-fun article(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("article", attrs, block) }
-fun aside(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("aside", attrs, block) }
-fun details(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("details", attrs, block) }
-fun summary(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("summary", attrs, block) }
-fun dialog(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dialog", attrs, block) }
-fun pre(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("pre", attrs, block) }
-fun code(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("code", attrs, block) }
-fun blockquote(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("blockquote", attrs, block) }
-fun em(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("em", attrs, block) }
-fun strong(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("strong", attrs, block) }
-fun small(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("small", attrs, block) }
-fun mark(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("mark", attrs, block) }
-fun del(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("del", attrs, block) }
-fun ins(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ins", attrs, block) }
-fun figure(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("figure", attrs, block) }
-fun figcaption(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("figcaption", attrs, block) }
-fun picture(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("picture", attrs, block) }
-fun video(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("video", attrs, block) }
-fun audio(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("audio", attrs, block) }
-fun canvas(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("canvas", attrs, block) }
-fun iframe(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("iframe", attrs, block) }
+// --- HTML elements (common params: cls, id, style, attrs overflow, block) ---
+fun div(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("div", cls, id, style, attrs, block)
+}
 
-// --- Self-closing elements (no block) ---
-fun br(attrs: Map<String, Any> = {}): Float { return _tc_el("br", attrs, nil) }
-fun hr(attrs: Map<String, Any> = {}): Float { return _tc_el("hr", attrs, nil) }
-fun img(attrs: Map<String, Any> = {}): Float { return _tc_el("img", attrs, nil) }
-fun source(attrs: Map<String, Any> = {}): Float { return _tc_el("source", attrs, nil) }
-fun track(attrs: Map<String, Any> = {}): Float { return _tc_el("track", attrs, nil) }
-fun wbr(attrs: Map<String, Any> = {}): Float { return _tc_el("wbr", attrs, nil) }
-fun embed(attrs: Map<String, Any> = {}): Float { return _tc_el("embed", attrs, nil) }
-fun link(attrs: Map<String, Any> = {}): Float { return _tc_el("link", attrs, nil) }
-fun meta(attrs: Map<String, Any> = {}): Float { return _tc_el("meta", attrs, nil) }
+fun span(cls: String = "", id: String = "", style: String = "",
+         attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("span", cls, id, style, attrs, block)
+}
+
+fun p(cls: String = "", id: String = "", style: String = "",
+      attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("p", cls, id, style, attrs, block)
+}
+
+fun h1(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h1", cls, id, style, attrs, block)
+}
+
+fun h2(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h2", cls, id, style, attrs, block)
+}
+
+fun h3(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h3", cls, id, style, attrs, block)
+}
+
+fun h4(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h4", cls, id, style, attrs, block)
+}
+
+fun h5(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h5", cls, id, style, attrs, block)
+}
+
+fun h6(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("h6", cls, id, style, attrs, block)
+}
+
+fun ul(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("ul", cls, id, style, attrs, block)
+}
+
+fun ol(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("ol", cls, id, style, attrs, block)
+}
+
+fun li(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("li", cls, id, style, attrs, block)
+}
+
+fun dl(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dl", cls, id, style, attrs, block)
+}
+
+fun dt(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dt", cls, id, style, attrs, block)
+}
+
+fun dd(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dd", cls, id, style, attrs, block)
+}
+
+fun table(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("table", cls, id, style, attrs, block)
+}
+
+fun thead(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("thead", cls, id, style, attrs, block)
+}
+
+fun tbody(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("tbody", cls, id, style, attrs, block)
+}
+
+fun tr(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("tr", cls, id, style, attrs, block)
+}
+
+fun th(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("th", cls, id, style, attrs, block)
+}
+
+fun td(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("td", cls, id, style, attrs, block)
+}
+
+fun nav(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("nav", cls, id, style, attrs, block)
+}
+
+fun header(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("header", cls, id, style, attrs, block)
+}
+
+fun footer(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("footer", cls, id, style, attrs, block)
+}
+
+fun section(cls: String = "", id: String = "", style: String = "",
+            attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("section", cls, id, style, attrs, block)
+}
+
+fun article(cls: String = "", id: String = "", style: String = "",
+            attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("article", cls, id, style, attrs, block)
+}
+
+fun aside(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("aside", cls, id, style, attrs, block)
+}
+
+fun details(cls: String = "", id: String = "", style: String = "",
+            attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("details", cls, id, style, attrs, block)
+}
+
+fun summary(cls: String = "", id: String = "", style: String = "",
+            attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("summary", cls, id, style, attrs, block)
+}
+
+fun dialog(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("dialog", cls, id, style, attrs, block)
+}
+
+fun pre(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("pre", cls, id, style, attrs, block)
+}
+
+fun code(cls: String = "", id: String = "", style: String = "",
+         attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("code", cls, id, style, attrs, block)
+}
+
+fun blockquote(cls: String = "", id: String = "", style: String = "",
+               attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("blockquote", cls, id, style, attrs, block)
+}
+
+fun em(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("em", cls, id, style, attrs, block)
+}
+
+fun strong(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("strong", cls, id, style, attrs, block)
+}
+
+fun small(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("small", cls, id, style, attrs, block)
+}
+
+fun mark(cls: String = "", id: String = "", style: String = "",
+         attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("mark", cls, id, style, attrs, block)
+}
+
+fun del(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("del", cls, id, style, attrs, block)
+}
+
+fun ins(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("ins", cls, id, style, attrs, block)
+}
+
+fun figure(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("figure", cls, id, style, attrs, block)
+}
+
+fun figcaption(cls: String = "", id: String = "", style: String = "",
+               attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+}
+
+fun picture(cls: String = "", id: String = "", style: String = "",
+            attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("picture", cls, id, style, attrs, block)
+}
+
+fun video(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("video", cls, id, style, attrs, block)
+}
+
+fun audio(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("audio", cls, id, style, attrs, block)
+}
+
+fun canvas(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("canvas", cls, id, style, attrs, block)
+}
+
+fun iframe(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("iframe", cls, id, style, attrs, block)
+}
+
+fun label(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("label", cls, id, style, attrs, block)
+}
+
+fun fieldset(cls: String = "", id: String = "", style: String = "",
+             attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("fieldset", cls, id, style, attrs, block)
+}
+
+fun legend(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("legend", cls, id, style, attrs, block)
+}
+
+fun option(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("option", cls, id, style, attrs, block)
+}
+
+fun textarea(cls: String = "", id: String = "", style: String = "",
+             attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    return _tc_el_with_common("textarea", cls, id, style, attrs, block)
+}
+
+// --- Interactive elements (extra typed params for events/attributes) ---
+
+fun button(cls: String = "", id: String = "", style: String = "",
+           on_click: Any = nil, disabled: String = "",
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    var el: Float = _tc_create("button")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (disabled.length() > 0) { _tc_set_attr(el, "disabled", disabled) }
+    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun input(cls: String = "", id: String = "", style: String = "",
+          type: String = "", value: String = "", placeholder: String = "",
+          on_input: Any = nil, on_change: Any = nil,
+          attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    var el: Float = _tc_create("input")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (type.length() > 0) { _tc_set_attr(el, "type", type) }
+    if (value.length() > 0) { _tc_set_attr(el, "value", value) }
+    if (placeholder.length() > 0) { _tc_set_attr(el, "placeholder", placeholder) }
+    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
+    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun a(cls: String = "", id: String = "", style: String = "",
+      href: String = "", target: String = "",
+      attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    var el: Float = _tc_create("a")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (href.length() > 0) { _tc_set_attr(el, "href", href) }
+    if (target.length() > 0) { _tc_set_attr(el, "target", target) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun form(cls: String = "", id: String = "", style: String = "",
+         on_submit: Any = nil,
+         attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    var el: Float = _tc_create("form")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+fun select(cls: String = "", id: String = "", style: String = "",
+           on_change: Any = nil,
+           attrs: Map<String, Any> = {}, block: Any = nil): Float {
+    var el: Float = _tc_create("select")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) { _tc_push(el); block(); _tc_pop() }
+    return el
+}
+
+// --- Self-closing elements ---
+fun br(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("br", cls, id, style, attrs, nil)
+}
+
+fun hr(cls: String = "", id: String = "", style: String = "",
+       attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("hr", cls, id, style, attrs, nil)
+}
+
+fun img(cls: String = "", id: String = "", style: String = "",
+        src: String = "", alt: String = "",
+        attrs: Map<String, Any> = {}): Float {
+    var el: Float = _tc_create("img")
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    if (src.length() > 0) { _tc_set_attr(el, "src", src) }
+    if (alt.length() > 0) { _tc_set_attr(el, "alt", alt) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    return el
+}
+
+fun source(cls: String = "", id: String = "", style: String = "",
+           attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("source", cls, id, style, attrs, nil)
+}
+
+fun track(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("track", cls, id, style, attrs, nil)
+}
+
+fun wbr(cls: String = "", id: String = "", style: String = "",
+        attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("wbr", cls, id, style, attrs, nil)
+}
+
+fun embed(cls: String = "", id: String = "", style: String = "",
+          attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("embed", cls, id, style, attrs, nil)
+}
+
+fun link(cls: String = "", id: String = "", style: String = "",
+         attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("link", cls, id, style, attrs, nil)
+}
+
+fun meta(cls: String = "", id: String = "", style: String = "",
+         attrs: Map<String, Any> = {}): Float {
+    return _tc_el_with_common("meta", cls, id, style, attrs, nil)
+}
 
 // --- Mount: set the root element and call the app function ---
 fun mount(selector: String, app: Any) {
