@@ -1,0 +1,104 @@
+// turmeric-build — Build a Turmeric app to WASM
+// Usage: saffron run tools/build.sf [--dev]
+//
+// Reads pantry.toml for entry, compiles to WASM, bundles public/ → build/
+
+import "@process" as Process
+import "@args" as Args
+
+var parsed = Args.parse()
+var is_dev: Bool = parsed.flags.has("dev")
+
+// --- Config ---
+var entry: String = "src/main.sf"
+var public_dir: String = "public"
+var build_dir: String = "build"
+var port: String = "8080"
+
+// Read entry from pantry.toml
+if (IO.file_exists("pantry.toml")) {
+    var toml: String = IO.read_file("pantry.toml")
+    var lines: List<String> = toml.split("\n")
+    var i: Float = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.starts_with("entry")) {
+            var eq: Float = line.index_of("=")
+            if (eq > 0) {
+                var val: String = line.slice(eq + 1, line.length()).trim()
+                if (val.starts_with("\"") and val.ends_with("\"")) {
+                    entry = val.slice(1, val.length() - 1)
+                }
+            }
+        }
+        i = i + 1
+    }
+}
+
+// --- Step 1: Compile ---
+IO.println("[1/3] Compiling " + entry + " → WASM...")
+var compile_cmd: String = "saffron build --target wasm32 --lib-path .pantry/packages " + entry + " -o " + build_dir + "/app.wasm"
+var compile_result = Process.run(compile_cmd)
+if (!compile_result.success) {
+    IO.println("Error: Compilation failed")
+    IO.println(compile_result.stderr)
+    IO.println(compile_result.stdout)
+    return
+}
+
+// --- Step 2: Bundle ---
+IO.println("[2/3] Bundling " + public_dir + "/ → " + build_dir + "/...")
+
+// Copy public files
+if (IO.file_exists(public_dir)) {
+    Process.run("cp -r " + public_dir + "/* " + build_dir + "/")
+}
+
+// Transform index.html: rewrite .sf script src to ./app.js
+var html_path: String = build_dir + "/index.html"
+if (IO.file_exists(html_path)) {
+    var html: String = IO.read_file(html_path)
+    // Replace src="...*.sf" with src="./app.js"
+    var lines: List<String> = html.split("\n")
+    var out: StringBuilder = StringBuilder()
+    var li: Float = 0
+    while (li < lines.length()) {
+        var line: String = lines[li]
+        if (line.contains(".sf\"")) {
+            // Rewrite script src
+            var start: Float = line.index_of("src=\"")
+            if (start >= 0) {
+                var before: String = line.slice(0, start)
+                var after_src: String = line.slice(start + 5, line.length())
+                var end_quote: Float = after_src.index_of("\"")
+                var after: String = after_src.slice(end_quote, after_src.length())
+                line = before + "src=\"./app.js" + after
+            }
+        }
+        out.append(line)
+        if (li < lines.length() - 1) { out.append("\n") }
+        li = li + 1
+    }
+    IO.write_file(html_path, out.to_string())
+}
+
+// Generate app.js
+IO.println("[3/3] Generating app.js...")
+var app_js: String = IO.read_file(".pantry/packages/turmeric/runtime/app_template.js")
+IO.write_file(build_dir + "/app.js", app_js)
+
+// --- Done ---
+IO.println("")
+IO.println("✓ Build complete: " + build_dir + "/")
+if (IO.file_exists(build_dir + "/app.wasm")) {
+    IO.println("  app.wasm  — WASM binary")
+}
+IO.println("  index.html — entry page")
+IO.println("  app.js     — loader (auto-generated)")
+
+// --- Dev server ---
+if (is_dev) {
+    IO.println("")
+    IO.println("  Serving at http://localhost:" + port)
+    Process.run("cd " + build_dir + " && python3 -m http.server " + port)
+}

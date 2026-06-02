@@ -15,3 +15,5 @@ generate = "saffron run tools/generate_types.sf"
 
 [scripts.bin]
 sfx = "saffron run tools/sfx_transform.sf"
+turmeric-build = "saffron run tools/build.sf"
+turmeric-dev = "saffron run tools/build.sf --dev"
