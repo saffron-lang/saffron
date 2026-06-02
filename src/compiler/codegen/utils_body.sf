@@ -19,6 +19,23 @@
         rt.append("declare i1 @__val_is_nil(i64)\n")
         rt.append("declare i1 @__val_is_list(i64)\n")
         rt.append("declare i1 @__val_is_map(i64)\n")
+        // Coroutine intrinsics
+        if (this.coroutine_funcs.length() > 0) {
+            rt.append("\n; --- Coroutine intrinsics ---\n")
+            rt.append("declare token @llvm.coro.id(i32, ptr, ptr, ptr)\n")
+            rt.append("declare i64 @llvm.coro.size.i64()\n")
+            rt.append("declare ptr @llvm.coro.begin(token, ptr)\n")
+            rt.append("declare token @llvm.coro.save(ptr)\n")
+            rt.append("declare i8 @llvm.coro.suspend(token, i1)\n")
+            rt.append("declare ptr @llvm.coro.free(token, ptr)\n")
+            rt.append("declare i1 @llvm.coro.end(ptr, i1)\n")
+            rt.append("declare void @llvm.coro.resume(ptr)\n")
+            rt.append("declare i1 @llvm.coro.done(ptr)\n")
+            rt.append("declare void @llvm.coro.destroy(ptr)\n")
+            rt.append("declare ptr @llvm.coro.promise(ptr, i32, i1)\n")
+            rt.append("\n@__yield_reason = external global i64\n")
+            rt.append("@__yield_arg = external global i64\n")
+        }
         return rt.to_string()
     }
     fun find_enum_for_variant(variant: String): String {
@@ -319,6 +336,206 @@
     fun get_match_arms(expr: AST.Expr): List<AST.MatchArm> {
         return match (expr) { Match(s, a) => a
             _ => ""
+        }
+    }
+
+    // --- Coroutine detection ---
+
+    fun expr_has_yield(expr: AST.Expr): Bool {
+        return match (expr) {
+            Yield(v) => true
+            Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
+            Unary(o, r) => this.expr_has_yield(r)
+            Call(c, a) => this.exprs_have_yield(a)
+            Assign(n, v) => this.expr_has_yield(v)
+            Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
+            MethodCall(o, m, a) => this.expr_has_yield(o) or this.exprs_have_yield(a)
+            ListLit(e) => this.exprs_have_yield(e)
+            IndexGet(o, i) => this.expr_has_yield(o) or this.expr_has_yield(i)
+            IndexSet(o, i, v) => this.expr_has_yield(o) or this.expr_has_yield(i) or this.expr_has_yield(v)
+            SetField(o, f, v) => this.expr_has_yield(o) or this.expr_has_yield(v)
+            GetField(o, f) => this.expr_has_yield(o)
+            MemberAccess(o, f) => this.expr_has_yield(o)
+            EnumConstruct(e, v, a) => this.exprs_have_yield(a)
+            Match(s, a) => this.expr_has_yield(s)
+            BlockExpr(s, v) => this.stmts_have_yield(s) or this.expr_has_yield(v)
+            IfExpr(c, tb, tv, eb, ev) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(eb) or this.expr_has_yield(ev)
+            IsCheck(v, t) => this.expr_has_yield(v)
+            TryExpr(tb, tv, cn, cb, cv) => this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(cb) or this.expr_has_yield(cv)
+            _ => false
+        }
+    }
+
+    fun exprs_have_yield(exprs: List<AST.Expr>): Bool {
+        var i: Float = 0
+        while (i < exprs.length()) {
+            if (this.expr_has_yield(exprs[i])) { return true }
+            i = i + 1
+        }
+        return false
+    }
+
+    fun stmts_have_yield(stmts: List<AST.Stmt>): Bool {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            if (this.stmt_has_yield(stmts[i])) { return true }
+            i = i + 1
+        }
+        return false
+    }
+
+    fun stmt_has_yield(stmt: AST.Stmt): Bool {
+        return match (stmt) {
+            ExprStmt(e) => this.expr_has_yield(e)
+            VarDecl(n, t, init, d) => this.expr_has_yield(init)
+            Return(v) => this.expr_has_yield(v)
+            If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
+            While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
+            Block(s) => this.stmts_have_yield(s)
+            TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
+            Throw(v) => this.expr_has_yield(v)
+            FunDecl(n, p, r, b, d) => false
+            _ => false
+        }
+    }
+
+    fun collect_calls_from_expr(expr: AST.Expr, calls: List<String>) {
+        match (expr) {
+            Call(callee, args) => {
+                var name: String = this.get_variable_name(callee)
+                if (name.length() > 0) { calls.push(name) }
+                this.collect_calls_from_exprs(args, calls)
+            }
+            MethodCall(o, m, a) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_exprs(a, calls)
+            }
+            Binary(l, o, r) => {
+                this.collect_calls_from_expr(l, calls)
+                this.collect_calls_from_expr(r, calls)
+            }
+            Assign(n, v) => { this.collect_calls_from_expr(v, calls) }
+            Logical(l, o, r) => {
+                this.collect_calls_from_expr(l, calls)
+                this.collect_calls_from_expr(r, calls)
+            }
+            Unary(o, r) => { this.collect_calls_from_expr(r, calls) }
+            ListLit(e) => { this.collect_calls_from_exprs(e, calls) }
+            IndexGet(o, i) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(i, calls)
+            }
+            IndexSet(o, i, v) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(i, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            SetField(o, f, v) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            GetField(o, f) => { this.collect_calls_from_expr(o, calls) }
+            MemberAccess(o, f) => { this.collect_calls_from_expr(o, calls) }
+            BlockExpr(s, v) => {
+                this.collect_calls_from_stmts(s, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            IfExpr(c, tb, tv, eb, ev) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_expr(tv, calls)
+                this.collect_calls_from_stmts(eb, calls)
+                this.collect_calls_from_expr(ev, calls)
+            }
+            _ => {}
+        }
+    }
+
+    fun collect_calls_from_exprs(exprs: List<AST.Expr>, calls: List<String>) {
+        var i: Float = 0
+        while (i < exprs.length()) {
+            this.collect_calls_from_expr(exprs[i], calls)
+            i = i + 1
+        }
+    }
+
+    fun collect_calls_from_stmts(stmts: List<AST.Stmt>, calls: List<String>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.collect_calls_from_stmt(stmts[i], calls)
+            i = i + 1
+        }
+    }
+
+    fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
+        match (stmt) {
+            ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
+            VarDecl(n, t, init, d) => { this.collect_calls_from_expr(init, calls) }
+            Return(v) => { this.collect_calls_from_expr(v, calls) }
+            If(c, tb, eb) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_stmts(eb, calls)
+            }
+            While(c, b) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(b, calls)
+            }
+            Block(s) => { this.collect_calls_from_stmts(s, calls) }
+            TryCatch(t, n, c, f) => {
+                this.collect_calls_from_stmts(t, calls)
+                this.collect_calls_from_stmts(c, calls)
+                this.collect_calls_from_stmts(f, calls)
+            }
+            Throw(v) => { this.collect_calls_from_expr(v, calls) }
+            _ => {}
+        }
+    }
+
+    fun mark_coroutines(program: List<AST.Stmt>) {
+        // Pass 1: find functions that directly contain yield
+        var func_names: List<String> = []
+        var func_bodies: List<List<AST.Stmt>> = []
+        var i: Float = 0
+        while (i < program.length()) {
+            var kind: String = this.classify_stmt(program[i])
+            if (kind == "fun") {
+                var name: String = this.get_fun_name(program[i])
+                var body: List<AST.Stmt> = this.get_fun_body(program[i])
+                var full_name: String = this.current_prefix + name
+                func_names.push(full_name)
+                func_bodies.push(body)
+                if (this.stmts_have_yield(body)) {
+                    this.coroutine_funcs.push(full_name)
+                }
+            }
+            i = i + 1
+        }
+
+        // Pass 2: transitive coloring — if A calls B and B is a coroutine, A is too
+        var changed: Bool = true
+        while (changed) {
+            changed = false
+            var fi: Float = 0
+            while (fi < func_names.length()) {
+                var fn_name: String = func_names[fi]
+                if (!this.coroutine_funcs.contains(fn_name)) {
+                    var calls: List<String> = []
+                    this.collect_calls_from_stmts(func_bodies[fi], calls)
+                    var ci: Float = 0
+                    while (ci < calls.length()) {
+                        var callee: String = calls[ci]
+                        // Check both bare name and prefixed name
+                        if (this.coroutine_funcs.contains(callee) or this.coroutine_funcs.contains(this.current_prefix + callee)) {
+                            this.coroutine_funcs.push(fn_name)
+                            changed = true
+                            ci = calls.length()
+                        }
+                        ci = ci + 1
+                    }
+                }
+                fi = fi + 1
+            }
         }
     }
 

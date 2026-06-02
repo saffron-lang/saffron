@@ -52,6 +52,8 @@ class Codegen {
     var has_errors: Bool
     var module_init_names: List<String>
     var identity_mode: Bool
+    var coroutine_funcs: List<String>
+    var is_coroutine: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -99,6 +101,8 @@ class Codegen {
         this.has_errors = false
         this.module_init_names = []
         this.identity_mode = false
+        this.coroutine_funcs = []
+        this.is_coroutine = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
@@ -1130,9 +1134,6 @@ class Codegen {
     }
 
     fun gen_yield(value: AST.Expr): String {
-        // Emit yield argument into globals (scheduler reads these after suspend)
-        var yield_val: String = this.gen_arg_value(value)
-
         // Detect yield [reason, arg] pattern for sleep/IO
         var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
         if (is_list == "yes") {
@@ -1149,7 +1150,7 @@ class Codegen {
 
         // Coroutine suspend sequence
         var save_tok: String = this.fresh_local()
-        this.emit_indent(save_tok + " = call token @llvm.coro.save(i8* %__coro_hdl)")
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
         var susp_result: String = this.fresh_local()
         this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
 
@@ -1157,24 +1158,25 @@ class Codegen {
         var cleanup_label: String = this.fresh_label("yield.cleanup")
         var suspend_label: String = this.fresh_label("yield.suspend")
 
-        this.emit_indent("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+        this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
 
-        // Suspend path (returned to caller)
-        this.start_block(suspend_label)
-        this.emit_terminator("unreachable")
+        // Suspend path (returns handle to caller)
+        this.emit(suspend_label + ":")
+        this.block_terminated = false
+        this.emit_terminator("ret ptr %__coro_hdl")
 
-        // Cleanup path (coroutine destroyed)
-        this.start_block(cleanup_label)
+        // Cleanup path (coroutine destroyed while suspended)
+        this.emit(cleanup_label + ":")
+        this.block_terminated = false
         this.emit_terminator("br label %__coro_cleanup")
 
         // Resume path — read resume value from promise slot
-        this.start_block(resume_label)
+        this.emit(resume_label + ":")
+        this.block_terminated = false
         var promise_ptr: String = this.fresh_local()
-        this.emit_indent(promise_ptr + " = call i8* @llvm.coro.promise(i8* %__coro_hdl, i32 8, i1 false)")
-        var promise_i64ptr: String = this.fresh_local()
-        this.emit_indent(promise_i64ptr + " = bitcast i8* " + promise_ptr + " to i64*")
+        this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
         var resume_val: String = this.fresh_local()
-        this.emit_indent(resume_val + " = load i64, i64* " + promise_i64ptr)
+        this.emit_indent(resume_val + " = load i64, ptr " + promise_ptr)
 
         this.last_type = AST.Type.IntType
         return resume_val
@@ -1907,6 +1909,27 @@ class Codegen {
             return local
         }
 
+        // Task.spawn(fn) — call the coroutine function to get a handle, enqueue it
+        if (callee_name == "Task.spawn") {
+            // The argument is a lambda or function reference that is a coroutine
+            var spawn_arg: String = this.gen_arg_value(args[0])
+            // The lambda was compiled as a coroutine returning ptr.
+            // Call it to get the handle, then enqueue to scheduler.
+            // For now: the lambda is an indirect call via function pointer.
+            // The spawned function returns a ptr handle immediately (at first suspend).
+            var hdl: String = this.fresh_local()
+            this.emit_indent(hdl + " = inttoptr i64 " + spawn_arg + " to ptr")
+            var task_hdl: String = this.fresh_local()
+            this.emit_indent(task_hdl + " = call ptr " + hdl + "()")
+            // Enqueue to scheduler (convert ptr to i64 for scheduler's List<Int>)
+            var task_i64: String = this.fresh_local()
+            this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+            this.emit_indent("call i64 @enqueue(i64 " + task_i64 + ")")
+            this.called_functions.push("enqueue")
+            this.last_type = AST.Type.IntType
+            return task_i64
+        }
+
         // Check if it's a known direct function or an indirect call through a variable
         // Check for same-name enum variant: Token(kind, line, col) where enum Token { Token(...) }
         if (this.enum_defs.has(callee_name)) {
@@ -1937,6 +1960,64 @@ class Codegen {
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
+
+        // Coroutine-calls-coroutine: emit await forwarding pattern
+        if (this.is_coroutine) {
+            var is_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
+            if (!is_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+                is_coro_callee = true
+                resolved_callee = this.current_prefix + resolved_callee
+            }
+            if (is_coro_callee) {
+                this.called_functions.push(resolved_callee)
+                // Generate arguments
+                var coro_arg_strs: List<String> = []
+                var cai: Float = 0
+                while (cai < args.length()) {
+                    var val: String = this.gen_arg_value(args[cai])
+                    coro_arg_strs.push("i64 " + val)
+                    cai = cai + 1
+                }
+                // Call the coroutine — returns a handle (ptr)
+                var b_hdl: String = this.fresh_local()
+                this.emit_indent(b_hdl + " = call ptr @" + resolved_callee + "(" + coro_arg_strs.join(", ") + ")")
+
+                // Await loop: resume child until done, yielding ourselves each iteration
+                var await_loop: String = this.fresh_label("await.loop")
+                var await_yield: String = this.fresh_label("await.yield")
+                var await_suspend: String = this.fresh_label("await.suspend")
+                var await_cleanup: String = this.fresh_label("await.cleanup")
+                var await_done: String = this.fresh_label("await.done")
+
+                this.emit_terminator("br label %" + await_loop)
+
+                this.start_block(await_loop)
+                this.emit_indent("call void @llvm.coro.resume(ptr " + b_hdl + ")")
+                var b_done: String = this.fresh_local()
+                this.emit_indent(b_done + " = call i1 @llvm.coro.done(ptr " + b_hdl + ")")
+                this.emit_terminator("br i1 " + b_done + ", label %" + await_done + ", label %" + await_yield)
+
+                this.start_block(await_yield)
+                // Propagate suspension: yield ourselves (bare yield, no reason/arg)
+                var save_tok: String = this.fresh_local()
+                this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+                var susp_result: String = this.fresh_local()
+                this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+                this.emit_terminator("switch i8 " + susp_result + ", label %" + await_suspend + " [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
+
+                this.start_block(await_suspend)
+                this.emit_terminator("ret ptr %__coro_hdl")
+
+                this.start_block(await_cleanup)
+                this.emit_terminator("br label %__coro_cleanup")
+
+                this.start_block(await_done)
+                this.emit_indent("call void @llvm.coro.destroy(ptr " + b_hdl + ")")
+                this.last_type = AST.Type.IntType
+                return "0"
+            }
+        }
+
         // Error check: argument count validation (skip if named args present)
         var has_named_check: Bool = false
         var nac: Float = 0
@@ -3559,7 +3640,14 @@ class Codegen {
         var value: AST.Expr = match (stmt) { Return(v) => v
             _ => AST.Expr.NilLit
         }
-        if (this.current_ret_type == "void") {
+        if (this.is_coroutine) {
+            // Store return value into promise slot, then branch to final suspend
+            var val: String = this.gen_arg_value(value)
+            var promise_ptr: String = this.fresh_local()
+            this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
+            this.emit_indent("store i64 " + val + ", ptr " + promise_ptr)
+            this.emit_terminator("br label %__coro_final")
+        } else if (this.current_ret_type == "void") {
             this.emit_terminator("ret void")
         } else {
             var val: String = this.gen_arg_value(value)
@@ -4459,6 +4547,23 @@ class Codegen {
         rt.append("declare i1 @__val_is_nil(i64)\n")
         rt.append("declare i1 @__val_is_list(i64)\n")
         rt.append("declare i1 @__val_is_map(i64)\n")
+        // Coroutine intrinsics
+        if (this.coroutine_funcs.length() > 0) {
+            rt.append("\n; --- Coroutine intrinsics ---\n")
+            rt.append("declare token @llvm.coro.id(i32, ptr, ptr, ptr)\n")
+            rt.append("declare i64 @llvm.coro.size.i64()\n")
+            rt.append("declare ptr @llvm.coro.begin(token, ptr)\n")
+            rt.append("declare token @llvm.coro.save(ptr)\n")
+            rt.append("declare i8 @llvm.coro.suspend(token, i1)\n")
+            rt.append("declare ptr @llvm.coro.free(token, ptr)\n")
+            rt.append("declare i1 @llvm.coro.end(ptr, i1)\n")
+            rt.append("declare void @llvm.coro.resume(ptr)\n")
+            rt.append("declare i1 @llvm.coro.done(ptr)\n")
+            rt.append("declare void @llvm.coro.destroy(ptr)\n")
+            rt.append("declare ptr @llvm.coro.promise(ptr, i32, i1)\n")
+            rt.append("\n@__yield_reason = external global i64\n")
+            rt.append("@__yield_arg = external global i64\n")
+        }
         return rt.to_string()
     }
     fun find_enum_for_variant(variant: String): String {
@@ -4762,6 +4867,206 @@ class Codegen {
         }
     }
 
+    // --- Coroutine detection ---
+
+    fun expr_has_yield(expr: AST.Expr): Bool {
+        return match (expr) {
+            Yield(v) => true
+            Binary(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
+            Unary(o, r) => this.expr_has_yield(r)
+            Call(c, a) => this.exprs_have_yield(a)
+            Assign(n, v) => this.expr_has_yield(v)
+            Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
+            MethodCall(o, m, a) => this.expr_has_yield(o) or this.exprs_have_yield(a)
+            ListLit(e) => this.exprs_have_yield(e)
+            IndexGet(o, i) => this.expr_has_yield(o) or this.expr_has_yield(i)
+            IndexSet(o, i, v) => this.expr_has_yield(o) or this.expr_has_yield(i) or this.expr_has_yield(v)
+            SetField(o, f, v) => this.expr_has_yield(o) or this.expr_has_yield(v)
+            GetField(o, f) => this.expr_has_yield(o)
+            MemberAccess(o, f) => this.expr_has_yield(o)
+            EnumConstruct(e, v, a) => this.exprs_have_yield(a)
+            Match(s, a) => this.expr_has_yield(s)
+            BlockExpr(s, v) => this.stmts_have_yield(s) or this.expr_has_yield(v)
+            IfExpr(c, tb, tv, eb, ev) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(eb) or this.expr_has_yield(ev)
+            IsCheck(v, t) => this.expr_has_yield(v)
+            TryExpr(tb, tv, cn, cb, cv) => this.stmts_have_yield(tb) or this.expr_has_yield(tv) or this.stmts_have_yield(cb) or this.expr_has_yield(cv)
+            _ => false
+        }
+    }
+
+    fun exprs_have_yield(exprs: List<AST.Expr>): Bool {
+        var i: Float = 0
+        while (i < exprs.length()) {
+            if (this.expr_has_yield(exprs[i])) { return true }
+            i = i + 1
+        }
+        return false
+    }
+
+    fun stmts_have_yield(stmts: List<AST.Stmt>): Bool {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            if (this.stmt_has_yield(stmts[i])) { return true }
+            i = i + 1
+        }
+        return false
+    }
+
+    fun stmt_has_yield(stmt: AST.Stmt): Bool {
+        return match (stmt) {
+            ExprStmt(e) => this.expr_has_yield(e)
+            VarDecl(n, t, init, d) => this.expr_has_yield(init)
+            Return(v) => this.expr_has_yield(v)
+            If(c, tb, eb) => this.expr_has_yield(c) or this.stmts_have_yield(tb) or this.stmts_have_yield(eb)
+            While(c, b) => this.expr_has_yield(c) or this.stmts_have_yield(b)
+            Block(s) => this.stmts_have_yield(s)
+            TryCatch(t, n, c, f) => this.stmts_have_yield(t) or this.stmts_have_yield(c) or this.stmts_have_yield(f)
+            Throw(v) => this.expr_has_yield(v)
+            FunDecl(n, p, r, b, d) => false
+            _ => false
+        }
+    }
+
+    fun collect_calls_from_expr(expr: AST.Expr, calls: List<String>) {
+        match (expr) {
+            Call(callee, args) => {
+                var name: String = this.get_variable_name(callee)
+                if (name.length() > 0) { calls.push(name) }
+                this.collect_calls_from_exprs(args, calls)
+            }
+            MethodCall(o, m, a) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_exprs(a, calls)
+            }
+            Binary(l, o, r) => {
+                this.collect_calls_from_expr(l, calls)
+                this.collect_calls_from_expr(r, calls)
+            }
+            Assign(n, v) => { this.collect_calls_from_expr(v, calls) }
+            Logical(l, o, r) => {
+                this.collect_calls_from_expr(l, calls)
+                this.collect_calls_from_expr(r, calls)
+            }
+            Unary(o, r) => { this.collect_calls_from_expr(r, calls) }
+            ListLit(e) => { this.collect_calls_from_exprs(e, calls) }
+            IndexGet(o, i) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(i, calls)
+            }
+            IndexSet(o, i, v) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(i, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            SetField(o, f, v) => {
+                this.collect_calls_from_expr(o, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            GetField(o, f) => { this.collect_calls_from_expr(o, calls) }
+            MemberAccess(o, f) => { this.collect_calls_from_expr(o, calls) }
+            BlockExpr(s, v) => {
+                this.collect_calls_from_stmts(s, calls)
+                this.collect_calls_from_expr(v, calls)
+            }
+            IfExpr(c, tb, tv, eb, ev) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_expr(tv, calls)
+                this.collect_calls_from_stmts(eb, calls)
+                this.collect_calls_from_expr(ev, calls)
+            }
+            _ => {}
+        }
+    }
+
+    fun collect_calls_from_exprs(exprs: List<AST.Expr>, calls: List<String>) {
+        var i: Float = 0
+        while (i < exprs.length()) {
+            this.collect_calls_from_expr(exprs[i], calls)
+            i = i + 1
+        }
+    }
+
+    fun collect_calls_from_stmts(stmts: List<AST.Stmt>, calls: List<String>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.collect_calls_from_stmt(stmts[i], calls)
+            i = i + 1
+        }
+    }
+
+    fun collect_calls_from_stmt(stmt: AST.Stmt, calls: List<String>) {
+        match (stmt) {
+            ExprStmt(e) => { this.collect_calls_from_expr(e, calls) }
+            VarDecl(n, t, init, d) => { this.collect_calls_from_expr(init, calls) }
+            Return(v) => { this.collect_calls_from_expr(v, calls) }
+            If(c, tb, eb) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(tb, calls)
+                this.collect_calls_from_stmts(eb, calls)
+            }
+            While(c, b) => {
+                this.collect_calls_from_expr(c, calls)
+                this.collect_calls_from_stmts(b, calls)
+            }
+            Block(s) => { this.collect_calls_from_stmts(s, calls) }
+            TryCatch(t, n, c, f) => {
+                this.collect_calls_from_stmts(t, calls)
+                this.collect_calls_from_stmts(c, calls)
+                this.collect_calls_from_stmts(f, calls)
+            }
+            Throw(v) => { this.collect_calls_from_expr(v, calls) }
+            _ => {}
+        }
+    }
+
+    fun mark_coroutines(program: List<AST.Stmt>) {
+        // Pass 1: find functions that directly contain yield
+        var func_names: List<String> = []
+        var func_bodies: List<List<AST.Stmt>> = []
+        var i: Float = 0
+        while (i < program.length()) {
+            var kind: String = this.classify_stmt(program[i])
+            if (kind == "fun") {
+                var name: String = this.get_fun_name(program[i])
+                var body: List<AST.Stmt> = this.get_fun_body(program[i])
+                var full_name: String = this.current_prefix + name
+                func_names.push(full_name)
+                func_bodies.push(body)
+                if (this.stmts_have_yield(body)) {
+                    this.coroutine_funcs.push(full_name)
+                }
+            }
+            i = i + 1
+        }
+
+        // Pass 2: transitive coloring — if A calls B and B is a coroutine, A is too
+        var changed: Bool = true
+        while (changed) {
+            changed = false
+            var fi: Float = 0
+            while (fi < func_names.length()) {
+                var fn_name: String = func_names[fi]
+                if (!this.coroutine_funcs.contains(fn_name)) {
+                    var calls: List<String> = []
+                    this.collect_calls_from_stmts(func_bodies[fi], calls)
+                    var ci: Float = 0
+                    while (ci < calls.length()) {
+                        var callee: String = calls[ci]
+                        // Check both bare name and prefixed name
+                        if (this.coroutine_funcs.contains(callee) or this.coroutine_funcs.contains(this.current_prefix + callee)) {
+                            this.coroutine_funcs.push(fn_name)
+                            changed = true
+                            ci = calls.length()
+                        }
+                        ci = ci + 1
+                    }
+                }
+                fi = fi + 1
+            }
+        }
+    }
+
     // --- Statement codegen ---
 
     // @codegen-split: output
@@ -4931,14 +5236,30 @@ class Codegen {
         }
         this.func_param_names.set(emit_name, pnames_list)
 
+        // Check if this function is a coroutine
+        var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        this.is_coroutine = is_coro
+
         this.emit("")
         var linkage: String = "define"
         if (this.current_prefix.length() > 0) {
             linkage = "define linkonce_odr"
         }
-        this.emit(linkage + " " + ret_llvm + " @" + emit_name + "(" + param_strs.join(", ") + ") {")
+        var coro_attr: String = ""
+        if (is_coro) { coro_attr = " presplitcoroutine" }
+        var ret_type_ll: String = ret_llvm
+        if (is_coro) { ret_type_ll = "ptr" }
+        this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")
         this.emit("entry:")
         this.block_terminated = false
+
+        // Coroutine preamble
+        if (is_coro) {
+            this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
+            this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
+            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
+        }
 
         // Collect all local variable declarations from body
         var var_names: List<String> = []
@@ -4983,19 +5304,21 @@ class Codegen {
             var last_stmt: AST.Stmt = body[body.length() - 1]
             var last_kind: String = this.classify_stmt(last_stmt)
             if (last_kind == "expr") {
-                // Generate all but last
                 var bi: Float = 0
                 while (bi < body.length() - 1) {
                     this.gen_stmt(body[bi])
                     bi = bi + 1
                 }
-                // Generate last as implicit return
                 var last_expr: AST.Expr = match (last_stmt) { ExprStmt(e) => e
                     _ => AST.Expr.NilLit
                 }
                 var last_val: String = this.gen_arg_value(last_expr)
                 if (!this.block_terminated) {
-                    this.emit_terminator("ret i64 " + last_val)
+                    if (is_coro) {
+                        this.emit_terminator("br label %__coro_final")
+                    } else {
+                        this.emit_terminator("ret i64 " + last_val)
+                    }
                 }
             } else {
                 this.gen_stmts(body)
@@ -5004,13 +5327,43 @@ class Codegen {
             this.gen_stmts(body)
         }
 
-        // Ensure block has a terminator
-        if (!this.block_terminated) {
-            if (ret_llvm == "void") {
-                this.emit_terminator("ret void")
-            } else {
-                this.emit_terminator("ret i64 0")
+        // Non-coro: ensure block has a terminator
+        if (!is_coro) {
+            if (!this.block_terminated) {
+                if (ret_llvm == "void") {
+                    this.emit_terminator("ret void")
+                } else {
+                    this.emit_terminator("ret i64 0")
+                }
             }
+        }
+
+        // Coroutine epilogue: final suspend + cleanup
+        if (is_coro) {
+            if (!this.block_terminated) {
+                this.emit_terminator("br label %__coro_final")
+            }
+
+            this.emit("__coro_final:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
+            this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
+            this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")
+
+            this.emit("__coro_trap:")
+            this.block_terminated = false
+            this.emit_terminator("unreachable")
+
+            this.emit("__coro_cleanup:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_free = call ptr @llvm.coro.free(token %__coro_id, ptr %__coro_hdl)")
+            this.emit_indent("call void @free(ptr %__coro_free)")
+            this.emit_terminator("br label %__coro_suspend")
+
+            this.emit("__coro_suspend:")
+            this.block_terminated = false
+            this.emit_indent("call i1 @llvm.coro.end(ptr %__coro_hdl, i1 false)")
+            this.emit_terminator("ret ptr %__coro_hdl")
         }
 
         this.emit("}")
@@ -5018,6 +5371,7 @@ class Codegen {
         this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
+        this.is_coroutine = false
     }
 
     // --- Top-level ---
@@ -5109,6 +5463,9 @@ class Codegen {
             ei = ei + 1
         }
 
+        // Coroutine detection: mark functions containing yield (direct or transitive)
+        this.mark_coroutines(program)
+
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {
@@ -5169,6 +5526,11 @@ class Codegen {
                     this.gen_stmt(program[i])
                 }
                 i = i + 1
+            }
+            // Run the scheduler if any coroutines were spawned
+            if (this.coroutine_funcs.length() > 0 and !this.block_terminated) {
+                this.emit_indent("call i64 @scheduler_run()")
+                this.called_functions.push("scheduler_run")
             }
             if (!this.block_terminated) {
                 this.emit_terminator("ret i64 0")
@@ -6012,6 +6374,30 @@ class Codegen {
                 return this.gen_enum_construct(inner_field, method, args)
             }
         }
+    }
+
+    // --- Task methods: isReady() and getResult() ---
+    if (method == "isReady") {
+        var task_val: String = this.gen_arg_value(object)
+        var task_ptr: String = this.fresh_local()
+        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
+        var done_i1: String = this.fresh_local()
+        this.emit_indent(done_i1 + " = call i1 @llvm.coro.done(ptr " + task_ptr + ")")
+        var done_i64: String = this.fresh_local()
+        this.emit_indent(done_i64 + " = zext i1 " + done_i1 + " to i64")
+        this.last_type = AST.Type.BoolType
+        return done_i64
+    }
+    if (method == "getResult") {
+        var task_val: String = this.gen_arg_value(object)
+        var task_ptr: String = this.fresh_local()
+        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
+        var promise: String = this.fresh_local()
+        this.emit_indent(promise + " = call ptr @llvm.coro.promise(ptr " + task_ptr + ", i32 8, i1 false)")
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = load i64, ptr " + promise)
+        this.last_type = AST.Type.IntType
+        return result_val
     }
 
     // --- Builtin dispatch (only for non-class objects) ---
