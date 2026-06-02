@@ -5679,7 +5679,7 @@ class Codegen {
             linkage = "define linkonce_odr"
         }
         var coro_attr: String = ""
-        if (is_coro) { coro_attr = " noinline presplitcoroutine" }
+        if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
         var ret_type_ll: String = ret_llvm
         if (is_coro) { ret_type_ll = "ptr" }
         this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")
@@ -5713,6 +5713,12 @@ class Codegen {
             var vn: String = var_names[i]
             if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
+                // Zero-initialize allocas for heap-typed locals before they become GC roots.
+                // This prevents the GC from reading uninitialized memory if it triggers
+                // between push_root and the first real store to this variable.
+                if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                    this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                }
             }
             i = i + 1
         }
@@ -7907,6 +7913,22 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 }
                 si = si + 1
             }
+            // Register module globals as permanent GC roots (never popped).
+            // This prevents heap objects stored in module globals from being
+            // prematurely collected after this init function returns.
+            if (!gen.identity_mode and !gen.block_terminated) {
+                vi = 0
+                while (vi < top_vars.length()) {
+                    var gv_name: String = top_vars[vi]
+                    var gv_type: String = top_var_types[vi]
+                    if (gen.module_globals.has(prefix + gv_name) and gen.is_gc_root_type(gv_type)) {
+                        var gv_int: String = gen.fresh_local()
+                        gen.emit_indent(gv_int + " = ptrtoint i64* @__g_" + prefix + gen.sanitize_name(gv_name) + " to i64")
+                        gen.emit_indent("call void @__gc_push_root(i64 " + gv_int + ")")
+                    }
+                    vi = vi + 1
+                }
+            }
             if (!gen.block_terminated) {
                 gen.emit_indent("ret i64 0")
             }
@@ -8246,6 +8268,20 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     gen.gen_stmt(all_stmts[si])
                 }
                 si = si + 1
+            }
+            // Register module globals as permanent GC roots (never popped).
+            if (!gen.identity_mode and !gen.block_terminated) {
+                vi = 0
+                while (vi < top_vars.length()) {
+                    var gv_name: String = top_vars[vi]
+                    var gv_type: String = top_var_types[vi]
+                    if (gen.module_globals.has(prefix + gv_name) and gen.is_gc_root_type(gv_type)) {
+                        var gv_int: String = gen.fresh_local()
+                        gen.emit_indent(gv_int + " = ptrtoint i64* @__g_" + prefix + gen.sanitize_name(gv_name) + " to i64")
+                        gen.emit_indent("call void @__gc_push_root(i64 " + gv_int + ")")
+                    }
+                    vi = vi + 1
+                }
             }
             if (!gen.block_terminated) {
                 gen.emit_indent("ret i64 0")

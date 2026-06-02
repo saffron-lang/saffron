@@ -1,0 +1,56 @@
+import "@httpx" as Http
+import "@scheduler" as Scheduler
+import "@async" as Async
+
+// ---------------------------------------------------------------------------
+// Test 1: Simple HTTP GET
+// ---------------------------------------------------------------------------
+IO.println("=== Test 1: HTTP GET http://httpbin.org/get ===")
+var resp = Http.get("http://httpbin.org/get")
+IO.println("Status: ${resp.status}")
+IO.println("OK: ${resp.ok()}")
+IO.println("Body snippet: ${resp.body.slice(0, 80)}")
+IO.println("")
+
+// ---------------------------------------------------------------------------
+// Test 2: HTTPS GET
+// ---------------------------------------------------------------------------
+IO.println("=== Test 2: HTTPS GET https://httpbin.org/get ===")
+var resp2 = Http.get("https://httpbin.org/get")
+IO.println("Status: ${resp2.status}")
+IO.println("OK: ${resp2.ok()}")
+IO.println("Content-Type: ${resp2.header("Content-Type")}")
+IO.println("Body snippet: ${resp2.body.slice(0, 80)}")
+IO.println("")
+
+// ---------------------------------------------------------------------------
+// Test 3: POST with JSON body
+// ---------------------------------------------------------------------------
+IO.println("=== Test 3: POST https://httpbin.org/post ===")
+var post_body = "{\"name\": \"saffron\", \"version\": 1}"
+var resp3 = Http.post("https://httpbin.org/post", post_body, {"Content-Type": "application/json"})
+IO.println("Status: ${resp3.status}")
+IO.println("OK: ${resp3.ok()}")
+IO.println("Body contains our data: ${resp3.body.contains("saffron")}")
+IO.println("Body snippet: ${resp3.body.slice(0, 120)}")
+IO.println("")
+
+// ---------------------------------------------------------------------------
+// Test 4: Parallel requests with Task.spawn
+// ---------------------------------------------------------------------------
+IO.println("=== Test 4: Parallel requests ===")
+var t1 = Task.spawn(fun () => Http.get("https://httpbin.org/get?req=1"))
+var t2 = Task.spawn(fun () => Http.get("https://httpbin.org/get?req=2"))
+
+Scheduler.scheduler_run()
+
+var r1 = t1.await()
+var r2 = t2.await()
+IO.println("Request 1 status: ${r1.status}")
+IO.println("Request 2 status: ${r2.status}")
+IO.println("Both OK: ${r1.ok() and r2.ok()}")
+IO.println("R1 contains req=1: ${r1.body.contains("req=1")}")
+IO.println("R2 contains req=2: ${r2.body.contains("req=2")}")
+IO.println("")
+
+IO.println("=== All httpx tests complete ===")

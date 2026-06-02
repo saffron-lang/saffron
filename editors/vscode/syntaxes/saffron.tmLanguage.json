@@ -4,6 +4,7 @@
   "scopeName": "source.saffron",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#annotations" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#atoms" },
@@ -17,6 +18,32 @@
     { "include": "#identifiers" }
   ],
   "repository": {
+    "annotations": {
+      "patterns": [
+        {
+          "name": "meta.annotation.saffron",
+          "begin": "@(\\w+)(\\()",
+          "beginCaptures": {
+            "1": { "name": "entity.name.tag.annotation.saffron" },
+            "2": { "name": "punctuation.definition.annotation.begin.saffron" }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.annotation.end.saffron" }
+          },
+          "patterns": [
+            { "include": "#strings" }
+          ]
+        },
+        {
+          "name": "meta.annotation.saffron",
+          "match": "@(\\w+)\\b",
+          "captures": {
+            "1": { "name": "entity.name.tag.annotation.saffron" }
+          }
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {
