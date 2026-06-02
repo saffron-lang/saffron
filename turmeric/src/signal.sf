@@ -4,28 +4,24 @@
 // Dependency Tracking
 // =============================================================================
 
-var _tracker_deps: List<Subscribable> = []
+var _tracker_deps: List<Any> = []
 var _tracking: Bool = false
 var _sub_id_counter: Float = 0
 
-interface Subscribable {
-    fun subscribe(fn: () => Nil): Float
-    fun unsubscribe(id: Float)
-}
 
 fun start_tracking() {
     _tracking = true
     _tracker_deps = []
 }
 
-fun stop_tracking(): List<Subscribable> {
+fun stop_tracking(): List<Any> {
     _tracking = false
-    var deps: List<Subscribable> = _tracker_deps
+    var deps: List<Any> = _tracker_deps
     _tracker_deps = []
     return deps
 }
 
-fun record_dep(sig: Subscribable) {
+fun record_dep(sig: Any) {
     if (_tracking) {
         _tracker_deps.push(sig)
     }
@@ -56,7 +52,7 @@ class Subscription {
 // Signal<T> — mutable reactive state
 // =============================================================================
 
-class Signal<T> extends Subscribable {
+class Signal<T> {
     var value: T
     var subs: List<Subscription>
 
@@ -114,7 +110,7 @@ fun signal<T>(initial: T): Signal<T> {
 // Computed<T> — derived reactive value
 // =============================================================================
 
-class Computed<T> extends Subscribable {
+class Computed<T> {
     var value: T
     var compute: () => T
     var subs: List<Subscription>
@@ -133,7 +129,7 @@ class Computed<T> extends Subscribable {
     fun recompute() {
         start_tracking()
         this.value = this.compute()
-        var deps: List<Subscribable> = stop_tracking()
+        var deps: List<Any> = stop_tracking()
         var i: Float = 0
         while (i < deps.length()) {
             deps[i].subscribe(fun () => {
@@ -181,9 +177,9 @@ fun computed<T>(compute: () => T): Computed<T> {
 
 class EffectHandle {
     var sub_ids: List<Float>
-    var deps: List<Subscribable>
+    var deps: List<Any>
 
-    fun init(sub_ids: List<Float>, deps: List<Subscribable>) {
+    fun init(sub_ids: List<Float>, deps: List<Any>) {
         this.sub_ids = sub_ids
         this.deps = deps
     }
@@ -200,7 +196,7 @@ class EffectHandle {
 fun effect(fn: () => Nil): EffectHandle {
     start_tracking()
     fn()
-    var deps: List<Subscribable> = stop_tracking()
+    var deps: List<Any> = stop_tracking()
     var sub_ids: List<Float> = []
     var i: Float = 0
     while (i < deps.length()) {

@@ -59,6 +59,22 @@ fun text(content: String) {
     _tc_set_text(parent, content)
 }
 
+// --- Reactive text: re-evaluates and updates DOM when signals change ---
+// Usage: reactive(fun () => count.get().to_string())
+// Creates a <span>, renders initial value, and re-renders when deps change.
+// Uses the turmeric signal module's effect() for dependency tracking.
+fun reactive(compute: Any) {
+    var parent: Float = _tc_current()
+    var text_el: Float = _tc_create("span")
+    _tc_append(parent, text_el)
+    // effect() from turmeric/signal tracks deps and re-runs on change
+    turmeric_signal_effect(fun () => {
+        var val: String = compute()
+        _tc_set_text(text_el, val)
+    })
+}
+}
+
 // --- Attribute application: maps keys to DOM operations ---
 fun _tc_apply_attrs(el: Float, attrs: Map<String, Any>) {
     var keys = attrs.keys()
