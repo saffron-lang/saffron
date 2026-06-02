@@ -164,9 +164,23 @@
         }
         this.func_param_names.set(emit_name, pnames_list)
 
-        // Check if this function is a coroutine
+        // Check if this function is a coroutine (direct or transitive)
         var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
+        if (!is_coro) {
+            // Check if body calls any known coroutine (transitive)
+            var body_calls: List<String> = []
+            this.collect_calls_from_stmts(body, body_calls)
+            var bci: Float = 0
+            while (bci < body_calls.length()) {
+                var bc: String = body_calls[bci]
+                if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
+                    is_coro = true
+                    bci = body_calls.length()
+                }
+                bci = bci + 1
+            }
+        }
         if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
             this.coroutine_funcs.push(emit_name)
         }
