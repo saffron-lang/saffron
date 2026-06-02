@@ -529,7 +529,6 @@ fun module_prefix_from_file(file_path: String): String {
 }
 
 fun main(): Int {
-    IO.println("[DEBUG] main entered")
     var args: List<String> = OS.args()
 
     // Parse flags
@@ -603,14 +602,10 @@ fun main(): Int {
         stdlib_dir = exe_dir + "/../src/lib"
     }
 
-    IO.println("[DEBUG] start: " + input_path)
     // Lex and parse the main file
     var source: String = IO.read_file(input_path)
-    IO.println("[DEBUG] read done")
     var tokens: List = Lexer.lex(source)
-    IO.println("[DEBUG] lex done")
     var program: List = Parser.parse_with_source(tokens, source)
-    IO.println("[DEBUG] parse done")
 
     if (Parser.had_error()) {
         c_exit(1)
@@ -710,13 +705,11 @@ fun main(): Int {
 
     // Recursively collect modules (text-based extraction)
     var import_paths: List<String> = extract_imports(source)
-    IO.println("[DEBUG] collecting " + import_paths.length().to_string() + " imports")
     var pi: Float = 0
     while (pi < import_paths.length()) {
         var imp_path: String = import_paths[pi]
         if (!is_builtin_module(imp_path)) {
             var full_path: String = resolve_import_path(input_path, imp_path, stdlib_dir)
-            IO.println("[DEBUG] import: " + imp_path + " -> " + full_path)
             // Ensure path_to_prefix is populated before recursing
             if (!path_to_prefix.has(full_path)) {
                 path_to_prefix.set(full_path, path_based_prefix(imp_path, full_path, stdlib_dir))
@@ -725,7 +718,6 @@ fun main(): Int {
         }
         pi = pi + 1
     }
-    IO.println("[DEBUG] import collection done, modules=" + module_stmts.length().to_string())
 
     if (Parser.had_error()) {
         c_exit(1)
@@ -790,15 +782,12 @@ fun main(): Int {
         }
     }
 
-    IO.println("[DEBUG] starting codegen, stmts=" + all_import_stmts.length().to_string() + " boundaries=" + module_boundaries.length().to_string())
-    IO.println("[DEBUG] prefixes=" + prefixes_joined)
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
         ir = Codegen.generate_with_modules_flat_opts(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode)
     } else {
         ir = Codegen.generate_with_target_opts(program, target, identity_mode)
     }
-    IO.println("[DEBUG] codegen done")
 
     if (Codegen.had_error()) {
         IO.println("Compilation failed with codegen errors")
