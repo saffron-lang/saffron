@@ -10,7 +10,28 @@
 @extern("void js_dom_set_text(i64, void*)") fun _tc_set_text(handle: Float, text: String)
 @extern("void js_dom_append_child(i64, i64)") fun _tc_append(parent: Float, child: Float)
 @extern("void js_dom_set_attr(i64, void*, void*)") fun _tc_set_attr(handle: Float, name: String, value: String)
-@extern("void js_dom_add_event(i64, void*, i64)") fun _tc_add_event(handle: Float, event: String, handler: (Event) => Nil)
+@extern("void js_dom_add_event(i64, void*, i64)") fun _tc_add_event_raw(handle: Float, event: String, callback_id: Float)
+
+// --- Event callback registry ---
+var _tc_callbacks: List<Any> = []
+
+fun _tc_register_callback(handler: Any): Float {
+    _tc_callbacks.push(handler)
+    return _tc_callbacks.length() - 1
+}
+
+fun _tc_add_event(handle: Float, event: String, handler: Any) {
+    var id: Float = _tc_register_callback(handler)
+    _tc_add_event_raw(handle, event, id)
+}
+
+// Exported: JS calls this when a DOM event fires
+fun __dispatch_event(callback_id: Float) {
+    if (callback_id >= 0 and callback_id < _tc_callbacks.length()) {
+        var handler: Any = _tc_callbacks[callback_id]
+        handler()
+    }
+}
 
 // --- Context stack: tracks current parent for nesting ---
 var _tc_stack: List<Float> = []
