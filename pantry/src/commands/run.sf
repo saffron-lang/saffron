@@ -37,6 +37,11 @@ fun _bin_path_prefix(): String {
         i = i + 1
     }
 
+    // Also add .pantry/bin (project-level scripts)
+    if (OS.file_exists(".pantry/bin")) {
+        paths.push(".pantry/bin")
+    }
+
     // Join as PATH-style string
     var result: String = ""
     i = 0
