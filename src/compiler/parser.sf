@@ -1093,6 +1093,15 @@ class Parser {
         // Collect /// doc comments before declarations
         var docstring: String = this.collect_doc_comments()
 
+        // Type aliases: type Name = TargetType
+        if (this.is_ident_named("type")) {
+            this.advance()
+            var alias_name: String = this.expect_ident()
+            this.consume("=")
+            var alias_target: String = this.parse_type()
+            return AST.Stmt.TypeAlias(alias_name, alias_target)
+        }
+
         // Extension methods: extend fun ClassName.method(params): RetType { body }
         if (this.is_ident_named("extend")) {
             this.advance()
