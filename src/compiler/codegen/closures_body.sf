@@ -339,7 +339,7 @@
                 if (ret_llvm == "void") {
                     this.emit_terminator("ret void")
                 } else {
-                    this.emit_terminator("unreachable")
+                    this.emit_terminator("ret i64 0")
                 }
             }
         }
