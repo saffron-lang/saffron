@@ -134,6 +134,21 @@
                 vtype = post_type
             }
         }
+        // Resolve generic type parameters from lambda argument return types.
+        // e.g. var x = computed(fun (): String => ...) infers Computed<String> not Computed<T>
+        if (vtype.contains("<") and vtype.contains(">")) {
+            var gt_start: Float = vtype.index_of("<")
+            var gt_inner: String = vtype.slice(gt_start + 1, vtype.length() - 1)
+            // Only resolve if the generic arg is a single-letter type param (T, E, K, V)
+            if (gt_inner.length() <= 2 and gt_inner.length() > 0 and gt_inner == gt_inner.to_upper()) {
+                // Try to infer from init expression's lambda return type
+                var inferred: String = this.infer_generic_from_init(init)
+                if (inferred.length() > 0 and inferred != "Any" and inferred != "Int") {
+                    var gt_base: String = vtype.slice(0, gt_start)
+                    vtype = gt_base + "<" + inferred + ">"
+                }
+            }
+        }
         this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
@@ -146,6 +161,27 @@
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
         }
         this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+    }
+
+    fun infer_generic_from_init(init: AST.Expr): String {
+        // If init is a Call(callee, args) and one arg is a Lambda with explicit ret type,
+        // use that lambda's return type as the inferred generic type param.
+        var ek: String = this.classify_expr(init)
+        if (ek == "call") {
+            var call_args: List<AST.Expr> = match (init) { Call(c, a) => a   _ => [] }
+            var ai: Float = 0
+            while (ai < call_args.length()) {
+                var arg_kind: String = this.classify_expr(call_args[ai])
+                if (arg_kind == "lambda") {
+                    var lam_ret: String = match (call_args[ai]) { Lambda(p, r, b) => r   _ => "" }
+                    if (lam_ret.length() > 0 and lam_ret != "Int" and lam_ret != "Any") {
+                        return lam_ret
+                    }
+                }
+                ai = ai + 1
+            }
+        }
+        return ""
     }
 
     fun gen_return(stmt: AST.Stmt) {

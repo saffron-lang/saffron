@@ -4189,6 +4189,21 @@ class Codegen {
                 vtype = post_type
             }
         }
+        // Resolve generic type parameters from lambda argument return types.
+        // e.g. var x = computed(fun (): String => ...) infers Computed<String> not Computed<T>
+        if (vtype.contains("<") and vtype.contains(">")) {
+            var gt_start: Float = vtype.index_of("<")
+            var gt_inner: String = vtype.slice(gt_start + 1, vtype.length() - 1)
+            // Only resolve if the generic arg is a single-letter type param (T, E, K, V)
+            if (gt_inner.length() <= 2 and gt_inner.length() > 0 and gt_inner == gt_inner.to_upper()) {
+                // Try to infer from init expression's lambda return type
+                var inferred: String = this.infer_generic_from_init(init)
+                if (inferred.length() > 0 and inferred != "Any" and inferred != "Int") {
+                    var gt_base: String = vtype.slice(0, gt_start)
+                    vtype = gt_base + "<" + inferred + ">"
+                }
+            }
+        }
         this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))
         // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
@@ -4201,6 +4216,27 @@ class Codegen {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
         }
         this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+    }
+
+    fun infer_generic_from_init(init: AST.Expr): String {
+        // If init is a Call(callee, args) and one arg is a Lambda with explicit ret type,
+        // use that lambda's return type as the inferred generic type param.
+        var ek: String = this.classify_expr(init)
+        if (ek == "call") {
+            var call_args: List<AST.Expr> = match (init) { Call(c, a) => a   _ => [] }
+            var ai: Float = 0
+            while (ai < call_args.length()) {
+                var arg_kind: String = this.classify_expr(call_args[ai])
+                if (arg_kind == "lambda") {
+                    var lam_ret: String = match (call_args[ai]) { Lambda(p, r, b) => r   _ => "" }
+                    if (lam_ret.length() > 0 and lam_ret != "Int" and lam_ret != "Any") {
+                        return lam_ret
+                    }
+                }
+                ai = ai + 1
+            }
+        }
+        return ""
     }
 
     fun gen_return(stmt: AST.Stmt) {
@@ -8119,7 +8155,23 @@ class Codegen {
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
-        return this.gen_namespace_call(class_name, method, obj, args, true)
+        var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
+        // Resolve generic type parameter in return type (e.g. T -> String)
+        var ns_ret_str: String = this.type_to_string(this.last_type)
+        if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
+            // Looks like a type parameter — resolve from receiver's generic type args
+            if (obj_name.length() > 0) {
+                var recv_type: String = this.get_var_type_str(obj_name)
+                if (recv_type.contains("<") and recv_type.contains(">")) {
+                    var rg_start: Float = recv_type.index_of("<")
+                    var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
+                    if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
+                        this.last_type = this.str_to_type(rg_inner)
+                    }
+                }
+            }
+        }
+        return ns_result
     }
 
     // Universal methods (last resort, after class methods checked)
