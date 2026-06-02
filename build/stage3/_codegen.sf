@@ -105,6 +105,7 @@ class Codegen {
         this.is_coroutine = false
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
+        this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
         this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
         this.builtin_methods.set("reverse", "r1|rt_list_reverse|List|1")
         this.builtin_methods.set("copy", "r1|rt_list_copy|List|1")
@@ -1510,21 +1511,65 @@ class Codegen {
 
     fun gen_func_ref(fn_name: String): String {
         this.last_type = AST.Type.IntType
-        var nparams: Float = 1
+        var nparams: Float = 0
         if (this.func_param_count.has(fn_name)) {
             nparams = this.func_param_count.get(fn_name)
         }
-        var ftype: String = "i64 ("
-        var fti: Float = 0
-        while (fti < nparams) {
-            if (fti > 0) { ftype = ftype + ", " }
-            ftype = ftype + "i64"
-            fti = fti + 1
+
+        // Generate a trampoline wrapper that accepts (i64 env, <original params>)
+        // and forwards to the real function (dropping env). This ensures the closure
+        // calling convention (env first) works for plain function references.
+        this.label_counter = this.label_counter + 1
+        var wrap_name: String = "__wrap_" + this.label_counter.floor().to_string() + "_" + this.sanitize_name(fn_name)
+
+        // Build trampoline param list: env + original params
+        var wrap_params: List<String> = []
+        wrap_params.push("i64 %__env.arg")
+        var fwd_args: List<String> = []
+        var pi: Float = 0
+        while (pi < nparams) {
+            var pname: String = "%__a" + pi.floor().to_string() + ".arg"
+            wrap_params.push("i64 " + pname)
+            fwd_args.push("i64 " + pname)
+            pi = pi + 1
         }
-        ftype = ftype + ")*"
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = ptrtoint " + ftype + " @" + fn_name + " to i64")
-        return local
+
+        // Build the trampoline function IR
+        var wrap_ir: String = "\ndefine linkonce_odr i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+        if (nparams == 0) {
+            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "()\n"
+        } else {
+            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
+        }
+        wrap_ir = wrap_ir + "  ret i64 %r\n}\n"
+        this.globals.push(wrap_ir)
+
+        // Build closure pair [trampoline_fn_ptr, 0] on the heap
+        var num_total_params: Float = nparams + 1
+        var fn_type_str: String = "i64 ("
+        var tti: Float = 0
+        while (tti < num_total_params) {
+            if (tti > 0) { fn_type_str = fn_type_str + ", " }
+            fn_type_str = fn_type_str + "i64"
+            tti = tti + 1
+        }
+        fn_type_str = fn_type_str + ")*"
+
+        var closure_raw: String = this.fresh_local()
+        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        var closure_ptr: String = this.fresh_local()
+        this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+        var fn_as_int: String = this.fresh_local()
+        this.emit_indent(fn_as_int + " = ptrtoint " + fn_type_str + " @" + wrap_name + " to i64")
+        var fn_slot: String = this.fresh_local()
+        this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+        this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
+        var env_slot: String = this.fresh_local()
+        this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+        this.emit_indent("store i64 0, i64* " + env_slot)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = ptrtoint [2 x i64]* " + closure_ptr + " to i64")
+        return result
     }
 
     fun gen_arg_value(expr: AST.Expr): String {
@@ -3116,7 +3161,9 @@ class Codegen {
             // Store fn ptr
             var fn_as_int: String = this.fresh_local()
             var num_params: Float = param_names.length() + 1
-            var fn_type_str: String = "i64 ("
+            var ret_ty: String = "i64"
+            if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
+            var fn_type_str: String = ret_ty + " ("
             var ti: Float = 0
             while (ti < num_params) {
                 if (ti > 0) { fn_type_str = fn_type_str + ", " }
@@ -4776,8 +4823,8 @@ class Codegen {
         var rt: StringBuilder = StringBuilder()
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
-        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
+        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.defined_funcs.contains(names[di])) {
@@ -5492,7 +5539,7 @@ class Codegen {
             linkage = "define linkonce_odr"
         }
         var coro_attr: String = ""
-        if (is_coro) { coro_attr = " presplitcoroutine" }
+        if (is_coro) { coro_attr = " noinline presplitcoroutine" }
         var ret_type_ll: String = ret_llvm
         if (is_coro) { ret_type_ll = "ptr" }
         this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")

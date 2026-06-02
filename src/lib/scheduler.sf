@@ -3,9 +3,9 @@
 //! Driven by LLVM coroutine handles — each task is an opaque Int (i8* handle).
 
 @extern("double sf_time_now()") fun time_now(): Number
-@extern("void __sched_coro_resume(void*)") fun coro_resume(handle: Int)
-@extern("i64 __sched_coro_done(void*)") fun coro_done(handle: Int): Int
-@extern("void __sched_coro_destroy(void*)") fun coro_destroy(handle: Int)
+@extern("void __sched_coro_resume(i64)") fun coro_resume(handle: Int)
+@extern("i64 __sched_coro_done(i64)") fun coro_done(handle: Int): Int
+@extern("void __sched_coro_destroy(i64)") fun coro_destroy(handle: Int)
 @extern("i64 __sched_get_yield_reason()") fun get_yield_reason(): Int
 @extern("i64 __sched_get_yield_arg()") fun get_yield_arg(): Int
 @extern("void __sched_reset_yield()") fun reset_yield()

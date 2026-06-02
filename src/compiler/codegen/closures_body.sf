@@ -98,7 +98,9 @@
             // Store fn ptr
             var fn_as_int: String = this.fresh_local()
             var num_params: Float = param_names.length() + 1
-            var fn_type_str: String = "i64 ("
+            var ret_ty: String = "i64"
+            if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
+            var fn_type_str: String = ret_ty + " ("
             var ti: Float = 0
             while (ti < num_params) {
                 if (ti > 0) { fn_type_str = fn_type_str + ", " }

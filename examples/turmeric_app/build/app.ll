@@ -2,754 +2,1316 @@
 target triple = "wasm32-unknown-unknown"
 target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128-ni:1:10:20"
 
-@.str.0 = private unnamed_addr constant [4 x i8] c"div\00"
-@.str.1 = private unnamed_addr constant [5 x i8] c"span\00"
-@.str.2 = private unnamed_addr constant [2 x i8] c"p\00"
-@.str.3 = private unnamed_addr constant [2 x i8] c"a\00"
-@.str.4 = private unnamed_addr constant [3 x i8] c"h1\00"
-@.str.5 = private unnamed_addr constant [3 x i8] c"h2\00"
-@.str.6 = private unnamed_addr constant [3 x i8] c"h3\00"
-@.str.7 = private unnamed_addr constant [3 x i8] c"h4\00"
-@.str.8 = private unnamed_addr constant [3 x i8] c"h5\00"
-@.str.9 = private unnamed_addr constant [3 x i8] c"h6\00"
-@.str.10 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.11 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.12 = private unnamed_addr constant [9 x i8] c"textarea\00"
-@.str.13 = private unnamed_addr constant [7 x i8] c"select\00"
-@.str.14 = private unnamed_addr constant [7 x i8] c"option\00"
-@.str.15 = private unnamed_addr constant [5 x i8] c"form\00"
-@.str.16 = private unnamed_addr constant [6 x i8] c"label\00"
-@.str.17 = private unnamed_addr constant [9 x i8] c"fieldset\00"
-@.str.18 = private unnamed_addr constant [7 x i8] c"legend\00"
-@.str.19 = private unnamed_addr constant [3 x i8] c"ul\00"
-@.str.20 = private unnamed_addr constant [3 x i8] c"ol\00"
-@.str.21 = private unnamed_addr constant [3 x i8] c"li\00"
-@.str.22 = private unnamed_addr constant [3 x i8] c"dl\00"
-@.str.23 = private unnamed_addr constant [3 x i8] c"dt\00"
-@.str.24 = private unnamed_addr constant [3 x i8] c"dd\00"
-@.str.25 = private unnamed_addr constant [6 x i8] c"table\00"
-@.str.26 = private unnamed_addr constant [6 x i8] c"thead\00"
-@.str.27 = private unnamed_addr constant [6 x i8] c"tbody\00"
-@.str.28 = private unnamed_addr constant [3 x i8] c"tr\00"
-@.str.29 = private unnamed_addr constant [3 x i8] c"th\00"
-@.str.30 = private unnamed_addr constant [3 x i8] c"td\00"
-@.str.31 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.32 = private unnamed_addr constant [7 x i8] c"header\00"
-@.str.33 = private unnamed_addr constant [7 x i8] c"footer\00"
-@.str.34 = private unnamed_addr constant [8 x i8] c"section\00"
-@.str.35 = private unnamed_addr constant [8 x i8] c"article\00"
-@.str.36 = private unnamed_addr constant [6 x i8] c"aside\00"
-@.str.37 = private unnamed_addr constant [8 x i8] c"details\00"
-@.str.38 = private unnamed_addr constant [8 x i8] c"summary\00"
-@.str.39 = private unnamed_addr constant [7 x i8] c"dialog\00"
-@.str.40 = private unnamed_addr constant [4 x i8] c"pre\00"
-@.str.41 = private unnamed_addr constant [5 x i8] c"code\00"
-@.str.42 = private unnamed_addr constant [11 x i8] c"blockquote\00"
-@.str.43 = private unnamed_addr constant [3 x i8] c"em\00"
-@.str.44 = private unnamed_addr constant [7 x i8] c"strong\00"
-@.str.45 = private unnamed_addr constant [6 x i8] c"small\00"
-@.str.46 = private unnamed_addr constant [5 x i8] c"mark\00"
-@.str.47 = private unnamed_addr constant [4 x i8] c"del\00"
-@.str.48 = private unnamed_addr constant [4 x i8] c"ins\00"
-@.str.49 = private unnamed_addr constant [7 x i8] c"figure\00"
-@.str.50 = private unnamed_addr constant [11 x i8] c"figcaption\00"
-@.str.51 = private unnamed_addr constant [8 x i8] c"picture\00"
-@.str.52 = private unnamed_addr constant [6 x i8] c"video\00"
-@.str.53 = private unnamed_addr constant [6 x i8] c"audio\00"
-@.str.54 = private unnamed_addr constant [7 x i8] c"canvas\00"
-@.str.55 = private unnamed_addr constant [7 x i8] c"iframe\00"
-@.str.56 = private unnamed_addr constant [3 x i8] c"br\00"
-@.str.57 = private unnamed_addr constant [3 x i8] c"hr\00"
-@.str.58 = private unnamed_addr constant [4 x i8] c"img\00"
-@.str.59 = private unnamed_addr constant [7 x i8] c"source\00"
-@.str.60 = private unnamed_addr constant [6 x i8] c"track\00"
-@.str.61 = private unnamed_addr constant [4 x i8] c"wbr\00"
-@.str.62 = private unnamed_addr constant [6 x i8] c"embed\00"
-@.str.63 = private unnamed_addr constant [5 x i8] c"link\00"
-@.str.64 = private unnamed_addr constant [5 x i8] c"meta\00"
-@.str.65 = private unnamed_addr constant [9 x i8] c"Element(\00"
-@.str.66 = private unnamed_addr constant [3 x i8] c", \00"
-@.str.67 = private unnamed_addr constant [3 x i8] c", \00"
-@.str.68 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.69 = private unnamed_addr constant [6 x i8] c"Text(\00"
-@.str.70 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.71 = private unnamed_addr constant [10 x i8] c"Fragment(\00"
-@.str.72 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.73 = private unnamed_addr constant [8 x i8] c"Unknown\00"
-@.str.74 = private unnamed_addr constant [6 x i8] c"Prop(\00"
-@.str.75 = private unnamed_addr constant [3 x i8] c", \00"
-@.str.76 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.77 = private unnamed_addr constant [7 x i8] c"Event(\00"
-@.str.78 = private unnamed_addr constant [3 x i8] c", \00"
-@.str.79 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.80 = private unnamed_addr constant [6 x i8] c"Bind(\00"
-@.str.81 = private unnamed_addr constant [3 x i8] c", \00"
-@.str.82 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.83 = private unnamed_addr constant [8 x i8] c"Unknown\00"
-@.str.84 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.85 = private unnamed_addr constant [2 x i8] c"<\00"
-@.str.86 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.87 = private unnamed_addr constant [3 x i8] c"=\22\00"
-@.str.88 = private unnamed_addr constant [2 x i8] c"\22\00"
-@.str.89 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.90 = private unnamed_addr constant [3 x i8] c"=\22\00"
-@.str.91 = private unnamed_addr constant [2 x i8] c"\22\00"
-@.str.92 = private unnamed_addr constant [3 x i8] c"br\00"
-@.str.93 = private unnamed_addr constant [3 x i8] c"hr\00"
-@.str.94 = private unnamed_addr constant [4 x i8] c"img\00"
-@.str.95 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.96 = private unnamed_addr constant [4 x i8] c" />\00"
-@.str.97 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.98 = private unnamed_addr constant [3 x i8] c"</\00"
-@.str.99 = private unnamed_addr constant [2 x i8] c">\00"
-@.str.100 = private unnamed_addr constant [6 x i8] c"audio\00"
-@.str.101 = private unnamed_addr constant [6 x i8] c"thead\00"
-@.str.102 = private unnamed_addr constant [11 x i8] c"blockquote\00"
-@.str.103 = private unnamed_addr constant [5 x i8] c"mark\00"
-@.str.104 = private unnamed_addr constant [7 x i8] c"iframe\00"
-@.str.105 = private unnamed_addr constant [5 x i8] c"data\00"
-@.str.106 = private unnamed_addr constant [8 x i8] c"details\00"
-@.str.107 = private unnamed_addr constant [7 x i8] c"search\00"
-@.str.108 = private unnamed_addr constant [7 x i8] c"script\00"
-@.str.109 = private unnamed_addr constant [4 x i8] c"map\00"
-@.str.110 = private unnamed_addr constant [7 x i8] c"footer\00"
-@.str.111 = private unnamed_addr constant [3 x i8] c"h6\00"
-@.str.112 = private unnamed_addr constant [4 x i8] c"dfn\00"
-@.str.113 = private unnamed_addr constant [3 x i8] c"br\00"
-@.str.114 = private unnamed_addr constant [3 x i8] c"rt\00"
-@.str.115 = private unnamed_addr constant [7 x i8] c"dialog\00"
-@.str.116 = private unnamed_addr constant [7 x i8] c"object\00"
-@.str.117 = private unnamed_addr constant [5 x i8] c"abbr\00"
-@.str.118 = private unnamed_addr constant [4 x i8] c"sup\00"
-@.str.119 = private unnamed_addr constant [4 x i8] c"var\00"
-@.str.120 = private unnamed_addr constant [5 x i8] c"span\00"
-@.str.121 = private unnamed_addr constant [5 x i8] c"head\00"
-@.str.122 = private unnamed_addr constant [2 x i8] c"i\00"
-@.str.123 = private unnamed_addr constant [5 x i8] c"samp\00"
-@.str.124 = private unnamed_addr constant [6 x i8] c"aside\00"
-@.str.125 = private unnamed_addr constant [4 x i8] c"wbr\00"
-@.str.126 = private unnamed_addr constant [8 x i8] c"section\00"
-@.str.127 = private unnamed_addr constant [3 x i8] c"dl\00"
-@.str.128 = private unnamed_addr constant [5 x i8] c"html\00"
-@.str.129 = private unnamed_addr constant [6 x i8] c"style\00"
-@.str.130 = private unnamed_addr constant [5 x i8] c"base\00"
-@.str.131 = private unnamed_addr constant [3 x i8] c"h4\00"
-@.str.132 = private unnamed_addr constant [7 x i8] c"source\00"
-@.str.133 = private unnamed_addr constant [6 x i8] c"table\00"
-@.str.134 = private unnamed_addr constant [6 x i8] c"meter\00"
-@.str.135 = private unnamed_addr constant [5 x i8] c"time\00"
-@.str.136 = private unnamed_addr constant [2 x i8] c"b\00"
-@.str.137 = private unnamed_addr constant [4 x i8] c"pre\00"
-@.str.138 = private unnamed_addr constant [9 x i8] c"optgroup\00"
-@.str.139 = private unnamed_addr constant [2 x i8] c"p\00"
-@.str.140 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.141 = private unnamed_addr constant [5 x i8] c"code\00"
-@.str.142 = private unnamed_addr constant [3 x i8] c"ol\00"
-@.str.143 = private unnamed_addr constant [3 x i8] c"em\00"
-@.str.144 = private unnamed_addr constant [9 x i8] c"textarea\00"
-@.str.145 = private unnamed_addr constant [9 x i8] c"fieldset\00"
-@.str.146 = private unnamed_addr constant [6 x i8] c"label\00"
-@.str.147 = private unnamed_addr constant [3 x i8] c"rp\00"
-@.str.148 = private unnamed_addr constant [7 x i8] c"hgroup\00"
-@.str.149 = private unnamed_addr constant [2 x i8] c"a\00"
-@.str.150 = private unnamed_addr constant [7 x i8] c"select\00"
-@.str.151 = private unnamed_addr constant [4 x i8] c"bdo\00"
-@.str.152 = private unnamed_addr constant [3 x i8] c"dd\00"
-@.str.153 = private unnamed_addr constant [4 x i8] c"kbd\00"
-@.str.154 = private unnamed_addr constant [3 x i8] c"ul\00"
-@.str.155 = private unnamed_addr constant [5 x i8] c"menu\00"
-@.str.156 = private unnamed_addr constant [6 x i8] c"track\00"
-@.str.157 = private unnamed_addr constant [3 x i8] c"hr\00"
-@.str.158 = private unnamed_addr constant [5 x i8] c"area\00"
-@.str.159 = private unnamed_addr constant [3 x i8] c"td\00"
-@.str.160 = private unnamed_addr constant [3 x i8] c"h5\00"
-@.str.161 = private unnamed_addr constant [5 x i8] c"form\00"
-@.str.162 = private unnamed_addr constant [4 x i8] c"div\00"
-@.str.163 = private unnamed_addr constant [3 x i8] c"li\00"
-@.str.164 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.165 = private unnamed_addr constant [3 x i8] c"h1\00"
-@.str.166 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.167 = private unnamed_addr constant [7 x i8] c"header\00"
-@.str.168 = private unnamed_addr constant [5 x i8] c"main\00"
-@.str.169 = private unnamed_addr constant [6 x i8] c"click\00"
-@.str.170 = private unnamed_addr constant [9 x i8] c"dblclick\00"
-@.str.171 = private unnamed_addr constant [10 x i8] c"mousedown\00"
-@.str.172 = private unnamed_addr constant [8 x i8] c"mouseup\00"
-@.str.173 = private unnamed_addr constant [10 x i8] c"mousemove\00"
-@.str.174 = private unnamed_addr constant [11 x i8] c"mouseenter\00"
-@.str.175 = private unnamed_addr constant [11 x i8] c"mouseleave\00"
-@.str.176 = private unnamed_addr constant [10 x i8] c"mouseover\00"
-@.str.177 = private unnamed_addr constant [9 x i8] c"mouseout\00"
-@.str.178 = private unnamed_addr constant [8 x i8] c"keydown\00"
-@.str.179 = private unnamed_addr constant [6 x i8] c"keyup\00"
-@.str.180 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.181 = private unnamed_addr constant [7 x i8] c"change\00"
-@.str.182 = private unnamed_addr constant [7 x i8] c"submit\00"
-@.str.183 = private unnamed_addr constant [6 x i8] c"reset\00"
-@.str.184 = private unnamed_addr constant [6 x i8] c"focus\00"
-@.str.185 = private unnamed_addr constant [5 x i8] c"blur\00"
-@.str.186 = private unnamed_addr constant [8 x i8] c"focusin\00"
-@.str.187 = private unnamed_addr constant [9 x i8] c"focusout\00"
-@.str.188 = private unnamed_addr constant [7 x i8] c"scroll\00"
-@.str.189 = private unnamed_addr constant [7 x i8] c"resize\00"
-@.str.190 = private unnamed_addr constant [10 x i8] c"dragstart\00"
-@.str.191 = private unnamed_addr constant [5 x i8] c"drag\00"
-@.str.192 = private unnamed_addr constant [8 x i8] c"dragend\00"
-@.str.193 = private unnamed_addr constant [10 x i8] c"dragenter\00"
-@.str.194 = private unnamed_addr constant [10 x i8] c"dragleave\00"
-@.str.195 = private unnamed_addr constant [9 x i8] c"dragover\00"
-@.str.196 = private unnamed_addr constant [5 x i8] c"drop\00"
-@.str.197 = private unnamed_addr constant [11 x i8] c"touchstart\00"
-@.str.198 = private unnamed_addr constant [10 x i8] c"touchmove\00"
-@.str.199 = private unnamed_addr constant [9 x i8] c"touchend\00"
-@.str.200 = private unnamed_addr constant [12 x i8] c"pointerdown\00"
-@.str.201 = private unnamed_addr constant [10 x i8] c"pointerup\00"
-@.str.202 = private unnamed_addr constant [12 x i8] c"pointermove\00"
-@.str.203 = private unnamed_addr constant [13 x i8] c"pointerenter\00"
-@.str.204 = private unnamed_addr constant [13 x i8] c"pointerleave\00"
-@.str.205 = private unnamed_addr constant [15 x i8] c"animationstart\00"
-@.str.206 = private unnamed_addr constant [13 x i8] c"animationend\00"
-@.str.207 = private unnamed_addr constant [14 x i8] c"transitionend\00"
-@.str.208 = private unnamed_addr constant [12 x i8] c"contextmenu\00"
-@.str.209 = private unnamed_addr constant [6 x i8] c"wheel\00"
-@.str.210 = private unnamed_addr constant [5 x i8] c"copy\00"
-@.str.211 = private unnamed_addr constant [4 x i8] c"cut\00"
-@.str.212 = private unnamed_addr constant [6 x i8] c"paste\00"
-@.str.213 = private unnamed_addr constant [5 x i8] c"load\00"
-@.str.214 = private unnamed_addr constant [6 x i8] c"error\00"
-@.str.215 = private unnamed_addr constant [6 x i8] c"class\00"
-@.str.216 = private unnamed_addr constant [3 x i8] c"id\00"
-@.str.217 = private unnamed_addr constant [6 x i8] c"title\00"
-@.str.218 = private unnamed_addr constant [9 x i8] c"tabindex\00"
-@.str.219 = private unnamed_addr constant [5 x i8] c"role\00"
-@.str.220 = private unnamed_addr constant [7 x i8] c"hidden\00"
-@.str.221 = private unnamed_addr constant [10 x i8] c"draggable\00"
-@.str.222 = private unnamed_addr constant [16 x i8] c"contenteditable\00"
-@.str.223 = private unnamed_addr constant [4 x i8] c"dir\00"
-@.str.224 = private unnamed_addr constant [5 x i8] c"lang\00"
-@.str.225 = private unnamed_addr constant [11 x i8] c"spellcheck\00"
-@.str.226 = private unnamed_addr constant [5 x i8] c"href\00"
-@.str.227 = private unnamed_addr constant [4 x i8] c"src\00"
-@.str.228 = private unnamed_addr constant [4 x i8] c"alt\00"
-@.str.229 = private unnamed_addr constant [5 x i8] c"type\00"
-@.str.230 = private unnamed_addr constant [5 x i8] c"name\00"
-@.str.231 = private unnamed_addr constant [6 x i8] c"value\00"
-@.str.232 = private unnamed_addr constant [12 x i8] c"placeholder\00"
-@.str.233 = private unnamed_addr constant [9 x i8] c"disabled\00"
-@.str.234 = private unnamed_addr constant [8 x i8] c"checked\00"
-@.str.235 = private unnamed_addr constant [9 x i8] c"readonly\00"
-@.str.236 = private unnamed_addr constant [9 x i8] c"required\00"
-@.str.237 = private unnamed_addr constant [9 x i8] c"multiple\00"
-@.str.238 = private unnamed_addr constant [9 x i8] c"selected\00"
-@.str.239 = private unnamed_addr constant [7 x i8] c"action\00"
-@.str.240 = private unnamed_addr constant [7 x i8] c"method\00"
-@.str.241 = private unnamed_addr constant [7 x i8] c"target\00"
-@.str.242 = private unnamed_addr constant [4 x i8] c"rel\00"
-@.str.243 = private unnamed_addr constant [6 x i8] c"width\00"
-@.str.244 = private unnamed_addr constant [7 x i8] c"height\00"
-@.str.245 = private unnamed_addr constant [4 x i8] c"min\00"
-@.str.246 = private unnamed_addr constant [4 x i8] c"max\00"
-@.str.247 = private unnamed_addr constant [5 x i8] c"step\00"
-@.str.248 = private unnamed_addr constant [8 x i8] c"pattern\00"
-@.str.249 = private unnamed_addr constant [13 x i8] c"autocomplete\00"
-@.str.250 = private unnamed_addr constant [10 x i8] c"autofocus\00"
-@.str.251 = private unnamed_addr constant [4 x i8] c"for\00"
-@.str.252 = private unnamed_addr constant [8 x i8] c"colspan\00"
-@.str.253 = private unnamed_addr constant [8 x i8] c"rowspan\00"
-@.str.254 = private unnamed_addr constant [6 x i8] c"aria-\00"
-@.str.255 = private unnamed_addr constant [3 x i8] c"; \00"
-@.str.256 = private unnamed_addr constant [3 x i8] c": \00"
-@.str.257 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.258 = private unnamed_addr constant [3 x i8] c"_s\00"
-@.str.259 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.260 = private unnamed_addr constant [4 x i8] c" { \00"
-@.str.261 = private unnamed_addr constant [3 x i8] c" }\00"
-@.str.262 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.263 = private unnamed_addr constant [3 x i8] c"; \00"
-@.str.264 = private unnamed_addr constant [3 x i8] c": \00"
-@.str.265 = private unnamed_addr constant [3 x i8] c"  \00"
-@.str.266 = private unnamed_addr constant [4 x i8] c" { \00"
-@.str.267 = private unnamed_addr constant [3 x i8] c" }\00"
-@.str.268 = private unnamed_addr constant [5 x i8] c"from\00"
-@.str.269 = private unnamed_addr constant [3 x i8] c"to\00"
-@.str.270 = private unnamed_addr constant [12 x i8] c"@keyframes \00"
-@.str.271 = private unnamed_addr constant [4 x i8] c" {\0A\00"
-@.str.272 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.273 = private unnamed_addr constant [2 x i8] c"}\00"
-@.str.274 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.275 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.276 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.277 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.278 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.279 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.280 = private unnamed_addr constant [7 x i8] c"Click(\00"
-@.str.281 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.282 = private unnamed_addr constant [10 x i8] c"DblClick(\00"
-@.str.283 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.284 = private unnamed_addr constant [11 x i8] c"MouseDown(\00"
-@.str.285 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.286 = private unnamed_addr constant [9 x i8] c"MouseUp(\00"
-@.str.287 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.288 = private unnamed_addr constant [11 x i8] c"MouseMove(\00"
-@.str.289 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.290 = private unnamed_addr constant [12 x i8] c"MouseEnter(\00"
-@.str.291 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.292 = private unnamed_addr constant [12 x i8] c"MouseLeave(\00"
-@.str.293 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.294 = private unnamed_addr constant [9 x i8] c"KeyDown(\00"
-@.str.295 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.296 = private unnamed_addr constant [7 x i8] c"KeyUp(\00"
-@.str.297 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.298 = private unnamed_addr constant [7 x i8] c"Input(\00"
-@.str.299 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.300 = private unnamed_addr constant [8 x i8] c"Change(\00"
-@.str.301 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.302 = private unnamed_addr constant [7 x i8] c"Focus(\00"
-@.str.303 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.304 = private unnamed_addr constant [6 x i8] c"Blur(\00"
-@.str.305 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.306 = private unnamed_addr constant [8 x i8] c"Submit(\00"
-@.str.307 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.308 = private unnamed_addr constant [7 x i8] c"Wheel(\00"
-@.str.309 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.310 = private unnamed_addr constant [12 x i8] c"TouchStart(\00"
-@.str.311 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.312 = private unnamed_addr constant [11 x i8] c"TouchMove(\00"
-@.str.313 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.314 = private unnamed_addr constant [10 x i8] c"TouchEnd(\00"
-@.str.315 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.316 = private unnamed_addr constant [11 x i8] c"DragStart(\00"
-@.str.317 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.318 = private unnamed_addr constant [9 x i8] c"DragEnd(\00"
-@.str.319 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.320 = private unnamed_addr constant [6 x i8] c"Drop(\00"
-@.str.321 = private unnamed_addr constant [2 x i8] c")\00"
-@.str.322 = private unnamed_addr constant [7 x i8] c"Scroll\00"
-@.str.323 = private unnamed_addr constant [7 x i8] c"Resize\00"
-@.str.324 = private unnamed_addr constant [8 x i8] c"Unknown\00"
-@.str.325 = private unnamed_addr constant [8 x i8] c"clientX\00"
-@.str.326 = private unnamed_addr constant [8 x i8] c"clientY\00"
-@.str.327 = private unnamed_addr constant [8 x i8] c"offsetX\00"
-@.str.328 = private unnamed_addr constant [8 x i8] c"offsetY\00"
-@.str.329 = private unnamed_addr constant [7 x i8] c"button\00"
-@.str.330 = private unnamed_addr constant [7 x i8] c"altKey\00"
-@.str.331 = private unnamed_addr constant [8 x i8] c"ctrlKey\00"
-@.str.332 = private unnamed_addr constant [9 x i8] c"shiftKey\00"
-@.str.333 = private unnamed_addr constant [8 x i8] c"metaKey\00"
-@.str.334 = private unnamed_addr constant [4 x i8] c"key\00"
-@.str.335 = private unnamed_addr constant [5 x i8] c"code\00"
-@.str.336 = private unnamed_addr constant [7 x i8] c"repeat\00"
-@.str.337 = private unnamed_addr constant [7 x i8] c"altKey\00"
-@.str.338 = private unnamed_addr constant [8 x i8] c"ctrlKey\00"
-@.str.339 = private unnamed_addr constant [9 x i8] c"shiftKey\00"
-@.str.340 = private unnamed_addr constant [8 x i8] c"metaKey\00"
-@.str.341 = private unnamed_addr constant [4 x i8] c"key\00"
-@.str.342 = private unnamed_addr constant [5 x i8] c"code\00"
-@.str.343 = private unnamed_addr constant [13 x i8] c"target.value\00"
-@.str.344 = private unnamed_addr constant [10 x i8] c"inputType\00"
-@.str.345 = private unnamed_addr constant [5 x i8] c"data\00"
-@.str.346 = private unnamed_addr constant [13 x i8] c"target.value\00"
-@.str.347 = private unnamed_addr constant [7 x i8] c"deltaX\00"
-@.str.348 = private unnamed_addr constant [7 x i8] c"deltaY\00"
-@.str.349 = private unnamed_addr constant [7 x i8] c"deltaZ\00"
-@.str.350 = private unnamed_addr constant [10 x i8] c"deltaMode\00"
-@.str.351 = private unnamed_addr constant [6 x i8] c"click\00"
-@.str.352 = private unnamed_addr constant [9 x i8] c"dblclick\00"
-@.str.353 = private unnamed_addr constant [10 x i8] c"mousedown\00"
-@.str.354 = private unnamed_addr constant [8 x i8] c"mouseup\00"
-@.str.355 = private unnamed_addr constant [10 x i8] c"mousemove\00"
-@.str.356 = private unnamed_addr constant [11 x i8] c"mouseenter\00"
-@.str.357 = private unnamed_addr constant [11 x i8] c"mouseleave\00"
-@.str.358 = private unnamed_addr constant [8 x i8] c"keydown\00"
-@.str.359 = private unnamed_addr constant [6 x i8] c"keyup\00"
-@.str.360 = private unnamed_addr constant [6 x i8] c"input\00"
-@.str.361 = private unnamed_addr constant [7 x i8] c"change\00"
-@.str.362 = private unnamed_addr constant [6 x i8] c"focus\00"
-@.str.363 = private unnamed_addr constant [5 x i8] c"blur\00"
-@.str.364 = private unnamed_addr constant [7 x i8] c"submit\00"
-@.str.365 = private unnamed_addr constant [6 x i8] c"wheel\00"
-@.str.366 = private unnamed_addr constant [7 x i8] c"scroll\00"
-@.str.367 = private unnamed_addr constant [6 x i8] c"value\00"
-@.str.368 = private unnamed_addr constant [6 x i8] c"value\00"
-@.str.369 = private unnamed_addr constant [8 x i8] c"checked\00"
-@.str.370 = private unnamed_addr constant [5 x i8] c"true\00"
-@.str.371 = private unnamed_addr constant [8 x i8] c"checked\00"
-@.str.372 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.373 = private unnamed_addr constant [5 x i8] c"even\00"
-@.str.374 = private unnamed_addr constant [4 x i8] c"odd\00"
-@.str.375 = private unnamed_addr constant [5 x i8] c"even\00"
-@.str.376 = private unnamed_addr constant [4 x i8] c"odd\00"
-@.str.377 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.378 = private unnamed_addr constant [17 x i8] c"Reactive Counter\00"
-@.str.379 = private unnamed_addr constant [17 x i8] c"Reactive Counter\00"
-@.str.380 = private unnamed_addr constant [10 x i8] c"font-size\00"
-@.str.381 = private unnamed_addr constant [5 x i8] c"3rem\00"
-@.str.382 = private unnamed_addr constant [12 x i8] c"font-weight\00"
-@.str.383 = private unnamed_addr constant [5 x i8] c"bold\00"
-@.str.384 = private unnamed_addr constant [6 x i8] c"color\00"
-@.str.385 = private unnamed_addr constant [8 x i8] c"#4fc3f7\00"
-@.str.386 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.387 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.388 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.389 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.390 = private unnamed_addr constant [6 x i8] c"color\00"
-@.str.391 = private unnamed_addr constant [5 x i8] c"#aaa\00"
-@.str.392 = private unnamed_addr constant [10 x i8] c"Doubled: \00"
-@.str.393 = private unnamed_addr constant [4 x i8] c" | \00"
-@.str.394 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.395 = private unnamed_addr constant [11 x i8] c"button-row\00"
-@.str.396 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
-@.str.397 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
-@.str.398 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
-@.str.399 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
-@.str.400 = private unnamed_addr constant [7 x i8] c"danger\00"
-@.str.401 = private unnamed_addr constant [6 x i8] c"Reset\00"
-@.str.402 = private unnamed_addr constant [6 x i8] c"Reset\00"
-@.str.403 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
-@.str.404 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
-@.str.405 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
-@.str.406 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
-@.str.407 = private unnamed_addr constant [7 x i8] c"danger\00"
-@.str.408 = private unnamed_addr constant [6 x i8] c"Reset\00"
-@.str.409 = private unnamed_addr constant [6 x i8] c"Reset\00"
-@.str.410 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.411 = private unnamed_addr constant [12 x i8] c"todo-header\00"
-@.str.412 = private unnamed_addr constant [10 x i8] c"Todo List\00"
-@.str.413 = private unnamed_addr constant [10 x i8] c"Todo List\00"
-@.str.414 = private unnamed_addr constant [6 x i8] c"badge\00"
-@.str.415 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.416 = private unnamed_addr constant [7 x i8] c" items\00"
-@.str.417 = private unnamed_addr constant [11 x i8] c"todo-input\00"
-@.str.418 = private unnamed_addr constant [5 x i8] c"text\00"
-@.str.419 = private unnamed_addr constant [18 x i8] c"What needs doing?\00"
-@.str.420 = private unnamed_addr constant [6 x i8] c"Enter\00"
-@.str.421 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.422 = private unnamed_addr constant [6 x i8] c"Enter\00"
-@.str.423 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.424 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.425 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.426 = private unnamed_addr constant [4 x i8] c"Add\00"
-@.str.427 = private unnamed_addr constant [4 x i8] c"Add\00"
-@.str.428 = private unnamed_addr constant [5 x i8] c"text\00"
-@.str.429 = private unnamed_addr constant [18 x i8] c"What needs doing?\00"
-@.str.430 = private unnamed_addr constant [6 x i8] c"Enter\00"
-@.str.431 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.432 = private unnamed_addr constant [6 x i8] c"Enter\00"
-@.str.433 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.434 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.435 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.436 = private unnamed_addr constant [4 x i8] c"Add\00"
-@.str.437 = private unnamed_addr constant [4 x i8] c"Add\00"
-@.str.438 = private unnamed_addr constant [10 x i8] c"todo-list\00"
-@.str.439 = private unnamed_addr constant [10 x i8] c"todo-item\00"
-@.str.440 = private unnamed_addr constant [10 x i8] c"todo-item\00"
-@.str.441 = private unnamed_addr constant [10 x i8] c"todo-item\00"
-@.str.442 = private unnamed_addr constant [10 x i8] c"todo-item\00"
-@.str.443 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.444 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
-@.str.445 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
-@.str.446 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
-@.str.447 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
-@.str.448 = private unnamed_addr constant [9 x i8] c"features\00"
-@.str.449 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.450 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.451 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.452 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.453 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.454 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.455 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.456 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.457 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.458 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.459 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.460 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.461 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.462 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.463 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.464 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.465 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.466 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.467 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.468 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.469 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.470 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.471 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.472 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.473 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.474 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.475 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.476 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.477 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.478 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.479 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.480 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.481 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
-@.str.482 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
-@.str.483 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
-@.str.484 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
-@.str.485 = private unnamed_addr constant [9 x i8] c"features\00"
-@.str.486 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.487 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.488 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.489 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.490 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.491 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.492 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.493 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.494 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.495 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.496 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.497 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.498 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.499 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.500 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.501 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.502 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.503 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
-@.str.504 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.505 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
-@.str.506 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.507 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
-@.str.508 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.509 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
-@.str.510 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.511 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
-@.str.512 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.513 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
-@.str.514 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.515 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
-@.str.516 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.517 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
-@.str.518 = private unnamed_addr constant [4 x i8] c"app\00"
-@.str.519 = private unnamed_addr constant [11 x i8] c"app-header\00"
-@.str.520 = private unnamed_addr constant [5 x i8] c"logo\00"
-@.str.521 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.522 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.523 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.524 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.525 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.526 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.527 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.528 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.529 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.530 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.531 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.532 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.533 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.534 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.535 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.536 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.537 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.538 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.539 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.540 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.541 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.542 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.543 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.544 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.545 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.546 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.547 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.548 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.549 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.550 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.551 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.552 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.553 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.554 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.555 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.556 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.557 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.558 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.559 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.560 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.561 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.562 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.563 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.564 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.565 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.566 = private unnamed_addr constant [5 x i8] c"logo\00"
-@.str.567 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.568 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.569 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.570 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.571 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.572 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.573 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.574 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.575 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.576 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.577 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.578 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.579 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.580 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.581 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.582 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.583 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.584 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.585 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.586 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.587 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.588 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.589 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.590 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.591 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.592 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.593 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.594 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.595 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.596 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.597 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.598 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.599 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.600 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.601 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.602 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.603 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.604 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.605 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.606 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.607 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.608 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.609 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.610 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.611 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.612 = private unnamed_addr constant [8 x i8] c"content\00"
-@.str.613 = private unnamed_addr constant [11 x i8] c"app-footer\00"
-@.str.614 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
-@.str.615 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
-@.str.616 = private unnamed_addr constant [11 x i8] c"app-header\00"
-@.str.617 = private unnamed_addr constant [5 x i8] c"logo\00"
-@.str.618 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.619 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.620 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.621 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.622 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.623 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.624 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.625 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.626 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.627 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.628 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.629 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.630 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.631 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.632 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.633 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.634 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.635 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.636 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.637 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.638 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.639 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.640 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.641 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.642 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.643 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.644 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.645 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.646 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.647 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.648 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.649 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.650 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.651 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.652 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.653 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.654 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.655 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.656 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.657 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.658 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.659 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.660 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.661 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.662 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.663 = private unnamed_addr constant [5 x i8] c"logo\00"
-@.str.664 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.665 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
-@.str.666 = private unnamed_addr constant [4 x i8] c"nav\00"
-@.str.667 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.668 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.669 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.670 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.671 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.672 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.673 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.674 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.675 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.676 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.677 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.678 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.679 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.680 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.681 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.682 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.683 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.684 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.685 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.686 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.687 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.688 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.689 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.690 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.691 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.692 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.693 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.694 = private unnamed_addr constant [8 x i8] c"Counter\00"
-@.str.695 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.696 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.697 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.698 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.699 = private unnamed_addr constant [6 x i8] c"todos\00"
-@.str.700 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.701 = private unnamed_addr constant [6 x i8] c"Todos\00"
-@.str.702 = private unnamed_addr constant [9 x i8] c"nav-link\00"
-@.str.703 = private unnamed_addr constant [7 x i8] c"active\00"
-@.str.704 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.705 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.706 = private unnamed_addr constant [6 x i8] c"about\00"
-@.str.707 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.708 = private unnamed_addr constant [6 x i8] c"About\00"
-@.str.709 = private unnamed_addr constant [8 x i8] c"content\00"
-@.str.710 = private unnamed_addr constant [11 x i8] c"app-footer\00"
-@.str.711 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
-@.str.712 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
-@.str.713 = private unnamed_addr constant [8 x i8] c"counter\00"
-@.str.714 = private unnamed_addr constant [9 x i8] c"Buy milk\00"
-@.str.715 = private unnamed_addr constant [15 x i8] c"Write compiler\00"
-@.str.716 = private unnamed_addr constant [15 x i8] c"Ship framework\00"
+@.str.0 = private unnamed_addr constant [76 x i8] c"turmeric: element stack underflow — more pops than pushes (check nesting)\00"
+@.str.1 = private unnamed_addr constant [4 x i8] c"cls\00"
+@.str.2 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.3 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.4 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.5 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.6 = private unnamed_addr constant [4 x i8] c"on_\00"
+@.str.7 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.8 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.9 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.10 = private unnamed_addr constant [2 x i8] c"a\00"
+@.str.11 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.12 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.13 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.14 = private unnamed_addr constant [9 x i8] c"download\00"
+@.str.15 = private unnamed_addr constant [9 x i8] c"hreflang\00"
+@.str.16 = private unnamed_addr constant [4 x i8] c"rel\00"
+@.str.17 = private unnamed_addr constant [7 x i8] c"target\00"
+@.str.18 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.19 = private unnamed_addr constant [5 x i8] c"href\00"
+@.str.20 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.21 = private unnamed_addr constant [5 x i8] c"abbr\00"
+@.str.22 = private unnamed_addr constant [8 x i8] c"address\00"
+@.str.23 = private unnamed_addr constant [5 x i8] c"area\00"
+@.str.24 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.25 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.26 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.27 = private unnamed_addr constant [4 x i8] c"alt\00"
+@.str.28 = private unnamed_addr constant [9 x i8] c"download\00"
+@.str.29 = private unnamed_addr constant [4 x i8] c"rel\00"
+@.str.30 = private unnamed_addr constant [7 x i8] c"target\00"
+@.str.31 = private unnamed_addr constant [5 x i8] c"href\00"
+@.str.32 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.33 = private unnamed_addr constant [8 x i8] c"article\00"
+@.str.34 = private unnamed_addr constant [6 x i8] c"aside\00"
+@.str.35 = private unnamed_addr constant [6 x i8] c"audio\00"
+@.str.36 = private unnamed_addr constant [2 x i8] c"b\00"
+@.str.37 = private unnamed_addr constant [5 x i8] c"base\00"
+@.str.38 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.39 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.40 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.41 = private unnamed_addr constant [5 x i8] c"href\00"
+@.str.42 = private unnamed_addr constant [7 x i8] c"target\00"
+@.str.43 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.44 = private unnamed_addr constant [4 x i8] c"bdi\00"
+@.str.45 = private unnamed_addr constant [4 x i8] c"bdo\00"
+@.str.46 = private unnamed_addr constant [11 x i8] c"blockquote\00"
+@.str.47 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.48 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.49 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.50 = private unnamed_addr constant [5 x i8] c"cite\00"
+@.str.51 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.52 = private unnamed_addr constant [3 x i8] c"br\00"
+@.str.53 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.54 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.55 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.56 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.57 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.58 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.59 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.60 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.61 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.62 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.63 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.64 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.65 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.66 = private unnamed_addr constant [7 x i8] c"submit\00"
+@.str.67 = private unnamed_addr constant [7 x i8] c"canvas\00"
+@.str.68 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.69 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.70 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.71 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.72 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.73 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.74 = private unnamed_addr constant [8 x i8] c"caption\00"
+@.str.75 = private unnamed_addr constant [5 x i8] c"cite\00"
+@.str.76 = private unnamed_addr constant [5 x i8] c"code\00"
+@.str.77 = private unnamed_addr constant [4 x i8] c"col\00"
+@.str.78 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.79 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.80 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.81 = private unnamed_addr constant [5 x i8] c"span\00"
+@.str.82 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.83 = private unnamed_addr constant [9 x i8] c"colgroup\00"
+@.str.84 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.85 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.86 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.87 = private unnamed_addr constant [5 x i8] c"span\00"
+@.str.88 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.89 = private unnamed_addr constant [5 x i8] c"data\00"
+@.str.90 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.91 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.92 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.93 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.94 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.95 = private unnamed_addr constant [9 x i8] c"datalist\00"
+@.str.96 = private unnamed_addr constant [3 x i8] c"dd\00"
+@.str.97 = private unnamed_addr constant [4 x i8] c"del\00"
+@.str.98 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.99 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.100 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.101 = private unnamed_addr constant [5 x i8] c"cite\00"
+@.str.102 = private unnamed_addr constant [9 x i8] c"datetime\00"
+@.str.103 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.104 = private unnamed_addr constant [8 x i8] c"details\00"
+@.str.105 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.106 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.107 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.108 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.109 = private unnamed_addr constant [5 x i8] c"open\00"
+@.str.110 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.111 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.112 = private unnamed_addr constant [7 x i8] c"toggle\00"
+@.str.113 = private unnamed_addr constant [4 x i8] c"dfn\00"
+@.str.114 = private unnamed_addr constant [7 x i8] c"dialog\00"
+@.str.115 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.116 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.117 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.118 = private unnamed_addr constant [9 x i8] c"closedby\00"
+@.str.119 = private unnamed_addr constant [5 x i8] c"open\00"
+@.str.120 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.121 = private unnamed_addr constant [12 x i8] c"returnvalue\00"
+@.str.122 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.123 = private unnamed_addr constant [4 x i8] c"div\00"
+@.str.124 = private unnamed_addr constant [3 x i8] c"dl\00"
+@.str.125 = private unnamed_addr constant [3 x i8] c"dt\00"
+@.str.126 = private unnamed_addr constant [3 x i8] c"em\00"
+@.str.127 = private unnamed_addr constant [6 x i8] c"embed\00"
+@.str.128 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.129 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.130 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.131 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.132 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.133 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.134 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.135 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.136 = private unnamed_addr constant [9 x i8] c"fieldset\00"
+@.str.137 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.138 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.139 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.140 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.141 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.142 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.143 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.144 = private unnamed_addr constant [11 x i8] c"figcaption\00"
+@.str.145 = private unnamed_addr constant [7 x i8] c"figure\00"
+@.str.146 = private unnamed_addr constant [7 x i8] c"footer\00"
+@.str.147 = private unnamed_addr constant [5 x i8] c"form\00"
+@.str.148 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.149 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.150 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.151 = private unnamed_addr constant [7 x i8] c"action\00"
+@.str.152 = private unnamed_addr constant [8 x i8] c"enctype\00"
+@.str.153 = private unnamed_addr constant [7 x i8] c"method\00"
+@.str.154 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.155 = private unnamed_addr constant [11 x i8] c"novalidate\00"
+@.str.156 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.157 = private unnamed_addr constant [4 x i8] c"rel\00"
+@.str.158 = private unnamed_addr constant [7 x i8] c"target\00"
+@.str.159 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.160 = private unnamed_addr constant [7 x i8] c"submit\00"
+@.str.161 = private unnamed_addr constant [6 x i8] c"reset\00"
+@.str.162 = private unnamed_addr constant [3 x i8] c"h1\00"
+@.str.163 = private unnamed_addr constant [3 x i8] c"h2\00"
+@.str.164 = private unnamed_addr constant [3 x i8] c"h3\00"
+@.str.165 = private unnamed_addr constant [3 x i8] c"h4\00"
+@.str.166 = private unnamed_addr constant [3 x i8] c"h5\00"
+@.str.167 = private unnamed_addr constant [3 x i8] c"h6\00"
+@.str.168 = private unnamed_addr constant [7 x i8] c"header\00"
+@.str.169 = private unnamed_addr constant [7 x i8] c"hgroup\00"
+@.str.170 = private unnamed_addr constant [3 x i8] c"hr\00"
+@.str.171 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.172 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.173 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.174 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.175 = private unnamed_addr constant [2 x i8] c"i\00"
+@.str.176 = private unnamed_addr constant [7 x i8] c"iframe\00"
+@.str.177 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.178 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.179 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.180 = private unnamed_addr constant [6 x i8] c"allow\00"
+@.str.181 = private unnamed_addr constant [16 x i8] c"allowfullscreen\00"
+@.str.182 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.183 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.184 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.185 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.186 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.187 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.188 = private unnamed_addr constant [4 x i8] c"img\00"
+@.str.189 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.190 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.191 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.192 = private unnamed_addr constant [4 x i8] c"alt\00"
+@.str.193 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.194 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.195 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.196 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.197 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.198 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.199 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.200 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.201 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.202 = private unnamed_addr constant [4 x i8] c"alt\00"
+@.str.203 = private unnamed_addr constant [8 x i8] c"checked\00"
+@.str.204 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.205 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.206 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.207 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.208 = private unnamed_addr constant [4 x i8] c"max\00"
+@.str.209 = private unnamed_addr constant [10 x i8] c"maxlength\00"
+@.str.210 = private unnamed_addr constant [4 x i8] c"min\00"
+@.str.211 = private unnamed_addr constant [10 x i8] c"minlength\00"
+@.str.212 = private unnamed_addr constant [9 x i8] c"multiple\00"
+@.str.213 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.214 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.215 = private unnamed_addr constant [8 x i8] c"pattern\00"
+@.str.216 = private unnamed_addr constant [12 x i8] c"placeholder\00"
+@.str.217 = private unnamed_addr constant [9 x i8] c"readonly\00"
+@.str.218 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.219 = private unnamed_addr constant [9 x i8] c"required\00"
+@.str.220 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.221 = private unnamed_addr constant [5 x i8] c"size\00"
+@.str.222 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.223 = private unnamed_addr constant [5 x i8] c"step\00"
+@.str.224 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.225 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.226 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.227 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.228 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.229 = private unnamed_addr constant [7 x i8] c"change\00"
+@.str.230 = private unnamed_addr constant [6 x i8] c"focus\00"
+@.str.231 = private unnamed_addr constant [5 x i8] c"blur\00"
+@.str.232 = private unnamed_addr constant [8 x i8] c"keydown\00"
+@.str.233 = private unnamed_addr constant [4 x i8] c"ins\00"
+@.str.234 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.235 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.236 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.237 = private unnamed_addr constant [5 x i8] c"cite\00"
+@.str.238 = private unnamed_addr constant [9 x i8] c"datetime\00"
+@.str.239 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.240 = private unnamed_addr constant [4 x i8] c"kbd\00"
+@.str.241 = private unnamed_addr constant [6 x i8] c"label\00"
+@.str.242 = private unnamed_addr constant [7 x i8] c"legend\00"
+@.str.243 = private unnamed_addr constant [3 x i8] c"li\00"
+@.str.244 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.245 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.246 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.247 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.248 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.249 = private unnamed_addr constant [5 x i8] c"link\00"
+@.str.250 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.251 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.252 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.253 = private unnamed_addr constant [3 x i8] c"as\00"
+@.str.254 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.255 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.256 = private unnamed_addr constant [5 x i8] c"href\00"
+@.str.257 = private unnamed_addr constant [9 x i8] c"hreflang\00"
+@.str.258 = private unnamed_addr constant [11 x i8] c"imagesizes\00"
+@.str.259 = private unnamed_addr constant [12 x i8] c"imagesrcset\00"
+@.str.260 = private unnamed_addr constant [10 x i8] c"integrity\00"
+@.str.261 = private unnamed_addr constant [6 x i8] c"media\00"
+@.str.262 = private unnamed_addr constant [4 x i8] c"rel\00"
+@.str.263 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.264 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.265 = private unnamed_addr constant [5 x i8] c"main\00"
+@.str.266 = private unnamed_addr constant [4 x i8] c"map\00"
+@.str.267 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.268 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.269 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.270 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.271 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.272 = private unnamed_addr constant [5 x i8] c"mark\00"
+@.str.273 = private unnamed_addr constant [5 x i8] c"menu\00"
+@.str.274 = private unnamed_addr constant [5 x i8] c"meta\00"
+@.str.275 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.276 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.277 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.278 = private unnamed_addr constant [8 x i8] c"content\00"
+@.str.279 = private unnamed_addr constant [10 x i8] c"httpequiv\00"
+@.str.280 = private unnamed_addr constant [6 x i8] c"media\00"
+@.str.281 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.282 = private unnamed_addr constant [7 x i8] c"scheme\00"
+@.str.283 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.284 = private unnamed_addr constant [6 x i8] c"meter\00"
+@.str.285 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.286 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.287 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.288 = private unnamed_addr constant [5 x i8] c"high\00"
+@.str.289 = private unnamed_addr constant [4 x i8] c"low\00"
+@.str.290 = private unnamed_addr constant [4 x i8] c"max\00"
+@.str.291 = private unnamed_addr constant [4 x i8] c"min\00"
+@.str.292 = private unnamed_addr constant [8 x i8] c"optimum\00"
+@.str.293 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.294 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.295 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.296 = private unnamed_addr constant [7 x i8] c"object\00"
+@.str.297 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.298 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.299 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.300 = private unnamed_addr constant [5 x i8] c"data\00"
+@.str.301 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.302 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.303 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.304 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.305 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.306 = private unnamed_addr constant [3 x i8] c"ol\00"
+@.str.307 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.308 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.309 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.310 = private unnamed_addr constant [9 x i8] c"reversed\00"
+@.str.311 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.312 = private unnamed_addr constant [6 x i8] c"start\00"
+@.str.313 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.314 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.315 = private unnamed_addr constant [9 x i8] c"optgroup\00"
+@.str.316 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.317 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.318 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.319 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.320 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.321 = private unnamed_addr constant [6 x i8] c"label\00"
+@.str.322 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.323 = private unnamed_addr constant [7 x i8] c"option\00"
+@.str.324 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.325 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.326 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.327 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.328 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.329 = private unnamed_addr constant [6 x i8] c"label\00"
+@.str.330 = private unnamed_addr constant [9 x i8] c"selected\00"
+@.str.331 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.332 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.333 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.334 = private unnamed_addr constant [7 x i8] c"output\00"
+@.str.335 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.336 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.337 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.338 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.339 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.340 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.341 = private unnamed_addr constant [2 x i8] c"p\00"
+@.str.342 = private unnamed_addr constant [8 x i8] c"picture\00"
+@.str.343 = private unnamed_addr constant [4 x i8] c"pre\00"
+@.str.344 = private unnamed_addr constant [9 x i8] c"progress\00"
+@.str.345 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.346 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.347 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.348 = private unnamed_addr constant [4 x i8] c"max\00"
+@.str.349 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.350 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.351 = private unnamed_addr constant [2 x i8] c"q\00"
+@.str.352 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.353 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.354 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.355 = private unnamed_addr constant [5 x i8] c"cite\00"
+@.str.356 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.357 = private unnamed_addr constant [3 x i8] c"rp\00"
+@.str.358 = private unnamed_addr constant [3 x i8] c"rt\00"
+@.str.359 = private unnamed_addr constant [5 x i8] c"ruby\00"
+@.str.360 = private unnamed_addr constant [2 x i8] c"s\00"
+@.str.361 = private unnamed_addr constant [5 x i8] c"samp\00"
+@.str.362 = private unnamed_addr constant [7 x i8] c"search\00"
+@.str.363 = private unnamed_addr constant [8 x i8] c"section\00"
+@.str.364 = private unnamed_addr constant [7 x i8] c"select\00"
+@.str.365 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.366 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.367 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.368 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.369 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.370 = private unnamed_addr constant [9 x i8] c"multiple\00"
+@.str.371 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.372 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.373 = private unnamed_addr constant [9 x i8] c"required\00"
+@.str.374 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.375 = private unnamed_addr constant [5 x i8] c"size\00"
+@.str.376 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.377 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.378 = private unnamed_addr constant [7 x i8] c"change\00"
+@.str.379 = private unnamed_addr constant [6 x i8] c"focus\00"
+@.str.380 = private unnamed_addr constant [5 x i8] c"blur\00"
+@.str.381 = private unnamed_addr constant [6 x i8] c"small\00"
+@.str.382 = private unnamed_addr constant [7 x i8] c"source\00"
+@.str.383 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.384 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.385 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.386 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.387 = private unnamed_addr constant [6 x i8] c"media\00"
+@.str.388 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.389 = private unnamed_addr constant [5 x i8] c"type\00"
+@.str.390 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.391 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.392 = private unnamed_addr constant [5 x i8] c"span\00"
+@.str.393 = private unnamed_addr constant [7 x i8] c"strong\00"
+@.str.394 = private unnamed_addr constant [4 x i8] c"sub\00"
+@.str.395 = private unnamed_addr constant [8 x i8] c"summary\00"
+@.str.396 = private unnamed_addr constant [4 x i8] c"sup\00"
+@.str.397 = private unnamed_addr constant [6 x i8] c"table\00"
+@.str.398 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.399 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.400 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.401 = private unnamed_addr constant [12 x i8] c"cellpadding\00"
+@.str.402 = private unnamed_addr constant [12 x i8] c"cellspacing\00"
+@.str.403 = private unnamed_addr constant [6 x i8] c"frame\00"
+@.str.404 = private unnamed_addr constant [6 x i8] c"rules\00"
+@.str.405 = private unnamed_addr constant [8 x i8] c"summary\00"
+@.str.406 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.407 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.408 = private unnamed_addr constant [6 x i8] c"tbody\00"
+@.str.409 = private unnamed_addr constant [3 x i8] c"td\00"
+@.str.410 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.411 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.412 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.413 = private unnamed_addr constant [5 x i8] c"abbr\00"
+@.str.414 = private unnamed_addr constant [8 x i8] c"colspan\00"
+@.str.415 = private unnamed_addr constant [8 x i8] c"headers\00"
+@.str.416 = private unnamed_addr constant [8 x i8] c"rowspan\00"
+@.str.417 = private unnamed_addr constant [6 x i8] c"scope\00"
+@.str.418 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.419 = private unnamed_addr constant [9 x i8] c"textarea\00"
+@.str.420 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.421 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.422 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.423 = private unnamed_addr constant [5 x i8] c"cols\00"
+@.str.424 = private unnamed_addr constant [9 x i8] c"disabled\00"
+@.str.425 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.426 = private unnamed_addr constant [10 x i8] c"maxlength\00"
+@.str.427 = private unnamed_addr constant [10 x i8] c"minlength\00"
+@.str.428 = private unnamed_addr constant [5 x i8] c"name\00"
+@.str.429 = private unnamed_addr constant [12 x i8] c"placeholder\00"
+@.str.430 = private unnamed_addr constant [9 x i8] c"readonly\00"
+@.str.431 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.432 = private unnamed_addr constant [9 x i8] c"required\00"
+@.str.433 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.434 = private unnamed_addr constant [5 x i8] c"rows\00"
+@.str.435 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.436 = private unnamed_addr constant [5 x i8] c"wrap\00"
+@.str.437 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.438 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.439 = private unnamed_addr constant [7 x i8] c"change\00"
+@.str.440 = private unnamed_addr constant [6 x i8] c"focus\00"
+@.str.441 = private unnamed_addr constant [5 x i8] c"blur\00"
+@.str.442 = private unnamed_addr constant [8 x i8] c"keydown\00"
+@.str.443 = private unnamed_addr constant [6 x i8] c"tfoot\00"
+@.str.444 = private unnamed_addr constant [3 x i8] c"th\00"
+@.str.445 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.446 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.447 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.448 = private unnamed_addr constant [5 x i8] c"abbr\00"
+@.str.449 = private unnamed_addr constant [8 x i8] c"colspan\00"
+@.str.450 = private unnamed_addr constant [8 x i8] c"headers\00"
+@.str.451 = private unnamed_addr constant [8 x i8] c"rowspan\00"
+@.str.452 = private unnamed_addr constant [6 x i8] c"scope\00"
+@.str.453 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.454 = private unnamed_addr constant [6 x i8] c"thead\00"
+@.str.455 = private unnamed_addr constant [5 x i8] c"time\00"
+@.str.456 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.457 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.458 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.459 = private unnamed_addr constant [9 x i8] c"datetime\00"
+@.str.460 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.461 = private unnamed_addr constant [6 x i8] c"title\00"
+@.str.462 = private unnamed_addr constant [3 x i8] c"tr\00"
+@.str.463 = private unnamed_addr constant [6 x i8] c"track\00"
+@.str.464 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.465 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.466 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.467 = private unnamed_addr constant [8 x i8] c"default\00"
+@.str.468 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.469 = private unnamed_addr constant [5 x i8] c"kind\00"
+@.str.470 = private unnamed_addr constant [6 x i8] c"label\00"
+@.str.471 = private unnamed_addr constant [4 x i8] c"src\00"
+@.str.472 = private unnamed_addr constant [8 x i8] c"srclang\00"
+@.str.473 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.474 = private unnamed_addr constant [2 x i8] c"u\00"
+@.str.475 = private unnamed_addr constant [3 x i8] c"ul\00"
+@.str.476 = private unnamed_addr constant [4 x i8] c"var\00"
+@.str.477 = private unnamed_addr constant [6 x i8] c"video\00"
+@.str.478 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.479 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.480 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.481 = private unnamed_addr constant [24 x i8] c"disablepictureinpicture\00"
+@.str.482 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.483 = private unnamed_addr constant [7 x i8] c"height\00"
+@.str.484 = private unnamed_addr constant [12 x i8] c"playsinline\00"
+@.str.485 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.486 = private unnamed_addr constant [7 x i8] c"poster\00"
+@.str.487 = private unnamed_addr constant [6 x i8] c"width\00"
+@.str.488 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.489 = private unnamed_addr constant [5 x i8] c"play\00"
+@.str.490 = private unnamed_addr constant [6 x i8] c"pause\00"
+@.str.491 = private unnamed_addr constant [6 x i8] c"ended\00"
+@.str.492 = private unnamed_addr constant [4 x i8] c"wbr\00"
+@.str.493 = private unnamed_addr constant [6 x i8] c"class\00"
+@.str.494 = private unnamed_addr constant [3 x i8] c"id\00"
+@.str.495 = private unnamed_addr constant [6 x i8] c"style\00"
+@.str.496 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.497 = private unnamed_addr constant [3 x i8] c"; \00"
+@.str.498 = private unnamed_addr constant [3 x i8] c": \00"
+@.str.499 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.500 = private unnamed_addr constant [3 x i8] c"_s\00"
+@.str.501 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.502 = private unnamed_addr constant [4 x i8] c" { \00"
+@.str.503 = private unnamed_addr constant [3 x i8] c" }\00"
+@.str.504 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.505 = private unnamed_addr constant [3 x i8] c"; \00"
+@.str.506 = private unnamed_addr constant [3 x i8] c": \00"
+@.str.507 = private unnamed_addr constant [3 x i8] c"  \00"
+@.str.508 = private unnamed_addr constant [4 x i8] c" { \00"
+@.str.509 = private unnamed_addr constant [3 x i8] c" }\00"
+@.str.510 = private unnamed_addr constant [5 x i8] c"from\00"
+@.str.511 = private unnamed_addr constant [3 x i8] c"to\00"
+@.str.512 = private unnamed_addr constant [12 x i8] c"@keyframes \00"
+@.str.513 = private unnamed_addr constant [4 x i8] c" {\0A\00"
+@.str.514 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.515 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.516 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.517 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.518 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.519 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.520 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.521 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.522 = private unnamed_addr constant [7 x i8] c"Click(\00"
+@.str.523 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.524 = private unnamed_addr constant [10 x i8] c"DblClick(\00"
+@.str.525 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.526 = private unnamed_addr constant [11 x i8] c"MouseDown(\00"
+@.str.527 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.528 = private unnamed_addr constant [9 x i8] c"MouseUp(\00"
+@.str.529 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.530 = private unnamed_addr constant [11 x i8] c"MouseMove(\00"
+@.str.531 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.532 = private unnamed_addr constant [12 x i8] c"MouseEnter(\00"
+@.str.533 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.534 = private unnamed_addr constant [12 x i8] c"MouseLeave(\00"
+@.str.535 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.536 = private unnamed_addr constant [9 x i8] c"KeyDown(\00"
+@.str.537 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.538 = private unnamed_addr constant [7 x i8] c"KeyUp(\00"
+@.str.539 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.540 = private unnamed_addr constant [7 x i8] c"Input(\00"
+@.str.541 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.542 = private unnamed_addr constant [8 x i8] c"Change(\00"
+@.str.543 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.544 = private unnamed_addr constant [7 x i8] c"Focus(\00"
+@.str.545 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.546 = private unnamed_addr constant [6 x i8] c"Blur(\00"
+@.str.547 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.548 = private unnamed_addr constant [8 x i8] c"Submit(\00"
+@.str.549 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.550 = private unnamed_addr constant [7 x i8] c"Wheel(\00"
+@.str.551 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.552 = private unnamed_addr constant [12 x i8] c"TouchStart(\00"
+@.str.553 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.554 = private unnamed_addr constant [11 x i8] c"TouchMove(\00"
+@.str.555 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.556 = private unnamed_addr constant [10 x i8] c"TouchEnd(\00"
+@.str.557 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.558 = private unnamed_addr constant [11 x i8] c"DragStart(\00"
+@.str.559 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.560 = private unnamed_addr constant [9 x i8] c"DragEnd(\00"
+@.str.561 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.562 = private unnamed_addr constant [6 x i8] c"Drop(\00"
+@.str.563 = private unnamed_addr constant [2 x i8] c")\00"
+@.str.564 = private unnamed_addr constant [7 x i8] c"Scroll\00"
+@.str.565 = private unnamed_addr constant [7 x i8] c"Resize\00"
+@.str.566 = private unnamed_addr constant [8 x i8] c"Unknown\00"
+@.str.567 = private unnamed_addr constant [8 x i8] c"clientX\00"
+@.str.568 = private unnamed_addr constant [8 x i8] c"clientY\00"
+@.str.569 = private unnamed_addr constant [8 x i8] c"offsetX\00"
+@.str.570 = private unnamed_addr constant [8 x i8] c"offsetY\00"
+@.str.571 = private unnamed_addr constant [7 x i8] c"button\00"
+@.str.572 = private unnamed_addr constant [7 x i8] c"altKey\00"
+@.str.573 = private unnamed_addr constant [8 x i8] c"ctrlKey\00"
+@.str.574 = private unnamed_addr constant [9 x i8] c"shiftKey\00"
+@.str.575 = private unnamed_addr constant [8 x i8] c"metaKey\00"
+@.str.576 = private unnamed_addr constant [4 x i8] c"key\00"
+@.str.577 = private unnamed_addr constant [5 x i8] c"code\00"
+@.str.578 = private unnamed_addr constant [7 x i8] c"repeat\00"
+@.str.579 = private unnamed_addr constant [7 x i8] c"altKey\00"
+@.str.580 = private unnamed_addr constant [8 x i8] c"ctrlKey\00"
+@.str.581 = private unnamed_addr constant [9 x i8] c"shiftKey\00"
+@.str.582 = private unnamed_addr constant [8 x i8] c"metaKey\00"
+@.str.583 = private unnamed_addr constant [4 x i8] c"key\00"
+@.str.584 = private unnamed_addr constant [5 x i8] c"code\00"
+@.str.585 = private unnamed_addr constant [13 x i8] c"target.value\00"
+@.str.586 = private unnamed_addr constant [10 x i8] c"inputType\00"
+@.str.587 = private unnamed_addr constant [5 x i8] c"data\00"
+@.str.588 = private unnamed_addr constant [13 x i8] c"target.value\00"
+@.str.589 = private unnamed_addr constant [7 x i8] c"deltaX\00"
+@.str.590 = private unnamed_addr constant [7 x i8] c"deltaY\00"
+@.str.591 = private unnamed_addr constant [7 x i8] c"deltaZ\00"
+@.str.592 = private unnamed_addr constant [10 x i8] c"deltaMode\00"
+@.str.593 = private unnamed_addr constant [6 x i8] c"click\00"
+@.str.594 = private unnamed_addr constant [9 x i8] c"dblclick\00"
+@.str.595 = private unnamed_addr constant [10 x i8] c"mousedown\00"
+@.str.596 = private unnamed_addr constant [8 x i8] c"mouseup\00"
+@.str.597 = private unnamed_addr constant [10 x i8] c"mousemove\00"
+@.str.598 = private unnamed_addr constant [11 x i8] c"mouseenter\00"
+@.str.599 = private unnamed_addr constant [11 x i8] c"mouseleave\00"
+@.str.600 = private unnamed_addr constant [8 x i8] c"keydown\00"
+@.str.601 = private unnamed_addr constant [6 x i8] c"keyup\00"
+@.str.602 = private unnamed_addr constant [6 x i8] c"input\00"
+@.str.603 = private unnamed_addr constant [7 x i8] c"change\00"
+@.str.604 = private unnamed_addr constant [6 x i8] c"focus\00"
+@.str.605 = private unnamed_addr constant [5 x i8] c"blur\00"
+@.str.606 = private unnamed_addr constant [7 x i8] c"submit\00"
+@.str.607 = private unnamed_addr constant [6 x i8] c"wheel\00"
+@.str.608 = private unnamed_addr constant [7 x i8] c"scroll\00"
+@.str.609 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.610 = private unnamed_addr constant [6 x i8] c"value\00"
+@.str.611 = private unnamed_addr constant [8 x i8] c"checked\00"
+@.str.612 = private unnamed_addr constant [5 x i8] c"true\00"
+@.str.613 = private unnamed_addr constant [8 x i8] c"checked\00"
+@.str.614 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.615 = private unnamed_addr constant [5 x i8] c"even\00"
+@.str.616 = private unnamed_addr constant [4 x i8] c"odd\00"
+@.str.617 = private unnamed_addr constant [5 x i8] c"even\00"
+@.str.618 = private unnamed_addr constant [4 x i8] c"odd\00"
+@.str.619 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.620 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.621 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.622 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.623 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.624 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.625 = private unnamed_addr constant [17 x i8] c"Reactive Counter\00"
+@.str.626 = private unnamed_addr constant [17 x i8] c"Reactive Counter\00"
+@.str.627 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.628 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.629 = private unnamed_addr constant [10 x i8] c"font-size\00"
+@.str.630 = private unnamed_addr constant [5 x i8] c"3rem\00"
+@.str.631 = private unnamed_addr constant [12 x i8] c"font-weight\00"
+@.str.632 = private unnamed_addr constant [5 x i8] c"bold\00"
+@.str.633 = private unnamed_addr constant [6 x i8] c"color\00"
+@.str.634 = private unnamed_addr constant [8 x i8] c"#4fc3f7\00"
+@.str.635 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.636 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.637 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.638 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.639 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.640 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.641 = private unnamed_addr constant [6 x i8] c"color\00"
+@.str.642 = private unnamed_addr constant [5 x i8] c"#aaa\00"
+@.str.643 = private unnamed_addr constant [10 x i8] c"Doubled: \00"
+@.str.644 = private unnamed_addr constant [4 x i8] c" | \00"
+@.str.645 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.646 = private unnamed_addr constant [11 x i8] c"button-row\00"
+@.str.647 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.648 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.649 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.650 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.651 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.652 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.653 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.654 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
+@.str.655 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
+@.str.656 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.657 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.658 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.659 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.660 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.661 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
+@.str.662 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
+@.str.663 = private unnamed_addr constant [7 x i8] c"danger\00"
+@.str.664 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.665 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.666 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.667 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.668 = private unnamed_addr constant [6 x i8] c"Reset\00"
+@.str.669 = private unnamed_addr constant [6 x i8] c"Reset\00"
+@.str.670 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.671 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.672 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.673 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.674 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.675 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
+@.str.676 = private unnamed_addr constant [12 x i8] c"+ Increment\00"
+@.str.677 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.678 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.679 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.680 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.681 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.682 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
+@.str.683 = private unnamed_addr constant [12 x i8] c"- Decrement\00"
+@.str.684 = private unnamed_addr constant [7 x i8] c"danger\00"
+@.str.685 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.686 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.687 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.688 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.689 = private unnamed_addr constant [6 x i8] c"Reset\00"
+@.str.690 = private unnamed_addr constant [6 x i8] c"Reset\00"
+@.str.691 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.692 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.693 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.694 = private unnamed_addr constant [12 x i8] c"todo-header\00"
+@.str.695 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.696 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.697 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.698 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.699 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.700 = private unnamed_addr constant [10 x i8] c"Todo List\00"
+@.str.701 = private unnamed_addr constant [10 x i8] c"Todo List\00"
+@.str.702 = private unnamed_addr constant [6 x i8] c"badge\00"
+@.str.703 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.704 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.705 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.706 = private unnamed_addr constant [7 x i8] c" items\00"
+@.str.707 = private unnamed_addr constant [11 x i8] c"todo-input\00"
+@.str.708 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.709 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.710 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.711 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.712 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.713 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.714 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.715 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.716 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.717 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.718 = private unnamed_addr constant [5 x i8] c"#app\00"
+@.str.718 = private unnamed_addr constant [18 x i8] c"What needs doing?\00"
+@.str.719 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.720 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.721 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.722 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.723 = private unnamed_addr constant [6 x i8] c"Enter\00"
+@.str.724 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.725 = private unnamed_addr constant [6 x i8] c"Enter\00"
+@.str.726 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.727 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.728 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.729 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.730 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.731 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.732 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.733 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.734 = private unnamed_addr constant [4 x i8] c"Add\00"
+@.str.735 = private unnamed_addr constant [4 x i8] c"Add\00"
+@.str.736 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.737 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.738 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.739 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.740 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.741 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.742 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.743 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.744 = private unnamed_addr constant [18 x i8] c"What needs doing?\00"
+@.str.745 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.746 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.747 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.748 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.749 = private unnamed_addr constant [6 x i8] c"Enter\00"
+@.str.750 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.751 = private unnamed_addr constant [6 x i8] c"Enter\00"
+@.str.752 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.753 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.754 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.755 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.756 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.757 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.758 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.759 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.760 = private unnamed_addr constant [4 x i8] c"Add\00"
+@.str.761 = private unnamed_addr constant [4 x i8] c"Add\00"
+@.str.762 = private unnamed_addr constant [10 x i8] c"todo-list\00"
+@.str.763 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.764 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.765 = private unnamed_addr constant [10 x i8] c"todo-item\00"
+@.str.766 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.767 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.768 = private unnamed_addr constant [10 x i8] c"todo-item\00"
+@.str.769 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.770 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.771 = private unnamed_addr constant [10 x i8] c"todo-item\00"
+@.str.772 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.773 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.774 = private unnamed_addr constant [10 x i8] c"todo-item\00"
+@.str.775 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.776 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.777 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.778 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.779 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.780 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.781 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.782 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.783 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
+@.str.784 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
+@.str.785 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.786 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.787 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.788 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
+@.str.789 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
+@.str.790 = private unnamed_addr constant [9 x i8] c"features\00"
+@.str.791 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.792 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.793 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.794 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.795 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.796 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.797 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.798 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.799 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.800 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.801 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.802 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.803 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.804 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.805 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.806 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.807 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.808 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.809 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.810 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.811 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.812 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.813 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.814 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.815 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.816 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.817 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.818 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.819 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.820 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.821 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.822 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.823 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.824 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.825 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.826 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.827 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.828 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.829 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.830 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.831 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.832 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.833 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.834 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.835 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.836 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.837 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.838 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.839 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.840 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.841 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.842 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.843 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.844 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.845 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.846 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.847 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.848 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.849 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.850 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.851 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.852 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.853 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.854 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.855 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.856 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.857 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.858 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.859 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.860 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.861 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.862 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.863 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.864 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.865 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.866 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.867 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.868 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.869 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.870 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.871 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.872 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.873 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.874 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.875 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.876 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
+@.str.877 = private unnamed_addr constant [15 x i8] c"About Turmeric\00"
+@.str.878 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.879 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.880 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.881 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
+@.str.882 = private unnamed_addr constant [63 x i8] c"A reactive web framework for Saffron, compiled to WebAssembly.\00"
+@.str.883 = private unnamed_addr constant [9 x i8] c"features\00"
+@.str.884 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.885 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.886 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.887 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.888 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.889 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.890 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.891 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.892 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.893 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.894 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.895 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.896 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.897 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.898 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.899 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.900 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.901 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.902 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.903 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.904 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.905 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.906 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.907 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.908 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.909 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.910 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.911 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.912 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.913 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.914 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.915 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.916 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.917 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.918 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.919 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.920 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.921 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.922 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.923 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.924 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.925 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.926 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.927 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.928 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.929 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.930 = private unnamed_addr constant [36 x i8] c"Fine-grained reactivity via Signals\00"
+@.str.931 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.932 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.933 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.934 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.935 = private unnamed_addr constant [40 x i8] c"No virtual DOM — surgical DOM updates\00"
+@.str.936 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.937 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.938 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.939 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.940 = private unnamed_addr constant [31 x i8] c"Compiles to < 40KB WASM binary\00"
+@.str.941 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.942 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.943 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.944 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.945 = private unnamed_addr constant [39 x i8] c"Typed from the DOM spec (112 elements)\00"
+@.str.946 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.947 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.948 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.949 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.950 = private unnamed_addr constant [27 x i8] c"Pattern matching on events\00"
+@.str.951 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.952 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.953 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.954 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.955 = private unnamed_addr constant [43 x i8] c"Component lifecycle with automatic cleanup\00"
+@.str.956 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.957 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.958 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.959 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.960 = private unnamed_addr constant [20 x i8] c"Client-side routing\00"
+@.str.961 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.962 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.963 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.964 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.965 = private unnamed_addr constant [21 x i8] c"Scoped CSS + theming\00"
+@.str.966 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.967 = private unnamed_addr constant [4 x i8] c"app\00"
+@.str.968 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.969 = private unnamed_addr constant [11 x i8] c"app-header\00"
+@.str.970 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.971 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.972 = private unnamed_addr constant [5 x i8] c"logo\00"
+@.str.973 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.974 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.975 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.976 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.977 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.978 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.979 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.980 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.981 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.982 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.983 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.984 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.985 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.986 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.987 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.988 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.989 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.990 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.991 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.992 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.993 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.994 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.995 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.996 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.997 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.998 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.999 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1000 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1001 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1002 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1003 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1004 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1005 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1006 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1007 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1008 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1009 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1010 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1011 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1012 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1013 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1014 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1015 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1016 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1017 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1018 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1019 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1020 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1021 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1022 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1023 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1024 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1025 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1026 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1027 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1028 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1029 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1030 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1031 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1032 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1033 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1034 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1035 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1036 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1037 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1038 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1039 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1040 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1041 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1042 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1043 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1044 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1045 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1046 = private unnamed_addr constant [5 x i8] c"logo\00"
+@.str.1047 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1048 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1049 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1050 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1051 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.1052 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1053 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1054 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1055 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1056 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1057 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1058 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1059 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1060 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1061 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1062 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1063 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1064 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1065 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1066 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1067 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1068 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1069 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1070 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1071 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1072 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1073 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1074 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1075 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1076 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1077 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1078 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1079 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1080 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1081 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1082 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1083 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1084 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1085 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1086 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1087 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1088 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1089 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1090 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1091 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1092 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1093 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1094 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1095 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1096 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1097 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1098 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1099 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1100 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1101 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1102 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1103 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1104 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1105 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1106 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1107 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1108 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1109 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1110 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1111 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1112 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1113 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1114 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1115 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1116 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1117 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1118 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1119 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1120 = private unnamed_addr constant [8 x i8] c"content\00"
+@.str.1121 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1122 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1123 = private unnamed_addr constant [11 x i8] c"app-footer\00"
+@.str.1124 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1125 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1126 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
+@.str.1127 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
+@.str.1128 = private unnamed_addr constant [11 x i8] c"app-header\00"
+@.str.1129 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1130 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1131 = private unnamed_addr constant [5 x i8] c"logo\00"
+@.str.1132 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1133 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1134 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1135 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1136 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.1137 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1138 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1139 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1140 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1141 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1142 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1143 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1144 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1145 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1146 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1147 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1148 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1149 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1150 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1151 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1152 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1153 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1154 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1155 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1156 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1157 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1158 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1159 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1160 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1161 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1162 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1163 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1164 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1165 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1166 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1167 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1168 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1169 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1170 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1171 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1172 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1173 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1174 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1175 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1176 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1177 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1178 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1179 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1180 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1181 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1182 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1183 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1184 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1185 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1186 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1187 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1188 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1189 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1190 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1191 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1192 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1193 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1194 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1195 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1196 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1197 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1198 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1199 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1200 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1201 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1202 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1203 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1204 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1205 = private unnamed_addr constant [5 x i8] c"logo\00"
+@.str.1206 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1207 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1208 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1209 = private unnamed_addr constant [9 x i8] c"Turmeric\00"
+@.str.1210 = private unnamed_addr constant [4 x i8] c"nav\00"
+@.str.1211 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1212 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1213 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1214 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1215 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1216 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1217 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1218 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1219 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1220 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1221 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1222 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1223 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1224 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1225 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1226 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1227 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1228 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1229 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1230 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1231 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1232 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1233 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1234 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1235 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1236 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1237 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1238 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1239 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1240 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1241 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1242 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1243 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1244 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1245 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1246 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1247 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1248 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1249 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1250 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1251 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1252 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1253 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1254 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1255 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1256 = private unnamed_addr constant [8 x i8] c"Counter\00"
+@.str.1257 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1258 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1259 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1260 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1261 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1262 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1263 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1264 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1265 = private unnamed_addr constant [6 x i8] c"todos\00"
+@.str.1266 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1267 = private unnamed_addr constant [6 x i8] c"Todos\00"
+@.str.1268 = private unnamed_addr constant [9 x i8] c"nav-link\00"
+@.str.1269 = private unnamed_addr constant [7 x i8] c"active\00"
+@.str.1270 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1271 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1272 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1273 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1274 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1275 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1276 = private unnamed_addr constant [6 x i8] c"about\00"
+@.str.1277 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1278 = private unnamed_addr constant [6 x i8] c"About\00"
+@.str.1279 = private unnamed_addr constant [8 x i8] c"content\00"
+@.str.1280 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1281 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1282 = private unnamed_addr constant [11 x i8] c"app-footer\00"
+@.str.1283 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1284 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1285 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
+@.str.1286 = private unnamed_addr constant [57 x i8] c"Built with Saffron + Turmeric | Signals + Effects + WASM\00"
+@.str.1287 = private unnamed_addr constant [8 x i8] c"counter\00"
+@.str.1288 = private unnamed_addr constant [9 x i8] c"Buy milk\00"
+@.str.1289 = private unnamed_addr constant [15 x i8] c"Write compiler\00"
+@.str.1290 = private unnamed_addr constant [15 x i8] c"Ship framework\00"
+@.str.1291 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.1292 = private unnamed_addr constant [5 x i8] c"#app\00"
 
+%Addable = type {  }
+%Subtractable = type {  }
+%Multipliable = type {  }
+%Dividable = type {  }
+%Modable = type {  }
+%Comparable = type {  }
+%Equatable = type {  }
+%Indexable = type {  }
+%Stringable = type {  }
+%Iterator = type {  }
+%Iterable = type {  }
 %turmeric_signal_Subscribable = type {  }
 %turmeric_signal_Subscription = type { i64, i64, i64 }
 %turmeric_signal_Signal = type { i64, i64 }
 %turmeric_signal_Computed = type { i64, i64, i64 }
 %turmeric_signal_EffectHandle = type { i64, i64 }
-%Node = type { i8, [16 x i8] }
-%Attr = type { i8, [16 x i8] }
-%turmeric_element_Context = type { i64 }
-%turmeric_generated_types_DomEvent = type { i64, i64, i64 }
-%turmeric_generated_types_PointerEvent = type { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }
-%turmeric_generated_types_ToggleEvent = type { i64, i64 }
-%turmeric_generated_types_AnimationEvent = type { i64, i64, i64 }
-%turmeric_generated_types_MouseEvent = type { i64, i64, i64, i64, i64, i64, i64, i64 }
-%turmeric_generated_types_TouchEvent = type { i64, i64, i64 }
-%turmeric_generated_types_FocusEvent = type {  }
-%turmeric_generated_types_CompositionEvent = type { i64 }
-%turmeric_generated_types_SubmitEvent = type {  }
-%turmeric_generated_types_DragEvent = type {  }
-%turmeric_generated_types_ClipboardEvent = type {  }
-%turmeric_generated_types_ProgressEvent = type { i64, i64, i64 }
-%turmeric_generated_types_ErrorEvent = type { i64, i64, i64, i64 }
-%turmeric_generated_types_InputEvent = type { i64, i64, i64 }
-%turmeric_generated_types_TransitionEvent = type { i64, i64, i64 }
-%turmeric_generated_types_UIEvent = type { i64 }
-%turmeric_generated_types_FormDataEvent = type { i64 }
-%turmeric_generated_types_KeyboardEvent = type { i64, i64, i64, i64, i64 }
-%turmeric_generated_types_SecurityPolicyViolationEvent = type { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }
-%turmeric_generated_types_WheelEvent = type { i64, i64, i64, i64 }
 %turmeric_style_ScopedStyles = type { i64, i64, i64 }
 %turmeric_style_Keyframes = type { i64, i64 }
 %turmeric_style_MediaQuery = type { i64, i64 }
@@ -886,6 +1448,8 @@ declare i1 @__val_is_map(i64)
 declare i64 @js_dom_create_element(i8*)
 declare void @js_dom_set_text(i64, i8*)
 declare void @js_dom_append_child(i64, i64)
+declare void @js_dom_set_attr(i64, i8*, i8*)
+declare void @js_dom_add_event(i64, i8*, i64)
 declare i64 @js_dom_query_selector(i8*)
 declare i64 @js_event_get_float(i64, i8*)
 declare i64 @js_event_get_string(i64, i8*)
@@ -906,7 +1470,6 @@ declare void @js_dom_add_event_listener(i64, i8*, i64)
 @__g_turmeric_signal__sub_id_counter = global i64 0
 @__g_turmeric_signal__batch_depth = global i64 0
 @__g_turmeric_signal__batch_pending = global i64 0
-@__g_turmeric_element__ctx_stack = global i64 0
 @__g_turmeric_style__scope_counter = global i64 0
 @__g_turmeric_events__next_callback_id = global i64 0
 @__g_turmeric_events__callbacks = global i64 0
@@ -917,7 +1480,7 @@ declare void @js_dom_add_event_listener(i64, i8*, i64)
 @__g_todos = global i64 0
 @__g_new_todo = global i64 0
 
-define linkonce_odr i64 @__lambda_25(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1214(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -938,7 +1501,7 @@ entry:
   ret i64 %t11
 }
 
-define linkonce_odr i64 @__lambda_186(i64 %__env.arg, i64 %e.arg) {
+define linkonce_odr i64 @__lambda_1335(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -955,25 +1518,25 @@ entry:
   %t6 = alloca i64
   %t8 = lshr i64 %t5, 56
   %t7 = trunc i64 %t8 to i8
-  switch i8 %t7, label %match.arm189 [ i8 9, label %match.arm188 ]
-match.arm188:
+  switch i8 %t7, label %match.arm1338 [ i8 9, label %match.arm1337 ]
+match.arm1337:
   %t9 = and i64 %t5, 72057594037927935
   %t10 = call i64 @__val_tag_int(i64 %t9)
   store i64 %t10, i64* %data
   %t11 = load i64, i64* %sig
   %t12 = call i64 @turmeric_signal_Signal__set(i64 %t11, i64 0)
   store i64 %t12, i64* %t6
-  br label %match.end187
-match.arm189:
+  br label %match.end1336
+match.arm1338:
   %t13 = call i64 @__map_new()
   store i64 %t13, i64* %t6
-  br label %match.end187
-match.end187:
+  br label %match.end1336
+match.end1336:
   %t14 = load i64, i64* %t6
   ret i64 %t14
 }
 
-define linkonce_odr i64 @__lambda_190(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1339(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -988,7 +1551,7 @@ entry:
   %sig = alloca i64
   store i64 %t6, i64* %sig
   %t7 = load i64, i64* %handle
-  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.368, i64 0, i64 0
+  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.610, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i8* @__val_untag_ptr(i64 %t9)
   %t11 = load i64, i64* %sig
@@ -998,7 +1561,7 @@ entry:
   ret i64 0
 }
 
-define linkonce_odr i64 @__lambda_191(i64 %__env.arg, i64 %e.arg) {
+define linkonce_odr i64 @__lambda_1340(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1015,13 +1578,13 @@ entry:
   %t6 = alloca i64
   %t8 = lshr i64 %t5, 56
   %t7 = trunc i64 %t8 to i8
-  switch i8 %t7, label %match.arm194 [ i8 10, label %match.arm193 ]
-match.arm193:
+  switch i8 %t7, label %match.arm1343 [ i8 10, label %match.arm1342 ]
+match.arm1342:
   %t9 = and i64 %t5, 72057594037927935
   %t10 = call i64 @__val_tag_int(i64 %t9)
   store i64 %t10, i64* %data
   %t11 = load i64, i64* %sig
-  %t12 = getelementptr [5 x i8], [5 x i8]* @.str.370, i64 0, i64 0
+  %t12 = getelementptr [5 x i8], [5 x i8]* @.str.612, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   %t14 = inttoptr i64 0 to i8*
   %t15 = inttoptr i64 %t13 to i8*
@@ -1030,17 +1593,17 @@ match.arm193:
   %t18 = zext i1 %t17 to i64
   %t19 = call i64 @turmeric_signal_Signal__set(i64 %t11, i64 %t18)
   store i64 %t19, i64* %t6
-  br label %match.end192
-match.arm194:
+  br label %match.end1341
+match.arm1343:
   %t20 = call i64 @__map_new()
   store i64 %t20, i64* %t6
-  br label %match.end192
-match.end192:
+  br label %match.end1341
+match.end1341:
   %t21 = load i64, i64* %t6
   ret i64 %t21
 }
 
-define linkonce_odr i64 @__lambda_195(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1344(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1055,7 +1618,7 @@ entry:
   %sig = alloca i64
   store i64 %t6, i64* %sig
   %t7 = load i64, i64* %handle
-  %t8 = getelementptr [8 x i8], [8 x i8]* @.str.371, i64 0, i64 0
+  %t8 = getelementptr [8 x i8], [8 x i8]* @.str.613, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
   %t10 = call i8* @__val_untag_ptr(i64 %t9)
   %t11 = load i64, i64* %sig
@@ -1064,7 +1627,7 @@ entry:
   ret i64 0
 }
 
-define linkonce_odr i64 @__lambda_208(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1357(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1079,7 +1642,7 @@ entry:
   ret i64 %t6
 }
 
-define linkonce_odr i64 @__lambda_224(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1373(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1094,7 +1657,7 @@ entry:
   ret i64 %t6
 }
 
-define linkonce_odr i64 @__lambda_237(i64 %__env.arg) {
+define linkonce_odr i64 @__lambda_1386(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1109,7 +1672,7 @@ entry:
   ret i64 %t6
 }
 
-define i64 @__lambda_265(i64 %__env.arg) {
+define i64 @__lambda_1414(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1120,7 +1683,7 @@ entry:
   ret i64 %t4
 }
 
-define i64 @__lambda_266(i64 %__env.arg) {
+define i64 @__lambda_1415(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1128,51 +1691,44 @@ entry:
   %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
   %t3 = add i64 0, 2
   %t4 = icmp eq i64 %t3, 0
-  br i1 %t4, label %div_err273, label %div_ok274
-div_err273:
+  br i1 %t4, label %div_err1422, label %div_ok1423
+div_err1422:
   call i64 @__division_error()
   unreachable
-div_ok274:
+div_ok1423:
   %t5 = srem i64 %t2, %t3
   %t6 = add i64 0, 0
   %t8 = icmp eq i64 %t5, %t6
   %t7 = zext i1 %t8 to i64
   %t9 = trunc i64 %t7 to i1
-  br i1 %t9, label %then275, label %else276
-then275:
-  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.375, i64 0, i64 0
+  br i1 %t9, label %then1424, label %else1425
+then1424:
+  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.617, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   ret i64 %t11
-else276:
-  br label %endif272
-endif272:
-  %t12 = getelementptr [4 x i8], [4 x i8]* @.str.376, i64 0, i64 0
+else1425:
+  br label %endif1421
+endif1421:
+  %t12 = getelementptr [4 x i8], [4 x i8]* @.str.618, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   ret i64 %t13
 }
 
-define i64 @__lambda_278(i64 %__env.arg) {
+define i64 @__lambda_1427(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [17 x i8], [17 x i8]* @.str.379, i64 0, i64 0
+  %t1 = getelementptr [17 x i8], [17 x i8]* @.str.626, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_279(i64 %__env.arg) {
+define i64 @__lambda_1428(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_280(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.388, i64 0, i64 0
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.637, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
   %t3 = load i64, i64* @__g_count
   %t4 = call i64 @turmeric_signal_Signal__get(i64 %t3)
@@ -1188,7 +1744,7 @@ entry:
   call i8* @strcpy(i8* %t13, i8* %t7)
   call i8* @strcat(i8* %t13, i8* %t8)
   %t14 = ptrtoint i8* %t13 to i64
-  %t15 = getelementptr [1 x i8], [1 x i8]* @.str.389, i64 0, i64 0
+  %t15 = getelementptr [1 x i8], [1 x i8]* @.str.638, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   %t17 = inttoptr i64 %t14 to i8*
   %t18 = inttoptr i64 %t16 to i8*
@@ -1200,11 +1756,11 @@ entry:
   call i8* @strcpy(i8* %t23, i8* %t17)
   call i8* @strcat(i8* %t23, i8* %t18)
   %t24 = ptrtoint i8* %t23 to i64
-  %t25 = call i64 @turmeric_element_text(i64 %t24)
+  %t25 = call i64 @text(i64 %t24)
   ret i64 0
 }
 
-define i64 @__lambda_281(i64 %__env.arg) {
+define i64 @__lambda_1429(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1218,7 +1774,7 @@ entry:
   %t6 = load i64, i64* %t5
   %parity = alloca i64
   store i64 %t6, i64* %parity
-  %t7 = getelementptr [10 x i8], [10 x i8]* @.str.392, i64 0, i64 0
+  %t7 = getelementptr [10 x i8], [10 x i8]* @.str.643, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = load i64, i64* %doubled
   %t10 = call i64 @turmeric_signal_Computed__get(i64 %t9)
@@ -1234,7 +1790,7 @@ entry:
   call i8* @strcpy(i8* %t19, i8* %t13)
   call i8* @strcat(i8* %t19, i8* %t14)
   %t20 = ptrtoint i8* %t19 to i64
-  %t21 = getelementptr [4 x i8], [4 x i8]* @.str.393, i64 0, i64 0
+  %t21 = getelementptr [4 x i8], [4 x i8]* @.str.644, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = inttoptr i64 %t20 to i8*
   %t24 = inttoptr i64 %t22 to i8*
@@ -1260,7 +1816,7 @@ entry:
   call i8* @strcpy(i8* %t41, i8* %t35)
   call i8* @strcat(i8* %t41, i8* %t36)
   %t42 = ptrtoint i8* %t41 to i64
-  %t43 = getelementptr [1 x i8], [1 x i8]* @.str.394, i64 0, i64 0
+  %t43 = getelementptr [1 x i8], [1 x i8]* @.str.645, i64 0, i64 0
   %t44 = ptrtoint i8* %t43 to i64
   %t45 = inttoptr i64 %t42 to i8*
   %t46 = inttoptr i64 %t44 to i8*
@@ -1272,11 +1828,11 @@ entry:
   call i8* @strcpy(i8* %t51, i8* %t45)
   call i8* @strcat(i8* %t51, i8* %t46)
   %t52 = ptrtoint i8* %t51 to i64
-  %t53 = call i64 @turmeric_element_text(i64 %t52)
+  %t53 = call i64 @text(i64 %t52)
   unreachable
 }
 
-define i64 @__lambda_284(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1432(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1288,7 +1844,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_285(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1433(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1300,7 +1856,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_283(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1431(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1309,7 +1865,7 @@ entry:
   %t1 = load i64, i64* @__g_count
   %t2 = call i8* @malloc(i64 16)
   %t3 = bitcast i8* %t2 to [2 x i64]*
-  %t4 = ptrtoint i64 (i64, i64)* @__lambda_285 to i64
+  %t4 = ptrtoint i64 (i64, i64)* @__lambda_1433 to i64
   %t5 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
   store i64 %t4, i64* %t5
   %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
@@ -1319,17 +1875,17 @@ entry:
   ret i64 %t8
 }
 
-define i64 @__lambda_286(i64 %__env.arg) {
+define i64 @__lambda_1434(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.397, i64 0, i64 0
+  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.655, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_288(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1436(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1341,7 +1897,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_289(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1437(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1353,7 +1909,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_287(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1435(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1362,7 +1918,7 @@ entry:
   %t1 = load i64, i64* @__g_count
   %t2 = call i8* @malloc(i64 16)
   %t3 = bitcast i8* %t2 to [2 x i64]*
-  %t4 = ptrtoint i64 (i64, i64)* @__lambda_289 to i64
+  %t4 = ptrtoint i64 (i64, i64)* @__lambda_1437 to i64
   %t5 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
   store i64 %t4, i64* %t5
   %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
@@ -1372,17 +1928,17 @@ entry:
   ret i64 %t8
 }
 
-define i64 @__lambda_290(i64 %__env.arg) {
+define i64 @__lambda_1438(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.399, i64 0, i64 0
+  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.662, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_291(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1439(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1394,17 +1950,17 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_292(i64 %__env.arg) {
+define i64 @__lambda_1440(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.402, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.669, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_294(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1442(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1416,7 +1972,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_295(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1443(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1428,7 +1984,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_293(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1441(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1437,7 +1993,7 @@ entry:
   %t1 = load i64, i64* @__g_count
   %t2 = call i8* @malloc(i64 16)
   %t3 = bitcast i8* %t2 to [2 x i64]*
-  %t4 = ptrtoint i64 (i64, i64)* @__lambda_295 to i64
+  %t4 = ptrtoint i64 (i64, i64)* @__lambda_1443 to i64
   %t5 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
   store i64 %t4, i64* %t5
   %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
@@ -1447,17 +2003,17 @@ entry:
   ret i64 %t8
 }
 
-define i64 @__lambda_296(i64 %__env.arg) {
+define i64 @__lambda_1444(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.404, i64 0, i64 0
+  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.676, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_298(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1446(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1469,7 +2025,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_299(i64 %__env.arg, i64 %n.arg) {
+define i64 @__lambda_1447(i64 %__env.arg, i64 %n.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1481,7 +2037,7 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_297(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1445(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1490,7 +2046,7 @@ entry:
   %t1 = load i64, i64* @__g_count
   %t2 = call i8* @malloc(i64 16)
   %t3 = bitcast i8* %t2 to [2 x i64]*
-  %t4 = ptrtoint i64 (i64, i64)* @__lambda_299 to i64
+  %t4 = ptrtoint i64 (i64, i64)* @__lambda_1447 to i64
   %t5 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
   store i64 %t4, i64* %t5
   %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
@@ -1500,17 +2056,17 @@ entry:
   ret i64 %t8
 }
 
-define i64 @__lambda_300(i64 %__env.arg) {
+define i64 @__lambda_1448(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.406, i64 0, i64 0
+  %t1 = getelementptr [12 x i8], [12 x i8]* @.str.683, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_301(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1449(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1522,77 +2078,111 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_302(i64 %__env.arg) {
+define i64 @__lambda_1450(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.409, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.690, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_282(i64 %__env.arg) {
+define i64 @__lambda_1430(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64, i64)* @__lambda_293 to i64
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 %t3, i64* %t4
-  %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 0, i64* %t5
-  %t6 = ptrtoint [2 x i64]* %t2 to i64
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_296 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 0, i64* %t11
-  %t12 = ptrtoint [2 x i64]* %t8 to i64
-  %t13 = call i64 @turmeric_generated_types_button(i64 %t6, i64 %t12)
-  %t14 = call i8* @malloc(i64 16)
-  %t15 = bitcast i8* %t14 to [2 x i64]*
-  %t16 = ptrtoint i64 (i64, i64)* @__lambda_297 to i64
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
-  store i64 %t16, i64* %t17
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
-  store i64 0, i64* %t18
-  %t19 = ptrtoint [2 x i64]* %t15 to i64
-  %t20 = call i8* @malloc(i64 16)
-  %t21 = bitcast i8* %t20 to [2 x i64]*
-  %t22 = ptrtoint i64 (i64)* @__lambda_300 to i64
-  %t23 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 0
-  store i64 %t22, i64* %t23
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 1
-  store i64 0, i64* %t24
-  %t25 = ptrtoint [2 x i64]* %t21 to i64
-  %t26 = call i64 @turmeric_generated_types_button(i64 %t19, i64 %t25)
-  %t27 = getelementptr [7 x i8], [7 x i8]* @.str.407, i64 0, i64 0
-  %t28 = ptrtoint i8* %t27 to i64
-  %t29 = call i8* @malloc(i64 16)
-  %t30 = bitcast i8* %t29 to [2 x i64]*
-  %t31 = ptrtoint i64 (i64, i64)* @__lambda_301 to i64
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t30, i64 0, i64 0
-  store i64 %t31, i64* %t32
-  %t33 = getelementptr [2 x i64], [2 x i64]* %t30, i64 0, i64 1
-  store i64 0, i64* %t33
-  %t34 = ptrtoint [2 x i64]* %t30 to i64
-  %t35 = call i8* @malloc(i64 16)
-  %t36 = bitcast i8* %t35 to [2 x i64]*
-  %t37 = ptrtoint i64 (i64)* @__lambda_302 to i64
-  %t38 = getelementptr [2 x i64], [2 x i64]* %t36, i64 0, i64 0
-  store i64 %t37, i64* %t38
-  %t39 = getelementptr [2 x i64], [2 x i64]* %t36, i64 0, i64 1
-  store i64 0, i64* %t39
-  %t40 = ptrtoint [2 x i64]* %t36 to i64
-  %t41 = call i64 @turmeric_generated_types_button(i64 %t28, i64 %t34, i64 %t40)
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.670, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.671, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.672, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = add i64 0, 0
+  %t8 = getelementptr [1 x i8], [1 x i8]* @.str.673, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = getelementptr [1 x i8], [1 x i8]* @.str.674, i64 0, i64 0
+  %t11 = ptrtoint i8* %t10 to i64
+  %t12 = call i8* @malloc(i64 16)
+  %t13 = bitcast i8* %t12 to [2 x i64]*
+  %t14 = ptrtoint i64 (i64, i64)* @__lambda_1441 to i64
+  %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
+  store i64 %t14, i64* %t15
+  %t16 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 1
+  store i64 0, i64* %t16
+  %t17 = ptrtoint [2 x i64]* %t13 to i64
+  %t18 = call i64 @__map_new()
+  %t19 = call i8* @malloc(i64 16)
+  %t20 = bitcast i8* %t19 to [2 x i64]*
+  %t21 = ptrtoint i64 (i64)* @__lambda_1444 to i64
+  %t22 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 0
+  store i64 %t21, i64* %t22
+  %t23 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 1
+  store i64 0, i64* %t23
+  %t24 = ptrtoint [2 x i64]* %t20 to i64
+  %t25 = call i64 @button(i64 %t2, i64 %t4, i64 %t6, i64 %t7, i64 %t9, i64 %t11, i64 %t17, i64 0, i64 %t18, i64 %t24)
+  %t26 = getelementptr [1 x i8], [1 x i8]* @.str.677, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = getelementptr [1 x i8], [1 x i8]* @.str.678, i64 0, i64 0
+  %t29 = ptrtoint i8* %t28 to i64
+  %t30 = getelementptr [1 x i8], [1 x i8]* @.str.679, i64 0, i64 0
+  %t31 = ptrtoint i8* %t30 to i64
+  %t32 = add i64 0, 0
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.680, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = getelementptr [1 x i8], [1 x i8]* @.str.681, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = call i8* @malloc(i64 16)
+  %t38 = bitcast i8* %t37 to [2 x i64]*
+  %t39 = ptrtoint i64 (i64, i64)* @__lambda_1445 to i64
+  %t40 = getelementptr [2 x i64], [2 x i64]* %t38, i64 0, i64 0
+  store i64 %t39, i64* %t40
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t38, i64 0, i64 1
+  store i64 0, i64* %t41
+  %t42 = ptrtoint [2 x i64]* %t38 to i64
+  %t43 = call i64 @__map_new()
+  %t44 = call i8* @malloc(i64 16)
+  %t45 = bitcast i8* %t44 to [2 x i64]*
+  %t46 = ptrtoint i64 (i64)* @__lambda_1448 to i64
+  %t47 = getelementptr [2 x i64], [2 x i64]* %t45, i64 0, i64 0
+  store i64 %t46, i64* %t47
+  %t48 = getelementptr [2 x i64], [2 x i64]* %t45, i64 0, i64 1
+  store i64 0, i64* %t48
+  %t49 = ptrtoint [2 x i64]* %t45 to i64
+  %t50 = call i64 @button(i64 %t27, i64 %t29, i64 %t31, i64 %t32, i64 %t34, i64 %t36, i64 %t42, i64 0, i64 %t43, i64 %t49)
+  %t51 = getelementptr [7 x i8], [7 x i8]* @.str.684, i64 0, i64 0
+  %t52 = ptrtoint i8* %t51 to i64
+  %t53 = getelementptr [1 x i8], [1 x i8]* @.str.685, i64 0, i64 0
+  %t54 = ptrtoint i8* %t53 to i64
+  %t55 = getelementptr [1 x i8], [1 x i8]* @.str.686, i64 0, i64 0
+  %t56 = ptrtoint i8* %t55 to i64
+  %t57 = add i64 0, 0
+  %t58 = getelementptr [1 x i8], [1 x i8]* @.str.687, i64 0, i64 0
+  %t59 = ptrtoint i8* %t58 to i64
+  %t60 = getelementptr [1 x i8], [1 x i8]* @.str.688, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @malloc(i64 16)
+  %t63 = bitcast i8* %t62 to [2 x i64]*
+  %t64 = ptrtoint i64 (i64, i64)* @__lambda_1449 to i64
+  %t65 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 0
+  store i64 %t64, i64* %t65
+  %t66 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 1
+  store i64 0, i64* %t66
+  %t67 = ptrtoint [2 x i64]* %t63 to i64
+  %t68 = call i64 @__map_new()
+  %t69 = call i8* @malloc(i64 16)
+  %t70 = bitcast i8* %t69 to [2 x i64]*
+  %t71 = ptrtoint i64 (i64)* @__lambda_1450 to i64
+  %t72 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 0
+  store i64 %t71, i64* %t72
+  %t73 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 1
+  store i64 0, i64* %t73
+  %t74 = ptrtoint [2 x i64]* %t70 to i64
+  %t75 = call i64 @button(i64 %t52, i64 %t54, i64 %t56, i64 %t57, i64 %t59, i64 %t61, i64 %t67, i64 0, i64 %t68, i64 %t74)
   ret i64 0
 }
 
-define i64 @__lambda_277(i64 %__env.arg) {
+define i64 @__lambda_1426(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1607,95 +2197,109 @@ entry:
   %parity = alloca i64
   store i64 %t6, i64* %parity
   %__map = alloca i64
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_278 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 0, i64* %t11
-  %t12 = ptrtoint [2 x i64]* %t8 to i64
-  %t13 = call i8* @malloc(i64 16)
-  %t14 = bitcast i8* %t13 to [2 x i64]*
-  %t15 = ptrtoint i64 (i64)* @__lambda_279 to i64
-  %t16 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 0
-  store i64 %t15, i64* %t16
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 1
-  store i64 0, i64* %t17
-  %t18 = ptrtoint [2 x i64]* %t14 to i64
-  %t19 = call i64 @turmeric_generated_types_h1(i64 %t12, i64 %t18)
-  %t20 = call i64 @__map_new()
-  store i64 %t20, i64* %__map
-  %t21 = load i64, i64* %__map
-  %t22 = getelementptr [10 x i8], [10 x i8]* @.str.380, i64 0, i64 0
-  %t23 = ptrtoint i8* %t22 to i64
-  %t24 = getelementptr [5 x i8], [5 x i8]* @.str.381, i64 0, i64 0
-  %t25 = ptrtoint i8* %t24 to i64
-  %t26 = call i64 @__map_set(i64 %t21, i64 %t23, i64 %t25)
-  %t27 = load i64, i64* %__map
-  %t28 = getelementptr [12 x i8], [12 x i8]* @.str.382, i64 0, i64 0
-  %t29 = ptrtoint i8* %t28 to i64
-  %t30 = getelementptr [5 x i8], [5 x i8]* @.str.383, i64 0, i64 0
-  %t31 = ptrtoint i8* %t30 to i64
-  %t32 = call i64 @__map_set(i64 %t27, i64 %t29, i64 %t31)
-  %t33 = load i64, i64* %__map
-  %t34 = getelementptr [6 x i8], [6 x i8]* @.str.384, i64 0, i64 0
-  %t35 = ptrtoint i8* %t34 to i64
-  %t36 = getelementptr [8 x i8], [8 x i8]* @.str.385, i64 0, i64 0
-  %t37 = ptrtoint i8* %t36 to i64
-  %t38 = call i64 @__map_set(i64 %t33, i64 %t35, i64 %t37)
-  %t39 = load i64, i64* %__map
-  %t40 = call i8* @malloc(i64 16)
-  %t41 = bitcast i8* %t40 to [2 x i64]*
-  %t42 = ptrtoint i64 (i64)* @__lambda_280 to i64
-  %t43 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 0
-  store i64 %t42, i64* %t43
-  %t44 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 1
-  store i64 0, i64* %t44
-  %t45 = ptrtoint [2 x i64]* %t41 to i64
-  %t46 = call i64 @turmeric_generated_types_p(i64 %t39, i64 %t45)
-  %t47 = call i64 @__map_new()
-  store i64 %t47, i64* %__map
-  %t48 = load i64, i64* %__map
-  %t49 = getelementptr [6 x i8], [6 x i8]* @.str.390, i64 0, i64 0
-  %t50 = ptrtoint i8* %t49 to i64
-  %t51 = getelementptr [5 x i8], [5 x i8]* @.str.391, i64 0, i64 0
-  %t52 = ptrtoint i8* %t51 to i64
-  %t53 = call i64 @__map_set(i64 %t48, i64 %t50, i64 %t52)
-  %t54 = load i64, i64* %__map
-  %t55 = call i8* @malloc(i64 16)
-  %t56 = bitcast i8* %t55 to [2 x i64]*
-  %t57 = load i64, i64* %doubled
-  %t58 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 0
-  store i64 %t57, i64* %t58
-  %t59 = load i64, i64* %parity
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 1
-  store i64 %t59, i64* %t60
-  %t61 = call i8* @malloc(i64 16)
-  %t62 = bitcast i8* %t61 to [2 x i64]*
-  %t63 = ptrtoint i64 (i64)* @__lambda_281 to i64
-  %t64 = getelementptr [2 x i64], [2 x i64]* %t62, i64 0, i64 0
-  store i64 %t63, i64* %t64
-  %t65 = ptrtoint [2 x i64]* %t56 to i64
-  %t66 = getelementptr [2 x i64], [2 x i64]* %t62, i64 0, i64 1
-  store i64 %t65, i64* %t66
-  %t67 = ptrtoint [2 x i64]* %t62 to i64
-  %t68 = call i64 @turmeric_generated_types_p(i64 %t54, i64 %t67)
-  %t69 = getelementptr [11 x i8], [11 x i8]* @.str.395, i64 0, i64 0
-  %t70 = ptrtoint i8* %t69 to i64
-  %t71 = call i8* @malloc(i64 16)
-  %t72 = bitcast i8* %t71 to [2 x i64]*
-  %t73 = ptrtoint i64 (i64)* @__lambda_282 to i64
-  %t74 = getelementptr [2 x i64], [2 x i64]* %t72, i64 0, i64 0
-  store i64 %t73, i64* %t74
-  %t75 = getelementptr [2 x i64], [2 x i64]* %t72, i64 0, i64 1
-  store i64 0, i64* %t75
-  %t76 = ptrtoint [2 x i64]* %t72 to i64
-  %t77 = call i64 @turmeric_generated_types_div(i64 %t70, i64 %t76)
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.622, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  %t9 = getelementptr [1 x i8], [1 x i8]* @.str.623, i64 0, i64 0
+  %t10 = ptrtoint i8* %t9 to i64
+  %t11 = getelementptr [1 x i8], [1 x i8]* @.str.624, i64 0, i64 0
+  %t12 = ptrtoint i8* %t11 to i64
+  %t13 = call i64 @__map_new()
+  %t14 = call i8* @malloc(i64 16)
+  %t15 = bitcast i8* %t14 to [2 x i64]*
+  %t16 = ptrtoint i64 (i64)* @__lambda_1427 to i64
+  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
+  store i64 %t16, i64* %t17
+  %t18 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
+  store i64 0, i64* %t18
+  %t19 = ptrtoint [2 x i64]* %t15 to i64
+  %t20 = call i64 @h1(i64 %t8, i64 %t10, i64 %t12, i64 0, i64 %t13, i64 %t19)
+  %t21 = getelementptr [1 x i8], [1 x i8]* @.str.627, i64 0, i64 0
+  %t22 = ptrtoint i8* %t21 to i64
+  %t23 = getelementptr [1 x i8], [1 x i8]* @.str.628, i64 0, i64 0
+  %t24 = ptrtoint i8* %t23 to i64
+  %t25 = call i64 @__map_new()
+  store i64 %t25, i64* %__map
+  %t26 = load i64, i64* %__map
+  %t27 = getelementptr [10 x i8], [10 x i8]* @.str.629, i64 0, i64 0
+  %t28 = ptrtoint i8* %t27 to i64
+  %t29 = getelementptr [5 x i8], [5 x i8]* @.str.630, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i64 @__map_set(i64 %t26, i64 %t28, i64 %t30)
+  %t32 = load i64, i64* %__map
+  %t33 = getelementptr [12 x i8], [12 x i8]* @.str.631, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = getelementptr [5 x i8], [5 x i8]* @.str.632, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = call i64 @__map_set(i64 %t32, i64 %t34, i64 %t36)
+  %t38 = load i64, i64* %__map
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.633, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = getelementptr [8 x i8], [8 x i8]* @.str.634, i64 0, i64 0
+  %t42 = ptrtoint i8* %t41 to i64
+  %t43 = call i64 @__map_set(i64 %t38, i64 %t40, i64 %t42)
+  %t44 = load i64, i64* %__map
+  %t45 = call i64 @__map_new()
+  %t46 = call i8* @malloc(i64 16)
+  %t47 = bitcast i8* %t46 to [2 x i64]*
+  %t48 = ptrtoint i64 (i64)* @__lambda_1428 to i64
+  %t49 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 0
+  store i64 %t48, i64* %t49
+  %t50 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 1
+  store i64 0, i64* %t50
+  %t51 = ptrtoint [2 x i64]* %t47 to i64
+  %t52 = call i64 @p(i64 %t22, i64 %t24, i64 %t44, i64 0, i64 %t45, i64 %t51)
+  %t53 = getelementptr [1 x i8], [1 x i8]* @.str.639, i64 0, i64 0
+  %t54 = ptrtoint i8* %t53 to i64
+  %t55 = getelementptr [1 x i8], [1 x i8]* @.str.640, i64 0, i64 0
+  %t56 = ptrtoint i8* %t55 to i64
+  %t57 = call i64 @__map_new()
+  store i64 %t57, i64* %__map
+  %t58 = load i64, i64* %__map
+  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.641, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = getelementptr [5 x i8], [5 x i8]* @.str.642, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i64 @__map_set(i64 %t58, i64 %t60, i64 %t62)
+  %t64 = load i64, i64* %__map
+  %t65 = call i64 @__map_new()
+  %t66 = call i8* @malloc(i64 16)
+  %t67 = bitcast i8* %t66 to [2 x i64]*
+  %t68 = load i64, i64* %doubled
+  %t69 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 0
+  store i64 %t68, i64* %t69
+  %t70 = load i64, i64* %parity
+  %t71 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 1
+  store i64 %t70, i64* %t71
+  %t72 = call i8* @malloc(i64 16)
+  %t73 = bitcast i8* %t72 to [2 x i64]*
+  %t74 = ptrtoint i64 (i64)* @__lambda_1429 to i64
+  %t75 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 0
+  store i64 %t74, i64* %t75
+  %t76 = ptrtoint [2 x i64]* %t67 to i64
+  %t77 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 1
+  store i64 %t76, i64* %t77
+  %t78 = ptrtoint [2 x i64]* %t73 to i64
+  %t79 = call i64 @p(i64 %t54, i64 %t56, i64 %t64, i64 0, i64 %t65, i64 %t78)
+  %t80 = getelementptr [11 x i8], [11 x i8]* @.str.646, i64 0, i64 0
+  %t81 = ptrtoint i8* %t80 to i64
+  %t82 = getelementptr [1 x i8], [1 x i8]* @.str.647, i64 0, i64 0
+  %t83 = ptrtoint i8* %t82 to i64
+  %t84 = getelementptr [1 x i8], [1 x i8]* @.str.648, i64 0, i64 0
+  %t85 = ptrtoint i8* %t84 to i64
+  %t86 = call i64 @__map_new()
+  %t87 = call i8* @malloc(i64 16)
+  %t88 = bitcast i8* %t87 to [2 x i64]*
+  %t89 = ptrtoint i64 (i64)* @__lambda_1430 to i64
+  %t90 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 0
+  store i64 %t89, i64* %t90
+  %t91 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 1
+  store i64 0, i64* %t91
+  %t92 = ptrtoint [2 x i64]* %t88 to i64
+  %t93 = call i64 @div(i64 %t81, i64 %t83, i64 %t85, i64 0, i64 %t86, i64 %t92)
   unreachable
 }
 
-define i64 @__lambda_303(i64 %__env.arg) {
+define i64 @__lambda_1451(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1705,24 +2309,17 @@ entry:
   ret i64 %t3
 }
 
-define i64 @__lambda_306(i64 %__env.arg) {
+define i64 @__lambda_1454(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.413, i64 0, i64 0
+  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.701, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_307(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_308(i64 %__env.arg) {
+define i64 @__lambda_1455(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1732,7 +2329,7 @@ entry:
   %t4 = load i64, i64* %t3
   %active_count = alloca i64
   store i64 %t4, i64* %active_count
-  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.415, i64 0, i64 0
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.705, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = load i64, i64* %active_count
   %t8 = call i64 @turmeric_signal_Computed__get(i64 %t7)
@@ -1748,7 +2345,7 @@ entry:
   call i8* @strcpy(i8* %t17, i8* %t11)
   call i8* @strcat(i8* %t17, i8* %t12)
   %t18 = ptrtoint i8* %t17 to i64
-  %t19 = getelementptr [7 x i8], [7 x i8]* @.str.416, i64 0, i64 0
+  %t19 = getelementptr [7 x i8], [7 x i8]* @.str.706, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = inttoptr i64 %t18 to i8*
   %t22 = inttoptr i64 %t20 to i8*
@@ -1760,11 +2357,11 @@ entry:
   call i8* @strcpy(i8* %t27, i8* %t21)
   call i8* @strcat(i8* %t27, i8* %t22)
   %t28 = ptrtoint i8* %t27 to i64
-  %t29 = call i64 @turmeric_element_text(i64 %t28)
+  %t29 = call i64 @text(i64 %t28)
   unreachable
 }
 
-define i64 @__lambda_305(i64 %__env.arg) {
+define i64 @__lambda_1453(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1774,44 +2371,48 @@ entry:
   %t4 = load i64, i64* %t3
   %active_count = alloca i64
   store i64 %t4, i64* %active_count
-  %t5 = call i8* @malloc(i64 16)
-  %t6 = bitcast i8* %t5 to [2 x i64]*
-  %t7 = ptrtoint i64 (i64)* @__lambda_306 to i64
-  %t8 = getelementptr [2 x i64], [2 x i64]* %t6, i64 0, i64 0
-  store i64 %t7, i64* %t8
-  %t9 = getelementptr [2 x i64], [2 x i64]* %t6, i64 0, i64 1
-  store i64 0, i64* %t9
-  %t10 = ptrtoint [2 x i64]* %t6 to i64
-  %t11 = call i8* @malloc(i64 16)
-  %t12 = bitcast i8* %t11 to [2 x i64]*
-  %t13 = ptrtoint i64 (i64)* @__lambda_307 to i64
-  %t14 = getelementptr [2 x i64], [2 x i64]* %t12, i64 0, i64 0
-  store i64 %t13, i64* %t14
-  %t15 = getelementptr [2 x i64], [2 x i64]* %t12, i64 0, i64 1
-  store i64 0, i64* %t15
-  %t16 = ptrtoint [2 x i64]* %t12 to i64
-  %t17 = call i64 @turmeric_generated_types_h1(i64 %t10, i64 %t16)
-  %t18 = getelementptr [6 x i8], [6 x i8]* @.str.414, i64 0, i64 0
-  %t19 = ptrtoint i8* %t18 to i64
-  %t20 = call i8* @malloc(i64 8)
-  %t21 = bitcast i8* %t20 to [1 x i64]*
-  %t22 = load i64, i64* %active_count
-  %t23 = getelementptr [1 x i64], [1 x i64]* %t21, i64 0, i64 0
-  store i64 %t22, i64* %t23
-  %t24 = call i8* @malloc(i64 16)
-  %t25 = bitcast i8* %t24 to [2 x i64]*
-  %t26 = ptrtoint i64 (i64)* @__lambda_308 to i64
-  %t27 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 0
-  store i64 %t26, i64* %t27
-  %t28 = ptrtoint [1 x i64]* %t21 to i64
-  %t29 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 1
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.697, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.698, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  %t9 = getelementptr [1 x i8], [1 x i8]* @.str.699, i64 0, i64 0
+  %t10 = ptrtoint i8* %t9 to i64
+  %t11 = call i64 @__map_new()
+  %t12 = call i8* @malloc(i64 16)
+  %t13 = bitcast i8* %t12 to [2 x i64]*
+  %t14 = ptrtoint i64 (i64)* @__lambda_1454 to i64
+  %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
+  store i64 %t14, i64* %t15
+  %t16 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 1
+  store i64 0, i64* %t16
+  %t17 = ptrtoint [2 x i64]* %t13 to i64
+  %t18 = call i64 @h1(i64 %t6, i64 %t8, i64 %t10, i64 0, i64 %t11, i64 %t17)
+  %t19 = getelementptr [6 x i8], [6 x i8]* @.str.702, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = getelementptr [1 x i8], [1 x i8]* @.str.703, i64 0, i64 0
+  %t22 = ptrtoint i8* %t21 to i64
+  %t23 = getelementptr [1 x i8], [1 x i8]* @.str.704, i64 0, i64 0
+  %t24 = ptrtoint i8* %t23 to i64
+  %t25 = call i64 @__map_new()
+  %t26 = call i8* @malloc(i64 8)
+  %t27 = bitcast i8* %t26 to [1 x i64]*
+  %t28 = load i64, i64* %active_count
+  %t29 = getelementptr [1 x i64], [1 x i64]* %t27, i64 0, i64 0
   store i64 %t28, i64* %t29
-  %t30 = ptrtoint [2 x i64]* %t25 to i64
-  %t31 = call i64 @turmeric_generated_types_span(i64 %t19, i64 %t30)
+  %t30 = call i8* @malloc(i64 16)
+  %t31 = bitcast i8* %t30 to [2 x i64]*
+  %t32 = ptrtoint i64 (i64)* @__lambda_1455 to i64
+  %t33 = getelementptr [2 x i64], [2 x i64]* %t31, i64 0, i64 0
+  store i64 %t32, i64* %t33
+  %t34 = ptrtoint [1 x i64]* %t27 to i64
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t31, i64 0, i64 1
+  store i64 %t34, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t31 to i64
+  %t37 = call i64 @span(i64 %t20, i64 %t22, i64 %t24, i64 0, i64 %t25, i64 %t36)
   unreachable
 }
 
-define i64 @__lambda_320(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1467(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1825,7 +2426,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_330(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1477(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1839,7 +2440,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_310(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1457(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1850,12 +2451,12 @@ entry:
   %t2 = alloca i64
   %t4 = lshr i64 %t1, 56
   %t3 = trunc i64 %t4 to i8
-  switch i8 %t3, label %match.arm323 [ i8 7, label %match.arm322 ]
-match.arm322:
+  switch i8 %t3, label %match.arm1470 [ i8 7, label %match.arm1469 ]
+match.arm1469:
   %t5 = and i64 %t1, 72057594037927935
   %t6 = call i64 @__val_tag_int(i64 %t5)
   store i64 %t6, i64* %data
-  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.422, i64 0, i64 0
+  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.725, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = inttoptr i64 0 to i8*
   %t10 = inttoptr i64 %t8 to i8*
@@ -1863,10 +2464,10 @@ match.arm322:
   %t12 = icmp eq i32 %t11, 0
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br label %logic.entry325
-logic.entry325:
-  br i1 %t14, label %rhs326, label %end327
-rhs326:
+  br label %logic.entry1472
+logic.entry1472:
+  br i1 %t14, label %rhs1473, label %end1474
+rhs1473:
   %t15 = load i64, i64* @__g_new_todo
   %t16 = call i64 @turmeric_signal_Signal__get(i64 %t15)
   %t17 = call i64 @__list_length(i64 %t16)
@@ -1874,17 +2475,17 @@ rhs326:
   %t20 = icmp sgt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br label %end327
-end327:
-  %t22 = phi i1 [%t14, %logic.entry325], [%t21, %rhs326]
+  br label %end1474
+end1474:
+  %t22 = phi i1 [%t14, %logic.entry1472], [%t21, %rhs1473]
   %t23 = zext i1 %t22 to i64
   %t24 = trunc i64 %t23 to i1
-  br i1 %t24, label %then328, label %else329
-then328:
+  br i1 %t24, label %then1475, label %else1476
+then1475:
   %t25 = load i64, i64* @__g_todos
   %t26 = call i8* @malloc(i64 16)
   %t27 = bitcast i8* %t26 to [2 x i64]*
-  %t28 = ptrtoint i64 (i64, i64)* @__lambda_330 to i64
+  %t28 = ptrtoint i64 (i64, i64)* @__lambda_1477 to i64
   %t29 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 0
   store i64 %t28, i64* %t29
   %t30 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 1
@@ -1892,25 +2493,25 @@ then328:
   %t31 = ptrtoint [2 x i64]* %t27 to i64
   %t32 = call i64 @turmeric_signal_Signal__update(i64 %t25, i64 %t31)
   %t33 = load i64, i64* @__g_new_todo
-  %t34 = getelementptr [1 x i8], [1 x i8]* @.str.423, i64 0, i64 0
+  %t34 = getelementptr [1 x i8], [1 x i8]* @.str.726, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @turmeric_signal_Signal__set(i64 %t33, i64 %t35)
-  br label %endif324
-else329:
-  br label %endif324
-endif324:
+  br label %endif1471
+else1476:
+  br label %endif1471
+endif1471:
   store i64 0, i64* %t2
-  br label %match.end321
-match.arm323:
+  br label %match.end1468
+match.arm1470:
   %t37 = call i64 @__map_new()
   store i64 %t37, i64* %t2
-  br label %match.end321
-match.end321:
+  br label %match.end1468
+match.end1468:
   %t38 = load i64, i64* %t2
   ret i64 %t38
 }
 
-define i64 @__lambda_335(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1482(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1924,7 +2525,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_339(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1486(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1938,7 +2539,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_331(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1478(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1951,12 +2552,12 @@ entry:
   %t6 = icmp sgt i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then337, label %else338
-then337:
+  br i1 %t7, label %then1484, label %else1485
+then1484:
   %t8 = load i64, i64* @__g_todos
   %t9 = call i8* @malloc(i64 16)
   %t10 = bitcast i8* %t9 to [2 x i64]*
-  %t11 = ptrtoint i64 (i64, i64)* @__lambda_339 to i64
+  %t11 = ptrtoint i64 (i64, i64)* @__lambda_1486 to i64
   %t12 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 0
   store i64 %t11, i64* %t12
   %t13 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 1
@@ -1964,27 +2565,27 @@ then337:
   %t14 = ptrtoint [2 x i64]* %t10 to i64
   %t15 = call i64 @turmeric_signal_Signal__update(i64 %t8, i64 %t14)
   %t16 = load i64, i64* @__g_new_todo
-  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.425, i64 0, i64 0
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.733, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @turmeric_signal_Signal__set(i64 %t16, i64 %t18)
-  br label %endif336
-else338:
-  br label %endif336
-endif336:
+  br label %endif1483
+else1485:
+  br label %endif1483
+endif1483:
   ret i64 0
 }
 
-define i64 @__lambda_340(i64 %__env.arg) {
+define i64 @__lambda_1487(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.427, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.735, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_351(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1498(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -1998,7 +2599,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_361(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1508(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2012,7 +2613,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_341(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1488(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2023,12 +2624,12 @@ entry:
   %t2 = alloca i64
   %t4 = lshr i64 %t1, 56
   %t3 = trunc i64 %t4 to i8
-  switch i8 %t3, label %match.arm354 [ i8 7, label %match.arm353 ]
-match.arm353:
+  switch i8 %t3, label %match.arm1501 [ i8 7, label %match.arm1500 ]
+match.arm1500:
   %t5 = and i64 %t1, 72057594037927935
   %t6 = call i64 @__val_tag_int(i64 %t5)
   store i64 %t6, i64* %data
-  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.432, i64 0, i64 0
+  %t7 = getelementptr [6 x i8], [6 x i8]* @.str.751, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = inttoptr i64 0 to i8*
   %t10 = inttoptr i64 %t8 to i8*
@@ -2036,10 +2637,10 @@ match.arm353:
   %t12 = icmp eq i32 %t11, 0
   %t13 = zext i1 %t12 to i64
   %t14 = trunc i64 %t13 to i1
-  br label %logic.entry356
-logic.entry356:
-  br i1 %t14, label %rhs357, label %end358
-rhs357:
+  br label %logic.entry1503
+logic.entry1503:
+  br i1 %t14, label %rhs1504, label %end1505
+rhs1504:
   %t15 = load i64, i64* @__g_new_todo
   %t16 = call i64 @turmeric_signal_Signal__get(i64 %t15)
   %t17 = call i64 @__list_length(i64 %t16)
@@ -2047,17 +2648,17 @@ rhs357:
   %t20 = icmp sgt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br label %end358
-end358:
-  %t22 = phi i1 [%t14, %logic.entry356], [%t21, %rhs357]
+  br label %end1505
+end1505:
+  %t22 = phi i1 [%t14, %logic.entry1503], [%t21, %rhs1504]
   %t23 = zext i1 %t22 to i64
   %t24 = trunc i64 %t23 to i1
-  br i1 %t24, label %then359, label %else360
-then359:
+  br i1 %t24, label %then1506, label %else1507
+then1506:
   %t25 = load i64, i64* @__g_todos
   %t26 = call i8* @malloc(i64 16)
   %t27 = bitcast i8* %t26 to [2 x i64]*
-  %t28 = ptrtoint i64 (i64, i64)* @__lambda_361 to i64
+  %t28 = ptrtoint i64 (i64, i64)* @__lambda_1508 to i64
   %t29 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 0
   store i64 %t28, i64* %t29
   %t30 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 1
@@ -2065,25 +2666,25 @@ then359:
   %t31 = ptrtoint [2 x i64]* %t27 to i64
   %t32 = call i64 @turmeric_signal_Signal__update(i64 %t25, i64 %t31)
   %t33 = load i64, i64* @__g_new_todo
-  %t34 = getelementptr [1 x i8], [1 x i8]* @.str.433, i64 0, i64 0
+  %t34 = getelementptr [1 x i8], [1 x i8]* @.str.752, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @turmeric_signal_Signal__set(i64 %t33, i64 %t35)
-  br label %endif355
-else360:
-  br label %endif355
-endif355:
+  br label %endif1502
+else1507:
+  br label %endif1502
+endif1502:
   store i64 0, i64* %t2
-  br label %match.end352
-match.arm354:
+  br label %match.end1499
+match.arm1501:
   %t37 = call i64 @__map_new()
   store i64 %t37, i64* %t2
-  br label %match.end352
-match.end352:
+  br label %match.end1499
+match.end1499:
   %t38 = load i64, i64* %t2
   ret i64 %t38
 }
 
-define i64 @__lambda_366(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1513(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2097,7 +2698,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_370(i64 %__env.arg, i64 %list.arg) {
+define i64 @__lambda_1517(i64 %__env.arg, i64 %list.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2111,7 +2712,7 @@ entry:
   ret i64 %t5
 }
 
-define i64 @__lambda_362(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1509(i64 %__env.arg, i64 %e.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2124,12 +2725,12 @@ entry:
   %t6 = icmp sgt i64 %t3, %t4
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then368, label %else369
-then368:
+  br i1 %t7, label %then1515, label %else1516
+then1515:
   %t8 = load i64, i64* @__g_todos
   %t9 = call i8* @malloc(i64 16)
   %t10 = bitcast i8* %t9 to [2 x i64]*
-  %t11 = ptrtoint i64 (i64, i64)* @__lambda_370 to i64
+  %t11 = ptrtoint i64 (i64, i64)* @__lambda_1517 to i64
   %t12 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 0
   store i64 %t11, i64* %t12
   %t13 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 1
@@ -2137,65 +2738,169 @@ then368:
   %t14 = ptrtoint [2 x i64]* %t10 to i64
   %t15 = call i64 @turmeric_signal_Signal__update(i64 %t8, i64 %t14)
   %t16 = load i64, i64* @__g_new_todo
-  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.435, i64 0, i64 0
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.759, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @turmeric_signal_Signal__set(i64 %t16, i64 %t18)
-  br label %endif367
-else369:
-  br label %endif367
-endif367:
+  br label %endif1514
+else1516:
+  br label %endif1514
+endif1514:
   ret i64 0
 }
 
-define i64 @__lambda_371(i64 %__env.arg) {
+define i64 @__lambda_1518(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.437, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.761, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_309(i64 %__env.arg) {
+define i64 @__lambda_1456(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.428, i64 0, i64 0
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.736, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = getelementptr [18 x i8], [18 x i8]* @.str.429, i64 0, i64 0
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.737, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  %t5 = load i64, i64* @__g_new_todo
-  %t6 = call i8* @malloc(i64 16)
-  %t7 = bitcast i8* %t6 to [2 x i64]*
-  %t8 = ptrtoint i64 (i64, i64)* @__lambda_341 to i64
-  %t9 = getelementptr [2 x i64], [2 x i64]* %t7, i64 0, i64 0
-  store i64 %t8, i64* %t9
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t7, i64 0, i64 1
-  store i64 0, i64* %t10
-  %t11 = ptrtoint [2 x i64]* %t7 to i64
-  %t12 = call i64 @turmeric_generated_types_input(i64 %t2, i64 %t4, i64 %t5, i64 %t11)
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.738, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.739, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  %t9 = add i64 0, 0
+  %t10 = add i64 0, 0
+  %t11 = add i64 0, 0
+  %t12 = getelementptr [1 x i8], [1 x i8]* @.str.740, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = add i64 0, 0
+  %t15 = getelementptr [1 x i8], [1 x i8]* @.str.741, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i64
+  %t17 = add i64 0, 0
+  %t18 = add i64 0, 0
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.742, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = getelementptr [1 x i8], [1 x i8]* @.str.743, i64 0, i64 0
+  %t22 = ptrtoint i8* %t21 to i64
+  %t23 = getelementptr [18 x i8], [18 x i8]* @.str.744, i64 0, i64 0
+  %t24 = ptrtoint i8* %t23 to i64
+  %t25 = add i64 0, 0
+  %t26 = add i64 0, 0
+  %t27 = add i64 0, 0
+  %t28 = getelementptr [1 x i8], [1 x i8]* @.str.745, i64 0, i64 0
+  %t29 = ptrtoint i8* %t28 to i64
+  %t30 = getelementptr [1 x i8], [1 x i8]* @.str.746, i64 0, i64 0
+  %t31 = ptrtoint i8* %t30 to i64
+  %t32 = getelementptr [1 x i8], [1 x i8]* @.str.747, i64 0, i64 0
+  %t33 = ptrtoint i8* %t32 to i64
+  %t34 = getelementptr [1 x i8], [1 x i8]* @.str.748, i64 0, i64 0
+  %t35 = ptrtoint i8* %t34 to i64
+  %t36 = add i64 0, 0
+  %t37 = call i8* @malloc(i64 16)
+  %t38 = bitcast i8* %t37 to [2 x i64]*
+  %t39 = ptrtoint i64 (i64, i64)* @__lambda_1488 to i64
+  %t40 = getelementptr [2 x i64], [2 x i64]* %t38, i64 0, i64 0
+  store i64 %t39, i64* %t40
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t38, i64 0, i64 1
+  store i64 0, i64* %t41
+  %t42 = ptrtoint [2 x i64]* %t38 to i64
+  %t43 = call i64 @__map_new()
+  %t44 = call i64 @input(i64 %t2, i64 %t4, i64 %t6, i64 %t8, i64 %t9, i64 %t10, i64 %t11, i64 %t13, i64 %t14, i64 %t16, i64 %t17, i64 %t18, i64 %t20, i64 %t22, i64 %t24, i64 %t25, i64 %t26, i64 %t27, i64 %t29, i64 %t31, i64 %t33, i64 %t35, i64 %t36, i64 0, i64 0, i64 0, i64 0, i64 0, i64 %t42, i64 %t43)
+  %t45 = getelementptr [1 x i8], [1 x i8]* @.str.753, i64 0, i64 0
+  %t46 = ptrtoint i8* %t45 to i64
+  %t47 = getelementptr [1 x i8], [1 x i8]* @.str.754, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = getelementptr [1 x i8], [1 x i8]* @.str.755, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  %t51 = add i64 0, 0
+  %t52 = getelementptr [1 x i8], [1 x i8]* @.str.756, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = getelementptr [1 x i8], [1 x i8]* @.str.757, i64 0, i64 0
+  %t55 = ptrtoint i8* %t54 to i64
+  %t56 = call i8* @malloc(i64 16)
+  %t57 = bitcast i8* %t56 to [2 x i64]*
+  %t58 = ptrtoint i64 (i64, i64)* @__lambda_1509 to i64
+  %t59 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
+  store i64 %t58, i64* %t59
+  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
+  store i64 0, i64* %t60
+  %t61 = ptrtoint [2 x i64]* %t57 to i64
+  %t62 = call i64 @__map_new()
+  %t63 = call i8* @malloc(i64 16)
+  %t64 = bitcast i8* %t63 to [2 x i64]*
+  %t65 = ptrtoint i64 (i64)* @__lambda_1518 to i64
+  %t66 = getelementptr [2 x i64], [2 x i64]* %t64, i64 0, i64 0
+  store i64 %t65, i64* %t66
+  %t67 = getelementptr [2 x i64], [2 x i64]* %t64, i64 0, i64 1
+  store i64 0, i64* %t67
+  %t68 = ptrtoint [2 x i64]* %t64 to i64
+  %t69 = call i64 @button(i64 %t46, i64 %t48, i64 %t50, i64 %t51, i64 %t53, i64 %t55, i64 %t61, i64 0, i64 %t62, i64 %t68)
+  ret i64 0
+}
+
+define i64 @__lambda_1521(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = load i64, i64* %__env
+  %t2 = inttoptr i64 %t1 to [1 x i64]*
+  %t3 = getelementptr [1 x i64], [1 x i64]* %t2, i64 0, i64 0
+  %t4 = load i64, i64* %t3
+  %todo = alloca i64
+  store i64 %t4, i64* %todo
+  %t5 = load i64, i64* %todo
+  unreachable
+}
+
+define i64 @__lambda_1522(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = load i64, i64* %__env
+  %t2 = inttoptr i64 %t1 to [1 x i64]*
+  %t3 = getelementptr [1 x i64], [1 x i64]* %t2, i64 0, i64 0
+  %t4 = load i64, i64* %t3
+  %todo = alloca i64
+  store i64 %t4, i64* %todo
+  %t5 = load i64, i64* %todo
+  unreachable
+}
+
+define i64 @__lambda_1520(i64 %__env.arg, i64 %todo.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %todo = alloca i64
+  store i64 %todo.arg, i64* %todo
+  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.768, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.769, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.770, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = add i64 0, 0
+  %t8 = call i64 @__map_new()
+  %t9 = call i8* @malloc(i64 8)
+  %t10 = bitcast i8* %t9 to [1 x i64]*
+  %t11 = load i64, i64* %todo
+  %t12 = getelementptr [1 x i64], [1 x i64]* %t10, i64 0, i64 0
+  store i64 %t11, i64* %t12
   %t13 = call i8* @malloc(i64 16)
   %t14 = bitcast i8* %t13 to [2 x i64]*
-  %t15 = ptrtoint i64 (i64, i64)* @__lambda_362 to i64
+  %t15 = ptrtoint i64 (i64)* @__lambda_1522 to i64
   %t16 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 0
   store i64 %t15, i64* %t16
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 1
-  store i64 0, i64* %t17
-  %t18 = ptrtoint [2 x i64]* %t14 to i64
-  %t19 = call i8* @malloc(i64 16)
-  %t20 = bitcast i8* %t19 to [2 x i64]*
-  %t21 = ptrtoint i64 (i64)* @__lambda_371 to i64
-  %t22 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 0
-  store i64 %t21, i64* %t22
-  %t23 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 1
-  store i64 0, i64* %t23
-  %t24 = ptrtoint [2 x i64]* %t20 to i64
-  %t25 = call i64 @turmeric_generated_types_button(i64 %t18, i64 %t24)
+  %t17 = ptrtoint [1 x i64]* %t10 to i64
+  %t18 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 1
+  store i64 %t17, i64* %t18
+  %t19 = ptrtoint [2 x i64]* %t14 to i64
+  %t20 = call i64 @li(i64 %t2, i64 %t4, i64 %t6, i64 %t7, i64 0, i64 %t8, i64 %t19)
   ret i64 0
 }
 
-define i64 @__lambda_374(i64 %__env.arg) {
+define i64 @__lambda_1524(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2209,7 +2914,7 @@ entry:
   unreachable
 }
 
-define i64 @__lambda_375(i64 %__env.arg) {
+define i64 @__lambda_1525(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2223,87 +2928,39 @@ entry:
   unreachable
 }
 
-define i64 @__lambda_373(i64 %__env.arg, i64 %todo.arg) {
+define i64 @__lambda_1523(i64 %__env.arg, i64 %todo.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
   %todo = alloca i64
   store i64 %todo.arg, i64* %todo
-  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.440, i64 0, i64 0
+  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.774, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 8)
-  %t4 = bitcast i8* %t3 to [1 x i64]*
-  %t5 = load i64, i64* %todo
-  %t6 = getelementptr [1 x i64], [1 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_375 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [1 x i64]* %t4 to i64
-  %t12 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.775, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.776, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = add i64 0, 0
+  %t8 = call i64 @__map_new()
+  %t9 = call i8* @malloc(i64 8)
+  %t10 = bitcast i8* %t9 to [1 x i64]*
+  %t11 = load i64, i64* %todo
+  %t12 = getelementptr [1 x i64], [1 x i64]* %t10, i64 0, i64 0
   store i64 %t11, i64* %t12
-  %t13 = ptrtoint [2 x i64]* %t8 to i64
-  %t14 = call i64 @turmeric_generated_types_li(i64 %t2, i64 %t13)
+  %t13 = call i8* @malloc(i64 16)
+  %t14 = bitcast i8* %t13 to [2 x i64]*
+  %t15 = ptrtoint i64 (i64)* @__lambda_1525 to i64
+  %t16 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 0
+  store i64 %t15, i64* %t16
+  %t17 = ptrtoint [1 x i64]* %t10 to i64
+  %t18 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 1
+  store i64 %t17, i64* %t18
+  %t19 = ptrtoint [2 x i64]* %t14 to i64
+  %t20 = call i64 @li(i64 %t2, i64 %t4, i64 %t6, i64 %t7, i64 0, i64 %t8, i64 %t19)
   ret i64 0
 }
 
-define i64 @__lambda_377(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = load i64, i64* %__env
-  %t2 = inttoptr i64 %t1 to [1 x i64]*
-  %t3 = getelementptr [1 x i64], [1 x i64]* %t2, i64 0, i64 0
-  %t4 = load i64, i64* %t3
-  %todo = alloca i64
-  store i64 %t4, i64* %todo
-  %t5 = load i64, i64* %todo
-  unreachable
-}
-
-define i64 @__lambda_378(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = load i64, i64* %__env
-  %t2 = inttoptr i64 %t1 to [1 x i64]*
-  %t3 = getelementptr [1 x i64], [1 x i64]* %t2, i64 0, i64 0
-  %t4 = load i64, i64* %t3
-  %todo = alloca i64
-  store i64 %t4, i64* %todo
-  %t5 = load i64, i64* %todo
-  unreachable
-}
-
-define i64 @__lambda_376(i64 %__env.arg, i64 %todo.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %todo = alloca i64
-  store i64 %todo.arg, i64* %todo
-  %t1 = getelementptr [10 x i8], [10 x i8]* @.str.442, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 8)
-  %t4 = bitcast i8* %t3 to [1 x i64]*
-  %t5 = load i64, i64* %todo
-  %t6 = getelementptr [1 x i64], [1 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_378 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [1 x i64]* %t4 to i64
-  %t12 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 %t11, i64* %t12
-  %t13 = ptrtoint [2 x i64]* %t8 to i64
-  %t14 = call i64 @turmeric_generated_types_li(i64 %t2, i64 %t13)
-  ret i64 0
-}
-
-define i64 @__lambda_372(i64 %__env.arg) {
+define i64 @__lambda_1519(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2311,7 +2968,7 @@ entry:
   %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
   %t3 = call i8* @malloc(i64 16)
   %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64, i64)* @__lambda_376 to i64
+  %t5 = ptrtoint i64 (i64, i64)* @__lambda_1523 to i64
   %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
   store i64 %t5, i64* %t6
   %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
@@ -2321,7 +2978,7 @@ entry:
   ret i64 0
 }
 
-define i64 @__lambda_304(i64 %__env.arg) {
+define i64 @__lambda_1452(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
@@ -2331,2232 +2988,2356 @@ entry:
   %t4 = load i64, i64* %t3
   %active_count = alloca i64
   store i64 %t4, i64* %active_count
-  %t5 = getelementptr [12 x i8], [12 x i8]* @.str.411, i64 0, i64 0
+  %t5 = getelementptr [12 x i8], [12 x i8]* @.str.694, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
-  %t7 = call i8* @malloc(i64 8)
-  %t8 = bitcast i8* %t7 to [1 x i64]*
-  %t9 = load i64, i64* %active_count
-  %t10 = getelementptr [1 x i64], [1 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = call i8* @malloc(i64 16)
-  %t12 = bitcast i8* %t11 to [2 x i64]*
-  %t13 = ptrtoint i64 (i64)* @__lambda_305 to i64
-  %t14 = getelementptr [2 x i64], [2 x i64]* %t12, i64 0, i64 0
-  store i64 %t13, i64* %t14
-  %t15 = ptrtoint [1 x i64]* %t8 to i64
-  %t16 = getelementptr [2 x i64], [2 x i64]* %t12, i64 0, i64 1
-  store i64 %t15, i64* %t16
-  %t17 = ptrtoint [2 x i64]* %t12 to i64
-  %t18 = call i64 @turmeric_generated_types_div(i64 %t6, i64 %t17)
-  %t19 = getelementptr [11 x i8], [11 x i8]* @.str.417, i64 0, i64 0
-  %t20 = ptrtoint i8* %t19 to i64
-  %t21 = call i8* @malloc(i64 16)
-  %t22 = bitcast i8* %t21 to [2 x i64]*
-  %t23 = ptrtoint i64 (i64)* @__lambda_309 to i64
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t22, i64 0, i64 0
-  store i64 %t23, i64* %t24
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t22, i64 0, i64 1
-  store i64 0, i64* %t25
-  %t26 = ptrtoint [2 x i64]* %t22 to i64
-  %t27 = call i64 @turmeric_generated_types_div(i64 %t20, i64 %t26)
-  %t28 = getelementptr [10 x i8], [10 x i8]* @.str.438, i64 0, i64 0
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.695, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  %t9 = getelementptr [1 x i8], [1 x i8]* @.str.696, i64 0, i64 0
+  %t10 = ptrtoint i8* %t9 to i64
+  %t11 = call i64 @__map_new()
+  %t12 = call i8* @malloc(i64 8)
+  %t13 = bitcast i8* %t12 to [1 x i64]*
+  %t14 = load i64, i64* %active_count
+  %t15 = getelementptr [1 x i64], [1 x i64]* %t13, i64 0, i64 0
+  store i64 %t14, i64* %t15
+  %t16 = call i8* @malloc(i64 16)
+  %t17 = bitcast i8* %t16 to [2 x i64]*
+  %t18 = ptrtoint i64 (i64)* @__lambda_1453 to i64
+  %t19 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 0
+  store i64 %t18, i64* %t19
+  %t20 = ptrtoint [1 x i64]* %t13 to i64
+  %t21 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 1
+  store i64 %t20, i64* %t21
+  %t22 = ptrtoint [2 x i64]* %t17 to i64
+  %t23 = call i64 @div(i64 %t6, i64 %t8, i64 %t10, i64 0, i64 %t11, i64 %t22)
+  %t24 = getelementptr [11 x i8], [11 x i8]* @.str.707, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i64
+  %t26 = getelementptr [1 x i8], [1 x i8]* @.str.708, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = getelementptr [1 x i8], [1 x i8]* @.str.709, i64 0, i64 0
   %t29 = ptrtoint i8* %t28 to i64
-  %t30 = call i8* @malloc(i64 16)
-  %t31 = bitcast i8* %t30 to [2 x i64]*
-  %t32 = ptrtoint i64 (i64)* @__lambda_372 to i64
-  %t33 = getelementptr [2 x i64], [2 x i64]* %t31, i64 0, i64 0
-  store i64 %t32, i64* %t33
-  %t34 = getelementptr [2 x i64], [2 x i64]* %t31, i64 0, i64 1
-  store i64 0, i64* %t34
-  %t35 = ptrtoint [2 x i64]* %t31 to i64
-  %t36 = call i64 @turmeric_generated_types_ul(i64 %t29, i64 %t35)
+  %t30 = call i64 @__map_new()
+  %t31 = call i8* @malloc(i64 16)
+  %t32 = bitcast i8* %t31 to [2 x i64]*
+  %t33 = ptrtoint i64 (i64)* @__lambda_1456 to i64
+  %t34 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 0
+  store i64 %t33, i64* %t34
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 1
+  store i64 0, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t32 to i64
+  %t37 = call i64 @div(i64 %t25, i64 %t27, i64 %t29, i64 0, i64 %t30, i64 %t36)
+  %t38 = getelementptr [10 x i8], [10 x i8]* @.str.762, i64 0, i64 0
+  %t39 = ptrtoint i8* %t38 to i64
+  %t40 = getelementptr [1 x i8], [1 x i8]* @.str.763, i64 0, i64 0
+  %t41 = ptrtoint i8* %t40 to i64
+  %t42 = getelementptr [1 x i8], [1 x i8]* @.str.764, i64 0, i64 0
+  %t43 = ptrtoint i8* %t42 to i64
+  %t44 = call i64 @__map_new()
+  %t45 = call i8* @malloc(i64 16)
+  %t46 = bitcast i8* %t45 to [2 x i64]*
+  %t47 = ptrtoint i64 (i64)* @__lambda_1519 to i64
+  %t48 = getelementptr [2 x i64], [2 x i64]* %t46, i64 0, i64 0
+  store i64 %t47, i64* %t48
+  %t49 = getelementptr [2 x i64], [2 x i64]* %t46, i64 0, i64 1
+  store i64 0, i64* %t49
+  %t50 = ptrtoint [2 x i64]* %t46 to i64
+  %t51 = call i64 @ul(i64 %t39, i64 %t41, i64 %t43, i64 0, i64 %t44, i64 %t50)
   unreachable
 }
 
-define i64 @__lambda_380(i64 %__env.arg) {
+define i64 @__lambda_1527(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [15 x i8], [15 x i8]* @.str.445, i64 0, i64 0
+  %t1 = getelementptr [15 x i8], [15 x i8]* @.str.784, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_381(i64 %__env.arg) {
+define i64 @__lambda_1528(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_382(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [63 x i8], [63 x i8]* @.str.447, i64 0, i64 0
+  %t1 = getelementptr [63 x i8], [63 x i8]* @.str.789, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_383(i64 %__env.arg) {
+define i64 @__lambda_1530(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_385(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.450, i64 0, i64 0
+  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.797, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_386(i64 %__env.arg) {
+define i64 @__lambda_1531(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_387(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.452, i64 0, i64 0
+  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.802, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_388(i64 %__env.arg) {
+define i64 @__lambda_1532(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_389(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.454, i64 0, i64 0
+  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.807, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_390(i64 %__env.arg) {
+define i64 @__lambda_1533(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_391(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.456, i64 0, i64 0
+  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.812, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_392(i64 %__env.arg) {
+define i64 @__lambda_1534(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_393(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.458, i64 0, i64 0
+  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.817, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_394(i64 %__env.arg) {
+define i64 @__lambda_1535(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_395(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.460, i64 0, i64 0
+  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.822, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_396(i64 %__env.arg) {
+define i64 @__lambda_1536(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_397(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.462, i64 0, i64 0
+  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.827, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_398(i64 %__env.arg) {
+define i64 @__lambda_1537(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_399(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.464, i64 0, i64 0
+  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.832, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_400(i64 %__env.arg) {
+define i64 @__lambda_1538(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_401(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.466, i64 0, i64 0
+  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.837, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_402(i64 %__env.arg) {
+define i64 @__lambda_1539(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_403(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.468, i64 0, i64 0
+  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.842, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_404(i64 %__env.arg) {
+define i64 @__lambda_1540(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_405(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.470, i64 0, i64 0
+  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.847, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_406(i64 %__env.arg) {
+define i64 @__lambda_1541(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_407(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.472, i64 0, i64 0
+  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.852, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_408(i64 %__env.arg) {
+define i64 @__lambda_1542(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_409(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.474, i64 0, i64 0
+  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.857, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_410(i64 %__env.arg) {
+define i64 @__lambda_1543(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_411(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.476, i64 0, i64 0
+  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.862, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_412(i64 %__env.arg) {
+define i64 @__lambda_1544(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_413(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.478, i64 0, i64 0
+  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.867, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_414(i64 %__env.arg) {
+define i64 @__lambda_1545(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_415(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.480, i64 0, i64 0
+  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.872, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_416(i64 %__env.arg) {
+define i64 @__lambda_1529(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_384(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64)* @__lambda_401 to i64
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 %t3, i64* %t4
-  %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 0, i64* %t5
-  %t6 = ptrtoint [2 x i64]* %t2 to i64
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_402 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 0, i64* %t11
-  %t12 = ptrtoint [2 x i64]* %t8 to i64
-  %t13 = call i64 @turmeric_generated_types_li(i64 %t6, i64 %t12)
-  %t14 = call i8* @malloc(i64 16)
-  %t15 = bitcast i8* %t14 to [2 x i64]*
-  %t16 = ptrtoint i64 (i64)* @__lambda_403 to i64
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
-  store i64 %t16, i64* %t17
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
-  store i64 0, i64* %t18
-  %t19 = ptrtoint [2 x i64]* %t15 to i64
-  %t20 = call i8* @malloc(i64 16)
-  %t21 = bitcast i8* %t20 to [2 x i64]*
-  %t22 = ptrtoint i64 (i64)* @__lambda_404 to i64
-  %t23 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 0
-  store i64 %t22, i64* %t23
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 1
-  store i64 0, i64* %t24
-  %t25 = ptrtoint [2 x i64]* %t21 to i64
-  %t26 = call i64 @turmeric_generated_types_li(i64 %t19, i64 %t25)
-  %t27 = call i8* @malloc(i64 16)
-  %t28 = bitcast i8* %t27 to [2 x i64]*
-  %t29 = ptrtoint i64 (i64)* @__lambda_405 to i64
-  %t30 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 0
-  store i64 %t29, i64* %t30
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 1
-  store i64 0, i64* %t31
-  %t32 = ptrtoint [2 x i64]* %t28 to i64
-  %t33 = call i8* @malloc(i64 16)
-  %t34 = bitcast i8* %t33 to [2 x i64]*
-  %t35 = ptrtoint i64 (i64)* @__lambda_406 to i64
-  %t36 = getelementptr [2 x i64], [2 x i64]* %t34, i64 0, i64 0
-  store i64 %t35, i64* %t36
-  %t37 = getelementptr [2 x i64], [2 x i64]* %t34, i64 0, i64 1
-  store i64 0, i64* %t37
-  %t38 = ptrtoint [2 x i64]* %t34 to i64
-  %t39 = call i64 @turmeric_generated_types_li(i64 %t32, i64 %t38)
-  %t40 = call i8* @malloc(i64 16)
-  %t41 = bitcast i8* %t40 to [2 x i64]*
-  %t42 = ptrtoint i64 (i64)* @__lambda_407 to i64
-  %t43 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 0
-  store i64 %t42, i64* %t43
-  %t44 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 1
-  store i64 0, i64* %t44
-  %t45 = ptrtoint [2 x i64]* %t41 to i64
-  %t46 = call i8* @malloc(i64 16)
-  %t47 = bitcast i8* %t46 to [2 x i64]*
-  %t48 = ptrtoint i64 (i64)* @__lambda_408 to i64
-  %t49 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 0
-  store i64 %t48, i64* %t49
-  %t50 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 1
-  store i64 0, i64* %t50
-  %t51 = ptrtoint [2 x i64]* %t47 to i64
-  %t52 = call i64 @turmeric_generated_types_li(i64 %t45, i64 %t51)
-  %t53 = call i8* @malloc(i64 16)
-  %t54 = bitcast i8* %t53 to [2 x i64]*
-  %t55 = ptrtoint i64 (i64)* @__lambda_409 to i64
-  %t56 = getelementptr [2 x i64], [2 x i64]* %t54, i64 0, i64 0
-  store i64 %t55, i64* %t56
-  %t57 = getelementptr [2 x i64], [2 x i64]* %t54, i64 0, i64 1
-  store i64 0, i64* %t57
-  %t58 = ptrtoint [2 x i64]* %t54 to i64
-  %t59 = call i8* @malloc(i64 16)
-  %t60 = bitcast i8* %t59 to [2 x i64]*
-  %t61 = ptrtoint i64 (i64)* @__lambda_410 to i64
-  %t62 = getelementptr [2 x i64], [2 x i64]* %t60, i64 0, i64 0
-  store i64 %t61, i64* %t62
-  %t63 = getelementptr [2 x i64], [2 x i64]* %t60, i64 0, i64 1
-  store i64 0, i64* %t63
-  %t64 = ptrtoint [2 x i64]* %t60 to i64
-  %t65 = call i64 @turmeric_generated_types_li(i64 %t58, i64 %t64)
-  %t66 = call i8* @malloc(i64 16)
-  %t67 = bitcast i8* %t66 to [2 x i64]*
-  %t68 = ptrtoint i64 (i64)* @__lambda_411 to i64
-  %t69 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 0
-  store i64 %t68, i64* %t69
-  %t70 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 1
-  store i64 0, i64* %t70
-  %t71 = ptrtoint [2 x i64]* %t67 to i64
-  %t72 = call i8* @malloc(i64 16)
-  %t73 = bitcast i8* %t72 to [2 x i64]*
-  %t74 = ptrtoint i64 (i64)* @__lambda_412 to i64
-  %t75 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 0
-  store i64 %t74, i64* %t75
-  %t76 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 1
-  store i64 0, i64* %t76
-  %t77 = ptrtoint [2 x i64]* %t73 to i64
-  %t78 = call i64 @turmeric_generated_types_li(i64 %t71, i64 %t77)
-  %t79 = call i8* @malloc(i64 16)
-  %t80 = bitcast i8* %t79 to [2 x i64]*
-  %t81 = ptrtoint i64 (i64)* @__lambda_413 to i64
-  %t82 = getelementptr [2 x i64], [2 x i64]* %t80, i64 0, i64 0
-  store i64 %t81, i64* %t82
-  %t83 = getelementptr [2 x i64], [2 x i64]* %t80, i64 0, i64 1
-  store i64 0, i64* %t83
-  %t84 = ptrtoint [2 x i64]* %t80 to i64
-  %t85 = call i8* @malloc(i64 16)
-  %t86 = bitcast i8* %t85 to [2 x i64]*
-  %t87 = ptrtoint i64 (i64)* @__lambda_414 to i64
-  %t88 = getelementptr [2 x i64], [2 x i64]* %t86, i64 0, i64 0
-  store i64 %t87, i64* %t88
-  %t89 = getelementptr [2 x i64], [2 x i64]* %t86, i64 0, i64 1
-  store i64 0, i64* %t89
-  %t90 = ptrtoint [2 x i64]* %t86 to i64
-  %t91 = call i64 @turmeric_generated_types_li(i64 %t84, i64 %t90)
-  %t92 = call i8* @malloc(i64 16)
-  %t93 = bitcast i8* %t92 to [2 x i64]*
-  %t94 = ptrtoint i64 (i64)* @__lambda_415 to i64
-  %t95 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 0
-  store i64 %t94, i64* %t95
-  %t96 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 1
-  store i64 0, i64* %t96
-  %t97 = ptrtoint [2 x i64]* %t93 to i64
-  %t98 = call i8* @malloc(i64 16)
-  %t99 = bitcast i8* %t98 to [2 x i64]*
-  %t100 = ptrtoint i64 (i64)* @__lambda_416 to i64
-  %t101 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 0
-  store i64 %t100, i64* %t101
-  %t102 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 1
-  store i64 0, i64* %t102
-  %t103 = ptrtoint [2 x i64]* %t99 to i64
-  %t104 = call i64 @turmeric_generated_types_li(i64 %t97, i64 %t103)
-  ret i64 0
-}
-
-define i64 @__lambda_417(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [15 x i8], [15 x i8]* @.str.482, i64 0, i64 0
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.833, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_418(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_419(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [63 x i8], [63 x i8]* @.str.484, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_420(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_422(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.487, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_423(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_424(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.489, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_425(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_426(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.491, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_427(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_428(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.493, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_429(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_430(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.495, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_431(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_432(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.497, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_433(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_434(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.499, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_435(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_436(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.501, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_437(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_438(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.503, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_439(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_440(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.505, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_441(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_442(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.507, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_443(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_444(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.509, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_445(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_446(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.511, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_447(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_448(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.513, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_449(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_450(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.515, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_451(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_452(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.517, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_453(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  ret i64 0
-}
-
-define i64 @__lambda_421(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64)* @__lambda_438 to i64
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 %t3, i64* %t4
-  %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 0, i64* %t5
-  %t6 = ptrtoint [2 x i64]* %t2 to i64
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_439 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 0, i64* %t11
-  %t12 = ptrtoint [2 x i64]* %t8 to i64
-  %t13 = call i64 @turmeric_generated_types_li(i64 %t6, i64 %t12)
-  %t14 = call i8* @malloc(i64 16)
-  %t15 = bitcast i8* %t14 to [2 x i64]*
-  %t16 = ptrtoint i64 (i64)* @__lambda_440 to i64
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
-  store i64 %t16, i64* %t17
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
-  store i64 0, i64* %t18
-  %t19 = ptrtoint [2 x i64]* %t15 to i64
-  %t20 = call i8* @malloc(i64 16)
-  %t21 = bitcast i8* %t20 to [2 x i64]*
-  %t22 = ptrtoint i64 (i64)* @__lambda_441 to i64
-  %t23 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 0
-  store i64 %t22, i64* %t23
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 1
-  store i64 0, i64* %t24
-  %t25 = ptrtoint [2 x i64]* %t21 to i64
-  %t26 = call i64 @turmeric_generated_types_li(i64 %t19, i64 %t25)
-  %t27 = call i8* @malloc(i64 16)
-  %t28 = bitcast i8* %t27 to [2 x i64]*
-  %t29 = ptrtoint i64 (i64)* @__lambda_442 to i64
-  %t30 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 0
-  store i64 %t29, i64* %t30
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 1
-  store i64 0, i64* %t31
-  %t32 = ptrtoint [2 x i64]* %t28 to i64
-  %t33 = call i8* @malloc(i64 16)
-  %t34 = bitcast i8* %t33 to [2 x i64]*
-  %t35 = ptrtoint i64 (i64)* @__lambda_443 to i64
-  %t36 = getelementptr [2 x i64], [2 x i64]* %t34, i64 0, i64 0
-  store i64 %t35, i64* %t36
-  %t37 = getelementptr [2 x i64], [2 x i64]* %t34, i64 0, i64 1
-  store i64 0, i64* %t37
-  %t38 = ptrtoint [2 x i64]* %t34 to i64
-  %t39 = call i64 @turmeric_generated_types_li(i64 %t32, i64 %t38)
-  %t40 = call i8* @malloc(i64 16)
-  %t41 = bitcast i8* %t40 to [2 x i64]*
-  %t42 = ptrtoint i64 (i64)* @__lambda_444 to i64
-  %t43 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 0
-  store i64 %t42, i64* %t43
-  %t44 = getelementptr [2 x i64], [2 x i64]* %t41, i64 0, i64 1
-  store i64 0, i64* %t44
-  %t45 = ptrtoint [2 x i64]* %t41 to i64
-  %t46 = call i8* @malloc(i64 16)
-  %t47 = bitcast i8* %t46 to [2 x i64]*
-  %t48 = ptrtoint i64 (i64)* @__lambda_445 to i64
-  %t49 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 0
-  store i64 %t48, i64* %t49
-  %t50 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 1
-  store i64 0, i64* %t50
-  %t51 = ptrtoint [2 x i64]* %t47 to i64
-  %t52 = call i64 @turmeric_generated_types_li(i64 %t45, i64 %t51)
-  %t53 = call i8* @malloc(i64 16)
-  %t54 = bitcast i8* %t53 to [2 x i64]*
-  %t55 = ptrtoint i64 (i64)* @__lambda_446 to i64
-  %t56 = getelementptr [2 x i64], [2 x i64]* %t54, i64 0, i64 0
-  store i64 %t55, i64* %t56
-  %t57 = getelementptr [2 x i64], [2 x i64]* %t54, i64 0, i64 1
-  store i64 0, i64* %t57
-  %t58 = ptrtoint [2 x i64]* %t54 to i64
-  %t59 = call i8* @malloc(i64 16)
-  %t60 = bitcast i8* %t59 to [2 x i64]*
-  %t61 = ptrtoint i64 (i64)* @__lambda_447 to i64
-  %t62 = getelementptr [2 x i64], [2 x i64]* %t60, i64 0, i64 0
-  store i64 %t61, i64* %t62
-  %t63 = getelementptr [2 x i64], [2 x i64]* %t60, i64 0, i64 1
-  store i64 0, i64* %t63
-  %t64 = ptrtoint [2 x i64]* %t60 to i64
-  %t65 = call i64 @turmeric_generated_types_li(i64 %t58, i64 %t64)
-  %t66 = call i8* @malloc(i64 16)
-  %t67 = bitcast i8* %t66 to [2 x i64]*
-  %t68 = ptrtoint i64 (i64)* @__lambda_448 to i64
-  %t69 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 0
-  store i64 %t68, i64* %t69
-  %t70 = getelementptr [2 x i64], [2 x i64]* %t67, i64 0, i64 1
-  store i64 0, i64* %t70
-  %t71 = ptrtoint [2 x i64]* %t67 to i64
-  %t72 = call i8* @malloc(i64 16)
-  %t73 = bitcast i8* %t72 to [2 x i64]*
-  %t74 = ptrtoint i64 (i64)* @__lambda_449 to i64
-  %t75 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 0
-  store i64 %t74, i64* %t75
-  %t76 = getelementptr [2 x i64], [2 x i64]* %t73, i64 0, i64 1
-  store i64 0, i64* %t76
-  %t77 = ptrtoint [2 x i64]* %t73 to i64
-  %t78 = call i64 @turmeric_generated_types_li(i64 %t71, i64 %t77)
-  %t79 = call i8* @malloc(i64 16)
-  %t80 = bitcast i8* %t79 to [2 x i64]*
-  %t81 = ptrtoint i64 (i64)* @__lambda_450 to i64
-  %t82 = getelementptr [2 x i64], [2 x i64]* %t80, i64 0, i64 0
-  store i64 %t81, i64* %t82
-  %t83 = getelementptr [2 x i64], [2 x i64]* %t80, i64 0, i64 1
-  store i64 0, i64* %t83
-  %t84 = ptrtoint [2 x i64]* %t80 to i64
-  %t85 = call i8* @malloc(i64 16)
-  %t86 = bitcast i8* %t85 to [2 x i64]*
-  %t87 = ptrtoint i64 (i64)* @__lambda_451 to i64
-  %t88 = getelementptr [2 x i64], [2 x i64]* %t86, i64 0, i64 0
-  store i64 %t87, i64* %t88
-  %t89 = getelementptr [2 x i64], [2 x i64]* %t86, i64 0, i64 1
-  store i64 0, i64* %t89
-  %t90 = ptrtoint [2 x i64]* %t86 to i64
-  %t91 = call i64 @turmeric_generated_types_li(i64 %t84, i64 %t90)
-  %t92 = call i8* @malloc(i64 16)
-  %t93 = bitcast i8* %t92 to [2 x i64]*
-  %t94 = ptrtoint i64 (i64)* @__lambda_452 to i64
-  %t95 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 0
-  store i64 %t94, i64* %t95
-  %t96 = getelementptr [2 x i64], [2 x i64]* %t93, i64 0, i64 1
-  store i64 0, i64* %t96
-  %t97 = ptrtoint [2 x i64]* %t93 to i64
-  %t98 = call i8* @malloc(i64 16)
-  %t99 = bitcast i8* %t98 to [2 x i64]*
-  %t100 = ptrtoint i64 (i64)* @__lambda_453 to i64
-  %t101 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 0
-  store i64 %t100, i64* %t101
-  %t102 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 1
-  store i64 0, i64* %t102
-  %t103 = ptrtoint [2 x i64]* %t99 to i64
-  %t104 = call i64 @turmeric_generated_types_li(i64 %t97, i64 %t103)
-  ret i64 0
-}
-
-define i64 @__lambda_379(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64)* @__lambda_417 to i64
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 %t3, i64* %t4
-  %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 0, i64* %t5
-  %t6 = ptrtoint [2 x i64]* %t2 to i64
-  %t7 = call i8* @malloc(i64 16)
-  %t8 = bitcast i8* %t7 to [2 x i64]*
-  %t9 = ptrtoint i64 (i64)* @__lambda_418 to i64
-  %t10 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 0
-  store i64 %t9, i64* %t10
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t8, i64 0, i64 1
-  store i64 0, i64* %t11
-  %t12 = ptrtoint [2 x i64]* %t8 to i64
-  %t13 = call i64 @turmeric_generated_types_h1(i64 %t6, i64 %t12)
-  %t14 = call i8* @malloc(i64 16)
-  %t15 = bitcast i8* %t14 to [2 x i64]*
-  %t16 = ptrtoint i64 (i64)* @__lambda_419 to i64
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
-  store i64 %t16, i64* %t17
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
-  store i64 0, i64* %t18
-  %t19 = ptrtoint [2 x i64]* %t15 to i64
-  %t20 = call i8* @malloc(i64 16)
-  %t21 = bitcast i8* %t20 to [2 x i64]*
-  %t22 = ptrtoint i64 (i64)* @__lambda_420 to i64
-  %t23 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 0
-  store i64 %t22, i64* %t23
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t21, i64 0, i64 1
-  store i64 0, i64* %t24
-  %t25 = ptrtoint [2 x i64]* %t21 to i64
-  %t26 = call i64 @turmeric_generated_types_p(i64 %t19, i64 %t25)
-  %t27 = getelementptr [9 x i8], [9 x i8]* @.str.485, i64 0, i64 0
-  %t28 = ptrtoint i8* %t27 to i64
-  %t29 = call i8* @malloc(i64 16)
-  %t30 = bitcast i8* %t29 to [2 x i64]*
-  %t31 = ptrtoint i64 (i64)* @__lambda_421 to i64
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t30, i64 0, i64 0
-  store i64 %t31, i64* %t32
-  %t33 = getelementptr [2 x i64], [2 x i64]* %t30, i64 0, i64 1
-  store i64 0, i64* %t33
-  %t34 = ptrtoint [2 x i64]* %t30 to i64
-  %t35 = call i64 @turmeric_generated_types_ul(i64 %t28, i64 %t34)
-  ret i64 0
-}
-
-define i64 @__lambda_456(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.522, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_458(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.528, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_459(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.530, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_460(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.535, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_461(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.537, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_462(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.542, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_463(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.544, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_464(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.549, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_465(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.551, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_466(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.556, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_467(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.558, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_468(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.563, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_469(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.565, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_457(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %__map = alloca i64
-  %t1 = call i64 @__map_new()
-  store i64 %t1, i64* %__map
-  %t2 = load i64, i64* %__map
-  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.545, i64 0, i64 0
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.834, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  %t5 = add i64 0, 1
-  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
-  %t7 = load i64, i64* %__map
-  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.546, i64 0, i64 0
-  %t9 = ptrtoint i8* %t8 to i64
-  %t10 = load i64, i64* @__g_page
-  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
-  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.547, i64 0, i64 0
-  %t13 = ptrtoint i8* %t12 to i64
-  %t14 = inttoptr i64 %t11 to i8*
-  %t15 = inttoptr i64 %t13 to i8*
-  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
-  %t17 = icmp eq i32 %t16, 0
-  %t18 = zext i1 %t17 to i64
-  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
-  %t20 = load i64, i64* %__map
-  %t21 = call i64 @turmeric_style_cx(i64 %t20)
-  %t22 = call i8* @malloc(i64 16)
-  %t23 = bitcast i8* %t22 to [2 x i64]*
-  %t24 = ptrtoint i64 (i64, i64)* @__lambda_464 to i64
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
-  store i64 %t24, i64* %t25
-  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
-  store i64 0, i64* %t26
-  %t27 = ptrtoint [2 x i64]* %t23 to i64
-  %t28 = call i8* @malloc(i64 16)
-  %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_465 to i64
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
-  store i64 %t30, i64* %t31
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
-  store i64 0, i64* %t32
-  %t33 = ptrtoint [2 x i64]* %t29 to i64
-  %t34 = call i64 @turmeric_generated_types_button(i64 %t21, i64 %t27, i64 %t33)
-  %t35 = call i64 @__map_new()
-  store i64 %t35, i64* %__map
-  %t36 = load i64, i64* %__map
-  %t37 = getelementptr [9 x i8], [9 x i8]* @.str.552, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = add i64 0, 1
-  %t40 = call i64 @__map_set(i64 %t36, i64 %t38, i64 %t39)
-  %t41 = load i64, i64* %__map
-  %t42 = getelementptr [7 x i8], [7 x i8]* @.str.553, i64 0, i64 0
-  %t43 = ptrtoint i8* %t42 to i64
-  %t44 = load i64, i64* @__g_page
-  %t45 = call i64 @turmeric_signal_Signal__get(i64 %t44)
-  %t46 = getelementptr [6 x i8], [6 x i8]* @.str.554, i64 0, i64 0
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.835, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = add i64 0, 0
+  %t8 = call i64 @__map_new()
+  %t9 = call i8* @malloc(i64 16)
+  %t10 = bitcast i8* %t9 to [2 x i64]*
+  %t11 = ptrtoint i64 (i64)* @__lambda_1538 to i64
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 0
+  store i64 %t11, i64* %t12
+  %t13 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 1
+  store i64 0, i64* %t13
+  %t14 = ptrtoint [2 x i64]* %t10 to i64
+  %t15 = call i64 @li(i64 %t2, i64 %t4, i64 %t6, i64 %t7, i64 0, i64 %t8, i64 %t14)
+  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.838, i64 0, i64 0
+  %t17 = ptrtoint i8* %t16 to i64
+  %t18 = getelementptr [1 x i8], [1 x i8]* @.str.839, i64 0, i64 0
+  %t19 = ptrtoint i8* %t18 to i64
+  %t20 = getelementptr [1 x i8], [1 x i8]* @.str.840, i64 0, i64 0
+  %t21 = ptrtoint i8* %t20 to i64
+  %t22 = add i64 0, 0
+  %t23 = call i64 @__map_new()
+  %t24 = call i8* @malloc(i64 16)
+  %t25 = bitcast i8* %t24 to [2 x i64]*
+  %t26 = ptrtoint i64 (i64)* @__lambda_1539 to i64
+  %t27 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 0
+  store i64 %t26, i64* %t27
+  %t28 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 1
+  store i64 0, i64* %t28
+  %t29 = ptrtoint [2 x i64]* %t25 to i64
+  %t30 = call i64 @li(i64 %t17, i64 %t19, i64 %t21, i64 %t22, i64 0, i64 %t23, i64 %t29)
+  %t31 = getelementptr [1 x i8], [1 x i8]* @.str.843, i64 0, i64 0
+  %t32 = ptrtoint i8* %t31 to i64
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.844, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = getelementptr [1 x i8], [1 x i8]* @.str.845, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = add i64 0, 0
+  %t38 = call i64 @__map_new()
+  %t39 = call i8* @malloc(i64 16)
+  %t40 = bitcast i8* %t39 to [2 x i64]*
+  %t41 = ptrtoint i64 (i64)* @__lambda_1540 to i64
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t40, i64 0, i64 0
+  store i64 %t41, i64* %t42
+  %t43 = getelementptr [2 x i64], [2 x i64]* %t40, i64 0, i64 1
+  store i64 0, i64* %t43
+  %t44 = ptrtoint [2 x i64]* %t40 to i64
+  %t45 = call i64 @li(i64 %t32, i64 %t34, i64 %t36, i64 %t37, i64 0, i64 %t38, i64 %t44)
+  %t46 = getelementptr [1 x i8], [1 x i8]* @.str.848, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
-  %t48 = inttoptr i64 %t45 to i8*
-  %t49 = inttoptr i64 %t47 to i8*
-  %t50 = call i32 @strcmp(i8* %t48, i8* %t49)
-  %t51 = icmp eq i32 %t50, 0
-  %t52 = zext i1 %t51 to i64
-  %t53 = call i64 @__map_set(i64 %t41, i64 %t43, i64 %t52)
-  %t54 = load i64, i64* %__map
-  %t55 = call i64 @turmeric_style_cx(i64 %t54)
-  %t56 = call i8* @malloc(i64 16)
-  %t57 = bitcast i8* %t56 to [2 x i64]*
-  %t58 = ptrtoint i64 (i64, i64)* @__lambda_466 to i64
-  %t59 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
-  store i64 %t58, i64* %t59
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
-  store i64 0, i64* %t60
-  %t61 = ptrtoint [2 x i64]* %t57 to i64
-  %t62 = call i8* @malloc(i64 16)
-  %t63 = bitcast i8* %t62 to [2 x i64]*
-  %t64 = ptrtoint i64 (i64)* @__lambda_467 to i64
-  %t65 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 0
-  store i64 %t64, i64* %t65
-  %t66 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 1
-  store i64 0, i64* %t66
-  %t67 = ptrtoint [2 x i64]* %t63 to i64
-  %t68 = call i64 @turmeric_generated_types_button(i64 %t55, i64 %t61, i64 %t67)
-  %t69 = call i64 @__map_new()
-  store i64 %t69, i64* %__map
-  %t70 = load i64, i64* %__map
-  %t71 = getelementptr [9 x i8], [9 x i8]* @.str.559, i64 0, i64 0
-  %t72 = ptrtoint i8* %t71 to i64
-  %t73 = add i64 0, 1
-  %t74 = call i64 @__map_set(i64 %t70, i64 %t72, i64 %t73)
-  %t75 = load i64, i64* %__map
-  %t76 = getelementptr [7 x i8], [7 x i8]* @.str.560, i64 0, i64 0
+  %t48 = getelementptr [1 x i8], [1 x i8]* @.str.849, i64 0, i64 0
+  %t49 = ptrtoint i8* %t48 to i64
+  %t50 = getelementptr [1 x i8], [1 x i8]* @.str.850, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = add i64 0, 0
+  %t53 = call i64 @__map_new()
+  %t54 = call i8* @malloc(i64 16)
+  %t55 = bitcast i8* %t54 to [2 x i64]*
+  %t56 = ptrtoint i64 (i64)* @__lambda_1541 to i64
+  %t57 = getelementptr [2 x i64], [2 x i64]* %t55, i64 0, i64 0
+  store i64 %t56, i64* %t57
+  %t58 = getelementptr [2 x i64], [2 x i64]* %t55, i64 0, i64 1
+  store i64 0, i64* %t58
+  %t59 = ptrtoint [2 x i64]* %t55 to i64
+  %t60 = call i64 @li(i64 %t47, i64 %t49, i64 %t51, i64 %t52, i64 0, i64 %t53, i64 %t59)
+  %t61 = getelementptr [1 x i8], [1 x i8]* @.str.853, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = getelementptr [1 x i8], [1 x i8]* @.str.854, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = getelementptr [1 x i8], [1 x i8]* @.str.855, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = add i64 0, 0
+  %t68 = call i64 @__map_new()
+  %t69 = call i8* @malloc(i64 16)
+  %t70 = bitcast i8* %t69 to [2 x i64]*
+  %t71 = ptrtoint i64 (i64)* @__lambda_1542 to i64
+  %t72 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 0
+  store i64 %t71, i64* %t72
+  %t73 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 1
+  store i64 0, i64* %t73
+  %t74 = ptrtoint [2 x i64]* %t70 to i64
+  %t75 = call i64 @li(i64 %t62, i64 %t64, i64 %t66, i64 %t67, i64 0, i64 %t68, i64 %t74)
+  %t76 = getelementptr [1 x i8], [1 x i8]* @.str.858, i64 0, i64 0
   %t77 = ptrtoint i8* %t76 to i64
-  %t78 = load i64, i64* @__g_page
-  %t79 = call i64 @turmeric_signal_Signal__get(i64 %t78)
-  %t80 = getelementptr [6 x i8], [6 x i8]* @.str.561, i64 0, i64 0
+  %t78 = getelementptr [1 x i8], [1 x i8]* @.str.859, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = getelementptr [1 x i8], [1 x i8]* @.str.860, i64 0, i64 0
   %t81 = ptrtoint i8* %t80 to i64
-  %t82 = inttoptr i64 %t79 to i8*
-  %t83 = inttoptr i64 %t81 to i8*
-  %t84 = call i32 @strcmp(i8* %t82, i8* %t83)
-  %t85 = icmp eq i32 %t84, 0
-  %t86 = zext i1 %t85 to i64
-  %t87 = call i64 @__map_set(i64 %t75, i64 %t77, i64 %t86)
-  %t88 = load i64, i64* %__map
-  %t89 = call i64 @turmeric_style_cx(i64 %t88)
-  %t90 = call i8* @malloc(i64 16)
-  %t91 = bitcast i8* %t90 to [2 x i64]*
-  %t92 = ptrtoint i64 (i64, i64)* @__lambda_468 to i64
-  %t93 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 0
-  store i64 %t92, i64* %t93
-  %t94 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 1
-  store i64 0, i64* %t94
-  %t95 = ptrtoint [2 x i64]* %t91 to i64
-  %t96 = call i8* @malloc(i64 16)
-  %t97 = bitcast i8* %t96 to [2 x i64]*
-  %t98 = ptrtoint i64 (i64)* @__lambda_469 to i64
-  %t99 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 0
-  store i64 %t98, i64* %t99
-  %t100 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 1
-  store i64 0, i64* %t100
-  %t101 = ptrtoint [2 x i64]* %t97 to i64
-  %t102 = call i64 @turmeric_generated_types_button(i64 %t89, i64 %t95, i64 %t101)
+  %t82 = add i64 0, 0
+  %t83 = call i64 @__map_new()
+  %t84 = call i8* @malloc(i64 16)
+  %t85 = bitcast i8* %t84 to [2 x i64]*
+  %t86 = ptrtoint i64 (i64)* @__lambda_1543 to i64
+  %t87 = getelementptr [2 x i64], [2 x i64]* %t85, i64 0, i64 0
+  store i64 %t86, i64* %t87
+  %t88 = getelementptr [2 x i64], [2 x i64]* %t85, i64 0, i64 1
+  store i64 0, i64* %t88
+  %t89 = ptrtoint [2 x i64]* %t85 to i64
+  %t90 = call i64 @li(i64 %t77, i64 %t79, i64 %t81, i64 %t82, i64 0, i64 %t83, i64 %t89)
+  %t91 = getelementptr [1 x i8], [1 x i8]* @.str.863, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = getelementptr [1 x i8], [1 x i8]* @.str.864, i64 0, i64 0
+  %t94 = ptrtoint i8* %t93 to i64
+  %t95 = getelementptr [1 x i8], [1 x i8]* @.str.865, i64 0, i64 0
+  %t96 = ptrtoint i8* %t95 to i64
+  %t97 = add i64 0, 0
+  %t98 = call i64 @__map_new()
+  %t99 = call i8* @malloc(i64 16)
+  %t100 = bitcast i8* %t99 to [2 x i64]*
+  %t101 = ptrtoint i64 (i64)* @__lambda_1544 to i64
+  %t102 = getelementptr [2 x i64], [2 x i64]* %t100, i64 0, i64 0
+  store i64 %t101, i64* %t102
+  %t103 = getelementptr [2 x i64], [2 x i64]* %t100, i64 0, i64 1
+  store i64 0, i64* %t103
+  %t104 = ptrtoint [2 x i64]* %t100 to i64
+  %t105 = call i64 @li(i64 %t92, i64 %t94, i64 %t96, i64 %t97, i64 0, i64 %t98, i64 %t104)
+  %t106 = getelementptr [1 x i8], [1 x i8]* @.str.868, i64 0, i64 0
+  %t107 = ptrtoint i8* %t106 to i64
+  %t108 = getelementptr [1 x i8], [1 x i8]* @.str.869, i64 0, i64 0
+  %t109 = ptrtoint i8* %t108 to i64
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.870, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = add i64 0, 0
+  %t113 = call i64 @__map_new()
+  %t114 = call i8* @malloc(i64 16)
+  %t115 = bitcast i8* %t114 to [2 x i64]*
+  %t116 = ptrtoint i64 (i64)* @__lambda_1545 to i64
+  %t117 = getelementptr [2 x i64], [2 x i64]* %t115, i64 0, i64 0
+  store i64 %t116, i64* %t117
+  %t118 = getelementptr [2 x i64], [2 x i64]* %t115, i64 0, i64 1
+  store i64 0, i64* %t118
+  %t119 = ptrtoint [2 x i64]* %t115 to i64
+  %t120 = call i64 @li(i64 %t107, i64 %t109, i64 %t111, i64 %t112, i64 0, i64 %t113, i64 %t119)
   ret i64 0
 }
 
-define i64 @__lambda_470(i64 %__env.arg) {
+define i64 @__lambda_1546(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.568, i64 0, i64 0
+  %t1 = getelementptr [15 x i8], [15 x i8]* @.str.877, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_472(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1547(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.574, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_473(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.576, i64 0, i64 0
+  %t1 = getelementptr [63 x i8], [63 x i8]* @.str.882, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_474(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1549(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.581, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_475(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.583, i64 0, i64 0
+  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.890, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_476(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1550(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.588, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_477(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.590, i64 0, i64 0
+  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.895, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_478(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1551(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.595, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_479(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.597, i64 0, i64 0
+  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.900, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_480(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1552(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.602, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_481(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.604, i64 0, i64 0
+  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.905, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_482(i64 %__env.arg, i64 %e.arg) {
+define i64 @__lambda_1553(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.609, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_483(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.611, i64 0, i64 0
+  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.910, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
+  %t3 = call i64 @text(i64 %t2)
   ret i64 0
 }
 
-define i64 @__lambda_471(i64 %__env.arg) {
+define i64 @__lambda_1554(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %__map = alloca i64
-  %t1 = call i64 @__map_new()
-  store i64 %t1, i64* %__map
-  %t2 = load i64, i64* %__map
-  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.591, i64 0, i64 0
+  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.915, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1555(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.920, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1556(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.925, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1557(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [36 x i8], [36 x i8]* @.str.930, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1558(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [40 x i8], [40 x i8]* @.str.935, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1559(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [31 x i8], [31 x i8]* @.str.940, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1560(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [39 x i8], [39 x i8]* @.str.945, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1561(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [27 x i8], [27 x i8]* @.str.950, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1562(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [43 x i8], [43 x i8]* @.str.955, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1563(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [20 x i8], [20 x i8]* @.str.960, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1564(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [21 x i8], [21 x i8]* @.str.965, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1548(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.926, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.927, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  %t5 = add i64 0, 1
-  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
-  %t7 = load i64, i64* %__map
-  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.592, i64 0, i64 0
-  %t9 = ptrtoint i8* %t8 to i64
-  %t10 = load i64, i64* @__g_page
-  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
-  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.593, i64 0, i64 0
-  %t13 = ptrtoint i8* %t12 to i64
-  %t14 = inttoptr i64 %t11 to i8*
-  %t15 = inttoptr i64 %t13 to i8*
-  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
-  %t17 = icmp eq i32 %t16, 0
-  %t18 = zext i1 %t17 to i64
-  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
-  %t20 = load i64, i64* %__map
-  %t21 = call i64 @turmeric_style_cx(i64 %t20)
-  %t22 = call i8* @malloc(i64 16)
-  %t23 = bitcast i8* %t22 to [2 x i64]*
-  %t24 = ptrtoint i64 (i64, i64)* @__lambda_478 to i64
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
-  store i64 %t24, i64* %t25
-  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
-  store i64 0, i64* %t26
-  %t27 = ptrtoint [2 x i64]* %t23 to i64
-  %t28 = call i8* @malloc(i64 16)
-  %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_479 to i64
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
-  store i64 %t30, i64* %t31
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
-  store i64 0, i64* %t32
-  %t33 = ptrtoint [2 x i64]* %t29 to i64
-  %t34 = call i64 @turmeric_generated_types_button(i64 %t21, i64 %t27, i64 %t33)
-  %t35 = call i64 @__map_new()
-  store i64 %t35, i64* %__map
-  %t36 = load i64, i64* %__map
-  %t37 = getelementptr [9 x i8], [9 x i8]* @.str.598, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = add i64 0, 1
-  %t40 = call i64 @__map_set(i64 %t36, i64 %t38, i64 %t39)
-  %t41 = load i64, i64* %__map
-  %t42 = getelementptr [7 x i8], [7 x i8]* @.str.599, i64 0, i64 0
-  %t43 = ptrtoint i8* %t42 to i64
-  %t44 = load i64, i64* @__g_page
-  %t45 = call i64 @turmeric_signal_Signal__get(i64 %t44)
-  %t46 = getelementptr [6 x i8], [6 x i8]* @.str.600, i64 0, i64 0
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.928, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = add i64 0, 0
+  %t8 = call i64 @__map_new()
+  %t9 = call i8* @malloc(i64 16)
+  %t10 = bitcast i8* %t9 to [2 x i64]*
+  %t11 = ptrtoint i64 (i64)* @__lambda_1557 to i64
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 0
+  store i64 %t11, i64* %t12
+  %t13 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 1
+  store i64 0, i64* %t13
+  %t14 = ptrtoint [2 x i64]* %t10 to i64
+  %t15 = call i64 @li(i64 %t2, i64 %t4, i64 %t6, i64 %t7, i64 0, i64 %t8, i64 %t14)
+  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.931, i64 0, i64 0
+  %t17 = ptrtoint i8* %t16 to i64
+  %t18 = getelementptr [1 x i8], [1 x i8]* @.str.932, i64 0, i64 0
+  %t19 = ptrtoint i8* %t18 to i64
+  %t20 = getelementptr [1 x i8], [1 x i8]* @.str.933, i64 0, i64 0
+  %t21 = ptrtoint i8* %t20 to i64
+  %t22 = add i64 0, 0
+  %t23 = call i64 @__map_new()
+  %t24 = call i8* @malloc(i64 16)
+  %t25 = bitcast i8* %t24 to [2 x i64]*
+  %t26 = ptrtoint i64 (i64)* @__lambda_1558 to i64
+  %t27 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 0
+  store i64 %t26, i64* %t27
+  %t28 = getelementptr [2 x i64], [2 x i64]* %t25, i64 0, i64 1
+  store i64 0, i64* %t28
+  %t29 = ptrtoint [2 x i64]* %t25 to i64
+  %t30 = call i64 @li(i64 %t17, i64 %t19, i64 %t21, i64 %t22, i64 0, i64 %t23, i64 %t29)
+  %t31 = getelementptr [1 x i8], [1 x i8]* @.str.936, i64 0, i64 0
+  %t32 = ptrtoint i8* %t31 to i64
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.937, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = getelementptr [1 x i8], [1 x i8]* @.str.938, i64 0, i64 0
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = add i64 0, 0
+  %t38 = call i64 @__map_new()
+  %t39 = call i8* @malloc(i64 16)
+  %t40 = bitcast i8* %t39 to [2 x i64]*
+  %t41 = ptrtoint i64 (i64)* @__lambda_1559 to i64
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t40, i64 0, i64 0
+  store i64 %t41, i64* %t42
+  %t43 = getelementptr [2 x i64], [2 x i64]* %t40, i64 0, i64 1
+  store i64 0, i64* %t43
+  %t44 = ptrtoint [2 x i64]* %t40 to i64
+  %t45 = call i64 @li(i64 %t32, i64 %t34, i64 %t36, i64 %t37, i64 0, i64 %t38, i64 %t44)
+  %t46 = getelementptr [1 x i8], [1 x i8]* @.str.941, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i64
-  %t48 = inttoptr i64 %t45 to i8*
-  %t49 = inttoptr i64 %t47 to i8*
-  %t50 = call i32 @strcmp(i8* %t48, i8* %t49)
-  %t51 = icmp eq i32 %t50, 0
-  %t52 = zext i1 %t51 to i64
-  %t53 = call i64 @__map_set(i64 %t41, i64 %t43, i64 %t52)
-  %t54 = load i64, i64* %__map
-  %t55 = call i64 @turmeric_style_cx(i64 %t54)
-  %t56 = call i8* @malloc(i64 16)
-  %t57 = bitcast i8* %t56 to [2 x i64]*
-  %t58 = ptrtoint i64 (i64, i64)* @__lambda_480 to i64
-  %t59 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
-  store i64 %t58, i64* %t59
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
-  store i64 0, i64* %t60
-  %t61 = ptrtoint [2 x i64]* %t57 to i64
-  %t62 = call i8* @malloc(i64 16)
-  %t63 = bitcast i8* %t62 to [2 x i64]*
-  %t64 = ptrtoint i64 (i64)* @__lambda_481 to i64
-  %t65 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 0
-  store i64 %t64, i64* %t65
-  %t66 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 1
-  store i64 0, i64* %t66
-  %t67 = ptrtoint [2 x i64]* %t63 to i64
-  %t68 = call i64 @turmeric_generated_types_button(i64 %t55, i64 %t61, i64 %t67)
-  %t69 = call i64 @__map_new()
-  store i64 %t69, i64* %__map
-  %t70 = load i64, i64* %__map
-  %t71 = getelementptr [9 x i8], [9 x i8]* @.str.605, i64 0, i64 0
-  %t72 = ptrtoint i8* %t71 to i64
-  %t73 = add i64 0, 1
-  %t74 = call i64 @__map_set(i64 %t70, i64 %t72, i64 %t73)
-  %t75 = load i64, i64* %__map
-  %t76 = getelementptr [7 x i8], [7 x i8]* @.str.606, i64 0, i64 0
+  %t48 = getelementptr [1 x i8], [1 x i8]* @.str.942, i64 0, i64 0
+  %t49 = ptrtoint i8* %t48 to i64
+  %t50 = getelementptr [1 x i8], [1 x i8]* @.str.943, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = add i64 0, 0
+  %t53 = call i64 @__map_new()
+  %t54 = call i8* @malloc(i64 16)
+  %t55 = bitcast i8* %t54 to [2 x i64]*
+  %t56 = ptrtoint i64 (i64)* @__lambda_1560 to i64
+  %t57 = getelementptr [2 x i64], [2 x i64]* %t55, i64 0, i64 0
+  store i64 %t56, i64* %t57
+  %t58 = getelementptr [2 x i64], [2 x i64]* %t55, i64 0, i64 1
+  store i64 0, i64* %t58
+  %t59 = ptrtoint [2 x i64]* %t55 to i64
+  %t60 = call i64 @li(i64 %t47, i64 %t49, i64 %t51, i64 %t52, i64 0, i64 %t53, i64 %t59)
+  %t61 = getelementptr [1 x i8], [1 x i8]* @.str.946, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = getelementptr [1 x i8], [1 x i8]* @.str.947, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = getelementptr [1 x i8], [1 x i8]* @.str.948, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = add i64 0, 0
+  %t68 = call i64 @__map_new()
+  %t69 = call i8* @malloc(i64 16)
+  %t70 = bitcast i8* %t69 to [2 x i64]*
+  %t71 = ptrtoint i64 (i64)* @__lambda_1561 to i64
+  %t72 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 0
+  store i64 %t71, i64* %t72
+  %t73 = getelementptr [2 x i64], [2 x i64]* %t70, i64 0, i64 1
+  store i64 0, i64* %t73
+  %t74 = ptrtoint [2 x i64]* %t70 to i64
+  %t75 = call i64 @li(i64 %t62, i64 %t64, i64 %t66, i64 %t67, i64 0, i64 %t68, i64 %t74)
+  %t76 = getelementptr [1 x i8], [1 x i8]* @.str.951, i64 0, i64 0
   %t77 = ptrtoint i8* %t76 to i64
-  %t78 = load i64, i64* @__g_page
-  %t79 = call i64 @turmeric_signal_Signal__get(i64 %t78)
-  %t80 = getelementptr [6 x i8], [6 x i8]* @.str.607, i64 0, i64 0
+  %t78 = getelementptr [1 x i8], [1 x i8]* @.str.952, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = getelementptr [1 x i8], [1 x i8]* @.str.953, i64 0, i64 0
   %t81 = ptrtoint i8* %t80 to i64
-  %t82 = inttoptr i64 %t79 to i8*
-  %t83 = inttoptr i64 %t81 to i8*
-  %t84 = call i32 @strcmp(i8* %t82, i8* %t83)
-  %t85 = icmp eq i32 %t84, 0
-  %t86 = zext i1 %t85 to i64
-  %t87 = call i64 @__map_set(i64 %t75, i64 %t77, i64 %t86)
-  %t88 = load i64, i64* %__map
-  %t89 = call i64 @turmeric_style_cx(i64 %t88)
-  %t90 = call i8* @malloc(i64 16)
-  %t91 = bitcast i8* %t90 to [2 x i64]*
-  %t92 = ptrtoint i64 (i64, i64)* @__lambda_482 to i64
-  %t93 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 0
-  store i64 %t92, i64* %t93
-  %t94 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 1
-  store i64 0, i64* %t94
-  %t95 = ptrtoint [2 x i64]* %t91 to i64
-  %t96 = call i8* @malloc(i64 16)
-  %t97 = bitcast i8* %t96 to [2 x i64]*
-  %t98 = ptrtoint i64 (i64)* @__lambda_483 to i64
-  %t99 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 0
-  store i64 %t98, i64* %t99
-  %t100 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 1
-  store i64 0, i64* %t100
-  %t101 = ptrtoint [2 x i64]* %t97 to i64
-  %t102 = call i64 @turmeric_generated_types_button(i64 %t89, i64 %t95, i64 %t101)
+  %t82 = add i64 0, 0
+  %t83 = call i64 @__map_new()
+  %t84 = call i8* @malloc(i64 16)
+  %t85 = bitcast i8* %t84 to [2 x i64]*
+  %t86 = ptrtoint i64 (i64)* @__lambda_1562 to i64
+  %t87 = getelementptr [2 x i64], [2 x i64]* %t85, i64 0, i64 0
+  store i64 %t86, i64* %t87
+  %t88 = getelementptr [2 x i64], [2 x i64]* %t85, i64 0, i64 1
+  store i64 0, i64* %t88
+  %t89 = ptrtoint [2 x i64]* %t85 to i64
+  %t90 = call i64 @li(i64 %t77, i64 %t79, i64 %t81, i64 %t82, i64 0, i64 %t83, i64 %t89)
+  %t91 = getelementptr [1 x i8], [1 x i8]* @.str.956, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = getelementptr [1 x i8], [1 x i8]* @.str.957, i64 0, i64 0
+  %t94 = ptrtoint i8* %t93 to i64
+  %t95 = getelementptr [1 x i8], [1 x i8]* @.str.958, i64 0, i64 0
+  %t96 = ptrtoint i8* %t95 to i64
+  %t97 = add i64 0, 0
+  %t98 = call i64 @__map_new()
+  %t99 = call i8* @malloc(i64 16)
+  %t100 = bitcast i8* %t99 to [2 x i64]*
+  %t101 = ptrtoint i64 (i64)* @__lambda_1563 to i64
+  %t102 = getelementptr [2 x i64], [2 x i64]* %t100, i64 0, i64 0
+  store i64 %t101, i64* %t102
+  %t103 = getelementptr [2 x i64], [2 x i64]* %t100, i64 0, i64 1
+  store i64 0, i64* %t103
+  %t104 = ptrtoint [2 x i64]* %t100 to i64
+  %t105 = call i64 @li(i64 %t92, i64 %t94, i64 %t96, i64 %t97, i64 0, i64 %t98, i64 %t104)
+  %t106 = getelementptr [1 x i8], [1 x i8]* @.str.961, i64 0, i64 0
+  %t107 = ptrtoint i8* %t106 to i64
+  %t108 = getelementptr [1 x i8], [1 x i8]* @.str.962, i64 0, i64 0
+  %t109 = ptrtoint i8* %t108 to i64
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.963, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = add i64 0, 0
+  %t113 = call i64 @__map_new()
+  %t114 = call i8* @malloc(i64 16)
+  %t115 = bitcast i8* %t114 to [2 x i64]*
+  %t116 = ptrtoint i64 (i64)* @__lambda_1564 to i64
+  %t117 = getelementptr [2 x i64], [2 x i64]* %t115, i64 0, i64 0
+  store i64 %t116, i64* %t117
+  %t118 = getelementptr [2 x i64], [2 x i64]* %t115, i64 0, i64 1
+  store i64 0, i64* %t118
+  %t119 = ptrtoint [2 x i64]* %t115 to i64
+  %t120 = call i64 @li(i64 %t107, i64 %t109, i64 %t111, i64 %t112, i64 0, i64 %t113, i64 %t119)
   ret i64 0
 }
 
-define i64 @__lambda_455(i64 %__env.arg) {
+define i64 @__lambda_1526(i64 %__env.arg) {
 entry:
   %__env = alloca i64
   store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.566, i64 0, i64 0
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.873, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 16)
-  %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64)* @__lambda_470 to i64
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
-  store i64 0, i64* %t7
-  %t8 = ptrtoint [2 x i64]* %t4 to i64
-  %t9 = call i64 @turmeric_generated_types_h1(i64 %t2, i64 %t8)
-  %t10 = getelementptr [4 x i8], [4 x i8]* @.str.569, i64 0, i64 0
-  %t11 = ptrtoint i8* %t10 to i64
-  %t12 = call i8* @malloc(i64 16)
-  %t13 = bitcast i8* %t12 to [2 x i64]*
-  %t14 = ptrtoint i64 (i64, i64, i64, i64)* @__lambda_471 to i64
-  %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
-  store i64 %t14, i64* %t15
-  %t16 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 1
-  store i64 0, i64* %t16
-  %t17 = ptrtoint [2 x i64]* %t13 to i64
-  %t18 = call i64 @turmeric_generated_types_nav(i64 %t11, i64 %t17)
-  ret i64 0
-}
-
-define i64 @__lambda_484(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = load i64, i64* @__g_page
-  %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
-  %t3 = alloca i64
-  %t4 = call i64 @CounterPage()
-  store i64 %t4, i64* %t3
-  %t5 = load i64, i64* %t3
-  ret i64 0
-}
-
-define i64 @__lambda_485(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [57 x i8], [57 x i8]* @.str.615, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_487(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.619, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_489(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.625, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_490(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.627, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_491(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.632, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_492(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.634, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_493(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.639, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_494(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.641, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_495(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.646, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_496(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.648, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_497(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.653, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_498(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.655, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_499(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.660, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_500(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.662, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_488(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %__map = alloca i64
-  %t1 = call i64 @__map_new()
-  store i64 %t1, i64* %__map
-  %t2 = load i64, i64* %__map
-  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.642, i64 0, i64 0
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.874, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
-  %t5 = add i64 0, 1
-  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
-  %t7 = load i64, i64* %__map
-  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.643, i64 0, i64 0
-  %t9 = ptrtoint i8* %t8 to i64
-  %t10 = load i64, i64* @__g_page
-  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
-  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.644, i64 0, i64 0
-  %t13 = ptrtoint i8* %t12 to i64
-  %t14 = inttoptr i64 %t11 to i8*
-  %t15 = inttoptr i64 %t13 to i8*
-  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
-  %t17 = icmp eq i32 %t16, 0
-  %t18 = zext i1 %t17 to i64
-  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
-  %t20 = load i64, i64* %__map
-  %t21 = call i64 @turmeric_style_cx(i64 %t20)
-  %t22 = call i8* @malloc(i64 16)
-  %t23 = bitcast i8* %t22 to [2 x i64]*
-  %t24 = ptrtoint i64 (i64, i64)* @__lambda_495 to i64
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
-  store i64 %t24, i64* %t25
-  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
-  store i64 0, i64* %t26
-  %t27 = ptrtoint [2 x i64]* %t23 to i64
-  %t28 = call i8* @malloc(i64 16)
-  %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_496 to i64
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
-  store i64 %t30, i64* %t31
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
-  store i64 0, i64* %t32
-  %t33 = ptrtoint [2 x i64]* %t29 to i64
-  %t34 = call i64 @turmeric_generated_types_button(i64 %t21, i64 %t27, i64 %t33)
-  %t35 = call i64 @__map_new()
-  store i64 %t35, i64* %__map
-  %t36 = load i64, i64* %__map
-  %t37 = getelementptr [9 x i8], [9 x i8]* @.str.649, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = add i64 0, 1
-  %t40 = call i64 @__map_set(i64 %t36, i64 %t38, i64 %t39)
-  %t41 = load i64, i64* %__map
-  %t42 = getelementptr [7 x i8], [7 x i8]* @.str.650, i64 0, i64 0
-  %t43 = ptrtoint i8* %t42 to i64
-  %t44 = load i64, i64* @__g_page
-  %t45 = call i64 @turmeric_signal_Signal__get(i64 %t44)
-  %t46 = getelementptr [6 x i8], [6 x i8]* @.str.651, i64 0, i64 0
-  %t47 = ptrtoint i8* %t46 to i64
-  %t48 = inttoptr i64 %t45 to i8*
-  %t49 = inttoptr i64 %t47 to i8*
-  %t50 = call i32 @strcmp(i8* %t48, i8* %t49)
-  %t51 = icmp eq i32 %t50, 0
-  %t52 = zext i1 %t51 to i64
-  %t53 = call i64 @__map_set(i64 %t41, i64 %t43, i64 %t52)
-  %t54 = load i64, i64* %__map
-  %t55 = call i64 @turmeric_style_cx(i64 %t54)
-  %t56 = call i8* @malloc(i64 16)
-  %t57 = bitcast i8* %t56 to [2 x i64]*
-  %t58 = ptrtoint i64 (i64, i64)* @__lambda_497 to i64
-  %t59 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
-  store i64 %t58, i64* %t59
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
-  store i64 0, i64* %t60
-  %t61 = ptrtoint [2 x i64]* %t57 to i64
-  %t62 = call i8* @malloc(i64 16)
-  %t63 = bitcast i8* %t62 to [2 x i64]*
-  %t64 = ptrtoint i64 (i64)* @__lambda_498 to i64
-  %t65 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 0
-  store i64 %t64, i64* %t65
-  %t66 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 1
-  store i64 0, i64* %t66
-  %t67 = ptrtoint [2 x i64]* %t63 to i64
-  %t68 = call i64 @turmeric_generated_types_button(i64 %t55, i64 %t61, i64 %t67)
-  %t69 = call i64 @__map_new()
-  store i64 %t69, i64* %__map
-  %t70 = load i64, i64* %__map
-  %t71 = getelementptr [9 x i8], [9 x i8]* @.str.656, i64 0, i64 0
-  %t72 = ptrtoint i8* %t71 to i64
-  %t73 = add i64 0, 1
-  %t74 = call i64 @__map_set(i64 %t70, i64 %t72, i64 %t73)
-  %t75 = load i64, i64* %__map
-  %t76 = getelementptr [7 x i8], [7 x i8]* @.str.657, i64 0, i64 0
-  %t77 = ptrtoint i8* %t76 to i64
-  %t78 = load i64, i64* @__g_page
-  %t79 = call i64 @turmeric_signal_Signal__get(i64 %t78)
-  %t80 = getelementptr [6 x i8], [6 x i8]* @.str.658, i64 0, i64 0
-  %t81 = ptrtoint i8* %t80 to i64
-  %t82 = inttoptr i64 %t79 to i8*
-  %t83 = inttoptr i64 %t81 to i8*
-  %t84 = call i32 @strcmp(i8* %t82, i8* %t83)
-  %t85 = icmp eq i32 %t84, 0
-  %t86 = zext i1 %t85 to i64
-  %t87 = call i64 @__map_set(i64 %t75, i64 %t77, i64 %t86)
-  %t88 = load i64, i64* %__map
-  %t89 = call i64 @turmeric_style_cx(i64 %t88)
-  %t90 = call i8* @malloc(i64 16)
-  %t91 = bitcast i8* %t90 to [2 x i64]*
-  %t92 = ptrtoint i64 (i64, i64)* @__lambda_499 to i64
-  %t93 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 0
-  store i64 %t92, i64* %t93
-  %t94 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 1
-  store i64 0, i64* %t94
-  %t95 = ptrtoint [2 x i64]* %t91 to i64
-  %t96 = call i8* @malloc(i64 16)
-  %t97 = bitcast i8* %t96 to [2 x i64]*
-  %t98 = ptrtoint i64 (i64)* @__lambda_500 to i64
-  %t99 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 0
-  store i64 %t98, i64* %t99
-  %t100 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 1
-  store i64 0, i64* %t100
-  %t101 = ptrtoint [2 x i64]* %t97 to i64
-  %t102 = call i64 @turmeric_generated_types_button(i64 %t89, i64 %t95, i64 %t101)
-  ret i64 0
-}
-
-define i64 @__lambda_501(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.665, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_503(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.671, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_504(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.673, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_505(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.678, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_506(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.680, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_507(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.685, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_508(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.687, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_509(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.692, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_510(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.694, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_511(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.699, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_512(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.701, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_513(i64 %__env.arg, i64 %e.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %e = alloca i64
-  store i64 %e.arg, i64* %e
-  %t1 = load i64, i64* @__g_page
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.706, i64 0, i64 0
-  %t3 = ptrtoint i8* %t2 to i64
-  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
-  ret i64 %t4
-}
-
-define i64 @__lambda_514(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.708, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_502(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %__map = alloca i64
-  %t1 = call i64 @__map_new()
-  store i64 %t1, i64* %__map
-  %t2 = load i64, i64* %__map
-  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.688, i64 0, i64 0
-  %t4 = ptrtoint i8* %t3 to i64
-  %t5 = add i64 0, 1
-  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
-  %t7 = load i64, i64* %__map
-  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.689, i64 0, i64 0
-  %t9 = ptrtoint i8* %t8 to i64
-  %t10 = load i64, i64* @__g_page
-  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
-  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.690, i64 0, i64 0
-  %t13 = ptrtoint i8* %t12 to i64
-  %t14 = inttoptr i64 %t11 to i8*
-  %t15 = inttoptr i64 %t13 to i8*
-  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
-  %t17 = icmp eq i32 %t16, 0
-  %t18 = zext i1 %t17 to i64
-  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
-  %t20 = load i64, i64* %__map
-  %t21 = call i64 @turmeric_style_cx(i64 %t20)
-  %t22 = call i8* @malloc(i64 16)
-  %t23 = bitcast i8* %t22 to [2 x i64]*
-  %t24 = ptrtoint i64 (i64, i64)* @__lambda_509 to i64
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
-  store i64 %t24, i64* %t25
-  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
-  store i64 0, i64* %t26
-  %t27 = ptrtoint [2 x i64]* %t23 to i64
-  %t28 = call i8* @malloc(i64 16)
-  %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_510 to i64
-  %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
-  store i64 %t30, i64* %t31
-  %t32 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
-  store i64 0, i64* %t32
-  %t33 = ptrtoint [2 x i64]* %t29 to i64
-  %t34 = call i64 @turmeric_generated_types_button(i64 %t21, i64 %t27, i64 %t33)
-  %t35 = call i64 @__map_new()
-  store i64 %t35, i64* %__map
-  %t36 = load i64, i64* %__map
-  %t37 = getelementptr [9 x i8], [9 x i8]* @.str.695, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = add i64 0, 1
-  %t40 = call i64 @__map_set(i64 %t36, i64 %t38, i64 %t39)
-  %t41 = load i64, i64* %__map
-  %t42 = getelementptr [7 x i8], [7 x i8]* @.str.696, i64 0, i64 0
-  %t43 = ptrtoint i8* %t42 to i64
-  %t44 = load i64, i64* @__g_page
-  %t45 = call i64 @turmeric_signal_Signal__get(i64 %t44)
-  %t46 = getelementptr [6 x i8], [6 x i8]* @.str.697, i64 0, i64 0
-  %t47 = ptrtoint i8* %t46 to i64
-  %t48 = inttoptr i64 %t45 to i8*
-  %t49 = inttoptr i64 %t47 to i8*
-  %t50 = call i32 @strcmp(i8* %t48, i8* %t49)
-  %t51 = icmp eq i32 %t50, 0
-  %t52 = zext i1 %t51 to i64
-  %t53 = call i64 @__map_set(i64 %t41, i64 %t43, i64 %t52)
-  %t54 = load i64, i64* %__map
-  %t55 = call i64 @turmeric_style_cx(i64 %t54)
-  %t56 = call i8* @malloc(i64 16)
-  %t57 = bitcast i8* %t56 to [2 x i64]*
-  %t58 = ptrtoint i64 (i64, i64)* @__lambda_511 to i64
-  %t59 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
-  store i64 %t58, i64* %t59
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
-  store i64 0, i64* %t60
-  %t61 = ptrtoint [2 x i64]* %t57 to i64
-  %t62 = call i8* @malloc(i64 16)
-  %t63 = bitcast i8* %t62 to [2 x i64]*
-  %t64 = ptrtoint i64 (i64)* @__lambda_512 to i64
-  %t65 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 0
-  store i64 %t64, i64* %t65
-  %t66 = getelementptr [2 x i64], [2 x i64]* %t63, i64 0, i64 1
-  store i64 0, i64* %t66
-  %t67 = ptrtoint [2 x i64]* %t63 to i64
-  %t68 = call i64 @turmeric_generated_types_button(i64 %t55, i64 %t61, i64 %t67)
-  %t69 = call i64 @__map_new()
-  store i64 %t69, i64* %__map
-  %t70 = load i64, i64* %__map
-  %t71 = getelementptr [9 x i8], [9 x i8]* @.str.702, i64 0, i64 0
-  %t72 = ptrtoint i8* %t71 to i64
-  %t73 = add i64 0, 1
-  %t74 = call i64 @__map_set(i64 %t70, i64 %t72, i64 %t73)
-  %t75 = load i64, i64* %__map
-  %t76 = getelementptr [7 x i8], [7 x i8]* @.str.703, i64 0, i64 0
-  %t77 = ptrtoint i8* %t76 to i64
-  %t78 = load i64, i64* @__g_page
-  %t79 = call i64 @turmeric_signal_Signal__get(i64 %t78)
-  %t80 = getelementptr [6 x i8], [6 x i8]* @.str.704, i64 0, i64 0
-  %t81 = ptrtoint i8* %t80 to i64
-  %t82 = inttoptr i64 %t79 to i8*
-  %t83 = inttoptr i64 %t81 to i8*
-  %t84 = call i32 @strcmp(i8* %t82, i8* %t83)
-  %t85 = icmp eq i32 %t84, 0
-  %t86 = zext i1 %t85 to i64
-  %t87 = call i64 @__map_set(i64 %t75, i64 %t77, i64 %t86)
-  %t88 = load i64, i64* %__map
-  %t89 = call i64 @turmeric_style_cx(i64 %t88)
-  %t90 = call i8* @malloc(i64 16)
-  %t91 = bitcast i8* %t90 to [2 x i64]*
-  %t92 = ptrtoint i64 (i64, i64)* @__lambda_513 to i64
-  %t93 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 0
-  store i64 %t92, i64* %t93
-  %t94 = getelementptr [2 x i64], [2 x i64]* %t91, i64 0, i64 1
-  store i64 0, i64* %t94
-  %t95 = ptrtoint [2 x i64]* %t91 to i64
-  %t96 = call i8* @malloc(i64 16)
-  %t97 = bitcast i8* %t96 to [2 x i64]*
-  %t98 = ptrtoint i64 (i64)* @__lambda_514 to i64
-  %t99 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 0
-  store i64 %t98, i64* %t99
-  %t100 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 1
-  store i64 0, i64* %t100
-  %t101 = ptrtoint [2 x i64]* %t97 to i64
-  %t102 = call i64 @turmeric_generated_types_button(i64 %t89, i64 %t95, i64 %t101)
-  ret i64 0
-}
-
-define i64 @__lambda_486(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.663, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 16)
-  %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64)* @__lambda_501 to i64
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
-  store i64 0, i64* %t7
-  %t8 = ptrtoint [2 x i64]* %t4 to i64
-  %t9 = call i64 @turmeric_generated_types_h1(i64 %t2, i64 %t8)
-  %t10 = getelementptr [4 x i8], [4 x i8]* @.str.666, i64 0, i64 0
-  %t11 = ptrtoint i8* %t10 to i64
-  %t12 = call i8* @malloc(i64 16)
-  %t13 = bitcast i8* %t12 to [2 x i64]*
-  %t14 = ptrtoint i64 (i64, i64, i64, i64)* @__lambda_502 to i64
-  %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
-  store i64 %t14, i64* %t15
-  %t16 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 1
-  store i64 0, i64* %t16
-  %t17 = ptrtoint [2 x i64]* %t13 to i64
-  %t18 = call i64 @turmeric_generated_types_nav(i64 %t11, i64 %t17)
-  ret i64 0
-}
-
-define i64 @__lambda_515(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = load i64, i64* @__g_page
-  %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
-  %t3 = alloca i64
-  %t4 = call i64 @CounterPage()
-  store i64 %t4, i64* %t3
-  %t5 = load i64, i64* %t3
-  ret i64 0
-}
-
-define i64 @__lambda_516(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [57 x i8], [57 x i8]* @.str.712, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @turmeric_element_text(i64 %t2)
-  ret i64 0
-}
-
-define i64 @__lambda_454(i64 %__env.arg) {
-entry:
-  %__env = alloca i64
-  store i64 %__env.arg, i64* %__env
-  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.616, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 16)
-  %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64)* @__lambda_486 to i64
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
-  store i64 0, i64* %t7
-  %t8 = ptrtoint [2 x i64]* %t4 to i64
-  %t9 = call i64 @turmeric_generated_types_header(i64 %t2, i64 %t8)
-  %t10 = getelementptr [8 x i8], [8 x i8]* @.str.709, i64 0, i64 0
-  %t11 = ptrtoint i8* %t10 to i64
-  %t12 = call i8* @malloc(i64 16)
-  %t13 = bitcast i8* %t12 to [2 x i64]*
-  %t14 = ptrtoint i64 (i64)* @__lambda_515 to i64
-  %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
-  store i64 %t14, i64* %t15
-  %t16 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 1
-  store i64 0, i64* %t16
-  %t17 = ptrtoint [2 x i64]* %t13 to i64
-  %t18 = call i64 @turmeric_generated_types_main_el(i64 %t11, i64 %t17)
-  %t19 = getelementptr [11 x i8], [11 x i8]* @.str.710, i64 0, i64 0
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.875, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1546 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @h1(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  %t15 = getelementptr [1 x i8], [1 x i8]* @.str.878, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i64
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.879, i64 0, i64 0
+  %t18 = ptrtoint i8* %t17 to i64
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.880, i64 0, i64 0
   %t20 = ptrtoint i8* %t19 to i64
-  %t21 = call i8* @malloc(i64 16)
-  %t22 = bitcast i8* %t21 to [2 x i64]*
-  %t23 = ptrtoint i64 (i64)* @__lambda_516 to i64
-  %t24 = getelementptr [2 x i64], [2 x i64]* %t22, i64 0, i64 0
-  store i64 %t23, i64* %t24
-  %t25 = getelementptr [2 x i64], [2 x i64]* %t22, i64 0, i64 1
-  store i64 0, i64* %t25
-  %t26 = ptrtoint [2 x i64]* %t22 to i64
-  %t27 = call i64 @turmeric_generated_types_footer(i64 %t20, i64 %t26)
+  %t21 = call i64 @__map_new()
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = ptrtoint i64 (i64)* @__lambda_1547 to i64
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 0, i64* %t26
+  %t27 = ptrtoint [2 x i64]* %t23 to i64
+  %t28 = call i64 @p(i64 %t16, i64 %t18, i64 %t20, i64 0, i64 %t21, i64 %t27)
+  %t29 = getelementptr [9 x i8], [9 x i8]* @.str.883, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = getelementptr [1 x i8], [1 x i8]* @.str.884, i64 0, i64 0
+  %t32 = ptrtoint i8* %t31 to i64
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.885, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = call i64 @__map_new()
+  %t36 = call i8* @malloc(i64 16)
+  %t37 = bitcast i8* %t36 to [2 x i64]*
+  %t38 = ptrtoint i64 (i64)* @__lambda_1548 to i64
+  %t39 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 0
+  store i64 %t38, i64* %t39
+  %t40 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 1
+  store i64 0, i64* %t40
+  %t41 = ptrtoint [2 x i64]* %t37 to i64
+  %t42 = call i64 @ul(i64 %t30, i64 %t32, i64 %t34, i64 0, i64 %t35, i64 %t41)
   ret i64 0
+}
+
+define i64 @__lambda_1567(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.976, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1569(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.988, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1570(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.990, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1571(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.999, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1572(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1001, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1573(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1010, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1574(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1012, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1575(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1021, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1576(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1023, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1577(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1032, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1578(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1034, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1579(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1043, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1580(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1045, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1568(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %__map = alloca i64
+  %t1 = call i64 @__map_new()
+  store i64 %t1, i64* %__map
+  %t2 = load i64, i64* %__map
+  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.1013, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = add i64 0, 1
+  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
+  %t7 = load i64, i64* %__map
+  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.1014, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = load i64, i64* @__g_page
+  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
+  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.1015, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = inttoptr i64 %t11 to i8*
+  %t15 = inttoptr i64 %t13 to i8*
+  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
+  %t17 = icmp eq i32 %t16, 0
+  %t18 = zext i1 %t17 to i64
+  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
+  %t20 = load i64, i64* %__map
+  %t21 = call i64 @turmeric_style_cx(i64 %t20)
+  %t22 = getelementptr [1 x i8], [1 x i8]* @.str.1016, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i64
+  %t24 = getelementptr [1 x i8], [1 x i8]* @.str.1017, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i64
+  %t26 = add i64 0, 0
+  %t27 = getelementptr [1 x i8], [1 x i8]* @.str.1018, i64 0, i64 0
+  %t28 = ptrtoint i8* %t27 to i64
+  %t29 = getelementptr [1 x i8], [1 x i8]* @.str.1019, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i8* @malloc(i64 16)
+  %t32 = bitcast i8* %t31 to [2 x i64]*
+  %t33 = ptrtoint i64 (i64, i64)* @__lambda_1575 to i64
+  %t34 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 0
+  store i64 %t33, i64* %t34
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 1
+  store i64 0, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t32 to i64
+  %t37 = call i64 @__map_new()
+  %t38 = call i8* @malloc(i64 16)
+  %t39 = bitcast i8* %t38 to [2 x i64]*
+  %t40 = ptrtoint i64 (i64)* @__lambda_1576 to i64
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 0
+  store i64 %t40, i64* %t41
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 1
+  store i64 0, i64* %t42
+  %t43 = ptrtoint [2 x i64]* %t39 to i64
+  %t44 = call i64 @button(i64 %t21, i64 %t23, i64 %t25, i64 %t26, i64 %t28, i64 %t30, i64 %t36, i64 0, i64 %t37, i64 %t43)
+  %t45 = call i64 @__map_new()
+  store i64 %t45, i64* %__map
+  %t46 = load i64, i64* %__map
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.1024, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = add i64 0, 1
+  %t50 = call i64 @__map_set(i64 %t46, i64 %t48, i64 %t49)
+  %t51 = load i64, i64* %__map
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.1025, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = load i64, i64* @__g_page
+  %t55 = call i64 @turmeric_signal_Signal__get(i64 %t54)
+  %t56 = getelementptr [6 x i8], [6 x i8]* @.str.1026, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  %t58 = inttoptr i64 %t55 to i8*
+  %t59 = inttoptr i64 %t57 to i8*
+  %t60 = call i32 @strcmp(i8* %t58, i8* %t59)
+  %t61 = icmp eq i32 %t60, 0
+  %t62 = zext i1 %t61 to i64
+  %t63 = call i64 @__map_set(i64 %t51, i64 %t53, i64 %t62)
+  %t64 = load i64, i64* %__map
+  %t65 = call i64 @turmeric_style_cx(i64 %t64)
+  %t66 = getelementptr [1 x i8], [1 x i8]* @.str.1027, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i64
+  %t68 = getelementptr [1 x i8], [1 x i8]* @.str.1028, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i64
+  %t70 = add i64 0, 0
+  %t71 = getelementptr [1 x i8], [1 x i8]* @.str.1029, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1030, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i8* @malloc(i64 16)
+  %t76 = bitcast i8* %t75 to [2 x i64]*
+  %t77 = ptrtoint i64 (i64, i64)* @__lambda_1577 to i64
+  %t78 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 0
+  store i64 %t77, i64* %t78
+  %t79 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 1
+  store i64 0, i64* %t79
+  %t80 = ptrtoint [2 x i64]* %t76 to i64
+  %t81 = call i64 @__map_new()
+  %t82 = call i8* @malloc(i64 16)
+  %t83 = bitcast i8* %t82 to [2 x i64]*
+  %t84 = ptrtoint i64 (i64)* @__lambda_1578 to i64
+  %t85 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 0
+  store i64 %t84, i64* %t85
+  %t86 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 1
+  store i64 0, i64* %t86
+  %t87 = ptrtoint [2 x i64]* %t83 to i64
+  %t88 = call i64 @button(i64 %t65, i64 %t67, i64 %t69, i64 %t70, i64 %t72, i64 %t74, i64 %t80, i64 0, i64 %t81, i64 %t87)
+  %t89 = call i64 @__map_new()
+  store i64 %t89, i64* %__map
+  %t90 = load i64, i64* %__map
+  %t91 = getelementptr [9 x i8], [9 x i8]* @.str.1035, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = add i64 0, 1
+  %t94 = call i64 @__map_set(i64 %t90, i64 %t92, i64 %t93)
+  %t95 = load i64, i64* %__map
+  %t96 = getelementptr [7 x i8], [7 x i8]* @.str.1036, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  %t98 = load i64, i64* @__g_page
+  %t99 = call i64 @turmeric_signal_Signal__get(i64 %t98)
+  %t100 = getelementptr [6 x i8], [6 x i8]* @.str.1037, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = inttoptr i64 %t99 to i8*
+  %t103 = inttoptr i64 %t101 to i8*
+  %t104 = call i32 @strcmp(i8* %t102, i8* %t103)
+  %t105 = icmp eq i32 %t104, 0
+  %t106 = zext i1 %t105 to i64
+  %t107 = call i64 @__map_set(i64 %t95, i64 %t97, i64 %t106)
+  %t108 = load i64, i64* %__map
+  %t109 = call i64 @turmeric_style_cx(i64 %t108)
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.1038, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = getelementptr [1 x i8], [1 x i8]* @.str.1039, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  %t114 = add i64 0, 0
+  %t115 = getelementptr [1 x i8], [1 x i8]* @.str.1040, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = getelementptr [1 x i8], [1 x i8]* @.str.1041, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @malloc(i64 16)
+  %t120 = bitcast i8* %t119 to [2 x i64]*
+  %t121 = ptrtoint i64 (i64, i64)* @__lambda_1579 to i64
+  %t122 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 0
+  store i64 %t121, i64* %t122
+  %t123 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 1
+  store i64 0, i64* %t123
+  %t124 = ptrtoint [2 x i64]* %t120 to i64
+  %t125 = call i64 @__map_new()
+  %t126 = call i8* @malloc(i64 16)
+  %t127 = bitcast i8* %t126 to [2 x i64]*
+  %t128 = ptrtoint i64 (i64)* @__lambda_1580 to i64
+  %t129 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 0
+  store i64 %t128, i64* %t129
+  %t130 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 1
+  store i64 0, i64* %t130
+  %t131 = ptrtoint [2 x i64]* %t127 to i64
+  %t132 = call i64 @button(i64 %t109, i64 %t111, i64 %t113, i64 %t114, i64 %t116, i64 %t118, i64 %t124, i64 0, i64 %t125, i64 %t131)
+  ret i64 0
+}
+
+define i64 @__lambda_1581(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.1050, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1583(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1062, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1584(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1064, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1585(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1073, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1586(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1075, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1587(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1084, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1588(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1086, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1589(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1095, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1590(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1097, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1591(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1106, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1592(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1108, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1593(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1117, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1594(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1119, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1582(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %__map = alloca i64
+  %t1 = call i64 @__map_new()
+  store i64 %t1, i64* %__map
+  %t2 = load i64, i64* %__map
+  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.1087, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = add i64 0, 1
+  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
+  %t7 = load i64, i64* %__map
+  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.1088, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = load i64, i64* @__g_page
+  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
+  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.1089, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = inttoptr i64 %t11 to i8*
+  %t15 = inttoptr i64 %t13 to i8*
+  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
+  %t17 = icmp eq i32 %t16, 0
+  %t18 = zext i1 %t17 to i64
+  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
+  %t20 = load i64, i64* %__map
+  %t21 = call i64 @turmeric_style_cx(i64 %t20)
+  %t22 = getelementptr [1 x i8], [1 x i8]* @.str.1090, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i64
+  %t24 = getelementptr [1 x i8], [1 x i8]* @.str.1091, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i64
+  %t26 = add i64 0, 0
+  %t27 = getelementptr [1 x i8], [1 x i8]* @.str.1092, i64 0, i64 0
+  %t28 = ptrtoint i8* %t27 to i64
+  %t29 = getelementptr [1 x i8], [1 x i8]* @.str.1093, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i8* @malloc(i64 16)
+  %t32 = bitcast i8* %t31 to [2 x i64]*
+  %t33 = ptrtoint i64 (i64, i64)* @__lambda_1589 to i64
+  %t34 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 0
+  store i64 %t33, i64* %t34
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 1
+  store i64 0, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t32 to i64
+  %t37 = call i64 @__map_new()
+  %t38 = call i8* @malloc(i64 16)
+  %t39 = bitcast i8* %t38 to [2 x i64]*
+  %t40 = ptrtoint i64 (i64)* @__lambda_1590 to i64
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 0
+  store i64 %t40, i64* %t41
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 1
+  store i64 0, i64* %t42
+  %t43 = ptrtoint [2 x i64]* %t39 to i64
+  %t44 = call i64 @button(i64 %t21, i64 %t23, i64 %t25, i64 %t26, i64 %t28, i64 %t30, i64 %t36, i64 0, i64 %t37, i64 %t43)
+  %t45 = call i64 @__map_new()
+  store i64 %t45, i64* %__map
+  %t46 = load i64, i64* %__map
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.1098, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = add i64 0, 1
+  %t50 = call i64 @__map_set(i64 %t46, i64 %t48, i64 %t49)
+  %t51 = load i64, i64* %__map
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.1099, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = load i64, i64* @__g_page
+  %t55 = call i64 @turmeric_signal_Signal__get(i64 %t54)
+  %t56 = getelementptr [6 x i8], [6 x i8]* @.str.1100, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  %t58 = inttoptr i64 %t55 to i8*
+  %t59 = inttoptr i64 %t57 to i8*
+  %t60 = call i32 @strcmp(i8* %t58, i8* %t59)
+  %t61 = icmp eq i32 %t60, 0
+  %t62 = zext i1 %t61 to i64
+  %t63 = call i64 @__map_set(i64 %t51, i64 %t53, i64 %t62)
+  %t64 = load i64, i64* %__map
+  %t65 = call i64 @turmeric_style_cx(i64 %t64)
+  %t66 = getelementptr [1 x i8], [1 x i8]* @.str.1101, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i64
+  %t68 = getelementptr [1 x i8], [1 x i8]* @.str.1102, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i64
+  %t70 = add i64 0, 0
+  %t71 = getelementptr [1 x i8], [1 x i8]* @.str.1103, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1104, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i8* @malloc(i64 16)
+  %t76 = bitcast i8* %t75 to [2 x i64]*
+  %t77 = ptrtoint i64 (i64, i64)* @__lambda_1591 to i64
+  %t78 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 0
+  store i64 %t77, i64* %t78
+  %t79 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 1
+  store i64 0, i64* %t79
+  %t80 = ptrtoint [2 x i64]* %t76 to i64
+  %t81 = call i64 @__map_new()
+  %t82 = call i8* @malloc(i64 16)
+  %t83 = bitcast i8* %t82 to [2 x i64]*
+  %t84 = ptrtoint i64 (i64)* @__lambda_1592 to i64
+  %t85 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 0
+  store i64 %t84, i64* %t85
+  %t86 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 1
+  store i64 0, i64* %t86
+  %t87 = ptrtoint [2 x i64]* %t83 to i64
+  %t88 = call i64 @button(i64 %t65, i64 %t67, i64 %t69, i64 %t70, i64 %t72, i64 %t74, i64 %t80, i64 0, i64 %t81, i64 %t87)
+  %t89 = call i64 @__map_new()
+  store i64 %t89, i64* %__map
+  %t90 = load i64, i64* %__map
+  %t91 = getelementptr [9 x i8], [9 x i8]* @.str.1109, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = add i64 0, 1
+  %t94 = call i64 @__map_set(i64 %t90, i64 %t92, i64 %t93)
+  %t95 = load i64, i64* %__map
+  %t96 = getelementptr [7 x i8], [7 x i8]* @.str.1110, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  %t98 = load i64, i64* @__g_page
+  %t99 = call i64 @turmeric_signal_Signal__get(i64 %t98)
+  %t100 = getelementptr [6 x i8], [6 x i8]* @.str.1111, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = inttoptr i64 %t99 to i8*
+  %t103 = inttoptr i64 %t101 to i8*
+  %t104 = call i32 @strcmp(i8* %t102, i8* %t103)
+  %t105 = icmp eq i32 %t104, 0
+  %t106 = zext i1 %t105 to i64
+  %t107 = call i64 @__map_set(i64 %t95, i64 %t97, i64 %t106)
+  %t108 = load i64, i64* %__map
+  %t109 = call i64 @turmeric_style_cx(i64 %t108)
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.1112, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = getelementptr [1 x i8], [1 x i8]* @.str.1113, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  %t114 = add i64 0, 0
+  %t115 = getelementptr [1 x i8], [1 x i8]* @.str.1114, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = getelementptr [1 x i8], [1 x i8]* @.str.1115, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @malloc(i64 16)
+  %t120 = bitcast i8* %t119 to [2 x i64]*
+  %t121 = ptrtoint i64 (i64, i64)* @__lambda_1593 to i64
+  %t122 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 0
+  store i64 %t121, i64* %t122
+  %t123 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 1
+  store i64 0, i64* %t123
+  %t124 = ptrtoint [2 x i64]* %t120 to i64
+  %t125 = call i64 @__map_new()
+  %t126 = call i8* @malloc(i64 16)
+  %t127 = bitcast i8* %t126 to [2 x i64]*
+  %t128 = ptrtoint i64 (i64)* @__lambda_1594 to i64
+  %t129 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 0
+  store i64 %t128, i64* %t129
+  %t130 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 1
+  store i64 0, i64* %t130
+  %t131 = ptrtoint [2 x i64]* %t127 to i64
+  %t132 = call i64 @button(i64 %t109, i64 %t111, i64 %t113, i64 %t114, i64 %t116, i64 %t118, i64 %t124, i64 0, i64 %t125, i64 %t131)
+  ret i64 0
+}
+
+define i64 @__lambda_1566(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.1046, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.1047, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.1048, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1581 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @h1(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.1051, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i64
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.1052, i64 0, i64 0
+  %t18 = ptrtoint i8* %t17 to i64
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1053, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = call i64 @__map_new()
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = ptrtoint i64 (i64, i64, i64, i64)* @__lambda_1582 to i64
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 0, i64* %t26
+  %t27 = ptrtoint [2 x i64]* %t23 to i64
+  %t28 = call i64 @nav(i64 %t16, i64 %t18, i64 %t20, i64 0, i64 %t21, i64 %t27)
+  ret i64 0
+}
+
+define i64 @__lambda_1595(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = load i64, i64* @__g_page
+  %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
+  %t3 = alloca i64
+  %t4 = call i64 @CounterPage()
+  store i64 %t4, i64* %t3
+  %t5 = load i64, i64* %t3
+  ret i64 0
+}
+
+define i64 @__lambda_1596(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [57 x i8], [57 x i8]* @.str.1127, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1598(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.1135, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1600(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1147, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1601(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1149, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1602(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1158, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1603(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1160, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1604(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1169, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1605(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1171, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1606(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1180, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1607(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1182, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1608(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1191, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1609(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1193, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1610(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1202, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1611(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1204, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1599(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %__map = alloca i64
+  %t1 = call i64 @__map_new()
+  store i64 %t1, i64* %__map
+  %t2 = load i64, i64* %__map
+  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.1172, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = add i64 0, 1
+  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
+  %t7 = load i64, i64* %__map
+  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.1173, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = load i64, i64* @__g_page
+  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
+  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.1174, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = inttoptr i64 %t11 to i8*
+  %t15 = inttoptr i64 %t13 to i8*
+  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
+  %t17 = icmp eq i32 %t16, 0
+  %t18 = zext i1 %t17 to i64
+  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
+  %t20 = load i64, i64* %__map
+  %t21 = call i64 @turmeric_style_cx(i64 %t20)
+  %t22 = getelementptr [1 x i8], [1 x i8]* @.str.1175, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i64
+  %t24 = getelementptr [1 x i8], [1 x i8]* @.str.1176, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i64
+  %t26 = add i64 0, 0
+  %t27 = getelementptr [1 x i8], [1 x i8]* @.str.1177, i64 0, i64 0
+  %t28 = ptrtoint i8* %t27 to i64
+  %t29 = getelementptr [1 x i8], [1 x i8]* @.str.1178, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i8* @malloc(i64 16)
+  %t32 = bitcast i8* %t31 to [2 x i64]*
+  %t33 = ptrtoint i64 (i64, i64)* @__lambda_1606 to i64
+  %t34 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 0
+  store i64 %t33, i64* %t34
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 1
+  store i64 0, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t32 to i64
+  %t37 = call i64 @__map_new()
+  %t38 = call i8* @malloc(i64 16)
+  %t39 = bitcast i8* %t38 to [2 x i64]*
+  %t40 = ptrtoint i64 (i64)* @__lambda_1607 to i64
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 0
+  store i64 %t40, i64* %t41
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 1
+  store i64 0, i64* %t42
+  %t43 = ptrtoint [2 x i64]* %t39 to i64
+  %t44 = call i64 @button(i64 %t21, i64 %t23, i64 %t25, i64 %t26, i64 %t28, i64 %t30, i64 %t36, i64 0, i64 %t37, i64 %t43)
+  %t45 = call i64 @__map_new()
+  store i64 %t45, i64* %__map
+  %t46 = load i64, i64* %__map
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.1183, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = add i64 0, 1
+  %t50 = call i64 @__map_set(i64 %t46, i64 %t48, i64 %t49)
+  %t51 = load i64, i64* %__map
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.1184, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = load i64, i64* @__g_page
+  %t55 = call i64 @turmeric_signal_Signal__get(i64 %t54)
+  %t56 = getelementptr [6 x i8], [6 x i8]* @.str.1185, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  %t58 = inttoptr i64 %t55 to i8*
+  %t59 = inttoptr i64 %t57 to i8*
+  %t60 = call i32 @strcmp(i8* %t58, i8* %t59)
+  %t61 = icmp eq i32 %t60, 0
+  %t62 = zext i1 %t61 to i64
+  %t63 = call i64 @__map_set(i64 %t51, i64 %t53, i64 %t62)
+  %t64 = load i64, i64* %__map
+  %t65 = call i64 @turmeric_style_cx(i64 %t64)
+  %t66 = getelementptr [1 x i8], [1 x i8]* @.str.1186, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i64
+  %t68 = getelementptr [1 x i8], [1 x i8]* @.str.1187, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i64
+  %t70 = add i64 0, 0
+  %t71 = getelementptr [1 x i8], [1 x i8]* @.str.1188, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1189, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i8* @malloc(i64 16)
+  %t76 = bitcast i8* %t75 to [2 x i64]*
+  %t77 = ptrtoint i64 (i64, i64)* @__lambda_1608 to i64
+  %t78 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 0
+  store i64 %t77, i64* %t78
+  %t79 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 1
+  store i64 0, i64* %t79
+  %t80 = ptrtoint [2 x i64]* %t76 to i64
+  %t81 = call i64 @__map_new()
+  %t82 = call i8* @malloc(i64 16)
+  %t83 = bitcast i8* %t82 to [2 x i64]*
+  %t84 = ptrtoint i64 (i64)* @__lambda_1609 to i64
+  %t85 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 0
+  store i64 %t84, i64* %t85
+  %t86 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 1
+  store i64 0, i64* %t86
+  %t87 = ptrtoint [2 x i64]* %t83 to i64
+  %t88 = call i64 @button(i64 %t65, i64 %t67, i64 %t69, i64 %t70, i64 %t72, i64 %t74, i64 %t80, i64 0, i64 %t81, i64 %t87)
+  %t89 = call i64 @__map_new()
+  store i64 %t89, i64* %__map
+  %t90 = load i64, i64* %__map
+  %t91 = getelementptr [9 x i8], [9 x i8]* @.str.1194, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = add i64 0, 1
+  %t94 = call i64 @__map_set(i64 %t90, i64 %t92, i64 %t93)
+  %t95 = load i64, i64* %__map
+  %t96 = getelementptr [7 x i8], [7 x i8]* @.str.1195, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  %t98 = load i64, i64* @__g_page
+  %t99 = call i64 @turmeric_signal_Signal__get(i64 %t98)
+  %t100 = getelementptr [6 x i8], [6 x i8]* @.str.1196, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = inttoptr i64 %t99 to i8*
+  %t103 = inttoptr i64 %t101 to i8*
+  %t104 = call i32 @strcmp(i8* %t102, i8* %t103)
+  %t105 = icmp eq i32 %t104, 0
+  %t106 = zext i1 %t105 to i64
+  %t107 = call i64 @__map_set(i64 %t95, i64 %t97, i64 %t106)
+  %t108 = load i64, i64* %__map
+  %t109 = call i64 @turmeric_style_cx(i64 %t108)
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.1197, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = getelementptr [1 x i8], [1 x i8]* @.str.1198, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  %t114 = add i64 0, 0
+  %t115 = getelementptr [1 x i8], [1 x i8]* @.str.1199, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = getelementptr [1 x i8], [1 x i8]* @.str.1200, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @malloc(i64 16)
+  %t120 = bitcast i8* %t119 to [2 x i64]*
+  %t121 = ptrtoint i64 (i64, i64)* @__lambda_1610 to i64
+  %t122 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 0
+  store i64 %t121, i64* %t122
+  %t123 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 1
+  store i64 0, i64* %t123
+  %t124 = ptrtoint [2 x i64]* %t120 to i64
+  %t125 = call i64 @__map_new()
+  %t126 = call i8* @malloc(i64 16)
+  %t127 = bitcast i8* %t126 to [2 x i64]*
+  %t128 = ptrtoint i64 (i64)* @__lambda_1611 to i64
+  %t129 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 0
+  store i64 %t128, i64* %t129
+  %t130 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 1
+  store i64 0, i64* %t130
+  %t131 = ptrtoint [2 x i64]* %t127 to i64
+  %t132 = call i64 @button(i64 %t109, i64 %t111, i64 %t113, i64 %t114, i64 %t116, i64 %t118, i64 %t124, i64 0, i64 %t125, i64 %t131)
+  ret i64 0
+}
+
+define i64 @__lambda_1612(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.1209, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1614(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1221, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1615(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1223, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1616(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1232, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1617(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1234, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1618(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1243, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1619(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1245, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1620(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.1254, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1621(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.1256, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1622(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1265, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1623(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1267, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1624(i64 %__env.arg, i64 %e.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %e = alloca i64
+  store i64 %e.arg, i64* %e
+  %t1 = load i64, i64* @__g_page
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.1276, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i64
+  %t4 = call i64 @turmeric_signal_Signal__set(i64 %t1, i64 %t3)
+  ret i64 %t4
+}
+
+define i64 @__lambda_1625(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.1278, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1613(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %__map = alloca i64
+  %t1 = call i64 @__map_new()
+  store i64 %t1, i64* %__map
+  %t2 = load i64, i64* %__map
+  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.1246, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = add i64 0, 1
+  %t6 = call i64 @__map_set(i64 %t2, i64 %t4, i64 %t5)
+  %t7 = load i64, i64* %__map
+  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.1247, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = load i64, i64* @__g_page
+  %t11 = call i64 @turmeric_signal_Signal__get(i64 %t10)
+  %t12 = getelementptr [8 x i8], [8 x i8]* @.str.1248, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = inttoptr i64 %t11 to i8*
+  %t15 = inttoptr i64 %t13 to i8*
+  %t16 = call i32 @strcmp(i8* %t14, i8* %t15)
+  %t17 = icmp eq i32 %t16, 0
+  %t18 = zext i1 %t17 to i64
+  %t19 = call i64 @__map_set(i64 %t7, i64 %t9, i64 %t18)
+  %t20 = load i64, i64* %__map
+  %t21 = call i64 @turmeric_style_cx(i64 %t20)
+  %t22 = getelementptr [1 x i8], [1 x i8]* @.str.1249, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i64
+  %t24 = getelementptr [1 x i8], [1 x i8]* @.str.1250, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i64
+  %t26 = add i64 0, 0
+  %t27 = getelementptr [1 x i8], [1 x i8]* @.str.1251, i64 0, i64 0
+  %t28 = ptrtoint i8* %t27 to i64
+  %t29 = getelementptr [1 x i8], [1 x i8]* @.str.1252, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i8* @malloc(i64 16)
+  %t32 = bitcast i8* %t31 to [2 x i64]*
+  %t33 = ptrtoint i64 (i64, i64)* @__lambda_1620 to i64
+  %t34 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 0
+  store i64 %t33, i64* %t34
+  %t35 = getelementptr [2 x i64], [2 x i64]* %t32, i64 0, i64 1
+  store i64 0, i64* %t35
+  %t36 = ptrtoint [2 x i64]* %t32 to i64
+  %t37 = call i64 @__map_new()
+  %t38 = call i8* @malloc(i64 16)
+  %t39 = bitcast i8* %t38 to [2 x i64]*
+  %t40 = ptrtoint i64 (i64)* @__lambda_1621 to i64
+  %t41 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 0
+  store i64 %t40, i64* %t41
+  %t42 = getelementptr [2 x i64], [2 x i64]* %t39, i64 0, i64 1
+  store i64 0, i64* %t42
+  %t43 = ptrtoint [2 x i64]* %t39 to i64
+  %t44 = call i64 @button(i64 %t21, i64 %t23, i64 %t25, i64 %t26, i64 %t28, i64 %t30, i64 %t36, i64 0, i64 %t37, i64 %t43)
+  %t45 = call i64 @__map_new()
+  store i64 %t45, i64* %__map
+  %t46 = load i64, i64* %__map
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.1257, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = add i64 0, 1
+  %t50 = call i64 @__map_set(i64 %t46, i64 %t48, i64 %t49)
+  %t51 = load i64, i64* %__map
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.1258, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = load i64, i64* @__g_page
+  %t55 = call i64 @turmeric_signal_Signal__get(i64 %t54)
+  %t56 = getelementptr [6 x i8], [6 x i8]* @.str.1259, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  %t58 = inttoptr i64 %t55 to i8*
+  %t59 = inttoptr i64 %t57 to i8*
+  %t60 = call i32 @strcmp(i8* %t58, i8* %t59)
+  %t61 = icmp eq i32 %t60, 0
+  %t62 = zext i1 %t61 to i64
+  %t63 = call i64 @__map_set(i64 %t51, i64 %t53, i64 %t62)
+  %t64 = load i64, i64* %__map
+  %t65 = call i64 @turmeric_style_cx(i64 %t64)
+  %t66 = getelementptr [1 x i8], [1 x i8]* @.str.1260, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i64
+  %t68 = getelementptr [1 x i8], [1 x i8]* @.str.1261, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i64
+  %t70 = add i64 0, 0
+  %t71 = getelementptr [1 x i8], [1 x i8]* @.str.1262, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = getelementptr [1 x i8], [1 x i8]* @.str.1263, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i8* @malloc(i64 16)
+  %t76 = bitcast i8* %t75 to [2 x i64]*
+  %t77 = ptrtoint i64 (i64, i64)* @__lambda_1622 to i64
+  %t78 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 0
+  store i64 %t77, i64* %t78
+  %t79 = getelementptr [2 x i64], [2 x i64]* %t76, i64 0, i64 1
+  store i64 0, i64* %t79
+  %t80 = ptrtoint [2 x i64]* %t76 to i64
+  %t81 = call i64 @__map_new()
+  %t82 = call i8* @malloc(i64 16)
+  %t83 = bitcast i8* %t82 to [2 x i64]*
+  %t84 = ptrtoint i64 (i64)* @__lambda_1623 to i64
+  %t85 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 0
+  store i64 %t84, i64* %t85
+  %t86 = getelementptr [2 x i64], [2 x i64]* %t83, i64 0, i64 1
+  store i64 0, i64* %t86
+  %t87 = ptrtoint [2 x i64]* %t83 to i64
+  %t88 = call i64 @button(i64 %t65, i64 %t67, i64 %t69, i64 %t70, i64 %t72, i64 %t74, i64 %t80, i64 0, i64 %t81, i64 %t87)
+  %t89 = call i64 @__map_new()
+  store i64 %t89, i64* %__map
+  %t90 = load i64, i64* %__map
+  %t91 = getelementptr [9 x i8], [9 x i8]* @.str.1268, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = add i64 0, 1
+  %t94 = call i64 @__map_set(i64 %t90, i64 %t92, i64 %t93)
+  %t95 = load i64, i64* %__map
+  %t96 = getelementptr [7 x i8], [7 x i8]* @.str.1269, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  %t98 = load i64, i64* @__g_page
+  %t99 = call i64 @turmeric_signal_Signal__get(i64 %t98)
+  %t100 = getelementptr [6 x i8], [6 x i8]* @.str.1270, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = inttoptr i64 %t99 to i8*
+  %t103 = inttoptr i64 %t101 to i8*
+  %t104 = call i32 @strcmp(i8* %t102, i8* %t103)
+  %t105 = icmp eq i32 %t104, 0
+  %t106 = zext i1 %t105 to i64
+  %t107 = call i64 @__map_set(i64 %t95, i64 %t97, i64 %t106)
+  %t108 = load i64, i64* %__map
+  %t109 = call i64 @turmeric_style_cx(i64 %t108)
+  %t110 = getelementptr [1 x i8], [1 x i8]* @.str.1271, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = getelementptr [1 x i8], [1 x i8]* @.str.1272, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  %t114 = add i64 0, 0
+  %t115 = getelementptr [1 x i8], [1 x i8]* @.str.1273, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = getelementptr [1 x i8], [1 x i8]* @.str.1274, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @malloc(i64 16)
+  %t120 = bitcast i8* %t119 to [2 x i64]*
+  %t121 = ptrtoint i64 (i64, i64)* @__lambda_1624 to i64
+  %t122 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 0
+  store i64 %t121, i64* %t122
+  %t123 = getelementptr [2 x i64], [2 x i64]* %t120, i64 0, i64 1
+  store i64 0, i64* %t123
+  %t124 = ptrtoint [2 x i64]* %t120 to i64
+  %t125 = call i64 @__map_new()
+  %t126 = call i8* @malloc(i64 16)
+  %t127 = bitcast i8* %t126 to [2 x i64]*
+  %t128 = ptrtoint i64 (i64)* @__lambda_1625 to i64
+  %t129 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 0
+  store i64 %t128, i64* %t129
+  %t130 = getelementptr [2 x i64], [2 x i64]* %t127, i64 0, i64 1
+  store i64 0, i64* %t130
+  %t131 = ptrtoint [2 x i64]* %t127 to i64
+  %t132 = call i64 @button(i64 %t109, i64 %t111, i64 %t113, i64 %t114, i64 %t116, i64 %t118, i64 %t124, i64 0, i64 %t125, i64 %t131)
+  ret i64 0
+}
+
+define i64 @__lambda_1597(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.1205, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.1206, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.1207, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1612 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @h1(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.1210, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i64
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.1211, i64 0, i64 0
+  %t18 = ptrtoint i8* %t17 to i64
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1212, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = call i64 @__map_new()
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = ptrtoint i64 (i64, i64, i64, i64)* @__lambda_1613 to i64
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 0, i64* %t26
+  %t27 = ptrtoint [2 x i64]* %t23 to i64
+  %t28 = call i64 @nav(i64 %t16, i64 %t18, i64 %t20, i64 0, i64 %t21, i64 %t27)
+  ret i64 0
+}
+
+define i64 @__lambda_1626(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = load i64, i64* @__g_page
+  %t2 = call i64 @turmeric_signal_Signal__get(i64 %t1)
+  %t3 = alloca i64
+  %t4 = call i64 @CounterPage()
+  store i64 %t4, i64* %t3
+  %t5 = load i64, i64* %t3
+  ret i64 0
+}
+
+define i64 @__lambda_1627(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [57 x i8], [57 x i8]* @.str.1286, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i64 @text(i64 %t2)
+  ret i64 0
+}
+
+define i64 @__lambda_1565(i64 %__env.arg) {
+entry:
+  %__env = alloca i64
+  store i64 %__env.arg, i64* %__env
+  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.1128, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.1129, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.1130, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1597 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @header(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  %t15 = getelementptr [8 x i8], [8 x i8]* @.str.1279, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i64
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.1280, i64 0, i64 0
+  %t18 = ptrtoint i8* %t17 to i64
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.1281, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = call i64 @__map_new()
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = ptrtoint i64 (i64)* @__lambda_1626 to i64
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 0, i64* %t26
+  %t27 = ptrtoint [2 x i64]* %t23 to i64
+  %t28 = call i64 @__saffron_main(i64 %t16, i64 %t18, i64 %t20, i64 0, i64 %t21, i64 %t27)
+  %t29 = getelementptr [11 x i8], [11 x i8]* @.str.1282, i64 0, i64 0
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = getelementptr [1 x i8], [1 x i8]* @.str.1283, i64 0, i64 0
+  %t32 = ptrtoint i8* %t31 to i64
+  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.1284, i64 0, i64 0
+  %t34 = ptrtoint i8* %t33 to i64
+  %t35 = call i64 @__map_new()
+  %t36 = call i8* @malloc(i64 16)
+  %t37 = bitcast i8* %t36 to [2 x i64]*
+  %t38 = ptrtoint i64 (i64)* @__lambda_1627 to i64
+  %t39 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 0
+  store i64 %t38, i64* %t39
+  %t40 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 1
+  store i64 0, i64* %t40
+  %t41 = ptrtoint [2 x i64]* %t37 to i64
+  %t42 = call i64 @footer(i64 %t30, i64 %t32, i64 %t34, i64 0, i64 %t35, i64 %t41)
+  ret i64 0
+}
+
+define linkonce_odr i64 @__wrap_1628_App(i64 %__env.arg) {
+entry:
+  %r = call i64 @App()
+  ret i64 %r
+}
+
+define i64 @Addable__add(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Addable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Addable*
+  %t3 = ptrtoint %Addable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Subtractable__sub(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Subtractable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Subtractable*
+  %t3 = ptrtoint %Subtractable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Multipliable__mul(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Multipliable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Multipliable*
+  %t3 = ptrtoint %Multipliable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Dividable__div(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Dividable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Dividable*
+  %t3 = ptrtoint %Dividable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Modable__mod(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Modable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Modable*
+  %t3 = ptrtoint %Modable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Comparable__lt(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define i64 @Comparable__gt(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Comparable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Comparable*
+  %t3 = ptrtoint %Comparable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Equatable__eq(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  ret i64 0
+}
+
+define linkonce_odr i64 @Equatable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Equatable*
+  %t3 = ptrtoint %Equatable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Indexable__getItem(i64 %self.arg, i64 %key.arg) {
+entry:
+  %self = alloca i64
+  %key = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %key.arg, i64* %key
+  ret i64 0
+}
+
+define linkonce_odr i64 @Indexable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Indexable*
+  %t3 = ptrtoint %Indexable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Stringable__to_string(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Stringable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Stringable*
+  %t3 = ptrtoint %Stringable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Iterator__next(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define i64 @Iterator__has_next(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Iterator() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Iterator*
+  %t3 = ptrtoint %Iterator* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Iterable__iter(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Iterable() {
+entry:
+  %t1 = call i8* @malloc(i64 0)
+  %t2 = bitcast i8* %t1 to %Iterable*
+  %t3 = ptrtoint %Iterable* %t2 to i64
+  ret i64 %t3
 }
 
 define i64 @_tc_push(i64 %handle.arg) {
@@ -4572,8 +5353,25 @@ entry:
 define i64 @_tc_pop() {
 entry:
   %t1 = load i64, i64* @__g__tc_stack
-  %t2 = call i64 @__list_pop(i64 %t1)
-  ret i64 %t2
+  %t2 = call i64 @__list_length(i64 %t1)
+  %t3 = add i64 0, 0
+  %t5 = icmp eq i64 %t2, %t3
+  %t4 = zext i1 %t5 to i64
+  %t6 = trunc i64 %t4 to i1
+  br i1 %t6, label %then2, label %else3
+then2:
+  %t7 = getelementptr [76 x i8], [76 x i8]* @.str.0, i64 0, i64 0
+  %t8 = ptrtoint i8* %t7 to i64
+  store i64 %t8, i64* @__exception_value
+  %t9 = load i8*, i8** @__jmp_buf_current
+  call void @longjmp(i8* %t9, i32 1)
+  unreachable
+else3:
+  br label %endif1
+endif1:
+  %t10 = load i64, i64* @__g__tc_stack
+  %t11 = call i64 @__list_pop(i64 %t10)
+  ret i64 %t11
 }
 
 define i64 @_tc_current() {
@@ -4584,13 +5382,13 @@ entry:
   %t5 = icmp eq i64 %t2, %t3
   %t4 = zext i1 %t5 to i64
   %t6 = trunc i64 %t4 to i1
-  br i1 %t6, label %then2, label %else3
-then2:
+  br i1 %t6, label %then5, label %else6
+then5:
   %t7 = load i64, i64* @__g__tc_root
   ret i64 %t7
-else3:
-  br label %endif1
-endif1:
+else6:
+  br label %endif4
+endif4:
   %t8 = load i64, i64* @__g__tc_stack
   %t9 = load i64, i64* @__g__tc_stack
   %t10 = call i64 @__list_length(i64 %t9)
@@ -4619,731 +5417,10995 @@ entry:
   ret i64 0
 }
 
-define i64 @_tc_el(i64 %tag.arg, i64 %block.arg) {
+define i64 @_tc_apply_attrs(i64 %el.arg, i64 %attrs.arg) {
+entry:
+  %el = alloca i64
+  %attrs = alloca i64
+  %keys = alloca i64
+  %i = alloca i64
+  %key = alloca i64
+  %value = alloca i64
+  %event_name = alloca i64
+  store i64 %el.arg, i64* %el
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = load i64, i64* %attrs
+  %t2 = call i64 @__map_keys(i64 %t1)
+  store i64 %t2, i64* %keys
+  %t3 = add i64 0, 0
+  store i64 %t3, i64* %i
+  br label %while.cond7
+while.cond7:
+  %t4 = load i64, i64* %i
+  %t5 = load i64, i64* %keys
+  %t6 = call i64 @__list_length(i64 %t5)
+  %t8 = icmp slt i64 %t4, %t6
+  %t7 = zext i1 %t8 to i64
+  %t9 = trunc i64 %t7 to i1
+  br i1 %t9, label %while.body8, label %while.end9
+while.body8:
+  %t10 = load i64, i64* %keys
+  %t11 = load i64, i64* %i
+  %t12 = call i64 @__val_untag_int(i64 %t11)
+  %t13 = icmp slt i64 %t12, 0
+  %t14 = call i64 @__list_length(i64 %t10)
+  %t15 = add i64 %t14, %t12
+  %t16 = select i1 %t13, i64 %t15, i64 %t12
+  %t17 = call i64 @__list_get(i64 %t10, i64 %t16)
+  store i64 %t17, i64* %key
+  %t18 = load i64, i64* %attrs
+  %t19 = load i64, i64* %key
+  %t20 = call i64 @__map_get(i64 %t18, i64 %t19)
+  store i64 %t20, i64* %value
+  %t21 = load i64, i64* %key
+  %t22 = getelementptr [4 x i8], [4 x i8]* @.str.1, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i64
+  %t24 = inttoptr i64 %t21 to i8*
+  %t25 = inttoptr i64 %t23 to i8*
+  %t26 = call i32 @strcmp(i8* %t24, i8* %t25)
+  %t27 = icmp eq i32 %t26, 0
+  %t28 = zext i1 %t27 to i64
+  %t29 = trunc i64 %t28 to i1
+  br label %logic.entry11
+logic.entry11:
+  br i1 %t29, label %end13, label %rhs12
+rhs12:
+  %t30 = load i64, i64* %key
+  %t31 = getelementptr [6 x i8], [6 x i8]* @.str.2, i64 0, i64 0
+  %t32 = ptrtoint i8* %t31 to i64
+  %t33 = inttoptr i64 %t30 to i8*
+  %t34 = inttoptr i64 %t32 to i8*
+  %t35 = call i32 @strcmp(i8* %t33, i8* %t34)
+  %t36 = icmp eq i32 %t35, 0
+  %t37 = zext i1 %t36 to i64
+  %t38 = trunc i64 %t37 to i1
+  br label %end13
+end13:
+  %t39 = phi i1 [%t29, %logic.entry11], [%t38, %rhs12]
+  %t40 = zext i1 %t39 to i64
+  %t41 = trunc i64 %t40 to i1
+  br i1 %t41, label %then14, label %else15
+then14:
+  %t42 = load i64, i64* %el
+  %t43 = getelementptr [6 x i8], [6 x i8]* @.str.3, i64 0, i64 0
+  %t44 = ptrtoint i8* %t43 to i64
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = load i64, i64* %value
+  %t47 = call i8* @__val_untag_ptr(i64 %t46)
+  call void @js_dom_set_attr(i64 %t42, i8* %t45, i8* %t47)
+  br label %endif10
+else15:
+  %t48 = load i64, i64* %key
+  %t49 = getelementptr [3 x i8], [3 x i8]* @.str.4, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  %t51 = inttoptr i64 %t48 to i8*
+  %t52 = inttoptr i64 %t50 to i8*
+  %t53 = call i32 @strcmp(i8* %t51, i8* %t52)
+  %t54 = icmp eq i32 %t53, 0
+  %t55 = zext i1 %t54 to i64
+  %t56 = trunc i64 %t55 to i1
+  br i1 %t56, label %then16, label %else17
+then16:
+  %t57 = load i64, i64* %el
+  %t58 = getelementptr [3 x i8], [3 x i8]* @.str.5, i64 0, i64 0
+  %t59 = ptrtoint i8* %t58 to i64
+  %t60 = call i8* @__val_untag_ptr(i64 %t59)
+  %t61 = load i64, i64* %value
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  call void @js_dom_set_attr(i64 %t57, i8* %t60, i8* %t62)
+  br label %endif10
+else17:
+  %t63 = load i64, i64* %key
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = getelementptr [4 x i8], [4 x i8]* @.str.6, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = call i32 @strncmp(i8* %t64, i8* %t67, i64 %t68)
+  %t70 = icmp eq i32 %t69, 0
+  %t71 = zext i1 %t70 to i64
+  %t72 = call i64 @__val_tag_bool(i64 %t71)
+  %t73 = trunc i64 %t72 to i1
+  br i1 %t73, label %then18, label %else19
+then18:
+  %t74 = load i64, i64* %key
+  %t75 = call i8* @__val_untag_ptr(i64 %t74)
+  %t76 = add i64 0, 3
+  %t77 = call i64 @__val_untag_int(i64 %t76)
+  %t78 = load i64, i64* %key
+  %t79 = call i8* @__val_untag_ptr(i64 %t78)
+  %t80 = call i64 @strlen(i8* %t79)
+  %t81 = call i64 @__val_untag_int(i64 %t80)
+  %t82 = sub i64 %t81, %t77
+  %t83 = add i64 %t82, 1
+  %t84 = call i8* @malloc(i64 %t83)
+  %t85 = getelementptr i8, i8* %t75, i64 %t77
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t84, i8* %t85, i64 %t82, i1 false)
+  %t86 = getelementptr i8, i8* %t84, i64 %t82
+  store i8 0, i8* %t86
+  %t87 = call i64 @__val_tag_ptr(i8* %t84)
+  store i64 %t87, i64* %event_name
+  %t88 = load i64, i64* %el
+  %t89 = load i64, i64* %event_name
+  %t90 = call i8* @__val_untag_ptr(i64 %t89)
+  %t91 = load i64, i64* %value
+  call void @js_dom_add_event(i64 %t88, i8* %t90, i64 %t91)
+  br label %endif10
+else19:
+  %t92 = load i64, i64* %el
+  %t93 = load i64, i64* %key
+  %t94 = call i8* @__val_untag_ptr(i64 %t93)
+  %t95 = load i64, i64* %value
+  %t96 = call i8* @__val_untag_ptr(i64 %t95)
+  call void @js_dom_set_attr(i64 %t92, i8* %t94, i8* %t96)
+  br label %endif10
+endif10:
+  %t97 = load i64, i64* %i
+  %t98 = add i64 0, 1
+  %t99 = add i64 %t97, %t98
+  store i64 %t99, i64* %i
+  br label %while.cond7
+while.end9:
+  ret i64 0
+}
+
+define i64 @_tc_el_with_common(i64 %tag.arg, i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
   %tag = alloca i64
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
   %el = alloca i64
   %parent = alloca i64
   store i64 %tag.arg, i64* %tag
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
   %t1 = load i64, i64* %tag
   %t2 = call i8* @__val_untag_ptr(i64 %t1)
   %t3 = call i64 @js_dom_create_element(i8* %t2)
   store i64 %t3, i64* %el
-  %t4 = call i64 @_tc_current()
-  store i64 %t4, i64* %parent
-  %t5 = load i64, i64* %parent
-  %t6 = load i64, i64* %el
-  call void @js_dom_append_child(i64 %t5, i64 %t6)
-  %t7 = load i64, i64* %block
-  %t9 = icmp ne i64 %t7, 0
+  %t4 = load i64, i64* %cls
+  %t5 = call i8* @__val_untag_ptr(i64 %t4)
+  %t6 = call i64 @strlen(i8* %t5)
+  %t7 = add i64 0, 0
+  %t9 = icmp sgt i64 %t6, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %then5, label %else6
-then5:
+  br i1 %t10, label %then21, label %else22
+then21:
   %t11 = load i64, i64* %el
-  %t12 = call i64 @_tc_push(i64 %t11)
-  %t13 = load i64, i64* %block
-  %t14 = inttoptr i64 %t13 to [2 x i64]*
-  %t15 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 0
-  %t16 = load i64, i64* %t15
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 1
-  %t18 = load i64, i64* %t17
-  %t19 = inttoptr i64 %t16 to i64 (i64)*
-  %t20 = call i64 %t19(i64 %t18)
-  %t21 = call i64 @_tc_pop()
-  br label %endif4
-else6:
-  br label %endif4
-endif4:
-  %t22 = load i64, i64* %el
-  ret i64 %t22
+  %t12 = getelementptr [6 x i8], [6 x i8]* @.str.7, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = call i8* @__val_untag_ptr(i64 %t13)
+  %t15 = load i64, i64* %cls
+  %t16 = call i8* @__val_untag_ptr(i64 %t15)
+  call void @js_dom_set_attr(i64 %t11, i8* %t14, i8* %t16)
+  br label %endif20
+else22:
+  br label %endif20
+endif20:
+  %t17 = load i64, i64* %id
+  %t18 = call i8* @__val_untag_ptr(i64 %t17)
+  %t19 = call i64 @strlen(i8* %t18)
+  %t20 = add i64 0, 0
+  %t22 = icmp sgt i64 %t19, %t20
+  %t21 = zext i1 %t22 to i64
+  %t23 = trunc i64 %t21 to i1
+  br i1 %t23, label %then24, label %else25
+then24:
+  %t24 = load i64, i64* %el
+  %t25 = getelementptr [3 x i8], [3 x i8]* @.str.8, i64 0, i64 0
+  %t26 = ptrtoint i8* %t25 to i64
+  %t27 = call i8* @__val_untag_ptr(i64 %t26)
+  %t28 = load i64, i64* %id
+  %t29 = call i8* @__val_untag_ptr(i64 %t28)
+  call void @js_dom_set_attr(i64 %t24, i8* %t27, i8* %t29)
+  br label %endif23
+else25:
+  br label %endif23
+endif23:
+  %t30 = load i64, i64* %style
+  %t31 = call i8* @__val_untag_ptr(i64 %t30)
+  %t32 = call i64 @strlen(i8* %t31)
+  %t33 = add i64 0, 0
+  %t35 = icmp sgt i64 %t32, %t33
+  %t34 = zext i1 %t35 to i64
+  %t36 = trunc i64 %t34 to i1
+  br i1 %t36, label %then27, label %else28
+then27:
+  %t37 = load i64, i64* %el
+  %t38 = getelementptr [6 x i8], [6 x i8]* @.str.9, i64 0, i64 0
+  %t39 = ptrtoint i8* %t38 to i64
+  %t40 = call i8* @__val_untag_ptr(i64 %t39)
+  %t41 = load i64, i64* %style
+  %t42 = call i8* @__val_untag_ptr(i64 %t41)
+  call void @js_dom_set_attr(i64 %t37, i8* %t40, i8* %t42)
+  br label %endif26
+else28:
+  br label %endif26
+endif26:
+  %t43 = load i64, i64* %el
+  %t44 = load i64, i64* %attrs
+  %t45 = call i64 @_tc_apply_attrs(i64 %t43, i64 %t44)
+  %t46 = call i64 @_tc_current()
+  store i64 %t46, i64* %parent
+  %t47 = load i64, i64* %parent
+  %t48 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t47, i64 %t48)
+  %t49 = load i64, i64* %block
+  %t51 = icmp ne i64 %t49, 0
+  %t50 = zext i1 %t51 to i64
+  %t52 = trunc i64 %t50 to i1
+  br i1 %t52, label %then30, label %else31
+then30:
+  %t53 = load i64, i64* %el
+  %t54 = call i64 @_tc_push(i64 %t53)
+  %t55 = load i64, i64* %block
+  %t56 = inttoptr i64 %t55 to [2 x i64]*
+  %t57 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 0
+  %t58 = load i64, i64* %t57
+  %t59 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 1
+  %t60 = load i64, i64* %t59
+  %t61 = inttoptr i64 %t58 to i64 (i64)*
+  %t62 = call i64 %t61(i64 %t60)
+  %t63 = call i64 @_tc_pop()
+  br label %endif29
+else31:
+  br label %endif29
+endif29:
+  %t64 = load i64, i64* %el
+  ret i64 %t64
 }
 
-define i64 @div(i64 %block.arg) {
+define i64 @a(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %download.arg, i64 %hreflang.arg, i64 %rel.arg, i64 %target.arg, i64 %type_.arg, i64 %href.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %download = alloca i64
+  %hreflang = alloca i64
+  %rel = alloca i64
+  %target = alloca i64
+  %type_ = alloca i64
+  %href = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %download.arg, i64* %download
+  store i64 %hreflang.arg, i64* %hreflang
+  store i64 %rel.arg, i64* %rel
+  store i64 %target.arg, i64* %target
+  store i64 %type_.arg, i64* %type_
+  store i64 %href.arg, i64* %href
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.0, i64 0, i64 0
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.10, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then33, label %else34
+then33:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif32
+else34:
+  br label %endif32
+endif32:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then36, label %else37
+then36:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.12, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif35
+else37:
+  br label %endif35
+endif35:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then39, label %else40
+then39:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.13, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif38
+else40:
+  br label %endif38
+endif38:
+  %t44 = load i64, i64* %download
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then42, label %else43
+then42:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [9 x i8], [9 x i8]* @.str.14, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %download
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif41
+else43:
+  br label %endif41
+endif41:
+  %t57 = load i64, i64* %hreflang
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then45, label %else46
+then45:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.15, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %hreflang
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif44
+else46:
+  br label %endif44
+endif44:
+  %t70 = load i64, i64* %rel
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then48, label %else49
+then48:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [4 x i8], [4 x i8]* @.str.16, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %rel
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif47
+else49:
+  br label %endif47
+endif47:
+  %t83 = load i64, i64* %target
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then51, label %else52
+then51:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [7 x i8], [7 x i8]* @.str.17, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %target
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif50
+else52:
+  br label %endif50
+endif50:
+  %t96 = load i64, i64* %type_
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then54, label %else55
+then54:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [5 x i8], [5 x i8]* @.str.18, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %type_
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif53
+else55:
+  br label %endif53
+endif53:
+  %t109 = load i64, i64* %href
+  %t110 = call i8* @__val_untag_ptr(i64 %t109)
+  %t111 = call i64 @strlen(i8* %t110)
+  %t112 = add i64 0, 0
+  %t114 = icmp sgt i64 %t111, %t112
+  %t113 = zext i1 %t114 to i64
+  %t115 = trunc i64 %t113 to i1
+  br i1 %t115, label %then57, label %else58
+then57:
+  %t116 = load i64, i64* %el
+  %t117 = getelementptr [5 x i8], [5 x i8]* @.str.19, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @__val_untag_ptr(i64 %t118)
+  %t120 = load i64, i64* %href
+  %t121 = call i8* @__val_untag_ptr(i64 %t120)
+  call void @js_dom_set_attr(i64 %t116, i8* %t119, i8* %t121)
+  br label %endif56
+else58:
+  br label %endif56
+endif56:
+  %t122 = load i64, i64* %on_click
+  %t124 = icmp ne i64 %t122, 0
+  %t123 = zext i1 %t124 to i64
+  %t125 = trunc i64 %t123 to i1
+  br i1 %t125, label %then60, label %else61
+then60:
+  %t126 = load i64, i64* %el
+  %t127 = getelementptr [6 x i8], [6 x i8]* @.str.20, i64 0, i64 0
+  %t128 = ptrtoint i8* %t127 to i64
+  %t129 = call i8* @__val_untag_ptr(i64 %t128)
+  %t130 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t126, i8* %t129, i64 %t130)
+  br label %endif59
+else61:
+  br label %endif59
+endif59:
+  %t131 = load i64, i64* %el
+  %t132 = load i64, i64* %attrs
+  %t133 = call i64 @_tc_apply_attrs(i64 %t131, i64 %t132)
+  %t134 = call i64 @_tc_current()
+  store i64 %t134, i64* %parent
+  %t135 = load i64, i64* %parent
+  %t136 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t135, i64 %t136)
+  %t137 = load i64, i64* %block
+  %t139 = icmp ne i64 %t137, 0
+  %t138 = zext i1 %t139 to i64
+  %t140 = trunc i64 %t138 to i1
+  br i1 %t140, label %then63, label %else64
+then63:
+  %t141 = load i64, i64* %el
+  %t142 = call i64 @_tc_push(i64 %t141)
+  %t143 = load i64, i64* %block
+  %t144 = inttoptr i64 %t143 to [2 x i64]*
+  %t145 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 0
+  %t146 = load i64, i64* %t145
+  %t147 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 1
+  %t148 = load i64, i64* %t147
+  %t149 = inttoptr i64 %t146 to i64 (i64)*
+  %t150 = call i64 %t149(i64 %t148)
+  %t151 = call i64 @_tc_pop()
+  br label %endif62
+else64:
+  br label %endif62
+endif62:
+  %t152 = load i64, i64* %el
+  ret i64 %t152
 }
 
-define i64 @span(i64 %block.arg) {
+define i64 @abbr(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.1, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.21, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @p(i64 %block.arg) {
+define i64 @address(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.2, i64 0, i64 0
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.22, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @a(i64 %block.arg) {
+define i64 @area(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %alt.arg, i64 %download.arg, i64 %rel.arg, i64 %target.arg, i64 %href.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %alt = alloca i64
+  %download = alloca i64
+  %rel = alloca i64
+  %target = alloca i64
+  %href = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %alt.arg, i64* %alt
+  store i64 %download.arg, i64* %download
+  store i64 %rel.arg, i64* %rel
+  store i64 %target.arg, i64* %target
+  store i64 %href.arg, i64* %href
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.23, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then66, label %else67
+then66:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.24, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif65
+else67:
+  br label %endif65
+endif65:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then69, label %else70
+then69:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.25, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif68
+else70:
+  br label %endif68
+endif68:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then72, label %else73
+then72:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif71
+else73:
+  br label %endif71
+endif71:
+  %t44 = load i64, i64* %alt
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then75, label %else76
+then75:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [4 x i8], [4 x i8]* @.str.27, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %alt
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif74
+else76:
+  br label %endif74
+endif74:
+  %t57 = load i64, i64* %download
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then78, label %else79
+then78:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.28, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %download
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif77
+else79:
+  br label %endif77
+endif77:
+  %t70 = load i64, i64* %rel
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then81, label %else82
+then81:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [4 x i8], [4 x i8]* @.str.29, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %rel
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif80
+else82:
+  br label %endif80
+endif80:
+  %t83 = load i64, i64* %target
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then84, label %else85
+then84:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [7 x i8], [7 x i8]* @.str.30, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %target
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif83
+else85:
+  br label %endif83
+endif83:
+  %t96 = load i64, i64* %href
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then87, label %else88
+then87:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [5 x i8], [5 x i8]* @.str.31, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %href
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif86
+else88:
+  br label %endif86
+endif86:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then90, label %else91
+then90:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.32, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif89
+else91:
+  br label %endif89
+endif89:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %el
+  ret i64 %t124
+}
+
+define i64 @article(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.33, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h1(i64 %block.arg) {
+define i64 @aside(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.4, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.34, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h2(i64 %block.arg) {
+define i64 @audio(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.5, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.35, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h3(i64 %block.arg) {
+define i64 @b(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.6, i64 0, i64 0
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.36, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h4(i64 %block.arg) {
+define i64 @base(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %href.arg, i64 %target.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %href = alloca i64
+  %target = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %href.arg, i64* %href
+  store i64 %target.arg, i64* %target
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.37, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then93, label %else94
+then93:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.38, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif92
+else94:
+  br label %endif92
+endif92:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then96, label %else97
+then96:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.39, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif95
+else97:
+  br label %endif95
+endif95:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then99, label %else100
+then99:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.40, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif98
+else100:
+  br label %endif98
+endif98:
+  %t44 = load i64, i64* %href
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then102, label %else103
+then102:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.41, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %href
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif101
+else103:
+  br label %endif101
+endif101:
+  %t57 = load i64, i64* %target
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then105, label %else106
+then105:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.42, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %target
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif104
+else106:
+  br label %endif104
+endif104:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then108, label %else109
+then108:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.43, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif107
+else109:
+  br label %endif107
+endif107:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %el
+  ret i64 %t85
+}
+
+define i64 @bdi(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.7, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.44, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h5(i64 %block.arg) {
+define i64 @bdo(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.8, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.45, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @h6(i64 %block.arg) {
+define i64 @blockquote(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cite.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cite = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cite.arg, i64* %cite
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.9, i64 0, i64 0
+  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.46, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then111, label %else112
+then111:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.47, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif110
+else112:
+  br label %endif110
+endif110:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then114, label %else115
+then114:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.48, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif113
+else115:
+  br label %endif113
+endif113:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then117, label %else118
+then117:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.49, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif116
+else118:
+  br label %endif116
+endif116:
+  %t44 = load i64, i64* %cite
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then120, label %else121
+then120:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.50, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %cite
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif119
+else121:
+  br label %endif119
+endif119:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then123, label %else124
+then123:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.51, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif122
+else124:
+  br label %endif122
+endif122:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then126, label %else127
+then126:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif125
+else127:
+  br label %endif125
+endif125:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @button(i64 %block.arg) {
+define i64 @br(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.52, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then129, label %else130
+then129:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.53, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif128
+else130:
+  br label %endif128
+endif128:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then132, label %else133
+then132:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.54, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif131
+else133:
+  br label %endif131
+endif131:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then135, label %else136
+then135:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.55, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif134
+else136:
+  br label %endif134
+endif134:
+  %t44 = load i64, i64* %on_click
+  %t46 = icmp ne i64 %t44, 0
+  %t45 = zext i1 %t46 to i64
+  %t47 = trunc i64 %t45 to i1
+  br i1 %t47, label %then138, label %else139
+then138:
+  %t48 = load i64, i64* %el
+  %t49 = getelementptr [6 x i8], [6 x i8]* @.str.56, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  %t51 = call i8* @__val_untag_ptr(i64 %t50)
+  %t52 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t48, i8* %t51, i64 %t52)
+  br label %endif137
+else139:
+  br label %endif137
+endif137:
+  %t53 = load i64, i64* %el
+  %t54 = load i64, i64* %attrs
+  %t55 = call i64 @_tc_apply_attrs(i64 %t53, i64 %t54)
+  %t56 = call i64 @_tc_current()
+  store i64 %t56, i64* %parent
+  %t57 = load i64, i64* %parent
+  %t58 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t57, i64 %t58)
+  %t59 = load i64, i64* %el
+  ret i64 %t59
+}
+
+define i64 @button(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disabled.arg, i64 %name.arg, i64 %value.arg, i64 %on_click.arg, i64 %on_submit.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disabled = alloca i64
+  %name = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %on_submit = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %name.arg, i64* %name
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_submit.arg, i64* %on_submit
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.10, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.57, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then141, label %else142
+then141:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.58, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif140
+else142:
+  br label %endif140
+endif140:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then144, label %else145
+then144:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.59, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif143
+else145:
+  br label %endif143
+endif143:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then147, label %else148
+then147:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.60, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif146
+else148:
+  br label %endif146
+endif146:
+  %t44 = load i64, i64* %disabled
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then150, label %else151
+then150:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.61, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.62, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif149
+else151:
+  br label %endif149
+endif149:
+  %t53 = load i64, i64* %name
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = call i64 @strlen(i8* %t54)
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then153, label %else154
+then153:
+  %t60 = load i64, i64* %el
+  %t61 = getelementptr [5 x i8], [5 x i8]* @.str.63, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = load i64, i64* %name
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t60, i8* %t63, i8* %t65)
+  br label %endif152
+else154:
+  br label %endif152
+endif152:
+  %t66 = load i64, i64* %value
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = add i64 0, 0
+  %t71 = icmp sgt i64 %t68, %t69
+  %t70 = zext i1 %t71 to i64
+  %t72 = trunc i64 %t70 to i1
+  br i1 %t72, label %then156, label %else157
+then156:
+  %t73 = load i64, i64* %el
+  %t74 = getelementptr [6 x i8], [6 x i8]* @.str.64, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = load i64, i64* %value
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t73, i8* %t76, i8* %t78)
+  br label %endif155
+else157:
+  br label %endif155
+endif155:
+  %t79 = load i64, i64* %on_click
+  %t81 = icmp ne i64 %t79, 0
+  %t80 = zext i1 %t81 to i64
+  %t82 = trunc i64 %t80 to i1
+  br i1 %t82, label %then159, label %else160
+then159:
+  %t83 = load i64, i64* %el
+  %t84 = getelementptr [6 x i8], [6 x i8]* @.str.65, i64 0, i64 0
+  %t85 = ptrtoint i8* %t84 to i64
+  %t86 = call i8* @__val_untag_ptr(i64 %t85)
+  %t87 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t83, i8* %t86, i64 %t87)
+  br label %endif158
+else160:
+  br label %endif158
+endif158:
+  %t88 = load i64, i64* %on_submit
+  %t90 = icmp ne i64 %t88, 0
+  %t89 = zext i1 %t90 to i64
+  %t91 = trunc i64 %t89 to i1
+  br i1 %t91, label %then162, label %else163
+then162:
+  %t92 = load i64, i64* %el
+  %t93 = getelementptr [7 x i8], [7 x i8]* @.str.66, i64 0, i64 0
+  %t94 = ptrtoint i8* %t93 to i64
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  %t96 = load i64, i64* %on_submit
+  call void @js_dom_add_event(i64 %t92, i8* %t95, i64 %t96)
+  br label %endif161
+else163:
+  br label %endif161
+endif161:
+  %t97 = load i64, i64* %el
+  %t98 = load i64, i64* %attrs
+  %t99 = call i64 @_tc_apply_attrs(i64 %t97, i64 %t98)
+  %t100 = call i64 @_tc_current()
+  store i64 %t100, i64* %parent
+  %t101 = load i64, i64* %parent
+  %t102 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t101, i64 %t102)
+  %t103 = load i64, i64* %block
+  %t105 = icmp ne i64 %t103, 0
+  %t104 = zext i1 %t105 to i64
+  %t106 = trunc i64 %t104 to i1
+  br i1 %t106, label %then165, label %else166
+then165:
+  %t107 = load i64, i64* %el
+  %t108 = call i64 @_tc_push(i64 %t107)
+  %t109 = load i64, i64* %block
+  %t110 = inttoptr i64 %t109 to [2 x i64]*
+  %t111 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 0
+  %t112 = load i64, i64* %t111
+  %t113 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 1
+  %t114 = load i64, i64* %t113
+  %t115 = inttoptr i64 %t112 to i64 (i64)*
+  %t116 = call i64 %t115(i64 %t114)
+  %t117 = call i64 @_tc_pop()
+  br label %endif164
+else166:
+  br label %endif164
+endif164:
+  %t118 = load i64, i64* %el
+  ret i64 %t118
 }
 
-define i64 @input() {
+define i64 @canvas(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %height.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.11, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
-}
-
-define i64 @textarea(i64 %block.arg) {
-entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %height = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %height.arg, i64* %height
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.12, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.67, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then168, label %else169
+then168:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.68, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif167
+else169:
+  br label %endif167
+endif167:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then171, label %else172
+then171:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.69, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif170
+else172:
+  br label %endif170
+endif170:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then174, label %else175
+then174:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.70, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif173
+else175:
+  br label %endif173
+endif173:
+  %t44 = load i64, i64* %height
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then177, label %else178
+then177:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [7 x i8], [7 x i8]* @.str.71, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %height
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif176
+else178:
+  br label %endif176
+endif176:
+  %t57 = load i64, i64* %width
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then180, label %else181
+then180:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [6 x i8], [6 x i8]* @.str.72, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %width
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif179
+else181:
+  br label %endif179
+endif179:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then183, label %else184
+then183:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.73, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif182
+else184:
+  br label %endif182
+endif182:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %block
+  %t87 = icmp ne i64 %t85, 0
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then186, label %else187
+then186:
+  %t89 = load i64, i64* %el
+  %t90 = call i64 @_tc_push(i64 %t89)
+  %t91 = load i64, i64* %block
+  %t92 = inttoptr i64 %t91 to [2 x i64]*
+  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
+  %t94 = load i64, i64* %t93
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
+  %t96 = load i64, i64* %t95
+  %t97 = inttoptr i64 %t94 to i64 (i64)*
+  %t98 = call i64 %t97(i64 %t96)
+  %t99 = call i64 @_tc_pop()
+  br label %endif185
+else187:
+  br label %endif185
+endif185:
+  %t100 = load i64, i64* %el
+  ret i64 %t100
 }
 
-define i64 @select(i64 %block.arg) {
+define i64 @caption(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.13, i64 0, i64 0
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.74, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @option(i64 %block.arg) {
+define i64 @cite(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.14, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.75, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @form(i64 %block.arg) {
+define i64 @code(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.15, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.76, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @label(i64 %block.arg) {
+define i64 @col(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %span.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %span = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %span.arg, i64* %span
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.77, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then189, label %else190
+then189:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.78, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif188
+else190:
+  br label %endif188
+endif188:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then192, label %else193
+then192:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.79, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif191
+else193:
+  br label %endif191
+endif191:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then195, label %else196
+then195:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.80, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif194
+else196:
+  br label %endif194
+endif194:
+  %t44 = load i64, i64* %span
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then198, label %else199
+then198:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.81, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %span
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif197
+else199:
+  br label %endif197
+endif197:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then201, label %else202
+then201:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.82, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif200
+else202:
+  br label %endif200
+endif200:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %el
+  ret i64 %t72
+}
+
+define i64 @colgroup(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %span.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %span = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %span.arg, i64* %span
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.16, i64 0, i64 0
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.83, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then204, label %else205
+then204:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.84, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif203
+else205:
+  br label %endif203
+endif203:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then207, label %else208
+then207:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.85, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif206
+else208:
+  br label %endif206
+endif206:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then210, label %else211
+then210:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.86, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif209
+else211:
+  br label %endif209
+endif209:
+  %t44 = load i64, i64* %span
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then213, label %else214
+then213:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.87, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %span
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif212
+else214:
+  br label %endif212
+endif212:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then216, label %else217
+then216:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.88, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif215
+else217:
+  br label %endif215
+endif215:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then219, label %else220
+then219:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif218
+else220:
+  br label %endif218
+endif218:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @fieldset(i64 %block.arg) {
+define i64 @data(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.17, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.89, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then222, label %else223
+then222:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.90, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif221
+else223:
+  br label %endif221
+endif221:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then225, label %else226
+then225:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.91, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif224
+else226:
+  br label %endif224
+endif224:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then228, label %else229
+then228:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.92, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif227
+else229:
+  br label %endif227
+endif227:
+  %t44 = load i64, i64* %value
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then231, label %else232
+then231:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [6 x i8], [6 x i8]* @.str.93, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %value
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif230
+else232:
+  br label %endif230
+endif230:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then234, label %else235
+then234:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.94, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif233
+else235:
+  br label %endif233
+endif233:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then237, label %else238
+then237:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif236
+else238:
+  br label %endif236
+endif236:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @legend(i64 %block.arg) {
+define i64 @datalist(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.18, i64 0, i64 0
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.95, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @ul(i64 %block.arg) {
+define i64 @dd(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.19, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.96, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @ol(i64 %block.arg) {
+define i64 @del(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cite.arg, i64 %date_time.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cite = alloca i64
+  %date_time = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cite.arg, i64* %cite
+  store i64 %date_time.arg, i64* %date_time
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.20, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.97, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then240, label %else241
+then240:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.98, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif239
+else241:
+  br label %endif239
+endif239:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then243, label %else244
+then243:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.99, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif242
+else244:
+  br label %endif242
+endif242:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then246, label %else247
+then246:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.100, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif245
+else247:
+  br label %endif245
+endif245:
+  %t44 = load i64, i64* %cite
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then249, label %else250
+then249:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.101, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %cite
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif248
+else250:
+  br label %endif248
+endif248:
+  %t57 = load i64, i64* %date_time
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then252, label %else253
+then252:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.102, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %date_time
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif251
+else253:
+  br label %endif251
+endif251:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then255, label %else256
+then255:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.103, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif254
+else256:
+  br label %endif254
+endif254:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %block
+  %t87 = icmp ne i64 %t85, 0
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then258, label %else259
+then258:
+  %t89 = load i64, i64* %el
+  %t90 = call i64 @_tc_push(i64 %t89)
+  %t91 = load i64, i64* %block
+  %t92 = inttoptr i64 %t91 to [2 x i64]*
+  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
+  %t94 = load i64, i64* %t93
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
+  %t96 = load i64, i64* %t95
+  %t97 = inttoptr i64 %t94 to i64 (i64)*
+  %t98 = call i64 %t97(i64 %t96)
+  %t99 = call i64 @_tc_pop()
+  br label %endif257
+else259:
+  br label %endif257
+endif257:
+  %t100 = load i64, i64* %el
+  ret i64 %t100
 }
 
-define i64 @li(i64 %block.arg) {
+define i64 @details(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %name.arg, i64 %open.arg, i64 %on_click.arg, i64 %on_toggle.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %name = alloca i64
+  %open = alloca i64
+  %on_click = alloca i64
+  %on_toggle = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %name.arg, i64* %name
+  store i64 %open.arg, i64* %open
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_toggle.arg, i64* %on_toggle
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.21, i64 0, i64 0
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.104, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then261, label %else262
+then261:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.105, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif260
+else262:
+  br label %endif260
+endif260:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then264, label %else265
+then264:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.106, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif263
+else265:
+  br label %endif263
+endif263:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then267, label %else268
+then267:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.107, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif266
+else268:
+  br label %endif266
+endif266:
+  %t44 = load i64, i64* %name
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then270, label %else271
+then270:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.108, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %name
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif269
+else271:
+  br label %endif269
+endif269:
+  %t57 = load i64, i64* %open
+  %t58 = trunc i64 %t57 to i1
+  br i1 %t58, label %then273, label %else274
+then273:
+  %t59 = load i64, i64* %el
+  %t60 = getelementptr [5 x i8], [5 x i8]* @.str.109, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  %t63 = getelementptr [5 x i8], [5 x i8]* @.str.110, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t59, i8* %t62, i8* %t65)
+  br label %endif272
+else274:
+  br label %endif272
+endif272:
+  %t66 = load i64, i64* %on_click
+  %t68 = icmp ne i64 %t66, 0
+  %t67 = zext i1 %t68 to i64
+  %t69 = trunc i64 %t67 to i1
+  br i1 %t69, label %then276, label %else277
+then276:
+  %t70 = load i64, i64* %el
+  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.111, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = call i8* @__val_untag_ptr(i64 %t72)
+  %t74 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t70, i8* %t73, i64 %t74)
+  br label %endif275
+else277:
+  br label %endif275
+endif275:
+  %t75 = load i64, i64* %on_toggle
+  %t77 = icmp ne i64 %t75, 0
+  %t76 = zext i1 %t77 to i64
+  %t78 = trunc i64 %t76 to i1
+  br i1 %t78, label %then279, label %else280
+then279:
+  %t79 = load i64, i64* %el
+  %t80 = getelementptr [7 x i8], [7 x i8]* @.str.112, i64 0, i64 0
+  %t81 = ptrtoint i8* %t80 to i64
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  %t83 = load i64, i64* %on_toggle
+  call void @js_dom_add_event(i64 %t79, i8* %t82, i64 %t83)
+  br label %endif278
+else280:
+  br label %endif278
+endif278:
+  %t84 = load i64, i64* %el
+  %t85 = load i64, i64* %attrs
+  %t86 = call i64 @_tc_apply_attrs(i64 %t84, i64 %t85)
+  %t87 = call i64 @_tc_current()
+  store i64 %t87, i64* %parent
+  %t88 = load i64, i64* %parent
+  %t89 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t88, i64 %t89)
+  %t90 = load i64, i64* %block
+  %t92 = icmp ne i64 %t90, 0
+  %t91 = zext i1 %t92 to i64
+  %t93 = trunc i64 %t91 to i1
+  br i1 %t93, label %then282, label %else283
+then282:
+  %t94 = load i64, i64* %el
+  %t95 = call i64 @_tc_push(i64 %t94)
+  %t96 = load i64, i64* %block
+  %t97 = inttoptr i64 %t96 to [2 x i64]*
+  %t98 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 0
+  %t99 = load i64, i64* %t98
+  %t100 = getelementptr [2 x i64], [2 x i64]* %t97, i64 0, i64 1
+  %t101 = load i64, i64* %t100
+  %t102 = inttoptr i64 %t99 to i64 (i64)*
+  %t103 = call i64 %t102(i64 %t101)
+  %t104 = call i64 @_tc_pop()
+  br label %endif281
+else283:
+  br label %endif281
+endif281:
+  %t105 = load i64, i64* %el
+  ret i64 %t105
 }
 
-define i64 @dl(i64 %block.arg) {
+define i64 @dfn(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.22, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.113, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @dt(i64 %block.arg) {
+define i64 @dialog(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %closed_by.arg, i64 %open.arg, i64 %return_value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %closed_by = alloca i64
+  %open = alloca i64
+  %return_value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %closed_by.arg, i64* %closed_by
+  store i64 %open.arg, i64* %open
+  store i64 %return_value.arg, i64* %return_value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.23, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.114, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then285, label %else286
+then285:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.115, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif284
+else286:
+  br label %endif284
+endif284:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then288, label %else289
+then288:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.116, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif287
+else289:
+  br label %endif287
+endif287:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then291, label %else292
+then291:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.117, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif290
+else292:
+  br label %endif290
+endif290:
+  %t44 = load i64, i64* %closed_by
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then294, label %else295
+then294:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [9 x i8], [9 x i8]* @.str.118, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %closed_by
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif293
+else295:
+  br label %endif293
+endif293:
+  %t57 = load i64, i64* %open
+  %t58 = trunc i64 %t57 to i1
+  br i1 %t58, label %then297, label %else298
+then297:
+  %t59 = load i64, i64* %el
+  %t60 = getelementptr [5 x i8], [5 x i8]* @.str.119, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  %t63 = getelementptr [5 x i8], [5 x i8]* @.str.120, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t59, i8* %t62, i8* %t65)
+  br label %endif296
+else298:
+  br label %endif296
+endif296:
+  %t66 = load i64, i64* %return_value
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = add i64 0, 0
+  %t71 = icmp sgt i64 %t68, %t69
+  %t70 = zext i1 %t71 to i64
+  %t72 = trunc i64 %t70 to i1
+  br i1 %t72, label %then300, label %else301
+then300:
+  %t73 = load i64, i64* %el
+  %t74 = getelementptr [12 x i8], [12 x i8]* @.str.121, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = load i64, i64* %return_value
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t73, i8* %t76, i8* %t78)
+  br label %endif299
+else301:
+  br label %endif299
+endif299:
+  %t79 = load i64, i64* %on_click
+  %t81 = icmp ne i64 %t79, 0
+  %t80 = zext i1 %t81 to i64
+  %t82 = trunc i64 %t80 to i1
+  br i1 %t82, label %then303, label %else304
+then303:
+  %t83 = load i64, i64* %el
+  %t84 = getelementptr [6 x i8], [6 x i8]* @.str.122, i64 0, i64 0
+  %t85 = ptrtoint i8* %t84 to i64
+  %t86 = call i8* @__val_untag_ptr(i64 %t85)
+  %t87 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t83, i8* %t86, i64 %t87)
+  br label %endif302
+else304:
+  br label %endif302
+endif302:
+  %t88 = load i64, i64* %el
+  %t89 = load i64, i64* %attrs
+  %t90 = call i64 @_tc_apply_attrs(i64 %t88, i64 %t89)
+  %t91 = call i64 @_tc_current()
+  store i64 %t91, i64* %parent
+  %t92 = load i64, i64* %parent
+  %t93 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t92, i64 %t93)
+  %t94 = load i64, i64* %block
+  %t96 = icmp ne i64 %t94, 0
+  %t95 = zext i1 %t96 to i64
+  %t97 = trunc i64 %t95 to i1
+  br i1 %t97, label %then306, label %else307
+then306:
+  %t98 = load i64, i64* %el
+  %t99 = call i64 @_tc_push(i64 %t98)
+  %t100 = load i64, i64* %block
+  %t101 = inttoptr i64 %t100 to [2 x i64]*
+  %t102 = getelementptr [2 x i64], [2 x i64]* %t101, i64 0, i64 0
+  %t103 = load i64, i64* %t102
+  %t104 = getelementptr [2 x i64], [2 x i64]* %t101, i64 0, i64 1
+  %t105 = load i64, i64* %t104
+  %t106 = inttoptr i64 %t103 to i64 (i64)*
+  %t107 = call i64 %t106(i64 %t105)
+  %t108 = call i64 @_tc_pop()
+  br label %endif305
+else307:
+  br label %endif305
+endif305:
+  %t109 = load i64, i64* %el
+  ret i64 %t109
 }
 
-define i64 @dd(i64 %block.arg) {
+define i64 @div(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.24, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.123, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @table(i64 %block.arg) {
+define i64 @dl(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.25, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.124, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @thead(i64 %block.arg) {
+define i64 @dt(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.26, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.125, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @tbody(i64 %block.arg) {
+define i64 @em(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.27, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.126, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @tr(i64 %block.arg) {
+define i64 @embed(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %height.arg, i64 %src.arg, i64 %type_.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %height = alloca i64
+  %src = alloca i64
+  %type_ = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %height.arg, i64* %height
+  store i64 %src.arg, i64* %src
+  store i64 %type_.arg, i64* %type_
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.127, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then309, label %else310
+then309:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.128, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif308
+else310:
+  br label %endif308
+endif308:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then312, label %else313
+then312:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.129, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif311
+else313:
+  br label %endif311
+endif311:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then315, label %else316
+then315:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.130, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif314
+else316:
+  br label %endif314
+endif314:
+  %t44 = load i64, i64* %height
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then318, label %else319
+then318:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.131, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %height
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif317
+else319:
+  br label %endif317
+endif317:
+  %t57 = load i64, i64* %src
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then321, label %else322
+then321:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [4 x i8], [4 x i8]* @.str.132, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %src
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif320
+else322:
+  br label %endif320
+endif320:
+  %t70 = load i64, i64* %type_
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then324, label %else325
+then324:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [5 x i8], [5 x i8]* @.str.133, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %type_
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif323
+else325:
+  br label %endif323
+endif323:
+  %t83 = load i64, i64* %width
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then327, label %else328
+then327:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [6 x i8], [6 x i8]* @.str.134, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %width
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif326
+else328:
+  br label %endif326
+endif326:
+  %t96 = load i64, i64* %on_click
+  %t98 = icmp ne i64 %t96, 0
+  %t97 = zext i1 %t98 to i64
+  %t99 = trunc i64 %t97 to i1
+  br i1 %t99, label %then330, label %else331
+then330:
+  %t100 = load i64, i64* %el
+  %t101 = getelementptr [6 x i8], [6 x i8]* @.str.135, i64 0, i64 0
+  %t102 = ptrtoint i8* %t101 to i64
+  %t103 = call i8* @__val_untag_ptr(i64 %t102)
+  %t104 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t100, i8* %t103, i64 %t104)
+  br label %endif329
+else331:
+  br label %endif329
+endif329:
+  %t105 = load i64, i64* %el
+  %t106 = load i64, i64* %attrs
+  %t107 = call i64 @_tc_apply_attrs(i64 %t105, i64 %t106)
+  %t108 = call i64 @_tc_current()
+  store i64 %t108, i64* %parent
+  %t109 = load i64, i64* %parent
+  %t110 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t109, i64 %t110)
+  %t111 = load i64, i64* %el
+  ret i64 %t111
+}
+
+define i64 @fieldset(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disabled.arg, i64 %name.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disabled = alloca i64
+  %name = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %name.arg, i64* %name
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.28, i64 0, i64 0
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.136, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then333, label %else334
+then333:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.137, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif332
+else334:
+  br label %endif332
+endif332:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then336, label %else337
+then336:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.138, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif335
+else337:
+  br label %endif335
+endif335:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then339, label %else340
+then339:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.139, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif338
+else340:
+  br label %endif338
+endif338:
+  %t44 = load i64, i64* %disabled
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then342, label %else343
+then342:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.140, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.141, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif341
+else343:
+  br label %endif341
+endif341:
+  %t53 = load i64, i64* %name
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = call i64 @strlen(i8* %t54)
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then345, label %else346
+then345:
+  %t60 = load i64, i64* %el
+  %t61 = getelementptr [5 x i8], [5 x i8]* @.str.142, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = load i64, i64* %name
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t60, i8* %t63, i8* %t65)
+  br label %endif344
+else346:
+  br label %endif344
+endif344:
+  %t66 = load i64, i64* %on_click
+  %t68 = icmp ne i64 %t66, 0
+  %t67 = zext i1 %t68 to i64
+  %t69 = trunc i64 %t67 to i1
+  br i1 %t69, label %then348, label %else349
+then348:
+  %t70 = load i64, i64* %el
+  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.143, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = call i8* @__val_untag_ptr(i64 %t72)
+  %t74 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t70, i8* %t73, i64 %t74)
+  br label %endif347
+else349:
+  br label %endif347
+endif347:
+  %t75 = load i64, i64* %el
+  %t76 = load i64, i64* %attrs
+  %t77 = call i64 @_tc_apply_attrs(i64 %t75, i64 %t76)
+  %t78 = call i64 @_tc_current()
+  store i64 %t78, i64* %parent
+  %t79 = load i64, i64* %parent
+  %t80 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t79, i64 %t80)
+  %t81 = load i64, i64* %block
+  %t83 = icmp ne i64 %t81, 0
+  %t82 = zext i1 %t83 to i64
+  %t84 = trunc i64 %t82 to i1
+  br i1 %t84, label %then351, label %else352
+then351:
+  %t85 = load i64, i64* %el
+  %t86 = call i64 @_tc_push(i64 %t85)
+  %t87 = load i64, i64* %block
+  %t88 = inttoptr i64 %t87 to [2 x i64]*
+  %t89 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 0
+  %t90 = load i64, i64* %t89
+  %t91 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 1
+  %t92 = load i64, i64* %t91
+  %t93 = inttoptr i64 %t90 to i64 (i64)*
+  %t94 = call i64 %t93(i64 %t92)
+  %t95 = call i64 @_tc_pop()
+  br label %endif350
+else352:
+  br label %endif350
+endif350:
+  %t96 = load i64, i64* %el
+  ret i64 %t96
 }
 
-define i64 @th(i64 %block.arg) {
+define i64 @figcaption(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.29, i64 0, i64 0
+  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.144, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @td(i64 %block.arg) {
+define i64 @figure(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.30, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.145, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @nav(i64 %block.arg) {
+define i64 @footer(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.31, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.146, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @header(i64 %block.arg) {
+define i64 @form(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %action.arg, i64 %enctype.arg, i64 %method.arg, i64 %name.arg, i64 %no_validate.arg, i64 %rel.arg, i64 %target.arg, i64 %on_click.arg, i64 %on_submit.arg, i64 %on_reset.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %action = alloca i64
+  %enctype = alloca i64
+  %method = alloca i64
+  %name = alloca i64
+  %no_validate = alloca i64
+  %rel = alloca i64
+  %target = alloca i64
+  %on_click = alloca i64
+  %on_submit = alloca i64
+  %on_reset = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %action.arg, i64* %action
+  store i64 %enctype.arg, i64* %enctype
+  store i64 %method.arg, i64* %method
+  store i64 %name.arg, i64* %name
+  store i64 %no_validate.arg, i64* %no_validate
+  store i64 %rel.arg, i64* %rel
+  store i64 %target.arg, i64* %target
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_submit.arg, i64* %on_submit
+  store i64 %on_reset.arg, i64* %on_reset
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.32, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.147, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then354, label %else355
+then354:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.148, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif353
+else355:
+  br label %endif353
+endif353:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then357, label %else358
+then357:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.149, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif356
+else358:
+  br label %endif356
+endif356:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then360, label %else361
+then360:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.150, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif359
+else361:
+  br label %endif359
+endif359:
+  %t44 = load i64, i64* %action
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then363, label %else364
+then363:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [7 x i8], [7 x i8]* @.str.151, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %action
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif362
+else364:
+  br label %endif362
+endif362:
+  %t57 = load i64, i64* %enctype
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then366, label %else367
+then366:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [8 x i8], [8 x i8]* @.str.152, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %enctype
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif365
+else367:
+  br label %endif365
+endif365:
+  %t70 = load i64, i64* %method
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then369, label %else370
+then369:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [7 x i8], [7 x i8]* @.str.153, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %method
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif368
+else370:
+  br label %endif368
+endif368:
+  %t83 = load i64, i64* %name
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then372, label %else373
+then372:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [5 x i8], [5 x i8]* @.str.154, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %name
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif371
+else373:
+  br label %endif371
+endif371:
+  %t96 = load i64, i64* %no_validate
+  %t97 = trunc i64 %t96 to i1
+  br i1 %t97, label %then375, label %else376
+then375:
+  %t98 = load i64, i64* %el
+  %t99 = getelementptr [11 x i8], [11 x i8]* @.str.155, i64 0, i64 0
+  %t100 = ptrtoint i8* %t99 to i64
+  %t101 = call i8* @__val_untag_ptr(i64 %t100)
+  %t102 = getelementptr [5 x i8], [5 x i8]* @.str.156, i64 0, i64 0
+  %t103 = ptrtoint i8* %t102 to i64
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  call void @js_dom_set_attr(i64 %t98, i8* %t101, i8* %t104)
+  br label %endif374
+else376:
+  br label %endif374
+endif374:
+  %t105 = load i64, i64* %rel
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = call i64 @strlen(i8* %t106)
+  %t108 = add i64 0, 0
+  %t110 = icmp sgt i64 %t107, %t108
+  %t109 = zext i1 %t110 to i64
+  %t111 = trunc i64 %t109 to i1
+  br i1 %t111, label %then378, label %else379
+then378:
+  %t112 = load i64, i64* %el
+  %t113 = getelementptr [4 x i8], [4 x i8]* @.str.157, i64 0, i64 0
+  %t114 = ptrtoint i8* %t113 to i64
+  %t115 = call i8* @__val_untag_ptr(i64 %t114)
+  %t116 = load i64, i64* %rel
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  call void @js_dom_set_attr(i64 %t112, i8* %t115, i8* %t117)
+  br label %endif377
+else379:
+  br label %endif377
+endif377:
+  %t118 = load i64, i64* %target
+  %t119 = call i8* @__val_untag_ptr(i64 %t118)
+  %t120 = call i64 @strlen(i8* %t119)
+  %t121 = add i64 0, 0
+  %t123 = icmp sgt i64 %t120, %t121
+  %t122 = zext i1 %t123 to i64
+  %t124 = trunc i64 %t122 to i1
+  br i1 %t124, label %then381, label %else382
+then381:
+  %t125 = load i64, i64* %el
+  %t126 = getelementptr [7 x i8], [7 x i8]* @.str.158, i64 0, i64 0
+  %t127 = ptrtoint i8* %t126 to i64
+  %t128 = call i8* @__val_untag_ptr(i64 %t127)
+  %t129 = load i64, i64* %target
+  %t130 = call i8* @__val_untag_ptr(i64 %t129)
+  call void @js_dom_set_attr(i64 %t125, i8* %t128, i8* %t130)
+  br label %endif380
+else382:
+  br label %endif380
+endif380:
+  %t131 = load i64, i64* %on_click
+  %t133 = icmp ne i64 %t131, 0
+  %t132 = zext i1 %t133 to i64
+  %t134 = trunc i64 %t132 to i1
+  br i1 %t134, label %then384, label %else385
+then384:
+  %t135 = load i64, i64* %el
+  %t136 = getelementptr [6 x i8], [6 x i8]* @.str.159, i64 0, i64 0
+  %t137 = ptrtoint i8* %t136 to i64
+  %t138 = call i8* @__val_untag_ptr(i64 %t137)
+  %t139 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t135, i8* %t138, i64 %t139)
+  br label %endif383
+else385:
+  br label %endif383
+endif383:
+  %t140 = load i64, i64* %on_submit
+  %t142 = icmp ne i64 %t140, 0
+  %t141 = zext i1 %t142 to i64
+  %t143 = trunc i64 %t141 to i1
+  br i1 %t143, label %then387, label %else388
+then387:
+  %t144 = load i64, i64* %el
+  %t145 = getelementptr [7 x i8], [7 x i8]* @.str.160, i64 0, i64 0
+  %t146 = ptrtoint i8* %t145 to i64
+  %t147 = call i8* @__val_untag_ptr(i64 %t146)
+  %t148 = load i64, i64* %on_submit
+  call void @js_dom_add_event(i64 %t144, i8* %t147, i64 %t148)
+  br label %endif386
+else388:
+  br label %endif386
+endif386:
+  %t149 = load i64, i64* %on_reset
+  %t151 = icmp ne i64 %t149, 0
+  %t150 = zext i1 %t151 to i64
+  %t152 = trunc i64 %t150 to i1
+  br i1 %t152, label %then390, label %else391
+then390:
+  %t153 = load i64, i64* %el
+  %t154 = getelementptr [6 x i8], [6 x i8]* @.str.161, i64 0, i64 0
+  %t155 = ptrtoint i8* %t154 to i64
+  %t156 = call i8* @__val_untag_ptr(i64 %t155)
+  %t157 = load i64, i64* %on_reset
+  call void @js_dom_add_event(i64 %t153, i8* %t156, i64 %t157)
+  br label %endif389
+else391:
+  br label %endif389
+endif389:
+  %t158 = load i64, i64* %el
+  %t159 = load i64, i64* %attrs
+  %t160 = call i64 @_tc_apply_attrs(i64 %t158, i64 %t159)
+  %t161 = call i64 @_tc_current()
+  store i64 %t161, i64* %parent
+  %t162 = load i64, i64* %parent
+  %t163 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t162, i64 %t163)
+  %t164 = load i64, i64* %block
+  %t166 = icmp ne i64 %t164, 0
+  %t165 = zext i1 %t166 to i64
+  %t167 = trunc i64 %t165 to i1
+  br i1 %t167, label %then393, label %else394
+then393:
+  %t168 = load i64, i64* %el
+  %t169 = call i64 @_tc_push(i64 %t168)
+  %t170 = load i64, i64* %block
+  %t171 = inttoptr i64 %t170 to [2 x i64]*
+  %t172 = getelementptr [2 x i64], [2 x i64]* %t171, i64 0, i64 0
+  %t173 = load i64, i64* %t172
+  %t174 = getelementptr [2 x i64], [2 x i64]* %t171, i64 0, i64 1
+  %t175 = load i64, i64* %t174
+  %t176 = inttoptr i64 %t173 to i64 (i64)*
+  %t177 = call i64 %t176(i64 %t175)
+  %t178 = call i64 @_tc_pop()
+  br label %endif392
+else394:
+  br label %endif392
+endif392:
+  %t179 = load i64, i64* %el
+  ret i64 %t179
 }
 
-define i64 @footer(i64 %block.arg) {
+define i64 @h1(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.33, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.162, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @section(i64 %block.arg) {
+define i64 @h2(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.34, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.163, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @article(i64 %block.arg) {
+define i64 @h3(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.35, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.164, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @aside(i64 %block.arg) {
+define i64 @h4(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.36, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.165, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @details(i64 %block.arg) {
+define i64 @h5(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.37, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.166, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @summary(i64 %block.arg) {
+define i64 @h6(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.38, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.167, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @dialog(i64 %block.arg) {
+define i64 @header(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.39, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.168, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @pre(i64 %block.arg) {
+define i64 @hgroup(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.40, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.169, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @code(i64 %block.arg) {
+define i64 @hr(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.170, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then396, label %else397
+then396:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.171, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif395
+else397:
+  br label %endif395
+endif395:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then399, label %else400
+then399:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.172, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif398
+else400:
+  br label %endif398
+endif398:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then402, label %else403
+then402:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.173, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif401
+else403:
+  br label %endif401
+endif401:
+  %t44 = load i64, i64* %on_click
+  %t46 = icmp ne i64 %t44, 0
+  %t45 = zext i1 %t46 to i64
+  %t47 = trunc i64 %t45 to i1
+  br i1 %t47, label %then405, label %else406
+then405:
+  %t48 = load i64, i64* %el
+  %t49 = getelementptr [6 x i8], [6 x i8]* @.str.174, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  %t51 = call i8* @__val_untag_ptr(i64 %t50)
+  %t52 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t48, i8* %t51, i64 %t52)
+  br label %endif404
+else406:
+  br label %endif404
+endif404:
+  %t53 = load i64, i64* %el
+  %t54 = load i64, i64* %attrs
+  %t55 = call i64 @_tc_apply_attrs(i64 %t53, i64 %t54)
+  %t56 = call i64 @_tc_current()
+  store i64 %t56, i64* %parent
+  %t57 = load i64, i64* %parent
+  %t58 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t57, i64 %t58)
+  %t59 = load i64, i64* %el
+  ret i64 %t59
+}
+
+define i64 @i(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.41, i64 0, i64 0
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.175, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @blockquote(i64 %block.arg) {
+define i64 @iframe(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %allow.arg, i64 %allow_fullscreen.arg, i64 %height.arg, i64 %name.arg, i64 %src.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %allow = alloca i64
+  %allow_fullscreen = alloca i64
+  %height = alloca i64
+  %name = alloca i64
+  %src = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %allow.arg, i64* %allow
+  store i64 %allow_fullscreen.arg, i64* %allow_fullscreen
+  store i64 %height.arg, i64* %height
+  store i64 %name.arg, i64* %name
+  store i64 %src.arg, i64* %src
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.42, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.176, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then408, label %else409
+then408:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.177, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif407
+else409:
+  br label %endif407
+endif407:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then411, label %else412
+then411:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.178, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif410
+else412:
+  br label %endif410
+endif410:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then414, label %else415
+then414:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.179, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif413
+else415:
+  br label %endif413
+endif413:
+  %t44 = load i64, i64* %allow
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then417, label %else418
+then417:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [6 x i8], [6 x i8]* @.str.180, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %allow
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif416
+else418:
+  br label %endif416
+endif416:
+  %t57 = load i64, i64* %allow_fullscreen
+  %t58 = trunc i64 %t57 to i1
+  br i1 %t58, label %then420, label %else421
+then420:
+  %t59 = load i64, i64* %el
+  %t60 = getelementptr [16 x i8], [16 x i8]* @.str.181, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  %t63 = getelementptr [5 x i8], [5 x i8]* @.str.182, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t59, i8* %t62, i8* %t65)
+  br label %endif419
+else421:
+  br label %endif419
+endif419:
+  %t66 = load i64, i64* %height
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = add i64 0, 0
+  %t71 = icmp sgt i64 %t68, %t69
+  %t70 = zext i1 %t71 to i64
+  %t72 = trunc i64 %t70 to i1
+  br i1 %t72, label %then423, label %else424
+then423:
+  %t73 = load i64, i64* %el
+  %t74 = getelementptr [7 x i8], [7 x i8]* @.str.183, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = load i64, i64* %height
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t73, i8* %t76, i8* %t78)
+  br label %endif422
+else424:
+  br label %endif422
+endif422:
+  %t79 = load i64, i64* %name
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = call i64 @strlen(i8* %t80)
+  %t82 = add i64 0, 0
+  %t84 = icmp sgt i64 %t81, %t82
+  %t83 = zext i1 %t84 to i64
+  %t85 = trunc i64 %t83 to i1
+  br i1 %t85, label %then426, label %else427
+then426:
+  %t86 = load i64, i64* %el
+  %t87 = getelementptr [5 x i8], [5 x i8]* @.str.184, i64 0, i64 0
+  %t88 = ptrtoint i8* %t87 to i64
+  %t89 = call i8* @__val_untag_ptr(i64 %t88)
+  %t90 = load i64, i64* %name
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  call void @js_dom_set_attr(i64 %t86, i8* %t89, i8* %t91)
+  br label %endif425
+else427:
+  br label %endif425
+endif425:
+  %t92 = load i64, i64* %src
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = call i64 @strlen(i8* %t93)
+  %t95 = add i64 0, 0
+  %t97 = icmp sgt i64 %t94, %t95
+  %t96 = zext i1 %t97 to i64
+  %t98 = trunc i64 %t96 to i1
+  br i1 %t98, label %then429, label %else430
+then429:
+  %t99 = load i64, i64* %el
+  %t100 = getelementptr [4 x i8], [4 x i8]* @.str.185, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = call i8* @__val_untag_ptr(i64 %t101)
+  %t103 = load i64, i64* %src
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  call void @js_dom_set_attr(i64 %t99, i8* %t102, i8* %t104)
+  br label %endif428
+else430:
+  br label %endif428
+endif428:
+  %t105 = load i64, i64* %width
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = call i64 @strlen(i8* %t106)
+  %t108 = add i64 0, 0
+  %t110 = icmp sgt i64 %t107, %t108
+  %t109 = zext i1 %t110 to i64
+  %t111 = trunc i64 %t109 to i1
+  br i1 %t111, label %then432, label %else433
+then432:
+  %t112 = load i64, i64* %el
+  %t113 = getelementptr [6 x i8], [6 x i8]* @.str.186, i64 0, i64 0
+  %t114 = ptrtoint i8* %t113 to i64
+  %t115 = call i8* @__val_untag_ptr(i64 %t114)
+  %t116 = load i64, i64* %width
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  call void @js_dom_set_attr(i64 %t112, i8* %t115, i8* %t117)
+  br label %endif431
+else433:
+  br label %endif431
+endif431:
+  %t118 = load i64, i64* %on_click
+  %t120 = icmp ne i64 %t118, 0
+  %t119 = zext i1 %t120 to i64
+  %t121 = trunc i64 %t119 to i1
+  br i1 %t121, label %then435, label %else436
+then435:
+  %t122 = load i64, i64* %el
+  %t123 = getelementptr [6 x i8], [6 x i8]* @.str.187, i64 0, i64 0
+  %t124 = ptrtoint i8* %t123 to i64
+  %t125 = call i8* @__val_untag_ptr(i64 %t124)
+  %t126 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t122, i8* %t125, i64 %t126)
+  br label %endif434
+else436:
+  br label %endif434
+endif434:
+  %t127 = load i64, i64* %el
+  %t128 = load i64, i64* %attrs
+  %t129 = call i64 @_tc_apply_attrs(i64 %t127, i64 %t128)
+  %t130 = call i64 @_tc_current()
+  store i64 %t130, i64* %parent
+  %t131 = load i64, i64* %parent
+  %t132 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t131, i64 %t132)
+  %t133 = load i64, i64* %block
+  %t135 = icmp ne i64 %t133, 0
+  %t134 = zext i1 %t135 to i64
+  %t136 = trunc i64 %t134 to i1
+  br i1 %t136, label %then438, label %else439
+then438:
+  %t137 = load i64, i64* %el
+  %t138 = call i64 @_tc_push(i64 %t137)
+  %t139 = load i64, i64* %block
+  %t140 = inttoptr i64 %t139 to [2 x i64]*
+  %t141 = getelementptr [2 x i64], [2 x i64]* %t140, i64 0, i64 0
+  %t142 = load i64, i64* %t141
+  %t143 = getelementptr [2 x i64], [2 x i64]* %t140, i64 0, i64 1
+  %t144 = load i64, i64* %t143
+  %t145 = inttoptr i64 %t142 to i64 (i64)*
+  %t146 = call i64 %t145(i64 %t144)
+  %t147 = call i64 @_tc_pop()
+  br label %endif437
+else439:
+  br label %endif437
+endif437:
+  %t148 = load i64, i64* %el
+  ret i64 %t148
 }
 
-define i64 @em(i64 %block.arg) {
+define i64 @img(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %alt.arg, i64 %height.arg, i64 %name.arg, i64 %src.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %alt = alloca i64
+  %height = alloca i64
+  %name = alloca i64
+  %src = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %alt.arg, i64* %alt
+  store i64 %height.arg, i64* %height
+  store i64 %name.arg, i64* %name
+  store i64 %src.arg, i64* %src
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.188, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then441, label %else442
+then441:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.189, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif440
+else442:
+  br label %endif440
+endif440:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then444, label %else445
+then444:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.190, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif443
+else445:
+  br label %endif443
+endif443:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then447, label %else448
+then447:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.191, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif446
+else448:
+  br label %endif446
+endif446:
+  %t44 = load i64, i64* %alt
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then450, label %else451
+then450:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [4 x i8], [4 x i8]* @.str.192, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %alt
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif449
+else451:
+  br label %endif449
+endif449:
+  %t57 = load i64, i64* %height
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then453, label %else454
+then453:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [7 x i8], [7 x i8]* @.str.193, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %height
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif452
+else454:
+  br label %endif452
+endif452:
+  %t70 = load i64, i64* %name
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then456, label %else457
+then456:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [5 x i8], [5 x i8]* @.str.194, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %name
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif455
+else457:
+  br label %endif455
+endif455:
+  %t83 = load i64, i64* %src
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then459, label %else460
+then459:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [4 x i8], [4 x i8]* @.str.195, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %src
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif458
+else460:
+  br label %endif458
+endif458:
+  %t96 = load i64, i64* %width
+  %t97 = add i64 0, 0
+  %t99 = icmp ne i64 %t96, %t97
+  %t98 = zext i1 %t99 to i64
+  %t100 = trunc i64 %t98 to i1
+  br i1 %t100, label %then462, label %else463
+then462:
+  %t101 = load i64, i64* %el
+  %t102 = getelementptr [6 x i8], [6 x i8]* @.str.196, i64 0, i64 0
+  %t103 = ptrtoint i8* %t102 to i64
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  %t105 = load i64, i64* %width
+  %t106 = call i64 @__val_untag_int(i64 %t105)
+  %t107 = call i64 @__int_to_string(i64 %t106)
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t101, i8* %t104, i8* %t108)
+  br label %endif461
+else463:
+  br label %endif461
+endif461:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then465, label %else466
+then465:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.197, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif464
+else466:
+  br label %endif464
+endif464:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %el
+  ret i64 %t124
+}
+
+define i64 @input(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %alt.arg, i64 %checked.arg, i64 %disabled.arg, i64 %height.arg, i64 %max.arg, i64 %max_length.arg, i64 %min.arg, i64 %min_length.arg, i64 %multiple.arg, i64 %name.arg, i64 %pattern.arg, i64 %placeholder.arg, i64 %read_only.arg, i64 %required.arg, i64 %size.arg, i64 %src.arg, i64 %step.arg, i64 %type_.arg, i64 %value.arg, i64 %width.arg, i64 %on_click.arg, i64 %on_input.arg, i64 %on_change.arg, i64 %on_focus.arg, i64 %on_blur.arg, i64 %on_keydown.arg, i64 %attrs.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %alt = alloca i64
+  %checked = alloca i64
+  %disabled = alloca i64
+  %height = alloca i64
+  %max = alloca i64
+  %max_length = alloca i64
+  %min = alloca i64
+  %min_length = alloca i64
+  %multiple = alloca i64
+  %name = alloca i64
+  %pattern = alloca i64
+  %placeholder = alloca i64
+  %read_only = alloca i64
+  %required = alloca i64
+  %size = alloca i64
+  %src = alloca i64
+  %step = alloca i64
+  %type_ = alloca i64
+  %value = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %on_input = alloca i64
+  %on_change = alloca i64
+  %on_focus = alloca i64
+  %on_blur = alloca i64
+  %on_keydown = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %alt.arg, i64* %alt
+  store i64 %checked.arg, i64* %checked
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %height.arg, i64* %height
+  store i64 %max.arg, i64* %max
+  store i64 %max_length.arg, i64* %max_length
+  store i64 %min.arg, i64* %min
+  store i64 %min_length.arg, i64* %min_length
+  store i64 %multiple.arg, i64* %multiple
+  store i64 %name.arg, i64* %name
+  store i64 %pattern.arg, i64* %pattern
+  store i64 %placeholder.arg, i64* %placeholder
+  store i64 %read_only.arg, i64* %read_only
+  store i64 %required.arg, i64* %required
+  store i64 %size.arg, i64* %size
+  store i64 %src.arg, i64* %src
+  store i64 %step.arg, i64* %step
+  store i64 %type_.arg, i64* %type_
+  store i64 %value.arg, i64* %value
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_input.arg, i64* %on_input
+  store i64 %on_change.arg, i64* %on_change
+  store i64 %on_focus.arg, i64* %on_focus
+  store i64 %on_blur.arg, i64* %on_blur
+  store i64 %on_keydown.arg, i64* %on_keydown
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.198, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then468, label %else469
+then468:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.199, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif467
+else469:
+  br label %endif467
+endif467:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then471, label %else472
+then471:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.200, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif470
+else472:
+  br label %endif470
+endif470:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then474, label %else475
+then474:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.201, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif473
+else475:
+  br label %endif473
+endif473:
+  %t44 = load i64, i64* %alt
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then477, label %else478
+then477:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [4 x i8], [4 x i8]* @.str.202, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %alt
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif476
+else478:
+  br label %endif476
+endif476:
+  %t57 = load i64, i64* %checked
+  %t58 = trunc i64 %t57 to i1
+  br i1 %t58, label %then480, label %else481
+then480:
+  %t59 = load i64, i64* %el
+  %t60 = getelementptr [8 x i8], [8 x i8]* @.str.203, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  %t63 = getelementptr [5 x i8], [5 x i8]* @.str.204, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t59, i8* %t62, i8* %t65)
+  br label %endif479
+else481:
+  br label %endif479
+endif479:
+  %t66 = load i64, i64* %disabled
+  %t67 = trunc i64 %t66 to i1
+  br i1 %t67, label %then483, label %else484
+then483:
+  %t68 = load i64, i64* %el
+  %t69 = getelementptr [9 x i8], [9 x i8]* @.str.205, i64 0, i64 0
+  %t70 = ptrtoint i8* %t69 to i64
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = getelementptr [5 x i8], [5 x i8]* @.str.206, i64 0, i64 0
+  %t73 = ptrtoint i8* %t72 to i64
+  %t74 = call i8* @__val_untag_ptr(i64 %t73)
+  call void @js_dom_set_attr(i64 %t68, i8* %t71, i8* %t74)
+  br label %endif482
+else484:
+  br label %endif482
+endif482:
+  %t75 = load i64, i64* %height
+  %t76 = add i64 0, 0
+  %t78 = icmp ne i64 %t75, %t76
+  %t77 = zext i1 %t78 to i64
+  %t79 = trunc i64 %t77 to i1
+  br i1 %t79, label %then486, label %else487
+then486:
+  %t80 = load i64, i64* %el
+  %t81 = getelementptr [7 x i8], [7 x i8]* @.str.207, i64 0, i64 0
+  %t82 = ptrtoint i8* %t81 to i64
+  %t83 = call i8* @__val_untag_ptr(i64 %t82)
+  %t84 = load i64, i64* %height
+  %t85 = call i64 @__val_untag_int(i64 %t84)
+  %t86 = call i64 @__int_to_string(i64 %t85)
+  %t87 = call i8* @__val_untag_ptr(i64 %t86)
+  call void @js_dom_set_attr(i64 %t80, i8* %t83, i8* %t87)
+  br label %endif485
+else487:
+  br label %endif485
+endif485:
+  %t88 = load i64, i64* %max
+  %t89 = call i8* @__val_untag_ptr(i64 %t88)
+  %t90 = call i64 @strlen(i8* %t89)
+  %t91 = add i64 0, 0
+  %t93 = icmp sgt i64 %t90, %t91
+  %t92 = zext i1 %t93 to i64
+  %t94 = trunc i64 %t92 to i1
+  br i1 %t94, label %then489, label %else490
+then489:
+  %t95 = load i64, i64* %el
+  %t96 = getelementptr [4 x i8], [4 x i8]* @.str.208, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i64
+  %t98 = call i8* @__val_untag_ptr(i64 %t97)
+  %t99 = load i64, i64* %max
+  %t100 = call i8* @__val_untag_ptr(i64 %t99)
+  call void @js_dom_set_attr(i64 %t95, i8* %t98, i8* %t100)
+  br label %endif488
+else490:
+  br label %endif488
+endif488:
+  %t101 = load i64, i64* %max_length
+  %t102 = add i64 0, 0
+  %t104 = icmp ne i64 %t101, %t102
+  %t103 = zext i1 %t104 to i64
+  %t105 = trunc i64 %t103 to i1
+  br i1 %t105, label %then492, label %else493
+then492:
+  %t106 = load i64, i64* %el
+  %t107 = getelementptr [10 x i8], [10 x i8]* @.str.209, i64 0, i64 0
+  %t108 = ptrtoint i8* %t107 to i64
+  %t109 = call i8* @__val_untag_ptr(i64 %t108)
+  %t110 = load i64, i64* %max_length
+  %t111 = call i64 @__val_untag_int(i64 %t110)
+  %t112 = call i64 @__int_to_string(i64 %t111)
+  %t113 = call i8* @__val_untag_ptr(i64 %t112)
+  call void @js_dom_set_attr(i64 %t106, i8* %t109, i8* %t113)
+  br label %endif491
+else493:
+  br label %endif491
+endif491:
+  %t114 = load i64, i64* %min
+  %t115 = call i8* @__val_untag_ptr(i64 %t114)
+  %t116 = call i64 @strlen(i8* %t115)
+  %t117 = add i64 0, 0
+  %t119 = icmp sgt i64 %t116, %t117
+  %t118 = zext i1 %t119 to i64
+  %t120 = trunc i64 %t118 to i1
+  br i1 %t120, label %then495, label %else496
+then495:
+  %t121 = load i64, i64* %el
+  %t122 = getelementptr [4 x i8], [4 x i8]* @.str.210, i64 0, i64 0
+  %t123 = ptrtoint i8* %t122 to i64
+  %t124 = call i8* @__val_untag_ptr(i64 %t123)
+  %t125 = load i64, i64* %min
+  %t126 = call i8* @__val_untag_ptr(i64 %t125)
+  call void @js_dom_set_attr(i64 %t121, i8* %t124, i8* %t126)
+  br label %endif494
+else496:
+  br label %endif494
+endif494:
+  %t127 = load i64, i64* %min_length
+  %t128 = add i64 0, 0
+  %t130 = icmp ne i64 %t127, %t128
+  %t129 = zext i1 %t130 to i64
+  %t131 = trunc i64 %t129 to i1
+  br i1 %t131, label %then498, label %else499
+then498:
+  %t132 = load i64, i64* %el
+  %t133 = getelementptr [10 x i8], [10 x i8]* @.str.211, i64 0, i64 0
+  %t134 = ptrtoint i8* %t133 to i64
+  %t135 = call i8* @__val_untag_ptr(i64 %t134)
+  %t136 = load i64, i64* %min_length
+  %t137 = call i64 @__val_untag_int(i64 %t136)
+  %t138 = call i64 @__int_to_string(i64 %t137)
+  %t139 = call i8* @__val_untag_ptr(i64 %t138)
+  call void @js_dom_set_attr(i64 %t132, i8* %t135, i8* %t139)
+  br label %endif497
+else499:
+  br label %endif497
+endif497:
+  %t140 = load i64, i64* %multiple
+  %t141 = trunc i64 %t140 to i1
+  br i1 %t141, label %then501, label %else502
+then501:
+  %t142 = load i64, i64* %el
+  %t143 = getelementptr [9 x i8], [9 x i8]* @.str.212, i64 0, i64 0
+  %t144 = ptrtoint i8* %t143 to i64
+  %t145 = call i8* @__val_untag_ptr(i64 %t144)
+  %t146 = getelementptr [5 x i8], [5 x i8]* @.str.213, i64 0, i64 0
+  %t147 = ptrtoint i8* %t146 to i64
+  %t148 = call i8* @__val_untag_ptr(i64 %t147)
+  call void @js_dom_set_attr(i64 %t142, i8* %t145, i8* %t148)
+  br label %endif500
+else502:
+  br label %endif500
+endif500:
+  %t149 = load i64, i64* %name
+  %t150 = call i8* @__val_untag_ptr(i64 %t149)
+  %t151 = call i64 @strlen(i8* %t150)
+  %t152 = add i64 0, 0
+  %t154 = icmp sgt i64 %t151, %t152
+  %t153 = zext i1 %t154 to i64
+  %t155 = trunc i64 %t153 to i1
+  br i1 %t155, label %then504, label %else505
+then504:
+  %t156 = load i64, i64* %el
+  %t157 = getelementptr [5 x i8], [5 x i8]* @.str.214, i64 0, i64 0
+  %t158 = ptrtoint i8* %t157 to i64
+  %t159 = call i8* @__val_untag_ptr(i64 %t158)
+  %t160 = load i64, i64* %name
+  %t161 = call i8* @__val_untag_ptr(i64 %t160)
+  call void @js_dom_set_attr(i64 %t156, i8* %t159, i8* %t161)
+  br label %endif503
+else505:
+  br label %endif503
+endif503:
+  %t162 = load i64, i64* %pattern
+  %t163 = call i8* @__val_untag_ptr(i64 %t162)
+  %t164 = call i64 @strlen(i8* %t163)
+  %t165 = add i64 0, 0
+  %t167 = icmp sgt i64 %t164, %t165
+  %t166 = zext i1 %t167 to i64
+  %t168 = trunc i64 %t166 to i1
+  br i1 %t168, label %then507, label %else508
+then507:
+  %t169 = load i64, i64* %el
+  %t170 = getelementptr [8 x i8], [8 x i8]* @.str.215, i64 0, i64 0
+  %t171 = ptrtoint i8* %t170 to i64
+  %t172 = call i8* @__val_untag_ptr(i64 %t171)
+  %t173 = load i64, i64* %pattern
+  %t174 = call i8* @__val_untag_ptr(i64 %t173)
+  call void @js_dom_set_attr(i64 %t169, i8* %t172, i8* %t174)
+  br label %endif506
+else508:
+  br label %endif506
+endif506:
+  %t175 = load i64, i64* %placeholder
+  %t176 = call i8* @__val_untag_ptr(i64 %t175)
+  %t177 = call i64 @strlen(i8* %t176)
+  %t178 = add i64 0, 0
+  %t180 = icmp sgt i64 %t177, %t178
+  %t179 = zext i1 %t180 to i64
+  %t181 = trunc i64 %t179 to i1
+  br i1 %t181, label %then510, label %else511
+then510:
+  %t182 = load i64, i64* %el
+  %t183 = getelementptr [12 x i8], [12 x i8]* @.str.216, i64 0, i64 0
+  %t184 = ptrtoint i8* %t183 to i64
+  %t185 = call i8* @__val_untag_ptr(i64 %t184)
+  %t186 = load i64, i64* %placeholder
+  %t187 = call i8* @__val_untag_ptr(i64 %t186)
+  call void @js_dom_set_attr(i64 %t182, i8* %t185, i8* %t187)
+  br label %endif509
+else511:
+  br label %endif509
+endif509:
+  %t188 = load i64, i64* %read_only
+  %t189 = trunc i64 %t188 to i1
+  br i1 %t189, label %then513, label %else514
+then513:
+  %t190 = load i64, i64* %el
+  %t191 = getelementptr [9 x i8], [9 x i8]* @.str.217, i64 0, i64 0
+  %t192 = ptrtoint i8* %t191 to i64
+  %t193 = call i8* @__val_untag_ptr(i64 %t192)
+  %t194 = getelementptr [5 x i8], [5 x i8]* @.str.218, i64 0, i64 0
+  %t195 = ptrtoint i8* %t194 to i64
+  %t196 = call i8* @__val_untag_ptr(i64 %t195)
+  call void @js_dom_set_attr(i64 %t190, i8* %t193, i8* %t196)
+  br label %endif512
+else514:
+  br label %endif512
+endif512:
+  %t197 = load i64, i64* %required
+  %t198 = trunc i64 %t197 to i1
+  br i1 %t198, label %then516, label %else517
+then516:
+  %t199 = load i64, i64* %el
+  %t200 = getelementptr [9 x i8], [9 x i8]* @.str.219, i64 0, i64 0
+  %t201 = ptrtoint i8* %t200 to i64
+  %t202 = call i8* @__val_untag_ptr(i64 %t201)
+  %t203 = getelementptr [5 x i8], [5 x i8]* @.str.220, i64 0, i64 0
+  %t204 = ptrtoint i8* %t203 to i64
+  %t205 = call i8* @__val_untag_ptr(i64 %t204)
+  call void @js_dom_set_attr(i64 %t199, i8* %t202, i8* %t205)
+  br label %endif515
+else517:
+  br label %endif515
+endif515:
+  %t206 = load i64, i64* %size
+  %t207 = add i64 0, 0
+  %t209 = icmp ne i64 %t206, %t207
+  %t208 = zext i1 %t209 to i64
+  %t210 = trunc i64 %t208 to i1
+  br i1 %t210, label %then519, label %else520
+then519:
+  %t211 = load i64, i64* %el
+  %t212 = getelementptr [5 x i8], [5 x i8]* @.str.221, i64 0, i64 0
+  %t213 = ptrtoint i8* %t212 to i64
+  %t214 = call i8* @__val_untag_ptr(i64 %t213)
+  %t215 = load i64, i64* %size
+  %t216 = call i64 @__val_untag_int(i64 %t215)
+  %t217 = call i64 @__int_to_string(i64 %t216)
+  %t218 = call i8* @__val_untag_ptr(i64 %t217)
+  call void @js_dom_set_attr(i64 %t211, i8* %t214, i8* %t218)
+  br label %endif518
+else520:
+  br label %endif518
+endif518:
+  %t219 = load i64, i64* %src
+  %t220 = call i8* @__val_untag_ptr(i64 %t219)
+  %t221 = call i64 @strlen(i8* %t220)
+  %t222 = add i64 0, 0
+  %t224 = icmp sgt i64 %t221, %t222
+  %t223 = zext i1 %t224 to i64
+  %t225 = trunc i64 %t223 to i1
+  br i1 %t225, label %then522, label %else523
+then522:
+  %t226 = load i64, i64* %el
+  %t227 = getelementptr [4 x i8], [4 x i8]* @.str.222, i64 0, i64 0
+  %t228 = ptrtoint i8* %t227 to i64
+  %t229 = call i8* @__val_untag_ptr(i64 %t228)
+  %t230 = load i64, i64* %src
+  %t231 = call i8* @__val_untag_ptr(i64 %t230)
+  call void @js_dom_set_attr(i64 %t226, i8* %t229, i8* %t231)
+  br label %endif521
+else523:
+  br label %endif521
+endif521:
+  %t232 = load i64, i64* %step
+  %t233 = call i8* @__val_untag_ptr(i64 %t232)
+  %t234 = call i64 @strlen(i8* %t233)
+  %t235 = add i64 0, 0
+  %t237 = icmp sgt i64 %t234, %t235
+  %t236 = zext i1 %t237 to i64
+  %t238 = trunc i64 %t236 to i1
+  br i1 %t238, label %then525, label %else526
+then525:
+  %t239 = load i64, i64* %el
+  %t240 = getelementptr [5 x i8], [5 x i8]* @.str.223, i64 0, i64 0
+  %t241 = ptrtoint i8* %t240 to i64
+  %t242 = call i8* @__val_untag_ptr(i64 %t241)
+  %t243 = load i64, i64* %step
+  %t244 = call i8* @__val_untag_ptr(i64 %t243)
+  call void @js_dom_set_attr(i64 %t239, i8* %t242, i8* %t244)
+  br label %endif524
+else526:
+  br label %endif524
+endif524:
+  %t245 = load i64, i64* %type_
+  %t246 = call i8* @__val_untag_ptr(i64 %t245)
+  %t247 = call i64 @strlen(i8* %t246)
+  %t248 = add i64 0, 0
+  %t250 = icmp sgt i64 %t247, %t248
+  %t249 = zext i1 %t250 to i64
+  %t251 = trunc i64 %t249 to i1
+  br i1 %t251, label %then528, label %else529
+then528:
+  %t252 = load i64, i64* %el
+  %t253 = getelementptr [5 x i8], [5 x i8]* @.str.224, i64 0, i64 0
+  %t254 = ptrtoint i8* %t253 to i64
+  %t255 = call i8* @__val_untag_ptr(i64 %t254)
+  %t256 = load i64, i64* %type_
+  %t257 = call i8* @__val_untag_ptr(i64 %t256)
+  call void @js_dom_set_attr(i64 %t252, i8* %t255, i8* %t257)
+  br label %endif527
+else529:
+  br label %endif527
+endif527:
+  %t258 = load i64, i64* %value
+  %t259 = call i8* @__val_untag_ptr(i64 %t258)
+  %t260 = call i64 @strlen(i8* %t259)
+  %t261 = add i64 0, 0
+  %t263 = icmp sgt i64 %t260, %t261
+  %t262 = zext i1 %t263 to i64
+  %t264 = trunc i64 %t262 to i1
+  br i1 %t264, label %then531, label %else532
+then531:
+  %t265 = load i64, i64* %el
+  %t266 = getelementptr [6 x i8], [6 x i8]* @.str.225, i64 0, i64 0
+  %t267 = ptrtoint i8* %t266 to i64
+  %t268 = call i8* @__val_untag_ptr(i64 %t267)
+  %t269 = load i64, i64* %value
+  %t270 = call i8* @__val_untag_ptr(i64 %t269)
+  call void @js_dom_set_attr(i64 %t265, i8* %t268, i8* %t270)
+  br label %endif530
+else532:
+  br label %endif530
+endif530:
+  %t271 = load i64, i64* %width
+  %t272 = add i64 0, 0
+  %t274 = icmp ne i64 %t271, %t272
+  %t273 = zext i1 %t274 to i64
+  %t275 = trunc i64 %t273 to i1
+  br i1 %t275, label %then534, label %else535
+then534:
+  %t276 = load i64, i64* %el
+  %t277 = getelementptr [6 x i8], [6 x i8]* @.str.226, i64 0, i64 0
+  %t278 = ptrtoint i8* %t277 to i64
+  %t279 = call i8* @__val_untag_ptr(i64 %t278)
+  %t280 = load i64, i64* %width
+  %t281 = call i64 @__val_untag_int(i64 %t280)
+  %t282 = call i64 @__int_to_string(i64 %t281)
+  %t283 = call i8* @__val_untag_ptr(i64 %t282)
+  call void @js_dom_set_attr(i64 %t276, i8* %t279, i8* %t283)
+  br label %endif533
+else535:
+  br label %endif533
+endif533:
+  %t284 = load i64, i64* %on_click
+  %t286 = icmp ne i64 %t284, 0
+  %t285 = zext i1 %t286 to i64
+  %t287 = trunc i64 %t285 to i1
+  br i1 %t287, label %then537, label %else538
+then537:
+  %t288 = load i64, i64* %el
+  %t289 = getelementptr [6 x i8], [6 x i8]* @.str.227, i64 0, i64 0
+  %t290 = ptrtoint i8* %t289 to i64
+  %t291 = call i8* @__val_untag_ptr(i64 %t290)
+  %t292 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t288, i8* %t291, i64 %t292)
+  br label %endif536
+else538:
+  br label %endif536
+endif536:
+  %t293 = load i64, i64* %on_input
+  %t295 = icmp ne i64 %t293, 0
+  %t294 = zext i1 %t295 to i64
+  %t296 = trunc i64 %t294 to i1
+  br i1 %t296, label %then540, label %else541
+then540:
+  %t297 = load i64, i64* %el
+  %t298 = getelementptr [6 x i8], [6 x i8]* @.str.228, i64 0, i64 0
+  %t299 = ptrtoint i8* %t298 to i64
+  %t300 = call i8* @__val_untag_ptr(i64 %t299)
+  %t301 = load i64, i64* %on_input
+  call void @js_dom_add_event(i64 %t297, i8* %t300, i64 %t301)
+  br label %endif539
+else541:
+  br label %endif539
+endif539:
+  %t302 = load i64, i64* %on_change
+  %t304 = icmp ne i64 %t302, 0
+  %t303 = zext i1 %t304 to i64
+  %t305 = trunc i64 %t303 to i1
+  br i1 %t305, label %then543, label %else544
+then543:
+  %t306 = load i64, i64* %el
+  %t307 = getelementptr [7 x i8], [7 x i8]* @.str.229, i64 0, i64 0
+  %t308 = ptrtoint i8* %t307 to i64
+  %t309 = call i8* @__val_untag_ptr(i64 %t308)
+  %t310 = load i64, i64* %on_change
+  call void @js_dom_add_event(i64 %t306, i8* %t309, i64 %t310)
+  br label %endif542
+else544:
+  br label %endif542
+endif542:
+  %t311 = load i64, i64* %on_focus
+  %t313 = icmp ne i64 %t311, 0
+  %t312 = zext i1 %t313 to i64
+  %t314 = trunc i64 %t312 to i1
+  br i1 %t314, label %then546, label %else547
+then546:
+  %t315 = load i64, i64* %el
+  %t316 = getelementptr [6 x i8], [6 x i8]* @.str.230, i64 0, i64 0
+  %t317 = ptrtoint i8* %t316 to i64
+  %t318 = call i8* @__val_untag_ptr(i64 %t317)
+  %t319 = load i64, i64* %on_focus
+  call void @js_dom_add_event(i64 %t315, i8* %t318, i64 %t319)
+  br label %endif545
+else547:
+  br label %endif545
+endif545:
+  %t320 = load i64, i64* %on_blur
+  %t322 = icmp ne i64 %t320, 0
+  %t321 = zext i1 %t322 to i64
+  %t323 = trunc i64 %t321 to i1
+  br i1 %t323, label %then549, label %else550
+then549:
+  %t324 = load i64, i64* %el
+  %t325 = getelementptr [5 x i8], [5 x i8]* @.str.231, i64 0, i64 0
+  %t326 = ptrtoint i8* %t325 to i64
+  %t327 = call i8* @__val_untag_ptr(i64 %t326)
+  %t328 = load i64, i64* %on_blur
+  call void @js_dom_add_event(i64 %t324, i8* %t327, i64 %t328)
+  br label %endif548
+else550:
+  br label %endif548
+endif548:
+  %t329 = load i64, i64* %on_keydown
+  %t331 = icmp ne i64 %t329, 0
+  %t330 = zext i1 %t331 to i64
+  %t332 = trunc i64 %t330 to i1
+  br i1 %t332, label %then552, label %else553
+then552:
+  %t333 = load i64, i64* %el
+  %t334 = getelementptr [8 x i8], [8 x i8]* @.str.232, i64 0, i64 0
+  %t335 = ptrtoint i8* %t334 to i64
+  %t336 = call i8* @__val_untag_ptr(i64 %t335)
+  %t337 = load i64, i64* %on_keydown
+  call void @js_dom_add_event(i64 %t333, i8* %t336, i64 %t337)
+  br label %endif551
+else553:
+  br label %endif551
+endif551:
+  %t338 = load i64, i64* %el
+  %t339 = load i64, i64* %attrs
+  %t340 = call i64 @_tc_apply_attrs(i64 %t338, i64 %t339)
+  %t341 = call i64 @_tc_current()
+  store i64 %t341, i64* %parent
+  %t342 = load i64, i64* %parent
+  %t343 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t342, i64 %t343)
+  %t344 = load i64, i64* %el
+  ret i64 %t344
+}
+
+define i64 @ins(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cite.arg, i64 %date_time.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cite = alloca i64
+  %date_time = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cite.arg, i64* %cite
+  store i64 %date_time.arg, i64* %date_time
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.43, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.233, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then555, label %else556
+then555:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.234, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif554
+else556:
+  br label %endif554
+endif554:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then558, label %else559
+then558:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.235, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif557
+else559:
+  br label %endif557
+endif557:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then561, label %else562
+then561:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.236, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif560
+else562:
+  br label %endif560
+endif560:
+  %t44 = load i64, i64* %cite
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then564, label %else565
+then564:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.237, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %cite
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif563
+else565:
+  br label %endif563
+endif563:
+  %t57 = load i64, i64* %date_time
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then567, label %else568
+then567:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.238, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %date_time
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif566
+else568:
+  br label %endif566
+endif566:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then570, label %else571
+then570:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.239, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif569
+else571:
+  br label %endif569
+endif569:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %block
+  %t87 = icmp ne i64 %t85, 0
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then573, label %else574
+then573:
+  %t89 = load i64, i64* %el
+  %t90 = call i64 @_tc_push(i64 %t89)
+  %t91 = load i64, i64* %block
+  %t92 = inttoptr i64 %t91 to [2 x i64]*
+  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
+  %t94 = load i64, i64* %t93
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
+  %t96 = load i64, i64* %t95
+  %t97 = inttoptr i64 %t94 to i64 (i64)*
+  %t98 = call i64 %t97(i64 %t96)
+  %t99 = call i64 @_tc_pop()
+  br label %endif572
+else574:
+  br label %endif572
+endif572:
+  %t100 = load i64, i64* %el
+  ret i64 %t100
 }
 
-define i64 @strong(i64 %block.arg) {
+define i64 @kbd(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.44, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.240, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @small(i64 %block.arg) {
+define i64 @label(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.45, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.241, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @mark(i64 %block.arg) {
+define i64 @legend(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.46, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.242, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @del(i64 %block.arg) {
+define i64 @li(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.47, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.243, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then576, label %else577
+then576:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.244, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif575
+else577:
+  br label %endif575
+endif575:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then579, label %else580
+then579:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.245, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif578
+else580:
+  br label %endif578
+endif578:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then582, label %else583
+then582:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.246, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif581
+else583:
+  br label %endif581
+endif581:
+  %t44 = load i64, i64* %value
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then585, label %else586
+then585:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [6 x i8], [6 x i8]* @.str.247, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %value
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif584
+else586:
+  br label %endif584
+endif584:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then588, label %else589
+then588:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.248, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif587
+else589:
+  br label %endif587
+endif587:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then591, label %else592
+then591:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif590
+else592:
+  br label %endif590
+endif590:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @ins(i64 %block.arg) {
+define i64 @link(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %as.arg, i64 %disabled.arg, i64 %href.arg, i64 %hreflang.arg, i64 %image_sizes.arg, i64 %image_srcset.arg, i64 %integrity.arg, i64 %media.arg, i64 %rel.arg, i64 %type_.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %as = alloca i64
+  %disabled = alloca i64
+  %href = alloca i64
+  %hreflang = alloca i64
+  %image_sizes = alloca i64
+  %image_srcset = alloca i64
+  %integrity = alloca i64
+  %media = alloca i64
+  %rel = alloca i64
+  %type_ = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %as.arg, i64* %as
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %href.arg, i64* %href
+  store i64 %hreflang.arg, i64* %hreflang
+  store i64 %image_sizes.arg, i64* %image_sizes
+  store i64 %image_srcset.arg, i64* %image_srcset
+  store i64 %integrity.arg, i64* %integrity
+  store i64 %media.arg, i64* %media
+  store i64 %rel.arg, i64* %rel
+  store i64 %type_.arg, i64* %type_
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.249, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then594, label %else595
+then594:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.250, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif593
+else595:
+  br label %endif593
+endif593:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then597, label %else598
+then597:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.251, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif596
+else598:
+  br label %endif596
+endif596:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then600, label %else601
+then600:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.252, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif599
+else601:
+  br label %endif599
+endif599:
+  %t44 = add i64 0, 1224979098644774912
+  %t45 = call i64 @__list_length(i64 %t44)
+  %t46 = add i64 0, 0
+  %t48 = icmp sgt i64 %t45, %t46
+  %t47 = zext i1 %t48 to i64
+  %t49 = trunc i64 %t47 to i1
+  br i1 %t49, label %then603, label %else604
+then603:
+  %t50 = load i64, i64* %el
+  %t51 = getelementptr [3 x i8], [3 x i8]* @.str.253, i64 0, i64 0
+  %t52 = ptrtoint i8* %t51 to i64
+  %t53 = call i8* @__val_untag_ptr(i64 %t52)
+  %t54 = add i64 0, 1224979098644774912
+  %t55 = call i8* @__val_untag_ptr(i64 %t54)
+  call void @js_dom_set_attr(i64 %t50, i8* %t53, i8* %t55)
+  br label %endif602
+else604:
+  br label %endif602
+endif602:
+  %t56 = load i64, i64* %disabled
+  %t57 = trunc i64 %t56 to i1
+  br i1 %t57, label %then606, label %else607
+then606:
+  %t58 = load i64, i64* %el
+  %t59 = getelementptr [9 x i8], [9 x i8]* @.str.254, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = call i8* @__val_untag_ptr(i64 %t60)
+  %t62 = getelementptr [5 x i8], [5 x i8]* @.str.255, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  call void @js_dom_set_attr(i64 %t58, i8* %t61, i8* %t64)
+  br label %endif605
+else607:
+  br label %endif605
+endif605:
+  %t65 = load i64, i64* %href
+  %t66 = call i8* @__val_untag_ptr(i64 %t65)
+  %t67 = call i64 @strlen(i8* %t66)
+  %t68 = add i64 0, 0
+  %t70 = icmp sgt i64 %t67, %t68
+  %t69 = zext i1 %t70 to i64
+  %t71 = trunc i64 %t69 to i1
+  br i1 %t71, label %then609, label %else610
+then609:
+  %t72 = load i64, i64* %el
+  %t73 = getelementptr [5 x i8], [5 x i8]* @.str.256, i64 0, i64 0
+  %t74 = ptrtoint i8* %t73 to i64
+  %t75 = call i8* @__val_untag_ptr(i64 %t74)
+  %t76 = load i64, i64* %href
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  call void @js_dom_set_attr(i64 %t72, i8* %t75, i8* %t77)
+  br label %endif608
+else610:
+  br label %endif608
+endif608:
+  %t78 = load i64, i64* %hreflang
+  %t79 = call i8* @__val_untag_ptr(i64 %t78)
+  %t80 = call i64 @strlen(i8* %t79)
+  %t81 = add i64 0, 0
+  %t83 = icmp sgt i64 %t80, %t81
+  %t82 = zext i1 %t83 to i64
+  %t84 = trunc i64 %t82 to i1
+  br i1 %t84, label %then612, label %else613
+then612:
+  %t85 = load i64, i64* %el
+  %t86 = getelementptr [9 x i8], [9 x i8]* @.str.257, i64 0, i64 0
+  %t87 = ptrtoint i8* %t86 to i64
+  %t88 = call i8* @__val_untag_ptr(i64 %t87)
+  %t89 = load i64, i64* %hreflang
+  %t90 = call i8* @__val_untag_ptr(i64 %t89)
+  call void @js_dom_set_attr(i64 %t85, i8* %t88, i8* %t90)
+  br label %endif611
+else613:
+  br label %endif611
+endif611:
+  %t91 = load i64, i64* %image_sizes
+  %t92 = call i8* @__val_untag_ptr(i64 %t91)
+  %t93 = call i64 @strlen(i8* %t92)
+  %t94 = add i64 0, 0
+  %t96 = icmp sgt i64 %t93, %t94
+  %t95 = zext i1 %t96 to i64
+  %t97 = trunc i64 %t95 to i1
+  br i1 %t97, label %then615, label %else616
+then615:
+  %t98 = load i64, i64* %el
+  %t99 = getelementptr [11 x i8], [11 x i8]* @.str.258, i64 0, i64 0
+  %t100 = ptrtoint i8* %t99 to i64
+  %t101 = call i8* @__val_untag_ptr(i64 %t100)
+  %t102 = load i64, i64* %image_sizes
+  %t103 = call i8* @__val_untag_ptr(i64 %t102)
+  call void @js_dom_set_attr(i64 %t98, i8* %t101, i8* %t103)
+  br label %endif614
+else616:
+  br label %endif614
+endif614:
+  %t104 = load i64, i64* %image_srcset
+  %t105 = call i8* @__val_untag_ptr(i64 %t104)
+  %t106 = call i64 @strlen(i8* %t105)
+  %t107 = add i64 0, 0
+  %t109 = icmp sgt i64 %t106, %t107
+  %t108 = zext i1 %t109 to i64
+  %t110 = trunc i64 %t108 to i1
+  br i1 %t110, label %then618, label %else619
+then618:
+  %t111 = load i64, i64* %el
+  %t112 = getelementptr [12 x i8], [12 x i8]* @.str.259, i64 0, i64 0
+  %t113 = ptrtoint i8* %t112 to i64
+  %t114 = call i8* @__val_untag_ptr(i64 %t113)
+  %t115 = load i64, i64* %image_srcset
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  call void @js_dom_set_attr(i64 %t111, i8* %t114, i8* %t116)
+  br label %endif617
+else619:
+  br label %endif617
+endif617:
+  %t117 = load i64, i64* %integrity
+  %t118 = call i8* @__val_untag_ptr(i64 %t117)
+  %t119 = call i64 @strlen(i8* %t118)
+  %t120 = add i64 0, 0
+  %t122 = icmp sgt i64 %t119, %t120
+  %t121 = zext i1 %t122 to i64
+  %t123 = trunc i64 %t121 to i1
+  br i1 %t123, label %then621, label %else622
+then621:
+  %t124 = load i64, i64* %el
+  %t125 = getelementptr [10 x i8], [10 x i8]* @.str.260, i64 0, i64 0
+  %t126 = ptrtoint i8* %t125 to i64
+  %t127 = call i8* @__val_untag_ptr(i64 %t126)
+  %t128 = load i64, i64* %integrity
+  %t129 = call i8* @__val_untag_ptr(i64 %t128)
+  call void @js_dom_set_attr(i64 %t124, i8* %t127, i8* %t129)
+  br label %endif620
+else622:
+  br label %endif620
+endif620:
+  %t130 = load i64, i64* %media
+  %t131 = call i8* @__val_untag_ptr(i64 %t130)
+  %t132 = call i64 @strlen(i8* %t131)
+  %t133 = add i64 0, 0
+  %t135 = icmp sgt i64 %t132, %t133
+  %t134 = zext i1 %t135 to i64
+  %t136 = trunc i64 %t134 to i1
+  br i1 %t136, label %then624, label %else625
+then624:
+  %t137 = load i64, i64* %el
+  %t138 = getelementptr [6 x i8], [6 x i8]* @.str.261, i64 0, i64 0
+  %t139 = ptrtoint i8* %t138 to i64
+  %t140 = call i8* @__val_untag_ptr(i64 %t139)
+  %t141 = load i64, i64* %media
+  %t142 = call i8* @__val_untag_ptr(i64 %t141)
+  call void @js_dom_set_attr(i64 %t137, i8* %t140, i8* %t142)
+  br label %endif623
+else625:
+  br label %endif623
+endif623:
+  %t143 = load i64, i64* %rel
+  %t144 = call i8* @__val_untag_ptr(i64 %t143)
+  %t145 = call i64 @strlen(i8* %t144)
+  %t146 = add i64 0, 0
+  %t148 = icmp sgt i64 %t145, %t146
+  %t147 = zext i1 %t148 to i64
+  %t149 = trunc i64 %t147 to i1
+  br i1 %t149, label %then627, label %else628
+then627:
+  %t150 = load i64, i64* %el
+  %t151 = getelementptr [4 x i8], [4 x i8]* @.str.262, i64 0, i64 0
+  %t152 = ptrtoint i8* %t151 to i64
+  %t153 = call i8* @__val_untag_ptr(i64 %t152)
+  %t154 = load i64, i64* %rel
+  %t155 = call i8* @__val_untag_ptr(i64 %t154)
+  call void @js_dom_set_attr(i64 %t150, i8* %t153, i8* %t155)
+  br label %endif626
+else628:
+  br label %endif626
+endif626:
+  %t156 = load i64, i64* %type_
+  %t157 = call i8* @__val_untag_ptr(i64 %t156)
+  %t158 = call i64 @strlen(i8* %t157)
+  %t159 = add i64 0, 0
+  %t161 = icmp sgt i64 %t158, %t159
+  %t160 = zext i1 %t161 to i64
+  %t162 = trunc i64 %t160 to i1
+  br i1 %t162, label %then630, label %else631
+then630:
+  %t163 = load i64, i64* %el
+  %t164 = getelementptr [5 x i8], [5 x i8]* @.str.263, i64 0, i64 0
+  %t165 = ptrtoint i8* %t164 to i64
+  %t166 = call i8* @__val_untag_ptr(i64 %t165)
+  %t167 = load i64, i64* %type_
+  %t168 = call i8* @__val_untag_ptr(i64 %t167)
+  call void @js_dom_set_attr(i64 %t163, i8* %t166, i8* %t168)
+  br label %endif629
+else631:
+  br label %endif629
+endif629:
+  %t169 = load i64, i64* %on_click
+  %t171 = icmp ne i64 %t169, 0
+  %t170 = zext i1 %t171 to i64
+  %t172 = trunc i64 %t170 to i1
+  br i1 %t172, label %then633, label %else634
+then633:
+  %t173 = load i64, i64* %el
+  %t174 = getelementptr [6 x i8], [6 x i8]* @.str.264, i64 0, i64 0
+  %t175 = ptrtoint i8* %t174 to i64
+  %t176 = call i8* @__val_untag_ptr(i64 %t175)
+  %t177 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t173, i8* %t176, i64 %t177)
+  br label %endif632
+else634:
+  br label %endif632
+endif632:
+  %t178 = load i64, i64* %el
+  %t179 = load i64, i64* %attrs
+  %t180 = call i64 @_tc_apply_attrs(i64 %t178, i64 %t179)
+  %t181 = call i64 @_tc_current()
+  store i64 %t181, i64* %parent
+  %t182 = load i64, i64* %parent
+  %t183 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t182, i64 %t183)
+  %t184 = load i64, i64* %el
+  ret i64 %t184
+}
+
+define i64 @__saffron_main(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.48, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.265, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @figure(i64 %block.arg) {
+define i64 @map_el(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %name.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %name = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %name.arg, i64* %name
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.49, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.266, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then636, label %else637
+then636:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.267, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif635
+else637:
+  br label %endif635
+endif635:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then639, label %else640
+then639:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.268, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif638
+else640:
+  br label %endif638
+endif638:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then642, label %else643
+then642:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.269, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif641
+else643:
+  br label %endif641
+endif641:
+  %t44 = load i64, i64* %name
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then645, label %else646
+then645:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.270, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %name
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif644
+else646:
+  br label %endif644
+endif644:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then648, label %else649
+then648:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.271, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif647
+else649:
+  br label %endif647
+endif647:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then651, label %else652
+then651:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif650
+else652:
+  br label %endif650
+endif650:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @figcaption(i64 %block.arg) {
+define i64 @mark(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.50, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.272, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @picture(i64 %block.arg) {
+define i64 @menu(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.51, i64 0, i64 0
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.273, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @video(i64 %block.arg) {
+define i64 @meta(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %content.arg, i64 %http_equiv.arg, i64 %media.arg, i64 %name.arg, i64 %scheme.arg, i64 %on_click.arg, i64 %attrs.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %content = alloca i64
+  %http_equiv = alloca i64
+  %media = alloca i64
+  %name = alloca i64
+  %scheme = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %content.arg, i64* %content
+  store i64 %http_equiv.arg, i64* %http_equiv
+  store i64 %media.arg, i64* %media
+  store i64 %name.arg, i64* %name
+  store i64 %scheme.arg, i64* %scheme
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.274, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then654, label %else655
+then654:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.275, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif653
+else655:
+  br label %endif653
+endif653:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then657, label %else658
+then657:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.276, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif656
+else658:
+  br label %endif656
+endif656:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then660, label %else661
+then660:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.277, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif659
+else661:
+  br label %endif659
+endif659:
+  %t44 = load i64, i64* %content
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then663, label %else664
+then663:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [8 x i8], [8 x i8]* @.str.278, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %content
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif662
+else664:
+  br label %endif662
+endif662:
+  %t57 = load i64, i64* %http_equiv
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then666, label %else667
+then666:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [10 x i8], [10 x i8]* @.str.279, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %http_equiv
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif665
+else667:
+  br label %endif665
+endif665:
+  %t70 = load i64, i64* %media
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then669, label %else670
+then669:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [6 x i8], [6 x i8]* @.str.280, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %media
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif668
+else670:
+  br label %endif668
+endif668:
+  %t83 = load i64, i64* %name
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then672, label %else673
+then672:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [5 x i8], [5 x i8]* @.str.281, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %name
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif671
+else673:
+  br label %endif671
+endif671:
+  %t96 = load i64, i64* %scheme
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then675, label %else676
+then675:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [7 x i8], [7 x i8]* @.str.282, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %scheme
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif674
+else676:
+  br label %endif674
+endif674:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then678, label %else679
+then678:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.283, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif677
+else679:
+  br label %endif677
+endif677:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %el
+  ret i64 %t124
+}
+
+define i64 @meter(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %high.arg, i64 %low.arg, i64 %max.arg, i64 %min.arg, i64 %optimum.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %high = alloca i64
+  %low = alloca i64
+  %max = alloca i64
+  %min = alloca i64
+  %optimum = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %high.arg, i64* %high
+  store i64 %low.arg, i64* %low
+  store i64 %max.arg, i64* %max
+  store i64 %min.arg, i64* %min
+  store i64 %optimum.arg, i64* %optimum
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.52, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.284, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then681, label %else682
+then681:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.285, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif680
+else682:
+  br label %endif680
+endif680:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then684, label %else685
+then684:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.286, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif683
+else685:
+  br label %endif683
+endif683:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then687, label %else688
+then687:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.287, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif686
+else688:
+  br label %endif686
+endif686:
+  %t44 = load i64, i64* %high
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then690, label %else691
+then690:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.288, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %high
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif689
+else691:
+  br label %endif689
+endif689:
+  %t57 = load i64, i64* %low
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then693, label %else694
+then693:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [4 x i8], [4 x i8]* @.str.289, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %low
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif692
+else694:
+  br label %endif692
+endif692:
+  %t70 = load i64, i64* %max
+  %t71 = add i64 0, 0
+  %t73 = icmp ne i64 %t70, %t71
+  %t72 = zext i1 %t73 to i64
+  %t74 = trunc i64 %t72 to i1
+  br i1 %t74, label %then696, label %else697
+then696:
+  %t75 = load i64, i64* %el
+  %t76 = getelementptr [4 x i8], [4 x i8]* @.str.290, i64 0, i64 0
+  %t77 = ptrtoint i8* %t76 to i64
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  %t79 = load i64, i64* %max
+  %t80 = call i64 @__val_untag_int(i64 %t79)
+  %t81 = call i64 @__int_to_string(i64 %t80)
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t75, i8* %t78, i8* %t82)
+  br label %endif695
+else697:
+  br label %endif695
+endif695:
+  %t83 = load i64, i64* %min
+  %t84 = add i64 0, 0
+  %t86 = icmp ne i64 %t83, %t84
+  %t85 = zext i1 %t86 to i64
+  %t87 = trunc i64 %t85 to i1
+  br i1 %t87, label %then699, label %else700
+then699:
+  %t88 = load i64, i64* %el
+  %t89 = getelementptr [4 x i8], [4 x i8]* @.str.291, i64 0, i64 0
+  %t90 = ptrtoint i8* %t89 to i64
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = load i64, i64* %min
+  %t93 = call i64 @__val_untag_int(i64 %t92)
+  %t94 = call i64 @__int_to_string(i64 %t93)
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t88, i8* %t91, i8* %t95)
+  br label %endif698
+else700:
+  br label %endif698
+endif698:
+  %t96 = load i64, i64* %optimum
+  %t97 = add i64 0, 0
+  %t99 = icmp ne i64 %t96, %t97
+  %t98 = zext i1 %t99 to i64
+  %t100 = trunc i64 %t98 to i1
+  br i1 %t100, label %then702, label %else703
+then702:
+  %t101 = load i64, i64* %el
+  %t102 = getelementptr [8 x i8], [8 x i8]* @.str.292, i64 0, i64 0
+  %t103 = ptrtoint i8* %t102 to i64
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  %t105 = load i64, i64* %optimum
+  %t106 = call i64 @__val_untag_int(i64 %t105)
+  %t107 = call i64 @__int_to_string(i64 %t106)
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t101, i8* %t104, i8* %t108)
+  br label %endif701
+else703:
+  br label %endif701
+endif701:
+  %t109 = load i64, i64* %value
+  %t110 = add i64 0, 0
+  %t112 = icmp ne i64 %t109, %t110
+  %t111 = zext i1 %t112 to i64
+  %t113 = trunc i64 %t111 to i1
+  br i1 %t113, label %then705, label %else706
+then705:
+  %t114 = load i64, i64* %el
+  %t115 = getelementptr [6 x i8], [6 x i8]* @.str.293, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  %t118 = load i64, i64* %value
+  %t119 = call i64 @__val_untag_int(i64 %t118)
+  %t120 = call i64 @__int_to_string(i64 %t119)
+  %t121 = call i8* @__val_untag_ptr(i64 %t120)
+  call void @js_dom_set_attr(i64 %t114, i8* %t117, i8* %t121)
+  br label %endif704
+else706:
+  br label %endif704
+endif704:
+  %t122 = load i64, i64* %on_click
+  %t124 = icmp ne i64 %t122, 0
+  %t123 = zext i1 %t124 to i64
+  %t125 = trunc i64 %t123 to i1
+  br i1 %t125, label %then708, label %else709
+then708:
+  %t126 = load i64, i64* %el
+  %t127 = getelementptr [6 x i8], [6 x i8]* @.str.294, i64 0, i64 0
+  %t128 = ptrtoint i8* %t127 to i64
+  %t129 = call i8* @__val_untag_ptr(i64 %t128)
+  %t130 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t126, i8* %t129, i64 %t130)
+  br label %endif707
+else709:
+  br label %endif707
+endif707:
+  %t131 = load i64, i64* %el
+  %t132 = load i64, i64* %attrs
+  %t133 = call i64 @_tc_apply_attrs(i64 %t131, i64 %t132)
+  %t134 = call i64 @_tc_current()
+  store i64 %t134, i64* %parent
+  %t135 = load i64, i64* %parent
+  %t136 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t135, i64 %t136)
+  %t137 = load i64, i64* %block
+  %t139 = icmp ne i64 %t137, 0
+  %t138 = zext i1 %t139 to i64
+  %t140 = trunc i64 %t138 to i1
+  br i1 %t140, label %then711, label %else712
+then711:
+  %t141 = load i64, i64* %el
+  %t142 = call i64 @_tc_push(i64 %t141)
+  %t143 = load i64, i64* %block
+  %t144 = inttoptr i64 %t143 to [2 x i64]*
+  %t145 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 0
+  %t146 = load i64, i64* %t145
+  %t147 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 1
+  %t148 = load i64, i64* %t147
+  %t149 = inttoptr i64 %t146 to i64 (i64)*
+  %t150 = call i64 %t149(i64 %t148)
+  %t151 = call i64 @_tc_pop()
+  br label %endif710
+else712:
+  br label %endif710
+endif710:
+  %t152 = load i64, i64* %el
+  ret i64 %t152
 }
 
-define i64 @audio(i64 %block.arg) {
+define i64 @nav(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.53, i64 0, i64 0
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.295, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @canvas(i64 %block.arg) {
+define i64 @object(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %data.arg, i64 %height.arg, i64 %name.arg, i64 %type_.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %data = alloca i64
+  %height = alloca i64
+  %name = alloca i64
+  %type_ = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %data.arg, i64* %data
+  store i64 %height.arg, i64* %height
+  store i64 %name.arg, i64* %name
+  store i64 %type_.arg, i64* %type_
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.54, i64 0, i64 0
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.296, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then714, label %else715
+then714:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.297, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif713
+else715:
+  br label %endif713
+endif713:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then717, label %else718
+then717:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.298, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif716
+else718:
+  br label %endif716
+endif716:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then720, label %else721
+then720:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.299, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif719
+else721:
+  br label %endif719
+endif719:
+  %t44 = load i64, i64* %data
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then723, label %else724
+then723:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.300, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %data
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif722
+else724:
+  br label %endif722
+endif722:
+  %t57 = load i64, i64* %height
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then726, label %else727
+then726:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.301, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %height
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif725
+else727:
+  br label %endif725
+endif725:
+  %t70 = load i64, i64* %name
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then729, label %else730
+then729:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [5 x i8], [5 x i8]* @.str.302, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %name
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif728
+else730:
+  br label %endif728
+endif728:
+  %t83 = load i64, i64* %type_
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then732, label %else733
+then732:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [5 x i8], [5 x i8]* @.str.303, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %type_
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif731
+else733:
+  br label %endif731
+endif731:
+  %t96 = load i64, i64* %width
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then735, label %else736
+then735:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [6 x i8], [6 x i8]* @.str.304, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %width
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif734
+else736:
+  br label %endif734
+endif734:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then738, label %else739
+then738:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.305, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif737
+else739:
+  br label %endif737
+endif737:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %block
+  %t126 = icmp ne i64 %t124, 0
+  %t125 = zext i1 %t126 to i64
+  %t127 = trunc i64 %t125 to i1
+  br i1 %t127, label %then741, label %else742
+then741:
+  %t128 = load i64, i64* %el
+  %t129 = call i64 @_tc_push(i64 %t128)
+  %t130 = load i64, i64* %block
+  %t131 = inttoptr i64 %t130 to [2 x i64]*
+  %t132 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 0
+  %t133 = load i64, i64* %t132
+  %t134 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 1
+  %t135 = load i64, i64* %t134
+  %t136 = inttoptr i64 %t133 to i64 (i64)*
+  %t137 = call i64 %t136(i64 %t135)
+  %t138 = call i64 @_tc_pop()
+  br label %endif740
+else742:
+  br label %endif740
+endif740:
+  %t139 = load i64, i64* %el
+  ret i64 %t139
 }
 
-define i64 @iframe(i64 %block.arg) {
+define i64 @ol(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %reversed.arg, i64 %start.arg, i64 %type_.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %reversed = alloca i64
+  %start = alloca i64
+  %type_ = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
   %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %reversed.arg, i64* %reversed
+  store i64 %start.arg, i64* %start
+  store i64 %type_.arg, i64* %type_
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
   store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.55, i64 0, i64 0
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.306, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %block
-  %t4 = call i64 @_tc_el(i64 %t2, i64 %t3)
-  ret i64 %t4
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then744, label %else745
+then744:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.307, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif743
+else745:
+  br label %endif743
+endif743:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then747, label %else748
+then747:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.308, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif746
+else748:
+  br label %endif746
+endif746:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then750, label %else751
+then750:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.309, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif749
+else751:
+  br label %endif749
+endif749:
+  %t44 = load i64, i64* %reversed
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then753, label %else754
+then753:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.310, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.311, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif752
+else754:
+  br label %endif752
+endif752:
+  %t53 = load i64, i64* %start
+  %t54 = add i64 0, 0
+  %t56 = icmp ne i64 %t53, %t54
+  %t55 = zext i1 %t56 to i64
+  %t57 = trunc i64 %t55 to i1
+  br i1 %t57, label %then756, label %else757
+then756:
+  %t58 = load i64, i64* %el
+  %t59 = getelementptr [6 x i8], [6 x i8]* @.str.312, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = call i8* @__val_untag_ptr(i64 %t60)
+  %t62 = load i64, i64* %start
+  %t63 = call i64 @__val_untag_int(i64 %t62)
+  %t64 = call i64 @__int_to_string(i64 %t63)
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t58, i8* %t61, i8* %t65)
+  br label %endif755
+else757:
+  br label %endif755
+endif755:
+  %t66 = load i64, i64* %type_
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = add i64 0, 0
+  %t71 = icmp sgt i64 %t68, %t69
+  %t70 = zext i1 %t71 to i64
+  %t72 = trunc i64 %t70 to i1
+  br i1 %t72, label %then759, label %else760
+then759:
+  %t73 = load i64, i64* %el
+  %t74 = getelementptr [5 x i8], [5 x i8]* @.str.313, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = load i64, i64* %type_
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t73, i8* %t76, i8* %t78)
+  br label %endif758
+else760:
+  br label %endif758
+endif758:
+  %t79 = load i64, i64* %on_click
+  %t81 = icmp ne i64 %t79, 0
+  %t80 = zext i1 %t81 to i64
+  %t82 = trunc i64 %t80 to i1
+  br i1 %t82, label %then762, label %else763
+then762:
+  %t83 = load i64, i64* %el
+  %t84 = getelementptr [6 x i8], [6 x i8]* @.str.314, i64 0, i64 0
+  %t85 = ptrtoint i8* %t84 to i64
+  %t86 = call i8* @__val_untag_ptr(i64 %t85)
+  %t87 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t83, i8* %t86, i64 %t87)
+  br label %endif761
+else763:
+  br label %endif761
+endif761:
+  %t88 = load i64, i64* %el
+  %t89 = load i64, i64* %attrs
+  %t90 = call i64 @_tc_apply_attrs(i64 %t88, i64 %t89)
+  %t91 = call i64 @_tc_current()
+  store i64 %t91, i64* %parent
+  %t92 = load i64, i64* %parent
+  %t93 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t92, i64 %t93)
+  %t94 = load i64, i64* %block
+  %t96 = icmp ne i64 %t94, 0
+  %t95 = zext i1 %t96 to i64
+  %t97 = trunc i64 %t95 to i1
+  br i1 %t97, label %then765, label %else766
+then765:
+  %t98 = load i64, i64* %el
+  %t99 = call i64 @_tc_push(i64 %t98)
+  %t100 = load i64, i64* %block
+  %t101 = inttoptr i64 %t100 to [2 x i64]*
+  %t102 = getelementptr [2 x i64], [2 x i64]* %t101, i64 0, i64 0
+  %t103 = load i64, i64* %t102
+  %t104 = getelementptr [2 x i64], [2 x i64]* %t101, i64 0, i64 1
+  %t105 = load i64, i64* %t104
+  %t106 = inttoptr i64 %t103 to i64 (i64)*
+  %t107 = call i64 %t106(i64 %t105)
+  %t108 = call i64 @_tc_pop()
+  br label %endif764
+else766:
+  br label %endif764
+endif764:
+  %t109 = load i64, i64* %el
+  ret i64 %t109
 }
 
-define i64 @br() {
+define i64 @optgroup(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disabled.arg, i64 %label.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.56, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disabled = alloca i64
+  %label = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %label.arg, i64* %label
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.315, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then768, label %else769
+then768:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.316, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif767
+else769:
+  br label %endif767
+endif767:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then771, label %else772
+then771:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.317, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif770
+else772:
+  br label %endif770
+endif770:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then774, label %else775
+then774:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.318, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif773
+else775:
+  br label %endif773
+endif773:
+  %t44 = load i64, i64* %disabled
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then777, label %else778
+then777:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.319, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.320, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif776
+else778:
+  br label %endif776
+endif776:
+  %t53 = load i64, i64* %label
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = call i64 @strlen(i8* %t54)
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then780, label %else781
+then780:
+  %t60 = load i64, i64* %el
+  %t61 = getelementptr [6 x i8], [6 x i8]* @.str.321, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = load i64, i64* %label
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t60, i8* %t63, i8* %t65)
+  br label %endif779
+else781:
+  br label %endif779
+endif779:
+  %t66 = load i64, i64* %on_click
+  %t68 = icmp ne i64 %t66, 0
+  %t67 = zext i1 %t68 to i64
+  %t69 = trunc i64 %t67 to i1
+  br i1 %t69, label %then783, label %else784
+then783:
+  %t70 = load i64, i64* %el
+  %t71 = getelementptr [6 x i8], [6 x i8]* @.str.322, i64 0, i64 0
+  %t72 = ptrtoint i8* %t71 to i64
+  %t73 = call i8* @__val_untag_ptr(i64 %t72)
+  %t74 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t70, i8* %t73, i64 %t74)
+  br label %endif782
+else784:
+  br label %endif782
+endif782:
+  %t75 = load i64, i64* %el
+  %t76 = load i64, i64* %attrs
+  %t77 = call i64 @_tc_apply_attrs(i64 %t75, i64 %t76)
+  %t78 = call i64 @_tc_current()
+  store i64 %t78, i64* %parent
+  %t79 = load i64, i64* %parent
+  %t80 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t79, i64 %t80)
+  %t81 = load i64, i64* %block
+  %t83 = icmp ne i64 %t81, 0
+  %t82 = zext i1 %t83 to i64
+  %t84 = trunc i64 %t82 to i1
+  br i1 %t84, label %then786, label %else787
+then786:
+  %t85 = load i64, i64* %el
+  %t86 = call i64 @_tc_push(i64 %t85)
+  %t87 = load i64, i64* %block
+  %t88 = inttoptr i64 %t87 to [2 x i64]*
+  %t89 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 0
+  %t90 = load i64, i64* %t89
+  %t91 = getelementptr [2 x i64], [2 x i64]* %t88, i64 0, i64 1
+  %t92 = load i64, i64* %t91
+  %t93 = inttoptr i64 %t90 to i64 (i64)*
+  %t94 = call i64 %t93(i64 %t92)
+  %t95 = call i64 @_tc_pop()
+  br label %endif785
+else787:
+  br label %endif785
+endif785:
+  %t96 = load i64, i64* %el
+  ret i64 %t96
 }
 
-define i64 @hr() {
+define i64 @option(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disabled.arg, i64 %label.arg, i64 %selected.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.57, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disabled = alloca i64
+  %label = alloca i64
+  %selected = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %label.arg, i64* %label
+  store i64 %selected.arg, i64* %selected
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.323, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then789, label %else790
+then789:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.324, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif788
+else790:
+  br label %endif788
+endif788:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then792, label %else793
+then792:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.325, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif791
+else793:
+  br label %endif791
+endif791:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then795, label %else796
+then795:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.326, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif794
+else796:
+  br label %endif794
+endif794:
+  %t44 = load i64, i64* %disabled
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then798, label %else799
+then798:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.327, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.328, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif797
+else799:
+  br label %endif797
+endif797:
+  %t53 = load i64, i64* %label
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = call i64 @strlen(i8* %t54)
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then801, label %else802
+then801:
+  %t60 = load i64, i64* %el
+  %t61 = getelementptr [6 x i8], [6 x i8]* @.str.329, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = load i64, i64* %label
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t60, i8* %t63, i8* %t65)
+  br label %endif800
+else802:
+  br label %endif800
+endif800:
+  %t66 = load i64, i64* %selected
+  %t67 = trunc i64 %t66 to i1
+  br i1 %t67, label %then804, label %else805
+then804:
+  %t68 = load i64, i64* %el
+  %t69 = getelementptr [9 x i8], [9 x i8]* @.str.330, i64 0, i64 0
+  %t70 = ptrtoint i8* %t69 to i64
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = getelementptr [5 x i8], [5 x i8]* @.str.331, i64 0, i64 0
+  %t73 = ptrtoint i8* %t72 to i64
+  %t74 = call i8* @__val_untag_ptr(i64 %t73)
+  call void @js_dom_set_attr(i64 %t68, i8* %t71, i8* %t74)
+  br label %endif803
+else805:
+  br label %endif803
+endif803:
+  %t75 = load i64, i64* %value
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = call i64 @strlen(i8* %t76)
+  %t78 = add i64 0, 0
+  %t80 = icmp sgt i64 %t77, %t78
+  %t79 = zext i1 %t80 to i64
+  %t81 = trunc i64 %t79 to i1
+  br i1 %t81, label %then807, label %else808
+then807:
+  %t82 = load i64, i64* %el
+  %t83 = getelementptr [6 x i8], [6 x i8]* @.str.332, i64 0, i64 0
+  %t84 = ptrtoint i8* %t83 to i64
+  %t85 = call i8* @__val_untag_ptr(i64 %t84)
+  %t86 = load i64, i64* %value
+  %t87 = call i8* @__val_untag_ptr(i64 %t86)
+  call void @js_dom_set_attr(i64 %t82, i8* %t85, i8* %t87)
+  br label %endif806
+else808:
+  br label %endif806
+endif806:
+  %t88 = load i64, i64* %on_click
+  %t90 = icmp ne i64 %t88, 0
+  %t89 = zext i1 %t90 to i64
+  %t91 = trunc i64 %t89 to i1
+  br i1 %t91, label %then810, label %else811
+then810:
+  %t92 = load i64, i64* %el
+  %t93 = getelementptr [6 x i8], [6 x i8]* @.str.333, i64 0, i64 0
+  %t94 = ptrtoint i8* %t93 to i64
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  %t96 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t92, i8* %t95, i64 %t96)
+  br label %endif809
+else811:
+  br label %endif809
+endif809:
+  %t97 = load i64, i64* %el
+  %t98 = load i64, i64* %attrs
+  %t99 = call i64 @_tc_apply_attrs(i64 %t97, i64 %t98)
+  %t100 = call i64 @_tc_current()
+  store i64 %t100, i64* %parent
+  %t101 = load i64, i64* %parent
+  %t102 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t101, i64 %t102)
+  %t103 = load i64, i64* %block
+  %t105 = icmp ne i64 %t103, 0
+  %t104 = zext i1 %t105 to i64
+  %t106 = trunc i64 %t104 to i1
+  br i1 %t106, label %then813, label %else814
+then813:
+  %t107 = load i64, i64* %el
+  %t108 = call i64 @_tc_push(i64 %t107)
+  %t109 = load i64, i64* %block
+  %t110 = inttoptr i64 %t109 to [2 x i64]*
+  %t111 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 0
+  %t112 = load i64, i64* %t111
+  %t113 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 1
+  %t114 = load i64, i64* %t113
+  %t115 = inttoptr i64 %t112 to i64 (i64)*
+  %t116 = call i64 %t115(i64 %t114)
+  %t117 = call i64 @_tc_pop()
+  br label %endif812
+else814:
+  br label %endif812
+endif812:
+  %t118 = load i64, i64* %el
+  ret i64 %t118
 }
 
-define i64 @img() {
+define i64 @output(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %name.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.58, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %name = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %name.arg, i64* %name
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.334, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then816, label %else817
+then816:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.335, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif815
+else817:
+  br label %endif815
+endif815:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then819, label %else820
+then819:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.336, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif818
+else820:
+  br label %endif818
+endif818:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then822, label %else823
+then822:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.337, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif821
+else823:
+  br label %endif821
+endif821:
+  %t44 = load i64, i64* %name
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then825, label %else826
+then825:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.338, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %name
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif824
+else826:
+  br label %endif824
+endif824:
+  %t57 = load i64, i64* %value
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then828, label %else829
+then828:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [6 x i8], [6 x i8]* @.str.339, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %value
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif827
+else829:
+  br label %endif827
+endif827:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then831, label %else832
+then831:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.340, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif830
+else832:
+  br label %endif830
+endif830:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %block
+  %t87 = icmp ne i64 %t85, 0
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then834, label %else835
+then834:
+  %t89 = load i64, i64* %el
+  %t90 = call i64 @_tc_push(i64 %t89)
+  %t91 = load i64, i64* %block
+  %t92 = inttoptr i64 %t91 to [2 x i64]*
+  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
+  %t94 = load i64, i64* %t93
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
+  %t96 = load i64, i64* %t95
+  %t97 = inttoptr i64 %t94 to i64 (i64)*
+  %t98 = call i64 %t97(i64 %t96)
+  %t99 = call i64 @_tc_pop()
+  br label %endif833
+else835:
+  br label %endif833
+endif833:
+  %t100 = load i64, i64* %el
+  ret i64 %t100
 }
 
-define i64 @source() {
+define i64 @p(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.59, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.341, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @track() {
+define i64 @picture(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.60, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.342, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @wbr() {
+define i64 @pre(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.61, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.343, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
 }
 
-define i64 @embed() {
+define i64 @progress(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %max.arg, i64 %value.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.62, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %max = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %max.arg, i64* %max
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.344, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then837, label %else838
+then837:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.345, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif836
+else838:
+  br label %endif836
+endif836:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then840, label %else841
+then840:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.346, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif839
+else841:
+  br label %endif839
+endif839:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then843, label %else844
+then843:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.347, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif842
+else844:
+  br label %endif842
+endif842:
+  %t44 = load i64, i64* %max
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then846, label %else847
+then846:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [4 x i8], [4 x i8]* @.str.348, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %max
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif845
+else847:
+  br label %endif845
+endif845:
+  %t57 = load i64, i64* %value
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then849, label %else850
+then849:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [6 x i8], [6 x i8]* @.str.349, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %value
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif848
+else850:
+  br label %endif848
+endif848:
+  %t70 = load i64, i64* %on_click
+  %t72 = icmp ne i64 %t70, 0
+  %t71 = zext i1 %t72 to i64
+  %t73 = trunc i64 %t71 to i1
+  br i1 %t73, label %then852, label %else853
+then852:
+  %t74 = load i64, i64* %el
+  %t75 = getelementptr [6 x i8], [6 x i8]* @.str.350, i64 0, i64 0
+  %t76 = ptrtoint i8* %t75 to i64
+  %t77 = call i8* @__val_untag_ptr(i64 %t76)
+  %t78 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t74, i8* %t77, i64 %t78)
+  br label %endif851
+else853:
+  br label %endif851
+endif851:
+  %t79 = load i64, i64* %el
+  %t80 = load i64, i64* %attrs
+  %t81 = call i64 @_tc_apply_attrs(i64 %t79, i64 %t80)
+  %t82 = call i64 @_tc_current()
+  store i64 %t82, i64* %parent
+  %t83 = load i64, i64* %parent
+  %t84 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t83, i64 %t84)
+  %t85 = load i64, i64* %block
+  %t87 = icmp ne i64 %t85, 0
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then855, label %else856
+then855:
+  %t89 = load i64, i64* %el
+  %t90 = call i64 @_tc_push(i64 %t89)
+  %t91 = load i64, i64* %block
+  %t92 = inttoptr i64 %t91 to [2 x i64]*
+  %t93 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 0
+  %t94 = load i64, i64* %t93
+  %t95 = getelementptr [2 x i64], [2 x i64]* %t92, i64 0, i64 1
+  %t96 = load i64, i64* %t95
+  %t97 = inttoptr i64 %t94 to i64 (i64)*
+  %t98 = call i64 %t97(i64 %t96)
+  %t99 = call i64 @_tc_pop()
+  br label %endif854
+else856:
+  br label %endif854
+endif854:
+  %t100 = load i64, i64* %el
+  ret i64 %t100
 }
 
-define i64 @link() {
+define i64 @q(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cite.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.63, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cite = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cite.arg, i64* %cite
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.351, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then858, label %else859
+then858:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.352, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif857
+else859:
+  br label %endif857
+endif857:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then861, label %else862
+then861:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.353, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif860
+else862:
+  br label %endif860
+endif860:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then864, label %else865
+then864:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.354, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif863
+else865:
+  br label %endif863
+endif863:
+  %t44 = load i64, i64* %cite
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then867, label %else868
+then867:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.355, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %cite
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif866
+else868:
+  br label %endif866
+endif866:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then870, label %else871
+then870:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.356, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif869
+else871:
+  br label %endif869
+endif869:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then873, label %else874
+then873:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif872
+else874:
+  br label %endif872
+endif872:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
 }
 
-define i64 @meta() {
+define i64 @rp(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
 entry:
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.64, i64 0, i64 0
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.357, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i64 @_tc_el(i64 %t2, i64 0)
-  ret i64 %t3
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @rt(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.358, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @ruby(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.359, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @s(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.360, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @samp(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.361, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @search(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.362, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @section(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.363, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @select(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disabled.arg, i64 %multiple.arg, i64 %name.arg, i64 %required.arg, i64 %size.arg, i64 %value.arg, i64 %on_click.arg, i64 %on_change.arg, i64 %on_focus.arg, i64 %on_blur.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disabled = alloca i64
+  %multiple = alloca i64
+  %name = alloca i64
+  %required = alloca i64
+  %size = alloca i64
+  %value = alloca i64
+  %on_click = alloca i64
+  %on_change = alloca i64
+  %on_focus = alloca i64
+  %on_blur = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %multiple.arg, i64* %multiple
+  store i64 %name.arg, i64* %name
+  store i64 %required.arg, i64* %required
+  store i64 %size.arg, i64* %size
+  store i64 %value.arg, i64* %value
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_change.arg, i64* %on_change
+  store i64 %on_focus.arg, i64* %on_focus
+  store i64 %on_blur.arg, i64* %on_blur
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.364, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then876, label %else877
+then876:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.365, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif875
+else877:
+  br label %endif875
+endif875:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then879, label %else880
+then879:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.366, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif878
+else880:
+  br label %endif878
+endif878:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then882, label %else883
+then882:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.367, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif881
+else883:
+  br label %endif881
+endif881:
+  %t44 = load i64, i64* %disabled
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then885, label %else886
+then885:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [9 x i8], [9 x i8]* @.str.368, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.369, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif884
+else886:
+  br label %endif884
+endif884:
+  %t53 = load i64, i64* %multiple
+  %t54 = trunc i64 %t53 to i1
+  br i1 %t54, label %then888, label %else889
+then888:
+  %t55 = load i64, i64* %el
+  %t56 = getelementptr [9 x i8], [9 x i8]* @.str.370, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i64
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = getelementptr [5 x i8], [5 x i8]* @.str.371, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = call i8* @__val_untag_ptr(i64 %t60)
+  call void @js_dom_set_attr(i64 %t55, i8* %t58, i8* %t61)
+  br label %endif887
+else889:
+  br label %endif887
+endif887:
+  %t62 = load i64, i64* %name
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = call i64 @strlen(i8* %t63)
+  %t65 = add i64 0, 0
+  %t67 = icmp sgt i64 %t64, %t65
+  %t66 = zext i1 %t67 to i64
+  %t68 = trunc i64 %t66 to i1
+  br i1 %t68, label %then891, label %else892
+then891:
+  %t69 = load i64, i64* %el
+  %t70 = getelementptr [5 x i8], [5 x i8]* @.str.372, i64 0, i64 0
+  %t71 = ptrtoint i8* %t70 to i64
+  %t72 = call i8* @__val_untag_ptr(i64 %t71)
+  %t73 = load i64, i64* %name
+  %t74 = call i8* @__val_untag_ptr(i64 %t73)
+  call void @js_dom_set_attr(i64 %t69, i8* %t72, i8* %t74)
+  br label %endif890
+else892:
+  br label %endif890
+endif890:
+  %t75 = load i64, i64* %required
+  %t76 = trunc i64 %t75 to i1
+  br i1 %t76, label %then894, label %else895
+then894:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [9 x i8], [9 x i8]* @.str.373, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = getelementptr [5 x i8], [5 x i8]* @.str.374, i64 0, i64 0
+  %t82 = ptrtoint i8* %t81 to i64
+  %t83 = call i8* @__val_untag_ptr(i64 %t82)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t83)
+  br label %endif893
+else895:
+  br label %endif893
+endif893:
+  %t84 = load i64, i64* %size
+  %t85 = add i64 0, 0
+  %t87 = icmp ne i64 %t84, %t85
+  %t86 = zext i1 %t87 to i64
+  %t88 = trunc i64 %t86 to i1
+  br i1 %t88, label %then897, label %else898
+then897:
+  %t89 = load i64, i64* %el
+  %t90 = getelementptr [5 x i8], [5 x i8]* @.str.375, i64 0, i64 0
+  %t91 = ptrtoint i8* %t90 to i64
+  %t92 = call i8* @__val_untag_ptr(i64 %t91)
+  %t93 = load i64, i64* %size
+  %t94 = call i64 @__val_untag_int(i64 %t93)
+  %t95 = call i64 @__int_to_string(i64 %t94)
+  %t96 = call i8* @__val_untag_ptr(i64 %t95)
+  call void @js_dom_set_attr(i64 %t89, i8* %t92, i8* %t96)
+  br label %endif896
+else898:
+  br label %endif896
+endif896:
+  %t97 = load i64, i64* %value
+  %t98 = call i8* @__val_untag_ptr(i64 %t97)
+  %t99 = call i64 @strlen(i8* %t98)
+  %t100 = add i64 0, 0
+  %t102 = icmp sgt i64 %t99, %t100
+  %t101 = zext i1 %t102 to i64
+  %t103 = trunc i64 %t101 to i1
+  br i1 %t103, label %then900, label %else901
+then900:
+  %t104 = load i64, i64* %el
+  %t105 = getelementptr [6 x i8], [6 x i8]* @.str.376, i64 0, i64 0
+  %t106 = ptrtoint i8* %t105 to i64
+  %t107 = call i8* @__val_untag_ptr(i64 %t106)
+  %t108 = load i64, i64* %value
+  %t109 = call i8* @__val_untag_ptr(i64 %t108)
+  call void @js_dom_set_attr(i64 %t104, i8* %t107, i8* %t109)
+  br label %endif899
+else901:
+  br label %endif899
+endif899:
+  %t110 = load i64, i64* %on_click
+  %t112 = icmp ne i64 %t110, 0
+  %t111 = zext i1 %t112 to i64
+  %t113 = trunc i64 %t111 to i1
+  br i1 %t113, label %then903, label %else904
+then903:
+  %t114 = load i64, i64* %el
+  %t115 = getelementptr [6 x i8], [6 x i8]* @.str.377, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  %t118 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t114, i8* %t117, i64 %t118)
+  br label %endif902
+else904:
+  br label %endif902
+endif902:
+  %t119 = load i64, i64* %on_change
+  %t121 = icmp ne i64 %t119, 0
+  %t120 = zext i1 %t121 to i64
+  %t122 = trunc i64 %t120 to i1
+  br i1 %t122, label %then906, label %else907
+then906:
+  %t123 = load i64, i64* %el
+  %t124 = getelementptr [7 x i8], [7 x i8]* @.str.378, i64 0, i64 0
+  %t125 = ptrtoint i8* %t124 to i64
+  %t126 = call i8* @__val_untag_ptr(i64 %t125)
+  %t127 = load i64, i64* %on_change
+  call void @js_dom_add_event(i64 %t123, i8* %t126, i64 %t127)
+  br label %endif905
+else907:
+  br label %endif905
+endif905:
+  %t128 = load i64, i64* %on_focus
+  %t130 = icmp ne i64 %t128, 0
+  %t129 = zext i1 %t130 to i64
+  %t131 = trunc i64 %t129 to i1
+  br i1 %t131, label %then909, label %else910
+then909:
+  %t132 = load i64, i64* %el
+  %t133 = getelementptr [6 x i8], [6 x i8]* @.str.379, i64 0, i64 0
+  %t134 = ptrtoint i8* %t133 to i64
+  %t135 = call i8* @__val_untag_ptr(i64 %t134)
+  %t136 = load i64, i64* %on_focus
+  call void @js_dom_add_event(i64 %t132, i8* %t135, i64 %t136)
+  br label %endif908
+else910:
+  br label %endif908
+endif908:
+  %t137 = load i64, i64* %on_blur
+  %t139 = icmp ne i64 %t137, 0
+  %t138 = zext i1 %t139 to i64
+  %t140 = trunc i64 %t138 to i1
+  br i1 %t140, label %then912, label %else913
+then912:
+  %t141 = load i64, i64* %el
+  %t142 = getelementptr [5 x i8], [5 x i8]* @.str.380, i64 0, i64 0
+  %t143 = ptrtoint i8* %t142 to i64
+  %t144 = call i8* @__val_untag_ptr(i64 %t143)
+  %t145 = load i64, i64* %on_blur
+  call void @js_dom_add_event(i64 %t141, i8* %t144, i64 %t145)
+  br label %endif911
+else913:
+  br label %endif911
+endif911:
+  %t146 = load i64, i64* %el
+  %t147 = load i64, i64* %attrs
+  %t148 = call i64 @_tc_apply_attrs(i64 %t146, i64 %t147)
+  %t149 = call i64 @_tc_current()
+  store i64 %t149, i64* %parent
+  %t150 = load i64, i64* %parent
+  %t151 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t150, i64 %t151)
+  %t152 = load i64, i64* %block
+  %t154 = icmp ne i64 %t152, 0
+  %t153 = zext i1 %t154 to i64
+  %t155 = trunc i64 %t153 to i1
+  br i1 %t155, label %then915, label %else916
+then915:
+  %t156 = load i64, i64* %el
+  %t157 = call i64 @_tc_push(i64 %t156)
+  %t158 = load i64, i64* %block
+  %t159 = inttoptr i64 %t158 to [2 x i64]*
+  %t160 = getelementptr [2 x i64], [2 x i64]* %t159, i64 0, i64 0
+  %t161 = load i64, i64* %t160
+  %t162 = getelementptr [2 x i64], [2 x i64]* %t159, i64 0, i64 1
+  %t163 = load i64, i64* %t162
+  %t164 = inttoptr i64 %t161 to i64 (i64)*
+  %t165 = call i64 %t164(i64 %t163)
+  %t166 = call i64 @_tc_pop()
+  br label %endif914
+else916:
+  br label %endif914
+endif914:
+  %t167 = load i64, i64* %el
+  ret i64 %t167
+}
+
+define i64 @small(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.381, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @source(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %height.arg, i64 %media.arg, i64 %src.arg, i64 %type_.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %height = alloca i64
+  %media = alloca i64
+  %src = alloca i64
+  %type_ = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %height.arg, i64* %height
+  store i64 %media.arg, i64* %media
+  store i64 %src.arg, i64* %src
+  store i64 %type_.arg, i64* %type_
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.382, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then918, label %else919
+then918:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.383, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif917
+else919:
+  br label %endif917
+endif917:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then921, label %else922
+then921:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.384, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif920
+else922:
+  br label %endif920
+endif920:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then924, label %else925
+then924:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.385, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif923
+else925:
+  br label %endif923
+endif923:
+  %t44 = load i64, i64* %height
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then927, label %else928
+then927:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [7 x i8], [7 x i8]* @.str.386, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %height
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif926
+else928:
+  br label %endif926
+endif926:
+  %t57 = load i64, i64* %media
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then930, label %else931
+then930:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [6 x i8], [6 x i8]* @.str.387, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %media
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif929
+else931:
+  br label %endif929
+endif929:
+  %t70 = load i64, i64* %src
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then933, label %else934
+then933:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [4 x i8], [4 x i8]* @.str.388, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %src
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif932
+else934:
+  br label %endif932
+endif932:
+  %t83 = load i64, i64* %type_
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then936, label %else937
+then936:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [5 x i8], [5 x i8]* @.str.389, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %type_
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif935
+else937:
+  br label %endif935
+endif935:
+  %t96 = load i64, i64* %width
+  %t97 = add i64 0, 0
+  %t99 = icmp ne i64 %t96, %t97
+  %t98 = zext i1 %t99 to i64
+  %t100 = trunc i64 %t98 to i1
+  br i1 %t100, label %then939, label %else940
+then939:
+  %t101 = load i64, i64* %el
+  %t102 = getelementptr [6 x i8], [6 x i8]* @.str.390, i64 0, i64 0
+  %t103 = ptrtoint i8* %t102 to i64
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  %t105 = load i64, i64* %width
+  %t106 = call i64 @__val_untag_int(i64 %t105)
+  %t107 = call i64 @__int_to_string(i64 %t106)
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t101, i8* %t104, i8* %t108)
+  br label %endif938
+else940:
+  br label %endif938
+endif938:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then942, label %else943
+then942:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.391, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif941
+else943:
+  br label %endif941
+endif941:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %el
+  ret i64 %t124
+}
+
+define i64 @span(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.392, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @strong(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.393, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @sub(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.394, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @summary(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.395, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @sup(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.396, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @table(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cell_padding.arg, i64 %cell_spacing.arg, i64 %frame.arg, i64 %rules.arg, i64 %summary.arg, i64 %width.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cell_padding = alloca i64
+  %cell_spacing = alloca i64
+  %frame = alloca i64
+  %rules = alloca i64
+  %summary = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cell_padding.arg, i64* %cell_padding
+  store i64 %cell_spacing.arg, i64* %cell_spacing
+  store i64 %frame.arg, i64* %frame
+  store i64 %rules.arg, i64* %rules
+  store i64 %summary.arg, i64* %summary
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.397, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then945, label %else946
+then945:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.398, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif944
+else946:
+  br label %endif944
+endif944:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then948, label %else949
+then948:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.399, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif947
+else949:
+  br label %endif947
+endif947:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then951, label %else952
+then951:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.400, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif950
+else952:
+  br label %endif950
+endif950:
+  %t44 = load i64, i64* %cell_padding
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then954, label %else955
+then954:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [12 x i8], [12 x i8]* @.str.401, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %cell_padding
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif953
+else955:
+  br label %endif953
+endif953:
+  %t57 = load i64, i64* %cell_spacing
+  %t58 = call i8* @__val_untag_ptr(i64 %t57)
+  %t59 = call i64 @strlen(i8* %t58)
+  %t60 = add i64 0, 0
+  %t62 = icmp sgt i64 %t59, %t60
+  %t61 = zext i1 %t62 to i64
+  %t63 = trunc i64 %t61 to i1
+  br i1 %t63, label %then957, label %else958
+then957:
+  %t64 = load i64, i64* %el
+  %t65 = getelementptr [12 x i8], [12 x i8]* @.str.402, i64 0, i64 0
+  %t66 = ptrtoint i8* %t65 to i64
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = load i64, i64* %cell_spacing
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t64, i8* %t67, i8* %t69)
+  br label %endif956
+else958:
+  br label %endif956
+endif956:
+  %t70 = load i64, i64* %frame
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then960, label %else961
+then960:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [6 x i8], [6 x i8]* @.str.403, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %frame
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif959
+else961:
+  br label %endif959
+endif959:
+  %t83 = load i64, i64* %rules
+  %t84 = call i8* @__val_untag_ptr(i64 %t83)
+  %t85 = call i64 @strlen(i8* %t84)
+  %t86 = add i64 0, 0
+  %t88 = icmp sgt i64 %t85, %t86
+  %t87 = zext i1 %t88 to i64
+  %t89 = trunc i64 %t87 to i1
+  br i1 %t89, label %then963, label %else964
+then963:
+  %t90 = load i64, i64* %el
+  %t91 = getelementptr [6 x i8], [6 x i8]* @.str.404, i64 0, i64 0
+  %t92 = ptrtoint i8* %t91 to i64
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = load i64, i64* %rules
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t90, i8* %t93, i8* %t95)
+  br label %endif962
+else964:
+  br label %endif962
+endif962:
+  %t96 = load i64, i64* %summary
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then966, label %else967
+then966:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [8 x i8], [8 x i8]* @.str.405, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %summary
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif965
+else967:
+  br label %endif965
+endif965:
+  %t109 = load i64, i64* %width
+  %t110 = call i8* @__val_untag_ptr(i64 %t109)
+  %t111 = call i64 @strlen(i8* %t110)
+  %t112 = add i64 0, 0
+  %t114 = icmp sgt i64 %t111, %t112
+  %t113 = zext i1 %t114 to i64
+  %t115 = trunc i64 %t113 to i1
+  br i1 %t115, label %then969, label %else970
+then969:
+  %t116 = load i64, i64* %el
+  %t117 = getelementptr [6 x i8], [6 x i8]* @.str.406, i64 0, i64 0
+  %t118 = ptrtoint i8* %t117 to i64
+  %t119 = call i8* @__val_untag_ptr(i64 %t118)
+  %t120 = load i64, i64* %width
+  %t121 = call i8* @__val_untag_ptr(i64 %t120)
+  call void @js_dom_set_attr(i64 %t116, i8* %t119, i8* %t121)
+  br label %endif968
+else970:
+  br label %endif968
+endif968:
+  %t122 = load i64, i64* %on_click
+  %t124 = icmp ne i64 %t122, 0
+  %t123 = zext i1 %t124 to i64
+  %t125 = trunc i64 %t123 to i1
+  br i1 %t125, label %then972, label %else973
+then972:
+  %t126 = load i64, i64* %el
+  %t127 = getelementptr [6 x i8], [6 x i8]* @.str.407, i64 0, i64 0
+  %t128 = ptrtoint i8* %t127 to i64
+  %t129 = call i8* @__val_untag_ptr(i64 %t128)
+  %t130 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t126, i8* %t129, i64 %t130)
+  br label %endif971
+else973:
+  br label %endif971
+endif971:
+  %t131 = load i64, i64* %el
+  %t132 = load i64, i64* %attrs
+  %t133 = call i64 @_tc_apply_attrs(i64 %t131, i64 %t132)
+  %t134 = call i64 @_tc_current()
+  store i64 %t134, i64* %parent
+  %t135 = load i64, i64* %parent
+  %t136 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t135, i64 %t136)
+  %t137 = load i64, i64* %block
+  %t139 = icmp ne i64 %t137, 0
+  %t138 = zext i1 %t139 to i64
+  %t140 = trunc i64 %t138 to i1
+  br i1 %t140, label %then975, label %else976
+then975:
+  %t141 = load i64, i64* %el
+  %t142 = call i64 @_tc_push(i64 %t141)
+  %t143 = load i64, i64* %block
+  %t144 = inttoptr i64 %t143 to [2 x i64]*
+  %t145 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 0
+  %t146 = load i64, i64* %t145
+  %t147 = getelementptr [2 x i64], [2 x i64]* %t144, i64 0, i64 1
+  %t148 = load i64, i64* %t147
+  %t149 = inttoptr i64 %t146 to i64 (i64)*
+  %t150 = call i64 %t149(i64 %t148)
+  %t151 = call i64 @_tc_pop()
+  br label %endif974
+else976:
+  br label %endif974
+endif974:
+  %t152 = load i64, i64* %el
+  ret i64 %t152
+}
+
+define i64 @tbody(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.408, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @td(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %abbr.arg, i64 %col_span.arg, i64 %headers.arg, i64 %row_span.arg, i64 %scope.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %abbr = alloca i64
+  %col_span = alloca i64
+  %headers = alloca i64
+  %row_span = alloca i64
+  %scope = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %abbr.arg, i64* %abbr
+  store i64 %col_span.arg, i64* %col_span
+  store i64 %headers.arg, i64* %headers
+  store i64 %row_span.arg, i64* %row_span
+  store i64 %scope.arg, i64* %scope
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.409, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then978, label %else979
+then978:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.410, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif977
+else979:
+  br label %endif977
+endif977:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then981, label %else982
+then981:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.411, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif980
+else982:
+  br label %endif980
+endif980:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then984, label %else985
+then984:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.412, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif983
+else985:
+  br label %endif983
+endif983:
+  %t44 = load i64, i64* %abbr
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then987, label %else988
+then987:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.413, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %abbr
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif986
+else988:
+  br label %endif986
+endif986:
+  %t57 = load i64, i64* %col_span
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then990, label %else991
+then990:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [8 x i8], [8 x i8]* @.str.414, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %col_span
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif989
+else991:
+  br label %endif989
+endif989:
+  %t70 = load i64, i64* %headers
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then993, label %else994
+then993:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [8 x i8], [8 x i8]* @.str.415, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %headers
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif992
+else994:
+  br label %endif992
+endif992:
+  %t83 = load i64, i64* %row_span
+  %t84 = add i64 0, 0
+  %t86 = icmp ne i64 %t83, %t84
+  %t85 = zext i1 %t86 to i64
+  %t87 = trunc i64 %t85 to i1
+  br i1 %t87, label %then996, label %else997
+then996:
+  %t88 = load i64, i64* %el
+  %t89 = getelementptr [8 x i8], [8 x i8]* @.str.416, i64 0, i64 0
+  %t90 = ptrtoint i8* %t89 to i64
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = load i64, i64* %row_span
+  %t93 = call i64 @__val_untag_int(i64 %t92)
+  %t94 = call i64 @__int_to_string(i64 %t93)
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t88, i8* %t91, i8* %t95)
+  br label %endif995
+else997:
+  br label %endif995
+endif995:
+  %t96 = load i64, i64* %scope
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then999, label %else1000
+then999:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [6 x i8], [6 x i8]* @.str.417, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %scope
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif998
+else1000:
+  br label %endif998
+endif998:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then1002, label %else1003
+then1002:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.418, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif1001
+else1003:
+  br label %endif1001
+endif1001:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %block
+  %t126 = icmp ne i64 %t124, 0
+  %t125 = zext i1 %t126 to i64
+  %t127 = trunc i64 %t125 to i1
+  br i1 %t127, label %then1005, label %else1006
+then1005:
+  %t128 = load i64, i64* %el
+  %t129 = call i64 @_tc_push(i64 %t128)
+  %t130 = load i64, i64* %block
+  %t131 = inttoptr i64 %t130 to [2 x i64]*
+  %t132 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 0
+  %t133 = load i64, i64* %t132
+  %t134 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 1
+  %t135 = load i64, i64* %t134
+  %t136 = inttoptr i64 %t133 to i64 (i64)*
+  %t137 = call i64 %t136(i64 %t135)
+  %t138 = call i64 @_tc_pop()
+  br label %endif1004
+else1006:
+  br label %endif1004
+endif1004:
+  %t139 = load i64, i64* %el
+  ret i64 %t139
+}
+
+define i64 @textarea(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %cols.arg, i64 %disabled.arg, i64 %max_length.arg, i64 %min_length.arg, i64 %name.arg, i64 %placeholder.arg, i64 %read_only.arg, i64 %required.arg, i64 %rows.arg, i64 %value.arg, i64 %wrap.arg, i64 %on_click.arg, i64 %on_input.arg, i64 %on_change.arg, i64 %on_focus.arg, i64 %on_blur.arg, i64 %on_keydown.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %cols = alloca i64
+  %disabled = alloca i64
+  %max_length = alloca i64
+  %min_length = alloca i64
+  %name = alloca i64
+  %placeholder = alloca i64
+  %read_only = alloca i64
+  %required = alloca i64
+  %rows = alloca i64
+  %value = alloca i64
+  %wrap = alloca i64
+  %on_click = alloca i64
+  %on_input = alloca i64
+  %on_change = alloca i64
+  %on_focus = alloca i64
+  %on_blur = alloca i64
+  %on_keydown = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %cols.arg, i64* %cols
+  store i64 %disabled.arg, i64* %disabled
+  store i64 %max_length.arg, i64* %max_length
+  store i64 %min_length.arg, i64* %min_length
+  store i64 %name.arg, i64* %name
+  store i64 %placeholder.arg, i64* %placeholder
+  store i64 %read_only.arg, i64* %read_only
+  store i64 %required.arg, i64* %required
+  store i64 %rows.arg, i64* %rows
+  store i64 %value.arg, i64* %value
+  store i64 %wrap.arg, i64* %wrap
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_input.arg, i64* %on_input
+  store i64 %on_change.arg, i64* %on_change
+  store i64 %on_focus.arg, i64* %on_focus
+  store i64 %on_blur.arg, i64* %on_blur
+  store i64 %on_keydown.arg, i64* %on_keydown
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.419, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1008, label %else1009
+then1008:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.420, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1007
+else1009:
+  br label %endif1007
+endif1007:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1011, label %else1012
+then1011:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.421, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1010
+else1012:
+  br label %endif1010
+endif1010:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1014, label %else1015
+then1014:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.422, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1013
+else1015:
+  br label %endif1013
+endif1013:
+  %t44 = load i64, i64* %cols
+  %t45 = add i64 0, 0
+  %t47 = icmp ne i64 %t44, %t45
+  %t46 = zext i1 %t47 to i64
+  %t48 = trunc i64 %t46 to i1
+  br i1 %t48, label %then1017, label %else1018
+then1017:
+  %t49 = load i64, i64* %el
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.423, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  %t53 = load i64, i64* %cols
+  %t54 = call i64 @__val_untag_int(i64 %t53)
+  %t55 = call i64 @__int_to_string(i64 %t54)
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t49, i8* %t52, i8* %t56)
+  br label %endif1016
+else1018:
+  br label %endif1016
+endif1016:
+  %t57 = load i64, i64* %disabled
+  %t58 = trunc i64 %t57 to i1
+  br i1 %t58, label %then1020, label %else1021
+then1020:
+  %t59 = load i64, i64* %el
+  %t60 = getelementptr [9 x i8], [9 x i8]* @.str.424, i64 0, i64 0
+  %t61 = ptrtoint i8* %t60 to i64
+  %t62 = call i8* @__val_untag_ptr(i64 %t61)
+  %t63 = getelementptr [5 x i8], [5 x i8]* @.str.425, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t59, i8* %t62, i8* %t65)
+  br label %endif1019
+else1021:
+  br label %endif1019
+endif1019:
+  %t66 = load i64, i64* %max_length
+  %t67 = add i64 0, 0
+  %t69 = icmp ne i64 %t66, %t67
+  %t68 = zext i1 %t69 to i64
+  %t70 = trunc i64 %t68 to i1
+  br i1 %t70, label %then1023, label %else1024
+then1023:
+  %t71 = load i64, i64* %el
+  %t72 = getelementptr [10 x i8], [10 x i8]* @.str.426, i64 0, i64 0
+  %t73 = ptrtoint i8* %t72 to i64
+  %t74 = call i8* @__val_untag_ptr(i64 %t73)
+  %t75 = load i64, i64* %max_length
+  %t76 = call i64 @__val_untag_int(i64 %t75)
+  %t77 = call i64 @__int_to_string(i64 %t76)
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t71, i8* %t74, i8* %t78)
+  br label %endif1022
+else1024:
+  br label %endif1022
+endif1022:
+  %t79 = load i64, i64* %min_length
+  %t80 = add i64 0, 0
+  %t82 = icmp ne i64 %t79, %t80
+  %t81 = zext i1 %t82 to i64
+  %t83 = trunc i64 %t81 to i1
+  br i1 %t83, label %then1026, label %else1027
+then1026:
+  %t84 = load i64, i64* %el
+  %t85 = getelementptr [10 x i8], [10 x i8]* @.str.427, i64 0, i64 0
+  %t86 = ptrtoint i8* %t85 to i64
+  %t87 = call i8* @__val_untag_ptr(i64 %t86)
+  %t88 = load i64, i64* %min_length
+  %t89 = call i64 @__val_untag_int(i64 %t88)
+  %t90 = call i64 @__int_to_string(i64 %t89)
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  call void @js_dom_set_attr(i64 %t84, i8* %t87, i8* %t91)
+  br label %endif1025
+else1027:
+  br label %endif1025
+endif1025:
+  %t92 = load i64, i64* %name
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = call i64 @strlen(i8* %t93)
+  %t95 = add i64 0, 0
+  %t97 = icmp sgt i64 %t94, %t95
+  %t96 = zext i1 %t97 to i64
+  %t98 = trunc i64 %t96 to i1
+  br i1 %t98, label %then1029, label %else1030
+then1029:
+  %t99 = load i64, i64* %el
+  %t100 = getelementptr [5 x i8], [5 x i8]* @.str.428, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = call i8* @__val_untag_ptr(i64 %t101)
+  %t103 = load i64, i64* %name
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  call void @js_dom_set_attr(i64 %t99, i8* %t102, i8* %t104)
+  br label %endif1028
+else1030:
+  br label %endif1028
+endif1028:
+  %t105 = load i64, i64* %placeholder
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = call i64 @strlen(i8* %t106)
+  %t108 = add i64 0, 0
+  %t110 = icmp sgt i64 %t107, %t108
+  %t109 = zext i1 %t110 to i64
+  %t111 = trunc i64 %t109 to i1
+  br i1 %t111, label %then1032, label %else1033
+then1032:
+  %t112 = load i64, i64* %el
+  %t113 = getelementptr [12 x i8], [12 x i8]* @.str.429, i64 0, i64 0
+  %t114 = ptrtoint i8* %t113 to i64
+  %t115 = call i8* @__val_untag_ptr(i64 %t114)
+  %t116 = load i64, i64* %placeholder
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  call void @js_dom_set_attr(i64 %t112, i8* %t115, i8* %t117)
+  br label %endif1031
+else1033:
+  br label %endif1031
+endif1031:
+  %t118 = load i64, i64* %read_only
+  %t119 = trunc i64 %t118 to i1
+  br i1 %t119, label %then1035, label %else1036
+then1035:
+  %t120 = load i64, i64* %el
+  %t121 = getelementptr [9 x i8], [9 x i8]* @.str.430, i64 0, i64 0
+  %t122 = ptrtoint i8* %t121 to i64
+  %t123 = call i8* @__val_untag_ptr(i64 %t122)
+  %t124 = getelementptr [5 x i8], [5 x i8]* @.str.431, i64 0, i64 0
+  %t125 = ptrtoint i8* %t124 to i64
+  %t126 = call i8* @__val_untag_ptr(i64 %t125)
+  call void @js_dom_set_attr(i64 %t120, i8* %t123, i8* %t126)
+  br label %endif1034
+else1036:
+  br label %endif1034
+endif1034:
+  %t127 = load i64, i64* %required
+  %t128 = trunc i64 %t127 to i1
+  br i1 %t128, label %then1038, label %else1039
+then1038:
+  %t129 = load i64, i64* %el
+  %t130 = getelementptr [9 x i8], [9 x i8]* @.str.432, i64 0, i64 0
+  %t131 = ptrtoint i8* %t130 to i64
+  %t132 = call i8* @__val_untag_ptr(i64 %t131)
+  %t133 = getelementptr [5 x i8], [5 x i8]* @.str.433, i64 0, i64 0
+  %t134 = ptrtoint i8* %t133 to i64
+  %t135 = call i8* @__val_untag_ptr(i64 %t134)
+  call void @js_dom_set_attr(i64 %t129, i8* %t132, i8* %t135)
+  br label %endif1037
+else1039:
+  br label %endif1037
+endif1037:
+  %t136 = load i64, i64* %rows
+  %t137 = add i64 0, 0
+  %t139 = icmp ne i64 %t136, %t137
+  %t138 = zext i1 %t139 to i64
+  %t140 = trunc i64 %t138 to i1
+  br i1 %t140, label %then1041, label %else1042
+then1041:
+  %t141 = load i64, i64* %el
+  %t142 = getelementptr [5 x i8], [5 x i8]* @.str.434, i64 0, i64 0
+  %t143 = ptrtoint i8* %t142 to i64
+  %t144 = call i8* @__val_untag_ptr(i64 %t143)
+  %t145 = load i64, i64* %rows
+  %t146 = call i64 @__val_untag_int(i64 %t145)
+  %t147 = call i64 @__int_to_string(i64 %t146)
+  %t148 = call i8* @__val_untag_ptr(i64 %t147)
+  call void @js_dom_set_attr(i64 %t141, i8* %t144, i8* %t148)
+  br label %endif1040
+else1042:
+  br label %endif1040
+endif1040:
+  %t149 = load i64, i64* %value
+  %t150 = call i8* @__val_untag_ptr(i64 %t149)
+  %t151 = call i64 @strlen(i8* %t150)
+  %t152 = add i64 0, 0
+  %t154 = icmp sgt i64 %t151, %t152
+  %t153 = zext i1 %t154 to i64
+  %t155 = trunc i64 %t153 to i1
+  br i1 %t155, label %then1044, label %else1045
+then1044:
+  %t156 = load i64, i64* %el
+  %t157 = getelementptr [6 x i8], [6 x i8]* @.str.435, i64 0, i64 0
+  %t158 = ptrtoint i8* %t157 to i64
+  %t159 = call i8* @__val_untag_ptr(i64 %t158)
+  %t160 = load i64, i64* %value
+  %t161 = call i8* @__val_untag_ptr(i64 %t160)
+  call void @js_dom_set_attr(i64 %t156, i8* %t159, i8* %t161)
+  br label %endif1043
+else1045:
+  br label %endif1043
+endif1043:
+  %t162 = load i64, i64* %wrap
+  %t163 = call i8* @__val_untag_ptr(i64 %t162)
+  %t164 = call i64 @strlen(i8* %t163)
+  %t165 = add i64 0, 0
+  %t167 = icmp sgt i64 %t164, %t165
+  %t166 = zext i1 %t167 to i64
+  %t168 = trunc i64 %t166 to i1
+  br i1 %t168, label %then1047, label %else1048
+then1047:
+  %t169 = load i64, i64* %el
+  %t170 = getelementptr [5 x i8], [5 x i8]* @.str.436, i64 0, i64 0
+  %t171 = ptrtoint i8* %t170 to i64
+  %t172 = call i8* @__val_untag_ptr(i64 %t171)
+  %t173 = load i64, i64* %wrap
+  %t174 = call i8* @__val_untag_ptr(i64 %t173)
+  call void @js_dom_set_attr(i64 %t169, i8* %t172, i8* %t174)
+  br label %endif1046
+else1048:
+  br label %endif1046
+endif1046:
+  %t175 = load i64, i64* %on_click
+  %t177 = icmp ne i64 %t175, 0
+  %t176 = zext i1 %t177 to i64
+  %t178 = trunc i64 %t176 to i1
+  br i1 %t178, label %then1050, label %else1051
+then1050:
+  %t179 = load i64, i64* %el
+  %t180 = getelementptr [6 x i8], [6 x i8]* @.str.437, i64 0, i64 0
+  %t181 = ptrtoint i8* %t180 to i64
+  %t182 = call i8* @__val_untag_ptr(i64 %t181)
+  %t183 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t179, i8* %t182, i64 %t183)
+  br label %endif1049
+else1051:
+  br label %endif1049
+endif1049:
+  %t184 = load i64, i64* %on_input
+  %t186 = icmp ne i64 %t184, 0
+  %t185 = zext i1 %t186 to i64
+  %t187 = trunc i64 %t185 to i1
+  br i1 %t187, label %then1053, label %else1054
+then1053:
+  %t188 = load i64, i64* %el
+  %t189 = getelementptr [6 x i8], [6 x i8]* @.str.438, i64 0, i64 0
+  %t190 = ptrtoint i8* %t189 to i64
+  %t191 = call i8* @__val_untag_ptr(i64 %t190)
+  %t192 = load i64, i64* %on_input
+  call void @js_dom_add_event(i64 %t188, i8* %t191, i64 %t192)
+  br label %endif1052
+else1054:
+  br label %endif1052
+endif1052:
+  %t193 = load i64, i64* %on_change
+  %t195 = icmp ne i64 %t193, 0
+  %t194 = zext i1 %t195 to i64
+  %t196 = trunc i64 %t194 to i1
+  br i1 %t196, label %then1056, label %else1057
+then1056:
+  %t197 = load i64, i64* %el
+  %t198 = getelementptr [7 x i8], [7 x i8]* @.str.439, i64 0, i64 0
+  %t199 = ptrtoint i8* %t198 to i64
+  %t200 = call i8* @__val_untag_ptr(i64 %t199)
+  %t201 = load i64, i64* %on_change
+  call void @js_dom_add_event(i64 %t197, i8* %t200, i64 %t201)
+  br label %endif1055
+else1057:
+  br label %endif1055
+endif1055:
+  %t202 = load i64, i64* %on_focus
+  %t204 = icmp ne i64 %t202, 0
+  %t203 = zext i1 %t204 to i64
+  %t205 = trunc i64 %t203 to i1
+  br i1 %t205, label %then1059, label %else1060
+then1059:
+  %t206 = load i64, i64* %el
+  %t207 = getelementptr [6 x i8], [6 x i8]* @.str.440, i64 0, i64 0
+  %t208 = ptrtoint i8* %t207 to i64
+  %t209 = call i8* @__val_untag_ptr(i64 %t208)
+  %t210 = load i64, i64* %on_focus
+  call void @js_dom_add_event(i64 %t206, i8* %t209, i64 %t210)
+  br label %endif1058
+else1060:
+  br label %endif1058
+endif1058:
+  %t211 = load i64, i64* %on_blur
+  %t213 = icmp ne i64 %t211, 0
+  %t212 = zext i1 %t213 to i64
+  %t214 = trunc i64 %t212 to i1
+  br i1 %t214, label %then1062, label %else1063
+then1062:
+  %t215 = load i64, i64* %el
+  %t216 = getelementptr [5 x i8], [5 x i8]* @.str.441, i64 0, i64 0
+  %t217 = ptrtoint i8* %t216 to i64
+  %t218 = call i8* @__val_untag_ptr(i64 %t217)
+  %t219 = load i64, i64* %on_blur
+  call void @js_dom_add_event(i64 %t215, i8* %t218, i64 %t219)
+  br label %endif1061
+else1063:
+  br label %endif1061
+endif1061:
+  %t220 = load i64, i64* %on_keydown
+  %t222 = icmp ne i64 %t220, 0
+  %t221 = zext i1 %t222 to i64
+  %t223 = trunc i64 %t221 to i1
+  br i1 %t223, label %then1065, label %else1066
+then1065:
+  %t224 = load i64, i64* %el
+  %t225 = getelementptr [8 x i8], [8 x i8]* @.str.442, i64 0, i64 0
+  %t226 = ptrtoint i8* %t225 to i64
+  %t227 = call i8* @__val_untag_ptr(i64 %t226)
+  %t228 = load i64, i64* %on_keydown
+  call void @js_dom_add_event(i64 %t224, i8* %t227, i64 %t228)
+  br label %endif1064
+else1066:
+  br label %endif1064
+endif1064:
+  %t229 = load i64, i64* %el
+  %t230 = load i64, i64* %attrs
+  %t231 = call i64 @_tc_apply_attrs(i64 %t229, i64 %t230)
+  %t232 = call i64 @_tc_current()
+  store i64 %t232, i64* %parent
+  %t233 = load i64, i64* %parent
+  %t234 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t233, i64 %t234)
+  %t235 = load i64, i64* %block
+  %t237 = icmp ne i64 %t235, 0
+  %t236 = zext i1 %t237 to i64
+  %t238 = trunc i64 %t236 to i1
+  br i1 %t238, label %then1068, label %else1069
+then1068:
+  %t239 = load i64, i64* %el
+  %t240 = call i64 @_tc_push(i64 %t239)
+  %t241 = load i64, i64* %block
+  %t242 = inttoptr i64 %t241 to [2 x i64]*
+  %t243 = getelementptr [2 x i64], [2 x i64]* %t242, i64 0, i64 0
+  %t244 = load i64, i64* %t243
+  %t245 = getelementptr [2 x i64], [2 x i64]* %t242, i64 0, i64 1
+  %t246 = load i64, i64* %t245
+  %t247 = inttoptr i64 %t244 to i64 (i64)*
+  %t248 = call i64 %t247(i64 %t246)
+  %t249 = call i64 @_tc_pop()
+  br label %endif1067
+else1069:
+  br label %endif1067
+endif1067:
+  %t250 = load i64, i64* %el
+  ret i64 %t250
+}
+
+define i64 @tfoot(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.443, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @th(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %abbr.arg, i64 %col_span.arg, i64 %headers.arg, i64 %row_span.arg, i64 %scope.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %abbr = alloca i64
+  %col_span = alloca i64
+  %headers = alloca i64
+  %row_span = alloca i64
+  %scope = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %abbr.arg, i64* %abbr
+  store i64 %col_span.arg, i64* %col_span
+  store i64 %headers.arg, i64* %headers
+  store i64 %row_span.arg, i64* %row_span
+  store i64 %scope.arg, i64* %scope
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.444, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1071, label %else1072
+then1071:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.445, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1070
+else1072:
+  br label %endif1070
+endif1070:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1074, label %else1075
+then1074:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.446, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1073
+else1075:
+  br label %endif1073
+endif1073:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1077, label %else1078
+then1077:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.447, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1076
+else1078:
+  br label %endif1076
+endif1076:
+  %t44 = load i64, i64* %abbr
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then1080, label %else1081
+then1080:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [5 x i8], [5 x i8]* @.str.448, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %abbr
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif1079
+else1081:
+  br label %endif1079
+endif1079:
+  %t57 = load i64, i64* %col_span
+  %t58 = add i64 0, 0
+  %t60 = icmp ne i64 %t57, %t58
+  %t59 = zext i1 %t60 to i64
+  %t61 = trunc i64 %t59 to i1
+  br i1 %t61, label %then1083, label %else1084
+then1083:
+  %t62 = load i64, i64* %el
+  %t63 = getelementptr [8 x i8], [8 x i8]* @.str.449, i64 0, i64 0
+  %t64 = ptrtoint i8* %t63 to i64
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  %t66 = load i64, i64* %col_span
+  %t67 = call i64 @__val_untag_int(i64 %t66)
+  %t68 = call i64 @__int_to_string(i64 %t67)
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  call void @js_dom_set_attr(i64 %t62, i8* %t65, i8* %t69)
+  br label %endif1082
+else1084:
+  br label %endif1082
+endif1082:
+  %t70 = load i64, i64* %headers
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = call i64 @strlen(i8* %t71)
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then1086, label %else1087
+then1086:
+  %t77 = load i64, i64* %el
+  %t78 = getelementptr [8 x i8], [8 x i8]* @.str.450, i64 0, i64 0
+  %t79 = ptrtoint i8* %t78 to i64
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = load i64, i64* %headers
+  %t82 = call i8* @__val_untag_ptr(i64 %t81)
+  call void @js_dom_set_attr(i64 %t77, i8* %t80, i8* %t82)
+  br label %endif1085
+else1087:
+  br label %endif1085
+endif1085:
+  %t83 = load i64, i64* %row_span
+  %t84 = add i64 0, 0
+  %t86 = icmp ne i64 %t83, %t84
+  %t85 = zext i1 %t86 to i64
+  %t87 = trunc i64 %t85 to i1
+  br i1 %t87, label %then1089, label %else1090
+then1089:
+  %t88 = load i64, i64* %el
+  %t89 = getelementptr [8 x i8], [8 x i8]* @.str.451, i64 0, i64 0
+  %t90 = ptrtoint i8* %t89 to i64
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = load i64, i64* %row_span
+  %t93 = call i64 @__val_untag_int(i64 %t92)
+  %t94 = call i64 @__int_to_string(i64 %t93)
+  %t95 = call i8* @__val_untag_ptr(i64 %t94)
+  call void @js_dom_set_attr(i64 %t88, i8* %t91, i8* %t95)
+  br label %endif1088
+else1090:
+  br label %endif1088
+endif1088:
+  %t96 = load i64, i64* %scope
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = add i64 0, 0
+  %t101 = icmp sgt i64 %t98, %t99
+  %t100 = zext i1 %t101 to i64
+  %t102 = trunc i64 %t100 to i1
+  br i1 %t102, label %then1092, label %else1093
+then1092:
+  %t103 = load i64, i64* %el
+  %t104 = getelementptr [6 x i8], [6 x i8]* @.str.452, i64 0, i64 0
+  %t105 = ptrtoint i8* %t104 to i64
+  %t106 = call i8* @__val_untag_ptr(i64 %t105)
+  %t107 = load i64, i64* %scope
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  call void @js_dom_set_attr(i64 %t103, i8* %t106, i8* %t108)
+  br label %endif1091
+else1093:
+  br label %endif1091
+endif1091:
+  %t109 = load i64, i64* %on_click
+  %t111 = icmp ne i64 %t109, 0
+  %t110 = zext i1 %t111 to i64
+  %t112 = trunc i64 %t110 to i1
+  br i1 %t112, label %then1095, label %else1096
+then1095:
+  %t113 = load i64, i64* %el
+  %t114 = getelementptr [6 x i8], [6 x i8]* @.str.453, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i64
+  %t116 = call i8* @__val_untag_ptr(i64 %t115)
+  %t117 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t113, i8* %t116, i64 %t117)
+  br label %endif1094
+else1096:
+  br label %endif1094
+endif1094:
+  %t118 = load i64, i64* %el
+  %t119 = load i64, i64* %attrs
+  %t120 = call i64 @_tc_apply_attrs(i64 %t118, i64 %t119)
+  %t121 = call i64 @_tc_current()
+  store i64 %t121, i64* %parent
+  %t122 = load i64, i64* %parent
+  %t123 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t122, i64 %t123)
+  %t124 = load i64, i64* %block
+  %t126 = icmp ne i64 %t124, 0
+  %t125 = zext i1 %t126 to i64
+  %t127 = trunc i64 %t125 to i1
+  br i1 %t127, label %then1098, label %else1099
+then1098:
+  %t128 = load i64, i64* %el
+  %t129 = call i64 @_tc_push(i64 %t128)
+  %t130 = load i64, i64* %block
+  %t131 = inttoptr i64 %t130 to [2 x i64]*
+  %t132 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 0
+  %t133 = load i64, i64* %t132
+  %t134 = getelementptr [2 x i64], [2 x i64]* %t131, i64 0, i64 1
+  %t135 = load i64, i64* %t134
+  %t136 = inttoptr i64 %t133 to i64 (i64)*
+  %t137 = call i64 %t136(i64 %t135)
+  %t138 = call i64 @_tc_pop()
+  br label %endif1097
+else1099:
+  br label %endif1097
+endif1097:
+  %t139 = load i64, i64* %el
+  ret i64 %t139
+}
+
+define i64 @thead(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.454, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @time(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %date_time.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %date_time = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %date_time.arg, i64* %date_time
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.455, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1101, label %else1102
+then1101:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.456, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1100
+else1102:
+  br label %endif1100
+endif1100:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1104, label %else1105
+then1104:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.457, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1103
+else1105:
+  br label %endif1103
+endif1103:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1107, label %else1108
+then1107:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.458, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1106
+else1108:
+  br label %endif1106
+endif1106:
+  %t44 = load i64, i64* %date_time
+  %t45 = call i8* @__val_untag_ptr(i64 %t44)
+  %t46 = call i64 @strlen(i8* %t45)
+  %t47 = add i64 0, 0
+  %t49 = icmp sgt i64 %t46, %t47
+  %t48 = zext i1 %t49 to i64
+  %t50 = trunc i64 %t48 to i1
+  br i1 %t50, label %then1110, label %else1111
+then1110:
+  %t51 = load i64, i64* %el
+  %t52 = getelementptr [9 x i8], [9 x i8]* @.str.459, i64 0, i64 0
+  %t53 = ptrtoint i8* %t52 to i64
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = load i64, i64* %date_time
+  %t56 = call i8* @__val_untag_ptr(i64 %t55)
+  call void @js_dom_set_attr(i64 %t51, i8* %t54, i8* %t56)
+  br label %endif1109
+else1111:
+  br label %endif1109
+endif1109:
+  %t57 = load i64, i64* %on_click
+  %t59 = icmp ne i64 %t57, 0
+  %t58 = zext i1 %t59 to i64
+  %t60 = trunc i64 %t58 to i1
+  br i1 %t60, label %then1113, label %else1114
+then1113:
+  %t61 = load i64, i64* %el
+  %t62 = getelementptr [6 x i8], [6 x i8]* @.str.460, i64 0, i64 0
+  %t63 = ptrtoint i8* %t62 to i64
+  %t64 = call i8* @__val_untag_ptr(i64 %t63)
+  %t65 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t61, i8* %t64, i64 %t65)
+  br label %endif1112
+else1114:
+  br label %endif1112
+endif1112:
+  %t66 = load i64, i64* %el
+  %t67 = load i64, i64* %attrs
+  %t68 = call i64 @_tc_apply_attrs(i64 %t66, i64 %t67)
+  %t69 = call i64 @_tc_current()
+  store i64 %t69, i64* %parent
+  %t70 = load i64, i64* %parent
+  %t71 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t70, i64 %t71)
+  %t72 = load i64, i64* %block
+  %t74 = icmp ne i64 %t72, 0
+  %t73 = zext i1 %t74 to i64
+  %t75 = trunc i64 %t73 to i1
+  br i1 %t75, label %then1116, label %else1117
+then1116:
+  %t76 = load i64, i64* %el
+  %t77 = call i64 @_tc_push(i64 %t76)
+  %t78 = load i64, i64* %block
+  %t79 = inttoptr i64 %t78 to [2 x i64]*
+  %t80 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 0
+  %t81 = load i64, i64* %t80
+  %t82 = getelementptr [2 x i64], [2 x i64]* %t79, i64 0, i64 1
+  %t83 = load i64, i64* %t82
+  %t84 = inttoptr i64 %t81 to i64 (i64)*
+  %t85 = call i64 %t84(i64 %t83)
+  %t86 = call i64 @_tc_pop()
+  br label %endif1115
+else1117:
+  br label %endif1115
+endif1115:
+  %t87 = load i64, i64* %el
+  ret i64 %t87
+}
+
+define i64 @title(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.461, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @tr(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.462, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @track(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %default.arg, i64 %kind.arg, i64 %label.arg, i64 %src.arg, i64 %srclang.arg, i64 %on_click.arg, i64 %attrs.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %default = alloca i64
+  %kind = alloca i64
+  %label = alloca i64
+  %src = alloca i64
+  %srclang = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %default.arg, i64* %default
+  store i64 %kind.arg, i64* %kind
+  store i64 %label.arg, i64* %label
+  store i64 %src.arg, i64* %src
+  store i64 %srclang.arg, i64* %srclang
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.463, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1119, label %else1120
+then1119:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.464, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1118
+else1120:
+  br label %endif1118
+endif1118:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1122, label %else1123
+then1122:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.465, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1121
+else1123:
+  br label %endif1121
+endif1121:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1125, label %else1126
+then1125:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.466, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1124
+else1126:
+  br label %endif1124
+endif1124:
+  %t44 = load i64, i64* %default
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then1128, label %else1129
+then1128:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [8 x i8], [8 x i8]* @.str.467, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.468, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif1127
+else1129:
+  br label %endif1127
+endif1127:
+  %t53 = load i64, i64* %kind
+  %t54 = call i8* @__val_untag_ptr(i64 %t53)
+  %t55 = call i64 @strlen(i8* %t54)
+  %t56 = add i64 0, 0
+  %t58 = icmp sgt i64 %t55, %t56
+  %t57 = zext i1 %t58 to i64
+  %t59 = trunc i64 %t57 to i1
+  br i1 %t59, label %then1131, label %else1132
+then1131:
+  %t60 = load i64, i64* %el
+  %t61 = getelementptr [5 x i8], [5 x i8]* @.str.469, i64 0, i64 0
+  %t62 = ptrtoint i8* %t61 to i64
+  %t63 = call i8* @__val_untag_ptr(i64 %t62)
+  %t64 = load i64, i64* %kind
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t60, i8* %t63, i8* %t65)
+  br label %endif1130
+else1132:
+  br label %endif1130
+endif1130:
+  %t66 = load i64, i64* %label
+  %t67 = call i8* @__val_untag_ptr(i64 %t66)
+  %t68 = call i64 @strlen(i8* %t67)
+  %t69 = add i64 0, 0
+  %t71 = icmp sgt i64 %t68, %t69
+  %t70 = zext i1 %t71 to i64
+  %t72 = trunc i64 %t70 to i1
+  br i1 %t72, label %then1134, label %else1135
+then1134:
+  %t73 = load i64, i64* %el
+  %t74 = getelementptr [6 x i8], [6 x i8]* @.str.470, i64 0, i64 0
+  %t75 = ptrtoint i8* %t74 to i64
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = load i64, i64* %label
+  %t78 = call i8* @__val_untag_ptr(i64 %t77)
+  call void @js_dom_set_attr(i64 %t73, i8* %t76, i8* %t78)
+  br label %endif1133
+else1135:
+  br label %endif1133
+endif1133:
+  %t79 = load i64, i64* %src
+  %t80 = call i8* @__val_untag_ptr(i64 %t79)
+  %t81 = call i64 @strlen(i8* %t80)
+  %t82 = add i64 0, 0
+  %t84 = icmp sgt i64 %t81, %t82
+  %t83 = zext i1 %t84 to i64
+  %t85 = trunc i64 %t83 to i1
+  br i1 %t85, label %then1137, label %else1138
+then1137:
+  %t86 = load i64, i64* %el
+  %t87 = getelementptr [4 x i8], [4 x i8]* @.str.471, i64 0, i64 0
+  %t88 = ptrtoint i8* %t87 to i64
+  %t89 = call i8* @__val_untag_ptr(i64 %t88)
+  %t90 = load i64, i64* %src
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  call void @js_dom_set_attr(i64 %t86, i8* %t89, i8* %t91)
+  br label %endif1136
+else1138:
+  br label %endif1136
+endif1136:
+  %t92 = load i64, i64* %srclang
+  %t93 = call i8* @__val_untag_ptr(i64 %t92)
+  %t94 = call i64 @strlen(i8* %t93)
+  %t95 = add i64 0, 0
+  %t97 = icmp sgt i64 %t94, %t95
+  %t96 = zext i1 %t97 to i64
+  %t98 = trunc i64 %t96 to i1
+  br i1 %t98, label %then1140, label %else1141
+then1140:
+  %t99 = load i64, i64* %el
+  %t100 = getelementptr [8 x i8], [8 x i8]* @.str.472, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i64
+  %t102 = call i8* @__val_untag_ptr(i64 %t101)
+  %t103 = load i64, i64* %srclang
+  %t104 = call i8* @__val_untag_ptr(i64 %t103)
+  call void @js_dom_set_attr(i64 %t99, i8* %t102, i8* %t104)
+  br label %endif1139
+else1141:
+  br label %endif1139
+endif1139:
+  %t105 = load i64, i64* %on_click
+  %t107 = icmp ne i64 %t105, 0
+  %t106 = zext i1 %t107 to i64
+  %t108 = trunc i64 %t106 to i1
+  br i1 %t108, label %then1143, label %else1144
+then1143:
+  %t109 = load i64, i64* %el
+  %t110 = getelementptr [6 x i8], [6 x i8]* @.str.473, i64 0, i64 0
+  %t111 = ptrtoint i8* %t110 to i64
+  %t112 = call i8* @__val_untag_ptr(i64 %t111)
+  %t113 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t109, i8* %t112, i64 %t113)
+  br label %endif1142
+else1144:
+  br label %endif1142
+endif1142:
+  %t114 = load i64, i64* %el
+  %t115 = load i64, i64* %attrs
+  %t116 = call i64 @_tc_apply_attrs(i64 %t114, i64 %t115)
+  %t117 = call i64 @_tc_current()
+  store i64 %t117, i64* %parent
+  %t118 = load i64, i64* %parent
+  %t119 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t118, i64 %t119)
+  %t120 = load i64, i64* %el
+  ret i64 %t120
+}
+
+define i64 @u(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.474, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @ul(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.475, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @var_(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.476, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = load i64, i64* %cls
+  %t4 = load i64, i64* %id
+  %t5 = load i64, i64* %style
+  %t6 = load i64, i64* %attrs
+  %t7 = load i64, i64* %block
+  %t8 = call i64 @_tc_el_with_common(i64 %t2, i64 %t3, i64 %t4, i64 %t5, i64 %t6, i64 %t7)
+  ret i64 %t8
+}
+
+define i64 @video(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %disable_picture_in_picture.arg, i64 %height.arg, i64 %plays_inline.arg, i64 %poster.arg, i64 %width.arg, i64 %on_click.arg, i64 %on_play.arg, i64 %on_pause.arg, i64 %on_ended.arg, i64 %attrs.arg, i64 %block.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %disable_picture_in_picture = alloca i64
+  %height = alloca i64
+  %plays_inline = alloca i64
+  %poster = alloca i64
+  %width = alloca i64
+  %on_click = alloca i64
+  %on_play = alloca i64
+  %on_pause = alloca i64
+  %on_ended = alloca i64
+  %attrs = alloca i64
+  %block = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %disable_picture_in_picture.arg, i64* %disable_picture_in_picture
+  store i64 %height.arg, i64* %height
+  store i64 %plays_inline.arg, i64* %plays_inline
+  store i64 %poster.arg, i64* %poster
+  store i64 %width.arg, i64* %width
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %on_play.arg, i64* %on_play
+  store i64 %on_pause.arg, i64* %on_pause
+  store i64 %on_ended.arg, i64* %on_ended
+  store i64 %attrs.arg, i64* %attrs
+  store i64 %block.arg, i64* %block
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.477, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1146, label %else1147
+then1146:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.478, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1145
+else1147:
+  br label %endif1145
+endif1145:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1149, label %else1150
+then1149:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.479, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1148
+else1150:
+  br label %endif1148
+endif1148:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1152, label %else1153
+then1152:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.480, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1151
+else1153:
+  br label %endif1151
+endif1151:
+  %t44 = load i64, i64* %disable_picture_in_picture
+  %t45 = trunc i64 %t44 to i1
+  br i1 %t45, label %then1155, label %else1156
+then1155:
+  %t46 = load i64, i64* %el
+  %t47 = getelementptr [24 x i8], [24 x i8]* @.str.481, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = getelementptr [5 x i8], [5 x i8]* @.str.482, i64 0, i64 0
+  %t51 = ptrtoint i8* %t50 to i64
+  %t52 = call i8* @__val_untag_ptr(i64 %t51)
+  call void @js_dom_set_attr(i64 %t46, i8* %t49, i8* %t52)
+  br label %endif1154
+else1156:
+  br label %endif1154
+endif1154:
+  %t53 = load i64, i64* %height
+  %t54 = add i64 0, 0
+  %t56 = icmp ne i64 %t53, %t54
+  %t55 = zext i1 %t56 to i64
+  %t57 = trunc i64 %t55 to i1
+  br i1 %t57, label %then1158, label %else1159
+then1158:
+  %t58 = load i64, i64* %el
+  %t59 = getelementptr [7 x i8], [7 x i8]* @.str.483, i64 0, i64 0
+  %t60 = ptrtoint i8* %t59 to i64
+  %t61 = call i8* @__val_untag_ptr(i64 %t60)
+  %t62 = load i64, i64* %height
+  %t63 = call i64 @__val_untag_int(i64 %t62)
+  %t64 = call i64 @__int_to_string(i64 %t63)
+  %t65 = call i8* @__val_untag_ptr(i64 %t64)
+  call void @js_dom_set_attr(i64 %t58, i8* %t61, i8* %t65)
+  br label %endif1157
+else1159:
+  br label %endif1157
+endif1157:
+  %t66 = load i64, i64* %plays_inline
+  %t67 = trunc i64 %t66 to i1
+  br i1 %t67, label %then1161, label %else1162
+then1161:
+  %t68 = load i64, i64* %el
+  %t69 = getelementptr [12 x i8], [12 x i8]* @.str.484, i64 0, i64 0
+  %t70 = ptrtoint i8* %t69 to i64
+  %t71 = call i8* @__val_untag_ptr(i64 %t70)
+  %t72 = getelementptr [5 x i8], [5 x i8]* @.str.485, i64 0, i64 0
+  %t73 = ptrtoint i8* %t72 to i64
+  %t74 = call i8* @__val_untag_ptr(i64 %t73)
+  call void @js_dom_set_attr(i64 %t68, i8* %t71, i8* %t74)
+  br label %endif1160
+else1162:
+  br label %endif1160
+endif1160:
+  %t75 = load i64, i64* %poster
+  %t76 = call i8* @__val_untag_ptr(i64 %t75)
+  %t77 = call i64 @strlen(i8* %t76)
+  %t78 = add i64 0, 0
+  %t80 = icmp sgt i64 %t77, %t78
+  %t79 = zext i1 %t80 to i64
+  %t81 = trunc i64 %t79 to i1
+  br i1 %t81, label %then1164, label %else1165
+then1164:
+  %t82 = load i64, i64* %el
+  %t83 = getelementptr [7 x i8], [7 x i8]* @.str.486, i64 0, i64 0
+  %t84 = ptrtoint i8* %t83 to i64
+  %t85 = call i8* @__val_untag_ptr(i64 %t84)
+  %t86 = load i64, i64* %poster
+  %t87 = call i8* @__val_untag_ptr(i64 %t86)
+  call void @js_dom_set_attr(i64 %t82, i8* %t85, i8* %t87)
+  br label %endif1163
+else1165:
+  br label %endif1163
+endif1163:
+  %t88 = load i64, i64* %width
+  %t89 = add i64 0, 0
+  %t91 = icmp ne i64 %t88, %t89
+  %t90 = zext i1 %t91 to i64
+  %t92 = trunc i64 %t90 to i1
+  br i1 %t92, label %then1167, label %else1168
+then1167:
+  %t93 = load i64, i64* %el
+  %t94 = getelementptr [6 x i8], [6 x i8]* @.str.487, i64 0, i64 0
+  %t95 = ptrtoint i8* %t94 to i64
+  %t96 = call i8* @__val_untag_ptr(i64 %t95)
+  %t97 = load i64, i64* %width
+  %t98 = call i64 @__val_untag_int(i64 %t97)
+  %t99 = call i64 @__int_to_string(i64 %t98)
+  %t100 = call i8* @__val_untag_ptr(i64 %t99)
+  call void @js_dom_set_attr(i64 %t93, i8* %t96, i8* %t100)
+  br label %endif1166
+else1168:
+  br label %endif1166
+endif1166:
+  %t101 = load i64, i64* %on_click
+  %t103 = icmp ne i64 %t101, 0
+  %t102 = zext i1 %t103 to i64
+  %t104 = trunc i64 %t102 to i1
+  br i1 %t104, label %then1170, label %else1171
+then1170:
+  %t105 = load i64, i64* %el
+  %t106 = getelementptr [6 x i8], [6 x i8]* @.str.488, i64 0, i64 0
+  %t107 = ptrtoint i8* %t106 to i64
+  %t108 = call i8* @__val_untag_ptr(i64 %t107)
+  %t109 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t105, i8* %t108, i64 %t109)
+  br label %endif1169
+else1171:
+  br label %endif1169
+endif1169:
+  %t110 = load i64, i64* %on_play
+  %t112 = icmp ne i64 %t110, 0
+  %t111 = zext i1 %t112 to i64
+  %t113 = trunc i64 %t111 to i1
+  br i1 %t113, label %then1173, label %else1174
+then1173:
+  %t114 = load i64, i64* %el
+  %t115 = getelementptr [5 x i8], [5 x i8]* @.str.489, i64 0, i64 0
+  %t116 = ptrtoint i8* %t115 to i64
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  %t118 = load i64, i64* %on_play
+  call void @js_dom_add_event(i64 %t114, i8* %t117, i64 %t118)
+  br label %endif1172
+else1174:
+  br label %endif1172
+endif1172:
+  %t119 = load i64, i64* %on_pause
+  %t121 = icmp ne i64 %t119, 0
+  %t120 = zext i1 %t121 to i64
+  %t122 = trunc i64 %t120 to i1
+  br i1 %t122, label %then1176, label %else1177
+then1176:
+  %t123 = load i64, i64* %el
+  %t124 = getelementptr [6 x i8], [6 x i8]* @.str.490, i64 0, i64 0
+  %t125 = ptrtoint i8* %t124 to i64
+  %t126 = call i8* @__val_untag_ptr(i64 %t125)
+  %t127 = load i64, i64* %on_pause
+  call void @js_dom_add_event(i64 %t123, i8* %t126, i64 %t127)
+  br label %endif1175
+else1177:
+  br label %endif1175
+endif1175:
+  %t128 = load i64, i64* %on_ended
+  %t130 = icmp ne i64 %t128, 0
+  %t129 = zext i1 %t130 to i64
+  %t131 = trunc i64 %t129 to i1
+  br i1 %t131, label %then1179, label %else1180
+then1179:
+  %t132 = load i64, i64* %el
+  %t133 = getelementptr [6 x i8], [6 x i8]* @.str.491, i64 0, i64 0
+  %t134 = ptrtoint i8* %t133 to i64
+  %t135 = call i8* @__val_untag_ptr(i64 %t134)
+  %t136 = load i64, i64* %on_ended
+  call void @js_dom_add_event(i64 %t132, i8* %t135, i64 %t136)
+  br label %endif1178
+else1180:
+  br label %endif1178
+endif1178:
+  %t137 = load i64, i64* %el
+  %t138 = load i64, i64* %attrs
+  %t139 = call i64 @_tc_apply_attrs(i64 %t137, i64 %t138)
+  %t140 = call i64 @_tc_current()
+  store i64 %t140, i64* %parent
+  %t141 = load i64, i64* %parent
+  %t142 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t141, i64 %t142)
+  %t143 = load i64, i64* %block
+  %t145 = icmp ne i64 %t143, 0
+  %t144 = zext i1 %t145 to i64
+  %t146 = trunc i64 %t144 to i1
+  br i1 %t146, label %then1182, label %else1183
+then1182:
+  %t147 = load i64, i64* %el
+  %t148 = call i64 @_tc_push(i64 %t147)
+  %t149 = load i64, i64* %block
+  %t150 = inttoptr i64 %t149 to [2 x i64]*
+  %t151 = getelementptr [2 x i64], [2 x i64]* %t150, i64 0, i64 0
+  %t152 = load i64, i64* %t151
+  %t153 = getelementptr [2 x i64], [2 x i64]* %t150, i64 0, i64 1
+  %t154 = load i64, i64* %t153
+  %t155 = inttoptr i64 %t152 to i64 (i64)*
+  %t156 = call i64 %t155(i64 %t154)
+  %t157 = call i64 @_tc_pop()
+  br label %endif1181
+else1183:
+  br label %endif1181
+endif1181:
+  %t158 = load i64, i64* %el
+  ret i64 %t158
+}
+
+define i64 @wbr(i64 %cls.arg, i64 %id.arg, i64 %style.arg, i64 %on_click.arg, i64 %attrs.arg) {
+entry:
+  %cls = alloca i64
+  %id = alloca i64
+  %style = alloca i64
+  %on_click = alloca i64
+  %attrs = alloca i64
+  %el = alloca i64
+  %parent = alloca i64
+  store i64 %cls.arg, i64* %cls
+  store i64 %id.arg, i64* %id
+  store i64 %style.arg, i64* %style
+  store i64 %on_click.arg, i64* %on_click
+  store i64 %attrs.arg, i64* %attrs
+  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.492, i64 0, i64 0
+  %t2 = ptrtoint i8* %t1 to i64
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i64 @js_dom_create_element(i8* %t3)
+  store i64 %t4, i64* %el
+  %t5 = load i64, i64* %cls
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp sgt i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then1185, label %else1186
+then1185:
+  %t12 = load i64, i64* %el
+  %t13 = getelementptr [6 x i8], [6 x i8]* @.str.493, i64 0, i64 0
+  %t14 = ptrtoint i8* %t13 to i64
+  %t15 = call i8* @__val_untag_ptr(i64 %t14)
+  %t16 = load i64, i64* %cls
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  call void @js_dom_set_attr(i64 %t12, i8* %t15, i8* %t17)
+  br label %endif1184
+else1186:
+  br label %endif1184
+endif1184:
+  %t18 = load i64, i64* %id
+  %t19 = call i8* @__val_untag_ptr(i64 %t18)
+  %t20 = call i64 @strlen(i8* %t19)
+  %t21 = add i64 0, 0
+  %t23 = icmp sgt i64 %t20, %t21
+  %t22 = zext i1 %t23 to i64
+  %t24 = trunc i64 %t22 to i1
+  br i1 %t24, label %then1188, label %else1189
+then1188:
+  %t25 = load i64, i64* %el
+  %t26 = getelementptr [3 x i8], [3 x i8]* @.str.494, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = call i8* @__val_untag_ptr(i64 %t27)
+  %t29 = load i64, i64* %id
+  %t30 = call i8* @__val_untag_ptr(i64 %t29)
+  call void @js_dom_set_attr(i64 %t25, i8* %t28, i8* %t30)
+  br label %endif1187
+else1189:
+  br label %endif1187
+endif1187:
+  %t31 = load i64, i64* %style
+  %t32 = call i8* @__val_untag_ptr(i64 %t31)
+  %t33 = call i64 @strlen(i8* %t32)
+  %t34 = add i64 0, 0
+  %t36 = icmp sgt i64 %t33, %t34
+  %t35 = zext i1 %t36 to i64
+  %t37 = trunc i64 %t35 to i1
+  br i1 %t37, label %then1191, label %else1192
+then1191:
+  %t38 = load i64, i64* %el
+  %t39 = getelementptr [6 x i8], [6 x i8]* @.str.495, i64 0, i64 0
+  %t40 = ptrtoint i8* %t39 to i64
+  %t41 = call i8* @__val_untag_ptr(i64 %t40)
+  %t42 = load i64, i64* %style
+  %t43 = call i8* @__val_untag_ptr(i64 %t42)
+  call void @js_dom_set_attr(i64 %t38, i8* %t41, i8* %t43)
+  br label %endif1190
+else1192:
+  br label %endif1190
+endif1190:
+  %t44 = load i64, i64* %on_click
+  %t46 = icmp ne i64 %t44, 0
+  %t45 = zext i1 %t46 to i64
+  %t47 = trunc i64 %t45 to i1
+  br i1 %t47, label %then1194, label %else1195
+then1194:
+  %t48 = load i64, i64* %el
+  %t49 = getelementptr [6 x i8], [6 x i8]* @.str.496, i64 0, i64 0
+  %t50 = ptrtoint i8* %t49 to i64
+  %t51 = call i8* @__val_untag_ptr(i64 %t50)
+  %t52 = load i64, i64* %on_click
+  call void @js_dom_add_event(i64 %t48, i8* %t51, i64 %t52)
+  br label %endif1193
+else1195:
+  br label %endif1193
+endif1193:
+  %t53 = load i64, i64* %el
+  %t54 = load i64, i64* %attrs
+  %t55 = call i64 @_tc_apply_attrs(i64 %t53, i64 %t54)
+  %t56 = call i64 @_tc_current()
+  store i64 %t56, i64* %parent
+  %t57 = load i64, i64* %parent
+  %t58 = load i64, i64* %el
+  call void @js_dom_append_child(i64 %t57, i64 %t58)
+  %t59 = load i64, i64* %el
+  ret i64 %t59
 }
 
 define i64 @mount(i64 %selector.arg, i64 %app.arg) {
@@ -5367,7 +16429,7 @@ entry:
   ret i64 0
 }
 
-define i64 @__mod_init_prelude_0() {
+define i64 @__mod_init_prelude_1() {
 entry:
   %t1 = call i64 @__list_new()
   store i64 %t1, i64* @__g__tc_stack
@@ -5430,15 +16492,15 @@ entry:
   store i64 %sig.arg, i64* %sig
   %t1 = load i64, i64* @__g_turmeric_signal__tracking
   %t2 = trunc i64 %t1 to i1
-  br i1 %t2, label %then8, label %else9
-then8:
+  br i1 %t2, label %then1197, label %else1198
+then1197:
   %t3 = load i64, i64* @__g_turmeric_signal__tracker_deps
   %t4 = load i64, i64* %sig
   %t5 = call i64 @__list_push(i64 %t3, i64 %t4)
-  br label %endif7
-else9:
-  br label %endif7
-endif7:
+  br label %endif1196
+else1198:
+  br label %endif1196
+endif1196:
   ret i64 0
 }
 
@@ -5570,8 +16632,8 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond10
-while.cond10:
+  br label %while.cond1199
+while.cond1199:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_signal_Signal*
@@ -5581,11 +16643,11 @@ while.cond10:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body11, label %while.end12
-while.body11:
+  br i1 %t10, label %while.body1200, label %while.end1201
+while.body1200:
   %t11 = trunc i64 0 to i1
-  br i1 %t11, label %then14, label %else15
-then14:
+  br i1 %t11, label %then1203, label %else1204
+then1203:
   %t12 = load i64, i64* %self
   %t13 = inttoptr i64 %t12 to %turmeric_signal_Signal*
   %t14 = getelementptr %turmeric_signal_Signal, %turmeric_signal_Signal* %t13, i32 0, i32 1
@@ -5593,16 +16655,16 @@ then14:
   %t16 = call i64 @__list_new()
   %t17 = load i64, i64* %i
   %t18 = call i64 @__list_push(i64 %t16, i64 %t17)
-  br label %endif13
-else15:
-  br label %endif13
-endif13:
+  br label %endif1202
+else1204:
+  br label %endif1202
+endif1202:
   %t19 = load i64, i64* %i
   %t20 = add i64 0, 1
   %t21 = add i64 %t19, %t20
   store i64 %t21, i64* %i
-  br label %while.cond10
-while.end12:
+  br label %while.cond1199
+while.end1201:
   ret i64 0
 }
 
@@ -5637,8 +16699,8 @@ entry:
   store i64 %id.arg, i64* %id
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond16
-while.cond16:
+  br label %while.cond1205
+while.cond1205:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_signal_Signal*
@@ -5648,14 +16710,14 @@ while.cond16:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body17, label %while.end18
-while.body17:
+  br i1 %t10, label %while.body1206, label %while.end1207
+while.body1206:
   %t11 = load i64, i64* %id
   %t13 = icmp eq i64 0, %t11
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %then20, label %else21
-then20:
+  br i1 %t14, label %then1209, label %else1210
+then1209:
   %t15 = load i64, i64* %self
   %t16 = inttoptr i64 %t15 to %turmeric_signal_Signal*
   %t17 = getelementptr %turmeric_signal_Signal, %turmeric_signal_Signal* %t16, i32 0, i32 1
@@ -5667,16 +16729,16 @@ then20:
   %t23 = inttoptr i64 %t19 to %turmeric_signal_Signal*
   %t24 = getelementptr %turmeric_signal_Signal, %turmeric_signal_Signal* %t23, i32 0, i32 0
   store volatile i64 %t22, i64* %t24
-  br label %endif19
-else21:
-  br label %endif19
-endif19:
+  br label %endif1208
+else1210:
+  br label %endif1208
+endif1208:
   %t25 = load i64, i64* %i
   %t26 = add i64 0, 1
   %t27 = add i64 %t25, %t26
   store i64 %t27, i64* %i
-  br label %while.cond16
-while.end18:
+  br label %while.cond1205
+while.end1207:
   ret i64 0
 }
 
@@ -5753,16 +16815,16 @@ entry:
   store i64 %t7, i64* %deps
   %t8 = add i64 0, 0
   store i64 %t8, i64* %i
-  br label %while.cond22
-while.cond22:
+  br label %while.cond1211
+while.cond1211:
   %t9 = load i64, i64* %i
   %t10 = load i64, i64* %deps
   %t11 = call i64 @__list_length(i64 %t10)
   %t13 = icmp slt i64 %t9, %t11
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %while.body23, label %while.end24
-while.body23:
+  br i1 %t14, label %while.body1212, label %while.end1213
+while.body1212:
   %t15 = load i64, i64* %deps
   %t16 = load i64, i64* %i
   %t17 = call i64 @__val_untag_int(i64 %t16)
@@ -5771,7 +16833,7 @@ while.body23:
   %t20 = add i64 %t19, %t17
   %t21 = select i1 %t18, i64 %t20, i64 %t17
   %t22 = call i64 @__list_get(i64 %t15, i64 %t21)
-  %t23 = add i64 0, 3963167672086036480
+  %t23 = add i64 0, 4035225266123964416
   %t24 = call i8* @malloc(i64 8)
   %t25 = bitcast i8* %t24 to [1 x i64]*
   %t26 = load i64, i64* %self
@@ -5779,7 +16841,7 @@ while.body23:
   store i64 %t26, i64* %t27
   %t28 = call i8* @malloc(i64 16)
   %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_25 to i64
+  %t30 = ptrtoint i64 (i64)* @__lambda_1214 to i64
   %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
   store i64 %t30, i64* %t31
   %t32 = ptrtoint [1 x i64]* %t25 to i64
@@ -5791,8 +16853,8 @@ while.body23:
   %t37 = add i64 0, 1
   %t38 = add i64 %t36, %t37
   store i64 %t38, i64* %i
-  br label %while.cond22
-while.end24:
+  br label %while.cond1211
+while.end1213:
   ret i64 0
 }
 
@@ -5803,8 +16865,8 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond26
-while.cond26:
+  br label %while.cond1215
+while.cond1215:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_signal_Computed*
@@ -5814,11 +16876,11 @@ while.cond26:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body27, label %while.end28
-while.body27:
+  br i1 %t10, label %while.body1216, label %while.end1217
+while.body1216:
   %t11 = trunc i64 0 to i1
-  br i1 %t11, label %then30, label %else31
-then30:
+  br i1 %t11, label %then1219, label %else1220
+then1219:
   %t12 = load i64, i64* %self
   %t13 = inttoptr i64 %t12 to %turmeric_signal_Computed*
   %t14 = getelementptr %turmeric_signal_Computed, %turmeric_signal_Computed* %t13, i32 0, i32 2
@@ -5826,16 +16888,16 @@ then30:
   %t16 = call i64 @__list_new()
   %t17 = load i64, i64* %i
   %t18 = call i64 @__list_push(i64 %t16, i64 %t17)
-  br label %endif29
-else31:
-  br label %endif29
-endif29:
+  br label %endif1218
+else1220:
+  br label %endif1218
+endif1218:
   %t19 = load i64, i64* %i
   %t20 = add i64 0, 1
   %t21 = add i64 %t19, %t20
   store i64 %t21, i64* %i
-  br label %while.cond26
-while.end28:
+  br label %while.cond1215
+while.end1217:
   ret i64 0
 }
 
@@ -5870,8 +16932,8 @@ entry:
   store i64 %id.arg, i64* %id
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond32
-while.cond32:
+  br label %while.cond1221
+while.cond1221:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_signal_Computed*
@@ -5881,14 +16943,14 @@ while.cond32:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body33, label %while.end34
-while.body33:
+  br i1 %t10, label %while.body1222, label %while.end1223
+while.body1222:
   %t11 = load i64, i64* %id
   %t13 = icmp eq i64 0, %t11
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br i1 %t14, label %then36, label %else37
-then36:
+  br i1 %t14, label %then1225, label %else1226
+then1225:
   %t15 = load i64, i64* %self
   %t16 = inttoptr i64 %t15 to %turmeric_signal_Computed*
   %t17 = getelementptr %turmeric_signal_Computed, %turmeric_signal_Computed* %t16, i32 0, i32 2
@@ -5900,16 +16962,16 @@ then36:
   %t23 = inttoptr i64 %t19 to %turmeric_signal_Computed*
   %t24 = getelementptr %turmeric_signal_Computed, %turmeric_signal_Computed* %t23, i32 0, i32 0
   store volatile i64 %t22, i64* %t24
-  br label %endif35
-else37:
-  br label %endif35
-endif35:
+  br label %endif1224
+else1226:
+  br label %endif1224
+endif1224:
   %t25 = load i64, i64* %i
   %t26 = add i64 0, 1
   %t27 = add i64 %t25, %t26
   store i64 %t27, i64* %i
-  br label %while.cond32
-while.end34:
+  br label %while.cond1221
+while.end1223:
   ret i64 0
 }
 
@@ -5965,8 +17027,8 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond38
-while.cond38:
+  br label %while.cond1227
+while.cond1227:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_signal_EffectHandle*
@@ -5976,8 +17038,8 @@ while.cond38:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body39, label %while.end40
-while.body39:
+  br i1 %t10, label %while.body1228, label %while.end1229
+while.body1228:
   %t11 = load i64, i64* %self
   %t12 = inttoptr i64 %t11 to %turmeric_signal_EffectHandle*
   %t13 = getelementptr %turmeric_signal_EffectHandle, %turmeric_signal_EffectHandle* %t12, i32 0, i32 1
@@ -6001,8 +17063,8 @@ while.body39:
   %t31 = add i64 0, 1
   %t32 = add i64 %t30, %t31
   store i64 %t32, i64* %i
-  br label %while.cond38
-while.end40:
+  br label %while.cond1227
+while.end1229:
   ret i64 0
 }
 
@@ -6040,16 +17102,16 @@ entry:
   store i64 %t11, i64* %sub_ids
   %t12 = add i64 0, 0
   store i64 %t12, i64* %i
-  br label %while.cond41
-while.cond41:
+  br label %while.cond1230
+while.cond1230:
   %t13 = load i64, i64* %i
   %t14 = load i64, i64* %deps
   %t15 = call i64 @__list_length(i64 %t14)
   %t17 = icmp slt i64 %t13, %t15
   %t16 = zext i1 %t17 to i64
   %t18 = trunc i64 %t16 to i1
-  br i1 %t18, label %while.body42, label %while.end43
-while.body42:
+  br i1 %t18, label %while.body1231, label %while.end1232
+while.body1231:
   %t19 = load i64, i64* %sub_ids
   %t20 = load i64, i64* %deps
   %t21 = load i64, i64* %i
@@ -6066,8 +17128,8 @@ while.body42:
   %t32 = add i64 0, 1
   %t33 = add i64 %t31, %t32
   store i64 %t33, i64* %i
-  br label %while.cond41
-while.end43:
+  br label %while.cond1230
+while.end1232:
   %t34 = call i64 @turmeric_signal_EffectHandle()
   %t35 = load i64, i64* %sub_ids
   %t36 = load i64, i64* %deps
@@ -6103,24 +17165,24 @@ entry:
   %t18 = icmp eq i64 %t15, %t16
   %t17 = zext i1 %t18 to i64
   %t19 = trunc i64 %t17 to i1
-  br i1 %t19, label %then45, label %else46
-then45:
+  br i1 %t19, label %then1234, label %else1235
+then1234:
   %t20 = load i64, i64* @__g_turmeric_signal__batch_pending
   store i64 %t20, i64* %pending
   %t21 = call i64 @__list_new()
   store i64 %t21, i64* @__g_turmeric_signal__batch_pending
   %t22 = add i64 0, 0
   store i64 %t22, i64* %i
-  br label %while.cond47
-while.cond47:
+  br label %while.cond1236
+while.cond1236:
   %t23 = load i64, i64* %i
   %t24 = load i64, i64* %pending
   %t25 = call i64 @__list_length(i64 %t24)
   %t27 = icmp slt i64 %t23, %t25
   %t26 = zext i1 %t27 to i64
   %t28 = trunc i64 %t26 to i1
-  br i1 %t28, label %while.body48, label %while.end49
-while.body48:
+  br i1 %t28, label %while.body1237, label %while.end1238
+while.body1237:
   %t29 = load i64, i64* %pending
   %t30 = load i64, i64* %i
   %t31 = call i64 @__val_untag_int(i64 %t30)
@@ -6142,12 +17204,12 @@ while.body48:
   %t46 = add i64 0, 1
   %t47 = add i64 %t45, %t46
   store i64 %t47, i64* %i
-  br label %while.cond47
-while.end49:
-  br label %endif44
-else46:
-  br label %endif44
-endif44:
+  br label %while.cond1236
+while.end1238:
+  br label %endif1233
+else1235:
+  br label %endif1233
+endif1233:
   ret i64 0
 }
 
@@ -6191,4244 +17253,6 @@ entry:
   ret i64 0
 }
 
-define linkonce_odr i64 @Element(i64 %f0, i64 %f1, i64 %f2) {
-entry:
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %f1, i64* %t5
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %f2, i64* %t6
-  %t7 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t7
-}
-
-define linkonce_odr i64 @Text(i64 %f0) {
-entry:
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = ptrtoint [2 x i64]* %t2 to i64
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @Fragment(i64 %f0) {
-entry:
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
-  store i64 2, i64* %t3
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = ptrtoint [2 x i64]* %t2 to i64
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @Node__to_string(i64 %self) {
-entry:
-  %t1 = inttoptr i64 %self to i64*
-  %t2 = load i64, i64* %t1
-  switch i64 %t2, label %ets.end50 [ i64 0, label %ets.v51 i64 1, label %ets.v52 i64 2, label %ets.v53 ]
-ets.v51:
-  %t3 = getelementptr [9 x i8], [9 x i8]* @.str.65, i64 0, i64 0
-  %t4 = ptrtoint i8* %t3 to i64
-  %t5 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t5, i64 %t4)
-  %t6 = inttoptr i64 %self to [4 x i64]*
-  %t7 = getelementptr [4 x i64], [4 x i64]* %t6, i64 0, i64 1
-  %t8 = load i64, i64* %t7
-  call i64 @__sb_append(i64 %t5, i64 %t8)
-  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.66, i64 0, i64 0
-  %t10 = ptrtoint i8* %t9 to i64
-  call i64 @__sb_append(i64 %t5, i64 %t10)
-  %t11 = inttoptr i64 %self to [4 x i64]*
-  %t12 = getelementptr [4 x i64], [4 x i64]* %t11, i64 0, i64 2
-  %t13 = load i64, i64* %t12
-  %t14 = call i64 @__int_to_string(i64 %t13)
-  call i64 @__sb_append(i64 %t5, i64 %t14)
-  %t15 = getelementptr [3 x i8], [3 x i8]* @.str.67, i64 0, i64 0
-  %t16 = ptrtoint i8* %t15 to i64
-  call i64 @__sb_append(i64 %t5, i64 %t16)
-  %t17 = inttoptr i64 %self to [4 x i64]*
-  %t18 = getelementptr [4 x i64], [4 x i64]* %t17, i64 0, i64 3
-  %t19 = load i64, i64* %t18
-  %t20 = call i64 @__int_to_string(i64 %t19)
-  call i64 @__sb_append(i64 %t5, i64 %t20)
-  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.68, i64 0, i64 0
-  %t22 = ptrtoint i8* %t21 to i64
-  call i64 @__sb_append(i64 %t5, i64 %t22)
-  %t23 = call i64 @__sb_to_string(i64 %t5)
-  ret i64 %t23
-ets.v52:
-  %t24 = getelementptr [6 x i8], [6 x i8]* @.str.69, i64 0, i64 0
-  %t25 = ptrtoint i8* %t24 to i64
-  %t26 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t26, i64 %t25)
-  %t27 = inttoptr i64 %self to [2 x i64]*
-  %t28 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 1
-  %t29 = load i64, i64* %t28
-  call i64 @__sb_append(i64 %t26, i64 %t29)
-  %t30 = getelementptr [2 x i8], [2 x i8]* @.str.70, i64 0, i64 0
-  %t31 = ptrtoint i8* %t30 to i64
-  call i64 @__sb_append(i64 %t26, i64 %t31)
-  %t32 = call i64 @__sb_to_string(i64 %t26)
-  ret i64 %t32
-ets.v53:
-  %t33 = getelementptr [10 x i8], [10 x i8]* @.str.71, i64 0, i64 0
-  %t34 = ptrtoint i8* %t33 to i64
-  %t35 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t35, i64 %t34)
-  %t36 = inttoptr i64 %self to [2 x i64]*
-  %t37 = getelementptr [2 x i64], [2 x i64]* %t36, i64 0, i64 1
-  %t38 = load i64, i64* %t37
-  %t39 = call i64 @__int_to_string(i64 %t38)
-  call i64 @__sb_append(i64 %t35, i64 %t39)
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.72, i64 0, i64 0
-  %t41 = ptrtoint i8* %t40 to i64
-  call i64 @__sb_append(i64 %t35, i64 %t41)
-  %t42 = call i64 @__sb_to_string(i64 %t35)
-  ret i64 %t42
-ets.end50:
-  %t43 = getelementptr [8 x i8], [8 x i8]* @.str.73, i64 0, i64 0
-  %t44 = ptrtoint i8* %t43 to i64
-  ret i64 %t44
-}
-
-define linkonce_odr i64 @Prop(i64 %f0, i64 %f1) {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %f1, i64* %t5
-  %t6 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @Event(i64 %f0, i64 %f1) {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %f1, i64* %t5
-  %t6 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @Bind(i64 %f0, i64 %f1) {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 2, i64* %t3
-  %t4 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %f0, i64* %t4
-  %t5 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %f1, i64* %t5
-  %t6 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @Attr__to_string(i64 %self) {
-entry:
-  %t1 = inttoptr i64 %self to i64*
-  %t2 = load i64, i64* %t1
-  switch i64 %t2, label %ets.end54 [ i64 0, label %ets.v55 i64 1, label %ets.v56 i64 2, label %ets.v57 ]
-ets.v55:
-  %t3 = getelementptr [6 x i8], [6 x i8]* @.str.74, i64 0, i64 0
-  %t4 = ptrtoint i8* %t3 to i64
-  %t5 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t5, i64 %t4)
-  %t6 = inttoptr i64 %self to [3 x i64]*
-  %t7 = getelementptr [3 x i64], [3 x i64]* %t6, i64 0, i64 1
-  %t8 = load i64, i64* %t7
-  call i64 @__sb_append(i64 %t5, i64 %t8)
-  %t9 = getelementptr [3 x i8], [3 x i8]* @.str.75, i64 0, i64 0
-  %t10 = ptrtoint i8* %t9 to i64
-  call i64 @__sb_append(i64 %t5, i64 %t10)
-  %t11 = inttoptr i64 %self to [3 x i64]*
-  %t12 = getelementptr [3 x i64], [3 x i64]* %t11, i64 0, i64 2
-  %t13 = load i64, i64* %t12
-  call i64 @__sb_append(i64 %t5, i64 %t13)
-  %t14 = getelementptr [2 x i8], [2 x i8]* @.str.76, i64 0, i64 0
-  %t15 = ptrtoint i8* %t14 to i64
-  call i64 @__sb_append(i64 %t5, i64 %t15)
-  %t16 = call i64 @__sb_to_string(i64 %t5)
-  ret i64 %t16
-ets.v56:
-  %t17 = getelementptr [7 x i8], [7 x i8]* @.str.77, i64 0, i64 0
-  %t18 = ptrtoint i8* %t17 to i64
-  %t19 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t19, i64 %t18)
-  %t20 = inttoptr i64 %self to [3 x i64]*
-  %t21 = getelementptr [3 x i64], [3 x i64]* %t20, i64 0, i64 1
-  %t22 = load i64, i64* %t21
-  call i64 @__sb_append(i64 %t19, i64 %t22)
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.78, i64 0, i64 0
-  %t24 = ptrtoint i8* %t23 to i64
-  call i64 @__sb_append(i64 %t19, i64 %t24)
-  %t25 = inttoptr i64 %self to [3 x i64]*
-  %t26 = getelementptr [3 x i64], [3 x i64]* %t25, i64 0, i64 2
-  %t27 = load i64, i64* %t26
-  %t28 = call i64 @__int_to_string(i64 %t27)
-  call i64 @__sb_append(i64 %t19, i64 %t28)
-  %t29 = getelementptr [2 x i8], [2 x i8]* @.str.79, i64 0, i64 0
-  %t30 = ptrtoint i8* %t29 to i64
-  call i64 @__sb_append(i64 %t19, i64 %t30)
-  %t31 = call i64 @__sb_to_string(i64 %t19)
-  ret i64 %t31
-ets.v57:
-  %t32 = getelementptr [6 x i8], [6 x i8]* @.str.80, i64 0, i64 0
-  %t33 = ptrtoint i8* %t32 to i64
-  %t34 = call i64 @StringBuilder()
-  call i64 @__sb_append(i64 %t34, i64 %t33)
-  %t35 = inttoptr i64 %self to [3 x i64]*
-  %t36 = getelementptr [3 x i64], [3 x i64]* %t35, i64 0, i64 1
-  %t37 = load i64, i64* %t36
-  call i64 @__sb_append(i64 %t34, i64 %t37)
-  %t38 = getelementptr [3 x i8], [3 x i8]* @.str.81, i64 0, i64 0
-  %t39 = ptrtoint i8* %t38 to i64
-  call i64 @__sb_append(i64 %t34, i64 %t39)
-  %t40 = inttoptr i64 %self to [3 x i64]*
-  %t41 = getelementptr [3 x i64], [3 x i64]* %t40, i64 0, i64 2
-  %t42 = load i64, i64* %t41
-  %t43 = call i64 @__int_to_string(i64 %t42)
-  call i64 @__sb_append(i64 %t34, i64 %t43)
-  %t44 = getelementptr [2 x i8], [2 x i8]* @.str.82, i64 0, i64 0
-  %t45 = ptrtoint i8* %t44 to i64
-  call i64 @__sb_append(i64 %t34, i64 %t45)
-  %t46 = call i64 @__sb_to_string(i64 %t34)
-  ret i64 %t46
-ets.end54:
-  %t47 = getelementptr [8 x i8], [8 x i8]* @.str.83, i64 0, i64 0
-  %t48 = ptrtoint i8* %t47 to i64
-  ret i64 %t48
-}
-
-define linkonce_odr i64 @turmeric_element_Context__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  %t1 = load i64, i64* %self
-  %t2 = call i64 @__list_new()
-  %t3 = inttoptr i64 %t1 to %turmeric_element_Context*
-  %t4 = getelementptr %turmeric_element_Context, %turmeric_element_Context* %t3, i32 0, i32 0
-  store volatile i64 %t2, i64* %t4
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_element_Context__add(i64 %self.arg, i64 %node.arg) {
-entry:
-  %self = alloca i64
-  %node = alloca i64
-  store i64 %self.arg, i64* %self
-  store i64 %node.arg, i64* %node
-  %t1 = load i64, i64* %self
-  %t2 = inttoptr i64 %t1 to %turmeric_element_Context*
-  %t3 = getelementptr %turmeric_element_Context, %turmeric_element_Context* %t2, i32 0, i32 0
-  %t4 = load volatile i64, i64* %t3
-  %t5 = load i64, i64* %node
-  %t6 = call i64 @__list_push(i64 %t4, i64 %t5)
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_element_Context() {
-entry:
-  %t7 = call i8* @malloc(i64 8)
-  %t8 = bitcast i8* %t7 to %turmeric_element_Context*
-  %t9 = getelementptr %turmeric_element_Context, %turmeric_element_Context* %t8, i32 0, i32 0
-  store i64 0, i64* %t9
-  %t10 = ptrtoint %turmeric_element_Context* %t8 to i64
-  ret i64 %t10
-}
-
-define linkonce_odr i64 @turmeric_element__push_ctx() {
-entry:
-  %ctx = alloca i64
-  %t1 = call i64 @turmeric_element_Context()
-  %t2 = call i64 @turmeric_element_Context__init(i64 %t1)
-  store i64 %t1, i64* %ctx
-  %t3 = load i64, i64* @__g_turmeric_element__ctx_stack
-  %t4 = load i64, i64* %ctx
-  %t5 = call i64 @__list_push(i64 %t3, i64 %t4)
-  %t6 = load i64, i64* %ctx
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_element__pop_ctx() {
-entry:
-  %t1 = load i64, i64* @__g_turmeric_element__ctx_stack
-  %t2 = call i64 @__list_pop(i64 %t1)
-  ret i64 %t2
-}
-
-define linkonce_odr i64 @turmeric_element__current_ctx() {
-entry:
-  %t1 = load i64, i64* @__g_turmeric_element__ctx_stack
-  %t2 = load i64, i64* @__g_turmeric_element__ctx_stack
-  %t3 = call i64 @__list_length(i64 %t2)
-  %t4 = add i64 0, 1
-  %t5 = sub i64 %t3, %t4
-  %t6 = call i64 @__val_untag_int(i64 %t5)
-  %t7 = icmp slt i64 %t6, 0
-  %t8 = call i64 @__list_length(i64 %t1)
-  %t9 = add i64 %t8, %t6
-  %t10 = select i1 %t7, i64 %t9, i64 %t6
-  %t11 = call i64 @__list_get(i64 %t1, i64 %t10)
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_element__el(i64 %tag.arg, i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %tag = alloca i64
-  %attrs = alloca i64
-  %block = alloca i64
-  %ctx = alloca i64
-  %node = alloca i64
-  store i64 %tag.arg, i64* %tag
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = call i64 @turmeric_element__push_ctx()
-  store i64 %t1, i64* %ctx
-  %t2 = load i64, i64* %block
-  %t3 = inttoptr i64 %t2 to [2 x i64]*
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
-  %t5 = load i64, i64* %t4
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
-  %t7 = load i64, i64* %t6
-  %t8 = inttoptr i64 %t5 to i64 (i64)*
-  %t9 = call i64 %t8(i64 %t7)
-  %t10 = call i64 @turmeric_element__pop_ctx()
-  %t11 = call i8* @malloc(i64 32)
-  %t12 = bitcast i8* %t11 to [4 x i64]*
-  %t13 = getelementptr [4 x i64], [4 x i64]* %t12, i64 0, i64 0
-  store i64 0, i64* %t13
-  %t14 = load i64, i64* %tag
-  %t15 = getelementptr [4 x i64], [4 x i64]* %t12, i64 0, i64 1
-  store i64 %t14, i64* %t15
-  %t16 = load i64, i64* %attrs
-  %t17 = getelementptr [4 x i64], [4 x i64]* %t12, i64 0, i64 2
-  store i64 %t16, i64* %t17
-  %t18 = load i64, i64* %ctx
-  %t19 = inttoptr i64 %t18 to %turmeric_element_Context*
-  %t20 = getelementptr %turmeric_element_Context, %turmeric_element_Context* %t19, i32 0, i32 0
-  %t21 = load volatile i64, i64* %t20
-  %t22 = getelementptr [4 x i64], [4 x i64]* %t12, i64 0, i64 3
-  store i64 %t21, i64* %t22
-  %t23 = ptrtoint [4 x i64]* %t12 to i64
-  store i64 %t23, i64* %node
-  %t24 = load i64, i64* @__g_turmeric_element__ctx_stack
-  %t25 = call i64 @__list_length(i64 %t24)
-  %t26 = add i64 0, 0
-  %t28 = icmp sgt i64 %t25, %t26
-  %t27 = zext i1 %t28 to i64
-  %t29 = trunc i64 %t27 to i1
-  br i1 %t29, label %then59, label %else60
-then59:
-  %t30 = call i64 @turmeric_element__current_ctx()
-  %t31 = load i64, i64* %node
-  %t32 = call i64 @turmeric_element_Context__add(i64 %t30, i64 %t31)
-  br label %endif58
-else60:
-  br label %endif58
-endif58:
-  %t33 = load i64, i64* %node
-  ret i64 %t33
-}
-
-define linkonce_odr i64 @turmeric_element_text(i64 %content.arg) {
-entry:
-  %content = alloca i64
-  store i64 %content.arg, i64* %content
-  %t1 = call i64 @turmeric_element__current_ctx()
-  %t2 = call i8* @malloc(i64 16)
-  %t3 = bitcast i8* %t2 to [2 x i64]*
-  %t4 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 0
-  store i64 1, i64* %t4
-  %t5 = load i64, i64* %content
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t3, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = ptrtoint [2 x i64]* %t3 to i64
-  %t8 = call i64 @turmeric_element_Context__add(i64 %t1, i64 %t7)
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_element_render_to_html(i64 %node.arg) {
-entry:
-  %node = alloca i64
-  %content = alloca i64
-  %children = alloca i64
-  %html = alloca i64
-  %i = alloca i64
-  %tag = alloca i64
-  %attrs = alloca i64
-  %n = alloca i64
-  %v = alloca i64
-  %h = alloca i64
-  %sig = alloca i64
-  store i64 %node.arg, i64* %node
-  %t1 = load i64, i64* %node
-  %t2 = alloca i64
-  %t4 = inttoptr i64 %t1 to i64*
-  %t5 = load i64, i64* %t4
-  %t3 = trunc i64 %t5 to i8
-  switch i8 %t3, label %match.end61 [ i8 1, label %match.arm62 i8 2, label %match.arm63 i8 0, label %match.arm64 ]
-match.arm62:
-  %t6 = inttoptr i64 %t1 to [2 x i64]*
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t6, i64 0, i64 1
-  %t8 = load i64, i64* %t7
-  store i64 %t8, i64* %content
-  %t9 = load i64, i64* %content
-  store i64 %t9, i64* %t2
-  br label %match.end61
-match.arm63:
-  %t10 = inttoptr i64 %t1 to [2 x i64]*
-  %t11 = getelementptr [2 x i64], [2 x i64]* %t10, i64 0, i64 1
-  %t12 = load i64, i64* %t11
-  store i64 %t12, i64* %children
-  %t13 = getelementptr [1 x i8], [1 x i8]* @.str.84, i64 0, i64 0
-  %t14 = ptrtoint i8* %t13 to i64
-  store i64 %t14, i64* %html
-  %t15 = add i64 0, 0
-  store i64 %t15, i64* %i
-  br label %while.cond65
-while.cond65:
-  %t16 = load i64, i64* %i
-  %t17 = load i64, i64* %children
-  %t18 = call i64 @__list_length(i64 %t17)
-  %t20 = icmp slt i64 %t16, %t18
-  %t19 = zext i1 %t20 to i64
-  %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %while.body66, label %while.end67
-while.body66:
-  %t22 = load i64, i64* %html
-  %t23 = load i64, i64* %children
-  %t24 = load i64, i64* %i
-  %t25 = call i64 @__val_untag_int(i64 %t24)
-  %t26 = icmp slt i64 %t25, 0
-  %t27 = call i64 @__list_length(i64 %t23)
-  %t28 = add i64 %t27, %t25
-  %t29 = select i1 %t26, i64 %t28, i64 %t25
-  %t30 = call i64 @__list_get(i64 %t23, i64 %t29)
-  %t31 = call i64 @turmeric_element_render_to_html(i64 %t30)
-  %t32 = inttoptr i64 %t22 to i8*
-  %t33 = inttoptr i64 %t31 to i8*
-  %t34 = call i64 @strlen(i8* %t32)
-  %t35 = call i64 @strlen(i8* %t33)
-  %t36 = add i64 %t34, %t35
-  %t37 = add i64 %t36, 1
-  %t38 = call i8* @malloc(i64 %t37)
-  call i8* @strcpy(i8* %t38, i8* %t32)
-  call i8* @strcat(i8* %t38, i8* %t33)
-  %t39 = ptrtoint i8* %t38 to i64
-  store i64 %t39, i64* %html
-  %t40 = load i64, i64* %i
-  %t41 = add i64 0, 1
-  %t42 = add i64 %t40, %t41
-  store i64 %t42, i64* %i
-  br label %while.cond65
-while.end67:
-  %t43 = load i64, i64* %html
-  store i64 %t43, i64* %t2
-  br label %match.end61
-match.arm64:
-  %t44 = inttoptr i64 %t1 to [4 x i64]*
-  %t45 = getelementptr [4 x i64], [4 x i64]* %t44, i64 0, i64 1
-  %t46 = load i64, i64* %t45
-  store i64 %t46, i64* %tag
-  %t47 = getelementptr [4 x i64], [4 x i64]* %t44, i64 0, i64 2
-  %t48 = load i64, i64* %t47
-  store i64 %t48, i64* %attrs
-  %t49 = getelementptr [4 x i64], [4 x i64]* %t44, i64 0, i64 3
-  %t50 = load i64, i64* %t49
-  store i64 %t50, i64* %children
-  %t51 = getelementptr [2 x i8], [2 x i8]* @.str.85, i64 0, i64 0
-  %t52 = ptrtoint i8* %t51 to i64
-  %t53 = load i64, i64* %tag
-  %t54 = inttoptr i64 %t52 to i8*
-  %t55 = inttoptr i64 %t53 to i8*
-  %t56 = call i64 @strlen(i8* %t54)
-  %t57 = call i64 @strlen(i8* %t55)
-  %t58 = add i64 %t56, %t57
-  %t59 = add i64 %t58, 1
-  %t60 = call i8* @malloc(i64 %t59)
-  call i8* @strcpy(i8* %t60, i8* %t54)
-  call i8* @strcat(i8* %t60, i8* %t55)
-  %t61 = ptrtoint i8* %t60 to i64
-  store i64 %t61, i64* %html
-  %t62 = add i64 0, 0
-  store i64 %t62, i64* %i
-  br label %while.cond68
-while.cond68:
-  %t63 = load i64, i64* %i
-  %t64 = load i64, i64* %attrs
-  %t65 = call i64 @__list_length(i64 %t64)
-  %t67 = icmp slt i64 %t63, %t65
-  %t66 = zext i1 %t67 to i64
-  %t68 = trunc i64 %t66 to i1
-  br i1 %t68, label %while.body69, label %while.end70
-while.body69:
-  %t69 = load i64, i64* %attrs
-  %t70 = load i64, i64* %i
-  %t71 = call i64 @__val_untag_int(i64 %t70)
-  %t72 = icmp slt i64 %t71, 0
-  %t73 = call i64 @__list_length(i64 %t69)
-  %t74 = add i64 %t73, %t71
-  %t75 = select i1 %t72, i64 %t74, i64 %t71
-  %t76 = call i64 @__list_get(i64 %t69, i64 %t75)
-  %t77 = alloca i64
-  %t79 = inttoptr i64 %t76 to i64*
-  %t80 = load i64, i64* %t79
-  %t78 = trunc i64 %t80 to i8
-  switch i8 %t78, label %match.end71 [ i8 0, label %match.arm72 i8 1, label %match.arm73 i8 2, label %match.arm74 ]
-match.arm72:
-  %t81 = inttoptr i64 %t76 to [3 x i64]*
-  %t82 = getelementptr [3 x i64], [3 x i64]* %t81, i64 0, i64 1
-  %t83 = load i64, i64* %t82
-  store i64 %t83, i64* %n
-  %t84 = getelementptr [3 x i64], [3 x i64]* %t81, i64 0, i64 2
-  %t85 = load i64, i64* %t84
-  store i64 %t85, i64* %v
-  %t86 = load i64, i64* %html
-  %t87 = getelementptr [2 x i8], [2 x i8]* @.str.86, i64 0, i64 0
-  %t88 = ptrtoint i8* %t87 to i64
-  %t89 = inttoptr i64 %t86 to i8*
-  %t90 = inttoptr i64 %t88 to i8*
-  %t91 = call i64 @strlen(i8* %t89)
-  %t92 = call i64 @strlen(i8* %t90)
-  %t93 = add i64 %t91, %t92
-  %t94 = add i64 %t93, 1
-  %t95 = call i8* @malloc(i64 %t94)
-  call i8* @strcpy(i8* %t95, i8* %t89)
-  call i8* @strcat(i8* %t95, i8* %t90)
-  %t96 = ptrtoint i8* %t95 to i64
-  %t97 = load i64, i64* %n
-  %t98 = inttoptr i64 %t96 to i8*
-  %t99 = inttoptr i64 %t97 to i8*
-  %t100 = call i64 @strlen(i8* %t98)
-  %t101 = call i64 @strlen(i8* %t99)
-  %t102 = add i64 %t100, %t101
-  %t103 = add i64 %t102, 1
-  %t104 = call i8* @malloc(i64 %t103)
-  call i8* @strcpy(i8* %t104, i8* %t98)
-  call i8* @strcat(i8* %t104, i8* %t99)
-  %t105 = ptrtoint i8* %t104 to i64
-  %t106 = getelementptr [3 x i8], [3 x i8]* @.str.87, i64 0, i64 0
-  %t107 = ptrtoint i8* %t106 to i64
-  %t108 = inttoptr i64 %t105 to i8*
-  %t109 = inttoptr i64 %t107 to i8*
-  %t110 = call i64 @strlen(i8* %t108)
-  %t111 = call i64 @strlen(i8* %t109)
-  %t112 = add i64 %t110, %t111
-  %t113 = add i64 %t112, 1
-  %t114 = call i8* @malloc(i64 %t113)
-  call i8* @strcpy(i8* %t114, i8* %t108)
-  call i8* @strcat(i8* %t114, i8* %t109)
-  %t115 = ptrtoint i8* %t114 to i64
-  %t116 = load i64, i64* %v
-  %t117 = inttoptr i64 %t115 to i8*
-  %t118 = inttoptr i64 %t116 to i8*
-  %t119 = call i64 @strlen(i8* %t117)
-  %t120 = call i64 @strlen(i8* %t118)
-  %t121 = add i64 %t119, %t120
-  %t122 = add i64 %t121, 1
-  %t123 = call i8* @malloc(i64 %t122)
-  call i8* @strcpy(i8* %t123, i8* %t117)
-  call i8* @strcat(i8* %t123, i8* %t118)
-  %t124 = ptrtoint i8* %t123 to i64
-  %t125 = getelementptr [2 x i8], [2 x i8]* @.str.88, i64 0, i64 0
-  %t126 = ptrtoint i8* %t125 to i64
-  %t127 = inttoptr i64 %t124 to i8*
-  %t128 = inttoptr i64 %t126 to i8*
-  %t129 = call i64 @strlen(i8* %t127)
-  %t130 = call i64 @strlen(i8* %t128)
-  %t131 = add i64 %t129, %t130
-  %t132 = add i64 %t131, 1
-  %t133 = call i8* @malloc(i64 %t132)
-  call i8* @strcpy(i8* %t133, i8* %t127)
-  call i8* @strcat(i8* %t133, i8* %t128)
-  %t134 = ptrtoint i8* %t133 to i64
-  store i64 %t134, i64* %html
-  store i64 %t134, i64* %t77
-  br label %match.end71
-match.arm73:
-  %t135 = inttoptr i64 %t76 to [3 x i64]*
-  %t136 = getelementptr [3 x i64], [3 x i64]* %t135, i64 0, i64 1
-  %t137 = load i64, i64* %t136
-  store i64 %t137, i64* %n
-  %t138 = getelementptr [3 x i64], [3 x i64]* %t135, i64 0, i64 2
-  %t139 = load i64, i64* %t138
-  store i64 %t139, i64* %h
-  %t140 = call i64 @__map_new()
-  store i64 %t140, i64* %t77
-  br label %match.end71
-match.arm74:
-  %t141 = inttoptr i64 %t76 to [3 x i64]*
-  %t142 = getelementptr [3 x i64], [3 x i64]* %t141, i64 0, i64 1
-  %t143 = load i64, i64* %t142
-  store i64 %t143, i64* %n
-  %t144 = getelementptr [3 x i64], [3 x i64]* %t141, i64 0, i64 2
-  %t145 = load i64, i64* %t144
-  store i64 %t145, i64* %sig
-  %t146 = load i64, i64* %html
-  %t147 = getelementptr [2 x i8], [2 x i8]* @.str.89, i64 0, i64 0
-  %t148 = ptrtoint i8* %t147 to i64
-  %t149 = inttoptr i64 %t146 to i8*
-  %t150 = inttoptr i64 %t148 to i8*
-  %t151 = call i64 @strlen(i8* %t149)
-  %t152 = call i64 @strlen(i8* %t150)
-  %t153 = add i64 %t151, %t152
-  %t154 = add i64 %t153, 1
-  %t155 = call i8* @malloc(i64 %t154)
-  call i8* @strcpy(i8* %t155, i8* %t149)
-  call i8* @strcat(i8* %t155, i8* %t150)
-  %t156 = ptrtoint i8* %t155 to i64
-  %t157 = load i64, i64* %n
-  %t158 = inttoptr i64 %t156 to i8*
-  %t159 = inttoptr i64 %t157 to i8*
-  %t160 = call i64 @strlen(i8* %t158)
-  %t161 = call i64 @strlen(i8* %t159)
-  %t162 = add i64 %t160, %t161
-  %t163 = add i64 %t162, 1
-  %t164 = call i8* @malloc(i64 %t163)
-  call i8* @strcpy(i8* %t164, i8* %t158)
-  call i8* @strcat(i8* %t164, i8* %t159)
-  %t165 = ptrtoint i8* %t164 to i64
-  %t166 = getelementptr [3 x i8], [3 x i8]* @.str.90, i64 0, i64 0
-  %t167 = ptrtoint i8* %t166 to i64
-  %t168 = inttoptr i64 %t165 to i8*
-  %t169 = inttoptr i64 %t167 to i8*
-  %t170 = call i64 @strlen(i8* %t168)
-  %t171 = call i64 @strlen(i8* %t169)
-  %t172 = add i64 %t170, %t171
-  %t173 = add i64 %t172, 1
-  %t174 = call i8* @malloc(i64 %t173)
-  call i8* @strcpy(i8* %t174, i8* %t168)
-  call i8* @strcat(i8* %t174, i8* %t169)
-  %t175 = ptrtoint i8* %t174 to i64
-  %t176 = load i64, i64* %sig
-  %t177 = call i64 @turmeric_signal_Signal__get(i64 %t176)
-  %t178 = inttoptr i64 %t175 to i8*
-  %t179 = inttoptr i64 %t177 to i8*
-  %t180 = call i64 @strlen(i8* %t178)
-  %t181 = call i64 @strlen(i8* %t179)
-  %t182 = add i64 %t180, %t181
-  %t183 = add i64 %t182, 1
-  %t184 = call i8* @malloc(i64 %t183)
-  call i8* @strcpy(i8* %t184, i8* %t178)
-  call i8* @strcat(i8* %t184, i8* %t179)
-  %t185 = ptrtoint i8* %t184 to i64
-  %t186 = getelementptr [2 x i8], [2 x i8]* @.str.91, i64 0, i64 0
-  %t187 = ptrtoint i8* %t186 to i64
-  %t188 = inttoptr i64 %t185 to i8*
-  %t189 = inttoptr i64 %t187 to i8*
-  %t190 = call i64 @strlen(i8* %t188)
-  %t191 = call i64 @strlen(i8* %t189)
-  %t192 = add i64 %t190, %t191
-  %t193 = add i64 %t192, 1
-  %t194 = call i8* @malloc(i64 %t193)
-  call i8* @strcpy(i8* %t194, i8* %t188)
-  call i8* @strcat(i8* %t194, i8* %t189)
-  %t195 = ptrtoint i8* %t194 to i64
-  store i64 %t195, i64* %html
-  store i64 %t195, i64* %t77
-  br label %match.end71
-match.end71:
-  %t196 = load i64, i64* %t77
-  %t197 = load i64, i64* %i
-  %t198 = add i64 0, 1
-  %t199 = add i64 %t197, %t198
-  store i64 %t199, i64* %i
-  br label %while.cond68
-while.end70:
-  %t200 = load i64, i64* %tag
-  %t201 = getelementptr [3 x i8], [3 x i8]* @.str.92, i64 0, i64 0
-  %t202 = ptrtoint i8* %t201 to i64
-  %t203 = inttoptr i64 %t200 to i8*
-  %t204 = inttoptr i64 %t202 to i8*
-  %t205 = call i32 @strcmp(i8* %t203, i8* %t204)
-  %t206 = icmp eq i32 %t205, 0
-  %t207 = zext i1 %t206 to i64
-  %t208 = trunc i64 %t207 to i1
-  br label %logic.entry76
-logic.entry76:
-  br i1 %t208, label %end78, label %rhs77
-rhs77:
-  %t209 = load i64, i64* %tag
-  %t210 = getelementptr [3 x i8], [3 x i8]* @.str.93, i64 0, i64 0
-  %t211 = ptrtoint i8* %t210 to i64
-  %t212 = inttoptr i64 %t209 to i8*
-  %t213 = inttoptr i64 %t211 to i8*
-  %t214 = call i32 @strcmp(i8* %t212, i8* %t213)
-  %t215 = icmp eq i32 %t214, 0
-  %t216 = zext i1 %t215 to i64
-  %t217 = trunc i64 %t216 to i1
-  br label %end78
-end78:
-  %t218 = phi i1 [%t208, %logic.entry76], [%t217, %rhs77]
-  %t219 = zext i1 %t218 to i64
-  %t220 = trunc i64 %t219 to i1
-  br label %logic.entry79
-logic.entry79:
-  br i1 %t220, label %end81, label %rhs80
-rhs80:
-  %t221 = load i64, i64* %tag
-  %t222 = getelementptr [4 x i8], [4 x i8]* @.str.94, i64 0, i64 0
-  %t223 = ptrtoint i8* %t222 to i64
-  %t224 = inttoptr i64 %t221 to i8*
-  %t225 = inttoptr i64 %t223 to i8*
-  %t226 = call i32 @strcmp(i8* %t224, i8* %t225)
-  %t227 = icmp eq i32 %t226, 0
-  %t228 = zext i1 %t227 to i64
-  %t229 = trunc i64 %t228 to i1
-  br label %end81
-end81:
-  %t230 = phi i1 [%t220, %logic.entry79], [%t229, %rhs80]
-  %t231 = zext i1 %t230 to i64
-  %t232 = trunc i64 %t231 to i1
-  br label %logic.entry82
-logic.entry82:
-  br i1 %t232, label %end84, label %rhs83
-rhs83:
-  %t233 = load i64, i64* %tag
-  %t234 = getelementptr [6 x i8], [6 x i8]* @.str.95, i64 0, i64 0
-  %t235 = ptrtoint i8* %t234 to i64
-  %t236 = inttoptr i64 %t233 to i8*
-  %t237 = inttoptr i64 %t235 to i8*
-  %t238 = call i32 @strcmp(i8* %t236, i8* %t237)
-  %t239 = icmp eq i32 %t238, 0
-  %t240 = zext i1 %t239 to i64
-  %t241 = trunc i64 %t240 to i1
-  br label %end84
-end84:
-  %t242 = phi i1 [%t232, %logic.entry82], [%t241, %rhs83]
-  %t243 = zext i1 %t242 to i64
-  %t244 = trunc i64 %t243 to i1
-  br i1 %t244, label %then85, label %else86
-then85:
-  %t245 = load i64, i64* %html
-  %t246 = getelementptr [4 x i8], [4 x i8]* @.str.96, i64 0, i64 0
-  %t247 = ptrtoint i8* %t246 to i64
-  %t248 = inttoptr i64 %t245 to i8*
-  %t249 = inttoptr i64 %t247 to i8*
-  %t250 = call i64 @strlen(i8* %t248)
-  %t251 = call i64 @strlen(i8* %t249)
-  %t252 = add i64 %t250, %t251
-  %t253 = add i64 %t252, 1
-  %t254 = call i8* @malloc(i64 %t253)
-  call i8* @strcpy(i8* %t254, i8* %t248)
-  call i8* @strcat(i8* %t254, i8* %t249)
-  %t255 = ptrtoint i8* %t254 to i64
-  ret i64 %t255
-else86:
-  br label %endif75
-endif75:
-  %t256 = load i64, i64* %html
-  %t257 = getelementptr [2 x i8], [2 x i8]* @.str.97, i64 0, i64 0
-  %t258 = ptrtoint i8* %t257 to i64
-  %t259 = inttoptr i64 %t256 to i8*
-  %t260 = inttoptr i64 %t258 to i8*
-  %t261 = call i64 @strlen(i8* %t259)
-  %t262 = call i64 @strlen(i8* %t260)
-  %t263 = add i64 %t261, %t262
-  %t264 = add i64 %t263, 1
-  %t265 = call i8* @malloc(i64 %t264)
-  call i8* @strcpy(i8* %t265, i8* %t259)
-  call i8* @strcat(i8* %t265, i8* %t260)
-  %t266 = ptrtoint i8* %t265 to i64
-  store i64 %t266, i64* %html
-  %t267 = add i64 0, 0
-  store i64 %t267, i64* %i
-  br label %while.cond87
-while.cond87:
-  %t268 = load i64, i64* %i
-  %t269 = load i64, i64* %children
-  %t270 = call i64 @__list_length(i64 %t269)
-  %t272 = icmp slt i64 %t268, %t270
-  %t271 = zext i1 %t272 to i64
-  %t273 = trunc i64 %t271 to i1
-  br i1 %t273, label %while.body88, label %while.end89
-while.body88:
-  %t274 = load i64, i64* %html
-  %t275 = load i64, i64* %children
-  %t276 = load i64, i64* %i
-  %t277 = call i64 @__val_untag_int(i64 %t276)
-  %t278 = icmp slt i64 %t277, 0
-  %t279 = call i64 @__list_length(i64 %t275)
-  %t280 = add i64 %t279, %t277
-  %t281 = select i1 %t278, i64 %t280, i64 %t277
-  %t282 = call i64 @__list_get(i64 %t275, i64 %t281)
-  %t283 = call i64 @turmeric_element_render_to_html(i64 %t282)
-  %t284 = inttoptr i64 %t274 to i8*
-  %t285 = inttoptr i64 %t283 to i8*
-  %t286 = call i64 @strlen(i8* %t284)
-  %t287 = call i64 @strlen(i8* %t285)
-  %t288 = add i64 %t286, %t287
-  %t289 = add i64 %t288, 1
-  %t290 = call i8* @malloc(i64 %t289)
-  call i8* @strcpy(i8* %t290, i8* %t284)
-  call i8* @strcat(i8* %t290, i8* %t285)
-  %t291 = ptrtoint i8* %t290 to i64
-  store i64 %t291, i64* %html
-  %t292 = load i64, i64* %i
-  %t293 = add i64 0, 1
-  %t294 = add i64 %t292, %t293
-  store i64 %t294, i64* %i
-  br label %while.cond87
-while.end89:
-  %t295 = load i64, i64* %html
-  %t296 = getelementptr [3 x i8], [3 x i8]* @.str.98, i64 0, i64 0
-  %t297 = ptrtoint i8* %t296 to i64
-  %t298 = inttoptr i64 %t295 to i8*
-  %t299 = inttoptr i64 %t297 to i8*
-  %t300 = call i64 @strlen(i8* %t298)
-  %t301 = call i64 @strlen(i8* %t299)
-  %t302 = add i64 %t300, %t301
-  %t303 = add i64 %t302, 1
-  %t304 = call i8* @malloc(i64 %t303)
-  call i8* @strcpy(i8* %t304, i8* %t298)
-  call i8* @strcat(i8* %t304, i8* %t299)
-  %t305 = ptrtoint i8* %t304 to i64
-  %t306 = load i64, i64* %tag
-  %t307 = inttoptr i64 %t305 to i8*
-  %t308 = inttoptr i64 %t306 to i8*
-  %t309 = call i64 @strlen(i8* %t307)
-  %t310 = call i64 @strlen(i8* %t308)
-  %t311 = add i64 %t309, %t310
-  %t312 = add i64 %t311, 1
-  %t313 = call i8* @malloc(i64 %t312)
-  call i8* @strcpy(i8* %t313, i8* %t307)
-  call i8* @strcat(i8* %t313, i8* %t308)
-  %t314 = ptrtoint i8* %t313 to i64
-  %t315 = getelementptr [2 x i8], [2 x i8]* @.str.99, i64 0, i64 0
-  %t316 = ptrtoint i8* %t315 to i64
-  %t317 = inttoptr i64 %t314 to i8*
-  %t318 = inttoptr i64 %t316 to i8*
-  %t319 = call i64 @strlen(i8* %t317)
-  %t320 = call i64 @strlen(i8* %t318)
-  %t321 = add i64 %t319, %t320
-  %t322 = add i64 %t321, 1
-  %t323 = call i8* @malloc(i64 %t322)
-  call i8* @strcpy(i8* %t323, i8* %t317)
-  call i8* @strcat(i8* %t323, i8* %t318)
-  %t324 = ptrtoint i8* %t323 to i64
-  store i64 %t324, i64* %t2
-  br label %match.end61
-match.end61:
-  %t325 = load i64, i64* %t2
-  ret i64 %t325
-}
-
-define i64 @__mod_init_turmeric_element() {
-entry:
-  %t1 = call i64 @__list_new()
-  store i64 %t1, i64* @__g_turmeric_element__ctx_stack
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DomEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DomEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DomEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DomEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_DomEvent*
-  %t3 = getelementptr %turmeric_generated_types_DomEvent, %turmeric_generated_types_DomEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_DomEvent, %turmeric_generated_types_DomEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_DomEvent, %turmeric_generated_types_DomEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_DomEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_PointerEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_PointerEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_PointerEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_PointerEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 112)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_PointerEvent*
-  %t3 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 4
-  store i64 0, i64* %t7
-  %t8 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 5
-  store i64 0, i64* %t8
-  %t9 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 6
-  store i64 0, i64* %t9
-  %t10 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 7
-  store i64 0, i64* %t10
-  %t11 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 8
-  store i64 0, i64* %t11
-  %t12 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 9
-  store i64 0, i64* %t12
-  %t13 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 10
-  store i64 0, i64* %t13
-  %t14 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 11
-  store i64 0, i64* %t14
-  %t15 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 12
-  store i64 0, i64* %t15
-  %t16 = getelementptr %turmeric_generated_types_PointerEvent, %turmeric_generated_types_PointerEvent* %t2, i32 0, i32 13
-  store i64 0, i64* %t16
-  %t17 = ptrtoint %turmeric_generated_types_PointerEvent* %t2 to i64
-  ret i64 %t17
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ToggleEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ToggleEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ToggleEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ToggleEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 16)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_ToggleEvent*
-  %t3 = getelementptr %turmeric_generated_types_ToggleEvent, %turmeric_generated_types_ToggleEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_ToggleEvent, %turmeric_generated_types_ToggleEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = ptrtoint %turmeric_generated_types_ToggleEvent* %t2 to i64
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_AnimationEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_AnimationEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_AnimationEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_AnimationEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_AnimationEvent*
-  %t3 = getelementptr %turmeric_generated_types_AnimationEvent, %turmeric_generated_types_AnimationEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_AnimationEvent, %turmeric_generated_types_AnimationEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_AnimationEvent, %turmeric_generated_types_AnimationEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_AnimationEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_MouseEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_MouseEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_MouseEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_MouseEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 64)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_MouseEvent*
-  %t3 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 4
-  store i64 0, i64* %t7
-  %t8 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 5
-  store i64 0, i64* %t8
-  %t9 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 6
-  store i64 0, i64* %t9
-  %t10 = getelementptr %turmeric_generated_types_MouseEvent, %turmeric_generated_types_MouseEvent* %t2, i32 0, i32 7
-  store i64 0, i64* %t10
-  %t11 = ptrtoint %turmeric_generated_types_MouseEvent* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TouchEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TouchEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TouchEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TouchEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_TouchEvent*
-  %t3 = getelementptr %turmeric_generated_types_TouchEvent, %turmeric_generated_types_TouchEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_TouchEvent, %turmeric_generated_types_TouchEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_TouchEvent, %turmeric_generated_types_TouchEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_TouchEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FocusEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FocusEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FocusEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FocusEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 0)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_FocusEvent*
-  %t3 = ptrtoint %turmeric_generated_types_FocusEvent* %t2 to i64
-  ret i64 %t3
-}
-
-define linkonce_odr i64 @turmeric_generated_types_CompositionEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_CompositionEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_CompositionEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_CompositionEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 8)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_CompositionEvent*
-  %t3 = getelementptr %turmeric_generated_types_CompositionEvent, %turmeric_generated_types_CompositionEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = ptrtoint %turmeric_generated_types_CompositionEvent* %t2 to i64
-  ret i64 %t4
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SubmitEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SubmitEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SubmitEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SubmitEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 0)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_SubmitEvent*
-  %t3 = ptrtoint %turmeric_generated_types_SubmitEvent* %t2 to i64
-  ret i64 %t3
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DragEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DragEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DragEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_DragEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 0)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_DragEvent*
-  %t3 = ptrtoint %turmeric_generated_types_DragEvent* %t2 to i64
-  ret i64 %t3
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ClipboardEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ClipboardEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ClipboardEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ClipboardEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 0)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_ClipboardEvent*
-  %t3 = ptrtoint %turmeric_generated_types_ClipboardEvent* %t2 to i64
-  ret i64 %t3
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ProgressEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ProgressEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ProgressEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ProgressEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_ProgressEvent*
-  %t3 = getelementptr %turmeric_generated_types_ProgressEvent, %turmeric_generated_types_ProgressEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_ProgressEvent, %turmeric_generated_types_ProgressEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_ProgressEvent, %turmeric_generated_types_ProgressEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_ProgressEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ErrorEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ErrorEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ErrorEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ErrorEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_ErrorEvent*
-  %t3 = getelementptr %turmeric_generated_types_ErrorEvent, %turmeric_generated_types_ErrorEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_ErrorEvent, %turmeric_generated_types_ErrorEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_ErrorEvent, %turmeric_generated_types_ErrorEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_ErrorEvent, %turmeric_generated_types_ErrorEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = ptrtoint %turmeric_generated_types_ErrorEvent* %t2 to i64
-  ret i64 %t7
-}
-
-define linkonce_odr i64 @turmeric_generated_types_InputEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_InputEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_InputEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_InputEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_InputEvent*
-  %t3 = getelementptr %turmeric_generated_types_InputEvent, %turmeric_generated_types_InputEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_InputEvent, %turmeric_generated_types_InputEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_InputEvent, %turmeric_generated_types_InputEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_InputEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TransitionEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TransitionEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TransitionEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_TransitionEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_TransitionEvent*
-  %t3 = getelementptr %turmeric_generated_types_TransitionEvent, %turmeric_generated_types_TransitionEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_TransitionEvent, %turmeric_generated_types_TransitionEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_TransitionEvent, %turmeric_generated_types_TransitionEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = ptrtoint %turmeric_generated_types_TransitionEvent* %t2 to i64
-  ret i64 %t6
-}
-
-define linkonce_odr i64 @turmeric_generated_types_UIEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_UIEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_UIEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_UIEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 8)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_UIEvent*
-  %t3 = getelementptr %turmeric_generated_types_UIEvent, %turmeric_generated_types_UIEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = ptrtoint %turmeric_generated_types_UIEvent* %t2 to i64
-  ret i64 %t4
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FormDataEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FormDataEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FormDataEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_FormDataEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 8)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_FormDataEvent*
-  %t3 = getelementptr %turmeric_generated_types_FormDataEvent, %turmeric_generated_types_FormDataEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = ptrtoint %turmeric_generated_types_FormDataEvent* %t2 to i64
-  ret i64 %t4
-}
-
-define linkonce_odr i64 @turmeric_generated_types_KeyboardEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_KeyboardEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_KeyboardEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_KeyboardEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 40)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_KeyboardEvent*
-  %t3 = getelementptr %turmeric_generated_types_KeyboardEvent, %turmeric_generated_types_KeyboardEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_KeyboardEvent, %turmeric_generated_types_KeyboardEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_KeyboardEvent, %turmeric_generated_types_KeyboardEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_KeyboardEvent, %turmeric_generated_types_KeyboardEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = getelementptr %turmeric_generated_types_KeyboardEvent, %turmeric_generated_types_KeyboardEvent* %t2, i32 0, i32 4
-  store i64 0, i64* %t7
-  %t8 = ptrtoint %turmeric_generated_types_KeyboardEvent* %t2 to i64
-  ret i64 %t8
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SecurityPolicyViolationEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SecurityPolicyViolationEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SecurityPolicyViolationEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_SecurityPolicyViolationEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 96)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_SecurityPolicyViolationEvent*
-  %t3 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 4
-  store i64 0, i64* %t7
-  %t8 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 5
-  store i64 0, i64* %t8
-  %t9 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 6
-  store i64 0, i64* %t9
-  %t10 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 7
-  store i64 0, i64* %t10
-  %t11 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 8
-  store i64 0, i64* %t11
-  %t12 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 9
-  store i64 0, i64* %t12
-  %t13 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 10
-  store i64 0, i64* %t13
-  %t14 = getelementptr %turmeric_generated_types_SecurityPolicyViolationEvent, %turmeric_generated_types_SecurityPolicyViolationEvent* %t2, i32 0, i32 11
-  store i64 0, i64* %t14
-  %t15 = ptrtoint %turmeric_generated_types_SecurityPolicyViolationEvent* %t2 to i64
-  ret i64 %t15
-}
-
-define linkonce_odr i64 @turmeric_generated_types_WheelEvent__init(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_WheelEvent__prevent_default(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_WheelEvent__stop_propagation(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define linkonce_odr i64 @turmeric_generated_types_WheelEvent() {
-entry:
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to %turmeric_generated_types_WheelEvent*
-  %t3 = getelementptr %turmeric_generated_types_WheelEvent, %turmeric_generated_types_WheelEvent* %t2, i32 0, i32 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr %turmeric_generated_types_WheelEvent, %turmeric_generated_types_WheelEvent* %t2, i32 0, i32 1
-  store i64 0, i64* %t4
-  %t5 = getelementptr %turmeric_generated_types_WheelEvent, %turmeric_generated_types_WheelEvent* %t2, i32 0, i32 2
-  store i64 0, i64* %t5
-  %t6 = getelementptr %turmeric_generated_types_WheelEvent, %turmeric_generated_types_WheelEvent* %t2, i32 0, i32 3
-  store i64 0, i64* %t6
-  %t7 = ptrtoint %turmeric_generated_types_WheelEvent* %t2 to i64
-  ret i64 %t7
-}
-
-define linkonce_odr i64 @turmeric_generated_types_audio(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.100, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_thead(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.101, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_blockquote(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [11 x i8], [11 x i8]* @.str.102, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_mark(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.103, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_iframe(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.104, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_data(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.105, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_details(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.106, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_search(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.107, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_script(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.108, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_map(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.109, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_footer(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.110, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_h6(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.111, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_dfn(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.112, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_br(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.113, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_rt(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.114, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_dialog(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.115, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_object(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.116, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_abbr(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.117, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_sup(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.118, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_var_(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.119, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_span(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.120, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_head(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.121, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_i(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.122, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_samp(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.123, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_aside(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.124, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_wbr(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.125, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_section(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [8 x i8], [8 x i8]* @.str.126, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_dl(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.127, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_html(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.128, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_style(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.129, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_base(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.130, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_h4(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.131, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_source(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.132, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_table(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.133, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_meter(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.134, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_time(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.135, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_b(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.136, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_pre(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.137, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_optgroup(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.138, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_p(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.139, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_nav(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.140, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_code(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.141, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ol(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.142, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_em(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.143, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_textarea(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.144, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_fieldset(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [9 x i8], [9 x i8]* @.str.145, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_label(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.146, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_rp(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.147, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_hgroup(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.148, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_a(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [2 x i8], [2 x i8]* @.str.149, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_select(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.150, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_bdo(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.151, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_dd(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.152, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_kbd(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.153, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_ul(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.154, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_menu(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.155, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_track(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.156, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_hr(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.157, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_area(i64 %attrs.arg) {
-entry:
-  %attrs = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  %t1 = call i8* @malloc(i64 32)
-  %t2 = bitcast i8* %t1 to [4 x i64]*
-  %t3 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.158, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %attrs
-  %t8 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = call i64 @__list_new()
-  %t10 = getelementptr [4 x i64], [4 x i64]* %t2, i64 0, i64 3
-  store i64 %t9, i64* %t10
-  %t11 = ptrtoint [4 x i64]* %t2 to i64
-  ret i64 %t11
-}
-
-define linkonce_odr i64 @turmeric_generated_types_td(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.159, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_h5(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.160, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_form(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.161, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_div(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.162, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_li(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.163, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_button(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.164, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_h1(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [3 x i8], [3 x i8]* @.str.165, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_input(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.166, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_header(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [7 x i8], [7 x i8]* @.str.167, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_main_el(i64 %attrs.arg, i64 %block.arg) {
-entry:
-  %attrs = alloca i64
-  %block = alloca i64
-  store i64 %attrs.arg, i64* %attrs
-  store i64 %block.arg, i64* %block
-  %t1 = getelementptr [5 x i8], [5 x i8]* @.str.168, i64 0, i64 0
-  %t2 = ptrtoint i8* %t1 to i64
-  %t3 = load i64, i64* %attrs
-  %t4 = load i64, i64* %block
-  %t5 = call i64 @turmeric_element__el(i64 %t2, i64 %t3, i64 %t4)
-  ret i64 %t5
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_click(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.169, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dblclick(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.170, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mousedown(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.171, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mouseup(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.172, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mousemove(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.173, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mouseenter(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [11 x i8], [11 x i8]* @.str.174, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mouseleave(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [11 x i8], [11 x i8]* @.str.175, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mouseover(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.176, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_mouseout(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.177, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_keydown(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.178, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_keyup(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.179, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_input(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.180, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_change(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.181, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_submit(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.182, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_reset(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.183, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_focus(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.184, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_blur(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.185, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_focusin(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.186, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_focusout(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.187, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_scroll(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.188, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_resize(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.189, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dragstart(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.190, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_drag(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.191, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dragend(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.192, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dragenter(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.193, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dragleave(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.194, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_dragover(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.195, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_drop(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.196, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_touchstart(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [11 x i8], [11 x i8]* @.str.197, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_touchmove(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.198, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_touchend(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.199, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_pointerdown(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [12 x i8], [12 x i8]* @.str.200, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_pointerup(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.201, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_pointermove(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [12 x i8], [12 x i8]* @.str.202, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_pointerenter(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [13 x i8], [13 x i8]* @.str.203, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_pointerleave(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [13 x i8], [13 x i8]* @.str.204, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_animationstart(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [15 x i8], [15 x i8]* @.str.205, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_animationend(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [13 x i8], [13 x i8]* @.str.206, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_transitionend(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [14 x i8], [14 x i8]* @.str.207, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_contextmenu(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [12 x i8], [12 x i8]* @.str.208, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_wheel(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.209, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_copy(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.210, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_cut(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.211, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_paste(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.212, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_load(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.213, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_on_error(i64 %handler.arg) {
-entry:
-  %handler = alloca i64
-  store i64 %handler.arg, i64* %handler
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 1, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.214, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %handler
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_class_(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.215, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_id(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.216, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_title(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.217, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_tabindex(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.218, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_role(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.219, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_hidden(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.220, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_draggable(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.221, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_contenteditable(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [16 x i8], [16 x i8]* @.str.222, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_dir(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.223, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_lang(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.224, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_spellcheck(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [11 x i8], [11 x i8]* @.str.225, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_href(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.226, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_src(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.227, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_alt(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.228, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_type_(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.229, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_name(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.230, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_value(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.231, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_placeholder(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [12 x i8], [12 x i8]* @.str.232, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_disabled(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.233, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_checked(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.234, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_readonly_(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.235, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_required(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.236, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_multiple(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.237, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_selected(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [9 x i8], [9 x i8]* @.str.238, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_action(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.239, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_method(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.240, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_target(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.241, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_rel(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.242, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_width(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.243, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_height(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [7 x i8], [7 x i8]* @.str.244, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_min(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.245, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_max(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.246, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_step(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.247, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_pattern(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.248, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_autocomplete(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [13 x i8], [13 x i8]* @.str.249, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_autofocus(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [10 x i8], [10 x i8]* @.str.250, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_for_(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [4 x i8], [4 x i8]* @.str.251, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_colspan(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.252, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_rowspan(i64 %value.arg) {
-entry:
-  %value = alloca i64
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [8 x i8], [8 x i8]* @.str.253, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t5, i64* %t6
-  %t7 = load i64, i64* %value
-  %t8 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t7, i64* %t8
-  %t9 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t9
-}
-
-define linkonce_odr i64 @turmeric_generated_types_aria(i64 %name.arg, i64 %value.arg) {
-entry:
-  %name = alloca i64
-  %value = alloca i64
-  store i64 %name.arg, i64* %name
-  store i64 %value.arg, i64* %value
-  %t1 = call i8* @malloc(i64 24)
-  %t2 = bitcast i8* %t1 to [3 x i64]*
-  %t3 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 0
-  store i64 0, i64* %t3
-  %t4 = getelementptr [6 x i8], [6 x i8]* @.str.254, i64 0, i64 0
-  %t5 = ptrtoint i8* %t4 to i64
-  %t6 = load i64, i64* %name
-  %t7 = inttoptr i64 %t5 to i8*
-  %t8 = inttoptr i64 %t6 to i8*
-  %t9 = call i64 @strlen(i8* %t7)
-  %t10 = call i64 @strlen(i8* %t8)
-  %t11 = add i64 %t9, %t10
-  %t12 = add i64 %t11, 1
-  %t13 = call i8* @malloc(i64 %t12)
-  call i8* @strcpy(i8* %t13, i8* %t7)
-  call i8* @strcat(i8* %t13, i8* %t8)
-  %t14 = ptrtoint i8* %t13 to i64
-  %t15 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 1
-  store i64 %t14, i64* %t15
-  %t16 = load i64, i64* %value
-  %t17 = getelementptr [3 x i64], [3 x i64]* %t2, i64 0, i64 2
-  store i64 %t16, i64* %t17
-  %t18 = ptrtoint [3 x i64]* %t2 to i64
-  ret i64 %t18
-}
-
 define linkonce_odr i64 @turmeric_style_styles(i64 %pairs.arg) {
 entry:
   %pairs = alloca i64
@@ -10443,33 +17267,33 @@ entry:
   store i64 %t3, i64* %keys
   %t4 = add i64 0, 0
   store i64 %t4, i64* %i
-  br label %while.cond90
-while.cond90:
+  br label %while.cond1239
+while.cond1239:
   %t5 = load i64, i64* %i
   %t6 = load i64, i64* %keys
   %t7 = call i64 @__list_length(i64 %t6)
   %t9 = icmp slt i64 %t5, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body91, label %while.end92
-while.body91:
+  br i1 %t10, label %while.body1240, label %while.end1241
+while.body1240:
   %t11 = load i64, i64* %i
   %t12 = add i64 0, 0
   %t14 = icmp sgt i64 %t11, %t12
   %t13 = zext i1 %t14 to i64
   %t15 = trunc i64 %t13 to i1
-  br i1 %t15, label %then94, label %else95
-then94:
+  br i1 %t15, label %then1243, label %else1244
+then1243:
   %t16 = load i64, i64* %sb
-  %t17 = getelementptr [3 x i8], [3 x i8]* @.str.255, i64 0, i64 0
+  %t17 = getelementptr [3 x i8], [3 x i8]* @.str.497, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i8* @__val_untag_ptr(i64 %t18)
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @__sb_append(i64 %t16, i64 %t20)
-  br label %endif93
-else95:
-  br label %endif93
-endif93:
+  br label %endif1242
+else1244:
+  br label %endif1242
+endif1242:
   %t22 = load i64, i64* %sb
   %t23 = load i64, i64* %keys
   %t24 = load i64, i64* %i
@@ -10483,7 +17307,7 @@ endif93:
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = call i64 @__sb_append(i64 %t22, i64 %t32)
   %t34 = load i64, i64* %sb
-  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.256, i64 0, i64 0
+  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.498, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = call i8* @__val_untag_ptr(i64 %t36)
   %t38 = ptrtoint i8* %t37 to i64
@@ -10506,8 +17330,8 @@ endif93:
   %t55 = add i64 0, 1
   %t56 = add i64 %t54, %t55
   store i64 %t56, i64* %i
-  br label %while.cond90
-while.end92:
+  br label %while.cond1239
+while.end1241:
   %t57 = load i64, i64* %sb
   %t58 = call i64 @__sb_to_string(i64 %t57)
   ret i64 %t58
@@ -10527,16 +17351,16 @@ entry:
   store i64 %t3, i64* %keys
   %t4 = add i64 0, 0
   store i64 %t4, i64* %i
-  br label %while.cond96
-while.cond96:
+  br label %while.cond1245
+while.cond1245:
   %t5 = load i64, i64* %i
   %t6 = load i64, i64* %keys
   %t7 = call i64 @__list_length(i64 %t6)
   %t9 = icmp slt i64 %t5, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body97, label %while.end98
-while.body97:
+  br i1 %t10, label %while.body1246, label %while.end1247
+while.body1246:
   %t11 = load i64, i64* %classes
   %t12 = load i64, i64* %keys
   %t13 = load i64, i64* %i
@@ -10548,8 +17372,8 @@ while.body97:
   %t19 = call i64 @__list_get(i64 %t12, i64 %t18)
   %t20 = call i64 @__map_get(i64 %t11, i64 %t19)
   %t21 = trunc i64 %t20 to i1
-  br i1 %t21, label %then100, label %else101
-then100:
+  br i1 %t21, label %then1249, label %else1250
+then1249:
   %t22 = load i64, i64* %result
   %t23 = load i64, i64* %keys
   %t24 = load i64, i64* %i
@@ -10560,18 +17384,18 @@ then100:
   %t29 = select i1 %t26, i64 %t28, i64 %t25
   %t30 = call i64 @__list_get(i64 %t23, i64 %t29)
   %t31 = call i64 @__list_push(i64 %t22, i64 %t30)
-  br label %endif99
-else101:
-  br label %endif99
-endif99:
+  br label %endif1248
+else1250:
+  br label %endif1248
+endif1248:
   %t32 = load i64, i64* %i
   %t33 = add i64 0, 1
   %t34 = add i64 %t32, %t33
   store i64 %t34, i64* %i
-  br label %while.cond96
-while.end98:
+  br label %while.cond1245
+while.end1247:
   %t35 = load i64, i64* %result
-  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.257, i64 0, i64 0
+  %t36 = getelementptr [2 x i8], [2 x i8]* @.str.499, i64 0, i64 0
   %t37 = ptrtoint i8* %t36 to i64
   %t38 = call i64 @__list_join(i64 %t35, i64 %t37)
   ret i64 %t38
@@ -10583,7 +17407,7 @@ entry:
   %t2 = add i64 0, 1
   %t3 = add i64 %t1, %t2
   store i64 %t3, i64* @__g_turmeric_style__scope_counter
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.258, i64 0, i64 0
+  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.500, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i64
   %t6 = load i64, i64* @__g_turmeric_style__scope_counter
   %t7 = call i64 @__val_untag_int(i64 %t6)
@@ -10632,16 +17456,16 @@ entry:
   store i64 %t14, i64* %keys
   %t15 = add i64 0, 0
   store i64 %t15, i64* %i
-  br label %while.cond102
-while.cond102:
+  br label %while.cond1251
+while.cond1251:
   %t16 = load i64, i64* %i
   %t17 = load i64, i64* %keys
   %t18 = call i64 @__list_length(i64 %t17)
   %t20 = icmp slt i64 %t16, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %while.body103, label %while.end104
-while.body103:
+  br i1 %t21, label %while.body1252, label %while.end1253
+while.body1252:
   %t22 = load i64, i64* %keys
   %t23 = load i64, i64* %i
   %t24 = call i64 @__val_untag_int(i64 %t23)
@@ -10682,7 +17506,7 @@ while.body103:
   %t54 = inttoptr i64 %t53 to %turmeric_style_ScopedStyles*
   %t55 = getelementptr %turmeric_style_ScopedStyles, %turmeric_style_ScopedStyles* %t54, i32 0, i32 1
   %t56 = load volatile i64, i64* %t55
-  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.259, i64 0, i64 0
+  %t57 = getelementptr [2 x i8], [2 x i8]* @.str.501, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = load i64, i64* %scoped_name
   %t60 = inttoptr i64 %t58 to i8*
@@ -10695,7 +17519,7 @@ while.body103:
   call i8* @strcpy(i8* %t66, i8* %t60)
   call i8* @strcat(i8* %t66, i8* %t61)
   %t67 = ptrtoint i8* %t66 to i64
-  %t68 = getelementptr [4 x i8], [4 x i8]* @.str.260, i64 0, i64 0
+  %t68 = getelementptr [4 x i8], [4 x i8]* @.str.502, i64 0, i64 0
   %t69 = ptrtoint i8* %t68 to i64
   %t70 = inttoptr i64 %t67 to i8*
   %t71 = inttoptr i64 %t69 to i8*
@@ -10718,7 +17542,7 @@ while.body103:
   call i8* @strcpy(i8* %t85, i8* %t79)
   call i8* @strcat(i8* %t85, i8* %t80)
   %t86 = ptrtoint i8* %t85 to i64
-  %t87 = getelementptr [3 x i8], [3 x i8]* @.str.261, i64 0, i64 0
+  %t87 = getelementptr [3 x i8], [3 x i8]* @.str.503, i64 0, i64 0
   %t88 = ptrtoint i8* %t87 to i64
   %t89 = inttoptr i64 %t86 to i8*
   %t90 = inttoptr i64 %t88 to i8*
@@ -10735,8 +17559,8 @@ while.body103:
   %t99 = add i64 0, 1
   %t100 = add i64 %t98, %t99
   store i64 %t100, i64* %i
-  br label %while.cond102
-while.end104:
+  br label %while.cond1251
+while.end1253:
   ret i64 0
 }
 
@@ -10763,7 +17587,7 @@ entry:
   %t2 = inttoptr i64 %t1 to %turmeric_style_ScopedStyles*
   %t3 = getelementptr %turmeric_style_ScopedStyles, %turmeric_style_ScopedStyles* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
-  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.262, i64 0, i64 0
+  %t5 = getelementptr [2 x i8], [2 x i8]* @.str.504, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = call i64 @__list_join(i64 %t4, i64 %t6)
   ret i64 %t7
@@ -10807,33 +17631,33 @@ entry:
   store i64 %t3, i64* %keys
   %t4 = add i64 0, 0
   store i64 %t4, i64* %i
-  br label %while.cond105
-while.cond105:
+  br label %while.cond1254
+while.cond1254:
   %t5 = load i64, i64* %i
   %t6 = load i64, i64* %keys
   %t7 = call i64 @__list_length(i64 %t6)
   %t9 = icmp slt i64 %t5, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body106, label %while.end107
-while.body106:
+  br i1 %t10, label %while.body1255, label %while.end1256
+while.body1255:
   %t11 = load i64, i64* %i
   %t12 = add i64 0, 0
   %t14 = icmp sgt i64 %t11, %t12
   %t13 = zext i1 %t14 to i64
   %t15 = trunc i64 %t13 to i1
-  br i1 %t15, label %then109, label %else110
-then109:
+  br i1 %t15, label %then1258, label %else1259
+then1258:
   %t16 = load i64, i64* %sb
-  %t17 = getelementptr [3 x i8], [3 x i8]* @.str.263, i64 0, i64 0
+  %t17 = getelementptr [3 x i8], [3 x i8]* @.str.505, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i8* @__val_untag_ptr(i64 %t18)
   %t20 = ptrtoint i8* %t19 to i64
   %t21 = call i64 @__sb_append(i64 %t16, i64 %t20)
-  br label %endif108
-else110:
-  br label %endif108
-endif108:
+  br label %endif1257
+else1259:
+  br label %endif1257
+endif1257:
   %t22 = load i64, i64* %sb
   %t23 = load i64, i64* %keys
   %t24 = load i64, i64* %i
@@ -10847,7 +17671,7 @@ endif108:
   %t32 = ptrtoint i8* %t31 to i64
   %t33 = call i64 @__sb_append(i64 %t22, i64 %t32)
   %t34 = load i64, i64* %sb
-  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.264, i64 0, i64 0
+  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.506, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = call i8* @__val_untag_ptr(i64 %t36)
   %t38 = ptrtoint i8* %t37 to i64
@@ -10870,8 +17694,8 @@ endif108:
   %t55 = add i64 0, 1
   %t56 = add i64 %t54, %t55
   store i64 %t56, i64* %i
-  br label %while.cond105
-while.end107:
+  br label %while.cond1254
+while.end1256:
   %t57 = load i64, i64* %sb
   %t58 = call i64 @__sb_to_string(i64 %t57)
   ret i64 %t58
@@ -10908,7 +17732,7 @@ entry:
   %t2 = inttoptr i64 %t1 to %turmeric_style_Keyframes*
   %t3 = getelementptr %turmeric_style_Keyframes, %turmeric_style_Keyframes* %t2, i32 0, i32 1
   %t4 = load volatile i64, i64* %t3
-  %t5 = getelementptr [3 x i8], [3 x i8]* @.str.265, i64 0, i64 0
+  %t5 = getelementptr [3 x i8], [3 x i8]* @.str.507, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   %t7 = load i64, i64* %pct
   %t8 = inttoptr i64 %t6 to i8*
@@ -10921,7 +17745,7 @@ entry:
   call i8* @strcpy(i8* %t14, i8* %t8)
   call i8* @strcat(i8* %t14, i8* %t9)
   %t15 = ptrtoint i8* %t14 to i64
-  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.266, i64 0, i64 0
+  %t16 = getelementptr [4 x i8], [4 x i8]* @.str.508, i64 0, i64 0
   %t17 = ptrtoint i8* %t16 to i64
   %t18 = inttoptr i64 %t15 to i8*
   %t19 = inttoptr i64 %t17 to i8*
@@ -10944,7 +17768,7 @@ entry:
   call i8* @strcpy(i8* %t33, i8* %t27)
   call i8* @strcat(i8* %t33, i8* %t28)
   %t34 = ptrtoint i8* %t33 to i64
-  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.267, i64 0, i64 0
+  %t35 = getelementptr [3 x i8], [3 x i8]* @.str.509, i64 0, i64 0
   %t36 = ptrtoint i8* %t35 to i64
   %t37 = inttoptr i64 %t34 to i8*
   %t38 = inttoptr i64 %t36 to i8*
@@ -10968,7 +17792,7 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %css.arg, i64* %css
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [5 x i8], [5 x i8]* @.str.268, i64 0, i64 0
+  %t2 = getelementptr [5 x i8], [5 x i8]* @.str.510, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %css
   %t5 = call i64 @turmeric_style_Keyframes__at(i64 %t1, i64 %t3, i64 %t4)
@@ -10982,7 +17806,7 @@ entry:
   store i64 %self.arg, i64* %self
   store i64 %css.arg, i64* %css
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.269, i64 0, i64 0
+  %t2 = getelementptr [3 x i8], [3 x i8]* @.str.511, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %css
   %t5 = call i64 @turmeric_style_Keyframes__at(i64 %t1, i64 %t3, i64 %t4)
@@ -10998,7 +17822,7 @@ entry:
   %t1 = call i64 @StringBuilder()
   store i64 %t1, i64* %sb
   %t2 = load i64, i64* %sb
-  %t3 = getelementptr [12 x i8], [12 x i8]* @.str.270, i64 0, i64 0
+  %t3 = getelementptr [12 x i8], [12 x i8]* @.str.512, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = load i64, i64* %self
   %t6 = inttoptr i64 %t5 to %turmeric_style_Keyframes*
@@ -11014,7 +17838,7 @@ entry:
   call i8* @strcpy(i8* %t15, i8* %t9)
   call i8* @strcat(i8* %t15, i8* %t10)
   %t16 = ptrtoint i8* %t15 to i64
-  %t17 = getelementptr [4 x i8], [4 x i8]* @.str.271, i64 0, i64 0
+  %t17 = getelementptr [4 x i8], [4 x i8]* @.str.513, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = inttoptr i64 %t16 to i8*
   %t20 = inttoptr i64 %t18 to i8*
@@ -11031,8 +17855,8 @@ entry:
   %t29 = call i64 @__sb_append(i64 %t2, i64 %t28)
   %t30 = add i64 0, 0
   store i64 %t30, i64* %i
-  br label %while.cond111
-while.cond111:
+  br label %while.cond1260
+while.cond1260:
   %t31 = load i64, i64* %i
   %t32 = load i64, i64* %self
   %t33 = inttoptr i64 %t32 to %turmeric_style_Keyframes*
@@ -11042,8 +17866,8 @@ while.cond111:
   %t38 = icmp slt i64 %t31, %t36
   %t37 = zext i1 %t38 to i64
   %t39 = trunc i64 %t37 to i1
-  br i1 %t39, label %while.body112, label %while.end113
-while.body112:
+  br i1 %t39, label %while.body1261, label %while.end1262
+while.body1261:
   %t40 = load i64, i64* %sb
   %t41 = load i64, i64* %self
   %t42 = inttoptr i64 %t41 to %turmeric_style_Keyframes*
@@ -11060,7 +17884,7 @@ while.body112:
   %t53 = ptrtoint i8* %t52 to i64
   %t54 = call i64 @__sb_append(i64 %t40, i64 %t53)
   %t55 = load i64, i64* %sb
-  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.272, i64 0, i64 0
+  %t56 = getelementptr [2 x i8], [2 x i8]* @.str.514, i64 0, i64 0
   %t57 = ptrtoint i8* %t56 to i64
   %t58 = call i8* @__val_untag_ptr(i64 %t57)
   %t59 = ptrtoint i8* %t58 to i64
@@ -11069,10 +17893,10 @@ while.body112:
   %t62 = add i64 0, 1
   %t63 = add i64 %t61, %t62
   store i64 %t63, i64* %i
-  br label %while.cond111
-while.end113:
+  br label %while.cond1260
+while.end1262:
   %t64 = load i64, i64* %sb
-  %t65 = getelementptr [2 x i8], [2 x i8]* @.str.273, i64 0, i64 0
+  %t65 = getelementptr [2 x i8], [2 x i8]* @.str.515, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = call i8* @__val_untag_ptr(i64 %t66)
   %t68 = ptrtoint i8* %t67 to i64
@@ -11246,13 +18070,13 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.274, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.516, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = inttoptr i64 %t1 to %turmeric_events_KeyboardEventData*
   %t5 = getelementptr %turmeric_events_KeyboardEventData, %turmeric_events_KeyboardEventData* %t4, i32 0, i32 0
   store volatile i64 %t3, i64* %t5
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.275, i64 0, i64 0
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.517, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = inttoptr i64 %t6 to %turmeric_events_KeyboardEventData*
   %t10 = getelementptr %turmeric_events_KeyboardEventData, %turmeric_events_KeyboardEventData* %t9, i32 0, i32 1
@@ -11319,19 +18143,19 @@ entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
   %t1 = load i64, i64* %self
-  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.276, i64 0, i64 0
+  %t2 = getelementptr [1 x i8], [1 x i8]* @.str.518, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = inttoptr i64 %t1 to %turmeric_events_InputEventData*
   %t5 = getelementptr %turmeric_events_InputEventData, %turmeric_events_InputEventData* %t4, i32 0, i32 0
   store volatile i64 %t3, i64* %t5
   %t6 = load i64, i64* %self
-  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.277, i64 0, i64 0
+  %t7 = getelementptr [1 x i8], [1 x i8]* @.str.519, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = inttoptr i64 %t6 to %turmeric_events_InputEventData*
   %t10 = getelementptr %turmeric_events_InputEventData, %turmeric_events_InputEventData* %t9, i32 0, i32 1
   store volatile i64 %t8, i64* %t10
   %t11 = load i64, i64* %self
-  %t12 = getelementptr [1 x i8], [1 x i8]* @.str.278, i64 0, i64 0
+  %t12 = getelementptr [1 x i8], [1 x i8]* @.str.520, i64 0, i64 0
   %t13 = ptrtoint i8* %t12 to i64
   %t14 = inttoptr i64 %t11 to %turmeric_events_InputEventData*
   %t15 = getelementptr %turmeric_events_InputEventData, %turmeric_events_InputEventData* %t14, i32 0, i32 2
@@ -11412,7 +18236,7 @@ entry:
   %t8 = getelementptr %turmeric_events_DragEventData, %turmeric_events_DragEventData* %t7, i32 0, i32 1
   store volatile i64 %t6, i64* %t8
   %t9 = load i64, i64* %self
-  %t10 = getelementptr [1 x i8], [1 x i8]* @.str.279, i64 0, i64 0
+  %t10 = getelementptr [1 x i8], [1 x i8]* @.str.521, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = inttoptr i64 %t9 to %turmeric_events_DragEventData*
   %t13 = getelementptr %turmeric_events_DragEventData, %turmeric_events_DragEventData* %t12, i32 0, i32 2
@@ -11698,290 +18522,290 @@ entry:
 define linkonce_odr i64 @Event__to_string(i64 %self) {
 entry:
   %t1 = lshr i64 %self, 56
-  switch i64 %t1, label %ets.end114 [ i64 0, label %ets.v115 i64 1, label %ets.v116 i64 2, label %ets.v117 i64 3, label %ets.v118 i64 4, label %ets.v119 i64 5, label %ets.v120 i64 6, label %ets.v121 i64 7, label %ets.v122 i64 8, label %ets.v123 i64 9, label %ets.v124 i64 10, label %ets.v125 i64 11, label %ets.v126 i64 12, label %ets.v127 i64 13, label %ets.v128 i64 14, label %ets.v129 i64 15, label %ets.v130 i64 16, label %ets.v131 i64 17, label %ets.v132 i64 18, label %ets.v133 i64 19, label %ets.v134 i64 20, label %ets.v135 i64 21, label %ets.v136 i64 22, label %ets.v137 ]
-ets.v115:
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.280, i64 0, i64 0
+  switch i64 %t1, label %ets.end1263 [ i64 0, label %ets.v1264 i64 1, label %ets.v1265 i64 2, label %ets.v1266 i64 3, label %ets.v1267 i64 4, label %ets.v1268 i64 5, label %ets.v1269 i64 6, label %ets.v1270 i64 7, label %ets.v1271 i64 8, label %ets.v1272 i64 9, label %ets.v1273 i64 10, label %ets.v1274 i64 11, label %ets.v1275 i64 12, label %ets.v1276 i64 13, label %ets.v1277 i64 14, label %ets.v1278 i64 15, label %ets.v1279 i64 16, label %ets.v1280 i64 17, label %ets.v1281 i64 18, label %ets.v1282 i64 19, label %ets.v1283 i64 20, label %ets.v1284 i64 21, label %ets.v1285 i64 22, label %ets.v1286 ]
+ets.v1264:
+  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.522, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t4, i64 %t3)
   %t5 = and i64 %self, 72057594037927935
   %t6 = call i64 @__int_to_string(i64 %t5)
   call i64 @__sb_append(i64 %t4, i64 %t6)
-  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.281, i64 0, i64 0
+  %t7 = getelementptr [2 x i8], [2 x i8]* @.str.523, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   call i64 @__sb_append(i64 %t4, i64 %t8)
   %t9 = call i64 @__sb_to_string(i64 %t4)
   ret i64 %t9
-ets.v116:
-  %t10 = getelementptr [10 x i8], [10 x i8]* @.str.282, i64 0, i64 0
+ets.v1265:
+  %t10 = getelementptr [10 x i8], [10 x i8]* @.str.524, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t12, i64 %t11)
   %t13 = and i64 %self, 72057594037927935
   %t14 = call i64 @__int_to_string(i64 %t13)
   call i64 @__sb_append(i64 %t12, i64 %t14)
-  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.283, i64 0, i64 0
+  %t15 = getelementptr [2 x i8], [2 x i8]* @.str.525, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
   call i64 @__sb_append(i64 %t12, i64 %t16)
   %t17 = call i64 @__sb_to_string(i64 %t12)
   ret i64 %t17
-ets.v117:
-  %t18 = getelementptr [11 x i8], [11 x i8]* @.str.284, i64 0, i64 0
+ets.v1266:
+  %t18 = getelementptr [11 x i8], [11 x i8]* @.str.526, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
   %t20 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t20, i64 %t19)
   %t21 = and i64 %self, 72057594037927935
   %t22 = call i64 @__int_to_string(i64 %t21)
   call i64 @__sb_append(i64 %t20, i64 %t22)
-  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.285, i64 0, i64 0
+  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.527, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i64
   call i64 @__sb_append(i64 %t20, i64 %t24)
   %t25 = call i64 @__sb_to_string(i64 %t20)
   ret i64 %t25
-ets.v118:
-  %t26 = getelementptr [9 x i8], [9 x i8]* @.str.286, i64 0, i64 0
+ets.v1267:
+  %t26 = getelementptr [9 x i8], [9 x i8]* @.str.528, i64 0, i64 0
   %t27 = ptrtoint i8* %t26 to i64
   %t28 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t28, i64 %t27)
   %t29 = and i64 %self, 72057594037927935
   %t30 = call i64 @__int_to_string(i64 %t29)
   call i64 @__sb_append(i64 %t28, i64 %t30)
-  %t31 = getelementptr [2 x i8], [2 x i8]* @.str.287, i64 0, i64 0
+  %t31 = getelementptr [2 x i8], [2 x i8]* @.str.529, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
   call i64 @__sb_append(i64 %t28, i64 %t32)
   %t33 = call i64 @__sb_to_string(i64 %t28)
   ret i64 %t33
-ets.v119:
-  %t34 = getelementptr [11 x i8], [11 x i8]* @.str.288, i64 0, i64 0
+ets.v1268:
+  %t34 = getelementptr [11 x i8], [11 x i8]* @.str.530, i64 0, i64 0
   %t35 = ptrtoint i8* %t34 to i64
   %t36 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t36, i64 %t35)
   %t37 = and i64 %self, 72057594037927935
   %t38 = call i64 @__int_to_string(i64 %t37)
   call i64 @__sb_append(i64 %t36, i64 %t38)
-  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.289, i64 0, i64 0
+  %t39 = getelementptr [2 x i8], [2 x i8]* @.str.531, i64 0, i64 0
   %t40 = ptrtoint i8* %t39 to i64
   call i64 @__sb_append(i64 %t36, i64 %t40)
   %t41 = call i64 @__sb_to_string(i64 %t36)
   ret i64 %t41
-ets.v120:
-  %t42 = getelementptr [12 x i8], [12 x i8]* @.str.290, i64 0, i64 0
+ets.v1269:
+  %t42 = getelementptr [12 x i8], [12 x i8]* @.str.532, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i64
   %t44 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t44, i64 %t43)
   %t45 = and i64 %self, 72057594037927935
   %t46 = call i64 @__int_to_string(i64 %t45)
   call i64 @__sb_append(i64 %t44, i64 %t46)
-  %t47 = getelementptr [2 x i8], [2 x i8]* @.str.291, i64 0, i64 0
+  %t47 = getelementptr [2 x i8], [2 x i8]* @.str.533, i64 0, i64 0
   %t48 = ptrtoint i8* %t47 to i64
   call i64 @__sb_append(i64 %t44, i64 %t48)
   %t49 = call i64 @__sb_to_string(i64 %t44)
   ret i64 %t49
-ets.v121:
-  %t50 = getelementptr [12 x i8], [12 x i8]* @.str.292, i64 0, i64 0
+ets.v1270:
+  %t50 = getelementptr [12 x i8], [12 x i8]* @.str.534, i64 0, i64 0
   %t51 = ptrtoint i8* %t50 to i64
   %t52 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t52, i64 %t51)
   %t53 = and i64 %self, 72057594037927935
   %t54 = call i64 @__int_to_string(i64 %t53)
   call i64 @__sb_append(i64 %t52, i64 %t54)
-  %t55 = getelementptr [2 x i8], [2 x i8]* @.str.293, i64 0, i64 0
+  %t55 = getelementptr [2 x i8], [2 x i8]* @.str.535, i64 0, i64 0
   %t56 = ptrtoint i8* %t55 to i64
   call i64 @__sb_append(i64 %t52, i64 %t56)
   %t57 = call i64 @__sb_to_string(i64 %t52)
   ret i64 %t57
-ets.v122:
-  %t58 = getelementptr [9 x i8], [9 x i8]* @.str.294, i64 0, i64 0
+ets.v1271:
+  %t58 = getelementptr [9 x i8], [9 x i8]* @.str.536, i64 0, i64 0
   %t59 = ptrtoint i8* %t58 to i64
   %t60 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t60, i64 %t59)
   %t61 = and i64 %self, 72057594037927935
   %t62 = call i64 @__int_to_string(i64 %t61)
   call i64 @__sb_append(i64 %t60, i64 %t62)
-  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.295, i64 0, i64 0
+  %t63 = getelementptr [2 x i8], [2 x i8]* @.str.537, i64 0, i64 0
   %t64 = ptrtoint i8* %t63 to i64
   call i64 @__sb_append(i64 %t60, i64 %t64)
   %t65 = call i64 @__sb_to_string(i64 %t60)
   ret i64 %t65
-ets.v123:
-  %t66 = getelementptr [7 x i8], [7 x i8]* @.str.296, i64 0, i64 0
+ets.v1272:
+  %t66 = getelementptr [7 x i8], [7 x i8]* @.str.538, i64 0, i64 0
   %t67 = ptrtoint i8* %t66 to i64
   %t68 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t68, i64 %t67)
   %t69 = and i64 %self, 72057594037927935
   %t70 = call i64 @__int_to_string(i64 %t69)
   call i64 @__sb_append(i64 %t68, i64 %t70)
-  %t71 = getelementptr [2 x i8], [2 x i8]* @.str.297, i64 0, i64 0
+  %t71 = getelementptr [2 x i8], [2 x i8]* @.str.539, i64 0, i64 0
   %t72 = ptrtoint i8* %t71 to i64
   call i64 @__sb_append(i64 %t68, i64 %t72)
   %t73 = call i64 @__sb_to_string(i64 %t68)
   ret i64 %t73
-ets.v124:
-  %t74 = getelementptr [7 x i8], [7 x i8]* @.str.298, i64 0, i64 0
+ets.v1273:
+  %t74 = getelementptr [7 x i8], [7 x i8]* @.str.540, i64 0, i64 0
   %t75 = ptrtoint i8* %t74 to i64
   %t76 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t76, i64 %t75)
   %t77 = and i64 %self, 72057594037927935
   %t78 = call i64 @__int_to_string(i64 %t77)
   call i64 @__sb_append(i64 %t76, i64 %t78)
-  %t79 = getelementptr [2 x i8], [2 x i8]* @.str.299, i64 0, i64 0
+  %t79 = getelementptr [2 x i8], [2 x i8]* @.str.541, i64 0, i64 0
   %t80 = ptrtoint i8* %t79 to i64
   call i64 @__sb_append(i64 %t76, i64 %t80)
   %t81 = call i64 @__sb_to_string(i64 %t76)
   ret i64 %t81
-ets.v125:
-  %t82 = getelementptr [8 x i8], [8 x i8]* @.str.300, i64 0, i64 0
+ets.v1274:
+  %t82 = getelementptr [8 x i8], [8 x i8]* @.str.542, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i64
   %t84 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t84, i64 %t83)
   %t85 = and i64 %self, 72057594037927935
   %t86 = call i64 @__int_to_string(i64 %t85)
   call i64 @__sb_append(i64 %t84, i64 %t86)
-  %t87 = getelementptr [2 x i8], [2 x i8]* @.str.301, i64 0, i64 0
+  %t87 = getelementptr [2 x i8], [2 x i8]* @.str.543, i64 0, i64 0
   %t88 = ptrtoint i8* %t87 to i64
   call i64 @__sb_append(i64 %t84, i64 %t88)
   %t89 = call i64 @__sb_to_string(i64 %t84)
   ret i64 %t89
-ets.v126:
-  %t90 = getelementptr [7 x i8], [7 x i8]* @.str.302, i64 0, i64 0
+ets.v1275:
+  %t90 = getelementptr [7 x i8], [7 x i8]* @.str.544, i64 0, i64 0
   %t91 = ptrtoint i8* %t90 to i64
   %t92 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t92, i64 %t91)
   %t93 = and i64 %self, 72057594037927935
   %t94 = call i64 @__int_to_string(i64 %t93)
   call i64 @__sb_append(i64 %t92, i64 %t94)
-  %t95 = getelementptr [2 x i8], [2 x i8]* @.str.303, i64 0, i64 0
+  %t95 = getelementptr [2 x i8], [2 x i8]* @.str.545, i64 0, i64 0
   %t96 = ptrtoint i8* %t95 to i64
   call i64 @__sb_append(i64 %t92, i64 %t96)
   %t97 = call i64 @__sb_to_string(i64 %t92)
   ret i64 %t97
-ets.v127:
-  %t98 = getelementptr [6 x i8], [6 x i8]* @.str.304, i64 0, i64 0
+ets.v1276:
+  %t98 = getelementptr [6 x i8], [6 x i8]* @.str.546, i64 0, i64 0
   %t99 = ptrtoint i8* %t98 to i64
   %t100 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t100, i64 %t99)
   %t101 = and i64 %self, 72057594037927935
   %t102 = call i64 @__int_to_string(i64 %t101)
   call i64 @__sb_append(i64 %t100, i64 %t102)
-  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.305, i64 0, i64 0
+  %t103 = getelementptr [2 x i8], [2 x i8]* @.str.547, i64 0, i64 0
   %t104 = ptrtoint i8* %t103 to i64
   call i64 @__sb_append(i64 %t100, i64 %t104)
   %t105 = call i64 @__sb_to_string(i64 %t100)
   ret i64 %t105
-ets.v128:
-  %t106 = getelementptr [8 x i8], [8 x i8]* @.str.306, i64 0, i64 0
+ets.v1277:
+  %t106 = getelementptr [8 x i8], [8 x i8]* @.str.548, i64 0, i64 0
   %t107 = ptrtoint i8* %t106 to i64
   %t108 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t108, i64 %t107)
   %t109 = and i64 %self, 72057594037927935
   %t110 = call i64 @__int_to_string(i64 %t109)
   call i64 @__sb_append(i64 %t108, i64 %t110)
-  %t111 = getelementptr [2 x i8], [2 x i8]* @.str.307, i64 0, i64 0
+  %t111 = getelementptr [2 x i8], [2 x i8]* @.str.549, i64 0, i64 0
   %t112 = ptrtoint i8* %t111 to i64
   call i64 @__sb_append(i64 %t108, i64 %t112)
   %t113 = call i64 @__sb_to_string(i64 %t108)
   ret i64 %t113
-ets.v129:
-  %t114 = getelementptr [7 x i8], [7 x i8]* @.str.308, i64 0, i64 0
+ets.v1278:
+  %t114 = getelementptr [7 x i8], [7 x i8]* @.str.550, i64 0, i64 0
   %t115 = ptrtoint i8* %t114 to i64
   %t116 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t116, i64 %t115)
   %t117 = and i64 %self, 72057594037927935
   %t118 = call i64 @__int_to_string(i64 %t117)
   call i64 @__sb_append(i64 %t116, i64 %t118)
-  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.309, i64 0, i64 0
+  %t119 = getelementptr [2 x i8], [2 x i8]* @.str.551, i64 0, i64 0
   %t120 = ptrtoint i8* %t119 to i64
   call i64 @__sb_append(i64 %t116, i64 %t120)
   %t121 = call i64 @__sb_to_string(i64 %t116)
   ret i64 %t121
-ets.v130:
-  %t122 = getelementptr [12 x i8], [12 x i8]* @.str.310, i64 0, i64 0
+ets.v1279:
+  %t122 = getelementptr [12 x i8], [12 x i8]* @.str.552, i64 0, i64 0
   %t123 = ptrtoint i8* %t122 to i64
   %t124 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t124, i64 %t123)
   %t125 = and i64 %self, 72057594037927935
   %t126 = call i64 @__int_to_string(i64 %t125)
   call i64 @__sb_append(i64 %t124, i64 %t126)
-  %t127 = getelementptr [2 x i8], [2 x i8]* @.str.311, i64 0, i64 0
+  %t127 = getelementptr [2 x i8], [2 x i8]* @.str.553, i64 0, i64 0
   %t128 = ptrtoint i8* %t127 to i64
   call i64 @__sb_append(i64 %t124, i64 %t128)
   %t129 = call i64 @__sb_to_string(i64 %t124)
   ret i64 %t129
-ets.v131:
-  %t130 = getelementptr [11 x i8], [11 x i8]* @.str.312, i64 0, i64 0
+ets.v1280:
+  %t130 = getelementptr [11 x i8], [11 x i8]* @.str.554, i64 0, i64 0
   %t131 = ptrtoint i8* %t130 to i64
   %t132 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t132, i64 %t131)
   %t133 = and i64 %self, 72057594037927935
   %t134 = call i64 @__int_to_string(i64 %t133)
   call i64 @__sb_append(i64 %t132, i64 %t134)
-  %t135 = getelementptr [2 x i8], [2 x i8]* @.str.313, i64 0, i64 0
+  %t135 = getelementptr [2 x i8], [2 x i8]* @.str.555, i64 0, i64 0
   %t136 = ptrtoint i8* %t135 to i64
   call i64 @__sb_append(i64 %t132, i64 %t136)
   %t137 = call i64 @__sb_to_string(i64 %t132)
   ret i64 %t137
-ets.v132:
-  %t138 = getelementptr [10 x i8], [10 x i8]* @.str.314, i64 0, i64 0
+ets.v1281:
+  %t138 = getelementptr [10 x i8], [10 x i8]* @.str.556, i64 0, i64 0
   %t139 = ptrtoint i8* %t138 to i64
   %t140 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t140, i64 %t139)
   %t141 = and i64 %self, 72057594037927935
   %t142 = call i64 @__int_to_string(i64 %t141)
   call i64 @__sb_append(i64 %t140, i64 %t142)
-  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.315, i64 0, i64 0
+  %t143 = getelementptr [2 x i8], [2 x i8]* @.str.557, i64 0, i64 0
   %t144 = ptrtoint i8* %t143 to i64
   call i64 @__sb_append(i64 %t140, i64 %t144)
   %t145 = call i64 @__sb_to_string(i64 %t140)
   ret i64 %t145
-ets.v133:
-  %t146 = getelementptr [11 x i8], [11 x i8]* @.str.316, i64 0, i64 0
+ets.v1282:
+  %t146 = getelementptr [11 x i8], [11 x i8]* @.str.558, i64 0, i64 0
   %t147 = ptrtoint i8* %t146 to i64
   %t148 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t148, i64 %t147)
   %t149 = and i64 %self, 72057594037927935
   %t150 = call i64 @__int_to_string(i64 %t149)
   call i64 @__sb_append(i64 %t148, i64 %t150)
-  %t151 = getelementptr [2 x i8], [2 x i8]* @.str.317, i64 0, i64 0
+  %t151 = getelementptr [2 x i8], [2 x i8]* @.str.559, i64 0, i64 0
   %t152 = ptrtoint i8* %t151 to i64
   call i64 @__sb_append(i64 %t148, i64 %t152)
   %t153 = call i64 @__sb_to_string(i64 %t148)
   ret i64 %t153
-ets.v134:
-  %t154 = getelementptr [9 x i8], [9 x i8]* @.str.318, i64 0, i64 0
+ets.v1283:
+  %t154 = getelementptr [9 x i8], [9 x i8]* @.str.560, i64 0, i64 0
   %t155 = ptrtoint i8* %t154 to i64
   %t156 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t156, i64 %t155)
   %t157 = and i64 %self, 72057594037927935
   %t158 = call i64 @__int_to_string(i64 %t157)
   call i64 @__sb_append(i64 %t156, i64 %t158)
-  %t159 = getelementptr [2 x i8], [2 x i8]* @.str.319, i64 0, i64 0
+  %t159 = getelementptr [2 x i8], [2 x i8]* @.str.561, i64 0, i64 0
   %t160 = ptrtoint i8* %t159 to i64
   call i64 @__sb_append(i64 %t156, i64 %t160)
   %t161 = call i64 @__sb_to_string(i64 %t156)
   ret i64 %t161
-ets.v135:
-  %t162 = getelementptr [6 x i8], [6 x i8]* @.str.320, i64 0, i64 0
+ets.v1284:
+  %t162 = getelementptr [6 x i8], [6 x i8]* @.str.562, i64 0, i64 0
   %t163 = ptrtoint i8* %t162 to i64
   %t164 = call i64 @StringBuilder()
   call i64 @__sb_append(i64 %t164, i64 %t163)
   %t165 = and i64 %self, 72057594037927935
   %t166 = call i64 @__int_to_string(i64 %t165)
   call i64 @__sb_append(i64 %t164, i64 %t166)
-  %t167 = getelementptr [2 x i8], [2 x i8]* @.str.321, i64 0, i64 0
+  %t167 = getelementptr [2 x i8], [2 x i8]* @.str.563, i64 0, i64 0
   %t168 = ptrtoint i8* %t167 to i64
   call i64 @__sb_append(i64 %t164, i64 %t168)
   %t169 = call i64 @__sb_to_string(i64 %t164)
   ret i64 %t169
-ets.v136:
-  %t170 = getelementptr [7 x i8], [7 x i8]* @.str.322, i64 0, i64 0
+ets.v1285:
+  %t170 = getelementptr [7 x i8], [7 x i8]* @.str.564, i64 0, i64 0
   %t171 = ptrtoint i8* %t170 to i64
   ret i64 %t171
-ets.v137:
-  %t172 = getelementptr [7 x i8], [7 x i8]* @.str.323, i64 0, i64 0
+ets.v1286:
+  %t172 = getelementptr [7 x i8], [7 x i8]* @.str.565, i64 0, i64 0
   %t173 = ptrtoint i8* %t172 to i64
   ret i64 %t173
-ets.end114:
-  %t174 = getelementptr [8 x i8], [8 x i8]* @.str.324, i64 0, i64 0
+ets.end1263:
+  %t174 = getelementptr [8 x i8], [8 x i8]* @.str.566, i64 0, i64 0
   %t175 = ptrtoint i8* %t174 to i64
   ret i64 %t175
 }
@@ -12019,28 +18843,28 @@ entry:
   store i64 %t2, i64* %id
   %t3 = load i64, i64* %prevent_default
   %t4 = trunc i64 %t3 to i1
-  br i1 %t4, label %then139, label %else140
-then139:
+  br i1 %t4, label %then1288, label %else1289
+then1288:
   %t5 = load i64, i64* @__g_turmeric_events__prevent_defaults
   %t6 = load i64, i64* %id
   %t7 = add i64 0, 1
   %t8 = call i64 @__map_set(i64 %t5, i64 %t6, i64 %t7)
-  br label %endif138
-else140:
-  br label %endif138
-endif138:
+  br label %endif1287
+else1289:
+  br label %endif1287
+endif1287:
   %t9 = load i64, i64* %stop_propagation
   %t10 = trunc i64 %t9 to i1
-  br i1 %t10, label %then142, label %else143
-then142:
+  br i1 %t10, label %then1291, label %else1292
+then1291:
   %t11 = load i64, i64* @__g_turmeric_events__stop_propagations
   %t12 = load i64, i64* %id
   %t13 = add i64 0, 1
   %t14 = call i64 @__map_set(i64 %t11, i64 %t12, i64 %t13)
-  br label %endif141
-else143:
-  br label %endif141
-endif141:
+  br label %endif1290
+else1292:
+  br label %endif1290
+endif1290:
   %t15 = load i64, i64* %id
   ret i64 %t15
 }
@@ -12078,44 +18902,44 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then145, label %else146
-then145:
+  br i1 %t8, label %then1294, label %else1295
+then1294:
   ret i64 0
-else146:
-  br label %endif144
-endif144:
+else1295:
+  br label %endif1293
+endif1293:
   %t9 = load i64, i64* @__g_turmeric_events__prevent_defaults
   %t10 = load i64, i64* %callback_id
   %t11 = call i64 @__map_has(i64 %t9, i64 %t10)
   %t12 = call i64 @__val_tag_bool(i64 %t11)
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then148, label %else149
-then148:
+  br i1 %t13, label %then1297, label %else1298
+then1297:
   %t14 = load i64, i64* %event_ptr
   call void @js_event_prevent_default(i64 %t14)
-  br label %endif147
-else149:
-  br label %endif147
-endif147:
+  br label %endif1296
+else1298:
+  br label %endif1296
+endif1296:
   %t15 = load i64, i64* @__g_turmeric_events__stop_propagations
   %t16 = load i64, i64* %callback_id
   %t17 = call i64 @__map_has(i64 %t15, i64 %t16)
   %t18 = call i64 @__val_tag_bool(i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then151, label %else152
-then151:
+  br i1 %t19, label %then1300, label %else1301
+then1300:
   %t20 = load i64, i64* %event_ptr
   call void @js_event_stop_propagation(i64 %t20)
-  br label %endif150
-else152:
-  br label %endif150
-endif150:
+  br label %endif1299
+else1301:
+  br label %endif1299
+endif1299:
   %t21 = call i64 @turmeric_events_MouseEventData()
   %t22 = call i64 @turmeric_events_MouseEventData__init(i64 %t21)
   store i64 %t21, i64* %data
   %t23 = load i64, i64* %data
   %t24 = load i64, i64* %event_ptr
-  %t25 = getelementptr [8 x i8], [8 x i8]* @.str.325, i64 0, i64 0
+  %t25 = getelementptr [8 x i8], [8 x i8]* @.str.567, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i8* @__val_untag_ptr(i64 %t26)
   %t28 = call i64 @js_event_get_float(i64 %t24, i8* %t27)
@@ -12124,7 +18948,7 @@ endif150:
   store volatile i64 %t28, i64* %t30
   %t31 = load i64, i64* %data
   %t32 = load i64, i64* %event_ptr
-  %t33 = getelementptr [8 x i8], [8 x i8]* @.str.326, i64 0, i64 0
+  %t33 = getelementptr [8 x i8], [8 x i8]* @.str.568, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i8* @__val_untag_ptr(i64 %t34)
   %t36 = call i64 @js_event_get_float(i64 %t32, i8* %t35)
@@ -12133,7 +18957,7 @@ endif150:
   store volatile i64 %t36, i64* %t38
   %t39 = load i64, i64* %data
   %t40 = load i64, i64* %event_ptr
-  %t41 = getelementptr [8 x i8], [8 x i8]* @.str.327, i64 0, i64 0
+  %t41 = getelementptr [8 x i8], [8 x i8]* @.str.569, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = call i8* @__val_untag_ptr(i64 %t42)
   %t44 = call i64 @js_event_get_float(i64 %t40, i8* %t43)
@@ -12142,7 +18966,7 @@ endif150:
   store volatile i64 %t44, i64* %t46
   %t47 = load i64, i64* %data
   %t48 = load i64, i64* %event_ptr
-  %t49 = getelementptr [8 x i8], [8 x i8]* @.str.328, i64 0, i64 0
+  %t49 = getelementptr [8 x i8], [8 x i8]* @.str.570, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i8* @__val_untag_ptr(i64 %t50)
   %t52 = call i64 @js_event_get_float(i64 %t48, i8* %t51)
@@ -12151,7 +18975,7 @@ endif150:
   store volatile i64 %t52, i64* %t54
   %t55 = load i64, i64* %data
   %t56 = load i64, i64* %event_ptr
-  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.329, i64 0, i64 0
+  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.571, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i8* @__val_untag_ptr(i64 %t58)
   %t60 = call i64 @js_event_get_float(i64 %t56, i8* %t59)
@@ -12160,7 +18984,7 @@ endif150:
   store volatile i64 %t60, i64* %t62
   %t63 = load i64, i64* %data
   %t64 = load i64, i64* %event_ptr
-  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.330, i64 0, i64 0
+  %t65 = getelementptr [7 x i8], [7 x i8]* @.str.572, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = call i8* @__val_untag_ptr(i64 %t66)
   %t68 = call i64 @js_event_get_bool(i64 %t64, i8* %t67)
@@ -12169,7 +18993,7 @@ endif150:
   store volatile i64 %t68, i64* %t70
   %t71 = load i64, i64* %data
   %t72 = load i64, i64* %event_ptr
-  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.331, i64 0, i64 0
+  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.573, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   %t75 = call i8* @__val_untag_ptr(i64 %t74)
   %t76 = call i64 @js_event_get_bool(i64 %t72, i8* %t75)
@@ -12178,7 +19002,7 @@ endif150:
   store volatile i64 %t76, i64* %t78
   %t79 = load i64, i64* %data
   %t80 = load i64, i64* %event_ptr
-  %t81 = getelementptr [9 x i8], [9 x i8]* @.str.332, i64 0, i64 0
+  %t81 = getelementptr [9 x i8], [9 x i8]* @.str.574, i64 0, i64 0
   %t82 = ptrtoint i8* %t81 to i64
   %t83 = call i8* @__val_untag_ptr(i64 %t82)
   %t84 = call i64 @js_event_get_bool(i64 %t80, i8* %t83)
@@ -12187,7 +19011,7 @@ endif150:
   store volatile i64 %t84, i64* %t86
   %t87 = load i64, i64* %data
   %t88 = load i64, i64* %event_ptr
-  %t89 = getelementptr [8 x i8], [8 x i8]* @.str.333, i64 0, i64 0
+  %t89 = getelementptr [8 x i8], [8 x i8]* @.str.575, i64 0, i64 0
   %t90 = ptrtoint i8* %t89 to i64
   %t91 = call i8* @__val_untag_ptr(i64 %t90)
   %t92 = call i64 @js_event_get_bool(i64 %t88, i8* %t91)
@@ -12225,44 +19049,44 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then154, label %else155
-then154:
+  br i1 %t8, label %then1303, label %else1304
+then1303:
   ret i64 0
-else155:
-  br label %endif153
-endif153:
+else1304:
+  br label %endif1302
+endif1302:
   %t9 = load i64, i64* @__g_turmeric_events__prevent_defaults
   %t10 = load i64, i64* %callback_id
   %t11 = call i64 @__map_has(i64 %t9, i64 %t10)
   %t12 = call i64 @__val_tag_bool(i64 %t11)
   %t13 = trunc i64 %t12 to i1
-  br i1 %t13, label %then157, label %else158
-then157:
+  br i1 %t13, label %then1306, label %else1307
+then1306:
   %t14 = load i64, i64* %event_ptr
   call void @js_event_prevent_default(i64 %t14)
-  br label %endif156
-else158:
-  br label %endif156
-endif156:
+  br label %endif1305
+else1307:
+  br label %endif1305
+endif1305:
   %t15 = load i64, i64* @__g_turmeric_events__stop_propagations
   %t16 = load i64, i64* %callback_id
   %t17 = call i64 @__map_has(i64 %t15, i64 %t16)
   %t18 = call i64 @__val_tag_bool(i64 %t17)
   %t19 = trunc i64 %t18 to i1
-  br i1 %t19, label %then160, label %else161
-then160:
+  br i1 %t19, label %then1309, label %else1310
+then1309:
   %t20 = load i64, i64* %event_ptr
   call void @js_event_stop_propagation(i64 %t20)
-  br label %endif159
-else161:
-  br label %endif159
-endif159:
+  br label %endif1308
+else1310:
+  br label %endif1308
+endif1308:
   %t21 = call i64 @turmeric_events_KeyboardEventData()
   %t22 = call i64 @turmeric_events_KeyboardEventData__init(i64 %t21)
   store i64 %t21, i64* %data
   %t23 = load i64, i64* %data
   %t24 = load i64, i64* %event_ptr
-  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.334, i64 0, i64 0
+  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.576, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i64
   %t27 = call i8* @__val_untag_ptr(i64 %t26)
   %t28 = call i64 @js_event_get_string(i64 %t24, i8* %t27)
@@ -12271,7 +19095,7 @@ endif159:
   store volatile i64 %t28, i64* %t30
   %t31 = load i64, i64* %data
   %t32 = load i64, i64* %event_ptr
-  %t33 = getelementptr [5 x i8], [5 x i8]* @.str.335, i64 0, i64 0
+  %t33 = getelementptr [5 x i8], [5 x i8]* @.str.577, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i8* @__val_untag_ptr(i64 %t34)
   %t36 = call i64 @js_event_get_string(i64 %t32, i8* %t35)
@@ -12280,7 +19104,7 @@ endif159:
   store volatile i64 %t36, i64* %t38
   %t39 = load i64, i64* %data
   %t40 = load i64, i64* %event_ptr
-  %t41 = getelementptr [7 x i8], [7 x i8]* @.str.336, i64 0, i64 0
+  %t41 = getelementptr [7 x i8], [7 x i8]* @.str.578, i64 0, i64 0
   %t42 = ptrtoint i8* %t41 to i64
   %t43 = call i8* @__val_untag_ptr(i64 %t42)
   %t44 = call i64 @js_event_get_bool(i64 %t40, i8* %t43)
@@ -12289,7 +19113,7 @@ endif159:
   store volatile i64 %t44, i64* %t46
   %t47 = load i64, i64* %data
   %t48 = load i64, i64* %event_ptr
-  %t49 = getelementptr [7 x i8], [7 x i8]* @.str.337, i64 0, i64 0
+  %t49 = getelementptr [7 x i8], [7 x i8]* @.str.579, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   %t51 = call i8* @__val_untag_ptr(i64 %t50)
   %t52 = call i64 @js_event_get_bool(i64 %t48, i8* %t51)
@@ -12298,7 +19122,7 @@ endif159:
   store volatile i64 %t52, i64* %t54
   %t55 = load i64, i64* %data
   %t56 = load i64, i64* %event_ptr
-  %t57 = getelementptr [8 x i8], [8 x i8]* @.str.338, i64 0, i64 0
+  %t57 = getelementptr [8 x i8], [8 x i8]* @.str.580, i64 0, i64 0
   %t58 = ptrtoint i8* %t57 to i64
   %t59 = call i8* @__val_untag_ptr(i64 %t58)
   %t60 = call i64 @js_event_get_bool(i64 %t56, i8* %t59)
@@ -12307,7 +19131,7 @@ endif159:
   store volatile i64 %t60, i64* %t62
   %t63 = load i64, i64* %data
   %t64 = load i64, i64* %event_ptr
-  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.339, i64 0, i64 0
+  %t65 = getelementptr [9 x i8], [9 x i8]* @.str.581, i64 0, i64 0
   %t66 = ptrtoint i8* %t65 to i64
   %t67 = call i8* @__val_untag_ptr(i64 %t66)
   %t68 = call i64 @js_event_get_bool(i64 %t64, i8* %t67)
@@ -12316,7 +19140,7 @@ endif159:
   store volatile i64 %t68, i64* %t70
   %t71 = load i64, i64* %data
   %t72 = load i64, i64* %event_ptr
-  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.340, i64 0, i64 0
+  %t73 = getelementptr [8 x i8], [8 x i8]* @.str.582, i64 0, i64 0
   %t74 = ptrtoint i8* %t73 to i64
   %t75 = call i8* @__val_untag_ptr(i64 %t74)
   %t76 = call i64 @js_event_get_bool(i64 %t72, i8* %t75)
@@ -12354,18 +19178,18 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then163, label %else164
-then163:
+  br i1 %t8, label %then1312, label %else1313
+then1312:
   ret i64 0
-else164:
-  br label %endif162
-endif162:
+else1313:
+  br label %endif1311
+endif1311:
   %t9 = call i64 @turmeric_events_KeyboardEventData()
   %t10 = call i64 @turmeric_events_KeyboardEventData__init(i64 %t9)
   store i64 %t9, i64* %data
   %t11 = load i64, i64* %data
   %t12 = load i64, i64* %event_ptr
-  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.341, i64 0, i64 0
+  %t13 = getelementptr [4 x i8], [4 x i8]* @.str.583, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i8* @__val_untag_ptr(i64 %t14)
   %t16 = call i64 @js_event_get_string(i64 %t12, i8* %t15)
@@ -12374,7 +19198,7 @@ endif162:
   store volatile i64 %t16, i64* %t18
   %t19 = load i64, i64* %data
   %t20 = load i64, i64* %event_ptr
-  %t21 = getelementptr [5 x i8], [5 x i8]* @.str.342, i64 0, i64 0
+  %t21 = getelementptr [5 x i8], [5 x i8]* @.str.584, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i8* @__val_untag_ptr(i64 %t22)
   %t24 = call i64 @js_event_get_string(i64 %t20, i8* %t23)
@@ -12412,18 +19236,18 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then166, label %else167
-then166:
+  br i1 %t8, label %then1315, label %else1316
+then1315:
   ret i64 0
-else167:
-  br label %endif165
-endif165:
+else1316:
+  br label %endif1314
+endif1314:
   %t9 = call i64 @turmeric_events_InputEventData()
   %t10 = call i64 @turmeric_events_InputEventData__init(i64 %t9)
   store i64 %t9, i64* %data
   %t11 = load i64, i64* %data
   %t12 = load i64, i64* %event_ptr
-  %t13 = getelementptr [13 x i8], [13 x i8]* @.str.343, i64 0, i64 0
+  %t13 = getelementptr [13 x i8], [13 x i8]* @.str.585, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i8* @__val_untag_ptr(i64 %t14)
   %t16 = call i64 @js_event_get_string(i64 %t12, i8* %t15)
@@ -12432,7 +19256,7 @@ endif165:
   store volatile i64 %t16, i64* %t18
   %t19 = load i64, i64* %data
   %t20 = load i64, i64* %event_ptr
-  %t21 = getelementptr [10 x i8], [10 x i8]* @.str.344, i64 0, i64 0
+  %t21 = getelementptr [10 x i8], [10 x i8]* @.str.586, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i8* @__val_untag_ptr(i64 %t22)
   %t24 = call i64 @js_event_get_string(i64 %t20, i8* %t23)
@@ -12441,7 +19265,7 @@ endif165:
   store volatile i64 %t24, i64* %t26
   %t27 = load i64, i64* %data
   %t28 = load i64, i64* %event_ptr
-  %t29 = getelementptr [5 x i8], [5 x i8]* @.str.345, i64 0, i64 0
+  %t29 = getelementptr [5 x i8], [5 x i8]* @.str.587, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i8* @__val_untag_ptr(i64 %t30)
   %t32 = call i64 @js_event_get_string(i64 %t28, i8* %t31)
@@ -12479,18 +19303,18 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then169, label %else170
-then169:
+  br i1 %t8, label %then1318, label %else1319
+then1318:
   ret i64 0
-else170:
-  br label %endif168
-endif168:
+else1319:
+  br label %endif1317
+endif1317:
   %t9 = call i64 @turmeric_events_InputEventData()
   %t10 = call i64 @turmeric_events_InputEventData__init(i64 %t9)
   store i64 %t9, i64* %data
   %t11 = load i64, i64* %data
   %t12 = load i64, i64* %event_ptr
-  %t13 = getelementptr [13 x i8], [13 x i8]* @.str.346, i64 0, i64 0
+  %t13 = getelementptr [13 x i8], [13 x i8]* @.str.588, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i8* @__val_untag_ptr(i64 %t14)
   %t16 = call i64 @js_event_get_string(i64 %t12, i8* %t15)
@@ -12528,12 +19352,12 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then172, label %else173
-then172:
+  br i1 %t8, label %then1321, label %else1322
+then1321:
   ret i64 0
-else173:
-  br label %endif171
-endif171:
+else1322:
+  br label %endif1320
+endif1320:
   %t9 = load i64, i64* %event_ptr
   call void @js_event_prevent_default(i64 %t9)
   %t10 = call i64 @turmeric_events_SubmitEventData()
@@ -12570,12 +19394,12 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then175, label %else176
-then175:
+  br i1 %t8, label %then1324, label %else1325
+then1324:
   ret i64 0
-else176:
-  br label %endif174
-endif174:
+else1325:
+  br label %endif1323
+endif1323:
   %t9 = call i64 @turmeric_events_FocusEventData()
   %t10 = call i64 @turmeric_events_FocusEventData__init(i64 %t9)
   store i64 %t9, i64* %data
@@ -12610,12 +19434,12 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then178, label %else179
-then178:
+  br i1 %t8, label %then1327, label %else1328
+then1327:
   ret i64 0
-else179:
-  br label %endif177
-endif177:
+else1328:
+  br label %endif1326
+endif1326:
   %t9 = call i64 @turmeric_events_FocusEventData()
   %t10 = call i64 @turmeric_events_FocusEventData__init(i64 %t9)
   store i64 %t9, i64* %data
@@ -12650,18 +19474,18 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then181, label %else182
-then181:
+  br i1 %t8, label %then1330, label %else1331
+then1330:
   ret i64 0
-else182:
-  br label %endif180
-endif180:
+else1331:
+  br label %endif1329
+endif1329:
   %t9 = call i64 @turmeric_events_WheelEventData()
   %t10 = call i64 @turmeric_events_WheelEventData__init(i64 %t9)
   store i64 %t9, i64* %data
   %t11 = load i64, i64* %data
   %t12 = load i64, i64* %event_ptr
-  %t13 = getelementptr [7 x i8], [7 x i8]* @.str.347, i64 0, i64 0
+  %t13 = getelementptr [7 x i8], [7 x i8]* @.str.589, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i8* @__val_untag_ptr(i64 %t14)
   %t16 = call i64 @js_event_get_float(i64 %t12, i8* %t15)
@@ -12670,7 +19494,7 @@ endif180:
   store volatile i64 %t16, i64* %t18
   %t19 = load i64, i64* %data
   %t20 = load i64, i64* %event_ptr
-  %t21 = getelementptr [7 x i8], [7 x i8]* @.str.348, i64 0, i64 0
+  %t21 = getelementptr [7 x i8], [7 x i8]* @.str.590, i64 0, i64 0
   %t22 = ptrtoint i8* %t21 to i64
   %t23 = call i8* @__val_untag_ptr(i64 %t22)
   %t24 = call i64 @js_event_get_float(i64 %t20, i8* %t23)
@@ -12679,7 +19503,7 @@ endif180:
   store volatile i64 %t24, i64* %t26
   %t27 = load i64, i64* %data
   %t28 = load i64, i64* %event_ptr
-  %t29 = getelementptr [7 x i8], [7 x i8]* @.str.349, i64 0, i64 0
+  %t29 = getelementptr [7 x i8], [7 x i8]* @.str.591, i64 0, i64 0
   %t30 = ptrtoint i8* %t29 to i64
   %t31 = call i8* @__val_untag_ptr(i64 %t30)
   %t32 = call i64 @js_event_get_float(i64 %t28, i8* %t31)
@@ -12688,7 +19512,7 @@ endif180:
   store volatile i64 %t32, i64* %t34
   %t35 = load i64, i64* %data
   %t36 = load i64, i64* %event_ptr
-  %t37 = getelementptr [10 x i8], [10 x i8]* @.str.350, i64 0, i64 0
+  %t37 = getelementptr [10 x i8], [10 x i8]* @.str.592, i64 0, i64 0
   %t38 = ptrtoint i8* %t37 to i64
   %t39 = call i8* @__val_untag_ptr(i64 %t38)
   %t40 = call i64 @js_event_get_float(i64 %t36, i8* %t39)
@@ -12725,12 +19549,12 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then184, label %else185
-then184:
+  br i1 %t8, label %then1333, label %else1334
+then1333:
   ret i64 0
-else185:
-  br label %endif183
-endif183:
+else1334:
+  br label %endif1332
+endif1332:
   %t9 = load i64, i64* @__g_turmeric_events__callbacks
   %t10 = load i64, i64* %callback_id
   %t11 = call i64 @__map_get(i64 %t9, i64 %t10)
@@ -12807,7 +19631,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.351, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.593, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12821,7 +19645,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [9 x i8], [9 x i8]* @.str.352, i64 0, i64 0
+  %t2 = getelementptr [9 x i8], [9 x i8]* @.str.594, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12835,7 +19659,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [10 x i8], [10 x i8]* @.str.353, i64 0, i64 0
+  %t2 = getelementptr [10 x i8], [10 x i8]* @.str.595, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12849,7 +19673,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.354, i64 0, i64 0
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.596, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12863,7 +19687,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [10 x i8], [10 x i8]* @.str.355, i64 0, i64 0
+  %t2 = getelementptr [10 x i8], [10 x i8]* @.str.597, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12877,7 +19701,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [11 x i8], [11 x i8]* @.str.356, i64 0, i64 0
+  %t2 = getelementptr [11 x i8], [11 x i8]* @.str.598, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12891,7 +19715,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [11 x i8], [11 x i8]* @.str.357, i64 0, i64 0
+  %t2 = getelementptr [11 x i8], [11 x i8]* @.str.599, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12905,7 +19729,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.358, i64 0, i64 0
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.600, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12919,7 +19743,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.359, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.601, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12933,7 +19757,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.360, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.602, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12947,7 +19771,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.361, i64 0, i64 0
+  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.603, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12961,7 +19785,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.362, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.604, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12975,7 +19799,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [5 x i8], [5 x i8]* @.str.363, i64 0, i64 0
+  %t2 = getelementptr [5 x i8], [5 x i8]* @.str.605, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -12989,7 +19813,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.364, i64 0, i64 0
+  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.606, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on_prevent(i64 %t1, i64 %t3, i64 %t4)
@@ -13003,7 +19827,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.365, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.607, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -13017,7 +19841,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %handler.arg, i64* %handler
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.366, i64 0, i64 0
+  %t2 = getelementptr [7 x i8], [7 x i8]* @.str.608, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = load i64, i64* %handler
   %t5 = call i64 @turmeric_events_on(i64 %t1, i64 %t3, i64 %t4)
@@ -13033,7 +19857,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %sig.arg, i64* %sig
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.367, i64 0, i64 0
+  %t2 = getelementptr [6 x i8], [6 x i8]* @.str.609, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i8* @__val_untag_ptr(i64 %t3)
   %t5 = load i64, i64* %sig
@@ -13048,7 +19872,7 @@ entry:
   store i64 %t11, i64* %t12
   %t13 = call i8* @malloc(i64 16)
   %t14 = bitcast i8* %t13 to [2 x i64]*
-  %t15 = ptrtoint i64 (i64, i64)* @__lambda_186 to i64
+  %t15 = ptrtoint i64 (i64, i64)* @__lambda_1335 to i64
   %t16 = getelementptr [2 x i64], [2 x i64]* %t14, i64 0, i64 0
   store i64 %t15, i64* %t16
   %t17 = ptrtoint [1 x i64]* %t10 to i64
@@ -13068,7 +19892,7 @@ entry:
   store i64 %t26, i64* %t27
   %t28 = call i8* @malloc(i64 16)
   %t29 = bitcast i8* %t28 to [2 x i64]*
-  %t30 = ptrtoint i64 (i64)* @__lambda_190 to i64
+  %t30 = ptrtoint i64 (i64)* @__lambda_1339 to i64
   %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
   store i64 %t30, i64* %t31
   %t32 = ptrtoint [2 x i64]* %t23 to i64
@@ -13089,7 +19913,7 @@ entry:
   store i64 %handle.arg, i64* %handle
   store i64 %sig.arg, i64* %sig
   %t1 = load i64, i64* %handle
-  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.369, i64 0, i64 0
+  %t2 = getelementptr [8 x i8], [8 x i8]* @.str.611, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i64
   %t4 = call i8* @__val_untag_ptr(i64 %t3)
   %t5 = load i64, i64* %sig
@@ -13103,7 +19927,7 @@ entry:
   store i64 %t10, i64* %t11
   %t12 = call i8* @malloc(i64 16)
   %t13 = bitcast i8* %t12 to [2 x i64]*
-  %t14 = ptrtoint i64 (i64, i64)* @__lambda_191 to i64
+  %t14 = ptrtoint i64 (i64, i64)* @__lambda_1340 to i64
   %t15 = getelementptr [2 x i64], [2 x i64]* %t13, i64 0, i64 0
   store i64 %t14, i64* %t15
   %t16 = ptrtoint [1 x i64]* %t9 to i64
@@ -13123,7 +19947,7 @@ entry:
   store i64 %t25, i64* %t26
   %t27 = call i8* @malloc(i64 16)
   %t28 = bitcast i8* %t27 to [2 x i64]*
-  %t29 = ptrtoint i64 (i64)* @__lambda_195 to i64
+  %t29 = ptrtoint i64 (i64)* @__lambda_1344 to i64
   %t30 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 0
   store i64 %t29, i64* %t30
   %t31 = ptrtoint [2 x i64]* %t22 to i64
@@ -13193,12 +20017,12 @@ entry:
   %t3 = getelementptr %turmeric_reconcile_Component, %turmeric_reconcile_Component* %t2, i32 0, i32 4
   %t4 = load volatile i64, i64* %t3
   %t5 = trunc i64 %t4 to i1
-  br i1 %t5, label %then197, label %else198
-then197:
+  br i1 %t5, label %then1346, label %else1347
+then1346:
   ret i64 0
-else198:
-  br label %endif196
-endif196:
+else1347:
+  br label %endif1345
+endif1345:
   %t6 = load i64, i64* %self
   %t7 = add i64 0, 1
   %t8 = inttoptr i64 %t6 to %turmeric_reconcile_Component*
@@ -13229,16 +20053,16 @@ entry:
   %t6 = xor i64 %t5, 1
   %t7 = call i64 @__val_tag_bool(i64 %t6)
   %t8 = trunc i64 %t7 to i1
-  br i1 %t8, label %then200, label %else201
-then200:
+  br i1 %t8, label %then1349, label %else1350
+then1349:
   ret i64 0
-else201:
-  br label %endif199
-endif199:
+else1350:
+  br label %endif1348
+endif1348:
   %t9 = add i64 0, 0
   store i64 %t9, i64* %i
-  br label %while.cond202
-while.cond202:
+  br label %while.cond1351
+while.cond1351:
   %t10 = load i64, i64* %i
   %t11 = load i64, i64* %self
   %t12 = inttoptr i64 %t11 to %turmeric_reconcile_Component*
@@ -13248,8 +20072,8 @@ while.cond202:
   %t17 = icmp slt i64 %t10, %t15
   %t16 = zext i1 %t17 to i64
   %t18 = trunc i64 %t16 to i1
-  br i1 %t18, label %while.body203, label %while.end204
-while.body203:
+  br i1 %t18, label %while.body1352, label %while.end1353
+while.body1352:
   %t19 = load i64, i64* %self
   %t20 = inttoptr i64 %t19 to %turmeric_reconcile_Component*
   %t21 = getelementptr %turmeric_reconcile_Component, %turmeric_reconcile_Component* %t20, i32 0, i32 2
@@ -13262,12 +20086,12 @@ while.body203:
   %t28 = add i64 0, 1
   %t29 = add i64 %t27, %t28
   store i64 %t29, i64* %i
-  br label %while.cond202
-while.end204:
+  br label %while.cond1351
+while.end1353:
   %t30 = add i64 0, 0
   store i64 %t30, i64* %i
-  br label %while.cond205
-while.cond205:
+  br label %while.cond1354
+while.cond1354:
   %t31 = load i64, i64* %i
   %t32 = load i64, i64* %self
   %t33 = inttoptr i64 %t32 to %turmeric_reconcile_Component*
@@ -13277,8 +20101,8 @@ while.cond205:
   %t38 = icmp slt i64 %t31, %t36
   %t37 = zext i1 %t38 to i64
   %t39 = trunc i64 %t37 to i1
-  br i1 %t39, label %while.body206, label %while.end207
-while.body206:
+  br i1 %t39, label %while.body1355, label %while.end1356
+while.body1355:
   %t40 = load i64, i64* %self
   %t41 = inttoptr i64 %t40 to %turmeric_reconcile_Component*
   %t42 = getelementptr %turmeric_reconcile_Component, %turmeric_reconcile_Component* %t41, i32 0, i32 3
@@ -13291,8 +20115,8 @@ while.body206:
   %t49 = add i64 0, 1
   %t50 = add i64 %t48, %t49
   store i64 %t50, i64* %i
-  br label %while.cond205
-while.end207:
+  br label %while.cond1354
+while.end1356:
   %t51 = load i64, i64* %self
   %t52 = inttoptr i64 %t51 to %turmeric_reconcile_Component*
   %t53 = getelementptr %turmeric_reconcile_Component, %turmeric_reconcile_Component* %t52, i32 0, i32 1
@@ -13427,7 +20251,7 @@ entry:
   store i64 %t25, i64* %t26
   %t27 = call i8* @malloc(i64 16)
   %t28 = bitcast i8* %t27 to [2 x i64]*
-  %t29 = ptrtoint i64 (i64)* @__lambda_208 to i64
+  %t29 = ptrtoint i64 (i64)* @__lambda_1357 to i64
   %t30 = getelementptr [2 x i64], [2 x i64]* %t28, i64 0, i64 0
   store i64 %t29, i64* %t30
   %t31 = ptrtoint [1 x i64]* %t24 to i64
@@ -13454,10 +20278,10 @@ entry:
   store i64 %t5, i64* %should_show
   %t6 = load i64, i64* %should_show
   %t7 = trunc i64 %t6 to i1
-  br label %logic.entry210
-logic.entry210:
-  br i1 %t7, label %rhs211, label %end212
-rhs211:
+  br label %logic.entry1359
+logic.entry1359:
+  br i1 %t7, label %rhs1360, label %end1361
+rhs1360:
   %t8 = load i64, i64* %self
   %t9 = inttoptr i64 %t8 to %turmeric_reconcile_ConditionalSlot*
   %t10 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t9, i32 0, i32 3
@@ -13465,13 +20289,13 @@ rhs211:
   %t13 = icmp eq i64 %t11, 0
   %t12 = zext i1 %t13 to i64
   %t14 = trunc i64 %t12 to i1
-  br label %end212
-end212:
-  %t15 = phi i1 [%t7, %logic.entry210], [%t14, %rhs211]
+  br label %end1361
+end1361:
+  %t15 = phi i1 [%t7, %logic.entry1359], [%t14, %rhs1360]
   %t16 = zext i1 %t15 to i64
   %t17 = trunc i64 %t16 to i1
-  br i1 %t17, label %then213, label %else214
-then213:
+  br i1 %t17, label %then1362, label %else1363
+then1362:
   %t18 = load i64, i64* %self
   %t19 = load i64, i64* %self
   %t20 = call i64 @turmeric_reconcile_ConditionalSlot__builder(i64 %t19)
@@ -13483,19 +20307,19 @@ then213:
   %t25 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t24, i32 0, i32 3
   %t26 = load volatile i64, i64* %t25
   %t27 = call i64 @turmeric_reconcile_Component__mount(i64 %t26)
-  br label %endif209
-else214:
-  br label %endif209
-endif209:
+  br label %endif1358
+else1363:
+  br label %endif1358
+endif1358:
   %t28 = load i64, i64* %should_show
   %t29 = call i64 @__val_untag_bool(i64 %t28)
   %t30 = xor i64 %t29, 1
   %t31 = call i64 @__val_tag_bool(i64 %t30)
   %t32 = trunc i64 %t31 to i1
-  br label %logic.entry216
-logic.entry216:
-  br i1 %t32, label %rhs217, label %end218
-rhs217:
+  br label %logic.entry1365
+logic.entry1365:
+  br i1 %t32, label %rhs1366, label %end1367
+rhs1366:
   %t33 = load i64, i64* %self
   %t34 = inttoptr i64 %t33 to %turmeric_reconcile_ConditionalSlot*
   %t35 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t34, i32 0, i32 3
@@ -13503,13 +20327,13 @@ rhs217:
   %t38 = icmp ne i64 %t36, 0
   %t37 = zext i1 %t38 to i64
   %t39 = trunc i64 %t37 to i1
-  br label %end218
-end218:
-  %t40 = phi i1 [%t32, %logic.entry216], [%t39, %rhs217]
+  br label %end1367
+end1367:
+  %t40 = phi i1 [%t32, %logic.entry1365], [%t39, %rhs1366]
   %t41 = zext i1 %t40 to i64
   %t42 = trunc i64 %t41 to i1
-  br i1 %t42, label %then219, label %else220
-then219:
+  br i1 %t42, label %then1368, label %else1369
+then1368:
   %t43 = load i64, i64* %self
   %t44 = inttoptr i64 %t43 to %turmeric_reconcile_ConditionalSlot*
   %t45 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t44, i32 0, i32 3
@@ -13519,10 +20343,10 @@ then219:
   %t49 = inttoptr i64 %t48 to %turmeric_reconcile_ConditionalSlot*
   %t50 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t49, i32 0, i32 3
   store volatile i64 0, i64* %t50
-  br label %endif215
-else220:
-  br label %endif215
-endif215:
+  br label %endif1364
+else1369:
+  br label %endif1364
+endif1364:
   ret i64 0
 }
 
@@ -13537,8 +20361,8 @@ entry:
   %t6 = icmp ne i64 %t4, 0
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then222, label %else223
-then222:
+  br i1 %t7, label %then1371, label %else1372
+then1371:
   %t8 = load i64, i64* %self
   %t9 = inttoptr i64 %t8 to %turmeric_reconcile_ConditionalSlot*
   %t10 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t9, i32 0, i32 3
@@ -13548,10 +20372,10 @@ then222:
   %t14 = inttoptr i64 %t13 to %turmeric_reconcile_ConditionalSlot*
   %t15 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t14, i32 0, i32 3
   store volatile i64 0, i64* %t15
-  br label %endif221
-else223:
-  br label %endif221
-endif221:
+  br label %endif1370
+else1372:
+  br label %endif1370
+endif1370:
   %t16 = load i64, i64* %self
   %t17 = inttoptr i64 %t16 to %turmeric_reconcile_ConditionalSlot*
   %t18 = getelementptr %turmeric_reconcile_ConditionalSlot, %turmeric_reconcile_ConditionalSlot* %t17, i32 0, i32 1
@@ -13624,7 +20448,7 @@ entry:
   %t12 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t11, i32 0, i32 2
   store volatile i64 %t10, i64* %t12
   %t13 = load i64, i64* %self
-  %t14 = getelementptr [1 x i8], [1 x i8]* @.str.372, i64 0, i64 0
+  %t14 = getelementptr [1 x i8], [1 x i8]* @.str.614, i64 0, i64 0
   %t15 = ptrtoint i8* %t14 to i64
   %t16 = inttoptr i64 %t13 to %turmeric_reconcile_MatchSlot*
   %t17 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t16, i32 0, i32 3
@@ -13647,7 +20471,7 @@ entry:
   store i64 %t30, i64* %t31
   %t32 = call i8* @malloc(i64 16)
   %t33 = bitcast i8* %t32 to [2 x i64]*
-  %t34 = ptrtoint i64 (i64)* @__lambda_224 to i64
+  %t34 = ptrtoint i64 (i64)* @__lambda_1373 to i64
   %t35 = getelementptr [2 x i64], [2 x i64]* %t33, i64 0, i64 0
   store i64 %t34, i64* %t35
   %t36 = ptrtoint [1 x i64]* %t29 to i64
@@ -13683,12 +20507,12 @@ entry:
   %t14 = icmp eq i32 %t13, 0
   %t15 = zext i1 %t14 to i64
   %t16 = trunc i64 %t15 to i1
-  br i1 %t16, label %then226, label %else227
-then226:
+  br i1 %t16, label %then1375, label %else1376
+then1375:
   ret i64 0
-else227:
-  br label %endif225
-endif225:
+else1376:
+  br label %endif1374
+endif1374:
   %t17 = load i64, i64* %self
   %t18 = inttoptr i64 %t17 to %turmeric_reconcile_MatchSlot*
   %t19 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t18, i32 0, i32 4
@@ -13696,17 +20520,17 @@ endif225:
   %t22 = icmp ne i64 %t20, 0
   %t21 = zext i1 %t22 to i64
   %t23 = trunc i64 %t21 to i1
-  br i1 %t23, label %then229, label %else230
-then229:
+  br i1 %t23, label %then1378, label %else1379
+then1378:
   %t24 = load i64, i64* %self
   %t25 = inttoptr i64 %t24 to %turmeric_reconcile_MatchSlot*
   %t26 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t25, i32 0, i32 4
   %t27 = load volatile i64, i64* %t26
   %t28 = call i64 @turmeric_reconcile_Component__unmount(i64 %t27)
-  br label %endif228
-else230:
-  br label %endif228
-endif228:
+  br label %endif1377
+else1379:
+  br label %endif1377
+endif1377:
   %t29 = load i64, i64* %self
   %t30 = load i64, i64* %key
   %t31 = inttoptr i64 %t29 to %turmeric_reconcile_MatchSlot*
@@ -13720,8 +20544,8 @@ endif228:
   %t38 = call i64 @__map_has(i64 %t36, i64 %t37)
   %t39 = call i64 @__val_tag_bool(i64 %t38)
   %t40 = trunc i64 %t39 to i1
-  br i1 %t40, label %then232, label %else233
-then232:
+  br i1 %t40, label %then1381, label %else1382
+then1381:
   %t41 = load i64, i64* %self
   %t42 = load i64, i64* %self
   %t43 = inttoptr i64 %t42 to %turmeric_reconcile_MatchSlot*
@@ -13744,14 +20568,14 @@ then232:
   %t59 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t58, i32 0, i32 4
   %t60 = load volatile i64, i64* %t59
   %t61 = call i64 @turmeric_reconcile_Component__mount(i64 %t60)
-  br label %endif231
-else233:
+  br label %endif1380
+else1382:
   %t62 = load i64, i64* %self
   %t63 = inttoptr i64 %t62 to %turmeric_reconcile_MatchSlot*
   %t64 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t63, i32 0, i32 4
   store volatile i64 0, i64* %t64
-  br label %endif231
-endif231:
+  br label %endif1380
+endif1380:
   ret i64 0
 }
 
@@ -13766,8 +20590,8 @@ entry:
   %t6 = icmp ne i64 %t4, 0
   %t5 = zext i1 %t6 to i64
   %t7 = trunc i64 %t5 to i1
-  br i1 %t7, label %then235, label %else236
-then235:
+  br i1 %t7, label %then1384, label %else1385
+then1384:
   %t8 = load i64, i64* %self
   %t9 = inttoptr i64 %t8 to %turmeric_reconcile_MatchSlot*
   %t10 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t9, i32 0, i32 4
@@ -13777,10 +20601,10 @@ then235:
   %t14 = inttoptr i64 %t13 to %turmeric_reconcile_MatchSlot*
   %t15 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t14, i32 0, i32 4
   store volatile i64 0, i64* %t15
-  br label %endif234
-else236:
-  br label %endif234
-endif234:
+  br label %endif1383
+else1385:
+  br label %endif1383
+endif1383:
   %t16 = load i64, i64* %self
   %t17 = inttoptr i64 %t16 to %turmeric_reconcile_MatchSlot*
   %t18 = getelementptr %turmeric_reconcile_MatchSlot, %turmeric_reconcile_MatchSlot* %t17, i32 0, i32 1
@@ -13913,7 +20737,7 @@ entry:
   store i64 %t30, i64* %t31
   %t32 = call i8* @malloc(i64 16)
   %t33 = bitcast i8* %t32 to [2 x i64]*
-  %t34 = ptrtoint i64 (i64)* @__lambda_237 to i64
+  %t34 = ptrtoint i64 (i64)* @__lambda_1386 to i64
   %t35 = getelementptr [2 x i64], [2 x i64]* %t33, i64 0, i64 0
   store i64 %t34, i64* %t35
   %t36 = ptrtoint [1 x i64]* %t29 to i64
@@ -13950,8 +20774,8 @@ entry:
   store i64 %t6, i64* %old_map
   %t7 = add i64 0, 0
   store i64 %t7, i64* %i
-  br label %while.cond238
-while.cond238:
+  br label %while.cond1387
+while.cond1387:
   %t8 = load i64, i64* %i
   %t9 = load i64, i64* %self
   %t10 = inttoptr i64 %t9 to %turmeric_reconcile_KeyedList*
@@ -13961,8 +20785,8 @@ while.cond238:
   %t15 = icmp slt i64 %t8, %t13
   %t14 = zext i1 %t15 to i64
   %t16 = trunc i64 %t14 to i1
-  br i1 %t16, label %while.body239, label %while.end240
-while.body239:
+  br i1 %t16, label %while.body1388, label %while.end1389
+while.body1388:
   %t17 = load i64, i64* %old_map
   %t18 = load i64, i64* %i
   %t19 = call i64 @__map_set(i64 %t17, i64 0, i64 %t18)
@@ -13970,22 +20794,22 @@ while.body239:
   %t21 = add i64 0, 1
   %t22 = add i64 %t20, %t21
   store i64 %t22, i64* %i
-  br label %while.cond238
-while.end240:
+  br label %while.cond1387
+while.end1389:
   %t23 = call i64 @__list_new()
   store i64 %t23, i64* %new_keys
   %t24 = add i64 0, 0
   store i64 %t24, i64* %i
-  br label %while.cond241
-while.cond241:
+  br label %while.cond1390
+while.cond1390:
   %t25 = load i64, i64* %i
   %t26 = load i64, i64* %new_items
   %t27 = call i64 @__list_length(i64 %t26)
   %t29 = icmp slt i64 %t25, %t27
   %t28 = zext i1 %t29 to i64
   %t30 = trunc i64 %t28 to i1
-  br i1 %t30, label %while.body242, label %while.end243
-while.body242:
+  br i1 %t30, label %while.body1391, label %while.end1392
+while.body1391:
   %t31 = load i64, i64* %new_keys
   %t32 = load i64, i64* %self
   %t33 = load i64, i64* %new_items
@@ -14002,22 +20826,22 @@ while.body242:
   %t44 = add i64 0, 1
   %t45 = add i64 %t43, %t44
   store i64 %t45, i64* %i
-  br label %while.cond241
-while.end243:
+  br label %while.cond1390
+while.end1392:
   %t46 = call i64 @__map_new()
   store i64 %t46, i64* %new_key_set
   %t47 = add i64 0, 0
   store i64 %t47, i64* %i
-  br label %while.cond244
-while.cond244:
+  br label %while.cond1393
+while.cond1393:
   %t48 = load i64, i64* %i
   %t49 = load i64, i64* %new_keys
   %t50 = call i64 @__list_length(i64 %t49)
   %t52 = icmp slt i64 %t48, %t50
   %t51 = zext i1 %t52 to i64
   %t53 = trunc i64 %t51 to i1
-  br i1 %t53, label %while.body245, label %while.end246
-while.body245:
+  br i1 %t53, label %while.body1394, label %while.end1395
+while.body1394:
   %t54 = load i64, i64* %new_key_set
   %t55 = load i64, i64* %new_keys
   %t56 = load i64, i64* %i
@@ -14033,12 +20857,12 @@ while.body245:
   %t66 = add i64 0, 1
   %t67 = add i64 %t65, %t66
   store i64 %t67, i64* %i
-  br label %while.cond244
-while.end246:
+  br label %while.cond1393
+while.end1395:
   %t68 = add i64 0, 0
   store i64 %t68, i64* %i
-  br label %while.cond247
-while.cond247:
+  br label %while.cond1396
+while.cond1396:
   %t69 = load i64, i64* %i
   %t70 = load i64, i64* %self
   %t71 = inttoptr i64 %t70 to %turmeric_reconcile_KeyedList*
@@ -14048,8 +20872,8 @@ while.cond247:
   %t76 = icmp slt i64 %t69, %t74
   %t75 = zext i1 %t76 to i64
   %t77 = trunc i64 %t75 to i1
-  br i1 %t77, label %while.body248, label %while.end249
-while.body248:
+  br i1 %t77, label %while.body1397, label %while.end1398
+while.body1397:
   %t78 = load i64, i64* %new_key_set
   %t79 = call i64 @__map_has(i64 %t78, i64 0)
   %t80 = call i64 @__val_tag_bool(i64 %t79)
@@ -14057,37 +20881,37 @@ while.body248:
   %t82 = xor i64 %t81, 1
   %t83 = call i64 @__val_tag_bool(i64 %t82)
   %t84 = trunc i64 %t83 to i1
-  br i1 %t84, label %then251, label %else252
-then251:
+  br i1 %t84, label %then1400, label %else1401
+then1400:
   %t85 = load i64, i64* %self
   %t86 = inttoptr i64 %t85 to %turmeric_reconcile_KeyedList*
   %t87 = getelementptr %turmeric_reconcile_KeyedList, %turmeric_reconcile_KeyedList* %t86, i32 0, i32 4
   %t88 = load volatile i64, i64* %t87
   %t89 = call i64 @turmeric_reconcile_Component__unmount(i64 0)
-  br label %endif250
-else252:
-  br label %endif250
-endif250:
+  br label %endif1399
+else1401:
+  br label %endif1399
+endif1399:
   %t90 = load i64, i64* %i
   %t91 = add i64 0, 1
   %t92 = add i64 %t90, %t91
   store i64 %t92, i64* %i
-  br label %while.cond247
-while.end249:
+  br label %while.cond1396
+while.end1398:
   %t93 = call i64 @__list_new()
   store i64 %t93, i64* %new_rendered
   %t94 = add i64 0, 0
   store i64 %t94, i64* %i
-  br label %while.cond253
-while.cond253:
+  br label %while.cond1402
+while.cond1402:
   %t95 = load i64, i64* %i
   %t96 = load i64, i64* %new_items
   %t97 = call i64 @__list_length(i64 %t96)
   %t99 = icmp slt i64 %t95, %t97
   %t98 = zext i1 %t99 to i64
   %t100 = trunc i64 %t98 to i1
-  br i1 %t100, label %while.body254, label %while.end255
-while.body254:
+  br i1 %t100, label %while.body1403, label %while.end1404
+while.body1403:
   %t101 = load i64, i64* %new_keys
   %t102 = load i64, i64* %i
   %t103 = call i64 @__val_untag_int(i64 %t102)
@@ -14102,8 +20926,8 @@ while.body254:
   %t111 = call i64 @__map_has(i64 %t109, i64 %t110)
   %t112 = call i64 @__val_tag_bool(i64 %t111)
   %t113 = trunc i64 %t112 to i1
-  br i1 %t113, label %then257, label %else258
-then257:
+  br i1 %t113, label %then1406, label %else1407
+then1406:
   %t114 = load i64, i64* %old_map
   %t115 = load i64, i64* %key
   %t116 = call i64 @__map_get(i64 %t114, i64 %t115)
@@ -14121,8 +20945,8 @@ then257:
   %t127 = select i1 %t124, i64 %t126, i64 %t123
   %t128 = call i64 @__list_get(i64 %t121, i64 %t127)
   %t129 = call i64 @__list_push(i64 %t117, i64 %t128)
-  br label %endif256
-else258:
+  br label %endif1405
+else1407:
   %t130 = load i64, i64* %self
   %t131 = load i64, i64* %new_items
   %t132 = load i64, i64* %i
@@ -14142,26 +20966,26 @@ else258:
   %t145 = load i64, i64* %comp
   %t146 = call i64 @turmeric_reconcile_KeyedItem__init(i64 %t143, i64 %t144, i64 %t145)
   %t147 = call i64 @__list_push(i64 %t142, i64 %t143)
-  br label %endif256
-endif256:
+  br label %endif1405
+endif1405:
   %t148 = load i64, i64* %i
   %t149 = add i64 0, 1
   %t150 = add i64 %t148, %t149
   store i64 %t150, i64* %i
-  br label %while.cond253
-while.end255:
+  br label %while.cond1402
+while.end1404:
   %t151 = add i64 0, 0
   store i64 %t151, i64* %i
-  br label %while.cond259
-while.cond259:
+  br label %while.cond1408
+while.cond1408:
   %t152 = load i64, i64* %i
   %t153 = load i64, i64* %new_rendered
   %t154 = call i64 @__list_length(i64 %t153)
   %t156 = icmp slt i64 %t152, %t154
   %t155 = zext i1 %t156 to i64
   %t157 = trunc i64 %t155 to i1
-  br i1 %t157, label %while.body260, label %while.end261
-while.body260:
+  br i1 %t157, label %while.body1409, label %while.end1410
+while.body1409:
   %t158 = load i64, i64* %self
   %t159 = inttoptr i64 %t158 to %turmeric_reconcile_KeyedList*
   %t160 = getelementptr %turmeric_reconcile_KeyedList, %turmeric_reconcile_KeyedList* %t159, i32 0, i32 0
@@ -14171,8 +20995,8 @@ while.body260:
   %t163 = add i64 0, 1
   %t164 = add i64 %t162, %t163
   store i64 %t164, i64* %i
-  br label %while.cond259
-while.end261:
+  br label %while.cond1408
+while.end1410:
   %t165 = load i64, i64* %self
   %t166 = load i64, i64* %new_rendered
   %t167 = inttoptr i64 %t165 to %turmeric_reconcile_KeyedList*
@@ -14188,8 +21012,8 @@ entry:
   store i64 %self.arg, i64* %self
   %t1 = add i64 0, 0
   store i64 %t1, i64* %i
-  br label %while.cond262
-while.cond262:
+  br label %while.cond1411
+while.cond1411:
   %t2 = load i64, i64* %i
   %t3 = load i64, i64* %self
   %t4 = inttoptr i64 %t3 to %turmeric_reconcile_KeyedList*
@@ -14199,8 +21023,8 @@ while.cond262:
   %t9 = icmp slt i64 %t2, %t7
   %t8 = zext i1 %t9 to i64
   %t10 = trunc i64 %t8 to i1
-  br i1 %t10, label %while.body263, label %while.end264
-while.body263:
+  br i1 %t10, label %while.body1412, label %while.end1413
+while.body1412:
   %t11 = load i64, i64* %self
   %t12 = inttoptr i64 %t11 to %turmeric_reconcile_KeyedList*
   %t13 = getelementptr %turmeric_reconcile_KeyedList, %turmeric_reconcile_KeyedList* %t12, i32 0, i32 4
@@ -14210,8 +21034,8 @@ while.body263:
   %t17 = add i64 0, 1
   %t18 = add i64 %t16, %t17
   store i64 %t18, i64* %i
-  br label %while.cond262
-while.end264:
+  br label %while.cond1411
+while.end1413:
   %t19 = load i64, i64* %self
   %t20 = call i64 @__list_new()
   %t21 = inttoptr i64 %t19 to %turmeric_reconcile_KeyedList*
@@ -14274,7 +21098,7 @@ entry:
   %parity = alloca i64
   %t1 = call i8* @malloc(i64 16)
   %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64)* @__lambda_265 to i64
+  %t3 = ptrtoint i64 (i64)* @__lambda_1414 to i64
   %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
   store i64 %t3, i64* %t4
   %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
@@ -14284,7 +21108,7 @@ entry:
   store i64 %t7, i64* %doubled
   %t8 = call i8* @malloc(i64 16)
   %t9 = bitcast i8* %t8 to [2 x i64]*
-  %t10 = ptrtoint i64 (i64)* @__lambda_266 to i64
+  %t10 = ptrtoint i64 (i64)* @__lambda_1415 to i64
   %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
   store i64 %t10, i64* %t11
   %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
@@ -14292,27 +21116,32 @@ entry:
   %t13 = ptrtoint [2 x i64]* %t9 to i64
   %t14 = call i64 @turmeric_signal_computed(i64 %t13)
   store i64 %t14, i64* %parity
-  %t15 = getelementptr [8 x i8], [8 x i8]* @.str.377, i64 0, i64 0
+  %t15 = getelementptr [8 x i8], [8 x i8]* @.str.619, i64 0, i64 0
   %t16 = ptrtoint i8* %t15 to i64
-  %t17 = call i8* @malloc(i64 16)
-  %t18 = bitcast i8* %t17 to [2 x i64]*
-  %t19 = load i64, i64* %doubled
-  %t20 = getelementptr [2 x i64], [2 x i64]* %t18, i64 0, i64 0
-  store i64 %t19, i64* %t20
-  %t21 = load i64, i64* %parity
-  %t22 = getelementptr [2 x i64], [2 x i64]* %t18, i64 0, i64 1
-  store i64 %t21, i64* %t22
-  %t23 = call i8* @malloc(i64 16)
-  %t24 = bitcast i8* %t23 to [2 x i64]*
-  %t25 = ptrtoint i64 (i64, i64, i64)* @__lambda_277 to i64
-  %t26 = getelementptr [2 x i64], [2 x i64]* %t24, i64 0, i64 0
-  store i64 %t25, i64* %t26
-  %t27 = ptrtoint [2 x i64]* %t18 to i64
-  %t28 = getelementptr [2 x i64], [2 x i64]* %t24, i64 0, i64 1
-  store i64 %t27, i64* %t28
-  %t29 = ptrtoint [2 x i64]* %t24 to i64
-  %t30 = call i64 @turmeric_generated_types_section(i64 %t16, i64 %t29)
-  ret i64 %t30
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.620, i64 0, i64 0
+  %t18 = ptrtoint i8* %t17 to i64
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.621, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i64
+  %t21 = call i64 @__map_new()
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = load i64, i64* %doubled
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = load i64, i64* %parity
+  %t27 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 %t26, i64* %t27
+  %t28 = call i8* @malloc(i64 16)
+  %t29 = bitcast i8* %t28 to [2 x i64]*
+  %t30 = ptrtoint i64 (i64, i64, i64)* @__lambda_1426 to i64
+  %t31 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 0
+  store i64 %t30, i64* %t31
+  %t32 = ptrtoint [2 x i64]* %t23 to i64
+  %t33 = getelementptr [2 x i64], [2 x i64]* %t29, i64 0, i64 1
+  store i64 %t32, i64* %t33
+  %t34 = ptrtoint [2 x i64]* %t29 to i64
+  %t35 = call i64 @section(i64 %t16, i64 %t18, i64 %t20, i64 0, i64 %t21, i64 %t34)
+  ret i64 %t35
 }
 
 define i64 @TodoPage() {
@@ -14320,7 +21149,7 @@ entry:
   %active_count = alloca i64
   %t1 = call i8* @malloc(i64 16)
   %t2 = bitcast i8* %t1 to [2 x i64]*
-  %t3 = ptrtoint i64 (i64)* @__lambda_303 to i64
+  %t3 = ptrtoint i64 (i64)* @__lambda_1451 to i64
   %t4 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 0
   store i64 %t3, i64* %t4
   %t5 = getelementptr [2 x i64], [2 x i64]* %t2, i64 0, i64 1
@@ -14328,56 +21157,71 @@ entry:
   %t6 = ptrtoint [2 x i64]* %t2 to i64
   %t7 = call i64 @turmeric_signal_computed(i64 %t6)
   store i64 %t7, i64* %active_count
-  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.410, i64 0, i64 0
+  %t8 = getelementptr [6 x i8], [6 x i8]* @.str.691, i64 0, i64 0
   %t9 = ptrtoint i8* %t8 to i64
-  %t10 = call i8* @malloc(i64 8)
-  %t11 = bitcast i8* %t10 to [1 x i64]*
-  %t12 = load i64, i64* %active_count
-  %t13 = getelementptr [1 x i64], [1 x i64]* %t11, i64 0, i64 0
-  store i64 %t12, i64* %t13
-  %t14 = call i8* @malloc(i64 16)
-  %t15 = bitcast i8* %t14 to [2 x i64]*
-  %t16 = ptrtoint i64 (i64)* @__lambda_304 to i64
-  %t17 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 0
-  store i64 %t16, i64* %t17
-  %t18 = ptrtoint [1 x i64]* %t11 to i64
-  %t19 = getelementptr [2 x i64], [2 x i64]* %t15, i64 0, i64 1
-  store i64 %t18, i64* %t19
-  %t20 = ptrtoint [2 x i64]* %t15 to i64
-  %t21 = call i64 @turmeric_generated_types_section(i64 %t9, i64 %t20)
-  ret i64 %t21
+  %t10 = getelementptr [1 x i8], [1 x i8]* @.str.692, i64 0, i64 0
+  %t11 = ptrtoint i8* %t10 to i64
+  %t12 = getelementptr [1 x i8], [1 x i8]* @.str.693, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i64
+  %t14 = call i64 @__map_new()
+  %t15 = call i8* @malloc(i64 8)
+  %t16 = bitcast i8* %t15 to [1 x i64]*
+  %t17 = load i64, i64* %active_count
+  %t18 = getelementptr [1 x i64], [1 x i64]* %t16, i64 0, i64 0
+  store i64 %t17, i64* %t18
+  %t19 = call i8* @malloc(i64 16)
+  %t20 = bitcast i8* %t19 to [2 x i64]*
+  %t21 = ptrtoint i64 (i64)* @__lambda_1452 to i64
+  %t22 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 0
+  store i64 %t21, i64* %t22
+  %t23 = ptrtoint [1 x i64]* %t16 to i64
+  %t24 = getelementptr [2 x i64], [2 x i64]* %t20, i64 0, i64 1
+  store i64 %t23, i64* %t24
+  %t25 = ptrtoint [2 x i64]* %t20 to i64
+  %t26 = call i64 @section(i64 %t9, i64 %t11, i64 %t13, i64 0, i64 %t14, i64 %t25)
+  ret i64 %t26
 }
 
 define i64 @AboutPage() {
 entry:
-  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.443, i64 0, i64 0
+  %t1 = getelementptr [6 x i8], [6 x i8]* @.str.777, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 16)
-  %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64)* @__lambda_379 to i64
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
-  store i64 0, i64* %t7
-  %t8 = ptrtoint [2 x i64]* %t4 to i64
-  %t9 = call i64 @turmeric_generated_types_section(i64 %t2, i64 %t8)
-  ret i64 %t9
+  %t3 = getelementptr [1 x i8], [1 x i8]* @.str.778, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.779, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1526 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @section(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  ret i64 %t14
 }
 
 define i64 @App() {
 entry:
-  %t1 = getelementptr [4 x i8], [4 x i8]* @.str.518, i64 0, i64 0
+  %t1 = getelementptr [1 x i8], [1 x i8]* @.str.966, i64 0, i64 0
   %t2 = ptrtoint i8* %t1 to i64
-  %t3 = call i8* @malloc(i64 16)
-  %t4 = bitcast i8* %t3 to [2 x i64]*
-  %t5 = ptrtoint i64 (i64)* @__lambda_454 to i64
-  %t6 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 0
-  store i64 %t5, i64* %t6
-  %t7 = getelementptr [2 x i64], [2 x i64]* %t4, i64 0, i64 1
-  store i64 0, i64* %t7
-  %t8 = ptrtoint [2 x i64]* %t4 to i64
-  %t9 = call i64 @turmeric_generated_types_div(i64 %t2, i64 %t8)
-  ret i64 %t9
+  %t3 = getelementptr [4 x i8], [4 x i8]* @.str.967, i64 0, i64 0
+  %t4 = ptrtoint i8* %t3 to i64
+  %t5 = getelementptr [1 x i8], [1 x i8]* @.str.968, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i64
+  %t7 = call i64 @__map_new()
+  %t8 = call i8* @malloc(i64 16)
+  %t9 = bitcast i8* %t8 to [2 x i64]*
+  %t10 = ptrtoint i64 (i64)* @__lambda_1565 to i64
+  %t11 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 0
+  store i64 %t10, i64* %t11
+  %t12 = getelementptr [2 x i64], [2 x i64]* %t9, i64 0, i64 1
+  store i64 0, i64* %t12
+  %t13 = ptrtoint [2 x i64]* %t9 to i64
+  %t14 = call i64 @div(i64 %t2, i64 %t4, i64 %t6, i64 0, i64 %t7, i64 %t13)
+  ret i64 %t14
 }
 
 define i64 @__saffron_entry() {
@@ -14386,38 +21230,44 @@ entry:
   %page = alloca i64
   %todos = alloca i64
   %new_todo = alloca i64
-  call i64 @__mod_init_prelude_0()
+  call i64 @__mod_init_prelude_1()
   call i64 @__mod_init_turmeric_signal()
-  call i64 @__mod_init_turmeric_element()
   call i64 @__mod_init_turmeric_style()
   call i64 @__mod_init_turmeric_events()
   %t1 = add i64 0, 0
   %t2 = call i64 @turmeric_signal_signal(i64 %t1)
   store i64 %t2, i64* @__g_count
-  %t3 = getelementptr [8 x i8], [8 x i8]* @.str.713, i64 0, i64 0
+  %t3 = getelementptr [8 x i8], [8 x i8]* @.str.1287, i64 0, i64 0
   %t4 = ptrtoint i8* %t3 to i64
   %t5 = call i64 @turmeric_signal_signal(i64 %t4)
   store i64 %t5, i64* @__g_page
   %t6 = call i64 @__list_new()
-  %t7 = getelementptr [9 x i8], [9 x i8]* @.str.714, i64 0, i64 0
+  %t7 = getelementptr [9 x i8], [9 x i8]* @.str.1288, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = call i64 @__list_push(i64 %t6, i64 %t8)
-  %t10 = getelementptr [15 x i8], [15 x i8]* @.str.715, i64 0, i64 0
+  %t10 = getelementptr [15 x i8], [15 x i8]* @.str.1289, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i64
   %t12 = call i64 @__list_push(i64 %t6, i64 %t11)
-  %t13 = getelementptr [15 x i8], [15 x i8]* @.str.716, i64 0, i64 0
+  %t13 = getelementptr [15 x i8], [15 x i8]* @.str.1290, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @__list_push(i64 %t6, i64 %t14)
   %t16 = call i64 @turmeric_signal_signal(i64 %t6)
   store i64 %t16, i64* @__g_todos
-  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.717, i64 0, i64 0
+  %t17 = getelementptr [1 x i8], [1 x i8]* @.str.1291, i64 0, i64 0
   %t18 = ptrtoint i8* %t17 to i64
   %t19 = call i64 @turmeric_signal_signal(i64 %t18)
   store i64 %t19, i64* @__g_new_todo
-  %t20 = getelementptr [5 x i8], [5 x i8]* @.str.718, i64 0, i64 0
+  %t20 = getelementptr [5 x i8], [5 x i8]* @.str.1292, i64 0, i64 0
   %t21 = ptrtoint i8* %t20 to i64
-  %t22 = ptrtoint i64 ()* @App to i64
-  %t23 = call i64 @turmeric_element_mount(i64 %t21, i64 %t22)
+  %t22 = call i8* @malloc(i64 16)
+  %t23 = bitcast i8* %t22 to [2 x i64]*
+  %t24 = ptrtoint i64 (i64)* @__wrap_1628_App to i64
+  %t25 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 0
+  store i64 %t24, i64* %t25
+  %t26 = getelementptr [2 x i64], [2 x i64]* %t23, i64 0, i64 1
+  store i64 0, i64* %t26
+  %t27 = ptrtoint [2 x i64]* %t23 to i64
+  %t28 = call i64 @mount(i64 %t21, i64 %t27)
   ret i64 0
 }
 declare i64 @turmeric_signal_Computed__compute(i64)
@@ -14426,7 +21276,6 @@ declare i64 @turmeric_reconcile_ConditionalSlot__builder(i64)
 declare i64 @turmeric_reconcile_KeyedList__key_fn(i64)
 declare i64 @turmeric_reconcile_KeyedList__builder_fn(i64)
 declare i64 @turmeric_reconcile_each(i64)
-declare i64 @turmeric_element_mount(i64)
 
 
 define i32 @main(i32 %argc, i8** %argv) {
