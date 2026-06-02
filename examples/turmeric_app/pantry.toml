@@ -8,5 +8,5 @@ target = "wasm"
 turmeric = { path = "../../turmeric" }
 
 [scripts]
-build = "saffron build --target wasm --lib-path .pantry/packages src/main.sf -o build/app.wasm"
-dev = "saffron build --target wasm --lib-path .pantry/packages src/main.sf -o build/app.wasm && cd build && python3 -m http.server 8080"
+build = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o build/app.wasm && cp public/* build/ && cp .pantry/packages/turmeric/runtime/turmeric.js build/"
+dev = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o build/app.wasm && cp public/* build/ && cp .pantry/packages/turmeric/runtime/turmeric.js build/ && cd build && python3 -m http.server 8080"
