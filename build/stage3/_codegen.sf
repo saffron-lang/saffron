@@ -1053,7 +1053,7 @@ class Codegen {
                 local
             }
             BoolLit(v) => {
-                this.last_type = AST.Type.IntType
+                this.last_type = AST.Type.BoolType
                 var local: String = this.fresh_local()
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
@@ -1514,7 +1514,7 @@ class Codegen {
                 }
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
-                this.last_type = AST.Type.IntType
+                this.last_type = AST.Type.BoolType
                 return local
             }
 
@@ -1524,7 +1524,7 @@ class Codegen {
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
             this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.BoolType
             return local
         }
 
@@ -1592,7 +1592,7 @@ class Codegen {
         else if (op == "<<") { this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs) }
         else if (op == ">>") { this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs) }
         else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.BoolType
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else if (op == "!=") { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
@@ -2769,7 +2769,11 @@ class Codegen {
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
-            this.last_type = AST.Type.IntType
+            if (this.func_ret_types.has(emit_callee)) {
+                this.last_type = this.str_to_type(this.func_ret_types.get(emit_callee))
+            } else {
+                this.last_type = AST.Type.IntType
+            }
             return local
         }
 
@@ -3594,7 +3598,7 @@ class Codegen {
                 if (ret_llvm == "void") {
                     this.emit_terminator("ret void")
                 } else {
-                    this.emit_terminator("unreachable")
+                    this.emit_terminator("ret i64 0")
                 }
             }
         }
@@ -5242,7 +5246,7 @@ class Codegen {
         // Extend back to i64 for uniform value type
         var result: String = this.fresh_local()
         this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
-        this.last_type = AST.Type.IntType
+        this.last_type = AST.Type.BoolType
         return result
     }
 
