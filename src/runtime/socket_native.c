@@ -450,3 +450,95 @@ void sf_tls_close(int64_t tls_handle) {
     SSL_free(ssl);
     tls_table_free(tls_handle);
 }
+
+/* ===== UDP Socket API ===== */
+
+/*
+ * Create a non-blocking UDP socket (IPv4).
+ *
+ * Returns: fd on success, -1 on error.
+ */
+int64_t sf_udp_socket(void) {
+    int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (fd < 0) return -1;
+
+    if (set_nonblocking(fd) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    return (int64_t)fd;
+}
+
+/*
+ * Send data via UDP to a specific host:port.
+ * Performs DNS resolution on the destination host (typically an IP string like "8.8.8.8").
+ *
+ * Returns: bytes sent on success, -1 for would_block, -2 for error.
+ */
+int64_t sf_udp_sendto(int64_t fd, const char *buf, int64_t len, const char *host, int64_t port) {
+    if (fd < 0 || buf == NULL || len <= 0 || host == NULL) return -2;
+    if (port < 0 || port > 65535) return -2;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+
+    /* Convert IP string to binary. For DNS we always send to an IP address. */
+    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
+        /* If not a valid IP, try getaddrinfo as fallback */
+        char port_str[8];
+        snprintf(port_str, sizeof(port_str), "%d", (int)port);
+        struct addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        struct addrinfo *result = NULL;
+        if (getaddrinfo(host, port_str, &hints, &result) != 0 || result == NULL) {
+            return -2;
+        }
+        memcpy(&addr, result->ai_addr, sizeof(addr));
+        freeaddrinfo(result);
+    }
+
+    ssize_t n = sendto((int)fd, buf, (size_t)len, 0,
+                       (struct sockaddr *)&addr, sizeof(addr));
+    if (n >= 0) return (int64_t)n;
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return -1;
+    if (errno == EINTR) return -1;
+    return -2;
+}
+
+/*
+ * Receive data from a UDP socket.
+ *
+ * Returns:
+ *   > 0  : bytes received
+ *   -1   : would block (no data available yet)
+ *   -2   : error
+ */
+int64_t sf_udp_recvfrom(int64_t fd, char *buf, int64_t len) {
+    if (fd < 0 || buf == NULL || len <= 0) return -2;
+
+    struct sockaddr_in sender_addr;
+    socklen_t addr_len = sizeof(sender_addr);
+
+    ssize_t n = recvfrom((int)fd, buf, (size_t)len, 0,
+                         (struct sockaddr *)&sender_addr, &addr_len);
+    if (n >= 0) return (int64_t)n;
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return -1;
+    if (errno == EINTR) return -1;
+    return -2;
+}
+
+/*
+ * Close a UDP socket.
+ */
+void sf_udp_close(int64_t fd) {
+    if (fd >= 0) {
+        close((int)fd);
+    }
+}

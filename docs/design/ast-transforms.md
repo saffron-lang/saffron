@@ -86,7 +86,33 @@ Saffron already has several relevant primitives:
 | Type safety | Phases run before the compiler. |
 | Ecosystem fit | Pantry would need fundamental redesign. |
 
-### 2.5 Decorator-Driven Transforms (Python/TypeScript Decorators)
+### 2.5 Compile-Time AST Macros (Elixir Style)
+
+**Concept:** Macros are regular functions that receive AST as data and return new AST. The language's AST is represented uniformly (Elixir uses 3-tuples `{form, meta, args}`), so macros manipulate the same data structures as runtime code. `quote` captures AST literally; `unquote` splices values in. Macros expand at compile time in the same runtime (BEAM VM) that runs user code.
+
+```elixir
+defmacro unless(condition, do: block) do
+  quote do
+    if !unquote(condition), do: unquote(block)
+  end
+end
+```
+
+| Criterion | Assessment |
+|-----------|-----------|
+| Implementation effort | **High.** Requires the compiler itself to be runnable at compile time (chicken-and-egg with bootstrap). Need `quote`/`unquote` syntax, hygiene system, and compile-time evaluation. |
+| User experience | Excellent. Macros look like functions. `quote`/`unquote` is learnable. Errors point to source. |
+| Composability | Very good. Macros compose by nesting. Hygiene prevents leakage between macro layers. |
+| Debuggability | Good: `Macro.expand/2` shows what a macro produces. But nested expansion gets complex. |
+| Performance | Macros run once at compile time — zero runtime cost. But compilation is slower. |
+| Type safety | Elixir is dynamically typed so N/A there; for Saffron, type checker would run after expansion. |
+| Ecosystem fit | **Interesting for Saffron.** Our AST is already exposed via `@ast`/`@parser` modules. The missing piece is a `quote`-like syntax and compile-time evaluation of Saffron code. Bootstrap makes this hard — gen2 must be able to expand macros to compile gen3. |
+
+**Key difference from Rust-style (2.1):** Rust proc macros are separate crates compiled ahead-of-time with a token stream API. Elixir macros are inline in the same codebase, operate on structured AST (not tokens), and the language is designed around homoiconicity. For Saffron, the Elixir approach would mean: AST nodes as first-class values + `quote { ... }` syntax + compile-time function execution.
+
+**Saffron feasibility:** Partially there. `@parser` and `@ast` already expose structured AST. What's missing: (1) `quote`/`unquote` syntax for AST construction, (2) compile-time evaluation (the compiler would need to interpret or run Saffron during compilation — hard with the bootstrap constraint), (3) hygiene rules.
+
+### 2.6 Decorator-Driven Transforms (Python/TypeScript Decorators)
 
 **Concept:** Decorators on functions/classes trigger codegen changes. `@observable class State { ... }` generates getter/setter wrappers.
 
@@ -104,17 +130,17 @@ Saffron already has several relevant primitives:
 
 ## 3. Summary Table
 
-| | Macros | Plugins | Preprocessing | Build Scripts | Decorators |
-|--|---|---|---|---|---|
-| **Impl effort** | Very High | High | Done | Very High | Medium |
-| **Consumer UX** | Excellent | Good | Fair | Good | Excellent |
-| **Author UX** | Hard | Standard | Standard | Complex | Standard |
-| **Composability** | Complex | Simple | Fragile | Excellent | Natural |
-| **Debuggability** | Hard | Good | Excellent | Good | Good |
-| **Performance** | Variable | Moderate | Slow | Good | Fast |
-| **Type safety** | After expansion | After transforms | After output | Before/after | Configurable |
-| **Ecosystem fit** | New infra | Leverages @ast | Already works | Redesign needed | Natural extension |
-| **Power** | Maximum | High | High | Maximum | Item-level |
+| | Macros (Rust) | Elixir Macros | Plugins | Preprocessing | Build Scripts | Decorators |
+|--|---|---|---|---|---|---|
+| **Impl effort** | Very High | High | High | Done | Very High | Medium |
+| **Consumer UX** | Excellent | Excellent | Good | Fair | Good | Excellent |
+| **Author UX** | Hard | Good | Standard | Standard | Complex | Standard |
+| **Composability** | Complex | Very Good | Simple | Fragile | Excellent | Natural |
+| **Debuggability** | Hard | Good | Good | Excellent | Good | Good |
+| **Performance** | Variable | Zero runtime | Moderate | Slow | Good | Fast |
+| **Type safety** | After expansion | After expansion | After transforms | After output | Before/after | Configurable |
+| **Ecosystem fit** | New infra | Partial (have @ast) | Leverages @ast | Already works | Redesign needed | Natural extension |
+| **Power** | Maximum | Maximum | High | High | Maximum | Item-level |
 
 ---
 
@@ -132,6 +158,8 @@ This combines:
 - **Pantry integration** for discovery and orchestration
 
 The key insight: we do NOT need to change the compiler. Pantry runs transform plugins as a pre-compilation step that reads `.sf` files, transforms the AST, and writes back `.sf`.
+
+**Future evolution toward Elixir-style:** Once the plugin system is stable, a natural next step is adding `quote { ... }` / `unquote(expr)` syntax for ergonomic AST construction inside transforms. This would bring Elixir-like authoring UX without requiring full compile-time evaluation — transforms still run as pantry plugins, but `quote` gives them first-class AST literals instead of manual `AST.Expr.Binary(...)` construction. Full Elixir-style inline macros (compile-time eval in the same pass) remains a stretch goal blocked by the bootstrap constraint.
 
 ---
 

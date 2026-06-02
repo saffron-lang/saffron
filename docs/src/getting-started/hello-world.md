@@ -6,10 +6,16 @@ Create a file called `hello.sf`:
 IO.println("Hello, world!")
 ```
 
-Run it:
+Run it with the C VM:
 
 ```bash
-saffron hello.sf
+./cvm/cmake-build-debug/saffron hello.sf
+```
+
+Or with the native compiler:
+
+```bash
+tools/saffron run hello.sf
 ```
 
 Output:

@@ -15,6 +15,8 @@
 @extern("void free(void*)") fun sock_free(ptr: Int)
 @extern("i64 strlen(void*)") fun sock_strlen(s: Int): Int
 
+@intrinsic fun __suspend(reason: Int, arg: Int)
+
 // Connect to a TCP host:port. Returns fd or -1 on error.
 fun connect(host: String, port: Int): Int {
     socket_init()
@@ -49,8 +51,8 @@ fun read(fd: Int, max_bytes: Int): String {
         }
         if (n == 0) { break }
         if (n == -2) { break }
-        // n == -1: would block — yield for read readiness
-        yield [2, fd]
+        // n == -1: would block — suspend for read readiness
+        __suspend(2, fd)
     }
     // Null-terminate
     @intrinsic fun store8(addr: Int, val: Int)
@@ -68,8 +70,8 @@ fun write(fd: Int, data: String): Int {
         if (n > 0) {
             written = written + n
         } else if (n == -1) {
-            // Would block — yield for write readiness
-            yield [4, fd]
+            // Would block — suspend for write readiness
+            __suspend(4, fd)
         } else {
             // Error
             break
@@ -92,8 +94,8 @@ fun tls_read(handle: Int, max_bytes: Int): String {
         }
         if (n == 0) { break }
         if (n == -2) { break }
-        // Would block — yield for read readiness on underlying fd
-        yield [2, fd]
+        // Would block — suspend for read readiness on underlying fd
+        __suspend(2, fd)
     }
     @intrinsic fun store8(addr: Int, val: Int)
     store8(buf + total, 0)
@@ -111,7 +113,7 @@ fun tls_write(handle: Int, data: String): Int {
         if (n > 0) {
             written = written + n
         } else if (n == -1) {
-            yield [4, fd]
+            __suspend(4, fd)
         } else {
             break
         }

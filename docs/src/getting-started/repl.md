@@ -1,9 +1,9 @@
 # The REPL
 
-Launch the REPL by running `saffron` with no arguments:
+Launch the REPL by running the C VM binary with no arguments:
 
 ```bash
-saffron
+./cvm/cmake-build-debug/saffron
 ```
 
 ```
@@ -40,3 +40,4 @@ Hello, world!
 - Use the REPL to test small expressions and explore the standard library
 - Define helper functions to iterate quickly on an idea
 - All imports work in the REPL just like in files
+- The REPL uses the C VM interpreter (not the LLVM compiler), so it starts instantly

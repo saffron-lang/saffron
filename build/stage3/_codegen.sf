@@ -8073,7 +8073,8 @@ class Codegen {
         if (obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
         }
-        if (obj_type == "String") {
+        if (obj_type == "String" or obj_type == "Any") {
+            // For Any type, default to strlen (common case: untyped vars hold strings)
             var str_ptr: String = this.emit_untag_ptr(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")

@@ -1,27 +1,27 @@
 # Elements
 
-Turmeric uses builder functions with trailing closures to construct a virtual element tree. Every HTML element has a corresponding Saffron function.
+Turmeric uses builder functions with trailing closures to construct the DOM tree. Every HTML element has a corresponding Saffron function. Attributes are passed as named arguments.
 
 ## Basic Usage
 
 ```saffron
 div {
-    h1 { text("Hello, Turmeric!") }
-    p { text("A reactive web framework.") }
+    h1 { "Hello, Turmeric!" }
+    p { "A reactive web framework." }
 }
 ```
 
-The `text()` function creates a text node inside the current element.
+String literals inside trailing closures are automatically desugared to text nodes.
 
-## Attributes
+## Attributes (Named Args)
 
-Pass attributes as the first argument — a list of `Attr` values:
+Pass attributes as named arguments to element functions:
 
 ```saffron
-div([class_("container"), id("main")]) {
-    a([href("/about")]) { text("About") }
-    img([src("/logo.png"), alt("Logo")])
-    input([type_("text"), placeholder("Search..."), name("q")])
+div(cls="container", id="main") {
+    a(href="/about") { "About" }
+    img(src="/logo.png", alt="Logo")
+    input(type_="text", placeholder="Search...", name="q")
 }
 ```
 
@@ -29,9 +29,9 @@ When no attributes are needed, just use the trailing closure directly:
 
 ```saffron
 ul {
-    li { text("First") }
-    li { text("Second") }
-    li { text("Third") }
+    li { "First" }
+    li { "Second" }
+    li { "Third" }
 }
 ```
 
@@ -41,7 +41,7 @@ All 112 HTML elements are available as functions, generated from the TypeScript 
 
 **Layout:** `div`, `span`, `section`, `article`, `aside`, `header`, `footer`, `main`, `nav`
 
-**Text:** `h1`–`h6`, `p`, `pre`, `code`, `blockquote`, `em`, `strong`, `small`, `mark`
+**Text:** `h1`-`h6`, `p`, `pre`, `code`, `blockquote`, `em`, `strong`, `small`, `mark`
 
 **Lists:** `ul`, `ol`, `li`, `dl`, `dt`, `dd`
 
@@ -53,69 +53,78 @@ All 112 HTML elements are available as functions, generated from the TypeScript 
 
 **Void (self-closing):** `br`, `hr`, `img`, `input`, `link`, `meta`, `source`, `track`, `wbr`
 
-## Attribute Helpers
+## Common Attributes
 
-Common attributes have typed helper functions:
+| Attribute | Notes |
+|-----------|-------|
+| `cls` | Sets the CSS class (maps to `class` attribute) |
+| `id` | Element ID |
+| `style` | Inline CSS |
+| `type_` | Trailing underscore to avoid keyword conflict |
+| `href`, `src`, `alt` | Standard HTML attributes |
+| `placeholder`, `name`, `value` | Form input attributes |
+| `rows` | Textarea rows |
 
-```saffron
-class_("btn primary")       // class="btn primary"
-id("submit-btn")            // id="submit-btn"
-href("/page")               // href="/page"
-src("/img.png")             // src="/img.png"
-alt("description")          // alt="description"
-type_("submit")             // type="submit"
-name("email")               // name="email"
-value("hello")              // value="hello"
-placeholder("Type here")    // placeholder="Type here"
-disabled("true")            // disabled="true"
-style("color: red")         // style="color: red"
-```
-
-Note: `class_`, `type_`, `for_`, `readonly_` use trailing underscores to avoid Saffron keyword conflicts.
-
-### Data and ARIA Attributes
-
-```saffron
-data("id", "42")            // data-id="42"
-aria("label", "Close")      // aria-label="Close"
-```
+Note: `cls` is used instead of `class`, and `type_` instead of `type`, to avoid Saffron keyword conflicts.
 
 ## Event Handlers
 
-Event handlers are typed — each event gets the correct event class:
+Event handlers are passed as named `on_*` attributes with typed `Event` objects:
 
 ```saffron
-button([on_click(fun (e: PointerEvent) => {
-    IO.println("Clicked at ${e.client_x}, ${e.client_y}")
-})]) {
-    text("Click me")
+import { Event } from "turmeric/events"
+
+button(cls="btn", on_click=fun (e: Event) => {
+    IO.println("Button clicked!")
+    count.set(count.get() + 1)
+}) {
+    "Click me"
 }
 
-input([on_input(fun (e: InputEvent) => {
-    IO.println("Input: ${e.data}")
-}), on_keydown(fun (e: KeyboardEvent) => {
-    if (e.key == "Enter") { submit() }
-})])
+input(
+    type_="text",
+    on_input=fun (e: Event) => name.set("typed")
+)
 ```
 
-Available event handlers include:
+Available event handlers:
 - **Mouse:** `on_click`, `on_dblclick`, `on_mousedown`, `on_mouseup`, `on_mousemove`, `on_mouseenter`, `on_mouseleave`
 - **Keyboard:** `on_keydown`, `on_keyup`
-- **Form:** `on_input`, `on_change`, `on_submit`, `on_reset`, `on_focus`, `on_blur`
-- **Pointer:** `on_pointerdown`, `on_pointerup`, `on_pointermove`
-- **Drag:** `on_dragstart`, `on_drag`, `on_dragend`, `on_drop`
-- **Touch:** `on_touchstart`, `on_touchmove`, `on_touchend`
-- **Animation:** `on_animationstart`, `on_animationend`, `on_transitionend`
+- **Form:** `on_input`, `on_change`, `on_submit`, `on_focus`, `on_blur`
+
+## Reactive Text
+
+Use `reactive()` to create text that updates when signals change:
+
+```saffron
+div {
+    reactive(fun () => "Count: " + count.get().to_string())
+}
+```
+
+The function is re-evaluated whenever any signal read inside it changes, and the DOM text node is updated automatically.
+
+## Conditional Classes with `cx()`
+
+The `cx()` utility generates class strings from a map of class names to boolean conditions:
+
+```saffron
+import { cx } from "turmeric/style"
+
+div(cls=cx({"card": true, "active": is_selected.get(), "disabled": !enabled.get()})) {
+    "Content"
+}
+```
 
 ## Components
 
-Components are just functions that return `Node`:
+Components are just functions that build elements:
 
 ```saffron
-fun Card(title: String, body: String): Node {
-    return div([class_("card")]) {
-        h2 { text(title) }
-        p { text(body) }
+fun Card(title: String, body: String) {
+    div(cls="card") {
+        h2 { title }
+        p { body }
     }
 }
 
@@ -126,58 +135,51 @@ div {
 }
 ```
 
-## Conditional Rendering
+## List Rendering with `each()`
 
-Use `show()` or pattern matching:
-
-```saffron
-var logged_in = signal(true)
-
-div {
-    show(logged_in.get()) {
-        p { text("Welcome back!") }
-    }
-
-    // Or with match:
-    match (user.get()) {
-        Loading => p { text("Loading...") }
-        is Ready(u) => h1 { text(u.name) }
-        is Error(msg) => p([class_("error")]) { text(msg) }
-    }
-}
-```
-
-## List Rendering
-
-Use `each()` with a trailing closure that receives each item:
+Use `each()` with a trailing closure to render lists reactively:
 
 ```saffron
+import { each } from "turmeric/reconcile"
+
 var todos = signal(["Buy milk", "Write code", "Ship it"])
 
-ul {
+ul(cls="todo-list") {
     each(todos.get()) { todo =>
-        li { text(todo) }
+        li(cls="todo-item") {
+            span { todo }
+            button(cls="delete", on_click=fun (e: Event) => {
+                // remove todo
+            }) { "x" }
+        }
     }
 }
 ```
 
-## Signal Binding
+## Pattern Matching for Pages
 
-Bind a signal to an input's value for two-way data flow:
+Use `match` on signals for page routing:
 
 ```saffron
-var query = signal("")
+var page = signal("home")
 
-input([bind_value(query), placeholder("Search...")])
-p { text("You typed: ${query.get()}") }
+main {
+    match (page.get()) {
+        "home" => HomePage()
+        "about" => AboutPage()
+        _ => section { p { "404 - Not Found" } }
+    }
+}
 ```
 
-## Rendering to HTML
+## Mounting
 
-For testing or server-side rendering:
+Use `mount()` to attach the app to a DOM element:
 
 ```saffron
-var tree = div { h1 { text("Hello") } }
-var html = render_to_html(tree)
-IO.println(html)  // <div><h1>Hello</h1></div>
+fun App() {
+    div { h1 { "Hello World" } }
+}
+
+mount("#app", App)
 ```

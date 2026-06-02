@@ -1,0 +1,56 @@
+//! DNS resolver test — demonstrates async DNS resolution.
+//! Resolves hostnames to IPv4 addresses using the UDP-based DNS library.
+
+import "@dns" as DNS
+
+IO.println("=== DNS Resolution Tests ===")
+
+// --- Test 1: Resolve a well-known hostname ---
+IO.println("")
+IO.println("--- Test 1: Resolve example.com ---")
+var ip = DNS.resolve("example.com")
+if (ip.length() > 0) {
+    IO.println("example.com -> ${ip}")
+} else {
+    IO.println("FAIL: could not resolve example.com")
+}
+
+// --- Test 2: Resolve with specific nameserver (Cloudflare) ---
+IO.println("")
+IO.println("--- Test 2: Resolve with Cloudflare DNS ---")
+var ip2 = DNS.resolve_with("google.com", "1.1.1.1")
+if (ip2.length() > 0) {
+    IO.println("google.com -> ${ip2}")
+} else {
+    IO.println("FAIL: could not resolve google.com via 1.1.1.1")
+}
+
+// --- Test 3: Resolve a non-existent domain (should return empty) ---
+IO.println("")
+IO.println("--- Test 3: Non-existent domain ---")
+var ip3 = DNS.resolve("this-domain-definitely-does-not-exist-12345.invalid")
+if (ip3.length() == 0) {
+    IO.println("OK: non-existent domain returned empty string")
+} else {
+    IO.println("UNEXPECTED: got ${ip3} for non-existent domain")
+}
+
+// --- Test 4: Parallel resolution ---
+IO.println("")
+IO.println("--- Test 4: Parallel resolution ---")
+var hosts = ["example.com", "google.com", "github.com"]
+var ips = DNS.resolve_all(hosts)
+var i = 0
+while (i < hosts.length()) {
+    var host: String = hosts[i]
+    var resolved: String = ips[i]
+    if (resolved.length() > 0) {
+        IO.println("${host} -> ${resolved}")
+    } else {
+        IO.println("${host} -> FAILED")
+    }
+    i = i + 1
+}
+
+IO.println("")
+IO.println("=== DNS Tests Complete ===")

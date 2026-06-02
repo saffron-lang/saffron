@@ -5,7 +5,7 @@ Lists are built-in — no import needed.
 ## Creating lists
 
 ```saffron
-var empty: List<Int> = []
+var empty: List<Number> = []
 var nums = [1, 2, 3]
 var mixed: List<String> = ["a", "b", "c"]
 ```
@@ -25,12 +25,12 @@ list[1]    // 20
 |--------|---------|-------------|
 | `list.push(item)` | — | Append to end |
 | `list.pop()` | element | Remove and return last |
-| `list.length()` | `Int` | Number of elements |
+| `list.length()` | `Number` | Number of elements |
 | `list.reverse()` | `List` | Reversed copy |
 | `list.sort()` | `List` | Sorted copy |
 | `list.copy()` | `List` | Shallow copy |
 | `list.contains(item)` | `Bool` | Check membership |
-| `list.index_of(item)` | `Int` | Index of first occurrence (-1 if absent) |
+| `list.index_of(item)` | `Number` | Index of first occurrence (-1 if absent) |
 | `list.slice(start, end)` | `List` | Sub-list by index range |
 | `list.join(sep)` | `String` | Join elements with separator |
 
@@ -47,6 +47,6 @@ for (item in [1, 2, 3]) {
 ```saffron
 import { map, filter } from "@iter"
 
-var squares = map([1, 2, 3, 4], fun (x: Int): Int => x * x)
+var squares = map([1, 2, 3, 4], fun (x: Number): Number => x * x)
 // [1, 4, 9, 16]
 ```

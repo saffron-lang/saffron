@@ -36,7 +36,7 @@ import "@math" as M
 Use 4 spaces. Opening brace on the same line:
 
 ```saffron
-fun fibonacci(n: Int): Int {
+fun fibonacci(n: Number): Number {
     if (n <= 1) {
         return n
     }
@@ -51,15 +51,15 @@ Prefer lines under 100 characters. Break long function calls or chains:
 ```saffron
 // Break pipe chains
 var result = items
-    |> filter(fun (x: Int): Bool => x > threshold)
-    |> map(fun (x: Int): Int => x * 2)
+    |> filter(fun (x: Number): Bool => x > threshold)
+    |> map(fun (x: Number): Number => x * 2)
     |> Iter.sum()
 
 // Break long parameter lists
 fun create_user(
     name: String,
     email: String,
-    age: Int,
+    age: Number,
     role: Role
 ): User {
     // ...
@@ -72,7 +72,7 @@ Annotate function parameters and return types. Omit on local variables when the 
 
 ```saffron
 // Parameters and returns: always annotate
-fun distance(a: Point, b: Point): Float {
+fun distance(a: Point, b: Point): Number {
     var dx = a.x - b.x   // type obvious from context
     var dy = a.y - b.y
     return Math.sqrt(dx * dx + dy * dy)
@@ -126,7 +126,7 @@ Use `///` doc-comments on public functions and classes. Skip comments for obviou
 
 ```saffron
 /// Parse a duration string like "5s", "100ms", or "2m" into seconds.
-fun parse_duration(input: String): Float {
+fun parse_duration(input: String): Number {
     // ...
 }
 
@@ -177,10 +177,10 @@ Put fields first, then `init`, then methods:
 ```saffron
 class Connection {
     var host: String
-    var port: Int
-    var timeout: Float
+    var port: Number
+    var timeout: Number
 
-    fun init(host: String, port: Int) {
+    fun init(host: String, port: Number) {
         this.host = host
         this.port = port
         this.timeout = 30.0

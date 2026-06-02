@@ -9,10 +9,10 @@ import "@math" as Math
 | Name | Value |
 |------|-------|
 | `Math.pi` | 3.14159265358979... |
-| `Math.e` | 2.71828182845904... |
-| `Math.inf` | Positive infinity |
-| `Math.nan` | Not a number |
-| `Math.tau` | 2π |
+| `Math.e` | 2.71828182845905... |
+| `Math.tau` | 6.28318530717959... (2pi) |
+| `Math.PI` | Alias for `pi` |
+| `Math.E` | Alias for `e` |
 
 ## Basic functions
 
@@ -64,5 +64,3 @@ import "@math" as Math
 | `Math.hypot(x, y)` | Hypotenuse length |
 | `Math.map_range(v, in_min, in_max, out_min, out_max)` | Remap value between ranges |
 | `Math.is_close(a, b, tolerance)` | Approximate equality |
-| `Math.sum(list)` | Sum of a list |
-| `Math.product(list)` | Product of a list |

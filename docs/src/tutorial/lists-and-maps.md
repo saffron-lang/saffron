@@ -45,18 +45,17 @@ for (item in [10, 20, 30]) {
 Maps are key-value collections:
 
 ```saffron
-var scores: Map<String, Int> = {"alice": 95, "bob": 87}
+var scores: Map<String, Number> = {"alice": 95, "bob": 87}
 ```
 
 ### Operations
 
 ```saffron
-var m: Map<String, Int> = {}
+var m: Map<String, Number> = {}
 
 m.set("x", 10)
 m.get("x")       // 10
 m.has("x")       // true
-m.delete("x")
 m.keys()         // list of keys
 m.values()       // list of values
 m.length()       // number of entries

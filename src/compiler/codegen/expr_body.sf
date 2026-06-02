@@ -1552,7 +1552,8 @@
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        if (!this.typed_vars.has(callee_name) and callee_name.length() > 0) {
+        // Also check var_types for captured variables in closures
+        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()
