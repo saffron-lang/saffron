@@ -154,6 +154,15 @@
             param_strs.push(this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg")
             i = i + 1
         }
+        // Register param names for named argument dispatch
+        var pnames_list: List<String> = []
+        var pni: Float = 0
+        while (pni < param_list.length()) {
+            var pnparts: List<String> = param_list[pni].split(":")
+            pnames_list.push(pnparts[0])
+            pni = pni + 1
+        }
+        this.func_param_names.set(emit_name, pnames_list)
 
         this.emit("")
         var linkage: String = "define"

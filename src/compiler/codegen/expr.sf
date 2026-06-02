@@ -846,16 +846,24 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
-        // Error check: argument count validation
-        if (this.called_function_arity.has(resolved_callee)) {
-            var expected: Float = this.called_function_arity.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-            }
-        } else if (this.func_param_count.has(resolved_callee)) {
-            var expected: Float = this.func_param_count.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+        // Error check: argument count validation (skip if named args present)
+        var has_named_check: Bool = false
+        var nac: Float = 0
+        while (nac < args.length()) {
+            if (this.classify_expr(args[nac]) == "assign") { has_named_check = true }
+            nac = nac + 1
+        }
+        if (!has_named_check) {
+            if (this.called_function_arity.has(resolved_callee)) {
+                var expected: Float = this.called_function_arity.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
+            } else if (this.func_param_count.has(resolved_callee)) {
+                var expected: Float = this.func_param_count.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
             }
         }
 
@@ -926,9 +934,75 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
                     }
                 }
             }
+            // Named argument reordering: detect Assign nodes in args
+            var reordered_args: List<AST.Expr> = args
+            var has_named_args: Bool = false
+            var nai: Float = 0
+            while (nai < args.length()) {
+                if (this.classify_expr(args[nai]) == "assign") {
+                    has_named_args = true
+                }
+                nai = nai + 1
+            }
+            if (has_named_args and this.func_param_names.has(resolved_callee)) {
+                var param_names: List<String> = this.func_param_names.get(resolved_callee)
+                var new_args: List<AST.Expr> = []
+                var positional_idx: Float = 0
+                var pi: Float = 0
+                while (pi < param_names.length()) {
+                    var pname: String = param_names[pi]
+                    // Search for a named arg matching this param
+                    var found: Bool = false
+                    var si: Float = 0
+                    while (si < args.length()) {
+                        if (this.classify_expr(args[si]) == "assign") {
+                            var arg_name: String = match (args[si]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (arg_name == pname) {
+                                var arg_value: AST.Expr = match (args[si]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                new_args.push(arg_value)
+                                found = true
+                            }
+                        }
+                        si = si + 1
+                    }
+                    if (!found) {
+                        // Use positional arg (skip over named args in positional counting)
+                        var used_positional: Bool = false
+                        while (positional_idx < args.length() and !used_positional) {
+                            if (this.classify_expr(args[positional_idx]) != "assign") {
+                                new_args.push(args[positional_idx])
+                                positional_idx = positional_idx + 1
+                                used_positional = true
+                            } else {
+                                positional_idx = positional_idx + 1
+                            }
+                        }
+                        if (!used_positional) {
+                            // No positional arg available — use default (will be filled below)
+                            new_args.push(AST.Expr.NilLit)
+                        }
+                    }
+                    pi = pi + 1
+                }
+                reordered_args = new_args
+            }
             var i: Float = 0
-            while (i < args.length()) {
-                var val: String = this.gen_arg_value(args[i])
+            while (i < reordered_args.length()) {
+                // Skip nil placeholders that signal "use default"
+                if (has_named_args and this.classify_expr(reordered_args[i]) == "nil" and this.func_defaults.has(resolved_callee)) {
+                    var defs: List<AST.Expr> = this.func_defaults.get(resolved_callee)
+                    if (i < defs.length() and this.classify_expr(defs[i]) != "nil") {
+                        var def_val: String = this.gen_arg_value(defs[i])
+                        arg_strs.push("i64 " + def_val)
+                        i = i + 1
+                        continue
+                    }
+                }
+                var val: String = this.gen_arg_value(reordered_args[i])
                 arg_strs.push("i64 " + val)
                 i = i + 1
             }

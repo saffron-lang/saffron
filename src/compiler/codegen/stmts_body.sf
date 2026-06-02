@@ -59,15 +59,19 @@
                     // Register default values for optional params
                     var emit_name: String = this.current_prefix + name
                     var defaults: List<AST.Expr> = []
+                    var param_names: List<String> = []
                     var pi: Float = 0
                     while (pi < params.length()) {
                         var p: AST.Param = params[pi]
                         var dval: AST.Expr = match (p) { Param(n, t, d) => d }
+                        var pname: String = match (p) { Param(n, t, d) => n }
                         defaults.push(dval)
+                        param_names.push(pname)
                         pi = pi + 1
                     }
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
+                    this.func_param_names.set(emit_name, param_names)
                     this.gen_function(name, params_str, ret_type, body)
                 }
             }
@@ -348,6 +352,38 @@
         this.called_function_arity.set(full_name, param_count)
         if (this.current_prefix.length() > 0) {
             this.called_function_arity.set(this.current_prefix + full_name, param_count)
+        }
+        // Register param names for named arg dispatch (self + method params)
+        var method_param_names: List<String> = []
+        method_param_names.push("self")
+        var mpi: Float = 0
+        while (mpi < mparams.length()) {
+            var mp: AST.Param = mparams[mpi]
+            var mpn: String = match (mp) { Param(n, t, d) => n }
+            method_param_names.push(mpn)
+            mpi = mpi + 1
+        }
+        this.func_param_names.set(full_name, method_param_names)
+        if (this.current_prefix.length() > 0) {
+            this.func_param_names.set(this.current_prefix + full_name, method_param_names)
+        }
+        // Register defaults for class methods
+        var method_defaults: List<AST.Expr> = []
+        method_defaults.push(AST.Expr.NilLit)
+        mpi = 0
+        while (mpi < mparams.length()) {
+            var mp: AST.Param = mparams[mpi]
+            var mdval: AST.Expr = match (mp) { Param(n, t, d) => d }
+            method_defaults.push(mdval)
+            mpi = mpi + 1
+        }
+        this.func_defaults.set(full_name, method_defaults)
+        if (this.current_prefix.length() > 0) {
+            this.func_defaults.set(this.current_prefix + full_name, method_defaults)
+        }
+        this.func_param_count.set(full_name, param_count)
+        if (this.current_prefix.length() > 0) {
+            this.func_param_count.set(this.current_prefix + full_name, param_count)
         }
         this.gen_function(full_name, full_params, mret, mbody)
     }
