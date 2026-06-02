@@ -591,49 +591,4 @@ entry:
   ret void
 }
 
-; --- List slice (hand-written to avoid NaN boxing loop arithmetic issues) ---
-@.slice_dbg = private constant [25 x i8] c"SLICE s=%ld e=%ld c=%ld\0A\00"
-declare i64 @__list_new()
-declare i64 @__list_length(i64)
-declare i64 @__list_get(i64, i64)
-declare i64 @__list_push(i64, i64)
-
-define i64 @__list_slice(i64 %list, i64 %start, i64 %end) {
-entry:
-  %is_null = icmp eq i64 %list, 0
-  br i1 %is_null, label %return_empty, label %check_bounds
-
-return_empty:
-  %empty = call i64 @__list_new()
-  ret i64 %empty
-
-check_bounds:
-  %count_raw = call i64 @__list_length(i64 %list)
-  %count = call i64 @__val_untag_int(i64 %count_raw)
-  %start_raw = call i64 @__val_untag_int(i64 %start)
-  %end_raw = call i64 @__val_untag_int(i64 %end)
-  %dbg_fmt = getelementptr [30 x i8], [25 x i8]* @.slice_dbg, i64 0, i64 0
-  call i32 (i8*, ...) @printf(i8* %dbg_fmt, i64 %start_raw, i64 %end_raw, i64 %count)
-  %s_neg = icmp slt i64 %start_raw, 0
-  %s = select i1 %s_neg, i64 0, i64 %start_raw
-  %e_over = icmp sgt i64 %end_raw, %count
-  %e = select i1 %e_over, i64 %count, i64 %end_raw
-  %result = call i64 @__list_new()
-  br label %loop_cond
-
-loop_cond:
-  %i = phi i64 [%s, %check_bounds], [%i_next, %loop_body]
-  %done = icmp sge i64 %i, %e
-  br i1 %done, label %loop_end, label %loop_body
-
-loop_body:
-  %i_tagged = call i64 @__val_tag_int(i64 %i)
-  %elem = call i64 @__list_get(i64 %list, i64 %i_tagged)
-  call i64 @__list_push(i64 %result, i64 %elem)
-  %i_next = add i64 %i, 1
-  br label %loop_cond
-
-loop_end:
-  ret i64 %result
-}
 

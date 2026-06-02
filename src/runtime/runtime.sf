@@ -137,7 +137,20 @@ fun __list_remove(list: Int, index: Int): Int {
     return removed
 }
 
-// __list_slice is defined in base_nanbox.ll (hand-written to avoid NaN boxing loop issues)
+fun __list_slice(list: Int, start: Int, end: Int): Int {
+    var result: Int = __list_new()
+    if (list == 0) { return result }
+    var len: Int = __list_length(list)
+    var s: Int = start
+    var e: Int = end
+    if (s < 0) { s = 0 }
+    if (e > len) { e = len }
+    while (s < e) {
+        __list_push(result, __list_get(list, s))
+        s = s + 1
+    }
+    return result
+}
 
 // =============================================================================
 // StringBuilder: { len@0, cap@8, buf*@16 } — 24 bytes
