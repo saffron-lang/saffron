@@ -1282,7 +1282,8 @@
         }
     }
     if (!is_user_class and method == "contains" and args.length() > 0) {
-        if (obj_type == "String") {
+        var contains_arg_type: String = this.get_expr_type(args[0])
+        if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
             var str_ptr: String = this.emit_untag_ptr(obj)
             var needle: String = this.gen_arg_value(args[0])
@@ -1359,6 +1360,10 @@
             var local: String = this.emit_tag_ptr(gep)
             this.last_type = AST.Type.StringType
             return local
+        } else if (obj_type == "Any") {
+            // Unknown type: assume already a string (common in interpolation of untyped vars)
+            this.last_type = AST.Type.StringType
+            return obj
         } else {
             var raw: String = this.emit_untag_int(obj)
             var local: String = this.fresh_local()
@@ -1592,7 +1597,7 @@
         return obj
     }
     if (method == "to_string") {
-        if (obj_type == "String") {
+        if (obj_type == "String" or obj_type == "Any") {
             this.last_type = AST.Type.StringType
             return obj
         }

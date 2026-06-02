@@ -161,8 +161,7 @@ class Codegen {
         this.known_functions.push("text")
     }
 
-    // Helpers to construct AST.Type nodes — avoids cross-module enum resolution
-    // issues where AST.Type.GenericType inside a class method gets misresolved.
+    // Split a string by delimiter, respecting nested <> brackets.
     fun split_respecting_generics(s: String, delim: String): List<String> {
         var result: List<String> = []
         var current: String = ""

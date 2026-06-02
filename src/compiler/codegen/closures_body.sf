@@ -390,7 +390,6 @@
             }
             Throw(value) => { this.find_free_vars_expr(value, bound, free) }
             LetPattern(pattern, value) => {
-                this.find_free_vars_expr(value, bound, free)
             }
         }
     }

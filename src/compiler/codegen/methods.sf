@@ -882,7 +882,8 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
     if (!is_user_class and method == "contains" and args.length() > 0) {
-        if (obj_type == "String") {
+        var contains_arg_type: String = this.get_expr_type(args[0])
+        if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
             var needle: String = this.gen_arg_value(args[0])
@@ -937,6 +938,10 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             var local: String = this.emit_tag_ptr(gep)
             this.set_last_type(AST.Type.StringType)
             return local
+        } else if (obj_type == "Any") {
+            // Unknown type: assume already a string (common in interpolation of untyped vars)
+            this.set_last_type(AST.Type.StringType)
+            return obj
         } else {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + obj + ")")
@@ -1040,7 +1045,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return obj
     }
     if (method == "to_string") {
-        if (obj_type == "String") {
+        if (obj_type == "String" or obj_type == "Any") {
             this.set_last_type(AST.Type.StringType)
             return obj
         }

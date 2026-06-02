@@ -421,9 +421,6 @@ The previous gen2 had several NaN-boxing and struct-layout bugs (arithmetic in l
 | Issue | Symptom | Workaround |
 |-------|---------|------------|
 | No tuple literal syntax in compiler source | `var t = (1, 2, 3)` parse error — gen2 has the `TupleLit` enum variant but can't parse tuple creation syntax | Use lists or multiple variables; tuple syntax works in user programs compiled by gen3 |
-| Cross-module enum construction in class methods | `AST.Type.SimpleType("Int")` emits `load i64, i64* %AST` (undefined) | Use helper functions defined in the same module to construct enum values (see `codegen.sf` line 164) |
-
-**Note:** The cross-module enum construction issue affects ALL compiler generations (not just gen2). It is a codegen limitation in how qualified enum constructors (`Module.Enum.Variant(...)`) are compiled inside class methods.
 
 ### Bootstrap file layout
 

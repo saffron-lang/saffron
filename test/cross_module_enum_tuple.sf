@@ -1,0 +1,47 @@
+// Test: cross-module enum construction inside class methods
+// Verifies Module.Enum.Variant(args) works when inside a class method context.
+// This covers: zero-arg variants, single-arg variants, multi-arg variants.
+import "../src/compiler/ast.sf" as AST
+
+class ExprBuilder {
+    var name: String
+    fun init(name: String) {
+        this.name = name
+    }
+    // Zero-arg variant
+    fun make_nil(): AST.Expr {
+        return AST.Expr.NilLit
+    }
+    // Single-arg variant (list)
+    fun make_tuple(elems: List<AST.Expr>): AST.Expr {
+        return AST.Expr.TupleLit(elems)
+    }
+    // Multi-arg variant
+    fun make_call(callee: AST.Expr, args: List<AST.Expr>): AST.Expr {
+        return AST.Expr.Call(callee, args)
+    }
+    // Three-arg variant
+    fun make_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): AST.Expr {
+        return AST.Expr.MethodCall(obj, method, args)
+    }
+    // Cross-module enum from a different enum in the same module
+    fun make_type(name: String): AST.Type {
+        return AST.Type.ClassType(name)
+    }
+}
+
+fun test() {
+    var b: ExprBuilder = ExprBuilder("test")
+    var nil_expr: AST.Expr = b.make_nil()
+    IO.println("nil ok")
+    var elems: List<AST.Expr> = [AST.Expr.IntLit(1), AST.Expr.IntLit(2)]
+    var t: AST.Expr = b.make_tuple(elems)
+    IO.println("tuple ok")
+    var c: AST.Expr = b.make_call(AST.Expr.Variable("foo"), [AST.Expr.IntLit(3)])
+    IO.println("call ok")
+    var m: AST.Expr = b.make_method_call(AST.Expr.Variable("obj"), "method", [])
+    IO.println("method_call ok")
+    var ty: AST.Type = b.make_type("MyClass")
+    IO.println("type ok")
+}
+test()
