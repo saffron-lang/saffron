@@ -1,0 +1,283 @@
+//! LLVM IR type system, value representation, and constants.
+
+/// LLVM types.
+enum Type {
+    Void,
+    I1,
+    I8,
+    I32,
+    I64,
+    Ptr,
+    Float64,
+    Array(element: Type, count: Float),
+    Struct(name: String, fields: List<Type>),
+    FnType(ret: Type, params: List<Type>, variadic: Bool),
+    NamedType(name: String),
+    Token
+}
+
+/// SSA values: instruction results, function arguments, constants, globals.
+enum Value {
+    Instruction(name: String, ty: Type),
+    Argument(name: String, ty: Type, index: Float),
+    Constant(val: Const),
+    Global(name: String, ty: Type),
+    Undef(ty: Type)
+}
+
+/// Constant values for instructions and global initializers.
+enum Const {
+    Int(value: Float, bits: Float),
+    Float(value: String),
+    Null(ty: Type),
+    StringLit(value: String, index: Float),
+    StructLit(fields: List<Const>),
+    ArrayLit(elements: List<Const>),
+    ZeroInit(ty: Type)
+}
+
+/// Integer comparison predicates.
+enum CmpPred {
+    Eq,
+    Ne,
+    Slt,
+    Sle,
+    Sgt,
+    Sge,
+    Ult,
+    Ule,
+    Ugt,
+    Uge
+}
+
+/// Linkage types for functions and globals.
+enum Linkage {
+    Default,
+    LinkOnceODR,
+    External,
+    Private,
+    Weak
+}
+
+// -- Convenience constructors --
+
+fun ptr_type(): Type {
+    return Type.Ptr
+}
+
+fun i1_type(): Type {
+    return Type.I1
+}
+
+fun i8_type(): Type {
+    return Type.I8
+}
+
+fun i32_type(): Type {
+    return Type.I32
+}
+
+fun i64_type(): Type {
+    return Type.I64
+}
+
+fun void_type(): Type {
+    return Type.Void
+}
+
+fun float64_type(): Type {
+    return Type.Float64
+}
+
+fun fn_type(ret: Type, params: List<Type>): Type {
+    return Type.FnType(ret, params, false)
+}
+
+fun fn_type_variadic(ret: Type, params: List<Type>): Type {
+    return Type.FnType(ret, params, true)
+}
+
+fun array_type(elem: Type, n: Float): Type {
+    return Type.Array(elem, n)
+}
+
+fun struct_type(name: String, fields: List<Type>): Type {
+    return Type.Struct(name, fields)
+}
+
+fun named_type(name: String): Type {
+    return Type.NamedType(name)
+}
+
+// -- Constant constructors --
+
+fun int_const(v: Float): Const {
+    return Const.Int(v, 64)
+}
+
+fun i32_const(v: Float): Const {
+    return Const.Int(v, 32)
+}
+
+fun i8_const(v: Float): Const {
+    return Const.Int(v, 8)
+}
+
+fun i1_const(v: Float): Const {
+    return Const.Int(v, 1)
+}
+
+fun null_ptr(): Const {
+    return Const.Null(Type.Ptr)
+}
+
+fun bool_const(v: Bool): Const {
+    if (v) {
+        return Const.Int(1, 1)
+    }
+    return Const.Int(0, 1)
+}
+
+fun zero_init(ty: Type): Const {
+    return Const.ZeroInit(ty)
+}
+
+// -- Formatting functions --
+
+fun format_type(ty: Type): String {
+    return match (ty) {
+        Void => "void"
+        I1 => "i1"
+        I8 => "i8"
+        I32 => "i32"
+        I64 => "i64"
+        Ptr => "ptr"
+        Float64 => "double"
+        Token => "token"
+        Array(elem, count) => "[${count.to_string().split(".")[0]} x ${format_type(elem)}]"
+        Struct(name, fields) => {
+            if (name.length() > 0) {
+                return "%${name}"
+            }
+            var parts: List<String> = []
+            var i: Float = 0
+            while (i < fields.length()) {
+                parts.push(format_type(fields[i]))
+                i = i + 1
+            }
+            return "{ ${parts.join(", ")} }"
+        }
+        FnType(ret, params, variadic) => {
+            var param_parts: List<String> = []
+            var i: Float = 0
+            while (i < params.length()) {
+                param_parts.push(format_type(params[i]))
+                i = i + 1
+            }
+            if (variadic) {
+                param_parts.push("...")
+            }
+            return "${format_type(ret)} (${param_parts.join(", ")})"
+        }
+        NamedType(name) => "%${name}"
+        _ => "i64"
+    }
+}
+
+fun format_value(val: Value): String {
+    return match (val) {
+        Instruction(name, ty) => name
+        Argument(name, ty, index) => name
+        Constant(c) => format_const(c)
+        Global(name, ty) => name
+        Undef(ty) => "undef"
+        _ => "undef"
+    }
+}
+
+fun format_const(c: Const): String {
+    return match (c) {
+        Int(value, bits) => value.to_string().split(".")[0]
+        Float(value) => value
+        Null(ty) => "null"
+        StringLit(value, index) => "@.str.${index.to_string().split(".")[0]}"
+        StructLit(fields) => {
+            var parts: List<String> = []
+            var i: Float = 0
+            while (i < fields.length()) {
+                parts.push(format_const(fields[i]))
+                i = i + 1
+            }
+            return "{ ${parts.join(", ")} }"
+        }
+        ArrayLit(elements) => {
+            var parts: List<String> = []
+            var i: Float = 0
+            while (i < elements.length()) {
+                parts.push(format_const(elements[i]))
+                i = i + 1
+            }
+            return "[ ${parts.join(", ")} ]"
+        }
+        ZeroInit(ty) => "zeroinitializer"
+        _ => "0"
+    }
+}
+
+fun format_cmp_pred(pred: CmpPred): String {
+    return match (pred) {
+        Eq => "eq"
+        Ne => "ne"
+        Slt => "slt"
+        Sle => "sle"
+        Sgt => "sgt"
+        Sge => "sge"
+        Ult => "ult"
+        Ule => "ule"
+        Ugt => "ugt"
+        Uge => "uge"
+        _ => "eq"
+    }
+}
+
+fun format_linkage(link: Linkage): String {
+    return match (link) {
+        Default => ""
+        LinkOnceODR => "linkonce_odr "
+        External => "external "
+        Private => "private "
+        Weak => "weak "
+        _ => ""
+    }
+}
+
+/// Get the type of a Value.
+fun value_type(val: Value): Type {
+    return match (val) {
+        Instruction(name, ty) => ty
+        Argument(name, ty, index) => ty
+        Constant(c) => const_type(c)
+        Global(name, ty) => ty
+        Undef(ty) => ty
+        _ => Type.I64
+    }
+}
+
+/// Get the type of a Const.
+fun const_type(c: Const): Type {
+    return match (c) {
+        Int(value, bits) => {
+            if (bits == 1) { return Type.I1 }
+            if (bits == 8) { return Type.I8 }
+            if (bits == 32) { return Type.I32 }
+            return Type.I64
+        }
+        Float(value) => Type.Float64
+        Null(ty) => ty
+        StringLit(value, index) => Type.Ptr
+        StructLit(fields) => Type.I64
+        ArrayLit(elements) => Type.I64
+        ZeroInit(ty) => ty
+        _ => Type.I64
+    }
+}

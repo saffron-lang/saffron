@@ -1,0 +1,8 @@
+fun greet(name: String): String {
+    return "hello " + name
+}
+
+fun main() {
+    var msg: String = greet("world")
+    IO.println(msg)
+}

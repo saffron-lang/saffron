@@ -188,7 +188,6 @@
     }
 
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
-        if (name == "on_click") { IO.println("[DEBUG-KF] gen_closure_function pushing on_click") }
         this.known_functions.push(name)
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}

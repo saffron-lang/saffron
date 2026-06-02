@@ -1,0 +1,369 @@
+//! Block builder — the primary instruction-emitting interface.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+
+/// Builder for emitting instructions into a BasicBlock.
+/// Each instruction method generates a fresh local, appends the instruction,
+/// and returns the result Value.
+class BlockBuilder {
+    var func_builder: Func.FunctionBuilder
+    var block: Func.BasicBlock
+
+    fun init(func_builder: Func.FunctionBuilder, block: Func.BasicBlock) {
+        this.func_builder = func_builder
+        this.block = block
+    }
+
+    /// Check if this block has been terminated.
+    fun is_terminated(): Bool {
+        return this.block.is_terminated
+    }
+
+    // ==================== Arithmetic ====================
+
+    fun add(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Add(result, lhs, rhs))
+        return result
+    }
+
+    fun sub(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Sub(result, lhs, rhs))
+        return result
+    }
+
+    fun mul(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Mul(result, lhs, rhs))
+        return result
+    }
+
+    fun sdiv(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.SDiv(result, lhs, rhs))
+        return result
+    }
+
+    fun srem(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.SRem(result, lhs, rhs))
+        return result
+    }
+
+    // ==================== Bitwise ====================
+
+    fun and_op(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.And(result, lhs, rhs))
+        return result
+    }
+
+    fun or_op(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Or(result, lhs, rhs))
+        return result
+    }
+
+    fun xor_op(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Xor(result, lhs, rhs))
+        return result
+    }
+
+    fun shl(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.Shl(result, lhs, rhs))
+        return result
+    }
+
+    fun lshr(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.LShr(result, lhs, rhs))
+        return result
+    }
+
+    fun ashr(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(lhs))
+        this.block.instructions.push(Instructions.Instruction.AShr(result, lhs, rhs))
+        return result
+    }
+
+    // ==================== Floating-point ====================
+
+    fun fadd(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Float64)
+        this.block.instructions.push(Instructions.Instruction.FAdd(result, lhs, rhs))
+        return result
+    }
+
+    fun fsub(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Float64)
+        this.block.instructions.push(Instructions.Instruction.FSub(result, lhs, rhs))
+        return result
+    }
+
+    fun fmul(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Float64)
+        this.block.instructions.push(Instructions.Instruction.FMul(result, lhs, rhs))
+        return result
+    }
+
+    fun fdiv(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Float64)
+        this.block.instructions.push(Instructions.Instruction.FDiv(result, lhs, rhs))
+        return result
+    }
+
+    // ==================== Comparisons ====================
+
+    fun icmp(pred: Types.CmpPred, lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.I1)
+        this.block.instructions.push(Instructions.Instruction.ICmp(result, pred, lhs, rhs))
+        return result
+    }
+
+    fun icmp_eq(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Eq, lhs, rhs)
+    }
+
+    fun icmp_ne(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Ne, lhs, rhs)
+    }
+
+    fun icmp_slt(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Slt, lhs, rhs)
+    }
+
+    fun icmp_sle(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Sle, lhs, rhs)
+    }
+
+    fun icmp_sgt(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Sgt, lhs, rhs)
+    }
+
+    fun icmp_sge(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Sge, lhs, rhs)
+    }
+
+    fun icmp_ult(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Ult, lhs, rhs)
+    }
+
+    fun icmp_uge(lhs: Types.Value, rhs: Types.Value): Types.Value {
+        return this.icmp(Types.CmpPred.Uge, lhs, rhs)
+    }
+
+    fun fcmp(pred: String, lhs: Types.Value, rhs: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.I1)
+        this.block.instructions.push(Instructions.Instruction.FCmp(result, pred, lhs, rhs))
+        return result
+    }
+
+    // ==================== Memory ====================
+
+    fun alloca(ty: Types.Type, name: String): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_named(name, Types.Type.Ptr)
+        this.block.instructions.push(Instructions.Instruction.Alloca(result, ty, name))
+        return result
+    }
+
+    /// Alloca with an exact name (no counter suffix). Matches codegen naming.
+    fun alloca_named(ty: Types.Type, name: String): Types.Value {
+        var result: Types.Value = this.func_builder.named_local(name, Types.Type.Ptr)
+        this.block.instructions.push(Instructions.Instruction.Alloca(result, ty, name))
+        return result
+    }
+
+    fun load(ty: Types.Type, ptr: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(ty)
+        this.block.instructions.push(Instructions.Instruction.Load(result, ty, ptr))
+        return result
+    }
+
+    fun store(val: Types.Value, ptr: Types.Value) {
+        this.block.instructions.push(Instructions.Instruction.Store(val, ptr))
+    }
+
+    fun gep(base_ty: Types.Type, ptr: Types.Value, indices: List<Types.Value>): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Ptr)
+        this.block.instructions.push(Instructions.Instruction.GEP(result, base_ty, ptr, indices))
+        return result
+    }
+
+    fun gep_struct(struct_ty: Types.Type, ptr: Types.Value, field_idx: Float): Types.Value {
+        var indices: List<Types.Value> = []
+        indices.push(Types.Value.Constant(Types.Const.Int(0, 32)))
+        indices.push(Types.Value.Constant(Types.Const.Int(field_idx, 32)))
+        return this.gep(struct_ty, ptr, indices)
+    }
+
+    // ==================== Conversions ====================
+
+    fun ptrtoint(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.PtrToInt(result, val, to_ty))
+        return result
+    }
+
+    fun inttoptr(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Ptr)
+        this.block.instructions.push(Instructions.Instruction.IntToPtr(result, val, to_ty))
+        return result
+    }
+
+    fun bitcast(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.Bitcast(result, val, to_ty))
+        return result
+    }
+
+    fun zext(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.ZExt(result, val, to_ty))
+        return result
+    }
+
+    fun sext(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.SExt(result, val, to_ty))
+        return result
+    }
+
+    fun trunc(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.Trunc(result, val, to_ty))
+        return result
+    }
+
+    fun fptosi(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(to_ty)
+        this.block.instructions.push(Instructions.Instruction.FPToSI(result, val, to_ty))
+        return result
+    }
+
+    fun sitofp(val: Types.Value, to_ty: Types.Type): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Float64)
+        this.block.instructions.push(Instructions.Instruction.SIToFP(result, val, to_ty))
+        return result
+    }
+
+    // ==================== Calls ====================
+
+    fun call(fn_name: String, ret_ty: Types.Type, args: List<Types.Value>): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(ret_ty)
+        this.block.instructions.push(Instructions.Instruction.Call(result, fn_name, ret_ty, args))
+        return result
+    }
+
+    fun call_void(fn_name: String, args: List<Types.Value>) {
+        this.block.instructions.push(Instructions.Instruction.CallVoid(fn_name, args))
+    }
+
+    fun call_indirect(fn_ptr: Types.Value, fn_ty: Types.Type, args: List<Types.Value>): Types.Value {
+        var ret_ty: Types.Type = match (fn_ty) {
+            FnType(ret, params, variadic) => ret
+            _ => Types.Type.I64
+        }
+        var result: Types.Value = this.func_builder.fresh_local(ret_ty)
+        this.block.instructions.push(Instructions.Instruction.CallIndirect(result, fn_ptr, fn_ty, args))
+        return result
+    }
+
+    fun call_void_indirect(fn_ptr: Types.Value, fn_ty: Types.Type, args: List<Types.Value>) {
+        this.block.instructions.push(Instructions.Instruction.CallVoidIndirect(fn_ptr, fn_ty, args))
+    }
+
+    /// Call returning a token type (for coroutine intrinsics).
+    fun call_token(fn_name: String, args: List<Types.Value>): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Token)
+        this.block.instructions.push(Instructions.Instruction.Call(result, fn_name, Types.Type.Token, args))
+        return result
+    }
+
+    /// Call returning a ptr type.
+    fun call_ptr(fn_name: String, args: List<Types.Value>): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.Type.Ptr)
+        this.block.instructions.push(Instructions.Instruction.Call(result, fn_name, Types.Type.Ptr, args))
+        return result
+    }
+
+    // ==================== Phi and Select ====================
+
+    fun phi(ty: Types.Type, incoming: List<Instructions.PhiIncoming>): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(ty)
+        this.block.instructions.push(Instructions.Instruction.Phi(result, ty, incoming))
+        return result
+    }
+
+    fun select(cond: Types.Value, then_val: Types.Value, else_val: Types.Value): Types.Value {
+        var result: Types.Value = this.func_builder.fresh_local(Types.value_type(then_val))
+        this.block.instructions.push(Instructions.Instruction.Select(result, cond, then_val, else_val))
+        return result
+    }
+
+    // ==================== Memcpy ====================
+
+    fun memcpy(dst: Types.Value, src: Types.Value, len: Types.Value, is_volatile: Bool) {
+        this.block.instructions.push(Instructions.Instruction.Memcpy(dst, src, len, is_volatile))
+    }
+
+    // ==================== Terminators ====================
+
+    fun br(target: Func.BasicBlock) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Br(target.label)
+        this.block.is_terminated = true
+    }
+
+    fun br_label(label: String) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Br(label)
+        this.block.is_terminated = true
+    }
+
+    fun cond_br(cond: Types.Value, then_bb: Func.BasicBlock, else_bb: Func.BasicBlock) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.CondBr(cond, then_bb.label, else_bb.label)
+        this.block.is_terminated = true
+    }
+
+    fun cond_br_labels(cond: Types.Value, then_label: String, else_label: String) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.CondBr(cond, then_label, else_label)
+        this.block.is_terminated = true
+    }
+
+    fun switch_br(val: Types.Value, default_bb: Func.BasicBlock, cases: List<Instructions.SwitchCase>) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Switch(val, default_bb.label, cases)
+        this.block.is_terminated = true
+    }
+
+    fun switch_br_label(val: Types.Value, default_label: String, cases: List<Instructions.SwitchCase>) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Switch(val, default_label, cases)
+        this.block.is_terminated = true
+    }
+
+    fun ret(val: Types.Value) {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Ret(val)
+        this.block.is_terminated = true
+    }
+
+    fun ret_void() {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.RetVoid
+        this.block.is_terminated = true
+    }
+
+    fun unreachable() {
+        if (this.block.is_terminated) { return nil }
+        this.block.terminator = Instructions.Terminator.Unreachable
+        this.block.is_terminated = true
+    }
+}

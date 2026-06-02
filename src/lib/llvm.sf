@@ -1,0 +1,32 @@
+//! LLVM IR generation library for Saffron.
+//! Provides typed construction and serialization of LLVM IR modules.
+//!
+//! Usage:
+//! ```saffron
+//! import "@llvm" as LLVM
+//!
+//! var module: LLVM.Module = LLVM.Module("my_program")
+//! module.set_target_triple("arm64-apple-macosx15.0.0")
+//! module.set_data_layout("e-m:o-i64:64-i128:128-n32:64-S128")
+//!
+//! var params: List<LLVM.Param> = []
+//! params.push(LLVM.Param("%a", LLVM.Type.I64))
+//! params.push(LLVM.Param("%b", LLVM.Type.I64))
+//!
+//! var fb: LLVM.FunctionBuilder = module.add_function("add", LLVM.Type.I64, params)
+//! var entry: LLVM.BlockBuilder = LLVM.BlockBuilder(fb, fb.entry_block())
+//! var result: LLVM.Value = entry.add(fb.param_value(0), fb.param_value(1))
+//! entry.ret(result)
+//!
+//! var ir: String = module.emit_ir()
+//! IO.println(ir)
+//! ```
+
+import "./llvm/types.sf" as Types
+import "./llvm/instructions.sf" as Instructions
+import "./llvm/module.sf" as Mod
+import "./llvm/function.sf" as Func
+import "./llvm/block.sf" as Block
+import "./llvm/nanbox.sf" as NanBox
+import "./llvm/gc.sf" as GC
+import "./llvm/coro.sf" as Coro

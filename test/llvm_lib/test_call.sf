@@ -1,0 +1,14 @@
+fun double(x: Number): Number {
+    return x * 2
+}
+
+fun apply_twice(x: Number): Number {
+    var first: Number = double(x)
+    var second: Number = double(first)
+    return second
+}
+
+fun main() {
+    var result: Number = apply_twice(3)
+    IO.println(result)
+}

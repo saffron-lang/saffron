@@ -1,0 +1,14 @@
+fun sum_to(n: Number): Number {
+    var total: Number = 0
+    var i: Number = 1
+    while (i <= n) {
+        total = total + i
+        i = i + 1
+    }
+    return total
+}
+
+fun main() {
+    var result: Number = sum_to(10)
+    IO.println(result)
+}

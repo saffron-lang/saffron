@@ -1,0 +1,212 @@
+//! Coroutine builder — encapsulates LLVM coroutine intrinsic sequences.
+//! Wraps llvm.coro.id, llvm.coro.begin, llvm.coro.save, llvm.coro.suspend,
+//! llvm.coro.end, llvm.coro.free, and llvm.coro.size.i64 into a high-level API.
+
+import "./types.sf" as Types
+import "./instructions.sf" as Instructions
+import "./function.sf" as Func
+import "./block.sf" as Block
+
+/// Builder that manages coroutine preamble, suspend points, and epilogue.
+///
+/// Usage:
+/// ```saffron
+/// var fb: Func.FunctionBuilder = module.add_function("my_coro", Types.Type.Ptr, params)
+///     .add_attribute("noinline")
+///     .add_attribute("optnone")
+///     .add_attribute("presplitcoroutine")
+///
+/// var coro: CoroBuilder = CoroBuilder(fb)
+/// var bb: Block.BlockBuilder = Block.BlockBuilder(fb, fb.entry_block())
+///
+/// // ... emit body instructions ...
+///
+/// // At yield point:
+/// bb = coro.suspend(bb)
+///
+/// // Finalize:
+/// coro.finalize(bb)
+/// ```
+class CoroBuilder {
+    var fb: Func.FunctionBuilder
+    var coro_id: Types.Value
+    var coro_hdl: Types.Value
+    var final_bb: Func.BasicBlock
+    var cleanup_bb: Func.BasicBlock
+    var suspend_bb: Func.BasicBlock
+
+    fun init(fb: Func.FunctionBuilder) {
+        this.fb = fb
+
+        // Emit coroutine preamble in the entry block
+        var entry: Func.BasicBlock = fb.entry_block()
+        var entry_builder: Block.BlockBuilder = Block.BlockBuilder(fb, entry)
+
+        // %coro.id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)
+        var null_val: Types.Value = Types.Value.Constant(Types.null_ptr())
+        var zero_i32: Types.Value = Types.Value.Constant(Types.i32_const(0))
+        this.coro_id = entry_builder.call_token("llvm.coro.id", [zero_i32, null_val, null_val, null_val])
+
+        // %coro.size = call i64 @llvm.coro.size.i64()
+        var coro_size: Types.Value = entry_builder.call("llvm.coro.size.i64", Types.Type.I64, [])
+
+        // %coro.mem = call ptr @malloc(i64 %coro.size)
+        var coro_mem: Types.Value = entry_builder.call_ptr("malloc", [coro_size])
+
+        // %coro.hdl = call ptr @llvm.coro.begin(token %coro.id, ptr %coro.mem)
+        this.coro_hdl = entry_builder.call_ptr("llvm.coro.begin", [this.coro_id, coro_mem])
+
+        // Pre-create epilogue blocks
+        this.final_bb = fb.new_block("__coro_final")
+        this.cleanup_bb = fb.new_block("__coro_cleanup")
+        this.suspend_bb = fb.new_block("__coro_suspend")
+    }
+
+    /// Get the coroutine handle value (ptr).
+    fun handle(): Types.Value {
+        return this.coro_hdl
+    }
+
+    /// Emit a suspend point. The current block is terminated with a switch
+    /// and a new resume block is returned as a BlockBuilder.
+    ///
+    /// The caller should continue emitting instructions into the returned builder.
+    fun suspend(bb: Block.BlockBuilder): Block.BlockBuilder {
+        // %save = call token @llvm.coro.save(ptr %coro.hdl)
+        var save_tok: Types.Value = bb.call_token("llvm.coro.save", [this.coro_hdl])
+
+        // %susp = call i8 @llvm.coro.suspend(token %save, i1 false)
+        var false_val: Types.Value = Types.Value.Constant(Types.bool_const(false))
+        var susp_result: Types.Value = bb.call("llvm.coro.suspend", Types.Type.I8, [save_tok, false_val])
+
+        // Create resume and cleanup blocks for this suspend point
+        var resume_bb: Func.BasicBlock = this.fb.new_block("yield.resume")
+        var yield_cleanup: Func.BasicBlock = this.fb.new_block("yield.cleanup")
+
+        // switch i8 %susp, label %__coro_suspend [
+        //   i8 0, label %yield.resume
+        //   i8 1, label %yield.cleanup
+        // ]
+        var cases: List<Instructions.SwitchCase> = []
+        cases.push(Instructions.SwitchCase(Types.i8_const(0), resume_bb.label))
+        cases.push(Instructions.SwitchCase(Types.i8_const(1), yield_cleanup.label))
+        bb.switch_br_label(susp_result, this.suspend_bb.label, cases)
+
+        // yield.cleanup -> br __coro_cleanup
+        var cleanup_builder: Block.BlockBuilder = Block.BlockBuilder(this.fb, yield_cleanup)
+        cleanup_builder.br(this.cleanup_bb)
+
+        // Return a builder positioned at the resume block
+        return Block.BlockBuilder(this.fb, resume_bb)
+    }
+
+    /// Emit the coroutine epilogue: final suspend, cleanup, and destroy.
+    /// Call this after all body instructions are emitted.
+    ///
+    /// `last_bb` is the last block builder from the body (or from the last suspend).
+    fun finalize(last_bb: Block.BlockBuilder) {
+        // Branch from last body block to final suspend
+        if (!last_bb.is_terminated()) {
+            last_bb.br(this.final_bb)
+        }
+
+        // === Final suspend block ===
+        var final_builder: Block.BlockBuilder = Block.BlockBuilder(this.fb, this.final_bb)
+
+        // %fs.tok = call token @llvm.coro.save(ptr %coro.hdl)
+        var fs_tok: Types.Value = final_builder.call_token("llvm.coro.save", [this.coro_hdl])
+
+        // %fs.result = call i8 @llvm.coro.suspend(token %fs.tok, i1 true)
+        var true_val: Types.Value = Types.Value.Constant(Types.bool_const(true))
+        var fs_result: Types.Value = final_builder.call("llvm.coro.suspend", Types.Type.I8, [fs_tok, true_val])
+
+        // Create trap block (unreachable — resumed after final suspend is a bug)
+        var trap_bb: Func.BasicBlock = this.fb.new_block("__coro_trap")
+
+        // switch i8 %fs.result, label %__coro_suspend [
+        //   i8 0, label %__coro_trap
+        //   i8 1, label %__coro_cleanup
+        // ]
+        var final_cases: List<Instructions.SwitchCase> = []
+        final_cases.push(Instructions.SwitchCase(Types.i8_const(0), trap_bb.label))
+        final_cases.push(Instructions.SwitchCase(Types.i8_const(1), this.cleanup_bb.label))
+        final_builder.switch_br_label(fs_result, this.suspend_bb.label, final_cases)
+
+        // === Trap block: unreachable ===
+        var trap_builder: Block.BlockBuilder = Block.BlockBuilder(this.fb, trap_bb)
+        trap_builder.unreachable()
+
+        // === Cleanup block: free coroutine memory ===
+        var cleanup_builder: Block.BlockBuilder = Block.BlockBuilder(this.fb, this.cleanup_bb)
+
+        // %coro.free = call ptr @llvm.coro.free(token %coro.id, ptr %coro.hdl)
+        var coro_free: Types.Value = cleanup_builder.call_ptr("llvm.coro.free", [this.coro_id, this.coro_hdl])
+
+        // call void @free(ptr %coro.free)
+        cleanup_builder.call_void("free", [coro_free])
+
+        // br label %__coro_suspend
+        cleanup_builder.br(this.suspend_bb)
+
+        // === Suspend block: end + ret handle ===
+        var suspend_builder: Block.BlockBuilder = Block.BlockBuilder(this.fb, this.suspend_bb)
+
+        // call i1 @llvm.coro.end(ptr %coro.hdl, i1 false)
+        var false_end: Types.Value = Types.Value.Constant(Types.bool_const(false))
+        suspend_builder.call("llvm.coro.end", Types.Type.I1, [this.coro_hdl, false_end])
+
+        // ret ptr %coro.hdl
+        suspend_builder.ret(this.coro_hdl)
+    }
+
+    /// Emit a "done" check for a coroutine handle (used by the caller/scheduler).
+    /// Returns an i1 value: true if the coroutine has reached its final suspend.
+    fun emit_done_check(bb: Block.BlockBuilder, handle: Types.Value): Types.Value {
+        return bb.call("llvm.coro.done", Types.Type.I1, [handle])
+    }
+
+    /// Emit a "resume" call for a coroutine handle (used by the scheduler).
+    fun emit_resume(bb: Block.BlockBuilder, handle: Types.Value) {
+        bb.call_void("llvm.coro.resume", [handle])
+    }
+
+    /// Emit a "destroy" call for a coroutine handle (used for cleanup).
+    fun emit_destroy(bb: Block.BlockBuilder, handle: Types.Value) {
+        bb.call_void("llvm.coro.destroy", [handle])
+    }
+}
+
+/// Returns a list of [name, ret_type_str, params_str] for all coroutine intrinsics.
+/// The caller should emit these as `declare` statements.
+///
+/// Required declarations for coroutine support:
+///   declare token @llvm.coro.id(i32, ptr, ptr, ptr)
+///   declare i64 @llvm.coro.size.i64()
+///   declare ptr @llvm.coro.begin(token, ptr)
+///   declare token @llvm.coro.save(ptr)
+///   declare i8 @llvm.coro.suspend(token, i1)
+///   declare i1 @llvm.coro.end(ptr, i1)
+///   declare ptr @llvm.coro.free(token, ptr)
+///   declare i1 @llvm.coro.done(ptr)
+///   declare void @llvm.coro.resume(ptr)
+///   declare void @llvm.coro.destroy(ptr)
+///
+/// Usage with Module:
+/// ```saffron
+/// var coro_decls: List<List<String>> = Coro.coro_intrinsic_decls()
+/// // Then add declarations to the module manually or via emit_ir
+/// ```
+fun coro_intrinsic_decls(): List<List<String>> {
+    var decls: List<List<String>> = []
+    decls.push(["llvm.coro.id", "token", "i32, ptr, ptr, ptr"])
+    decls.push(["llvm.coro.size.i64", "i64", ""])
+    decls.push(["llvm.coro.begin", "ptr", "token, ptr"])
+    decls.push(["llvm.coro.save", "token", "ptr"])
+    decls.push(["llvm.coro.suspend", "i8", "token, i1"])
+    decls.push(["llvm.coro.end", "i1", "ptr, i1"])
+    decls.push(["llvm.coro.free", "ptr", "token, ptr"])
+    decls.push(["llvm.coro.done", "i1", "ptr"])
+    decls.push(["llvm.coro.resume", "void", "ptr"])
+    decls.push(["llvm.coro.destroy", "void", "ptr"])
+    return decls
+}

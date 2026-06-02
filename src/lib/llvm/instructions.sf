@@ -1,0 +1,310 @@
+//! LLVM IR instruction and terminator enums.
+
+import "./types.sf" as Types
+
+/// A single LLVM IR instruction (non-terminator).
+enum Instruction {
+    // Arithmetic
+    Add(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    Sub(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    Mul(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    SDiv(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    SRem(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+
+    // Bitwise
+    And(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    Or(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    Xor(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    Shl(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    LShr(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    AShr(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+
+    // Floating-point arithmetic
+    FAdd(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    FSub(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    FMul(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+    FDiv(result: Types.Value, lhs: Types.Value, rhs: Types.Value),
+
+    // Comparison
+    ICmp(result: Types.Value, pred: Types.CmpPred, lhs: Types.Value, rhs: Types.Value),
+    FCmp(result: Types.Value, pred: String, lhs: Types.Value, rhs: Types.Value),
+
+    // Memory
+    Alloca(result: Types.Value, ty: Types.Type, name: String),
+    Load(result: Types.Value, ty: Types.Type, ptr: Types.Value),
+    Store(val: Types.Value, ptr: Types.Value),
+    GEP(result: Types.Value, base_ty: Types.Type, ptr: Types.Value, indices: List<Types.Value>),
+
+    // Conversions
+    PtrToInt(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    IntToPtr(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    Bitcast(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    ZExt(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    SExt(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    Trunc(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    FPToSI(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+    SIToFP(result: Types.Value, val: Types.Value, to_ty: Types.Type),
+
+    // Calls
+    Call(result: Types.Value, fn_name: String, ret_ty: Types.Type, args: List<Types.Value>),
+    CallVoid(fn_name: String, args: List<Types.Value>),
+    CallIndirect(result: Types.Value, fn_ptr: Types.Value, fn_ty: Types.Type, args: List<Types.Value>),
+    CallVoidIndirect(fn_ptr: Types.Value, fn_ty: Types.Type, args: List<Types.Value>),
+
+    // Phi
+    Phi(result: Types.Value, ty: Types.Type, incoming: List<PhiIncoming>),
+
+    // Select
+    Select(result: Types.Value, cond: Types.Value, then_val: Types.Value, else_val: Types.Value),
+
+    // Memcpy intrinsic
+    Memcpy(dst: Types.Value, src: Types.Value, len: Types.Value, is_volatile: Bool)
+}
+
+/// A basic block terminator instruction.
+enum Terminator {
+    Br(target_label: String),
+    CondBr(cond: Types.Value, then_label: String, else_label: String),
+    Switch(val: Types.Value, default_label: String, cases: List<SwitchCase>),
+    Ret(val: Types.Value),
+    RetVoid,
+    Unreachable,
+    None
+}
+
+/// A switch case entry: maps a constant to a target block label.
+class SwitchCase {
+    var value: Types.Const
+    var target_label: String
+
+    fun init(value: Types.Const, target_label: String) {
+        this.value = value
+        this.target_label = target_label
+    }
+}
+
+/// A phi incoming edge: value from a predecessor block.
+class PhiIncoming {
+    var value: Types.Value
+    var block_label: String
+
+    fun init(value: Types.Value, block_label: String) {
+        this.value = value
+        this.block_label = block_label
+    }
+}
+
+/// Format an instruction into LLVM IR text.
+fun format_instruction(inst: Instruction): String {
+    return match (inst) {
+        Add(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = add ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Sub(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = sub ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Mul(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = mul ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        SDiv(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = sdiv ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        SRem(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = srem ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        And(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = and ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Or(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = or ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Xor(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = xor ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Shl(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = shl ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        LShr(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = lshr ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        AShr(result, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = ashr ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        FAdd(result, lhs, rhs) => {
+            return "  ${Types.format_value(result)} = fadd double ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        FSub(result, lhs, rhs) => {
+            return "  ${Types.format_value(result)} = fsub double ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        FMul(result, lhs, rhs) => {
+            return "  ${Types.format_value(result)} = fmul double ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        FDiv(result, lhs, rhs) => {
+            return "  ${Types.format_value(result)} = fdiv double ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        ICmp(result, pred, lhs, rhs) => {
+            var ty_str: String = Types.format_type(Types.value_type(lhs))
+            return "  ${Types.format_value(result)} = icmp ${Types.format_cmp_pred(pred)} ${ty_str} ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        FCmp(result, pred, lhs, rhs) => {
+            return "  ${Types.format_value(result)} = fcmp ${pred} double ${Types.format_value(lhs)}, ${Types.format_value(rhs)}"
+        }
+        Alloca(result, ty, name) => {
+            return "  ${Types.format_value(result)} = alloca ${Types.format_type(ty)}"
+        }
+        Load(result, ty, ptr) => {
+            return "  ${Types.format_value(result)} = load ${Types.format_type(ty)}, ptr ${Types.format_value(ptr)}"
+        }
+        Store(val, ptr) => {
+            var ty_str: String = Types.format_type(Types.value_type(val))
+            return "  store ${ty_str} ${Types.format_value(val)}, ptr ${Types.format_value(ptr)}"
+        }
+        GEP(result, base_ty, ptr, indices) => {
+            var idx_parts: List<String> = []
+            var i: Float = 0
+            while (i < indices.length()) {
+                var idx: Types.Value = indices[i]
+                idx_parts.push("${Types.format_type(Types.value_type(idx))} ${Types.format_value(idx)}")
+                i = i + 1
+            }
+            return "  ${Types.format_value(result)} = getelementptr ${Types.format_type(base_ty)}, ptr ${Types.format_value(ptr)}, ${idx_parts.join(", ")}"
+        }
+        PtrToInt(result, val, to_ty) => {
+            return "  ${Types.format_value(result)} = ptrtoint ptr ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        IntToPtr(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = inttoptr ${from_ty} ${Types.format_value(val)} to ptr"
+        }
+        Bitcast(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = bitcast ${from_ty} ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        ZExt(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = zext ${from_ty} ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        SExt(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = sext ${from_ty} ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        Trunc(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = trunc ${from_ty} ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        FPToSI(result, val, to_ty) => {
+            return "  ${Types.format_value(result)} = fptosi double ${Types.format_value(val)} to ${Types.format_type(to_ty)}"
+        }
+        SIToFP(result, val, to_ty) => {
+            var from_ty: String = Types.format_type(Types.value_type(val))
+            return "  ${Types.format_value(result)} = sitofp ${from_ty} ${Types.format_value(val)} to double"
+        }
+        Call(result, fn_name, ret_ty, args) => {
+            var arg_parts: List<String> = []
+            var i: Float = 0
+            while (i < args.length()) {
+                var arg: Types.Value = args[i]
+                arg_parts.push("${Types.format_type(Types.value_type(arg))} ${Types.format_value(arg)}")
+                i = i + 1
+            }
+            return "  ${Types.format_value(result)} = call ${Types.format_type(ret_ty)} @${fn_name}(${arg_parts.join(", ")})"
+        }
+        CallVoid(fn_name, args) => {
+            var arg_parts: List<String> = []
+            var i: Float = 0
+            while (i < args.length()) {
+                var arg: Types.Value = args[i]
+                arg_parts.push("${Types.format_type(Types.value_type(arg))} ${Types.format_value(arg)}")
+                i = i + 1
+            }
+            return "  call void @${fn_name}(${arg_parts.join(", ")})"
+        }
+        CallIndirect(result, fn_ptr, fn_ty, args) => {
+            var arg_parts: List<String> = []
+            var i: Float = 0
+            while (i < args.length()) {
+                var arg: Types.Value = args[i]
+                arg_parts.push("${Types.format_type(Types.value_type(arg))} ${Types.format_value(arg)}")
+                i = i + 1
+            }
+            var ret_str: String = match (fn_ty) {
+                FnType(ret, params, variadic) => Types.format_type(ret)
+                _ => "i64"
+            }
+            return "  ${Types.format_value(result)} = call ${ret_str} ${Types.format_value(fn_ptr)}(${arg_parts.join(", ")})"
+        }
+        CallVoidIndirect(fn_ptr, fn_ty, args) => {
+            var arg_parts: List<String> = []
+            var i: Float = 0
+            while (i < args.length()) {
+                var arg: Types.Value = args[i]
+                arg_parts.push("${Types.format_type(Types.value_type(arg))} ${Types.format_value(arg)}")
+                i = i + 1
+            }
+            return "  call void ${Types.format_value(fn_ptr)}(${arg_parts.join(", ")})"
+        }
+        Phi(result, ty, incoming) => {
+            var parts: List<String> = []
+            var i: Float = 0
+            while (i < incoming.length()) {
+                var edge: PhiIncoming = incoming[i]
+                parts.push("[ ${Types.format_value(edge.value)}, %${edge.block_label} ]")
+                i = i + 1
+            }
+            return "  ${Types.format_value(result)} = phi ${Types.format_type(ty)} ${parts.join(", ")}"
+        }
+        Select(result, cond, then_val, else_val) => {
+            var ty_str: String = Types.format_type(Types.value_type(then_val))
+            return "  ${Types.format_value(result)} = select i1 ${Types.format_value(cond)}, ${ty_str} ${Types.format_value(then_val)}, ${ty_str} ${Types.format_value(else_val)}"
+        }
+        Memcpy(dst, src, len, is_volatile) => {
+            var vol_str: String = "false"
+            if (is_volatile) { vol_str = "true" }
+            return "  call void @llvm.memcpy.p0.p0.i64(ptr ${Types.format_value(dst)}, ptr ${Types.format_value(src)}, i64 ${Types.format_value(len)}, i1 ${vol_str})"
+        }
+        _ => ""
+    }
+}
+
+/// Format a terminator instruction into LLVM IR text.
+fun format_terminator(term: Terminator): String {
+    return match (term) {
+        Br(target_label) => "  br label %${target_label}"
+        CondBr(cond, then_label, else_label) => {
+            return "  br i1 ${Types.format_value(cond)}, label %${then_label}, label %${else_label}"
+        }
+        Switch(val, default_label, cases) => {
+            var ty_str: String = Types.format_type(Types.value_type(val))
+            var sb: StringBuilder = StringBuilder()
+            sb.append("  switch ${ty_str} ${Types.format_value(val)}, label %${default_label} [\n")
+            var i: Float = 0
+            while (i < cases.length()) {
+                var c: SwitchCase = cases[i]
+                var case_ty: String = Types.format_type(Types.const_type(c.value))
+                sb.append("    ${case_ty} ${Types.format_const(c.value)}, label %${c.target_label}\n")
+                i = i + 1
+            }
+            sb.append("  ]")
+            return sb.to_string()
+        }
+        Ret(val) => {
+            var ty_str: String = Types.format_type(Types.value_type(val))
+            return "  ret ${ty_str} ${Types.format_value(val)}"
+        }
+        RetVoid => "  ret void"
+        Unreachable => "  unreachable"
+        None => ""
+        _ => ""
+    }
+}

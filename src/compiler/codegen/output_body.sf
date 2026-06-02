@@ -6,7 +6,6 @@
         } else if (name.contains("__lambda")) {
             emit_name = name
         }
-        if (emit_name == "on_click") { IO.println("[DEBUG-KF] gen_function pushing on_click, name=" + name + " prefix=" + this.current_prefix) }
         this.known_functions.push(emit_name)
         this.func_ret_types.set(emit_name, ret_type)
         if (this.current_prefix.length() > 0) {
@@ -513,12 +512,10 @@
                 FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
-                        if (pr_emit == "on_click") { IO.println("[DEBUG-KF] output pre-reg pushing on_click emit") }
                         if (!this.known_functions.contains(pr_emit)) {
                             this.known_functions.push(pr_emit)
                         }
                         if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
-                            if (pr_name == "on_click") { IO.println("[DEBUG-KF] output pre-reg pushing on_click name") }
                             this.known_functions.push(pr_name)
                         }
                     }

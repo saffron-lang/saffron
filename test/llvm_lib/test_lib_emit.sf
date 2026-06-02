@@ -1,0 +1,441 @@
+//! Integration test: import the @llvm types and instructions, and verify
+//! that the instruction formatting matches expected codegen output.
+//!
+//! This only imports types.sf and instructions.sf (which works without
+//! transitive import crashes) to verify the core formatting logic.
+//!
+//! Run: build/saffronc test/llvm_lib/test_lib_emit.sf test/llvm_lib/test_lib_emit.ll
+//!      Then link and run to see output.
+
+import "../../src/lib/llvm/types.sf" as Types
+import "../../src/lib/llvm/instructions.sf" as Instructions
+
+// ============================================================================
+// Test: Verify instruction formatting matches expected patterns
+// ============================================================================
+
+fun test_add_instruction(): Bool {
+    // Simulate what the BlockBuilder would produce for: a + b (i64)
+    var lhs: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var rhs: Types.Value = Types.Value.Instruction("%t2", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.Add(result, lhs, rhs)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t3 = add i64 %t1, %t2"
+    if (ir == expected) {
+        IO.println("PASS: add instruction")
+        return true
+    }
+    IO.println("FAIL: add instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_sub_instruction(): Bool {
+    var lhs: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var rhs: Types.Value = Types.Value.Instruction("%t2", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.Sub(result, lhs, rhs)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t3 = sub i64 %t1, %t2"
+    if (ir == expected) {
+        IO.println("PASS: sub instruction")
+        return true
+    }
+    IO.println("FAIL: sub instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_mul_instruction(): Bool {
+    var lhs: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var rhs: Types.Value = Types.Value.Instruction("%t2", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.Mul(result, lhs, rhs)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t3 = mul i64 %t1, %t2"
+    if (ir == expected) {
+        IO.println("PASS: mul instruction")
+        return true
+    }
+    IO.println("FAIL: mul instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_icmp_instruction(): Bool {
+    var lhs: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var rhs: Types.Value = Types.Value.Instruction("%t2", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I1)
+    var inst: Instructions.Instruction = Instructions.Instruction.ICmp(result, Types.CmpPred.Sgt, lhs, rhs)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t3 = icmp sgt i64 %t1, %t2"
+    if (ir == expected) {
+        IO.println("PASS: icmp sgt instruction")
+        return true
+    }
+    IO.println("FAIL: icmp sgt instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_zext_instruction(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t3", Types.Type.I1)
+    var result: Types.Value = Types.Value.Instruction("%t4", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.ZExt(result, val, Types.Type.I64)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t4 = zext i1 %t3 to i64"
+    if (ir == expected) {
+        IO.println("PASS: zext i1->i64 instruction")
+        return true
+    }
+    IO.println("FAIL: zext i1->i64 instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_trunc_instruction(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t4", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t5", Types.Type.I1)
+    var inst: Instructions.Instruction = Instructions.Instruction.Trunc(result, val, Types.Type.I1)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t5 = trunc i64 %t4 to i1"
+    if (ir == expected) {
+        IO.println("PASS: trunc i64->i1 instruction")
+        return true
+    }
+    IO.println("FAIL: trunc i64->i1 instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_alloca_instruction(): Bool {
+    var result: Types.Value = Types.Value.Instruction("%a", Types.Type.Ptr)
+    var inst: Instructions.Instruction = Instructions.Instruction.Alloca(result, Types.Type.I64, "a")
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %a = alloca i64"
+    if (ir == expected) {
+        IO.println("PASS: alloca i64 instruction")
+        return true
+    }
+    IO.println("FAIL: alloca i64 instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_load_instruction(): Bool {
+    var ptr: Types.Value = Types.Value.Instruction("%a", Types.Type.Ptr)
+    var result: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.Load(result, Types.Type.I64, ptr)
+    var ir: String = Instructions.format_instruction(inst)
+
+    // Library uses opaque pointers: "load i64, ptr %a"
+    // Codegen uses typed pointers: "load i64, i64* %a"
+    // Both are valid LLVM IR (LLVM 15+ accepts both)
+    var expected: String = "  %t1 = load i64, ptr %a"
+    if (ir == expected) {
+        IO.println("PASS: load i64 instruction (opaque ptr)")
+        return true
+    }
+    IO.println("FAIL: load i64 instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_store_instruction(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var ptr: Types.Value = Types.Value.Instruction("%a", Types.Type.Ptr)
+    var inst: Instructions.Instruction = Instructions.Instruction.Store(val, ptr)
+    var ir: String = Instructions.format_instruction(inst)
+
+    // Library: "store i64 %t1, ptr %a"
+    // Codegen: "store i64 %t1, i64* %a"
+    var expected: String = "  store i64 %t1, ptr %a"
+    if (ir == expected) {
+        IO.println("PASS: store i64 instruction (opaque ptr)")
+        return true
+    }
+    IO.println("FAIL: store i64 instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_call_instruction(): Bool {
+    var arg1: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var arg2: Types.Value = Types.Value.Instruction("%t2", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var args: List<Types.Value> = []
+    args.push(arg1)
+    args.push(arg2)
+    var inst: Instructions.Instruction = Instructions.Instruction.Call(result, "add", Types.Type.I64, args)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  %t3 = call i64 @add(i64 %t1, i64 %t2)"
+    if (ir == expected) {
+        IO.println("PASS: call instruction")
+        return true
+    }
+    IO.println("FAIL: call instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_call_void_instruction(): Bool {
+    var arg: Types.Value = Types.Value.Instruction("%t1", Types.Type.I64)
+    var args: List<Types.Value> = []
+    args.push(arg)
+    var inst: Instructions.Instruction = Instructions.Instruction.CallVoid("__io_println_str", args)
+    var ir: String = Instructions.format_instruction(inst)
+
+    var expected: String = "  call void @__io_println_str(i64 %t1)"
+    if (ir == expected) {
+        IO.println("PASS: call void instruction")
+        return true
+    }
+    IO.println("FAIL: call void instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_br_terminator(): Bool {
+    var term: Instructions.Terminator = Instructions.Terminator.Br("while.cond1")
+    var ir: String = Instructions.format_terminator(term)
+
+    var expected: String = "  br label %while.cond1"
+    if (ir == expected) {
+        IO.println("PASS: br terminator")
+        return true
+    }
+    IO.println("FAIL: br terminator")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_cond_br_terminator(): Bool {
+    var cond: Types.Value = Types.Value.Instruction("%t5", Types.Type.I1)
+    var term: Instructions.Terminator = Instructions.Terminator.CondBr(cond, "then2", "else3")
+    var ir: String = Instructions.format_terminator(term)
+
+    var expected: String = "  br i1 %t5, label %then2, label %else3"
+    if (ir == expected) {
+        IO.println("PASS: cond_br terminator")
+        return true
+    }
+    IO.println("FAIL: cond_br terminator")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_ret_terminator(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var term: Instructions.Terminator = Instructions.Terminator.Ret(val)
+    var ir: String = Instructions.format_terminator(term)
+
+    var expected: String = "  ret i64 %t3"
+    if (ir == expected) {
+        IO.println("PASS: ret terminator")
+        return true
+    }
+    IO.println("FAIL: ret terminator")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_ret_constant(): Bool {
+    var val: Types.Value = Types.Value.Constant(Types.int_const(0))
+    var term: Instructions.Terminator = Instructions.Terminator.Ret(val)
+    var ir: String = Instructions.format_terminator(term)
+
+    var expected: String = "  ret i64 0"
+    if (ir == expected) {
+        IO.println("PASS: ret i64 0 terminator")
+        return true
+    }
+    IO.println("FAIL: ret i64 0 terminator")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_gep_instruction(): Bool {
+    var ptr: Types.Value = Types.Value.Global("@.str.0", Types.Type.Ptr)
+    var idx0: Types.Value = Types.Value.Constant(Types.Const.Int(0, 64))
+    var idx1: Types.Value = Types.Value.Constant(Types.Const.Int(0, 64))
+    var result: Types.Value = Types.Value.Instruction("%t2", Types.Type.Ptr)
+    var indices: List<Types.Value> = []
+    indices.push(idx0)
+    indices.push(idx1)
+    var base_ty: Types.Type = Types.array_type(Types.Type.I8, 7)
+    var inst: Instructions.Instruction = Instructions.Instruction.GEP(result, base_ty, ptr, indices)
+    var ir: String = Instructions.format_instruction(inst)
+
+    // Library (opaque ptr): getelementptr [7 x i8], ptr @.str.0, i64 0, i64 0
+    // Codegen (typed ptr):  getelementptr [7 x i8], [7 x i8]* @.str.0, i64 0, i64 0
+    var expected: String = "  %t2 = getelementptr [7 x i8], ptr @.str.0, i64 0, i64 0"
+    if (ir == expected) {
+        IO.println("PASS: gep instruction (opaque ptr)")
+        return true
+    }
+    IO.println("FAIL: gep instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_ptrtoint_instruction(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t2", Types.Type.Ptr)
+    var result: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var inst: Instructions.Instruction = Instructions.Instruction.PtrToInt(result, val, Types.Type.I64)
+    var ir: String = Instructions.format_instruction(inst)
+
+    // Library: ptrtoint ptr %t2 to i64
+    // Codegen: ptrtoint i8* %t2 to i64  (but also sometimes i64* %name to i64)
+    var expected: String = "  %t3 = ptrtoint ptr %t2 to i64"
+    if (ir == expected) {
+        IO.println("PASS: ptrtoint instruction (opaque ptr)")
+        return true
+    }
+    IO.println("FAIL: ptrtoint instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_inttoptr_instruction(): Bool {
+    var val: Types.Value = Types.Value.Instruction("%t3", Types.Type.I64)
+    var result: Types.Value = Types.Value.Instruction("%t5", Types.Type.Ptr)
+    var inst: Instructions.Instruction = Instructions.Instruction.IntToPtr(result, val, Types.Type.Ptr)
+    var ir: String = Instructions.format_instruction(inst)
+
+    // Library: inttoptr i64 %t3 to ptr
+    // Codegen: inttoptr i64 %t3 to i8*
+    var expected: String = "  %t5 = inttoptr i64 %t3 to ptr"
+    if (ir == expected) {
+        IO.println("PASS: inttoptr instruction (opaque ptr)")
+        return true
+    }
+    IO.println("FAIL: inttoptr instruction")
+    IO.println("  expected: " + expected)
+    IO.println("  got:      " + ir)
+    return false
+}
+
+fun test_constant_formatting(): Bool {
+    // Test integer constant
+    var c: Types.Const = Types.int_const(42)
+    var s: String = Types.format_const(c)
+    if (s != "42") {
+        IO.println("FAIL: int_const(42) = " + s)
+        return false
+    }
+
+    // Test zero
+    var c0: Types.Const = Types.int_const(0)
+    var s0: String = Types.format_const(c0)
+    if (s0 != "0") {
+        IO.println("FAIL: int_const(0) = " + s0)
+        return false
+    }
+
+    // Test null ptr
+    var cn: Types.Const = Types.null_ptr()
+    var sn: String = Types.format_const(cn)
+    if (sn != "null") {
+        IO.println("FAIL: null_ptr() = " + sn)
+        return false
+    }
+
+    IO.println("PASS: constant formatting")
+    return true
+}
+
+fun test_type_formatting(): Bool {
+    var pass: Bool = true
+
+    if (Types.format_type(Types.Type.I1) != "i1") {
+        IO.println("FAIL: I1"); pass = false
+    }
+    if (Types.format_type(Types.Type.I8) != "i8") {
+        IO.println("FAIL: I8"); pass = false
+    }
+    if (Types.format_type(Types.Type.I32) != "i32") {
+        IO.println("FAIL: I32"); pass = false
+    }
+    if (Types.format_type(Types.Type.I64) != "i64") {
+        IO.println("FAIL: I64"); pass = false
+    }
+    if (Types.format_type(Types.Type.Ptr) != "ptr") {
+        IO.println("FAIL: Ptr"); pass = false
+    }
+    if (Types.format_type(Types.Type.Void) != "void") {
+        IO.println("FAIL: Void"); pass = false
+    }
+    if (Types.format_type(Types.Type.Float64) != "double") {
+        IO.println("FAIL: Float64"); pass = false
+    }
+
+    var arr_ty: Types.Type = Types.array_type(Types.Type.I8, 7)
+    if (Types.format_type(arr_ty) != "[7 x i8]") {
+        IO.println("FAIL: Array [7 x i8] = " + Types.format_type(arr_ty)); pass = false
+    }
+
+    if (pass) {
+        IO.println("PASS: type formatting")
+    }
+    return pass
+}
+
+fun main() {
+    var passed: Float = 0
+    var failed: Float = 0
+
+    if (test_type_formatting()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_constant_formatting()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_add_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_sub_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_mul_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_icmp_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_zext_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_trunc_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_alloca_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_load_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_store_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_call_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_call_void_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_br_terminator()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_cond_br_terminator()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_ret_terminator()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_ret_constant()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_gep_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_ptrtoint_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_inttoptr_instruction()) { passed = passed + 1 } else { failed = failed + 1 }
+
+    IO.println("")
+    IO.println("Results: " + passed.floor().to_string() + "/20 passed, " + failed.floor().to_string() + " failed")
+
+    IO.println("")
+    IO.println("Note: load/store/gep/ptrtoint/inttoptr use opaque 'ptr' syntax (LLVM 15+)")
+    IO.println("Current codegen uses typed pointers (i64*, i8*, etc.)")
+    IO.println("Both are valid and produce identical machine code with clang 17+")
+}
