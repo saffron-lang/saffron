@@ -114,7 +114,8 @@ fun main() {
             }
         }
         IO.println("pantry: unknown command '${command}'")
-        IO.println("Run 'pantry --help' for usage.")
+        IO.println("  To run a script: pantry run ${command}")
+        IO.println("  For help: pantry --help")
         OS.exit(1)
     }
 }
