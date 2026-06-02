@@ -1256,16 +1256,24 @@ class Parser {
     fun parse_destructure(): AST.Stmt {
         this.advance() // consume [
         var names: List<String> = []
+        var rest_name: String = ""
         if (!this.match_kind_check("]")) {
-            names.push(this.expect_ident())
-            while (this.match_kind(",")) {
+            if (this.match_kind("*")) {
+                rest_name = this.expect_ident()
+            } else {
                 names.push(this.expect_ident())
+            }
+            while (this.match_kind(",")) {
+                if (this.match_kind("*")) {
+                    rest_name = this.expect_ident()
+                } else {
+                    names.push(this.expect_ident())
+                }
             }
         }
         this.consume("]")
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        // Desugar: var __destruct = init; var a = __destruct[0]; var b = __destruct[1]; ...
         var stmts: List<AST.Stmt> = []
         var tmp_name: String = "__destruct"
         stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
@@ -1274,6 +1282,15 @@ class Parser {
             var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
             stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
             i = i + 1
+        }
+        if (rest_name.length() > 0) {
+            // Desugar *rest: var rest = __destruct.slice(names.length(), __destruct.length())
+            var slice_expr: AST.Expr = AST.Expr.MethodCall(
+                AST.Expr.Variable(tmp_name),
+                "slice",
+                [AST.Expr.IntLit(names.length()), AST.Expr.MethodCall(AST.Expr.Variable(tmp_name), "length", [])]
+            )
+            stmts.push(AST.Stmt.VarDecl(rest_name, "Any", slice_expr, ""))
         }
         return AST.Stmt.Block(stmts)
     }

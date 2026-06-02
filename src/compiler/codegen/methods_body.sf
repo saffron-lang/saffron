@@ -1074,6 +1074,15 @@
         return local
     }
     if (!is_user_class and method == "slice" and args.length() > 0) {
+        var slice_obj_type: String = this.type_to_string(this.last_type)
+        if (slice_obj_type.starts_with("List")) {
+            var sl_start: String = this.gen_arg_value(args[0])
+            var sl_end: String = this.gen_arg_value(args[1])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_slice(i64 " + obj + ", i64 " + sl_start + ", i64 " + sl_end + ")")
+            this.last_type = AST.Type.GenericType("List", [AST.Type.AnyType])
+            return local
+        }
         var str_ptr: String = this.emit_untag_ptr(obj)
         var start_tagged: String = this.gen_arg_value(args[0])
         var start: String = this.emit_untag_int(start_tagged)
