@@ -1005,3 +1005,150 @@ Unicode.grapheme_boundaries(s) -> List<Int>
 Unicode.word_boundaries(s)     -> List<Int>
 Unicode.bidi_class(s)    -> String
 ```
+
+---
+
+## 15. File Encoding Support
+
+Once Saffron strings are UTF-8 by default, we need explicit encoding support for reading/writing files in other encodings (Windows-1252, Shift_JIS, ISO-8859-1, UTF-16, etc.).
+
+### Design Principle
+
+All in-memory strings remain UTF-8. Encoding/decoding happens only at I/O boundaries: when reading bytes from a file into a string, or writing a string out to bytes in a target encoding.
+
+### API: `@encoding` Module
+
+```saffron
+import "@encoding" as Encoding
+
+// Read a file in a non-UTF-8 encoding
+var content: String = Encoding.read_file("data.csv", "windows-1252")
+
+// Write a string to a file in a specific encoding
+Encoding.write_file("output.txt", content, "shift_jis")
+
+// Low-level: decode raw bytes to UTF-8 string
+var bytes: List<Number> = IO.read_bytes("legacy.dat")
+var text: String = Encoding.decode(bytes, "iso-8859-1")
+
+// Low-level: encode a UTF-8 string to bytes in target encoding
+var encoded: List<Number> = Encoding.encode(content, "utf-16le")
+IO.write_bytes("output.bin", encoded)
+
+// List available encodings
+var available: List<String> = Encoding.list_encodings()
+// ["utf-8", "utf-16le", "utf-16be", "utf-32le", "utf-32be",
+//  "ascii", "iso-8859-1", "windows-1252", "shift_jis", "euc-jp",
+//  "gb2312", "big5", "koi8-r", ...]
+
+// Check if an encoding is supported
+Encoding.is_supported("windows-1252")  // true
+
+// Detect encoding from BOM or heuristics (best-effort)
+var detected: String = Encoding.detect(bytes)  // "utf-8", "utf-16le", etc.
+```
+
+### Encoding Error Handling
+
+```saffron
+// Strict mode (default): throw on unmappable characters
+Encoding.encode("hello 🎉", "ascii")
+// throws: "Encoding: character U+1F389 cannot be represented in ascii"
+
+// Replace mode: substitute unmappable chars
+var opts: Map<String, String> = {"errors": "replace", "replacement": "?"}
+var bytes: List<Number> = Encoding.encode_with("hello 🎉", "ascii", opts)
+// bytes represent "hello ?"
+
+// Ignore mode: skip unmappable chars
+var opts2: Map<String, String> = {"errors": "ignore"}
+var bytes2: List<Number> = Encoding.encode_with("hello 🎉", "ascii", opts2)
+// bytes represent "hello "
+```
+
+### IO Module Changes
+
+The existing `IO.read_file` and `IO.write_file` assume UTF-8 (which is correct for the default). For encoding-aware I/O, users import `@encoding`:
+
+```saffron
+// These remain UTF-8 (no change to existing API)
+IO.read_file("file.txt")         // reads bytes, assumes UTF-8
+IO.write_file("file.txt", data)  // writes UTF-8 bytes
+
+// For other encodings, use @encoding
+Encoding.read_file("legacy.csv", "windows-1252")
+Encoding.write_file("output.csv", data, "windows-1252")
+
+// Binary I/O (raw bytes, no encoding)
+IO.read_bytes("image.png")       // List<Number>
+IO.write_bytes("out.bin", bytes) // List<Number>
+```
+
+### Supported Encodings (Phase 1)
+
+| Encoding | Aliases | Notes |
+|----------|---------|-------|
+| utf-8 | utf8 | Default, identity transform |
+| utf-16le | utf16le, utf-16 | Windows native |
+| utf-16be | utf16be | Network byte order |
+| utf-32le | utf32le | Fixed-width |
+| utf-32be | utf32be | Fixed-width |
+| ascii | us-ascii | 7-bit only |
+| iso-8859-1 | latin1, latin-1 | Western European |
+| windows-1252 | cp1252 | Windows Western |
+
+### Supported Encodings (Phase 2 — CJK + Cyrillic)
+
+| Encoding | Aliases | Notes |
+|----------|---------|-------|
+| shift_jis | shift-jis, sjis | Japanese |
+| euc-jp | eucjp | Japanese Unix |
+| iso-2022-jp | | Japanese email |
+| gb2312 | gbk, gb18030 | Chinese simplified |
+| big5 | big5-hkscs | Chinese traditional |
+| euc-kr | | Korean |
+| koi8-r | | Russian |
+| windows-1251 | cp1251 | Cyrillic Windows |
+
+### Implementation
+
+Encoding tables can be:
+1. **Compiled into the runtime** as static byte arrays (for common encodings like latin1, windows-1252 — just 256-entry lookup tables)
+2. **Generated at build time** from Unicode consortium data (for complex multi-byte encodings like Shift_JIS, GB2312)
+3. **Linked from system iconv** as a fallback for exotic encodings (optional, not required)
+
+For the LLVM-compiled path, encoding functions are C runtime calls:
+```c
+// runtime/encoding.c
+int64_t __encoding_decode(int64_t bytes_list, int64_t encoding_str);  // -> String
+int64_t __encoding_encode(int64_t string, int64_t encoding_str);      // -> List<Number>
+```
+
+### BOM Handling
+
+```saffron
+// Write UTF-8 with BOM (some Windows tools expect this)
+Encoding.write_file_with_bom("output.txt", content, "utf-8")
+
+// Read with BOM detection and stripping
+var result = Encoding.read_file_auto("unknown.txt")
+// Checks for BOM: UTF-8 (EF BB BF), UTF-16LE (FF FE), UTF-16BE (FE FF)
+// Falls back to UTF-8 if no BOM detected
+```
+
+### Streaming / Large Files
+
+For large files where loading everything into memory is impractical:
+
+```saffron
+var reader = Encoding.open_reader("huge.csv", "windows-1252")
+while (reader.has_next()) {
+    var line: String = reader.read_line()  // decoded to UTF-8
+    // process line
+}
+reader.close()
+
+var writer = Encoding.open_writer("output.csv", "shift_jis")
+writer.write_line("ヘッダー,データ")
+writer.close()
+```
