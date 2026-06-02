@@ -26,13 +26,13 @@ const execFileAsync = promisify(execFile);
 function findCompiler(): string {
   const serverDir = __dirname;
   const projectRoot = path.resolve(serverDir, "..", "..");
-  const localBinary = path.join(projectRoot, "cmake-build-debug", "saffron");
+  const localBinary = path.join(projectRoot, "build", "saffronc");
   if (fs.existsSync(localBinary)) return localBinary;
 
-  const homeBinary = path.join(process.env.HOME || "", ".saffron", "bin", "saffron");
+  const homeBinary = path.join(process.env.HOME || "", ".saffron", "bin", "saffronc");
   if (fs.existsSync(homeBinary)) return homeBinary;
 
-  return "saffron";
+  return "saffronc";
 }
 
 const connection = createConnection(ProposedFeatures.all);
@@ -49,7 +49,8 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   if (params.rootUri) {
     const rootPath = decodeURIComponent(params.rootUri.replace("file://", ""));
     projectRoot = rootPath;
-    const rootBinary = path.join(rootPath, "cmake-build-debug", "saffron");
+    depPathCache = null;
+    const rootBinary = path.join(rootPath, "build", "saffronc");
     if (!settings?.compilerPath && fs.existsSync(rootBinary)) {
       compilerPath = rootBinary;
     }
@@ -142,8 +143,6 @@ function resolveImportPath(importPath: string, fromDir: string): string | null {
     const name = importPath.slice(1);
     const libPath = path.join(projectRoot, "src", "lib", name + ".sf");
     if (fs.existsSync(libPath)) return libPath;
-    const buildLibPath = path.join(projectRoot, "cmake-build-debug", "lib", name + ".sf");
-    if (fs.existsSync(buildLibPath)) return buildLibPath;
     return null;
   }
 
@@ -154,8 +153,45 @@ function resolveImportPath(importPath: string, fromDir: string): string | null {
     return null;
   }
 
-  // Builtin C module — no .sf source, but we can generate a stub
+  // Package import: "turmeric/signal" → .pantry/packages/turmeric/src/signal.sf
+  if (importPath.includes("/") && !importPath.startsWith(".")) {
+    const parts = importPath.split("/");
+    const pkgName = parts[0];
+    const modulePath = parts.slice(1).join("/");
+
+    // Try .pantry/packages first (installed deps)
+    const pantryPkg = path.join(projectRoot, ".pantry", "packages", pkgName, "src", modulePath + ".sf");
+    if (fs.existsSync(pantryPkg)) return pantryPkg;
+
+    // Try direct path dependency from pantry.toml
+    const depPath = getDepPath(pkgName);
+    if (depPath) {
+      const depModule = path.join(depPath, "src", modulePath + ".sf");
+      if (fs.existsSync(depModule)) return depModule;
+    }
+
+    return null;
+  }
+
   return null;
+}
+
+let depPathCache: Map<string, string> | null = null;
+
+function getDepPath(pkgName: string): string | null {
+  if (!depPathCache) {
+    depPathCache = new Map();
+    const tomlPath = path.join(projectRoot, "pantry.toml");
+    if (fs.existsSync(tomlPath)) {
+      const content = fs.readFileSync(tomlPath, "utf8");
+      const depRegex = /^(\w[\w-]*)\s*=\s*\{\s*path\s*=\s*"([^"]+)"/gm;
+      let m: RegExpExecArray | null;
+      while ((m = depRegex.exec(content)) !== null) {
+        depPathCache.set(m[1], path.resolve(projectRoot, m[2]));
+      }
+    }
+  }
+  return depPathCache.get(pkgName) || null;
 }
 
 function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
@@ -176,25 +212,45 @@ function mapDiagnostics(raw: SaffronDiagnostic[]): Diagnostic[] {
 async function runCheck(uri: string): Promise<CheckOutput | null> {
   const filePath = decodeURIComponent(uri.replace("file://", ""));
 
+  const args = ["--check"];
+  if (projectRoot) {
+    const stdlibPath = path.join(projectRoot, "src", "lib");
+    if (fs.existsSync(stdlibPath)) {
+      args.push("--stdlib", stdlibPath);
+    }
+  }
+  args.push(filePath, "/dev/null");
+
   try {
-    const { stdout } = await execFileAsync(compilerPath, ["--check", filePath], {
+    const { stdout, stderr } = await execFileAsync(compilerPath, args, {
       timeout: 10000,
     });
-    const result: CheckOutput = JSON.parse(stdout);
+    const output = stdout + stderr;
+    const result = parseCheckOutput(filePath, output);
     fileCache.set(uri, result);
     return result;
   } catch (err: any) {
-    if (err.stdout) {
-      try {
-        const result: CheckOutput = JSON.parse(err.stdout);
-        fileCache.set(uri, result);
-        return result;
-      } catch {
-        // JSON parse failed
-      }
-    }
-    return null;
+    const output = (err.stdout || "") + (err.stderr || "");
+    const result = parseCheckOutput(filePath, output);
+    fileCache.set(uri, result);
+    return result;
   }
+}
+
+function parseCheckOutput(filePath: string, output: string): CheckOutput {
+  const diagnostics: SaffronDiagnostic[] = [];
+  const errorRegex = /\[line (\d+), col (\d+)\] (Error|Warning): (.+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = errorRegex.exec(output)) !== null) {
+    diagnostics.push({
+      line: parseInt(match[1]),
+      column: parseInt(match[2]),
+      length: 1,
+      severity: match[3].toLowerCase() === "warning" ? "warning" : "error",
+      message: match[4],
+    });
+  }
+  return { file: filePath, diagnostics, symbols: [] };
 }
 
 interface WordContext {
