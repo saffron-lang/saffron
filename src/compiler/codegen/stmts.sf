@@ -145,10 +145,19 @@ extend fun Codegen.gen_return(stmt: AST.Stmt) {
         var value: AST.Expr = match (stmt) { Return(v) => v
             _ => AST.Expr.NilLit
         }
-        if (this.current_ret_type == "void") {
+        if (this.is_coroutine) {
+            this.gen_arg_value(value)
+            this.emit_terminator("br label %__coro_final")
+        } else if (this.current_ret_type == "void") {
+            if (this.gc_root_count > 0) {
+                this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
+            }
             this.emit_terminator("ret void")
         } else {
             var val: String = this.gen_arg_value(value)
+            if (this.gc_root_count > 0) {
+                this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
+            }
             this.emit_terminator("ret i64 " + val)
         }
     }

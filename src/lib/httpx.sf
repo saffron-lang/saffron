@@ -1,0 +1,666 @@
+//! Async HTTP/1.1 client inspired by Python's httpx.
+//! Built directly on the async socket layer — all I/O yields cooperatively,
+//! so requests work both standalone and inside spawned tasks for parallelism.
+//!
+//! ```saffron
+//! import "@httpx" as Http
+//!
+//! // Simple GET
+//! var resp = Http.get("https://api.example.com/users")
+//! IO.println(resp.status)   // 200
+//! IO.println(resp.body)     // response text
+//!
+//! // POST with JSON body
+//! var resp = Http.post("https://api.example.com/users",
+//!     "{\"name\": \"alice\"}",
+//!     {"Content-Type": "application/json"})
+//!
+//! // Full request builder
+//! var resp = Http.request("PUT", "https://api.example.com/users/1",
+//!     body_str, headers_map)
+//!
+//! // Parallel requests via tasks
+//! import "@async" as Async
+//! var t1 = Task.spawn(fun () => Http.get("https://api.example.com/a"))
+//! var t2 = Task.spawn(fun () => Http.get("https://api.example.com/b"))
+//! var r1 = Async.await(t1)
+//! var r2 = Async.await(t2)
+//! ```
+
+import "@socket" as Socket
+import "@url" as URL
+import "@json" as JSON
+
+// ---------------------------------------------------------------------------
+// Response
+// ---------------------------------------------------------------------------
+
+/// An HTTP response returned by all request methods.
+class Response {
+    var status: Number
+    var status_text: String
+    var headers: Map<String, String>
+    var body: String
+    var url: String
+
+    fun init(status: Number, status_text: String, headers: Map<String, String>, body: String, url: String) {
+        this.status = status
+        this.status_text = status_text
+        this.headers = headers
+        this.body = body
+        this.url = url
+    }
+
+    // True if the status code is 2xx.
+    fun ok(): Bool {
+        return this.status >= 200 and this.status < 300
+    }
+
+    // True if the status code indicates a client error (4xx).
+    fun is_client_error(): Bool {
+        return this.status >= 400 and this.status < 500
+    }
+
+    // True if the status code indicates a server error (5xx).
+    fun is_server_error(): Bool {
+        return this.status >= 500 and this.status < 600
+    }
+
+    // Parse the response body as JSON.
+    fun json() {
+        return JSON.parse(this.body)
+    }
+
+    // Get a response header value by name (case-insensitive).
+    // Returns empty string if the header is not present.
+    fun header(name: String): String {
+        var lower = name.to_lower()
+        var keys = this.headers.keys()
+        var i = 0
+        while (i < keys.length()) {
+            if (keys[i].to_lower() == lower) {
+                return this.headers.get(keys[i])
+            }
+            i = i + 1
+        }
+        return ""
+    }
+
+    // Raise an error if the response status is not 2xx.
+    fun raise_for_status() {
+        if (this.status >= 400) {
+            throw "httpx: ${this.status} ${this.status_text} for url '${this.url}'"
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — convenience methods
+// ---------------------------------------------------------------------------
+
+/// Perform a GET request.
+///
+/// ```saffron
+/// var resp = Http.get("https://example.com")
+/// ```
+fun get(url: String): Response {
+    return request("GET", url, "", {})
+}
+
+/// Perform a GET request with custom headers.
+///
+/// ```saffron
+/// var resp = Http.get_with_headers("https://example.com", {"Accept": "text/html"})
+/// ```
+fun get_with_headers(url: String, headers: Map<String, String>): Response {
+    return request("GET", url, "", headers)
+}
+
+/// Perform a POST request with a body and optional headers.
+///
+/// ```saffron
+/// var resp = Http.post("https://api.example.com/users",
+///     "{\"name\": \"alice\"}",
+///     {"Content-Type": "application/json"})
+/// ```
+fun post(url: String, body: String, headers: Map<String, String>): Response {
+    return request("POST", url, body, headers)
+}
+
+/// Perform a POST request with just a body (no custom headers).
+fun post_body(url: String, body: String): Response {
+    return request("POST", url, body, {})
+}
+
+/// Perform a PUT request.
+///
+/// ```saffron
+/// var resp = Http.put("https://api.example.com/users/1", body, headers)
+/// ```
+fun put(url: String, body: String, headers: Map<String, String>): Response {
+    return request("PUT", url, body, headers)
+}
+
+/// Perform a PUT request with just a body (no custom headers).
+fun put_body(url: String, body: String): Response {
+    return request("PUT", url, body, {})
+}
+
+/// Perform a DELETE request.
+///
+/// ```saffron
+/// var resp = Http.delete("https://api.example.com/users/1")
+/// ```
+fun delete(url: String): Response {
+    return request("DELETE", url, "", {})
+}
+
+/// Perform a DELETE request with custom headers.
+fun delete_with_headers(url: String, headers: Map<String, String>): Response {
+    return request("DELETE", url, "", headers)
+}
+
+/// Perform a PATCH request.
+///
+/// ```saffron
+/// var resp = Http.patch("https://api.example.com/users/1", patch_body, headers)
+/// ```
+fun patch(url: String, body: String, headers: Map<String, String>): Response {
+    return request("PATCH", url, body, headers)
+}
+
+/// Perform a HEAD request (returns headers only, no body).
+///
+/// ```saffron
+/// var resp = Http.head("https://example.com")
+/// IO.println(resp.header("Content-Type"))
+/// ```
+fun head(url: String): Response {
+    return _do_request("HEAD", url, "", {}, true, 5, 0)
+}
+
+/// POST a JSON-serializable value. Automatically sets Content-Type.
+///
+/// ```saffron
+/// var resp = Http.post_json("https://api.example.com/users", {"name": "alice", "age": 30})
+/// ```
+fun post_json(url: String, payload): Response {
+    var headers: Map<String, String> = {}
+    headers.set("Content-Type", "application/json")
+    var json_body = JSON.to_string(payload)
+    return request("POST", url, json_body, headers)
+}
+
+/// PUT a JSON-serializable value. Automatically sets Content-Type.
+fun put_json(url: String, payload): Response {
+    var headers: Map<String, String> = {}
+    headers.set("Content-Type", "application/json")
+    var json_body = JSON.to_string(payload)
+    return request("PUT", url, json_body, headers)
+}
+
+/// PATCH with a JSON-serializable value. Automatically sets Content-Type.
+fun patch_json(url: String, payload): Response {
+    var headers: Map<String, String> = {}
+    headers.set("Content-Type", "application/json")
+    var json_body = JSON.to_string(payload)
+    return request("PATCH", url, json_body, headers)
+}
+
+/// GET and parse the response as JSON. Raises on non-2xx status.
+///
+/// ```saffron
+/// var users = Http.get_json("https://api.example.com/users")
+/// ```
+fun get_json(url: String) {
+    var resp = get(url)
+    resp.raise_for_status()
+    return resp.json()
+}
+
+/// Perform a request without following redirects.
+fun request_no_redirect(method: String, url: String, body: String, headers: Map<String, String>): Response {
+    return _do_request(method, url, body, headers, false, 0, 0)
+}
+
+// ---------------------------------------------------------------------------
+// Core request function
+// ---------------------------------------------------------------------------
+
+/// Perform an HTTP request with full control over method, URL, body, and headers.
+/// Follows up to 5 redirects by default.
+///
+/// ```saffron
+/// var resp = Http.request("PUT", "https://api.example.com/items/1",
+///     "{\"price\": 42}",
+///     {"Content-Type": "application/json", "Authorization": "Bearer tok"})
+/// ```
+fun request(method: String, url: String, body: String, headers: Map<String, String>): Response {
+    return _do_request(method, url, body, headers, true, 5, 0)
+}
+
+// ---------------------------------------------------------------------------
+// Internal: protocol implementation
+// ---------------------------------------------------------------------------
+
+// Recursive request handler with redirect tracking.
+fun _do_request(method: String, url: String, body: String, headers: Map<String, String>, follow_redirects: Bool, max_redirects: Number, redirect_count: Number): Response {
+    if (redirect_count > max_redirects) {
+        throw "httpx: too many redirects (max ${max_redirects})"
+    }
+
+    // Parse URL
+    var parsed = URL.parse(url)
+    var host = parsed.host
+    var port = URL.effective_port(parsed)
+    var use_tls = (parsed.scheme == "https")
+
+    // Connect (async — yields if would block)
+    var handle = _open_connection(host, port, use_tls)
+
+    // Build and send the HTTP request
+    var raw_request = _format_request(method, parsed, host, port, body, headers)
+    _send_all(handle, raw_request, use_tls)
+
+    // Read the full response (async — yields while waiting for data)
+    var is_head = (method == "HEAD")
+    var raw_response = _recv_response(handle, use_tls, is_head)
+
+    // Close connection
+    Socket.close(handle)
+
+    // Parse response
+    var response = _parse_response(raw_response, url)
+
+    // Handle redirects
+    if (follow_redirects and _is_redirect(response.status)) {
+        var location = response.header("Location")
+        if (location == "") {
+            throw "httpx: ${response.status} redirect with no Location header"
+        }
+
+        // Resolve relative redirect URLs
+        if (!(location.contains("://"))) {
+            location = URL.join(url, location)
+        }
+
+        // Determine method for redirect
+        var next_method = method
+        var next_body = body
+        // 303 always becomes GET; 301/302 for POST become GET (browser behavior)
+        if (response.status == 303 or ((response.status == 301 or response.status == 302) and method == "POST")) {
+            next_method = "GET"
+            next_body = ""
+        }
+        // 307/308 preserve method and body
+
+        return _do_request(next_method, location, next_body, headers, follow_redirects, max_redirects, redirect_count + 1)
+    }
+
+    return response
+}
+
+// ---------------------------------------------------------------------------
+// Connection
+// ---------------------------------------------------------------------------
+
+// Open a TCP or TLS connection. Returns a socket handle.
+fun _open_connection(host: String, port: Number, use_tls: Bool): Int {
+    var handle: Int = -1
+    if (use_tls) {
+        handle = Socket.connect_tls(host, port)
+    } else {
+        handle = Socket.connect(host, port)
+    }
+    if (handle < 0) {
+        throw "httpx: failed to connect to ${host}:${port}"
+    }
+    return handle
+}
+
+// ---------------------------------------------------------------------------
+// Send
+// ---------------------------------------------------------------------------
+
+// Write all request bytes to the socket (plain or TLS).
+fun _send_all(handle: Int, request_str: String, use_tls: Bool) {
+    if (use_tls) {
+        Socket.tls_write(handle, request_str)
+    } else {
+        Socket.write(handle, request_str)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Receive
+// ---------------------------------------------------------------------------
+
+// Read the full HTTP response from the socket.
+// Handles Content-Length, chunked transfer-encoding, and connection close.
+fun _recv_response(handle: Int, use_tls: Bool, head_only: Bool): String {
+    var buf = ""
+    var header_end = -1
+    var read_size = 4096
+
+    // Phase 1: read until we have the full header block
+    while (header_end < 0) {
+        var chunk = _recv_chunk(handle, read_size, use_tls)
+        if (chunk.length() == 0) {
+            // Connection closed before headers complete
+            break
+        }
+        buf = buf + chunk
+        header_end = buf.index_of("\r\n\r\n")
+        if (header_end < 0) {
+            // Try LF-only separator as fallback
+            header_end = buf.index_of("\n\n")
+        }
+    }
+
+    if (header_end < 0) {
+        // Return whatever we got — the parser will handle the error
+        return buf
+    }
+
+    // For HEAD requests, we don't expect a body
+    if (head_only) {
+        return buf
+    }
+
+    // Determine body length strategy from headers
+    var sep_len = 4
+    var check_crlf = buf.index_of("\r\n\r\n")
+    if (check_crlf < 0) {
+        sep_len = 2
+    }
+    var header_section = buf.slice(0, header_end)
+    var body_start = header_end + sep_len
+
+    // Parse headers to find Content-Length or Transfer-Encoding
+    var content_length = _extract_header_value(header_section, "content-length")
+    var transfer_enc = _extract_header_value(header_section, "transfer-encoding")
+
+    if (transfer_enc.to_lower().contains("chunked")) {
+        // Chunked: read until we see the final "0\r\n\r\n" chunk
+        buf = _recv_until_chunked_end(handle, buf, body_start, use_tls)
+    } else if (content_length != "") {
+        // Content-Length: read exactly that many bytes of body
+        var expected = content_length.to_number()
+        var body_so_far = buf.length() - body_start
+        while (body_so_far < expected) {
+            var chunk = _recv_chunk(handle, read_size, use_tls)
+            if (chunk.length() == 0) { break }
+            buf = buf + chunk
+            body_so_far = buf.length() - body_start
+        }
+    } else {
+        // No Content-Length, no chunked: read until connection close
+        while (true) {
+            var chunk = _recv_chunk(handle, read_size, use_tls)
+            if (chunk.length() == 0) { break }
+            buf = buf + chunk
+        }
+    }
+
+    return buf
+}
+
+// Read until we have the complete chunked body (terminated by 0-length chunk).
+fun _recv_until_chunked_end(handle: Int, buf: String, body_start: Number, use_tls: Bool): String {
+    var read_size = 4096
+    while (true) {
+        var body_portion = buf.slice(body_start, buf.length())
+        // The end of chunked encoding is "0\r\n\r\n" or "0\r\n" followed by trailer headers + "\r\n"
+        if (body_portion.contains("\r\n0\r\n\r\n") or body_portion.starts_with("0\r\n\r\n")) {
+            break
+        }
+        // Also check for bare "\n0\n\n" variant
+        if (body_portion.contains("\n0\n\n") or body_portion.starts_with("0\n\n")) {
+            break
+        }
+        var chunk = _recv_chunk(handle, read_size, use_tls)
+        if (chunk.length() == 0) { break }
+        buf = buf + chunk
+    }
+    return buf
+}
+
+// Read a single chunk from the socket.
+fun _recv_chunk(handle: Int, max_bytes: Number, use_tls: Bool): String {
+    if (use_tls) {
+        return Socket.tls_read(handle, max_bytes)
+    }
+    return Socket.read(handle, max_bytes)
+}
+
+// Extract a header value from the raw header section (case-insensitive key match).
+fun _extract_header_value(header_section: String, name: String): String {
+    var lower_name = name.to_lower()
+    // Determine line separator
+    var line_sep = "\r\n"
+    if (!(header_section.contains("\r\n"))) {
+        line_sep = "\n"
+    }
+    var lines = header_section.split(line_sep)
+    var i = 1
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var colon = line.index_of(":")
+        if (colon > 0) {
+            var key = line.slice(0, colon).trim().to_lower()
+            if (key == lower_name) {
+                return line.slice(colon + 1, line.length()).trim()
+            }
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+// ---------------------------------------------------------------------------
+// Request formatting
+// ---------------------------------------------------------------------------
+
+// Build the raw HTTP/1.1 request string.
+fun _format_request(method: String, parsed: URL.URL, host: String, port: Number, body: String, custom_headers: Map<String, String>): String {
+    var path = parsed.path
+    if (path == "") { path = "/" }
+    if (parsed.query != "") {
+        path = path + "?" + parsed.query
+    }
+
+    var sb = StringBuilder()
+
+    // Request line
+    sb.append(method)
+    sb.append(" ")
+    sb.append(path)
+    sb.append(" HTTP/1.1\r\n")
+
+    // Host header
+    var host_value = host
+    if (parsed.port > 0 and parsed.port != 80 and parsed.port != 443) {
+        host_value = "${host}:${port}"
+    }
+    sb.append("Host: ")
+    sb.append(host_value)
+    sb.append("\r\n")
+
+    // Connection: close (no keep-alive)
+    sb.append("Connection: close\r\n")
+
+    // User-Agent (if not overridden)
+    if (!(custom_headers.has("User-Agent"))) {
+        sb.append("User-Agent: saffron-httpx/1.0\r\n")
+    }
+
+    // Accept (if not overridden)
+    if (!(custom_headers.has("Accept"))) {
+        sb.append("Accept: */*\r\n")
+    }
+
+    // Content-Length for non-empty bodies
+    if (body.length() > 0) {
+        sb.append("Content-Length: ${body.length()}\r\n")
+    }
+
+    // Custom headers
+    var keys = custom_headers.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var k: String = keys[i]
+        sb.append(k)
+        sb.append(": ")
+        sb.append(custom_headers.get(k))
+        sb.append("\r\n")
+        i = i + 1
+    }
+
+    // End of headers
+    sb.append("\r\n")
+
+    // Body
+    if (body.length() > 0) {
+        sb.append(body)
+    }
+
+    return sb.to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Response parsing
+// ---------------------------------------------------------------------------
+
+// Parse a raw HTTP response string into a Response object.
+fun _parse_response(raw: String, request_url: String): Response {
+    // Find header/body boundary
+    var header_end = raw.index_of("\r\n\r\n")
+    var sep_len = 4
+    if (header_end < 0) {
+        header_end = raw.index_of("\n\n")
+        sep_len = 2
+        if (header_end < 0) {
+            throw "httpx: malformed response — no header/body separator"
+        }
+    }
+
+    var header_section = raw.slice(0, header_end)
+    var body = raw.slice(header_end + sep_len, raw.length())
+
+    // Determine line separator
+    var line_sep = "\r\n"
+    if (sep_len == 2) { line_sep = "\n" }
+
+    var lines = header_section.split(line_sep)
+    if (lines.length() == 0) {
+        throw "httpx: empty response"
+    }
+
+    // Parse status line: "HTTP/1.1 200 OK"
+    var status_line: String = lines[0]
+    var first_space = status_line.index_of(" ")
+    if (first_space < 0) {
+        throw "httpx: malformed status line: '${status_line}'"
+    }
+    var after_version = status_line.slice(first_space + 1, status_line.length())
+    var second_space = after_version.index_of(" ")
+    var status_code = 0
+    var status_text = ""
+    if (second_space >= 0) {
+        status_code = after_version.slice(0, second_space).to_number()
+        status_text = after_version.slice(second_space + 1, after_version.length())
+    } else {
+        status_code = after_version.to_number()
+    }
+
+    // Parse response headers
+    var headers: Map<String, String> = {}
+    var i = 1
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var colon = line.index_of(":")
+        if (colon > 0) {
+            var key = line.slice(0, colon).trim()
+            var value = line.slice(colon + 1, line.length()).trim()
+            headers.set(key, value)
+        }
+        i = i + 1
+    }
+
+    // Decode chunked transfer-encoding if present
+    var final_body = body
+    if (headers.has("Transfer-Encoding")) {
+        var te = headers.get("Transfer-Encoding")
+        if (te.to_lower().contains("chunked")) {
+            final_body = _decode_chunked(body)
+        }
+    }
+
+    return Response(status_code, status_text, headers, final_body, request_url)
+}
+
+// Decode a chunked transfer-encoded body.
+fun _decode_chunked(body: String): String {
+    var sb = StringBuilder()
+    var pos = 0
+    while (pos < body.length()) {
+        // Find end of chunk-size line
+        var line_end = _index_of_from(body, "\r\n", pos)
+        var line_end_len = 2
+        if (line_end < 0) {
+            line_end = _index_of_from(body, "\n", pos)
+            line_end_len = 1
+            if (line_end < 0) { break }
+        }
+
+        var size_str = body.slice(pos, line_end).trim()
+        if (size_str == "" or size_str == "0") { break }
+
+        // Parse hex chunk size
+        var chunk_size = _parse_hex(size_str)
+        if (chunk_size <= 0) { break }
+
+        var data_start = line_end + line_end_len
+        var data_end = data_start + chunk_size
+        if (data_end > body.length()) { data_end = body.length() }
+
+        sb.append(body.slice(data_start, data_end))
+
+        // Skip trailing \r\n after chunk data
+        pos = data_end + line_end_len
+    }
+    return sb.to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+
+// Parse a hexadecimal string to a number.
+fun _parse_hex(s: String): Number {
+    var hex_chars = "0123456789abcdef"
+    var result = 0
+    var i = 0
+    while (i < s.length()) {
+        var c = s.char_at(i).to_lower()
+        var val_idx = hex_chars.index_of(c)
+        if (val_idx < 0) { break }
+        result = result * 16 + val_idx
+        i = i + 1
+    }
+    return result
+}
+
+// Find substring starting from a given position.
+fun _index_of_from(s: String, sub: String, start: Number): Number {
+    if (start >= s.length()) { return -1 }
+    var remaining = s.slice(start, s.length())
+    var idx = remaining.index_of(sub)
+    if (idx < 0) { return -1 }
+    return start + idx
+}
+
+// Check if a status code is a redirect.
+fun _is_redirect(status: Number): Bool {
+    return status == 301 or status == 302 or status == 303 or status == 307 or status == 308
+}

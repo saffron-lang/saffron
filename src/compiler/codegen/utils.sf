@@ -23,6 +23,17 @@ extend fun Codegen.runtime_declares(): String {
         rt.append("declare i1 @__val_is_map(i64)\n")
         return rt.to_string()
     }
+
+extend fun Codegen.is_gc_root_type(type_str: String): Bool {
+        if (type_str == "Int" or type_str == "Float" or type_str == "Bool" or type_str == "Nil" or type_str == "Number" or type_str == "void") {
+            return false
+        }
+        if (type_str.length() == 0) {
+            return false
+        }
+        return true
+    }
+
 extend fun Codegen.find_enum_for_variant(variant: String): String {
         var keys: List<String> = this.enum_variant_tags.keys()
         var i: Float = 0
