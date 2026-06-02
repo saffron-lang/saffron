@@ -153,6 +153,20 @@ declare i64 @__gc_string_alloc(i64)
 declare i64 @__gc_closure_new(i64, i64)
 declare i64 @__gc_env_alloc(i64)
 declare i64 @__gc_instance_alloc(i64)
+
+; --- Scheduler runtime ---
+declare double @sf_time_now()
+declare i64 @sf_tcp_poll(i64, i64, i64)
+declare void @__sched_coro_resume(i64)
+declare i64 @__sched_coro_done(i64)
+declare void @__sched_coro_destroy(i64)
+declare i64 @__sched_get_yield_reason()
+declare i64 @__sched_get_yield_arg()
+declare i64 @__sched_get_task_result()
+declare void @__sched_reset_yield()
+declare void @__sched_store_result(i64, i64)
+declare i64 @__sched_get_stored_result(i64)
+declare i64 @__sched_has_stored_result(i64)
 @__g_name = global i64 0
 @__g_version = global i64 0
 
