@@ -474,8 +474,9 @@ entry:
   br i1 %is_zero, label %no, label %check_range
 
 check_range:
-  ; Quick sanity: heap pointers are above 4KB and below 2^48
-  %too_low = icmp ult i64 %val, 4096
+  ; Quick sanity: heap pointers are above 64KB and below 2^48.
+  ; 65536 avoids speculative loads into unmapped low pages (arm64 has 16KB pages).
+  %too_low = icmp ult i64 %val, 65536
   br i1 %too_low, label %no, label %check_high
 
 check_high:
@@ -888,22 +889,21 @@ entry:
 ; =============================================================================
 
 ; Allocate a new GC-tracked list
+; NOTE: Temporarily disables GC to prevent use-after-free during multi-alloc.
 define i64 @__gc_list_new() {
 entry:
-  ; List header: 24 bytes, tag=2
+  %saved_enabled = load i64, i64* @__gc_enabled
+  store i64 0, i64* @__gc_enabled
   %list = call i64 @__gc_alloc(i64 24, i64 2)
   %is_null = icmp eq i64 %list, 0
   br i1 %is_null, label %done, label %init
 
 init:
-  ; count = 0
   %count_ptr = inttoptr i64 %list to i64*
   store i64 0, i64* %count_ptr
-  ; capacity = 8
   %cap_addr = add i64 %list, 8
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 8, i64* %cap_ptr
-  ; data = gc_alloc_zeroed(64, tag=7)  (8 slots * 8 bytes, zeroed to avoid false ptrs)
   %data = call i64 @__gc_alloc_zeroed(i64 64, i64 7)
   %data_addr = add i64 %list, 16
   %data_ptr = inttoptr i64 %data_addr to i64*
@@ -911,31 +911,30 @@ init:
   br label %done
 
 done:
+  store i64 %saved_enabled, i64* @__gc_enabled
   ret i64 %list
 }
 
 ; Allocate a new GC-tracked map
+; NOTE: Temporarily disables GC to prevent use-after-free during multi-alloc.
 define i64 @__gc_map_new() {
 entry:
-  ; Map header: 32 bytes, tag=3
+  %saved_enabled = load i64, i64* @__gc_enabled
+  store i64 0, i64* @__gc_enabled
   %map = call i64 @__gc_alloc(i64 32, i64 3)
   %is_null = icmp eq i64 %map, 0
   br i1 %is_null, label %done, label %init
 
 init:
-  ; count = 0
   %count_ptr = inttoptr i64 %map to i64*
   store i64 0, i64* %count_ptr
-  ; capacity = 16
   %cap_addr = add i64 %map, 8
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 16, i64* %cap_ptr
-  ; keys = gc_alloc_zeroed(128, tag=8)
   %keys = call i64 @__gc_alloc_zeroed(i64 128, i64 8)
   %keys_addr = add i64 %map, 16
   %keys_ptr = inttoptr i64 %keys_addr to i64*
   store i64 %keys, i64* %keys_ptr
-  ; values = gc_alloc_zeroed(128, tag=8)
   %vals = call i64 @__gc_alloc_zeroed(i64 128, i64 8)
   %vals_addr = add i64 %map, 24
   %vals_ptr = inttoptr i64 %vals_addr to i64*
@@ -943,13 +942,16 @@ init:
   br label %done
 
 done:
+  store i64 %saved_enabled, i64* @__gc_enabled
   ret i64 %map
 }
 
 ; Allocate a new GC-tracked StringBuilder
+; NOTE: Temporarily disables GC to prevent use-after-free during multi-alloc.
 define i64 @__gc_stringbuilder_new() {
 entry:
-  ; SB header: 24 bytes, tag=6
+  %saved_enabled = load i64, i64* @__gc_enabled
+  store i64 0, i64* @__gc_enabled
   %sb = call i64 @__gc_alloc(i64 24, i64 6)
   %is_null = icmp eq i64 %sb, 0
   br i1 %is_null, label %done, label %init
@@ -973,6 +975,7 @@ init:
   br label %done
 
 done:
+  store i64 %saved_enabled, i64* @__gc_enabled
   ret i64 %sb
 }
 
