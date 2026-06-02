@@ -1822,7 +1822,7 @@ class Parser {
         var idx_var: String = "__for_i"
 
         // var __for_list = iter_expr
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "List", iter_expr, "")
+        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
         // var __for_i = 0
         var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
         // __for_i < __for_list.length()
