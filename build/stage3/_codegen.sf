@@ -2054,28 +2054,36 @@ class Codegen {
                 var await_cleanup: String = this.fresh_label("await.cleanup")
                 var await_done: String = this.fresh_label("await.done")
 
-                this.emit_terminator("br label %" + await_loop)
+                // Await pattern using opaque calls (defeats CoroElide):
+                // check done → yield → resume child → loop
+                // Use __sched_coro_* functions (opaque to LLVM) instead of intrinsics
+                var b_hdl_i64: String = this.fresh_local()
+                this.emit_indent(b_hdl_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+                var await_check: String = this.fresh_label("await.check")
+                this.emit_terminator("br label %" + await_check)
 
-                this.start_block(await_loop)
-                this.emit_indent("call void @llvm.coro.resume(ptr " + b_hdl + ")")
+                this.start_block(await_check)
                 var b_done: String = this.fresh_local()
-                this.emit_indent(b_done + " = call i1 @llvm.coro.done(ptr " + b_hdl + ")")
-                this.emit_terminator("br i1 " + b_done + ", label %" + await_done + ", label %" + await_yield)
+                this.emit_indent(b_done + " = call i64 @__sched_coro_done(i64 " + b_hdl_i64 + ")")
+                var b_done_cmp: String = this.fresh_local()
+                this.emit_indent(b_done_cmp + " = icmp eq i64 " + b_done + ", 1")
+                this.emit_terminator("br i1 " + b_done_cmp + ", label %" + await_done + ", label %" + await_yield)
 
                 this.start_block(await_yield)
-                // Propagate suspension: yield ourselves (bare yield, no reason/arg)
                 var save_tok: String = this.fresh_local()
                 this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
                 var susp_result: String = this.fresh_local()
                 this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
-                // Default (suspend) case branches to the shared __coro_suspend block.
                 this.emit_terminator("switch i8 " + susp_result + ", label %__coro_suspend [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
 
                 this.start_block(await_cleanup)
                 this.emit_terminator("br label %__coro_cleanup")
 
+                this.start_block(await_loop)
+                this.emit_indent("call void @__sched_coro_resume(i64 " + b_hdl_i64 + ")")
+                this.emit_terminator("br label %" + await_check)
+
                 this.start_block(await_done)
-                this.emit_indent("call void @llvm.coro.destroy(ptr " + b_hdl + ")")
                 this.last_type = AST.Type.IntType
                 return "0"
             }
@@ -4926,6 +4934,7 @@ class Codegen {
             rt.append("\n@__yield_reason = external global i64\n")
             rt.append("@__yield_arg = external global i64\n")
             rt.append("@__task_result = external global i64\n")
+            rt.append("@__coro_escape_sink = external global ptr\n")
         }
         return rt.to_string()
     }
@@ -5642,6 +5651,19 @@ class Codegen {
                 if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
+                } else {
+                    // Check if any coroutine name is a suffix of this callee
+                    // (handles module-prefixed calls like stdlib_async_sleep matching "sleep")
+                    var cfi: Float = 0
+                    while (cfi < this.coroutine_funcs.length()) {
+                        var cf: String = this.coroutine_funcs[cfi]
+                        if (bc.ends_with(cf) or bc.ends_with("_" + cf)) {
+                            is_coro = true
+                            cfi = this.coroutine_funcs.length()
+                            bci = body_calls.length()
+                        }
+                        cfi = cfi + 1
+                    }
                 }
                 bci = bci + 1
             }
@@ -7403,6 +7425,39 @@ class Codegen {
         }
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
+        // Coro-calls-coro: if this is a coroutine calling another, emit await loop
+        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+            var b_hdl: String = this.fresh_local()
+            this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            var b_i64: String = this.fresh_local()
+            this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            var ac: String = this.fresh_label("await.check")
+            var ay: String = this.fresh_label("await.yield")
+            var al: String = this.fresh_label("await.loop")
+            var acl: String = this.fresh_label("await.cleanup")
+            var ad: String = this.fresh_label("await.done")
+            this.emit_terminator("br label %" + ac)
+            this.start_block(ac)
+            var bd: String = this.fresh_local()
+            this.emit_indent(bd + " = call i64 @__sched_coro_done(i64 " + b_i64 + ")")
+            var bdc: String = this.fresh_local()
+            this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
+            this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
+            this.start_block(ay)
+            var st: String = this.fresh_local()
+            this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var sr: String = this.fresh_local()
+            this.emit_indent(sr + " = call i8 @llvm.coro.suspend(token " + st + ", i1 false)")
+            this.emit_terminator("switch i8 " + sr + ", label %__coro_suspend [i8 0, label %" + al + " i8 1, label %" + acl + "]")
+            this.start_block(acl)
+            this.emit_terminator("br label %__coro_cleanup")
+            this.start_block(al)
+            this.emit_indent("call void @__sched_coro_resume(i64 " + b_i64 + ")")
+            this.emit_terminator("br label %" + ac)
+            this.start_block(ad)
+            this.last_type = AST.Type.IntType
+            return "0"
+        }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
         if (this.func_ret_types.has(prefixed_name)) {

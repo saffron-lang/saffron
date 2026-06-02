@@ -177,6 +177,19 @@
                 if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
+                } else {
+                    // Check if any coroutine name is a suffix of this callee
+                    // (handles module-prefixed calls like stdlib_async_sleep matching "sleep")
+                    var cfi: Float = 0
+                    while (cfi < this.coroutine_funcs.length()) {
+                        var cf: String = this.coroutine_funcs[cfi]
+                        if (bc.ends_with(cf) or bc.ends_with("_" + cf)) {
+                            is_coro = true
+                            cfi = this.coroutine_funcs.length()
+                            bci = body_calls.length()
+                        }
+                        cfi = cfi + 1
+                    }
                 }
                 bci = bci + 1
             }
@@ -226,6 +239,12 @@
             var vn: String = var_names[i]
             if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
+                // Zero-initialize allocas for heap-typed locals before they become GC roots.
+                // This prevents the GC from reading uninitialized memory if it triggers
+                // between push_root and the first real store to this variable.
+                if (!this.identity_mode and this.is_gc_root_type(var_types[i])) {
+                    this.emit_indent("store i64 0, i64* %" + this.sanitize_name(vn))
+                }
             }
             i = i + 1
         }

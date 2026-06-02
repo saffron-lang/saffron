@@ -2,11 +2,11 @@
 name = "turmeric-demo"
 version = "0.1.0"
 entry = "src/main.sf"
-target = "wasm32"
+target = "wasm"
 
 [dependencies]
 turmeric = { path = "../../turmeric" }
 
 [scripts]
-build = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o build/app.wasm"
-dev = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o build/app.wasm && cd build && python3 -m http.server 8080"
+build = "saffron build --target wasm --lib-path .pantry/packages src/main.sf -o build/app.wasm"
+dev = "saffron build --target wasm --lib-path .pantry/packages src/main.sf -o build/app.wasm && cd build && python3 -m http.server 8080"
