@@ -4,9 +4,9 @@ import "@os" as OS
 
 /// Holds parsed command-line arguments split into flags, key=value options, and positional args.
 class ParsedArgs {
-    var flags = {}
-    var options = {}
-    var positional = []
+    var flags: Map<String, Bool> = {}
+    var options: Map<String, String> = {}
+    var positional: List<String> = []
 
     fun init() {
         this.flags = {}

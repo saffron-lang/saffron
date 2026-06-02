@@ -1,0 +1,14 @@
+fun swap(a: Int, b: Int): (Int, Int) {
+    return (b, a)
+}
+
+fun test() {
+    var pair = (42, "hello")
+    IO.println(pair.0)
+    IO.println(pair.1)
+
+    let (x, y) = swap(1, 2)
+    IO.println(x)
+    IO.println(y)
+}
+test()

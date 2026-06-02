@@ -204,9 +204,7 @@
                 this.collect_vars_expr(value, names, types)
             }
             LetPattern(pattern, value) => {
-                this.collect_vars_expr(value, names, types)
             }
-            TypeAlias(n, t) => {}
         }
     }
 
@@ -509,7 +507,6 @@
                 this.collect_calls_from_stmts(eb, calls)
                 this.collect_calls_from_expr(ev, calls)
             }
-            _ => {}
         }
     }
 
@@ -550,7 +547,6 @@
                 this.collect_calls_from_stmts(f, calls)
             }
             Throw(v) => { this.collect_calls_from_expr(v, calls) }
-            _ => {}
         }
     }
 

@@ -1,0 +1,32 @@
+// Test: if/else inside match arm producing a value
+enum Choice { A, B, C }
+
+fun test_basic(c: Choice): Number {
+    return match (c) {
+        A => {
+            if (true) { 1 } else { 2 }
+        }
+        B => 3
+        C => 4
+    }
+}
+
+fun test_with_var(c: Choice, flag: Bool): Number {
+    return match (c) {
+        A => {
+            var x: Number = 10
+            if (flag) {
+                x + 1
+            } else {
+                x + 2
+            }
+        }
+        B => 30
+        C => 40
+    }
+}
+
+IO.println(test_basic(Choice.A).to_string())
+IO.println(test_basic(Choice.B).to_string())
+IO.println(test_with_var(Choice.A, true).to_string())
+IO.println(test_with_var(Choice.A, false).to_string())
