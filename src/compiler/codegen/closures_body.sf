@@ -199,6 +199,12 @@
         var ret_llvm: String = this.llvm_type(ret_type)
         this.current_ret_type = ret_llvm
 
+        // Check if this closure is a coroutine
+        var is_coro: Bool = this.coroutine_funcs.contains(name)
+        if (is_coro) {
+            this.is_coroutine = true
+        }
+
         var param_list: List<String> = []
         if (params.length() > 0) {
             param_list = this.split_respecting_generics(params, ",")
@@ -219,9 +225,23 @@
         if (this.current_prefix.length() > 0) {
             closure_linkage = "define linkonce_odr"
         }
-        this.emit(closure_linkage + " " + ret_llvm + " @" + name + "(" + param_strs.join(", ") + ") {")
+        var coro_attr: String = ""
+        var ret_type_ll: String = ret_llvm
+        if (is_coro) {
+            coro_attr = " noinline optnone presplitcoroutine"
+            ret_type_ll = "ptr"
+        }
+        this.emit(closure_linkage + " " + ret_type_ll + " @" + name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")
         this.emit("entry:")
         this.block_terminated = false
+
+        // Coroutine preamble
+        if (is_coro) {
+            this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
+            this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
+            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
+        }
 
         // Alloca all params and register in var_types/typed_vars
         i = 0
@@ -279,15 +299,44 @@
 
         this.gen_stmts(body)
 
-        if (!this.block_terminated) {
-            if (ret_llvm == "void") {
-                this.emit_terminator("ret void")
-            } else {
-                this.emit_terminator("unreachable")
+        // Coroutine epilogue
+        if (is_coro) {
+            if (!this.block_terminated) {
+                this.emit_terminator("br label %__coro_final")
+            }
+
+            this.emit("__coro_final:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
+            this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
+            this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")
+
+            this.emit("__coro_trap:")
+            this.block_terminated = false
+            this.emit_terminator("unreachable")
+
+            this.emit("__coro_cleanup:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_free = call ptr @llvm.coro.free(token %__coro_id, ptr %__coro_hdl)")
+            this.emit_indent("call void @free(ptr %__coro_free)")
+            this.emit_terminator("br label %__coro_suspend")
+
+            this.emit("__coro_suspend:")
+            this.block_terminated = false
+            this.emit_indent("call i1 @llvm.coro.end(ptr %__coro_hdl, i1 false)")
+            this.emit_terminator("ret ptr %__coro_hdl")
+        } else {
+            if (!this.block_terminated) {
+                if (ret_llvm == "void") {
+                    this.emit_terminator("ret void")
+                } else {
+                    this.emit_terminator("unreachable")
+                }
             }
         }
         this.emit("}")
         this.block_terminated = false
+        this.is_coroutine = false
     }
 
 
