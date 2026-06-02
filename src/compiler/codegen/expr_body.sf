@@ -611,7 +611,12 @@
         }
 
         // Build the trampoline function IR
-        var wrap_ir: String = "\ndefine linkonce_odr i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+        // On WASM targets, use plain define to avoid function table index mismatch
+        var wrap_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            wrap_linkage = "define"
+        }
+        var wrap_ir: String = "\n" + wrap_linkage + " i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
         if (nparams == 0) {
             wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "()\n"
         } else {

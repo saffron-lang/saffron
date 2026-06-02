@@ -3,7 +3,7 @@
         if (name == "main") {
             emit_name = "__saffron_main"
             this.known_functions.push("main")
-        } else if (name.starts_with("__lambda")) {
+        } else if (name.contains("__lambda")) {
             emit_name = name
         }
         this.known_functions.push(emit_name)
@@ -14,9 +14,9 @@
         }
         if (this.register_only) { return }
         if (this.defined_funcs.contains(emit_name)) {
-            if (this.current_prefix.length() == 0 and !emit_name.starts_with("__lambda")) {
-                
-                
+            if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
+
+
             }
             return
         }
@@ -85,7 +85,7 @@
                 pi3 = pi3 + 1
             }
             var linkage2: String = "define"
-            if (this.current_prefix.length() > 0) { linkage2 = "define linkonce_odr" }
+            if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") { linkage2 = "define linkonce_odr" }
             this.emit("")
             this.emit(linkage2 + " " + ret_llvm2 + " @" + emit_name + "(" + param_strs2.join(", ") + ") {")
             this.emit("entry:")
@@ -209,7 +209,12 @@
         this.emit("")
         var linkage: String = "define"
         if (this.current_prefix.length() > 0) {
-            linkage = "define linkonce_odr"
+            // On WASM targets, linkonce_odr breaks indirect calls through function table
+            // index mismatch after linker deduplication. Use plain define with module-prefixed
+            // names to ensure each function has a stable table entry.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }

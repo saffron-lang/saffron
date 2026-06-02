@@ -409,7 +409,11 @@
         if (this.defined_funcs.contains(type_name)) { return }
         this.defined_funcs.push(type_name)
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + type_name + "() {")
+        var ctor_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ctor_linkage = "define"
+        }
+        this.emit(ctor_linkage + " i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
         // Allocate instance on heap
@@ -494,7 +498,11 @@
         var func_name: String = name + "__to_string"
 
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + func_name + "(i64 %self) {")
+        var ts_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ts_linkage = "define"
+        }
+        this.emit(ts_linkage + " i64 @" + func_name + "(i64 %self) {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
@@ -670,7 +678,11 @@
         }
 
         this.emit("")
-        this.emit("define linkonce_odr i64 @" + vname + "(" + params + ") {")
+        var ev_linkage: String = "define linkonce_odr"
+        if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+            ev_linkage = "define"
+        }
+        this.emit(ev_linkage + " i64 @" + vname + "(" + params + ") {")
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
