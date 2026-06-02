@@ -22,6 +22,9 @@
 var _hex_chars = "0123456789abcdef"
 // All alphanumerics: digits(48-57) + upper(65-90) + lower(97-122)
 var _chars_alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+// All printable ASCII characters (bytes 32-126) in order, for O(1) byte<->char conversion.
+// Index 0 = space (byte 32), index 94 = '~' (byte 126).
+var _printable_ascii = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
 /// Convert a single hex character to its 4-bit value (0-15).
 fun _hex_val(ch: String): Int {
@@ -53,90 +56,19 @@ fun _byte_to_hex_upper(b: Int): String {
 /// Convert a byte value to its ASCII character (printable range only).
 /// Non-printable bytes (0-31, 127+) return "?".
 fun _byte_to_char(b: Int): String {
-    // Digits 48-57: positions 0-9 in _chars_alnum
-    if (b >= 48 and b <= 57) { return _chars_alnum.char_at(b - 48) }
-    // Uppercase 65-90: positions 10-35 in _chars_alnum
-    if (b >= 65 and b <= 90) { return _chars_alnum.char_at(b - 65 + 10) }
-    // Lowercase 97-122: positions 36-61 in _chars_alnum
-    if (b >= 97 and b <= 122) { return _chars_alnum.char_at(b - 97 + 36) }
-    // Individual punctuation (inline, no module var needed)
-    if (b == 32) { return " " }
-    if (b == 33) { return "!" }
-    if (b == 34) { return "\"" }
-    if (b == 35) { return "#" }
-    if (b == 36) { return "$" }
-    if (b == 37) { return "%" }
-    if (b == 38) { return "&" }
-    if (b == 39) { return "'" }
-    if (b == 40) { return "(" }
-    if (b == 41) { return ")" }
-    if (b == 42) { return "*" }
-    if (b == 43) { return "+" }
-    if (b == 44) { return "," }
-    if (b == 45) { return "-" }
-    if (b == 46) { return "." }
-    if (b == 47) { return "/" }
-    if (b == 58) { return ":" }
-    if (b == 59) { return ";" }
-    if (b == 60) { return "<" }
-    if (b == 61) { return "=" }
-    if (b == 62) { return ">" }
-    if (b == 63) { return "?" }
-    if (b == 64) { return "@" }
-    if (b == 91) { return "[" }
-    if (b == 92) { return "\\" }
-    if (b == 93) { return "]" }
-    if (b == 94) { return "^" }
-    if (b == 95) { return "_" }
-    if (b == 96) { return "`" }
-    if (b == 123) { return "{" }
-    if (b == 124) { return "|" }
-    if (b == 125) { return "}" }
-    if (b == 126) { return "~" }
+    if (b >= 32 and b <= 126) {
+        return _printable_ascii.char_at(b - 32)
+    }
     return "?"
 }
 
 /// Convert a single character to its ASCII byte value.
 /// Returns 0 for characters not found.
 fun _char_to_byte(ch: String): Int {
-    // Use the same index_of approach as _hex_val (which works)
-    var idx: Int = _chars_alnum.index_of(ch)
+    var idx: Int = _printable_ascii.index_of(ch)
     if (idx >= 0) {
-        if (idx < 10) { return idx + 48 }
-        if (idx < 36) { return idx - 10 + 65 }
-        return idx - 36 + 97
+        return idx + 32
     }
-    if (ch == " ") { return 32 }
-    if (ch == "!") { return 33 }
-    if (ch == ".") { return 46 }
-    if (ch == ",") { return 44 }
-    if (ch == "-") { return 45 }
-    if (ch == "_") { return 95 }
-    if (ch == ":") { return 58 }
-    if (ch == "/") { return 47 }
-    if (ch == "(") { return 40 }
-    if (ch == ")") { return 41 }
-    if (ch == "[") { return 91 }
-    if (ch == "]") { return 93 }
-    if (ch == "{") { return 123 }
-    if (ch == "}") { return 125 }
-    if (ch == "<") { return 60 }
-    if (ch == ">") { return 62 }
-    if (ch == "=") { return 61 }
-    if (ch == "+") { return 43 }
-    if (ch == "*") { return 42 }
-    if (ch == "#") { return 35 }
-    if (ch == "@") { return 64 }
-    if (ch == "^") { return 94 }
-    if (ch == "&") { return 38 }
-    if (ch == "|") { return 124 }
-    if (ch == "~") { return 126 }
-    if (ch == "`") { return 96 }
-    if (ch == "$") { return 36 }
-    if (ch == "%") { return 37 }
-    if (ch == "?") { return 63 }
-    if (ch == ";") { return 59 }
-    if (ch == "'") { return 39 }
     return 0
 }
 
