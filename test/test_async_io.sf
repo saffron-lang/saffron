@@ -1,0 +1,58 @@
+//! Async I/O test — demonstrates Elixir-like concurrency.
+//! Spawn tasks trivially to parallelize work. Async is invisible by default.
+
+import "@scheduler" as Scheduler
+import "@socket" as Socket
+
+fun sleep(duration: Number) {
+    yield [1, duration]
+}
+
+// A simple HTTP GET — would be async if socket blocks
+fun http_get(host: String, port: Int, path: String): String {
+    var fd = Socket.connect(host, port)
+    if (fd < 0) { return "ERROR: connection failed" }
+    var req = "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\n\r\n"
+    Socket.write(fd, req)
+    var response = Socket.read(fd, 4096)
+    Socket.close(fd)
+    return response
+}
+
+// --- Test 1: Sequential (no parallelism, just normal calls) ---
+IO.println("=== Sequential ===")
+IO.println("fetching...")
+var r1 = http_get("example.com", 80, "/")
+IO.println("got " + r1.length().to_string() + " bytes")
+
+// --- Test 2: Parallel — spawn tasks, await results ---
+IO.println("")
+IO.println("=== Parallel ===")
+var taskA = Task.spawn(fun () => http_get("example.com", 80, "/"))
+var taskB = Task.spawn(fun () => http_get("example.org", 80, "/"))
+IO.println("both spawned, awaiting...")
+var resultA = taskA.await()
+var resultB = taskB.await()
+IO.println("A: " + resultA.length().to_string() + " bytes")
+IO.println("B: " + resultB.length().to_string() + " bytes")
+
+// --- Test 3: Fan-out pattern (like Elixir Task.async_stream) ---
+IO.println("")
+IO.println("=== Fan-out ===")
+var tasks: List<Int> = []
+var hosts: List<String> = ["example.com", "example.org", "example.net"]
+var i = 0
+while (i < hosts.length()) {
+    var host = hosts[i]
+    tasks.push(Task.spawn(fun () => http_get(host, 80, "/")))
+    i = i + 1
+}
+// Await all
+i = 0
+while (i < tasks.length()) {
+    var result = tasks[i].await()
+    IO.println(hosts[i] + ": " + result.length().to_string() + " bytes")
+    i = i + 1
+}
+
+IO.println("done!")

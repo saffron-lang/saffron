@@ -1,0 +1,61 @@
+//! Core async test — Elixir-like task spawning.
+//! Tests: spawn, await, sleep, concurrent execution order.
+
+import "@scheduler" as Scheduler
+
+fun sleep(duration: Number) {
+    yield [1, duration]
+}
+
+// --- Test 1: Basic spawn + await ---
+IO.println("=== Spawn + Await ===")
+
+fun compute(n: Int): Int {
+    sleep(0.01)
+    return n * n
+}
+
+var task = Task.spawn(fun () => compute(7))
+IO.println("spawned")
+var result = task.await()
+IO.println("7^2 = " + result.to_string())
+
+// --- Test 2: Concurrent workers ---
+IO.println("")
+IO.println("=== Concurrent ===")
+
+fun worker(name: String, ms: Number): String {
+    IO.println("  " + name + " start")
+    sleep(ms)
+    IO.println("  " + name + " end")
+    return name
+}
+
+var a = Task.spawn(fun () => worker("A", 0.03))
+var b = Task.spawn(fun () => worker("B", 0.01))
+var c = Task.spawn(fun () => worker("C", 0.02))
+
+var ra = a.await()
+var rb = b.await()
+var rc = c.await()
+IO.println("order: " + ra + " " + rb + " " + rc)
+
+// --- Test 3: Many tasks ---
+IO.println("")
+IO.println("=== Fan-out ===")
+var tasks: List<Int> = []
+var i = 0
+while (i < 5) {
+    var n = i
+    tasks.push(Task.spawn(fun () => compute(n)))
+    i = i + 1
+}
+
+i = 0
+while (i < tasks.length()) {
+    var r = tasks[i].await()
+    IO.println(i.to_string() + "^2 = " + r.to_string())
+    i = i + 1
+}
+
+IO.println("all done!")
