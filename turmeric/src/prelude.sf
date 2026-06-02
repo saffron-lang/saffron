@@ -5,6 +5,8 @@
 @extern("i64 js_dom_create_element(void*)") fun _tc_create(tag: String): Float
 @extern("void js_dom_set_text(i64, void*)") fun _tc_set_text(handle: Float, text: String)
 @extern("void js_dom_append_child(i64, i64)") fun _tc_append(parent: Float, child: Float)
+@extern("void js_dom_set_attr(i64, void*, void*)") fun _tc_set_attr(handle: Float, name: String, value: String)
+@extern("void js_dom_add_event(i64, void*, i64)") fun _tc_add_event(handle: Float, event: String, handler: Any)
 
 // --- Context stack: tracks current parent for nesting ---
 var _tc_stack: List<Float> = []
@@ -32,9 +34,31 @@ fun text(content: String) {
     _tc_set_text(parent, content)
 }
 
-// --- Element builder: creates element, pushes as parent, calls block, pops ---
-fun _tc_el(tag: String, block: Any): Float {
+// --- Attribute application: maps keys to DOM operations ---
+fun _tc_apply_attrs(el: Float, attrs: Map<String, Any>) {
+    var keys = attrs.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var key = keys[i]
+        var value = attrs.get(key)
+        if (key == "cls" or key == "class") {
+            _tc_set_attr(el, "class", value)
+        } else if (key == "id") {
+            _tc_set_attr(el, "id", value)
+        } else if (key.starts_with("on_")) {
+            var event_name = key.slice(3, key.length())
+            _tc_add_event(el, event_name, value)
+        } else {
+            _tc_set_attr(el, key, value)
+        }
+        i = i + 1
+    }
+}
+
+// --- Element builder: creates element, applies attrs, pushes as parent, calls block, pops ---
+fun _tc_el(tag: String, attrs: Map<String, Any>, block: Any): Float {
     var el: Float = _tc_create(tag)
+    _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
     if (block != nil) {
@@ -46,71 +70,73 @@ fun _tc_el(tag: String, block: Any): Float {
 }
 
 // --- HTML elements ---
-fun div(block: Any = nil): Float { return _tc_el("div", block) }
-fun span(block: Any = nil): Float { return _tc_el("span", block) }
-fun p(block: Any = nil): Float { return _tc_el("p", block) }
-fun a(block: Any = nil): Float { return _tc_el("a", block) }
-fun h1(block: Any = nil): Float { return _tc_el("h1", block) }
-fun h2(block: Any = nil): Float { return _tc_el("h2", block) }
-fun h3(block: Any = nil): Float { return _tc_el("h3", block) }
-fun h4(block: Any = nil): Float { return _tc_el("h4", block) }
-fun h5(block: Any = nil): Float { return _tc_el("h5", block) }
-fun h6(block: Any = nil): Float { return _tc_el("h6", block) }
-fun button(block: Any = nil): Float { return _tc_el("button", block) }
-fun input(): Float { return _tc_el("input", nil) }
-fun textarea(block: Any = nil): Float { return _tc_el("textarea", block) }
-fun select(block: Any = nil): Float { return _tc_el("select", block) }
-fun option(block: Any = nil): Float { return _tc_el("option", block) }
-fun form(block: Any = nil): Float { return _tc_el("form", block) }
-fun label(block: Any = nil): Float { return _tc_el("label", block) }
-fun fieldset(block: Any = nil): Float { return _tc_el("fieldset", block) }
-fun legend(block: Any = nil): Float { return _tc_el("legend", block) }
-fun ul(block: Any = nil): Float { return _tc_el("ul", block) }
-fun ol(block: Any = nil): Float { return _tc_el("ol", block) }
-fun li(block: Any = nil): Float { return _tc_el("li", block) }
-fun dl(block: Any = nil): Float { return _tc_el("dl", block) }
-fun dt(block: Any = nil): Float { return _tc_el("dt", block) }
-fun dd(block: Any = nil): Float { return _tc_el("dd", block) }
-fun table(block: Any = nil): Float { return _tc_el("table", block) }
-fun thead(block: Any = nil): Float { return _tc_el("thead", block) }
-fun tbody(block: Any = nil): Float { return _tc_el("tbody", block) }
-fun tr(block: Any = nil): Float { return _tc_el("tr", block) }
-fun th(block: Any = nil): Float { return _tc_el("th", block) }
-fun td(block: Any = nil): Float { return _tc_el("td", block) }
-fun nav(block: Any = nil): Float { return _tc_el("nav", block) }
-fun header(block: Any = nil): Float { return _tc_el("header", block) }
-fun footer(block: Any = nil): Float { return _tc_el("footer", block) }
-fun section(block: Any = nil): Float { return _tc_el("section", block) }
-fun article(block: Any = nil): Float { return _tc_el("article", block) }
-fun aside(block: Any = nil): Float { return _tc_el("aside", block) }
-fun details(block: Any = nil): Float { return _tc_el("details", block) }
-fun summary(block: Any = nil): Float { return _tc_el("summary", block) }
-fun dialog(block: Any = nil): Float { return _tc_el("dialog", block) }
-fun pre(block: Any = nil): Float { return _tc_el("pre", block) }
-fun code(block: Any = nil): Float { return _tc_el("code", block) }
-fun blockquote(block: Any = nil): Float { return _tc_el("blockquote", block) }
-fun em(block: Any = nil): Float { return _tc_el("em", block) }
-fun strong(block: Any = nil): Float { return _tc_el("strong", block) }
-fun small(block: Any = nil): Float { return _tc_el("small", block) }
-fun mark(block: Any = nil): Float { return _tc_el("mark", block) }
-fun del(block: Any = nil): Float { return _tc_el("del", block) }
-fun ins(block: Any = nil): Float { return _tc_el("ins", block) }
-fun figure(block: Any = nil): Float { return _tc_el("figure", block) }
-fun figcaption(block: Any = nil): Float { return _tc_el("figcaption", block) }
-fun picture(block: Any = nil): Float { return _tc_el("picture", block) }
-fun video(block: Any = nil): Float { return _tc_el("video", block) }
-fun audio(block: Any = nil): Float { return _tc_el("audio", block) }
-fun canvas(block: Any = nil): Float { return _tc_el("canvas", block) }
-fun iframe(block: Any = nil): Float { return _tc_el("iframe", block) }
-fun br(): Float { return _tc_el("br", nil) }
-fun hr(): Float { return _tc_el("hr", nil) }
-fun img(): Float { return _tc_el("img", nil) }
-fun source(): Float { return _tc_el("source", nil) }
-fun track(): Float { return _tc_el("track", nil) }
-fun wbr(): Float { return _tc_el("wbr", nil) }
-fun embed(): Float { return _tc_el("embed", nil) }
-fun link(): Float { return _tc_el("link", nil) }
-fun meta(): Float { return _tc_el("meta", nil) }
+fun div(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("div", attrs, block) }
+fun span(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("span", attrs, block) }
+fun p(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("p", attrs, block) }
+fun a(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("a", attrs, block) }
+fun h1(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h1", attrs, block) }
+fun h2(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h2", attrs, block) }
+fun h3(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h3", attrs, block) }
+fun h4(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h4", attrs, block) }
+fun h5(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h5", attrs, block) }
+fun h6(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("h6", attrs, block) }
+fun button(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("button", attrs, block) }
+fun input(attrs: Map<String, Any> = {}): Float { return _tc_el("input", attrs, nil) }
+fun textarea(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("textarea", attrs, block) }
+fun select(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("select", attrs, block) }
+fun option(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("option", attrs, block) }
+fun form(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("form", attrs, block) }
+fun label(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("label", attrs, block) }
+fun fieldset(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("fieldset", attrs, block) }
+fun legend(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("legend", attrs, block) }
+fun ul(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ul", attrs, block) }
+fun ol(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ol", attrs, block) }
+fun li(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("li", attrs, block) }
+fun dl(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dl", attrs, block) }
+fun dt(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dt", attrs, block) }
+fun dd(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dd", attrs, block) }
+fun table(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("table", attrs, block) }
+fun thead(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("thead", attrs, block) }
+fun tbody(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("tbody", attrs, block) }
+fun tr(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("tr", attrs, block) }
+fun th(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("th", attrs, block) }
+fun td(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("td", attrs, block) }
+fun nav(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("nav", attrs, block) }
+fun header(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("header", attrs, block) }
+fun footer(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("footer", attrs, block) }
+fun section(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("section", attrs, block) }
+fun article(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("article", attrs, block) }
+fun aside(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("aside", attrs, block) }
+fun details(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("details", attrs, block) }
+fun summary(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("summary", attrs, block) }
+fun dialog(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("dialog", attrs, block) }
+fun pre(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("pre", attrs, block) }
+fun code(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("code", attrs, block) }
+fun blockquote(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("blockquote", attrs, block) }
+fun em(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("em", attrs, block) }
+fun strong(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("strong", attrs, block) }
+fun small(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("small", attrs, block) }
+fun mark(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("mark", attrs, block) }
+fun del(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("del", attrs, block) }
+fun ins(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("ins", attrs, block) }
+fun figure(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("figure", attrs, block) }
+fun figcaption(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("figcaption", attrs, block) }
+fun picture(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("picture", attrs, block) }
+fun video(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("video", attrs, block) }
+fun audio(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("audio", attrs, block) }
+fun canvas(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("canvas", attrs, block) }
+fun iframe(attrs: Map<String, Any> = {}, block: Any = nil): Float { return _tc_el("iframe", attrs, block) }
+
+// --- Self-closing elements (no block) ---
+fun br(attrs: Map<String, Any> = {}): Float { return _tc_el("br", attrs, nil) }
+fun hr(attrs: Map<String, Any> = {}): Float { return _tc_el("hr", attrs, nil) }
+fun img(attrs: Map<String, Any> = {}): Float { return _tc_el("img", attrs, nil) }
+fun source(attrs: Map<String, Any> = {}): Float { return _tc_el("source", attrs, nil) }
+fun track(attrs: Map<String, Any> = {}): Float { return _tc_el("track", attrs, nil) }
+fun wbr(attrs: Map<String, Any> = {}): Float { return _tc_el("wbr", attrs, nil) }
+fun embed(attrs: Map<String, Any> = {}): Float { return _tc_el("embed", attrs, nil) }
+fun link(attrs: Map<String, Any> = {}): Float { return _tc_el("link", attrs, nil) }
+fun meta(attrs: Map<String, Any> = {}): Float { return _tc_el("meta", attrs, nil) }
 
 // --- Mount: set the root element and call the app function ---
 fun mount(selector: String, app: Any) {
