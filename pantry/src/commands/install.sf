@@ -64,7 +64,7 @@ fun run(parsed: Args.ParsedArgs) {
         var dep: Resolver.ResolvedDep = resolved[i]
         var pkg_manifest: String = dep.source_path + "/pantry.toml"
 
-        if (IO.file_exists(pkg_manifest)) {
+        if (OS.file_exists(pkg_manifest)) {
             // Extract bin script entries from the dep's pantry.toml
             var grep_out: String = OS.exec("sed -n '/\\[scripts.bin\\]/,/^\\[/p' " + pkg_manifest + " | grep '=' 2>/dev/null")
             if (grep_out.length() > 0) {

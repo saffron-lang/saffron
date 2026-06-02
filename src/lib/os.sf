@@ -24,3 +24,15 @@ fun platform(): String {
 fun env(name: String): String {
     return __os_env(name)
 }
+
+fun file_exists(path: String): Bool {
+    return __io_file_exists(path)
+}
+
+fun mkdir(path: String) {
+    __io_mkdir(path)
+}
+
+fun list_dir(path: String): List<String> {
+    return __io_walk_dir(path)
+}

@@ -24,7 +24,7 @@ fun run(parsed: Args.ParsedArgs) {
 
     // Remove build/ directory
     var build_dir: String = dir + "/build"
-    if (IO.file_exists(build_dir)) {
+    if (OS.file_exists(build_dir)) {
         OS.exec("rm -rf ${build_dir}")
         IO.println("  removed build/")
         removed = removed + 1
@@ -32,7 +32,7 @@ fun run(parsed: Args.ParsedArgs) {
 
     // Remove pantry.lock
     var lock_file: String = dir + "/pantry.lock"
-    if (IO.file_exists(lock_file)) {
+    if (OS.file_exists(lock_file)) {
         OS.exec("rm ${lock_file}")
         IO.println("  removed pantry.lock")
         removed = removed + 1
@@ -40,7 +40,7 @@ fun run(parsed: Args.ParsedArgs) {
 
     // Remove .pantry/ cache directory
     var cache_dir: String = dir + "/.pantry"
-    if (IO.file_exists(cache_dir)) {
+    if (OS.file_exists(cache_dir)) {
         OS.exec("rm -rf ${cache_dir}")
         IO.println("  removed .pantry/")
         removed = removed + 1

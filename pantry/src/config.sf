@@ -52,7 +52,7 @@ fun find_manifest(): String {
     var dir = OS.cwd()
     while (true) {
         var candidate = dir + "/" + manifest_name()
-        if (IO.file_exists(candidate)) {
+        if (OS.file_exists(candidate)) {
             return candidate
         }
         var parent = _parent_dir(dir)

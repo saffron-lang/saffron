@@ -4166,6 +4166,34 @@ while.end246:
   ret i64 %t27
 }
 
+define i64 @__os_file_exists(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = load i64, i64* %path
+  %t2 = call i64 @__io_file_exists(i64 %t1)
+  ret i64 %t2
+}
+
+define i64 @__os_mkdir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = load i64, i64* %path
+  %t2 = call i64 @__io_mkdir(i64 %t1)
+  %t3 = add i64 0, 0
+  ret i64 %t3
+}
+
+define i64 @__os_list_dir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = load i64, i64* %path
+  %t2 = call i64 @__io_walk_dir(i64 %t1)
+  ret i64 %t2
+}
+
 define i64 @rt_str_trim(i64 %s.arg) {
 entry:
   %s = alloca i64

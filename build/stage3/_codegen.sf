@@ -1123,7 +1123,61 @@ class Codegen {
             TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val) => {
                 this.gen_try_expr(try_stmts, try_val, catch_name, catch_stmts, catch_val)
             }
+            Yield(value) => {
+                this.gen_yield(value)
+            }
         }
+    }
+
+    fun gen_yield(value: AST.Expr): String {
+        // Emit yield argument into globals (scheduler reads these after suspend)
+        var yield_val: String = this.gen_arg_value(value)
+
+        // Detect yield [reason, arg] pattern for sleep/IO
+        var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
+        if (is_list == "yes") {
+            var elems: List<AST.Expr> = match (value) { ListLit(e) => e }
+            if (elems.length() >= 1) {
+                var reason: String = this.gen_arg_value(elems[0])
+                this.emit_indent("store i64 " + reason + ", i64* @__yield_reason")
+                if (elems.length() >= 2) {
+                    var arg: String = this.gen_arg_value(elems[1])
+                    this.emit_indent("store i64 " + arg + ", i64* @__yield_arg")
+                }
+            }
+        }
+
+        // Coroutine suspend sequence
+        var save_tok: String = this.fresh_local()
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(i8* %__coro_hdl)")
+        var susp_result: String = this.fresh_local()
+        this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+
+        var resume_label: String = this.fresh_label("yield.resume")
+        var cleanup_label: String = this.fresh_label("yield.cleanup")
+        var suspend_label: String = this.fresh_label("yield.suspend")
+
+        this.emit_indent("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+
+        // Suspend path (returned to caller)
+        this.start_block(suspend_label)
+        this.emit_terminator("unreachable")
+
+        // Cleanup path (coroutine destroyed)
+        this.start_block(cleanup_label)
+        this.emit_terminator("br label %__coro_cleanup")
+
+        // Resume path — read resume value from promise slot
+        this.start_block(resume_label)
+        var promise_ptr: String = this.fresh_local()
+        this.emit_indent(promise_ptr + " = call i8* @llvm.coro.promise(i8* %__coro_hdl, i32 8, i1 false)")
+        var promise_i64ptr: String = this.fresh_local()
+        this.emit_indent(promise_i64ptr + " = bitcast i8* " + promise_ptr + " to i64*")
+        var resume_val: String = this.fresh_local()
+        this.emit_indent(resume_val + " = load i64, i64* " + promise_i64ptr)
+
+        this.last_type = AST.Type.IntType
+        return resume_val
     }
 
     fun gen_is_check(value: AST.Expr, type_name: String): String {
@@ -1883,16 +1937,24 @@ class Codegen {
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
-        // Error check: argument count validation
-        if (this.called_function_arity.has(resolved_callee)) {
-            var expected: Float = this.called_function_arity.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
-            }
-        } else if (this.func_param_count.has(resolved_callee)) {
-            var expected: Float = this.func_param_count.get(resolved_callee)
-            if (args.length() != expected and expected > 0) {
-                IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+        // Error check: argument count validation (skip if named args present)
+        var has_named_check: Bool = false
+        var nac: Float = 0
+        while (nac < args.length()) {
+            if (this.classify_expr(args[nac]) == "assign") { has_named_check = true }
+            nac = nac + 1
+        }
+        if (!has_named_check) {
+            if (this.called_function_arity.has(resolved_callee)) {
+                var expected: Float = this.called_function_arity.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
+            } else if (this.func_param_count.has(resolved_callee)) {
+                var expected: Float = this.func_param_count.get(resolved_callee)
+                if (args.length() != expected and expected > 0) {
+                    IO.println("[codegen] Warning: '" + callee_name + "' expects " + expected.floor().to_string() + " arguments, got " + args.length().floor().to_string())
+                }
             }
         }
 
@@ -4609,6 +4671,7 @@ class Codegen {
             IsCheck(val, t) => { this.collect_vars_expr(val, names, types) }
             IfExpr(c, tb, tv, eb, ev) => {}
             TryExpr(tb, tv, cn, cb, cv) => {}
+            Yield(v) => { this.collect_vars_expr(v, names, types) }
         }
     }
 
@@ -5814,6 +5877,23 @@ class Codegen {
             this.emit_indent("call void @exit(i32 " + code32 + ")")
             this.last_type = AST.Type.NilType
             return "0"
+        }
+        if (method == "file_exists" or method == "mkdir" or method == "list_dir") {
+            var io_func: String = "__io_" + method
+            if (method == "list_dir") { io_func = "__io_walk_dir" }
+            this.called_functions.push(io_func)
+            var io_args: List<String> = []
+            var ii: Float = 0
+            while (ii < args.length()) {
+                io_args.push("i64 " + this.gen_arg_value(args[ii]))
+                ii = ii + 1
+            }
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            if (method == "file_exists") { this.last_type = AST.Type.BoolType }
+            else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
+            else if (method == "list_dir") { this.last_type = this.make_list_str_type() }
+            return local
         }
         var os_func: String = "__os_" + method
         this.called_functions.push(os_func)

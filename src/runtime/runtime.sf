@@ -838,6 +838,19 @@ fun __os_args(): Int {
     return list
 }
 
+fun __os_file_exists(path: Int): Int {
+    return __io_file_exists(path)
+}
+
+fun __os_mkdir(path: Int): Int {
+    __io_mkdir(path)
+    return 0
+}
+
+fun __os_list_dir(path: Int): Int {
+    return __io_walk_dir(path)
+}
+
 // =============================================================================
 // Runtime String Methods
 // =============================================================================

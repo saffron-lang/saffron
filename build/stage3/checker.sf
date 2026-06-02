@@ -1316,6 +1316,66 @@ class NullChecker {
     }
 
 
+    // --- Let-pattern type checking ---
+
+    fun check_let_pattern(pattern: AST.Pattern, val_type: String) {
+        var pat_kind: String = match (pattern) {
+            VariantPattern(v, b) => "variant"
+            ArrayPattern(elems, rest) => "array"
+            WildcardPattern => "wildcard"
+            NamedWildcard(n) => "named"
+            _ => "other"
+        }
+        if (pat_kind == "variant") {
+            var variant: String = match (pattern) { VariantPattern(v, b) => v   _ => "" }
+            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+            if (val_type == "Any") {
+                this.warn("let " + variant + "(...): cannot verify pattern against type Any")
+                var bi: Float = 0
+                while (bi < bindings.length()) {
+                    this.env.define_var(bindings[bi], "Any")
+                    bi = bi + 1
+                }
+                return
+            }
+            var key: String = val_type + "." + variant
+            if (!this.env.enum_fields.has(key)) {
+                this.error("let " + variant + "(...): " + variant + " is not a variant of " + val_type)
+                var bi: Float = 0
+                while (bi < bindings.length()) {
+                    this.env.define_var(bindings[bi], "Any")
+                    bi = bi + 1
+                }
+                return
+            }
+            var bi: Float = 0
+            while (bi < bindings.length()) {
+                var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
+                this.env.define_var(bindings[bi], field_type)
+                bi = bi + 1
+            }
+        } else if (pat_kind == "array") {
+            var elems: List<String> = match (pattern) { ArrayPattern(e, r) => e   _ => [] }
+            if (!val_type.starts_with("List")) {
+                if (val_type != "Any") {
+                    this.error("let [...]: cannot destructure " + val_type + " (expected List)")
+                }
+            }
+            var elem_type: String = "Any"
+            if (val_type.starts_with("List<") and val_type.ends_with(">")) {
+                elem_type = val_type.slice(5, val_type.length() - 1)
+            }
+            var ei: Float = 0
+            while (ei < elems.length()) {
+                this.env.define_var(elems[ei], elem_type)
+                ei = ei + 1
+            }
+        } else if (pat_kind == "named") {
+            var wc_name: String = match (pattern) { NamedWildcard(n) => n   _ => "" }
+            this.env.define_var(wc_name, val_type)
+        }
+    }
+
     // --- Report ---
 
     fun report(): String {

@@ -396,6 +396,15 @@ class Parser {
     }
 
     fun parse_primary(): AST.Expr {
+        // yield / yield expr
+        if (this.match_kind_check("yield")) {
+            this.advance()
+            if (this.match_kind_check(";") or this.match_kind_check("}") or this.match_kind_check("eof") or this.match_kind_check("newline")) {
+                return AST.Expr.Yield(AST.Expr.NilLit)
+            }
+            var yval: AST.Expr = this.parse_expr()
+            return AST.Expr.Yield(yval)
+        }
         // HTML element expression: <tag attrs...>children</tag>
         if (this.match_kind_check("<") and this.peek_is_html_start()) {
             return this.parse_html_element()
@@ -936,6 +945,7 @@ class Parser {
             TkThrow => "throw"
             TkFinally => "finally"
             TkIs => "is"
+            TkYield => "yield"
             TkEof => "eof"
             TkInt(v) => "int"
             TkFloat(v) => "float"

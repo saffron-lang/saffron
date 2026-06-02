@@ -33,6 +33,7 @@ enum TokenKind {
     TkThrow,
     TkFinally,
     TkIs,
+    TkYield,
 
     // Operators
     TkPlus,
@@ -331,6 +332,7 @@ class Lexer {
         else if (text == "throw") { this.emit(TokenKind.TkThrow) }
         else if (text == "finally") { this.emit(TokenKind.TkFinally) }
         else if (text == "is") { this.emit(TokenKind.TkIs) }
+        else if (text == "yield") { this.emit(TokenKind.TkYield) }
         else { this.emit(TokenKind.TkIdent(text)) }
     }
 

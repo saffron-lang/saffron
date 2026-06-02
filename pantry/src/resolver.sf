@@ -105,13 +105,13 @@ fun resolve_path_dep(name: String, dep_path: String, from_dir: String): Resolved
     }
 
     // Check the path exists
-    if (!(IO.file_exists(abs_path))) {
+    if (!(OS.file_exists(abs_path))) {
         throw "pantry: path dependency '${name}' not found at: ${abs_path}"
     }
 
     // Look for pantry.toml in the dependency
     var dep_manifest_path: String = abs_path + "/pantry.toml"
-    if (!(IO.file_exists(dep_manifest_path))) {
+    if (!(OS.file_exists(dep_manifest_path))) {
         throw "pantry: path dependency '${name}' has no pantry.toml at: ${abs_path}"
     }
 
@@ -143,14 +143,14 @@ fun resolve_git_dep(name: String, spec: Map<String, String>, manifest_dir: Strin
     OS.exec("mkdir -p ${cache}")
 
     // Clone or fetch
-    if (IO.file_exists(clone_dir + "/.git")) {
+    if (OS.file_exists(clone_dir + "/.git")) {
         // Already cloned — fetch latest
         OS.exec("cd ${clone_dir} && git fetch --quiet 2>/dev/null")
     } else {
         // Fresh clone
         IO.println("    cloning ${url}...")
         var result: String = OS.exec("git clone --quiet ${url} ${clone_dir} 2>&1")
-        if (!(IO.file_exists(clone_dir + "/.git"))) {
+        if (!(OS.file_exists(clone_dir + "/.git"))) {
             throw "pantry: failed to clone '${name}' from ${url}: ${result}"
         }
     }
@@ -172,7 +172,7 @@ fun resolve_git_dep(name: String, spec: Map<String, String>, manifest_dir: Strin
     var dep_version: String = "0.0.0"
     var dep_entry: String = "src/main.sf"
 
-    if (IO.file_exists(dep_manifest_path)) {
+    if (OS.file_exists(dep_manifest_path)) {
         var dep_toml: Map<String, Any> = TOML.parse_file(dep_manifest_path)
         if (dep_toml.has("package")) {
             var pkg: Map<String, Any> = dep_toml.get("package")

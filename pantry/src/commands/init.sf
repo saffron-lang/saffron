@@ -7,7 +7,7 @@ import "@path" as Path
 fun run(parsed: Args.ParsedArgs) {
     var manifest_path: String = OS.cwd() + "/pantry.toml"
 
-    if (IO.file_exists(manifest_path)) {
+    if (OS.file_exists(manifest_path)) {
         IO.println("pantry.toml already exists in this directory.")
         OS.exit(1)
     }
@@ -32,8 +32,8 @@ fun run(parsed: Args.ParsedArgs) {
     IO.println("Created pantry.toml for '${project_name}'")
 
     // Create src/ directory if it doesn't exist
-    if (!(IO.file_exists("src"))) {
-        IO.mkdir("src")
+    if (!(OS.file_exists("src"))) {
+        OS.mkdir("src")
         IO.write_file("src/main.sf", "IO.println(\"Hello from ${project_name}!\")\n")
         IO.println("Created src/main.sf")
     }
