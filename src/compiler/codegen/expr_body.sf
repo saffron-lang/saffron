@@ -194,9 +194,6 @@
     }
 
     fun gen_yield(value: AST.Expr): String {
-        // Emit yield argument into globals (scheduler reads these after suspend)
-        var yield_val: String = this.gen_arg_value(value)
-
         // Detect yield [reason, arg] pattern for sleep/IO
         var is_list: String = match (value) { ListLit(elems) => "yes" _ => "no" }
         if (is_list == "yes") {
@@ -213,7 +210,7 @@
 
         // Coroutine suspend sequence
         var save_tok: String = this.fresh_local()
-        this.emit_indent(save_tok + " = call token @llvm.coro.save(i8* %__coro_hdl)")
+        this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
         var susp_result: String = this.fresh_local()
         this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
 
@@ -221,24 +218,25 @@
         var cleanup_label: String = this.fresh_label("yield.cleanup")
         var suspend_label: String = this.fresh_label("yield.suspend")
 
-        this.emit_indent("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
+        this.emit_terminator("switch i8 " + susp_result + ", label %" + suspend_label + " [i8 0, label %" + resume_label + " i8 1, label %" + cleanup_label + "]")
 
-        // Suspend path (returned to caller)
-        this.start_block(suspend_label)
-        this.emit_terminator("unreachable")
+        // Suspend path (returns handle to caller)
+        this.emit(suspend_label + ":")
+        this.block_terminated = false
+        this.emit_terminator("ret ptr %__coro_hdl")
 
-        // Cleanup path (coroutine destroyed)
-        this.start_block(cleanup_label)
+        // Cleanup path (coroutine destroyed while suspended)
+        this.emit(cleanup_label + ":")
+        this.block_terminated = false
         this.emit_terminator("br label %__coro_cleanup")
 
         // Resume path — read resume value from promise slot
-        this.start_block(resume_label)
+        this.emit(resume_label + ":")
+        this.block_terminated = false
         var promise_ptr: String = this.fresh_local()
-        this.emit_indent(promise_ptr + " = call i8* @llvm.coro.promise(i8* %__coro_hdl, i32 8, i1 false)")
-        var promise_i64ptr: String = this.fresh_local()
-        this.emit_indent(promise_i64ptr + " = bitcast i8* " + promise_ptr + " to i64*")
+        this.emit_indent(promise_ptr + " = call ptr @llvm.coro.promise(ptr %__coro_hdl, i32 8, i1 false)")
         var resume_val: String = this.fresh_local()
-        this.emit_indent(resume_val + " = load i64, i64* " + promise_i64ptr)
+        this.emit_indent(resume_val + " = load i64, ptr " + promise_ptr)
 
         this.last_type = AST.Type.IntType
         return resume_val
@@ -914,6 +912,21 @@
             }
         }
 
+        // Task.spawn(fn) — call the coroutine function to get a handle, enqueue it
+        if (callee_name == "Task.spawn") {
+            var spawn_arg: String = this.gen_arg_value(args[0])
+            var hdl: String = this.fresh_local()
+            this.emit_indent(hdl + " = inttoptr i64 " + spawn_arg + " to ptr")
+            var task_hdl: String = this.fresh_local()
+            this.emit_indent(task_hdl + " = call ptr " + hdl + "()")
+            var task_i64: String = this.fresh_local()
+            this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+            this.emit_indent("call i64 @enqueue(i64 " + task_i64 + ")")
+            this.called_functions.push("enqueue")
+            this.last_type = AST.Type.IntType
+            return task_i64
+        }
+
         // Check if it's a method call on a class instance: obj.method(args)
         if (callee_name.contains(".") and !callee_name.starts_with("IO")) {
             var parts: List<String> = callee_name.split(".")
@@ -971,6 +984,27 @@
             return local
         }
 
+        // Task.spawn(fn) — call the coroutine function to get a handle, enqueue it
+        if (callee_name == "Task.spawn") {
+            // The argument is a lambda or function reference that is a coroutine
+            var spawn_arg: String = this.gen_arg_value(args[0])
+            // The lambda was compiled as a coroutine returning ptr.
+            // Call it to get the handle, then enqueue to scheduler.
+            // For now: the lambda is an indirect call via function pointer.
+            // The spawned function returns a ptr handle immediately (at first suspend).
+            var hdl: String = this.fresh_local()
+            this.emit_indent(hdl + " = inttoptr i64 " + spawn_arg + " to ptr")
+            var task_hdl: String = this.fresh_local()
+            this.emit_indent(task_hdl + " = call ptr " + hdl + "()")
+            // Enqueue to scheduler (convert ptr to i64 for scheduler's List<Int>)
+            var task_i64: String = this.fresh_local()
+            this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+            this.emit_indent("call i64 @enqueue(i64 " + task_i64 + ")")
+            this.called_functions.push("enqueue")
+            this.last_type = AST.Type.IntType
+            return task_i64
+        }
+
         // Check if it's a known direct function or an indirect call through a variable
         // Check for same-name enum variant: Token(kind, line, col) where enum Token { Token(...) }
         if (this.enum_defs.has(callee_name)) {
@@ -1001,6 +1035,64 @@
         if (this.extern_sigs.has(resolved_callee)) {
             return this.gen_extern_call(resolved_callee, args)
         }
+
+        // Coroutine-calls-coroutine: emit await forwarding pattern
+        if (this.is_coroutine) {
+            var is_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
+            if (!is_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+                is_coro_callee = true
+                resolved_callee = this.current_prefix + resolved_callee
+            }
+            if (is_coro_callee) {
+                this.called_functions.push(resolved_callee)
+                // Generate arguments
+                var coro_arg_strs: List<String> = []
+                var cai: Float = 0
+                while (cai < args.length()) {
+                    var val: String = this.gen_arg_value(args[cai])
+                    coro_arg_strs.push("i64 " + val)
+                    cai = cai + 1
+                }
+                // Call the coroutine — returns a handle (ptr)
+                var b_hdl: String = this.fresh_local()
+                this.emit_indent(b_hdl + " = call ptr @" + resolved_callee + "(" + coro_arg_strs.join(", ") + ")")
+
+                // Await loop: resume child until done, yielding ourselves each iteration
+                var await_loop: String = this.fresh_label("await.loop")
+                var await_yield: String = this.fresh_label("await.yield")
+                var await_suspend: String = this.fresh_label("await.suspend")
+                var await_cleanup: String = this.fresh_label("await.cleanup")
+                var await_done: String = this.fresh_label("await.done")
+
+                this.emit_terminator("br label %" + await_loop)
+
+                this.start_block(await_loop)
+                this.emit_indent("call void @llvm.coro.resume(ptr " + b_hdl + ")")
+                var b_done: String = this.fresh_local()
+                this.emit_indent(b_done + " = call i1 @llvm.coro.done(ptr " + b_hdl + ")")
+                this.emit_terminator("br i1 " + b_done + ", label %" + await_done + ", label %" + await_yield)
+
+                this.start_block(await_yield)
+                // Propagate suspension: yield ourselves (bare yield, no reason/arg)
+                var save_tok: String = this.fresh_local()
+                this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+                var susp_result: String = this.fresh_local()
+                this.emit_indent(susp_result + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+                this.emit_terminator("switch i8 " + susp_result + ", label %" + await_suspend + " [i8 0, label %" + await_loop + " i8 1, label %" + await_cleanup + "]")
+
+                this.start_block(await_suspend)
+                this.emit_terminator("ret ptr %__coro_hdl")
+
+                this.start_block(await_cleanup)
+                this.emit_terminator("br label %__coro_cleanup")
+
+                this.start_block(await_done)
+                this.emit_indent("call void @llvm.coro.destroy(ptr " + b_hdl + ")")
+                this.last_type = AST.Type.IntType
+                return "0"
+            }
+        }
+
         // Error check: argument count validation (skip if named args present)
         var has_named_check: Bool = false
         var nac: Float = 0

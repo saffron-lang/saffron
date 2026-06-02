@@ -164,14 +164,30 @@
         }
         this.func_param_names.set(emit_name, pnames_list)
 
+        // Check if this function is a coroutine
+        var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        this.is_coroutine = is_coro
+
         this.emit("")
         var linkage: String = "define"
         if (this.current_prefix.length() > 0) {
             linkage = "define linkonce_odr"
         }
-        this.emit(linkage + " " + ret_llvm + " @" + emit_name + "(" + param_strs.join(", ") + ") {")
+        var coro_attr: String = ""
+        if (is_coro) { coro_attr = " presplitcoroutine" }
+        var ret_type_ll: String = ret_llvm
+        if (is_coro) { ret_type_ll = "ptr" }
+        this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")
         this.emit("entry:")
         this.block_terminated = false
+
+        // Coroutine preamble
+        if (is_coro) {
+            this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
+            this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
+            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
+        }
 
         // Collect all local variable declarations from body
         var var_names: List<String> = []
@@ -216,19 +232,21 @@
             var last_stmt: AST.Stmt = body[body.length() - 1]
             var last_kind: String = this.classify_stmt(last_stmt)
             if (last_kind == "expr") {
-                // Generate all but last
                 var bi: Float = 0
                 while (bi < body.length() - 1) {
                     this.gen_stmt(body[bi])
                     bi = bi + 1
                 }
-                // Generate last as implicit return
                 var last_expr: AST.Expr = match (last_stmt) { ExprStmt(e) => e
                     _ => AST.Expr.NilLit
                 }
                 var last_val: String = this.gen_arg_value(last_expr)
                 if (!this.block_terminated) {
-                    this.emit_terminator("ret i64 " + last_val)
+                    if (is_coro) {
+                        this.emit_terminator("br label %__coro_final")
+                    } else {
+                        this.emit_terminator("ret i64 " + last_val)
+                    }
                 }
             } else {
                 this.gen_stmts(body)
@@ -237,13 +255,43 @@
             this.gen_stmts(body)
         }
 
-        // Ensure block has a terminator
-        if (!this.block_terminated) {
-            if (ret_llvm == "void") {
-                this.emit_terminator("ret void")
-            } else {
-                this.emit_terminator("ret i64 0")
+        // Non-coro: ensure block has a terminator
+        if (!is_coro) {
+            if (!this.block_terminated) {
+                if (ret_llvm == "void") {
+                    this.emit_terminator("ret void")
+                } else {
+                    this.emit_terminator("ret i64 0")
+                }
             }
+        }
+
+        // Coroutine epilogue: final suspend + cleanup
+        if (is_coro) {
+            if (!this.block_terminated) {
+                this.emit_terminator("br label %__coro_final")
+            }
+
+            this.emit("__coro_final:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
+            this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
+            this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")
+
+            this.emit("__coro_trap:")
+            this.block_terminated = false
+            this.emit_terminator("unreachable")
+
+            this.emit("__coro_cleanup:")
+            this.block_terminated = false
+            this.emit_indent("%__coro_free = call ptr @llvm.coro.free(token %__coro_id, ptr %__coro_hdl)")
+            this.emit_indent("call void @free(ptr %__coro_free)")
+            this.emit_terminator("br label %__coro_suspend")
+
+            this.emit("__coro_suspend:")
+            this.block_terminated = false
+            this.emit_indent("call i1 @llvm.coro.end(ptr %__coro_hdl, i1 false)")
+            this.emit_terminator("ret ptr %__coro_hdl")
         }
 
         this.emit("}")
@@ -251,6 +299,7 @@
         this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
+        this.is_coroutine = false
     }
 
     // --- Top-level ---
@@ -342,6 +391,9 @@
             ei = ei + 1
         }
 
+        // Coroutine detection: mark functions containing yield (direct or transitive)
+        this.mark_coroutines(program)
+
         // First pass: emit all declarations (functions, enums, classes)
         var i: Float = 0
         while (i < program.length()) {
@@ -402,6 +454,11 @@
                     this.gen_stmt(program[i])
                 }
                 i = i + 1
+            }
+            // Run the scheduler if any coroutines were spawned
+            if (this.coroutine_funcs.length() > 0 and !this.block_terminated) {
+                this.emit_indent("call i64 @scheduler_run()")
+                this.called_functions.push("scheduler_run")
             }
             if (!this.block_terminated) {
                 this.emit_terminator("ret i64 0")

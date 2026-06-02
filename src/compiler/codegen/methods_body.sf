@@ -647,6 +647,30 @@
         }
     }
 
+    // --- Task methods: isReady() and getResult() ---
+    if (method == "isReady") {
+        var task_val: String = this.gen_arg_value(object)
+        var task_ptr: String = this.fresh_local()
+        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
+        var done_i1: String = this.fresh_local()
+        this.emit_indent(done_i1 + " = call i1 @llvm.coro.done(ptr " + task_ptr + ")")
+        var done_i64: String = this.fresh_local()
+        this.emit_indent(done_i64 + " = zext i1 " + done_i1 + " to i64")
+        this.last_type = AST.Type.BoolType
+        return done_i64
+    }
+    if (method == "getResult") {
+        var task_val: String = this.gen_arg_value(object)
+        var task_ptr: String = this.fresh_local()
+        this.emit_indent(task_ptr + " = inttoptr i64 " + task_val + " to ptr")
+        var promise: String = this.fresh_local()
+        this.emit_indent(promise + " = call ptr @llvm.coro.promise(ptr " + task_ptr + ", i32 8, i1 false)")
+        var result_val: String = this.fresh_local()
+        this.emit_indent(result_val + " = load i64, ptr " + promise)
+        this.last_type = AST.Type.IntType
+        return result_val
+    }
+
     // --- Builtin dispatch (only for non-class objects) ---
     var obj: String = this.gen_arg_value(object)
     var is_user_class: Bool = false
