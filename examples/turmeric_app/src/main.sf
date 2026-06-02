@@ -28,9 +28,11 @@ fun CounterPage(): Node {
     return section(cls="counter") {
         h1 { "Reactive Counter" }
         p(style={"font-size": "3rem", "font-weight": "bold", "color": "#4fc3f7"}) {
-            "${count.get()}"
+            reactive(fun () => count.get().to_string())
         }
-        p(style={"color": "#aaa"}) { "Doubled: ${doubled.get()} | ${parity.get()}" }
+        p(style={"color": "#aaa"}) {
+            reactive(fun () => "Doubled: " + doubled.get().to_string() + " | " + parity.get())
+        }
 
         div(cls="button-row") {
             button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
