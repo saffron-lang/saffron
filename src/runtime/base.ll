@@ -110,6 +110,55 @@ entry:
   ret i64 %r
 }
 
+; =============================================================================
+; String Interning — O(1) Equality via Pointer Comparison
+; =============================================================================
+;
+; __string_eq: Fast string equality check.
+;   1. Pointer equality (O(1) — same literal or same interned string)
+;   2. Falls back to strcmp for dynamically-created strings
+;
+; Returns 1 (equal) or 0 (not equal) as i64.
+
+declare i32 @strcmp(i8*, i8*)
+
+define i64 @__string_eq(i64 %a, i64 %b) {
+entry:
+  ; Fast path: same pointer = same string
+  %same = icmp eq i64 %a, %b
+  br i1 %same, label %equal, label %slow
+
+slow:
+  ; Null checks: if either is 0, they're not equal (already checked pointer eq)
+  %a_null = icmp eq i64 %a, 0
+  br i1 %a_null, label %not_equal, label %check_b
+
+check_b:
+  %b_null = icmp eq i64 %b, 0
+  br i1 %b_null, label %not_equal, label %do_strcmp
+
+do_strcmp:
+  ; Fall back to byte-by-byte comparison
+  %a_ptr = inttoptr i64 %a to i8*
+  %b_ptr = inttoptr i64 %b to i8*
+  %cmp = call i32 @strcmp(i8* %a_ptr, i8* %b_ptr)
+  %is_eq = icmp eq i32 %cmp, 0
+  br i1 %is_eq, label %equal, label %not_equal
+
+equal:
+  ret i64 1
+not_equal:
+  ret i64 0
+}
+
+; __string_ne: Fast string inequality (complement of __string_eq)
+define i64 @__string_ne(i64 %a, i64 %b) {
+entry:
+  %eq = call i64 @__string_eq(i64 %a, i64 %b)
+  %ne = xor i64 %eq, 1
+  ret i64 %ne
+}
+
 @.fmt.float = private unnamed_addr constant [3 x i8] c"%g\00"
 
 define i64 @__float_to_string(i64 %v) {

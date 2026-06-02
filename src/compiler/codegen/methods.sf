@@ -730,6 +730,15 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
+        // Warn when dispatching on untyped value
+        var bd_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var bd_ot: String = this.get_var_type_str(obj_name)
+            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
+        }
+        if (bd_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching '" + method + "' on untyped value (type inference failed)")
+        }
         var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
         // Override result type for pop() based on list element type
         if (method == "pop" and obj_name.length() > 0) {
@@ -745,6 +754,14 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return bd_result
     }
     if (!is_user_class and method == "get" and args.length() > 0) {
+        var get_recv_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var get_ot: String = this.get_var_type_str(obj_name)
+            if (get_ot.length() > 0) { get_recv_type = get_ot }
+        }
+        if (get_recv_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
+        }
         var key: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key + ")")
@@ -836,6 +853,23 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return local
     }
     if (!is_user_class and method == "slice" and args.length() > 0) {
+        var slice_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var sl_ot: String = this.get_var_type_str(obj_name)
+            if (sl_ot.length() > 0) { slice_obj_type = sl_ot }
+        }
+        if (slice_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'slice' on untyped value (type inference failed)")
+        }
+        if (slice_obj_type.starts_with("List") or slice_obj_type == "Any") {
+            // For Any type, default to list slice (safer than string slice which dereferences a pointer)
+            var sl_start: String = this.gen_arg_value(args[0])
+            var sl_end: String = this.gen_arg_value(args[1])
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__list_slice(i64 " + obj + ", i64 " + sl_start + ", i64 " + sl_end + ")")
+            this.set_last_type(this.last_type)
+            return local
+        }
         var str_ptr: String = this.fresh_local()
         this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
         var start: String = this.gen_arg_value(args[0])
@@ -867,6 +901,9 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     }
 
     if (!is_user_class and method == "length") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+        }
         if (obj_type == "String") {
             var str_ptr: String = this.fresh_local()
             this.emit_indent(str_ptr + " = inttoptr i64 " + obj + " to i8*")
@@ -882,6 +919,9 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
     if (!is_user_class and method == "contains" and args.length() > 0) {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'contains' on untyped value (type inference failed)")
+        }
         var contains_arg_type: String = this.get_expr_type(args[0])
         if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
@@ -906,6 +946,9 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
     if (!is_user_class and method == "to_string") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'to_string' on untyped value (type inference failed)")
+        }
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
@@ -950,6 +993,9 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
     if (!is_user_class and method == "floor") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'floor' on untyped value (type inference failed)")
+        }
         this.set_last_type(AST.Type.IntType)
         return obj
     }

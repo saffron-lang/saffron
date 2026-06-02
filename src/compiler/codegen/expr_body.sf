@@ -476,18 +476,12 @@
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
-                var lptr: String = this.val_to_ptr(lhs)
-                var rptr: String = this.val_to_ptr(rhs)
-                var cmp: String = this.fresh_local()
-                this.emit_indent(cmp + " = call i32 @strcmp(i8* " + lptr + ", i8* " + rptr + ")")
-                var cmp_result: String = this.fresh_local()
-                if (op == "==") {
-                    this.emit_indent(cmp_result + " = icmp eq i32 " + cmp + ", 0")
-                } else {
-                    this.emit_indent(cmp_result + " = icmp ne i32 " + cmp + ", 0")
-                }
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = zext i1 " + cmp_result + " to i64")
+                if (op == "==") {
+                    this.emit_indent(local + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(local + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
                 this.last_type = AST.Type.BoolType
                 return local
             }

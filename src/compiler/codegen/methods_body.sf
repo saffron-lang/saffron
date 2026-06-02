@@ -1066,6 +1066,15 @@
     }
 
     if (!is_user_class and this.builtin_methods.has(method)) {
+        // Warn when dispatching on untyped value
+        var bd_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var bd_ot: String = this.get_var_type_str(obj_name)
+            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
+        }
+        if (bd_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching '" + method + "' on untyped value (type inference failed)")
+        }
         // Save receiver type before builtin dispatch clobbers last_type
         var pre_dispatch_type: AST.Type = this.last_type
         var bd_result: String = this.emit_builtin_dispatch(obj, method, args)
@@ -1108,6 +1117,9 @@
             var sot: String = this.get_var_type_str(obj_name)
             if (sot.length() > 0) { set_obj_type = sot }
         }
+        if (set_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'set' on untyped value (type inference failed)")
+        }
         if (set_obj_type == "List" or set_obj_type.starts_with("List<")) {
             // List.set(index, value) -> __list_set
             var idx_tagged: String = this.gen_arg_value(args[0])
@@ -1127,6 +1139,14 @@
         return "0"
     }
     if (!is_user_class and method == "has" and args.length() > 0) {
+        var has_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var has_ot: String = this.get_var_type_str(obj_name)
+            if (has_ot.length() > 0) { has_obj_type = has_ot }
+        }
+        if (has_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
+        }
         var key_val: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_val + ")")
@@ -1135,6 +1155,14 @@
         return local
     }
     if (!is_user_class and method == "get" and args.length() > 0) {
+        var get_recv_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var get_ot: String = this.get_var_type_str(obj_name)
+            if (get_ot.length() > 0) { get_recv_type = get_ot }
+        }
+        if (get_recv_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
+        }
         var key_val: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_val + ")")
@@ -1229,7 +1257,11 @@
             slice_saved_type = this.typed_vars.get(obj_name)
             slice_obj_type = this.type_to_string(slice_saved_type)
         }
-        if (slice_obj_type.starts_with("List")) {
+        if (slice_obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'slice' on untyped value (type inference failed)")
+        }
+        if (slice_obj_type.starts_with("List") or slice_obj_type == "Any") {
+            // For Any type, default to list slice (safer than string slice which dereferences a pointer)
             var sl_start: String = this.gen_arg_value(args[0])
             var sl_end: String = this.gen_arg_value(args[1])
             var local: String = this.fresh_local()
@@ -1268,7 +1300,11 @@
     }
 
     if (!is_user_class and method == "length") {
-        if (obj_type == "String") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+        }
+        if (obj_type == "String" or obj_type == "Any") {
+            // For Any type, default to strlen (common case: untyped vars hold strings)
             var str_ptr: String = this.emit_untag_ptr(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
@@ -1282,6 +1318,9 @@
         }
     }
     if (!is_user_class and method == "contains" and args.length() > 0) {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'contains' on untyped value (type inference failed)")
+        }
         var contains_arg_type: String = this.get_expr_type(args[0])
         if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
@@ -1306,6 +1345,9 @@
         }
     }
     if (!is_user_class and method == "to_number") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'to_number' on untyped value (type inference failed)")
+        }
         var str_ptr: String = this.emit_untag_ptr(obj)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
@@ -1322,6 +1364,9 @@
         return local
     }
     if (!is_user_class and method == "to_string") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'to_string' on untyped value (type inference failed)")
+        }
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
@@ -1373,6 +1418,9 @@
         }
     }
     if (!is_user_class and method == "floor") {
+        if (obj_type == "Any") {
+            IO.println("[codegen] Warning: dispatching 'floor' on untyped value (type inference failed)")
+        }
         if (obj_type == "Float") {
             // Actual float: untag as double, floor, convert to int, retag
             var dbl: String = this.emit_untag_float(obj)
