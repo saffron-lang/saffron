@@ -78,7 +78,8 @@
         BlockExpr(s, v) => ""
         IsCheck(val, t) => ""
         IfExpr(c, tb, tv, eb, ev) => ""
-        TryExpr(tb, tv, cn, cb, cv) => ""    }
+        TryExpr(tb, tv, cn, cb, cv) => ""
+        Yield(v) => ""    }
     return name
     }
 
@@ -1091,6 +1092,7 @@
         IsCheck(val, t) => "other"
         IfExpr(c, tb, tv, eb, ev) => "other"
         TryExpr(tb, tv, cn, cb, cv) => "other"
+        Yield(v) => "other"
     }
     return kind == "this"
     }

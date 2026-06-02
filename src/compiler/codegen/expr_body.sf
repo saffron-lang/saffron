@@ -1376,6 +1376,7 @@
             IsCheck(val, t) => "no"
             IfExpr(c, tb, tv, eb, ev) => "no"
             TryExpr(tb, tv, cn, cb, cv) => "no"
+            Yield(v) => "no"
         }
         return kind == "yes"
     }
@@ -1404,6 +1405,7 @@
             IsCheck(val, t) => ""
             IfExpr(c, tb, tv, eb, ev) => ""
             TryExpr(tb, tv, cn, cb, cv) => ""
+            Yield(v) => ""
         }
         if (name.length() > 0) {
             if (this.string_vars.contains(name)) return true
@@ -1454,6 +1456,7 @@
             IsCheck(val, t) => "is"
             IfExpr(c, tb, tv, eb, ev) => "other"
             TryExpr(tb, tv, cn, cb, cv) => "other"
+            Yield(v) => "other"
         }
         return kind == "string"
     }
