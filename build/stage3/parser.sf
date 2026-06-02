@@ -561,23 +561,12 @@ class Parser {
             }
             this.consume("}")
             // The last statement becomes the value expression if it's an ExprStmt
+            // or an If with else (value-producing if/else)
             if (block_stmts.length() > 0) {
                 var last: AST.Stmt = block_stmts[block_stmts.length() - 1]
-                var last_kind: AST.Expr = this.stmt_to_expr(last)
-                var is_expr_stmt: Bool = match (last) {
-                    ExprStmt(e) => true
-                    VarDecl(n, t, i, d) => false
-                    FunDecl(n, p, r, b, d) => false
-                    EnumDecl(n, v, d) => false
-                    ClassDecl(n, f, m, d) => false
-                    Return(v) => false
-                    If(c, t, e) => false
-                    While(c, b) => false
-                    Block(s) => false
-                    Break => false
-                    Continue => false
-                }
-                if (is_expr_stmt) {
+                var is_value_producing: Bool = this.is_value_stmt(last)
+                if (is_value_producing) {
+                    var last_kind: AST.Expr = this.stmt_to_expr(last)
                     block_stmts.pop()
                     return AST.Expr.BlockExpr(block_stmts, last_kind)
                 }
@@ -599,8 +588,21 @@ class Parser {
             TkIdent(name) => AST.Expr.Variable(name)
             TkLParen => {
                 var expr: AST.Expr = this.parse_expr()
-                this.consume(")")
-                expr
+                if (this.match_kind(",")) {
+                    var elems: List<AST.Expr> = [expr]
+                    if (!this.match_kind_check(")")) {
+                        elems.push(this.parse_expr())
+                        while (this.match_kind(",")) {
+                            if (this.match_kind_check(")")) { break }
+                            elems.push(this.parse_expr())
+                        }
+                    }
+                    this.consume(")")
+                    AST.Expr.TupleLit(elems)
+                } else {
+                    this.consume(")")
+                    expr
+                }
             }
         }
     }
@@ -654,9 +656,8 @@ class Parser {
             this.consume("}")
             if (then_stmts.length() > 0) {
                 var last: AST.Stmt = then_stmts[then_stmts.length() - 1]
-                var is_expr: Bool = match (last) { ExprStmt(e) => true   _ => false }
-                if (is_expr) {
-                    then_val = match (last) { ExprStmt(e) => e   _ => AST.Expr.NilLit }
+                if (this.is_value_stmt(last)) {
+                    then_val = this.stmt_to_expr(last)
                     then_stmts.pop()
                 }
             }
@@ -680,9 +681,8 @@ class Parser {
             this.consume("}")
             if (else_stmts.length() > 0) {
                 var last: AST.Stmt = else_stmts[else_stmts.length() - 1]
-                var is_expr: Bool = match (last) { ExprStmt(e) => true   _ => false }
-                if (is_expr) {
-                    else_val = match (last) { ExprStmt(e) => e   _ => AST.Expr.NilLit }
+                if (this.is_value_stmt(last)) {
+                    else_val = this.stmt_to_expr(last)
                     else_stmts.pop()
                 }
             }
@@ -706,12 +706,8 @@ class Parser {
         var try_val: AST.Expr = AST.Expr.NilLit
         if (try_stmts.length() > 0) {
             var last: AST.Stmt = try_stmts[try_stmts.length() - 1]
-            var is_expr: Bool = match (last) {
-                ExprStmt(e) => true
-                _ => false
-            }
-            if (is_expr) {
-                try_val = match (last) { ExprStmt(e) => e }
+            if (this.is_value_stmt(last)) {
+                try_val = this.stmt_to_expr(last)
                 try_stmts.pop()
             }
         }
@@ -730,12 +726,8 @@ class Parser {
         var catch_val: AST.Expr = AST.Expr.NilLit
         if (catch_stmts.length() > 0) {
             var last: AST.Stmt = catch_stmts[catch_stmts.length() - 1]
-            var is_expr: Bool = match (last) {
-                ExprStmt(e) => true
-                _ => false
-            }
-            if (is_expr) {
-                catch_val = match (last) { ExprStmt(e) => e }
+            if (this.is_value_stmt(last)) {
+                catch_val = this.stmt_to_expr(last)
                 catch_stmts.pop()
             }
         }
@@ -2320,6 +2312,7 @@ class Parser {
 
     fun stmt_to_expr(stmt: AST.Stmt): AST.Expr {
         // If it's an ExprStmt, extract the expression as the block value
+        // If it's an If with else, convert to IfExpr so the value propagates
         // Otherwise return NilLit
         var kind: String = match (stmt) {
             ExprStmt(e) => "expr"
@@ -2328,7 +2321,7 @@ class Parser {
             EnumDecl(n, v, d) => "other"
             ClassDecl(n, f, m, d) => "other"
             Return(v) => "other"
-            If(c, t, e) => "other"
+            If(c, t, e) => "if"
             While(c, b) => "other"
             Block(s) => "other"
             Break => "other"
@@ -2340,7 +2333,56 @@ class Parser {
         if (kind == "expr") {
             return match (stmt) { ExprStmt(e) => e }
         }
+        if (kind == "if") {
+            return this.if_stmt_to_expr(stmt)
+        }
         return AST.Expr.NilLit
+    }
+
+    fun if_stmt_to_expr(stmt: AST.Stmt): AST.Expr {
+        var cond: AST.Expr = match (stmt) { If(c, t, e) => c }
+        var then_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => t }
+        var else_branch: List<AST.Stmt> = match (stmt) { If(c, t, e) => e }
+        // Only convert if there is an else branch (otherwise not value-producing)
+        if (else_branch.length() == 0) {
+            return AST.Expr.NilLit
+        }
+        // Extract then value: last ExprStmt or If becomes value
+        var then_val: AST.Expr = AST.Expr.NilLit
+        if (then_branch.length() > 0) {
+            var then_last: AST.Stmt = then_branch[then_branch.length() - 1]
+            var then_extractable: Bool = this.is_value_stmt(then_last)
+            if (then_extractable) {
+                then_val = this.stmt_to_expr(then_last)
+                then_branch.pop()
+            }
+        }
+        // Extract else value: last ExprStmt or If becomes value
+        var else_val: AST.Expr = AST.Expr.NilLit
+        if (else_branch.length() > 0) {
+            var else_last: AST.Stmt = else_branch[else_branch.length() - 1]
+            var else_extractable: Bool = this.is_value_stmt(else_last)
+            if (else_extractable) {
+                else_val = this.stmt_to_expr(else_last)
+                else_branch.pop()
+            }
+        }
+        return AST.Expr.IfExpr(cond, then_branch, then_val, else_branch, else_val)
+    }
+
+    fun is_value_stmt(stmt: AST.Stmt): Bool {
+        var kind: String = match (stmt) {
+            ExprStmt(e) => "expr"
+            If(c, t, e) => "if"
+            _ => "other"
+        }
+        if (kind == "expr") { return true }
+        if (kind == "if") {
+            // Only if it has an else branch
+            var else_br: List<AST.Stmt> = match (stmt) { If(c, t, e) => e }
+            return else_br.length() > 0
+        }
+        return false
     }
 }
 
