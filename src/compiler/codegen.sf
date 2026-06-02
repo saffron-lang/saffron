@@ -55,6 +55,7 @@ class Codegen {
     var identity_mode: Bool
     var coroutine_funcs: List<String>
     var is_coroutine: Bool
+    var gc_root_count: Float
 
     fun init() {
         this.sb = StringBuilder()
@@ -104,6 +105,7 @@ class Codegen {
         this.identity_mode = false
         this.coroutine_funcs = []
         this.is_coroutine = false
+        this.gc_root_count = 0
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
