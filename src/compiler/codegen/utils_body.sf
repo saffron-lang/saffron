@@ -395,7 +395,7 @@
             Call(c, a) => this.call_is_suspend(c) or this.exprs_have_yield(a)
             Assign(n, v) => this.expr_has_yield(v)
             Logical(l, o, r) => this.expr_has_yield(l) or this.expr_has_yield(r)
-            MethodCall(o, m, a) => this.expr_has_yield(o) or this.exprs_have_yield(a)
+            MethodCall(o, m, a) => m == "await" or this.expr_has_yield(o) or this.exprs_have_yield(a)
             ListLit(e) => this.exprs_have_yield(e)
             IndexGet(o, i) => this.expr_has_yield(o) or this.expr_has_yield(i)
             IndexSet(o, i, v) => this.expr_has_yield(o) or this.expr_has_yield(i) or this.expr_has_yield(v)

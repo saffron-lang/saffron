@@ -121,8 +121,7 @@
                         var saved_class: String = this.current_class
                         this.current_class = resolved_type
                         var field_idx: Float = this.get_field_index(resolved_type, field)
-                        var obj_ptr: String = this.fresh_local()
-                        this.emit_indent(obj_ptr + " = inttoptr i64 " + obj_val + " to %" + resolved_type + "*")
+                        var obj_ptr: String = this.val_to_typed_ptr(obj_val, "%" + resolved_type + "*")
                         var field_ptr: String = this.fresh_local()
                         this.emit_indent(field_ptr + " = getelementptr %" + resolved_type + ", %" + resolved_type + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                         var result: String = this.fresh_local()
@@ -144,8 +143,7 @@
                         struct_name = this.class_struct_names.get(ma_resolved)
                     }
                     var field_idx: Float = this.get_field_index(ma_resolved, field)
-                    var obj_ptr: String = this.fresh_local()
-                    this.emit_indent(obj_ptr + " = inttoptr i64 " + ma_obj_val + " to %" + struct_name + "*")
+                    var obj_ptr: String = this.val_to_typed_ptr(ma_obj_val, "%" + struct_name + "*")
                     var field_ptr: String = this.fresh_local()
                     this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
                     var result: String = this.fresh_local()
@@ -801,8 +799,7 @@
             if (vt_resolved.length() > 0) {
                     var ov: String = this.gen_arg_value(m_obj)
                     var fi: Float = this.get_field_index(vt_resolved, m_field)
-                    var op: String = this.fresh_local()
-                    this.emit_indent(op + " = inttoptr i64 " + ov + " to %" + vt_resolved + "*")
+                    var op: String = this.val_to_typed_ptr(ov, "%" + vt_resolved + "*")
                     var fp: String = this.fresh_local()
                     this.emit_indent(fp + " = getelementptr %" + vt_resolved + ", %" + vt_resolved + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                     var result: String = this.fresh_local()
@@ -847,8 +844,7 @@
                             inner_struct = this.class_struct_names.get(inner_type)
                         }
                         var fi: Float = this.get_field_index(inner_type, m_field)
-                        var op: String = this.fresh_local()
-                        this.emit_indent(op + " = inttoptr i64 " + inner_val + " to %" + inner_struct + "*")
+                        var op: String = this.val_to_typed_ptr(inner_val, "%" + inner_struct + "*")
                         var fp: String = this.fresh_local()
                         this.emit_indent(fp + " = getelementptr %" + inner_struct + ", %" + inner_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                         var result: String = this.fresh_local()
@@ -868,8 +864,7 @@
                     fb_struct = this.class_struct_names.get(fb_resolved)
                 }
                 var fi: Float = this.get_field_index(fb_resolved, m_field)
-                var op: String = this.fresh_local()
-                this.emit_indent(op + " = inttoptr i64 " + fb_val + " to %" + fb_struct + "*")
+                var op: String = this.val_to_typed_ptr(fb_val, "%" + fb_struct + "*")
                 var fp: String = this.fresh_local()
                 this.emit_indent(fp + " = getelementptr %" + fb_struct + ", %" + fb_struct + "* " + op + ", i32 0, i32 " + fi.floor().to_string())
                 var result: String = this.fresh_local()
@@ -1265,8 +1260,7 @@
                     var cap_names: List<String> = caps_str.split(",")
                     var ci3: Float = 0
                     while (ci3 < cap_names.length()) {
-                        var cap_val: String = this.fresh_local()
-                        this.emit_indent(cap_val + " = ptrtoint i64* %" + this.sanitize_name(cap_names[ci3]) + " to i64")
+                        var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci3]), "i64*")
                         arg_strs.push("i64 " + cap_val)
                         ci3 = ci3 + 1
                     }

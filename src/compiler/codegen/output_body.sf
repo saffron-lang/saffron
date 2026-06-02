@@ -95,7 +95,13 @@
                 var pp2: List<String> = all_params[pi3].split(":")
                 if (pi3 < captures.length()) {
                     // Capture params are POINTERS — reconstruct via inttoptr
-                    this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i64 %" + this.sanitize_name(pp2[0]) + ".arg to i64*")
+                    if (this.target == "wasm32") {
+                        var __cap_i32: String = this.fresh_local()
+                        this.emit_indent(__cap_i32 + " = trunc i64 %" + this.sanitize_name(pp2[0]) + ".arg to i32")
+                        this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i32 " + __cap_i32 + " to i64*")
+                    } else {
+                        this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = inttoptr i64 %" + this.sanitize_name(pp2[0]) + ".arg to i64*")
+                    }
                 } else {
                     // Regular params — alloca and store
                     this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
@@ -275,8 +281,7 @@
                 var pname: String = parts[0]
                 var ptype: String = parts[1]
                 if (this.is_gc_root_type(ptype)) {
-                    var alloca_as_int: String = this.fresh_local()
-                    this.emit_indent(alloca_as_int + " = ptrtoint i64* %" + this.sanitize_name(pname) + " to i64")
+                    var alloca_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(pname), "i64*")
                     this.emit_indent("call void @__gc_push_root(i64 " + alloca_as_int + ")")
                     gc_root_count = gc_root_count + 1
                 }
@@ -288,8 +293,7 @@
                 var vn: String = var_names[i]
                 var vt: String = var_types[i]
                 if (!this.module_globals.has(this.current_prefix + vn) and vn != "self" and this.is_gc_root_type(vt)) {
-                    var loc_as_int: String = this.fresh_local()
-                    this.emit_indent(loc_as_int + " = ptrtoint i64* %" + this.sanitize_name(vn) + " to i64")
+                    var loc_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(vn), "i64*")
                     this.emit_indent("call void @__gc_push_root(i64 " + loc_as_int + ")")
                     gc_root_count = gc_root_count + 1
                 }
@@ -563,11 +567,11 @@
                     var tv_type: String = top_var_types[vi]
                     if (this.is_gc_root_type(tv_type)) {
                         var tv_name: String = top_vars[vi]
-                        var tv_as_int: String = this.fresh_local()
+                        var tv_as_int: String = ""
                         if (this.module_globals.has(this.current_prefix + tv_name)) {
-                            this.emit_indent(tv_as_int + " = ptrtoint i64* @__g_" + this.current_prefix + this.sanitize_name(tv_name) + " to i64")
+                            tv_as_int = this.typed_ptr_to_val("@__g_" + this.current_prefix + this.sanitize_name(tv_name), "i64*")
                         } else {
-                            this.emit_indent(tv_as_int + " = ptrtoint i64* %" + this.sanitize_name(tv_name) + " to i64")
+                            tv_as_int = this.typed_ptr_to_val("%" + this.sanitize_name(tv_name), "i64*")
                         }
                         this.emit_indent("call void @__gc_push_root(i64 " + tv_as_int + ")")
                     }
@@ -656,8 +660,13 @@
         out.append("declare i32 @puts(i8*)\n")
         out.append("declare i32 @printf(i8*, ...)\n")
         out.append("declare i32 @snprintf(i8*, i64, i8*, ...)\n")
-        out.append("declare i8* @malloc(i64)\n")
-        out.append("declare i8* @realloc(i8*, i64)\n")
+        if (this.target == "wasm32") {
+            out.append("declare i8* @malloc(i32)\n")
+            out.append("declare i8* @realloc(i8*, i32)\n")
+        } else {
+            out.append("declare i8* @malloc(i64)\n")
+            out.append("declare i8* @realloc(i8*, i64)\n")
+        }
         out.append("declare void @free(i8*)\n")
         out.append("declare i64 @strlen(i8*)\n")
         out.append("declare i8* @strcpy(i8*, i8*)\n")
