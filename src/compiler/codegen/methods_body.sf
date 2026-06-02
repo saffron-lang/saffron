@@ -703,6 +703,9 @@
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
             this.start_block(ay)
+            // Reset yield_reason before suspending so the scheduler sees reason=0
+            // (the child coroutine may have set reason=3 during its execution)
+            this.emit_indent("store i64 0, i64* @__yield_reason")
             var st: String = this.fresh_local()
             this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
             var sr: String = this.fresh_local()
@@ -1348,6 +1351,8 @@
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
             this.start_block(ay)
+            // Reset yield_reason before suspending so the scheduler sees reason=0
+            this.emit_indent("store i64 0, i64* @__yield_reason")
             var st: String = this.fresh_local()
             this.emit_indent(st + " = call token @llvm.coro.save(ptr %__coro_hdl)")
             var sr: String = this.fresh_local()
