@@ -5,7 +5,7 @@
 //! fallback until native C runtime functions are available.
 //!
 //! ```saffron
-//! import "@buffer" as Buffer
+//! import "@bytes" as Buffer
 //!
 //! var buf = Buffer.alloc(8)
 //! buf.write_u16_le(0, 4660)    // 0x1234

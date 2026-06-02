@@ -1,4 +1,4 @@
-//! Tests for the @buffer module.
+//! Tests for the @bytes module.
 //! Covers: alloc, from_list, from_string, from_hex, to_hex, slice, concat,
 //! multi-byte read/write, signed reads, bitwise ops, BufferReader, BufferWriter.
 //!
@@ -7,7 +7,7 @@
 //! multiple test files.
 
 import "@test" as T
-import "@buffer" as Buffer
+import "@bytes" as Buffer
 
 T.section("Basic access")
 var buf = Buffer.alloc(4)
