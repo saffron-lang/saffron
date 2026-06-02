@@ -142,6 +142,8 @@
         var saved_counter2: Float = this.local_counter
         var saved_var_types2: Map<String, String> = this.var_types
         var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
+        var saved_in_fn2: Bool = this.in_function
+        this.in_function = false
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
         if (params_str.length() > 0) {
@@ -149,6 +151,7 @@
         }
         this.gen_function(lambda_name, full_params, ret_type, body)
         this.globals.push(this.sb.to_string())
+        this.in_function = saved_in_fn2
         this.sb = saved_sb2
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
@@ -161,7 +164,9 @@
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
-        var fn_type_str: String = "i64 ("
+        var nocap_ret_ty: String = "i64"
+        if (this.coroutine_funcs.contains(lambda_name)) { nocap_ret_ty = "ptr" }
+        var fn_type_str: String = nocap_ret_ty + " ("
         var tti: Float = 0
         while (tti < num_total_params) {
             if (tti > 0) { fn_type_str = fn_type_str + ", " }
