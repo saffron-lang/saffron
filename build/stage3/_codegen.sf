@@ -2618,7 +2618,8 @@ class Codegen {
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        if (!this.typed_vars.has(callee_name) and callee_name.length() > 0) {
+        // Also check var_types for captured variables in closures
+        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()
@@ -5268,6 +5269,33 @@ class Codegen {
         rt.append("declare i64 @__gc_closure_new(i64, i64)\n")
         rt.append("declare i64 @__gc_env_alloc(i64)\n")
         rt.append("declare i64 @__gc_instance_alloc(i64)\n")
+        // Scheduler extern functions (always needed when @async or @scheduler imported)
+        rt.append("\n; --- Scheduler runtime ---\n")
+        rt.append("declare double @sf_time_now()\n")
+        rt.append("declare i64 @sf_tcp_poll(i64, i64, i64)\n")
+        rt.append("declare void @__sched_coro_resume(i64)\n")
+        rt.append("declare i64 @__sched_coro_done(i64)\n")
+        rt.append("declare void @__sched_coro_destroy(i64)\n")
+        rt.append("declare i64 @__sched_get_yield_reason()\n")
+        rt.append("declare i64 @__sched_get_yield_arg()\n")
+        rt.append("declare i64 @__sched_get_task_result()\n")
+        rt.append("declare void @__sched_reset_yield()\n")
+        rt.append("declare void @__sched_store_result(i64, i64)\n")
+        rt.append("declare i64 @__sched_get_stored_result(i64)\n")
+        rt.append("declare i64 @__sched_has_stored_result(i64)\n")
+        // Mark scheduler functions as known to prevent duplicate declares
+        this.known_functions.push("sf_time_now")
+        this.known_functions.push("sf_tcp_poll")
+        this.known_functions.push("__sched_coro_resume")
+        this.known_functions.push("__sched_coro_done")
+        this.known_functions.push("__sched_coro_destroy")
+        this.known_functions.push("__sched_get_yield_reason")
+        this.known_functions.push("__sched_get_yield_arg")
+        this.known_functions.push("__sched_get_task_result")
+        this.known_functions.push("__sched_reset_yield")
+        this.known_functions.push("__sched_store_result")
+        this.known_functions.push("__sched_get_stored_result")
+        this.known_functions.push("__sched_has_stored_result")
         // Coroutine intrinsics
         if (this.coroutine_funcs.length() > 0) {
             rt.append("\n; --- Coroutine intrinsics ---\n")
@@ -5285,10 +5313,6 @@ class Codegen {
             rt.append("@__yield_arg = external global i64\n")
             rt.append("@__task_result = external global i64\n")
             rt.append("@__coro_escape_sink = external global ptr\n")
-            rt.append("declare void @__sched_store_result(i64, i64)\n")
-            rt.append("declare i64 @__sched_get_stored_result(i64)\n")
-            this.known_functions.push("__sched_store_result")
-            this.known_functions.push("__sched_get_stored_result")
         }
         return rt.to_string()
     }
