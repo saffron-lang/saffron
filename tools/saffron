@@ -236,7 +236,8 @@ build_project() {
             exit 1
         }
     else
-        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" || {
+        local ASYNC_NATIVE="$SCRIPT_DIR/src/runtime/async_native.c"
+        clang "$OPT" -w -Wl,-stack_size,0x10000000 -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" "$ASYNC_NATIVE" || {
             echo "saffron: linking failed" >&2
             exit 1
         }

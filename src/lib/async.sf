@@ -1,5 +1,8 @@
 //! Async primitives for cooperative concurrency.
-//! Users import this for sleep/timing. task.await() is a method, not here.
+//! Importing this module also imports the scheduler automatically.
+//! Users only need: import "@async" as Async
+
+import "@scheduler" as Scheduler
 
 @intrinsic fun __suspend(reason: Int, arg: Int)
 
