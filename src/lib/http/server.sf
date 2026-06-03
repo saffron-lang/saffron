@@ -30,12 +30,72 @@ import "@async" as Async
 // Request
 // =============================================================================
 
+class Stream {
+    var _fd: Int
+    var _headers_sent: Bool
+    var _extra_headers: List<String>
+    var _extra_values: List<String>
+
+    fun init(fd: Int) {
+        this._fd = fd
+        this._headers_sent = false
+        this._extra_headers = []
+        this._extra_values = []
+    }
+
+    fun header(name: String, value: String): Stream {
+        this._extra_headers.push(name)
+        this._extra_values.push(value)
+        return this
+    }
+
+    fun _send_headers() {
+        if (this._headers_sent) { return }
+        this._headers_sent = true
+        var sb = StringBuilder()
+        sb.append("HTTP/1.1 200 OK\r\n")
+        sb.append("Content-Type: text/event-stream\r\n")
+        sb.append("Cache-Control: no-cache\r\n")
+        sb.append("Connection: keep-alive\r\n")
+        var i = 0
+        while (i < this._extra_headers.length()) {
+            sb.append(this._extra_headers[i])
+            sb.append(": ")
+            sb.append(this._extra_values[i])
+            sb.append("\r\n")
+            i = i + 1
+        }
+        sb.append("\r\n")
+        Socket.write(this._fd, sb.to_string())
+    }
+
+    fun send(data: String) {
+        this._send_headers()
+        Socket.write(this._fd, "data: " + data + "\n\n")
+    }
+
+    fun send_event(event: String, data: String) {
+        this._send_headers()
+        Socket.write(this._fd, "event: " + event + "\ndata: " + data + "\n\n")
+    }
+
+    fun write(raw: String) {
+        this._send_headers()
+        Socket.write(this._fd, raw)
+    }
+
+    fun close() {
+        Socket.close(this._fd)
+    }
+}
+
 class Request {
     var method: String
     var path: String
     var headers: Map<String, String>
     var body: String
     var query: String
+    var _client_fd: Int
 
     fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
         this.method = method
@@ -43,6 +103,7 @@ class Request {
         this.headers = headers
         this.body = body
         this.query = query
+        this._client_fd = 0
     }
 
     fun header(name: String): String {
@@ -56,6 +117,16 @@ class Request {
             i = i + 1
         }
         return ""
+    }
+
+    fun stream(handler: Fun): Response {
+        var s = Stream(this._client_fd)
+        handler(s)
+        s.close()
+        // Return a sentinel response that tells _handle not to write/close
+        var resp = Response(0, "")
+        resp._is_stream = true
+        return resp
     }
 }
 
@@ -240,19 +311,12 @@ class App {
             return
         }
         var req: Request = _parse_request(raw)
+        req._client_fd = client
         var resp: Response = this._route(req)
 
         if (resp._is_stream) {
-            // Stream response — send headers, then run stream function
-            Socket.write(client, _serialize_response(resp))
-            // Create a send function that writes SSE format
-            var send_fn = fun (data: String) => {
-                Socket.write(client, "data: " + data + "\n\n")
-            }
-            resp._stream_fn(send_fn)
-            Socket.close(client)
+            // req.stream already handled writing + closing
         } else {
-            // Normal response — send and close
             Socket.write(client, _serialize_response(resp))
             Socket.close(client)
         }

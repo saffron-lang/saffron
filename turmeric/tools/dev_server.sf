@@ -27,15 +27,13 @@ fun mime_for(path: String): String {
 }
 
 fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
-    // Set up file watcher in background
+    // File watcher — background task sets reload flag
     var watcher = Watch.create()
     var wi = 0
     while (wi < watch_dirs.length()) {
         watcher.add(watch_dirs[wi])
         wi = wi + 1
     }
-
-    // File watch task — sets reload flag when files change
     Task.spawn(fun () => {
         while (true) {
             if (watcher.poll(100)) {
@@ -46,16 +44,16 @@ fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
         }
     })
 
-    // HTTP server
+    // Server
     var app = Http.server(port)
 
-    // SSE endpoint — streams reload events to browser
+    // SSE hot reload — uses req.stream
     app.get("/__reload") { req =>
-        Http.event_stream() { send =>
-            send("connected")
+        req.stream { stream =>
+            stream.send("connected")
             while (true) {
                 if (_pending_reload) {
-                    send("reload")
+                    stream.send("reload")
                     _pending_reload = false
                     return
                 }
@@ -64,7 +62,7 @@ fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
         }
     }
 
-    // Static file serving with reload script injection
+    // Static files with reload script injection
     app.all("*") { req =>
         var path = req.path
         var file_path: String = build_dir + path

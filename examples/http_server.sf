@@ -1,0 +1,49 @@
+//! Example: HTTP server with async I/O, streaming, and concurrent handlers.
+
+import "@http/server" as Http
+import "@async" as Async
+
+// Simple text response
+var app = Http.server(8080)
+
+app.get("/") { req =>
+    Http.html("<h1>Hello from Saffron!</h1><p>Try /api, /stream, or /slow</p>")
+}
+
+// JSON API
+app.get("/api") { req =>
+    Http.json("{\"message\": \"hello\", \"version\": \"0.1.0\"}")
+        .header("X-Powered-By", "Saffron")
+}
+
+// Server-Sent Events via req.stream
+app.get("/stream") { req =>
+    req.stream { stream =>
+        stream.send_event("connected", "hello!")
+        var count = 0
+        while (count < 5) {
+            Async.sleep(1.0)
+            count = count + 1
+            stream.send_event("tick", count.to_string())
+        }
+        stream.send_event("done", "goodbye!")
+    }
+}
+
+// Slow endpoint — async sleep doesn't block other requests
+app.get("/slow") { req =>
+    Async.sleep(2.0)
+    Http.text("Done waiting 2 seconds!")
+}
+
+// POST handler
+app.post("/echo") { req =>
+    Http.json("{\"you_sent\": \"" + req.body + "\"}")
+}
+
+// 404 fallback
+app.all("*") { req =>
+    Http.not_found()
+}
+
+app.serve()
