@@ -943,7 +943,6 @@
 
     fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
         // LetPattern destructures value into bindings from pattern.
-        var val: String = this.gen_arg_value(value)
         var variant_name: String = match (pattern) {
             VariantPattern(v, b) => v
             _ => ""
@@ -951,6 +950,13 @@
         var bindings: List<String> = match (pattern) {
             VariantPattern(v, b) => b
             _ => []
+        }
+        var val: String = this.gen_arg_value(value)
+        var val_type: AST.Type = this.last_type
+        // Check for array pattern (encoded as __array:rest_name)
+        if (variant_name.starts_with("__array:")) {
+            this.gen_let_array_pattern(bindings, variant_name, val, val_type)
+            return
         }
         // For variant patterns, extract fields from the tagged value
         if (bindings.length() > 0) {
@@ -976,6 +982,38 @@
                 }
                 bi = bi + 1
             }
+        }
+    }
+
+    fun gen_let_array_pattern(elements: List<String>, variant_name: String, val: String, val_type: AST.Type) {
+        var rest: String = variant_name.slice(8, variant_name.length())
+        // Infer element type from list type
+        var elem_type_str: String = "Int"
+        var list_type_str: String = this.type_to_string(val_type)
+        if (list_type_str.starts_with("List<") and list_type_str.ends_with(">")) {
+            elem_type_str = list_type_str.slice(5, list_type_str.length() - 1)
+        }
+        var elem_type: AST.Type = this.str_to_type(elem_type_str)
+        var i: Float = 0
+        while (i < elements.length()) {
+            var elem_val: String = this.fresh_local()
+            this.emit_indent(elem_val + " = call i64 @__list_get(i64 " + val + ", i64 " + i.floor().to_string() + ")")
+            this.emit_indent("store i64 " + elem_val + ", i64* %" + this.sanitize_name(elements[i]))
+            this.var_types.set(elements[i], elem_type_str)
+            this.typed_vars.set(elements[i], elem_type)
+            if (elem_type_str == "String") {
+                this.string_vars.push(elements[i])
+            }
+            i = i + 1
+        }
+        if (rest.length() > 0) {
+            var len_val: String = this.fresh_local()
+            this.emit_indent(len_val + " = call i64 @__list_length(i64 " + val + ")")
+            var rest_val: String = this.fresh_local()
+            this.emit_indent(rest_val + " = call i64 @__list_slice(i64 " + val + ", i64 " + elements.length().floor().to_string() + ", i64 " + len_val + ")")
+            this.emit_indent("store i64 " + rest_val + ", i64* %" + this.sanitize_name(rest))
+            this.var_types.set(rest, list_type_str)
+            this.typed_vars.set(rest, val_type)
         }
     }
 

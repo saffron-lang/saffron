@@ -1,0 +1,10 @@
+// Test array pattern destructuring
+let [a, b, c] = [10, 20, 30]
+IO.println(a)
+IO.println(b)
+IO.println(c)
+
+// Test with rest/splat
+let [head, *rest] = [1, 2, 3, 4, 5]
+IO.println(head)
+IO.println(rest)

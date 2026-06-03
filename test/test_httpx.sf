@@ -1,4 +1,4 @@
-import "@httpx" as Http
+import "@http/client" as Http
 import "@scheduler" as Scheduler
 import "@async" as Async
 

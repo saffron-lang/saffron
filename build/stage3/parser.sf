@@ -1327,25 +1327,9 @@ class Parser {
         this.consume("]")
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        var stmts: List<AST.Stmt> = []
-        var tmp_name: String = "__destruct"
-        stmts.push(AST.Stmt.VarDecl(tmp_name, "Any", init, ""))
-        var i: Int = 0
-        while (i < names.length()) {
-            var idx_expr: AST.Expr = AST.Expr.IndexGet(AST.Expr.Variable(tmp_name), AST.Expr.IntLit(i))
-            stmts.push(AST.Stmt.VarDecl(names[i], "Any", idx_expr, ""))
-            i = i + 1
-        }
-        if (rest_name.length() > 0) {
-            // Desugar *rest: var rest = __destruct.slice(names.length(), __destruct.length())
-            var slice_expr: AST.Expr = AST.Expr.MethodCall(
-                AST.Expr.Variable(tmp_name),
-                "slice",
-                [AST.Expr.IntLit(names.length()), AST.Expr.MethodCall(AST.Expr.Variable(tmp_name), "length", [])]
-            )
-            stmts.push(AST.Stmt.VarDecl(rest_name, "Any", slice_expr, ""))
-        }
-        return AST.Stmt.Block(stmts)
+        // Encode as VariantPattern with __array: prefix for gen2 compatibility
+        // The variant name carries the rest binding, elements are in bindings list
+        return AST.Stmt.LetPattern(AST.Pattern.VariantPattern("__array:" + rest_name, names), init)
     }
 
     fun parse_tuple_destructure(): AST.Stmt {

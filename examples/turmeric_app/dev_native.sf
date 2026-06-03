@@ -1,4 +1,4 @@
 // Turmeric native dev server — run with: saffron run dev_native.sf
-import "@dev_server" as DevServer
+import "../../turmeric/tools/dev_server.sf" as DevServer
 
 DevServer.serve("build/", 8080, ["build/", "src/"])

@@ -615,6 +615,15 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
+        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -622,7 +631,6 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             arg_strs.push("i64 " + val)
             ai = ai + 1
         }
-        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
@@ -1030,13 +1038,6 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
 
     // Check for imported module function calls (module alias or unknown name)
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
-        var arg_strs: List<String> = []
-        var ai: Float = 0
-        while (ai < args.length()) {
-            var val: String = this.gen_arg_value(args[ai])
-            arg_strs.push("i64 " + val)
-            ai = ai + 1
-        }
         var prefixed_name: String = method
         if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
@@ -1047,6 +1048,21 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             if (this.known_functions.contains(guessed)) {
                 prefixed_name = guessed
             }
+        }
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
+        var arg_strs: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
         }
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
