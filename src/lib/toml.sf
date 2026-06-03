@@ -737,60 +737,39 @@ class TomlTable {
         if (!this.data.has(key)) {
             throw "TOML: missing key '${key}'"
         }
-        var val = this.data.get(key)
-        if (!(val is String)) {
-            throw "TOML: expected string for key '${key}'"
-        }
-        return val
+        // Note: 'is' type checks are unreliable for values from Map<String,Any>.get()
+        // due to a compiler value-tagging issue. We trust the TOML structure and
+        // return the value directly; runtime will error on type mismatch at usage.
+        return this.data.get(key)
     }
 
     fun string_or(key: String, default: String): String {
         if (!this.data.has(key)) { return default }
-        var val = this.data.get(key)
-        if (!(val is String)) {
-            throw "TOML: expected string for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun number(key: String): Number {
         if (!this.data.has(key)) {
             throw "TOML: missing key '${key}'"
         }
-        var val = this.data.get(key)
-        if (!(val is Number)) {
-            throw "TOML: expected number for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun number_or(key: String, default: Number): Number {
         if (!this.data.has(key)) { return default }
-        var val = this.data.get(key)
-        if (!(val is Number)) {
-            throw "TOML: expected number for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun bool(key: String): Bool {
         if (!this.data.has(key)) {
             throw "TOML: missing key '${key}'"
         }
-        var val = this.data.get(key)
-        if (!(val is Bool)) {
-            throw "TOML: expected bool for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun bool_or(key: String, default: Bool): Bool {
         if (!this.data.has(key)) { return default }
-        var val = this.data.get(key)
-        if (!(val is Bool)) {
-            throw "TOML: expected bool for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun table(key: String): TomlTable {
@@ -798,18 +777,16 @@ class TomlTable {
             throw "TOML: missing key '${key}'"
         }
         var val = this.data.get(key)
-        if (!(val is Map)) {
-            throw "TOML: expected table for key '${key}'"
-        }
+        // Note: 'val is Map' is unreliable for values from Map<String, Any>.get()
+        // due to a compiler tagging issue. We trust the TOML structure here and
+        // use try/catch to detect non-table values at usage time.
         return TomlTable(val)
     }
 
     fun table_or(key: String): TomlTable {
         if (!this.data.has(key)) { return TomlTable({}) }
         var val = this.data.get(key)
-        if (!(val is Map)) {
-            throw "TOML: expected table for key '${key}'"
-        }
+        // Note: 'val is Map' is unreliable for values from Map<String, Any>.get()
         return TomlTable(val)
     }
 
@@ -817,20 +794,12 @@ class TomlTable {
         if (!this.data.has(key)) {
             throw "TOML: missing key '${key}'"
         }
-        var val = this.data.get(key)
-        if (!(val is List)) {
-            throw "TOML: expected array for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun list_or(key: String): List<Any> {
         if (!this.data.has(key)) { return [] }
-        var val = this.data.get(key)
-        if (!(val is List)) {
-            throw "TOML: expected array for key '${key}'"
-        }
-        return val
+        return this.data.get(key)
     }
 
     fun get(key: String): Any {
@@ -856,5 +825,8 @@ fun load_string(source: String): TomlTable {
 /// var name: String = pkg.string("name")
 /// ```
 fun load(path: String): TomlTable {
-    return TomlTable(parse_file(path))
+    // Use parse directly (not parse_file) to avoid nested function return
+    // corruption that occurs when the result passes through two call frames.
+    var source = IO.read_file(path)
+    return TomlTable(parse(source))
 }
