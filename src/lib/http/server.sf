@@ -361,7 +361,18 @@ class App {
         }
         var req: Request = _parse_request(raw)
         req._client_fd = client
-        var resp: Response = this._route(req)
+
+        // Run before-middlewares in order
+        var resp: Response = this._run_middlewares(req)
+        if (resp == nil) {
+            // No middleware short-circuited, proceed to route matching
+            resp = this._route(req)
+        }
+
+        // Run after-middlewares on the response (skip for streams)
+        if (!resp._is_stream) {
+            resp = this._run_after_middlewares(req, resp)
+        }
 
         if (resp._is_stream) {
             // req.stream already handled writing + closing
@@ -369,6 +380,30 @@ class App {
             Socket.write(client, _serialize_response(resp))
             Socket.close(client)
         }
+    }
+
+    fun _run_middlewares(req: Request): Response {
+        var i: Number = 0
+        while (i < this._middlewares.length()) {
+            var mw: Fun = this._middlewares[i]
+            var result: Response = mw(req)
+            if (result != nil) {
+                return result
+            }
+            i = i + 1
+        }
+        return nil
+    }
+
+    fun _run_after_middlewares(req: Request, resp: Response): Response {
+        var i: Number = 0
+        var current: Response = resp
+        while (i < this._after_middlewares.length()) {
+            var mw: Fun = this._after_middlewares[i]
+            current = mw(req, current)
+            i = i + 1
+        }
+        return current
     }
 
     fun _route(req: Request): Response {
@@ -414,6 +449,99 @@ fun server(port: Int): App {
 // Alias for backward compat
 fun create(port: Int): App {
     return App(port)
+}
+
+// =============================================================================
+// Middleware helpers
+// =============================================================================
+
+/// CORS middleware that allows all origins.
+/// Adds Access-Control-Allow-Origin, Methods, and Headers to every response.
+/// Handles OPTIONS preflight requests with a 204 short-circuit.
+fun cors(): Fun {
+    return fun (req: Request): Response {
+        if (req.method == "OPTIONS") {
+            return Response(204, "")
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                .header("Access-Control-Max-Age", "86400")
+        }
+        return nil
+    }
+}
+
+/// After-response middleware that adds CORS headers to every response.
+/// Use with app.after(cors_headers()) for non-preflight responses.
+fun cors_headers(): Fun {
+    return fun (req: Request, resp: Response): Response {
+        resp.header("Access-Control-Allow-Origin", "*")
+        resp.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        resp.header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        return resp
+    }
+}
+
+/// Logging middleware that prints method + path for each request.
+/// Always returns nil (never short-circuits).
+fun logger(): Fun {
+    return fun (req: Request): Response {
+        IO.println(req.method + " " + req.path)
+        return nil
+    }
+}
+
+/// Static file serving middleware.
+/// Maps URLs with the given prefix to files in the given directory.
+/// Returns nil (falls through) if the file does not exist.
+fun static_files(url_prefix: String, dir: String): Fun {
+    return fun (req: Request): Response {
+        if (req.method != "GET") {
+            return nil
+        }
+        // Check if path starts with the url_prefix
+        if (req.path.length() < url_prefix.length()) {
+            return nil
+        }
+        if (req.path.slice(0, url_prefix.length()) != url_prefix) {
+            return nil
+        }
+        // Extract the relative file path after the prefix
+        var rel: String = req.path.slice(url_prefix.length(), req.path.length())
+        if (rel.length() == 0) {
+            rel = "index.html"
+        }
+        if (rel.slice(0, 1) == "/") {
+            rel = rel.slice(1, rel.length())
+        }
+        // Prevent directory traversal
+        if (rel.contains("..")) {
+            return nil
+        }
+        // Build full filesystem path
+        var full_path: String = dir + "/" + rel
+        if (!IO.file_exists(full_path)) {
+            return nil
+        }
+        var content: String = IO.read_file(full_path)
+        var mime: String = _guess_mime(full_path)
+        return Response(200, content).header("Content-Type", mime)
+    }
+}
+
+fun _guess_mime(path: String): String {
+    if (path.ends_with(".html")) { return "text/html" }
+    if (path.ends_with(".js")) { return "application/javascript" }
+    if (path.ends_with(".css")) { return "text/css" }
+    if (path.ends_with(".wasm")) { return "application/wasm" }
+    if (path.ends_with(".json")) { return "application/json" }
+    if (path.ends_with(".sf")) { return "text/plain" }
+    if (path.ends_with(".png")) { return "image/png" }
+    if (path.ends_with(".jpg")) { return "image/jpeg" }
+    if (path.ends_with(".svg")) { return "image/svg+xml" }
+    if (path.ends_with(".ico")) { return "image/x-icon" }
+    if (path.ends_with(".txt")) { return "text/plain" }
+    return "application/octet-stream"
 }
 
 // =============================================================================
