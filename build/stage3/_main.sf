@@ -536,7 +536,7 @@ fun main(): Int {
     var stdlib_dir: String = ""
     var target: String = "native"
     var identity_mode: Bool = false
-    var use_llvm_lib: Bool = false
+    var use_llvm_lib: Bool = true
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
@@ -549,8 +549,8 @@ fun main(): Int {
         if (arg == "--identity-mode") {
             identity_mode = true
         }
-        if (arg == "--use-llvm-lib") {
-            use_llvm_lib = true
+        if (arg == "--no-llvm-lib") {
+            use_llvm_lib = false
         }
         if (arg == "--stdlib") {
             if (i + 1 < args.length()) {

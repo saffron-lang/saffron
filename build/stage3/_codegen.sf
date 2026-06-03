@@ -110,7 +110,7 @@ class Codegen {
         this.identity_mode = false
         this.coroutine_funcs = []
         this.is_coroutine = false
-        this.use_llvm_lib = false
+        this.use_llvm_lib = true
         this.gc_root_count = 0
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
@@ -7714,15 +7714,26 @@ class Codegen {
     fun find_class_for_method(method: String): String {
     var keys: List<String> = this.class_methods.keys()
     var i: Float = 0
+    var interface_fallback: String = ""
     while (i < keys.length()) {
         var class_name: String = keys[i]
         var methods: List = this.class_methods.get(class_name)
         if (methods.contains(method)) {
-            return class_name
+            // Skip interfaces (classes with no fields) — prefer concrete classes.
+            // Interfaces have empty class_fields and register stub methods.
+            var cf: String = this.class_fields.get(class_name)
+            if (cf.length() == 0) {
+                // Could be an interface — save as fallback, keep searching
+                if (interface_fallback.length() == 0) {
+                    interface_fallback = class_name
+                }
+            } else {
+                return class_name
+            }
         }
         i = i + 1
     }
-    return ""
+    return interface_fallback
     }
 
     fun get_method_ret(class_name: String, method: String): String {
@@ -8273,6 +8284,15 @@ class Codegen {
         full_method = this.func_prefix_map.get(full_method)
     } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
         full_method = this.current_prefix + full_method
+    } else if (!this.known_functions.contains(full_method)) {
+        var kfi: Float = 0
+        while (kfi < this.known_functions.length()) {
+            if (this.known_functions[kfi].ends_with(full_method)) {
+                full_method = this.known_functions[kfi]
+                kfi = this.known_functions.length()
+            }
+            kfi = kfi + 1
+        }
     }
     this.called_functions.push(full_method)
     var local: String = this.fresh_local()
@@ -9419,11 +9439,13 @@ class Codegen {
             class_name = cn_type_resolved
         }
     }
-    if (class_name.length() == 0 and this.current_class.length() > 0) {
+    // Don't use find_class_for_method for builtin container methods —
+    // these should dispatch to runtime builtins (Map/List/String) not user classes
+    var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number"
+    if (class_name.length() == 0 and this.current_class.length() > 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
     }
-    // Last resort: check if any known class has this method (for gen.method() in standalone fns)
-    if (class_name.length() == 0) {
+    if (class_name.length() == 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
