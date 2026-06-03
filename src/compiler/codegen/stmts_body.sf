@@ -1276,5 +1276,123 @@
         this.emit_terminator("ret i64 " + ns_result)
         this.emit("}")
         this.block_terminated = false
+
+        // __reflect_get_fields: returns a Map of field_name -> field_value for an instance
+        this.emit("")
+        this.emit("define i64 @__reflect_get_fields(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var gf_tag: String = this.fresh_local()
+        this.emit_indent(gf_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        var gf_end: String = this.fresh_label("rgf.end")
+        var gf_switch: String = ""
+        var gf_arms: List<String> = []
+        ci = 0
+        while (ci < class_names.length()) {
+            var gf_lbl: String = this.fresh_label("rgf.c")
+            gf_arms.push(gf_lbl)
+            var gf_tid: Float = this.class_type_ids.get(class_names[ci])
+            gf_switch = gf_switch + " i64 " + gf_tid.floor().to_string() + ", label %" + gf_lbl
+            ci = ci + 1
+        }
+        this.emit_indent("switch i64 " + gf_tag + ", label %" + gf_end + " [" + gf_switch + " ]")
+        this.block_terminated = true
+        ci = 0
+        while (ci < class_names.length()) {
+            this.start_block(gf_arms[ci])
+            var cname2: String = class_names[ci]
+            var fields_str: String = ""
+            if (this.class_fields.has(cname2)) { fields_str = this.class_fields.get(cname2) }
+            var map_val: String = this.fresh_local()
+            this.emit_indent(map_val + " = call i64 @__map_new()")
+            if (fields_str.length() > 0) {
+                var parts: List<String> = this.split_respecting_generics(fields_str, ",")
+                var fi: Float = 0
+                while (fi < parts.length()) {
+                    var fp: List<String> = parts[fi].split(":")
+                    var fname: String = fp[0]
+                    var fname_const: String = this.add_string_constant(fname)
+                    var fname_len: Float = fname.length() + 1
+                    var fname_gep: String = this.fresh_local()
+                    this.emit_indent(fname_gep + " = getelementptr [" + fname_len.to_string() + " x i8], [" + fname_len.to_string() + " x i8]* " + fname_const + ", i64 0, i64 0")
+                    var fname_i64: String = this.ptr_to_val(fname_gep)
+                    var inst_ptr: String = this.fresh_local()
+                    this.emit_indent(inst_ptr + " = inttoptr i64 %val to %" + cname2 + "*")
+                    var field_ptr: String = this.fresh_local()
+                    this.emit_indent(field_ptr + " = getelementptr %" + cname2 + ", %" + cname2 + "* " + inst_ptr + ", i32 0, i32 " + fi.floor().to_string())
+                    var field_val: String = this.fresh_local()
+                    this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
+                    this.emit_indent("call i64 @__map_set(i64 " + map_val + ", i64 " + fname_i64 + ", i64 " + field_val + ")")
+                    fi = fi + 1
+                }
+            }
+            this.emit_terminator("ret i64 " + map_val)
+            ci = ci + 1
+        }
+        this.start_block(gf_end)
+        var empty_map: String = this.fresh_local()
+        this.emit_indent(empty_map + " = call i64 @__map_new()")
+        this.emit_terminator("ret i64 " + empty_map)
+        this.emit("}")
+        this.block_terminated = false
+
+        // __reflect_construct_from_map: given a class constructor ptr and a map, construct instance
+        this.emit("")
+        this.emit("define i64 @__reflect_construct_from_map(i64 %klass, i64 %map) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var rc_end: String = this.fresh_label("rcon.end")
+        ci = 0
+        while (ci < class_names.length()) {
+            var cname3: String = class_names[ci]
+            var fn_ptr_val: String = this.fresh_local()
+            this.emit_indent(fn_ptr_val + " = ptrtoint i64 (...)* bitcast (i64 ()* @" + cname3 + " to i64 (...)*) to i64")
+            var cmp_r: String = this.fresh_local()
+            this.emit_indent(cmp_r + " = icmp eq i64 %klass, " + fn_ptr_val)
+            var rc_arm: String = this.fresh_label("rcon.hit")
+            var rc_next: String = this.fresh_label("rcon.next")
+            if (ci < class_names.length() - 1) {
+                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arm + ", label %" + rc_next)
+            } else {
+                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arm + ", label %" + rc_end)
+            }
+            this.start_block(rc_arm)
+            var new_inst: String = this.fresh_local()
+            this.emit_indent(new_inst + " = call i64 @" + cname3 + "()")
+            var c_fields: String = ""
+            if (this.class_fields.has(cname3)) { c_fields = this.class_fields.get(cname3) }
+            if (c_fields.length() > 0) {
+                var c_parts: List<String> = this.split_respecting_generics(c_fields, ",")
+                var c_ptr: String = this.fresh_local()
+                this.emit_indent(c_ptr + " = inttoptr i64 " + new_inst + " to %" + cname3 + "*")
+                var cfi: Float = 0
+                while (cfi < c_parts.length()) {
+                    var cfp: List<String> = c_parts[cfi].split(":")
+                    var cf_name: String = cfp[0]
+                    var cf_key_const: String = this.add_string_constant(cf_name)
+                    var cf_key_len: Float = cf_name.length() + 1
+                    var cf_key_gep: String = this.fresh_local()
+                    this.emit_indent(cf_key_gep + " = getelementptr [" + cf_key_len.to_string() + " x i8], [" + cf_key_len.to_string() + " x i8]* " + cf_key_const + ", i64 0, i64 0")
+                    var cf_key_i64: String = this.ptr_to_val(cf_key_gep)
+                    var cf_val: String = this.fresh_local()
+                    this.emit_indent(cf_val + " = call i64 @__map_get(i64 %map, i64 " + cf_key_i64 + ")")
+                    var cf_fld_ptr: String = this.fresh_local()
+                    this.emit_indent(cf_fld_ptr + " = getelementptr %" + cname3 + ", %" + cname3 + "* " + c_ptr + ", i32 0, i32 " + cfi.floor().to_string())
+                    this.emit_indent("store i64 " + cf_val + ", i64* " + cf_fld_ptr)
+                    cfi = cfi + 1
+                }
+            }
+            this.emit_terminator("ret i64 " + new_inst)
+            if (ci < class_names.length() - 1) {
+                this.start_block(rc_next)
+            }
+            ci = ci + 1
+        }
+        this.start_block(rc_end)
+        this.emit_terminator("ret i64 0")
+        this.emit("}")
+        this.block_terminated = false
     }
 
