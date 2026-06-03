@@ -1327,9 +1327,7 @@ class Parser {
         this.consume("]")
         this.consume("=")
         var init: AST.Expr = this.parse_expr()
-        // Encode as VariantPattern with __array: prefix for gen2 compatibility
-        // The variant name carries the rest binding, elements are in bindings list
-        return AST.Stmt.LetPattern(AST.Pattern.VariantPattern("__array:" + rest_name, names), init)
+        return AST.Stmt.LetPattern(AST.Pattern.ArrayPattern(names, rest_name), init)
     }
 
     fun parse_tuple_destructure(): AST.Stmt {
