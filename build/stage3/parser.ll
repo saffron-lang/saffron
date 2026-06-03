@@ -1416,6 +1416,7 @@ declare i64 @__gc_string_alloc(i64)
 declare i64 @__gc_closure_new(i64, i64)
 declare i64 @__gc_env_alloc(i64)
 declare i64 @__gc_instance_alloc(i64)
+declare i64 @__gc_get_type_tag(i64)
 
 ; --- Scheduler runtime ---
 declare double @sf_time_now()
