@@ -167,62 +167,7 @@ class Parser {
         }
         var name: String = this.expect_ident()
         // Handle dotted types: Lexer.TokenKind, AST.Stmt, etc.
-        // Also detect receiver function types: Type.() => Ret or Type.(Params) => Ret
         while (this.match_kind(".")) {
-            // Check for receiver function type: Name.(params) => Ret
-            if (this.match_kind_check("(")) {
-                // Peek: save pos, scan for matching ), check if followed by =>
-                var save_pos: Float = this.pos
-                this.advance() // consume (
-                // Skip tokens until matching )
-                var paren_depth: Float = 1
-                while (paren_depth > 0 and !this.match_kind_check("eof")) {
-                    if (this.match_kind_check("(")) {
-                        paren_depth = paren_depth + 1
-                    } else if (this.match_kind_check(")")) {
-                        paren_depth = paren_depth - 1
-                        if (paren_depth > 0) { this.advance() }
-                    } else {
-                        this.advance()
-                    }
-                }
-                // Now we should be at )
-                var found_arrow: Bool = false
-                if (this.match_kind_check(")")) {
-                    this.advance() // consume )
-                    if (this.match_kind_check("=>")) {
-                        found_arrow = true
-                    }
-                }
-                // Restore position and parse properly if it's a receiver type
-                this.pos = save_pos
-                if (found_arrow) {
-                    // Parse receiver function type: Name.(ParamTypes) => RetType
-                    this.advance() // consume (
-                    var recv_params: List<String> = []
-                    if (!this.match_kind_check(")")) {
-                        recv_params.push(this.parse_type())
-                        while (this.match_kind(",")) {
-                            recv_params.push(this.parse_type())
-                        }
-                    }
-                    this.consume(")")
-                    this.consume("=>")
-                    var recv_ret: String = this.parse_type()
-                    // Encode as "Fun[ReceiverType](params):Ret"
-                    var recv_type: String = "Fun[" + name + "]("
-                    var rpi: Float = 0
-                    while (rpi < recv_params.length()) {
-                        if (rpi > 0) { recv_type = recv_type + "," }
-                        recv_type = recv_type + recv_params[rpi]
-                        rpi = rpi + 1
-                    }
-                    recv_type = recv_type + "):" + recv_ret
-                    return recv_type
-                }
-                // Not a receiver type — continue as dotted name
-                // The . was already consumed by match_kind, expect ident
-            }
             var part: String = this.expect_ident()
             name = name + "." + part
         }
@@ -893,10 +838,6 @@ class Parser {
         // Function type: "Fun(...):Ret"
         if (s.starts_with("Fun(")) {
             return AST.Type.FuncType([], AST.Type.AnyType)
-        }
-        // Receiver function type: "Fun[Type](...):Ret"
-        if (s.starts_with("Fun[")) {
-            return AST.Type.ClassType(s)
         }
         // Class/Enum type
         return AST.Type.ClassType(s)

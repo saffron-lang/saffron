@@ -7,9 +7,9 @@
             emit_name = name
         }
         this.known_functions.push(emit_name)
-        this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
+        this.func_ret_types.set(emit_name, ret_type)
         if (this.current_prefix.length() > 0) {
-            this.func_ret_types.set(name, this.str_to_type(ret_type))
+            this.func_ret_types.set(name, ret_type)
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
@@ -521,7 +521,7 @@
         this.known_functions.push("__gc_closure_new")
         this.known_functions.push("__gc_env_alloc")
         this.known_functions.push("__gc_instance_alloc")
-        this.func_ret_types.set("StringBuilder", this.str_to_type("StringBuilder"))
+        this.func_ret_types.set("StringBuilder", "StringBuilder")
 
         // Pre-scan: register extension methods before compilation
         var ei: Float = 0
@@ -635,9 +635,6 @@
             }
             i = i + 1
         }
-
-        // Emit reflection dispatch functions for all compiled classes
-        this.emit_reflect_helpers()
 
         // Second pass: wrap top-level statements in __saffron_entry
         var has_top_level: Bool = false

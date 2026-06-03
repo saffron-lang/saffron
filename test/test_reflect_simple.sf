@@ -1,0 +1,15 @@
+import "@reflect" as Reflect
+
+class Point {
+    var x: Number
+    var y: Number
+    fun init(x: Number, y: Number) {
+        this.x = x
+        this.y = y
+    }
+}
+
+var p = Point(10, 20)
+IO.println(Reflect.type_name(42))
+IO.println(Reflect.type_name("hello"))
+IO.println(Reflect.type_name(p))

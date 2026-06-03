@@ -28,7 +28,7 @@ enum Expr {
     MemberAccess(object: Expr, field: String),
     Match(subject: Expr, arms: List<MatchArm>),
     EnumConstruct(enum_name: String, variant: String, args: List<Expr>),
-    Lambda(params: List<Param>, ret_type: Type, body: List<Stmt>),
+    Lambda(params: List<Param>, ret_type: String, body: List<Stmt>),
     GetField(object: Expr, field: String),
     SetField(object: Expr, field: String, value: Expr),
     This,
@@ -63,8 +63,8 @@ enum Param {
 
 enum Stmt {
     ExprStmt(expr: Expr),
-    VarDecl(name: String, type_ann: Type, initializer: Expr, docstring: String),
-    FunDecl(name: String, params: List<Param>, ret_type: Type, body: List<Stmt>, docstring: String),
+    VarDecl(name: String, type_ann: String, initializer: Expr, docstring: String),
+    FunDecl(name: String, params: List<Param>, ret_type: String, body: List<Stmt>, docstring: String),
     EnumDecl(name: String, variants: List<Variant>, docstring: String),
     ClassDecl(name: String, parent: String, fields: List<Param>, methods: List<Stmt>, docstring: String),
     Return(value: Expr),
