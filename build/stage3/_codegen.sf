@@ -4553,7 +4553,7 @@ class Codegen {
     }
 
     fun get_var_type(stmt: AST.Stmt): String {
-        return match (stmt) { VarDecl(n, t, i, d) => this.type_to_string(t)
+        return match (stmt) { VarDecl(n, t, i, d) => t
             _ => ""
         }
     }
