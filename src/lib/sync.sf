@@ -30,7 +30,7 @@ class Mutex {
         this._locked = false
     }
 
-    // Acquire the lock. Suspends the current task if already held.
+    /// Acquire the lock. Suspends the current task if already held.
     fun acquire() {
         while (this._locked) {
             yield;
@@ -38,12 +38,12 @@ class Mutex {
         this._locked = true
     }
 
-    // Release the lock, allowing the next waiting task to acquire it.
+    /// Release the lock, allowing the next waiting task to acquire it.
     fun release() {
         this._locked = false
     }
 
-    // Returns true if the lock is currently held.
+    /// Returns true if the lock is currently held.
     fun is_locked(): Bool {
         return this._locked
     }
@@ -69,7 +69,7 @@ class Semaphore {
         this._permits = permits
     }
 
-    // Acquire one permit. Suspends if no permits are available.
+    /// Acquire one permit. Suspends if no permits are available.
     fun acquire() {
         while (this._permits <= 0) {
             yield;
@@ -77,12 +77,12 @@ class Semaphore {
         this._permits = this._permits - 1
     }
 
-    // Release one permit, potentially waking a waiting task.
+    /// Release one permit, potentially waking a waiting task.
     fun release() {
         this._permits = this._permits + 1
     }
 
-    // Returns the number of currently available permits.
+    /// Returns the number of currently available permits.
     fun available(): Number {
         return this._permits
     }
@@ -109,12 +109,12 @@ class WaitGroup {
         this._counter = 0
     }
 
-    // Add delta to the counter (typically called before spawning tasks).
+    /// Add delta to the counter (typically called before spawning tasks).
     fun add(delta: Number) {
         this._counter = this._counter + delta
     }
 
-    // Decrement the counter by 1. Called by each task when it finishes.
+    /// Decrement the counter by 1. Called by each task when it finishes.
     fun done() {
         this._counter = this._counter - 1
         if (this._counter < 0) {
@@ -122,14 +122,14 @@ class WaitGroup {
         }
     }
 
-    // Suspend the current task until the counter reaches 0.
+    /// Suspend the current task until the counter reaches 0.
     fun wait() {
         while (this._counter > 0) {
             yield;
         }
     }
 
-    // Returns the current counter value.
+    /// Returns the current counter value.
     fun count(): Number {
         return this._counter
     }
@@ -158,8 +158,8 @@ class Once {
         this._result = nil
     }
 
-    // Execute fn only if this is the first call. Returns the result
-    // of the first execution on all subsequent calls.
+    /// Execute fn only if this is the first call. Returns the result
+    /// of the first execution on all subsequent calls.
     fun do(fn: Any): Any {
         if (this._done) {
             return this._result
@@ -169,12 +169,12 @@ class Once {
         return this._result
     }
 
-    // Returns true if the guarded function has already been executed.
+    /// Returns true if the guarded function has already been executed.
     fun is_done(): Bool {
         return this._done
     }
 
-    // Returns the cached result (nil if not yet executed).
+    /// Returns the cached result (nil if not yet executed).
     fun result(): Any {
         return this._result
     }
@@ -205,8 +205,8 @@ class Channel {
         this._closed = false
     }
 
-    // Send a value into the channel. Suspends if the buffer is full.
-    // Throws if the channel is closed.
+    /// Send a value into the channel. Suspends if the buffer is full.
+    /// Throws if the channel is closed.
     fun send(value: Any) {
         if (this._closed) {
             throw "send on closed channel"
@@ -221,8 +221,8 @@ class Channel {
         this._buffer.push(value)
     }
 
-    // Receive a value from the channel. Suspends if the buffer is empty.
-    // Returns nil if the channel is closed and empty.
+    /// Receive a value from the channel. Suspends if the buffer is empty.
+    /// Returns nil if the channel is closed and empty.
     fun recv(): Any {
         // Wait until there is a value or channel is closed
         while (this._buffer.length() == 0) {
@@ -234,7 +234,7 @@ class Channel {
         return this._dequeue()
     }
 
-    // Try to receive without blocking. Returns nil if empty.
+    /// Try to receive without blocking. Returns nil if empty.
     fun try_recv(): Any {
         if (this._buffer.length() == 0) {
             return nil
@@ -242,7 +242,7 @@ class Channel {
         return this._dequeue()
     }
 
-    // Try to send without blocking. Returns true if sent, false if full.
+    /// Try to send without blocking. Returns true if sent, false if full.
     fun try_send(value: Any): Bool {
         if (this._closed) {
             return false
@@ -262,23 +262,23 @@ class Channel {
         return value
     }
 
-    // Close the channel. No more sends are allowed.
-    // Pending recv() calls will return nil once the buffer drains.
+    /// Close the channel. No more sends are allowed.
+    /// Pending recv() calls will return nil once the buffer drains.
     fun close() {
         this._closed = true
     }
 
-    // Returns true if the channel has been closed.
+    /// Returns true if the channel has been closed.
     fun is_closed(): Bool {
         return this._closed
     }
 
-    // Returns the number of values currently buffered.
+    /// Returns the number of values currently buffered.
     fun len(): Number {
         return this._buffer.length()
     }
 
-    // Returns the channel's maximum capacity.
+    /// Returns the channel's maximum capacity.
     fun capacity(): Number {
         return this._capacity
     }

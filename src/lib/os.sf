@@ -1,38 +1,47 @@
-// OS module — operating system operations
-// These functions are available as OS.args(), OS.exec(), etc.
+//! OS module — operating system operations.
+//! These functions are available as OS.args(), OS.exec(), etc.
 
+/// Return the command-line arguments as a list of strings.
 fun args(): List<String> {
     return __os_args()
 }
 
+/// Execute a shell command and return its stdout as a string.
 fun exec(cmd: String): String {
     return __os_exec(cmd)
 }
 
+/// Return the current working directory.
 fun cwd(): String {
     return __os_cwd()
 }
 
+/// Return the platform path separator ("/" on Unix, "\\" on Windows).
 fun path_sep(): String {
     return __os_path_sep()
 }
 
+/// Return the platform name (e.g. "darwin", "linux").
 fun platform(): String {
     return __os_platform()
 }
 
+/// Read an environment variable by name.
 fun env(name: String): String {
     return __os_env(name)
 }
 
+/// Return true if a file exists at the given path.
 fun file_exists(path: String): Bool {
     return __io_file_exists(path)
 }
 
+/// Create a directory (and parents) at the given path.
 fun mkdir(path: String) {
     __io_mkdir(path)
 }
 
+/// List the contents of a directory recursively.
 fun list_dir(path: String): List<String> {
     return __io_walk_dir(path)
 }

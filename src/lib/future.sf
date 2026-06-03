@@ -8,23 +8,23 @@ class Future {
         this.result = nil
     }
 
-    fun setResult(result: Any) {
+    fun set_result(result: Any) {
         this.result = result
     }
 
-    fun getResult() {
+    fun get_result() {
         return this.result
     }
 
-    fun isReady() {
+    fun is_ready() {
         return this.result != nil
     }
 
     fun join() {
-        while (!this.isReady()) {
+        while (!this.is_ready()) {
             yield;
         }
 
-        return this.getResult()
+        return this.get_result()
     }
 }

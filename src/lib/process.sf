@@ -73,7 +73,7 @@ class ProcessResult {
         this.success = (exit_code == 0)
     }
 
-    // Return a human-readable summary of the result.
+    /// Return a human-readable summary of the result.
     fun to_string(): String {
         if (this.success) {
             return "ProcessResult(ok, stdout=${this.stdout.length()} bytes)"
@@ -148,7 +148,7 @@ class Process {
         this._cmd = cmd
     }
 
-    // Wait for the process to complete and return its result.
+    /// Wait for the process to complete and return its result.
     fun wait(): ProcessResult {
         // Use wait/waitpid via shell — wait for PID and capture exit code
         var raw = OS.exec("wait ${this.pid} 2>/dev/null; echo $?")
@@ -158,31 +158,31 @@ class Process {
         return ProcessResult("", "", code)
     }
 
-    // Kill the process (SIGTERM).
+    /// Kill the process (SIGTERM).
     fun kill() {
         OS.exec("kill ${this.pid} 2>/dev/null")
     }
 
-    // Forcefully kill the process (SIGKILL).
+    /// Forcefully kill the process (SIGKILL).
     fun force_kill() {
         OS.exec("kill -9 ${this.pid} 2>/dev/null")
     }
 
-    // Check if the process is still running.
+    /// Check if the process is still running.
     fun is_running(): Bool {
         var raw = OS.exec("kill -0 ${this.pid} 2>/dev/null; echo $?")
         return raw.trim() == "0"
     }
 
-    // Write to the process's stdin.
-    // NOTE: Requires native subprocess support. Throws with current OS.exec backend.
+    /// Write to the process's stdin.
+    /// NOTE: Requires native subprocess support. Throws with current OS.exec backend.
     fun write_stdin(input: String) {
         // Cannot pipe stdin to a background process with OS.exec alone.
         // This requires native subprocess file descriptor management.
         throw "process: write_stdin requires native subprocess support (not yet available)"
     }
 
-    // Return a human-readable description.
+    /// Return a human-readable description.
     fun to_string(): String {
         return "Process(pid=${this.pid}, cmd=\"${this._cmd}\")"
     }
