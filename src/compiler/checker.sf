@@ -5,8 +5,8 @@
 import "./ast.sf" as AST
 
 class Scope {
-    var vars: Map<String, String>
-    var narrowed: Map<String, String>
+    var vars: Map<String, AST.Type>
+    var narrowed: Map<String, AST.Type>
     var used: Map<String, Bool>
 
     fun init() {
@@ -18,7 +18,7 @@ class Scope {
 
 class TypeEnv {
     var scopes: List<Scope>
-    var funcs: Map<String, String>
+    var funcs: Map<String, AST.Type>
     var func_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
@@ -48,12 +48,12 @@ class TypeEnv {
         return this.scopes[this.scopes.length() - 1]
     }
 
-    fun define_var(name: String, typ: String) {
+    fun define_var(name: String, typ: AST.Type) {
         var scope: Scope = this.current_scope()
         scope.vars.set(name, typ)
     }
 
-    fun get_var(name: String): String {
+    fun get_var_type(name: String): AST.Type {
         // Search from innermost scope outward
         var i: Float = this.scopes.length() - 1
         while (i >= 0) {
@@ -66,12 +66,33 @@ class TypeEnv {
             }
             i = i - 1
         }
-        return "Any"
+        return AST.Type.AnyType
     }
 
-    fun narrow(name: String, typ: String) {
+    // String wrapper — for backward compat during transition
+    fun get_var(name: String): String {
+        var t: AST.Type = this.get_var_type(name)
+        return AST.type_to_string(t)
+    }
+
+    fun narrow(name: String, typ: AST.Type) {
         var scope: Scope = this.current_scope()
         scope.narrowed.set(name, typ)
+    }
+
+    // String-based narrow helper for callers that still pass strings
+    fun narrow_str(name: String, typ: String) {
+        var scope: Scope = this.current_scope()
+        scope.narrowed.set(name, this.parse_type_str(typ))
+    }
+
+    fun parse_type_str(s: String): AST.Type {
+        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Bool") return AST.Type.BoolType
+        if (s == "String") return AST.Type.StringType
+        if (s == "Nil") return AST.Type.NilType
+        if (s == "Any") return AST.Type.AnyType
+        return AST.Type.ClassType(s)
     }
 
     fun mark_used(name: String) {
@@ -91,8 +112,13 @@ class TypeEnv {
         scope.narrowed = {}
     }
 
-    fun define_func(name: String, ret_type: String) {
+    fun define_func(name: String, ret_type: AST.Type) {
         this.funcs.set(name, ret_type)
+    }
+
+    // String-based define_func for callers passing string ret types
+    fun define_func_str(name: String, ret_type: String) {
+        this.funcs.set(name, this.parse_type_str(ret_type))
     }
 
     fun define_func_params(name: String, params_str: String) {
@@ -106,11 +132,17 @@ class TypeEnv {
         return ""
     }
 
-    fun get_func_ret(name: String): String {
+    fun get_func_ret_type(name: String): AST.Type {
         if (this.funcs.has(name)) {
             return this.funcs.get(name)
         }
-        return "Any"
+        return AST.Type.AnyType
+    }
+
+    // String wrapper for backward compat
+    fun get_func_ret(name: String): String {
+        var t: AST.Type = this.get_func_ret_type(name)
+        return AST.type_to_string(t)
     }
 }
 
@@ -118,7 +150,7 @@ class NullChecker {
     var env: TypeEnv
     var errors: List<String>
     var warnings: List<String>
-    var current_func_ret: String
+    var current_func_ret: AST.Type
     var current_class: String
     var class_parents: Map<String, String>
     var class_method_names: Map<String, String>
@@ -127,7 +159,7 @@ class NullChecker {
         this.env = TypeEnv()
         this.errors = []
         this.warnings = []
-        this.current_func_ret = "Nil"
+        this.current_func_ret = AST.Type.NilType
         this.current_class = ""
         this.class_parents = {}
         this.class_method_names = {}
@@ -504,7 +536,7 @@ class NullChecker {
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc) => {
-                this.env.define_func(name, ret_type)
+                this.env.define_func_str(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
             }
             EnumDecl(name, variants, doc) => {
@@ -513,9 +545,9 @@ class NullChecker {
             ClassDecl(name, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
-                this.env.define_func(name, name)
+                this.env.define_func(name, AST.Type.ClassType(name))
                 if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", parent)
+                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
                     this.class_parents.set(name, parent)
                 }
                 // Register methods with their return types and param types
@@ -534,7 +566,7 @@ class NullChecker {
                         _ => []
                     }
                     if (method_name.length() > 0) {
-                        this.env.define_func(name + "__" + method_name, method_ret)
+                        this.env.define_func_str(name + "__" + method_name, method_ret)
                         this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
                     }
                     mi = mi + 1
