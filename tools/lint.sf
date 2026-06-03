@@ -1,0 +1,306 @@
+//! saffron lint — check and fix code style issues.
+//!
+//! Usage:
+//!   saffron run tools/lint.sf [--fix] [--check] <path>...
+//!
+//! Modes:
+//!   --check   Report issues and exit non-zero if any found (default)
+//!   --fix     Apply fixes in-place
+//!
+//! Checks:
+//!   - Trailing whitespace
+//!   - Missing newline at end of file
+//!   - Consecutive blank lines (max 2)
+//!   - Tab indentation (should be spaces)
+//!   - Lines over 120 characters
+//!   - Unused imports (basic detection)
+
+import "@os" as OS
+import "@args" as Args
+import "@glob" as Glob
+import "@process" as Process
+
+class LintIssue {
+    var file: String
+    var line: Int
+    var message: String
+    var fixable: Bool
+
+    fun init(file: String, line: Int, message: String, fixable: Bool) {
+        this.file = file
+        this.line = line
+        this.message = message
+        this.fixable = fixable
+    }
+}
+
+class LintResult {
+    var issues: List<LintIssue>
+    var fixed_content: String
+    var was_modified: Bool
+
+    fun init() {
+        this.issues = []
+        this.fixed_content = ""
+        this.was_modified = false
+    }
+}
+
+/// Lint a single file. Returns issues found and optionally the fixed content.
+fun lint_file(path: String, fix_mode: Bool): LintResult {
+    var source: String = IO.read_file(path)
+    var lines: List<String> = source.split("\n")
+    var result: LintResult = LintResult()
+    var fixed_lines: List<String> = []
+    var consecutive_blanks: Int = 0
+
+    var i: Int = 0
+    while (i < lines.length()) {
+        var line: String = lines[i]
+        var line_num: Int = i + 1
+        var fixed_line: String = line
+
+        // Check: trailing whitespace
+        if (line.length() > 0 and (line.ends_with(" ") or line.ends_with("\t"))) {
+            result.issues.push(LintIssue(path, line_num, "trailing whitespace", true))
+            if (fix_mode) {
+                // Trim trailing whitespace
+                var end: Int = line.length() - 1
+                while (end >= 0 and (line.char_at(end) == " " or line.char_at(end) == "\t")) {
+                    end = end - 1
+                }
+                fixed_line = line.slice(0, end + 1)
+                result.was_modified = true
+            }
+        }
+
+        // Check: tab indentation
+        if (line.length() > 0 and line.char_at(0) == "\t") {
+            result.issues.push(LintIssue(path, line_num, "tab indentation (use spaces)", true))
+            if (fix_mode) {
+                // Replace leading tabs with 4 spaces each
+                var j: Int = 0
+                var spaces: String = ""
+                while (j < line.length() and line.char_at(j) == "\t") {
+                    spaces = spaces + "    "
+                    j = j + 1
+                }
+                fixed_line = spaces + line.slice(j, line.length())
+                result.was_modified = true
+            }
+        }
+
+        // Check: line length
+        if (line.length() > 120) {
+            result.issues.push(LintIssue(path, line_num, "line exceeds 120 characters (${line.length()})", false))
+        }
+
+        // Check: consecutive blank lines (max 2)
+        if (line.trim().length() == 0) {
+            consecutive_blanks = consecutive_blanks + 1
+            if (consecutive_blanks > 2) {
+                result.issues.push(LintIssue(path, line_num, "more than 2 consecutive blank lines", true))
+                if (fix_mode) {
+                    i = i + 1
+                    result.was_modified = true
+                    continue
+                }
+            }
+        } else {
+            consecutive_blanks = 0
+        }
+
+        fixed_lines.push(fixed_line)
+        i = i + 1
+    }
+
+    // Check: missing newline at end of file
+    if (source.length() > 0 and !(source.ends_with("\n"))) {
+        result.issues.push(LintIssue(path, lines.length(), "missing newline at end of file", true))
+        if (fix_mode) {
+            result.was_modified = true
+        }
+    }
+
+    // Build fixed content
+    if (fix_mode) {
+        result.fixed_content = _join_with_newline(fixed_lines)
+        if (!(result.fixed_content.ends_with("\n"))) {
+            result.fixed_content = result.fixed_content + "\n"
+        }
+    }
+
+    return result
+}
+
+/// Check for unused imports in a file.
+fun check_unused_imports(path: String, source: String): List<LintIssue> {
+    var issues: List<LintIssue> = []
+    var lines: List<String> = source.split("\n")
+
+    var i: Int = 0
+    while (i < lines.length()) {
+        var line: String = lines[i].trim()
+        if (line.starts_with("import ") and line.contains(" as ")) {
+            // Extract the alias name
+            var as_idx: Int = line.index_of(" as ")
+            if (as_idx >= 0) {
+                var alias: String = line.slice(as_idx + 4, line.length()).trim()
+                // Check if alias is used anywhere else in the file
+                var rest: String = _remove_line(source, i)
+                if (!(rest.contains(alias + ".")) and !(rest.contains(alias + "("))) {
+                    issues.push(LintIssue(path, i + 1, "potentially unused import '${alias}'", false))
+                }
+            }
+        }
+        i = i + 1
+    }
+
+    return issues
+}
+
+/// Collect all .sf files from paths (supports directories and globs).
+fun collect_files(paths: List<String>): List<String> {
+    var files: List<String> = []
+    var i: Int = 0
+    while (i < paths.length()) {
+        var path: String = paths[i]
+        if (path.ends_with(".sf")) {
+            files.push(path)
+        } else if (OS.file_exists(path)) {
+            // Directory — find all .sf files recursively
+            var found: List<String> = Glob.find_in(path, "**/*.sf")
+            var j: Int = 0
+            while (j < found.length()) {
+                files.push(found[j])
+                j = j + 1
+            }
+        }
+        i = i + 1
+    }
+    return files
+}
+
+fun _join_with_newline(lines: List<String>): String {
+    var result: String = ""
+    var i: Int = 0
+    while (i < lines.length()) {
+        if (i > 0) { result = result + "\n" }
+        result = result + lines[i]
+        i = i + 1
+    }
+    return result
+}
+
+fun _remove_line(source: String, line_idx: Int): String {
+    var lines: List<String> = source.split("\n")
+    var result: List<String> = []
+    var i: Int = 0
+    while (i < lines.length()) {
+        if (i != line_idx) {
+            result.push(lines[i])
+        }
+        i = i + 1
+    }
+    return _join_with_newline(result)
+}
+
+// --- Main ---
+
+fun main() {
+    var parsed: Args.ParsedArgs = Args.parse()
+    var positional: List<String> = parsed.positional
+
+    // Determine mode
+    var fix_mode: Bool = parsed.flag("fix")
+    var check_mode: Bool = parsed.flag("check") or !(fix_mode)
+
+    // Collect files
+    var target_paths: List<String> = []
+    var i: Int = 0
+    while (i < positional.length()) {
+        var arg: String = positional[i]
+        if (!(arg.starts_with("-"))) {
+            target_paths.push(arg)
+        }
+        i = i + 1
+    }
+
+    if (target_paths.length() == 0) {
+        // Default: lint src/ and current directory .sf files
+        if (OS.file_exists("src")) {
+            target_paths.push("src")
+        } else {
+            target_paths.push(".")
+        }
+    }
+
+    var files: List<String> = collect_files(target_paths)
+
+    if (files.length() == 0) {
+        IO.println("No .sf files found.")
+        return
+    }
+
+    var total_issues: Int = 0
+    var files_with_issues: Int = 0
+    var files_fixed: Int = 0
+
+    i = 0
+    while (i < files.length()) {
+        var file: String = files[i]
+        var result: LintResult = lint_file(file, fix_mode)
+
+        // Also check unused imports in check mode
+        if (check_mode and !(fix_mode)) {
+            var source: String = IO.read_file(file)
+            var import_issues: List<LintIssue> = check_unused_imports(file, source)
+            var j: Int = 0
+            while (j < import_issues.length()) {
+                result.issues.push(import_issues[j])
+                j = j + 1
+            }
+        }
+
+        if (result.issues.length() > 0) {
+            files_with_issues = files_with_issues + 1
+            total_issues = total_issues + result.issues.length()
+
+            if (check_mode and !(fix_mode)) {
+                // Print issues
+                var j: Int = 0
+                while (j < result.issues.length()) {
+                    var issue: LintIssue = result.issues[j]
+                    var fixable_marker: String = ""
+                    if (issue.fixable) { fixable_marker = " (fixable)" }
+                    IO.println("  ${issue.file}:${issue.line}: ${issue.message}${fixable_marker}")
+                    j = j + 1
+                }
+            }
+        }
+
+        if (fix_mode and result.was_modified) {
+            IO.write_file(file, result.fixed_content)
+            files_fixed = files_fixed + 1
+            IO.println("  fixed: ${file}")
+        }
+
+        i = i + 1
+    }
+
+    // Summary
+    IO.println("")
+    if (fix_mode) {
+        IO.println("Fixed ${files_fixed} files.")
+    } else {
+        if (total_issues == 0) {
+            IO.println("All clean! (${files.length()} files checked)")
+        } else {
+            IO.println("${total_issues} issues in ${files_with_issues} files (${files.length()} files checked)")
+            IO.println("Run with --fix to auto-fix fixable issues.")
+            OS.exit(1)
+        }
+    }
+}
+
+main()
