@@ -171,7 +171,13 @@
     }
 
     fun add_var_unique(names: List<String>, types: List<String>, name: String, typ: String) {
-        if (!names.contains(name)) {
+        var exists: Bool = false
+        var avi: Float = 0
+        while (avi < names.length()) {
+            if (names[avi] == name) { exists = true }
+            avi = avi + 1
+        }
+        if (!exists) {
             names.push(name)
             types.push(typ)
         }
