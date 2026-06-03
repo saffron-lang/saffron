@@ -59,6 +59,8 @@ class Codegen {
     var is_coroutine: Bool
     var use_llvm_lib: Bool
     var gc_root_count: Float
+    var class_type_ids: Map<String, Float>
+    var next_class_type_id: Float
 
     fun init() {
         this.sb = StringBuilder()
@@ -110,6 +112,8 @@ class Codegen {
         this.is_coroutine = false
         this.use_llvm_lib = true
         this.gc_root_count = 0
+        this.class_type_ids = {}
+        this.next_class_type_id = 10
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
@@ -4933,6 +4937,11 @@ class Codegen {
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
         this.func_ret_types.set(type_name, this.str_to_type(type_name))
+        // Assign a unique type ID for reflection (tags >= 10 are per-class)
+        if (!this.class_type_ids.has(type_name)) {
+            this.class_type_ids.set(type_name, this.next_class_type_id)
+            this.next_class_type_id = this.next_class_type_id + 1
+        }
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
@@ -4944,11 +4953,23 @@ class Codegen {
         this.emit(ctor_linkage + " i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
-        // Allocate instance on heap
+        // Allocate instance on GC-tracked heap with per-class type tag
+        var class_tag: Float = this.class_type_ids.get(type_name)
         var raw: String = this.fresh_local()
-        this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
-        var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
+        if (this.identity_mode) {
+            // In identity mode (bootstrap), use malloc (no GC)
+            this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+        } else {
+            this.emit_indent(raw + " = call i64 @__gc_alloc(i64 " + struct_size.floor().to_string() + ", i64 " + class_tag.floor().to_string() + ")")
+        }
+        var ptr: String = ""
+        if (this.identity_mode) {
+            ptr = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
+        } else {
+            ptr = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + raw + " to %" + type_name + "*")
+        }
         // Zero-initialize fields
         var i: Float = 0
         while (i < num_fields) {
