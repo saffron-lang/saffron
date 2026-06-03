@@ -825,7 +825,7 @@
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
         var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
-        if (this.intrinsic_funcs.contains(prefixed_name)) {
+        if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
             return this.gen_intrinsic_call(prefixed_name, args)
         }
         // Extern check: if the target is an extern C function, emit the proper extern call
@@ -843,7 +843,7 @@
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
         // emit the await loop pattern (call as ptr, suspend/resume until done)
-        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var b_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -893,7 +893,7 @@
             return coro_result
         }
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
-        if (!this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var s_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -1024,7 +1024,7 @@
         // Lambda names start with __lambda — check if in coroutine_funcs
         var spawn_fn_name: String = this.get_variable_name(args[0])
         var is_coro_spawn: Bool = false
-        if (spawn_fn_name.length() > 0 and this.coroutine_funcs.contains(spawn_fn_name)) {
+        if (spawn_fn_name.length() > 0 and this.str_in_list(this.coroutine_funcs, spawn_fn_name)) {
             is_coro_spawn = true
         }
         // Also check the last-generated lambda
@@ -1719,9 +1719,9 @@
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another, emit await loop
-        var is_coro_callee: Bool = this.coroutine_funcs.contains(prefixed_name)
+        var is_coro_callee: Bool = this.str_in_list(this.coroutine_funcs, prefixed_name)
         if (!is_coro_callee) {
-            is_coro_callee = this.coroutine_funcs.contains(method)
+            is_coro_callee = this.str_in_list(this.coroutine_funcs, method)
         }
         // Definitive check: if the function is already defined and is in coroutine_funcs
         if (!is_coro_callee and this.coroutine_funcs.length() > 0) {

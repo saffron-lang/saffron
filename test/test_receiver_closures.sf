@@ -1,0 +1,80 @@
+// Test receiver closures (Kotlin-style Type.() => Ret)
+
+import "@test" as T
+
+// --- Basic class to use as receiver ---
+class Project {
+    var name: String
+    var version: String
+    var deps: List<String>
+
+    fun init() {
+        this.name = ""
+        this.version = ""
+        this.deps = []
+    }
+
+    fun dep(pkg: String) {
+        this.deps.push(pkg)
+    }
+
+    fun full_name(): String {
+        return this.name + "@" + this.version
+    }
+}
+
+// --- Function that takes a receiver closure ---
+fun configure(config: Project.() => Nil): Project {
+    var p: Project = Project()
+    config(p)
+    return p
+}
+
+// --- Test 1: Basic field assignment via receiver closure ---
+var p1: Project = configure {
+    name = "hello"
+    version = "1.0.0"
+}
+T.assert_eq(p1.name, "hello", "receiver closure: field assignment (name)")
+T.assert_eq(p1.version, "1.0.0", "receiver closure: field assignment (version)")
+
+// --- Test 2: Method calls via receiver closure ---
+var p2: Project = configure {
+    name = "with-deps"
+    version = "2.0.0"
+    dep("http")
+    dep("json")
+}
+T.assert_eq(p2.name, "with-deps", "receiver closure: name with deps")
+T.assert_eq(p2.deps.length(), 2, "receiver closure: method calls added deps")
+
+// --- Test 3: Receiver closure with explicit parameters ---
+fun configure_with(base_name: String, config: Project.() => Nil): Project {
+    var p: Project = Project()
+    p.name = base_name
+    config(p)
+    return p
+}
+
+var p3: Project = configure_with("base") {
+    version = "3.0.0"
+}
+T.assert_eq(p3.name, "base", "receiver closure with other params: name preserved")
+T.assert_eq(p3.version, "3.0.0", "receiver closure with other params: version set")
+
+// --- Test 4: Local variable does NOT shadow receiver field ---
+fun configure_local(config: Project.() => Nil): Project {
+    var p: Project = Project()
+    config(p)
+    return p
+}
+
+var p4: Project = configure_local {
+    var local_name: String = "local"
+    name = local_name
+    version = "4.0.0"
+}
+T.assert_eq(p4.name, "local", "receiver closure: local variable used in field set")
+T.assert_eq(p4.version, "4.0.0", "receiver closure: other field set")
+
+T.summary()
