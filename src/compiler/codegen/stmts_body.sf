@@ -476,6 +476,11 @@
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
         this.func_ret_types.set(type_name, this.str_to_type(type_name))
+        // Assign a unique type ID for reflection (tags >= 10 are per-class)
+        if (!this.class_type_ids.has(type_name)) {
+            this.class_type_ids.set(type_name, this.next_class_type_id)
+            this.next_class_type_id = this.next_class_type_id + 1
+        }
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
@@ -487,11 +492,22 @@
         this.emit(ctor_linkage + " i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
-        // Allocate instance on heap
+        // Allocate instance on GC-tracked heap with per-class type tag
+        var class_tag: Float = this.class_type_ids.get(type_name)
         var raw: String = this.fresh_local()
-        this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
-        var ptr: String = this.fresh_local()
-        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
+        if (this.identity_mode) {
+            this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+        } else {
+            this.emit_indent(raw + " = call i64 @__gc_alloc(i64 " + struct_size.floor().to_string() + ", i64 " + class_tag.floor().to_string() + ")")
+        }
+        var ptr: String = ""
+        if (this.identity_mode) {
+            ptr = this.fresh_local()
+            this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
+        } else {
+            ptr = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + raw + " to %" + type_name + "*")
+        }
         // Zero-initialize fields
         var i: Float = 0
         while (i < num_fields) {
@@ -1189,5 +1205,76 @@
         this.loop_end_label = saved_loop_end
 
         this.start_block(end_label)
+    }
+
+    fun emit_reflect_helpers() {
+        var class_names: List<String> = this.class_type_ids.keys()
+        if (class_names.length() == 0) { return }
+        this.emit("")
+        this.emit("define i64 @__reflect_class_name(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var tag_r: String = this.fresh_local()
+        this.emit_indent(tag_r + " = call i64 @__gc_get_type_tag(i64 %val)")
+        var end_lbl: String = this.fresh_label("rcn.end")
+        var switch_str: String = ""
+        var arm_labels: List<String> = []
+        var ci: Float = 0
+        while (ci < class_names.length()) {
+            var lbl: String = this.fresh_label("rcn.c")
+            arm_labels.push(lbl)
+            var tid: Float = this.class_type_ids.get(class_names[ci])
+            switch_str = switch_str + " i64 " + tid.floor().to_string() + ", label %" + lbl
+            ci = ci + 1
+        }
+        this.emit_indent("switch i64 " + tag_r + ", label %" + end_lbl + " [" + switch_str + " ]")
+        this.block_terminated = true
+        ci = 0
+        while (ci < class_names.length()) {
+            this.start_block(arm_labels[ci])
+            var cname: String = class_names[ci]
+            var str_const: String = this.add_string_constant(cname)
+            var str_len: Float = cname.length() + 1
+            var gep: String = this.fresh_local()
+            this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + str_const + ", i64 0, i64 0")
+            var as_i64: String = this.ptr_to_val(gep)
+            this.emit_terminator("ret i64 " + as_i64)
+            ci = ci + 1
+        }
+        this.start_block(end_lbl)
+        var unk_const: String = this.add_string_constant("Unknown")
+        var unk_gep: String = this.fresh_local()
+        this.emit_indent(unk_gep + " = getelementptr [8 x i8], [8 x i8]* " + unk_const + ", i64 0, i64 0")
+        var unk_i64: String = this.ptr_to_val(unk_gep)
+        this.emit_terminator("ret i64 " + unk_i64)
+        this.emit("}")
+        this.block_terminated = false
+
+        this.emit("")
+        this.emit("define i64 @__reflect_is_class(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var is_tag: String = this.fresh_local()
+        this.emit_indent(is_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
+        var cmp: String = this.fresh_local()
+        this.emit_indent(cmp + " = icmp uge i64 " + is_tag + ", 10")
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = zext i1 " + cmp + " to i64")
+        this.emit_terminator("ret i64 " + result)
+        this.emit("}")
+        this.block_terminated = false
+
+        this.emit("")
+        this.emit("define i64 @__reflect_number_to_string(i64 %val) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        this.reset_locals()
+        var ns_result: String = this.fresh_local()
+        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 %val)")
+        this.emit_terminator("ret i64 " + ns_result)
+        this.emit("}")
+        this.block_terminated = false
     }
 
