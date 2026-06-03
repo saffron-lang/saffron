@@ -129,11 +129,11 @@ fun PackageCard(pkg: Map<String, String>) {
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
-    div([class_("bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer")]) {
+    div([class_("bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer"), on_click(fun (e) => {
+        load_package_detail(name)
+    })]) {
         div([class_("flex items-center justify-between mb-2")]) {
-            h2([class_("text-lg font-bold text-white hover:text-saffron-400 transition-colors"), on_click(fun (e) => {
-                load_package_detail(name)
-            })]) {
+            h2([class_("text-lg font-bold text-white")]) {
                 text(name)
             }
             span([class_("text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded")]) {
@@ -181,12 +181,18 @@ fun NavBar() {
             })]) {
                 text("Bazaar")
             }
-            div([class_("flex gap-4")]) {
+            div([class_("flex items-center gap-5")]) {
                 a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://saffron-lang.org/docs")]) {
                     text("Docs")
                 }
                 a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://github.com/henry232323/saffron")]) {
                     text("GitHub")
+                }
+                a([class_("text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer")]) {
+                    text("Publish")
+                }
+                a([class_("text-sm text-gray-400 hover:text-white transition-colors cursor-pointer")]) {
+                    text("Login")
                 }
             }
         }
@@ -255,46 +261,59 @@ fun PackageDetailPage() {
     var description: String = detail_description.get()
     var versions: List<Map<String, String>> = detail_versions.get()
 
-    div([class_("page detail-page")]) {
-        div([class_("detail-header")]) {
-            a([class_("back-link"), on_click(fun (e) => {
-                navigate_home()
-            })]) {
-                text("< Back")
-            }
-            h1([class_("detail-title")]) {
+    div([class_("min-h-screen max-w-4xl mx-auto px-6 py-8")]) {
+        // Back navigation
+        a([class_("inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer"), on_click(fun (e) => {
+            navigate_home()
+        })]) {
+            text("← Back to packages")
+        }
+
+        // Package header
+        div([class_("flex items-center gap-4 mb-4")]) {
+            h1([class_("text-3xl font-bold text-white")]) {
                 text(name)
             }
-            span([class_("version-badge large")]) {
+            span([class_("text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded")]) {
                 text("v" + latest)
             }
         }
+
         if (description.length() > 0) {
-            p([class_("detail-description")]) {
+            p([class_("text-gray-400 text-lg mb-6")]) {
                 text(description)
             }
         }
-        div([class_("install-section")]) {
-            h3([]) { text("Install") }
-            pre([class_("install-block")]) {
+
+        // Install command
+        div([class_("mb-8")]) {
+            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-2")]) { text("Install") }
+            div([class_("bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200 flex items-center justify-between")]) {
                 code([]) {
                     text("pantry add " + name)
                 }
+                button([class_("text-xs text-gray-500 hover:text-saffron-400 transition-colors ml-4"), on_click(fun (e) => {})]) {
+                    text("Copy")
+                }
             }
         }
+
+        // Version history
         if (versions.length() > 0) {
-            section([class_("versions-section")]) {
-                h3([]) { text("Versions") }
-                ul([class_("version-list")]) {
+            section([]) {
+                h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-3")]) {
+                    text("Versions (" + versions.length().to_string() + ")")
+                }
+                div([class_("space-y-2")]) {
                     var i: Float = versions.length() - 1
                     while (i >= 0) {
                         var v: Map<String, String> = versions[i]
-                        li([class_("version-item")]) {
-                            span([class_("version-number")]) {
+                        div([class_("flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50")]) {
+                            span([class_("font-mono text-sm text-white")]) {
                                 text(v.get("vers"))
                             }
                             if (v.has("yanked") and v.get("yanked") == "true") {
-                                span([class_("yanked-badge")]) {
+                                span([class_("text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded")]) {
                                     text("yanked")
                                 }
                             }
@@ -309,9 +328,11 @@ fun PackageDetailPage() {
 
 fun LoadingIndicator() {
     if (is_loading.get()) {
-        div([class_("loading")]) {
-            span([class_("spinner")]) {}
-            text("Loading...")
+        div([class_("flex items-center justify-center py-12 gap-3")]) {
+            div([class_("w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin")]) {}
+            span([class_("text-gray-400 text-sm")]) {
+                text("Loading...")
+            }
         }
     }
 }
@@ -321,9 +342,9 @@ fun LoadingIndicator() {
 // =============================================================================
 
 fun App() {
-    div([id("bazaar-app")]) {
+    div([id("bazaar-app"), class_("min-h-screen flex flex-col")]) {
         NavBar()
-        div([class_("container")]) {
+        div([class_("flex-1")]) {
             LoadingIndicator()
             var page: String = current_page.get()
             if (page == "home") {
@@ -336,9 +357,12 @@ fun App() {
                 PackageDetailPage()
             }
         }
-        footer([class_("site-footer")]) {
-            p([]) {
-                text("Bazaar -- the Saffron package registry")
+        footer([class_("border-t border-gray-800 py-6 text-center")]) {
+            p([class_("text-sm text-gray-500")]) {
+                text("Bazaar — the Saffron package registry")
+            }
+            p([class_("text-xs text-gray-600 mt-1")]) {
+                text("Built with Saffron + Turmeric")
             }
         }
     }
