@@ -571,6 +571,15 @@
         full_method = this.func_prefix_map.get(full_method)
     } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
         full_method = this.current_prefix + full_method
+    } else if (!this.known_functions.contains(full_method)) {
+        var kfi: Float = 0
+        while (kfi < this.known_functions.length()) {
+            if (this.known_functions[kfi].ends_with(full_method)) {
+                full_method = this.known_functions[kfi]
+                kfi = this.known_functions.length()
+            }
+            kfi = kfi + 1
+        }
     }
     this.called_functions.push(full_method)
     var local: String = this.fresh_local()
@@ -1717,11 +1726,13 @@
             class_name = cn_type_resolved
         }
     }
-    if (class_name.length() == 0 and this.current_class.length() > 0) {
+    // Don't use find_class_for_method for builtin container methods —
+    // these should dispatch to runtime builtins (Map/List/String) not user classes
+    var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number"
+    if (class_name.length() == 0 and this.current_class.length() > 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
     }
-    // Last resort: check if any known class has this method (for gen.method() in standalone fns)
-    if (class_name.length() == 0) {
+    if (class_name.length() == 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
     }
     if (class_name.length() > 0) {
