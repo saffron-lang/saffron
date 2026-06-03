@@ -184,18 +184,22 @@ class Once {
 // Channel — bounded async channel for message passing
 // ---------------------------------------------------------------------------
 
-/// A bounded channel for cooperative message passing between tasks.
+/// A bounded, typed channel for cooperative message passing between tasks.
 /// send() suspends if the buffer is full; recv() suspends if empty.
+///
+/// The type parameter T specifies the message type carried by the channel.
+/// Once the checker supports generic class type enforcement, send/recv will
+/// be statically checked against T.
 ///
 /// ```saffron
 /// import "@sync" as Sync
-/// var ch = Sync.Channel(10)
-/// ch.send("hello")        // buffers the value
-/// var msg = ch.recv()     // "hello"
+/// var ch = Sync.Channel<String>(10)
+/// ch.send("hello")        // OK: String matches T=String
+/// var msg: String = ch.recv()     // "hello"
 /// ch.close()
 /// ```
-class Channel {
-    var _buffer: List<Any>
+class Channel<T> {
+    var _buffer: List<T>
     var _capacity: Number
     var _closed: Bool
 
@@ -207,7 +211,7 @@ class Channel {
 
     /// Send a value into the channel. Suspends if the buffer is full.
     /// Throws if the channel is closed.
-    fun send(value: Any) {
+    fun send(value: T) {
         if (this._closed) {
             throw "send on closed channel"
         }
@@ -223,7 +227,7 @@ class Channel {
 
     /// Receive a value from the channel. Suspends if the buffer is empty.
     /// Returns nil if the channel is closed and empty.
-    fun recv(): Any {
+    fun recv(): T {
         // Wait until there is a value or channel is closed
         while (this._buffer.length() == 0) {
             if (this._closed) {
@@ -235,7 +239,7 @@ class Channel {
     }
 
     /// Try to receive without blocking. Returns nil if empty.
-    fun try_recv(): Any {
+    fun try_recv(): T {
         if (this._buffer.length() == 0) {
             return nil
         }
@@ -243,7 +247,7 @@ class Channel {
     }
 
     /// Try to send without blocking. Returns true if sent, false if full.
-    fun try_send(value: Any): Bool {
+    fun try_send(value: T): Bool {
         if (this._closed) {
             return false
         }
@@ -255,7 +259,7 @@ class Channel {
     }
 
     // Dequeue the first element from the buffer (FIFO).
-    fun _dequeue(): Any {
+    fun _dequeue(): T {
         this._buffer.reverse()
         var value = this._buffer.pop()
         this._buffer.reverse()
