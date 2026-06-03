@@ -553,6 +553,7 @@
             this.last_type = AST.Type.IntType
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("add", local, lhs, rhs)
             return local
         }
 
@@ -573,25 +574,71 @@
         var local: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
-        if (op == "-") { this.emit_indent(local + " = sub i64 " + lhs + ", " + rhs) }
-        else if (op == "*") { this.emit_indent(local + " = mul i64 " + lhs + ", " + rhs) }
-        else if (op == "/") { this.emit_indent(local + " = sdiv i64 " + lhs + ", " + rhs) }
-        else if (op == "%") { this.emit_indent(local + " = srem i64 " + lhs + ", " + rhs) }
-        else if (op == "&") { this.emit_indent(local + " = and i64 " + lhs + ", " + rhs) }
-        else if (op == "|") { this.emit_indent(local + " = or i64 " + lhs + ", " + rhs) }
-        else if (op == "^") { this.emit_indent(local + " = xor i64 " + lhs + ", " + rhs) }
-        else if (op == "<<") { this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs) }
-        else if (op == ">>") { this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs) }
+        if (op == "-") {
+            this.emit_indent(local + " = sub i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("sub", local, lhs, rhs)
+        }
+        else if (op == "*") {
+            this.emit_indent(local + " = mul i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("mul", local, lhs, rhs)
+        }
+        else if (op == "/") {
+            this.emit_indent(local + " = sdiv i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("sdiv", local, lhs, rhs)
+        }
+        else if (op == "%") {
+            this.emit_indent(local + " = srem i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("srem", local, lhs, rhs)
+        }
+        else if (op == "&") {
+            this.emit_indent(local + " = and i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("and", local, lhs, rhs)
+        }
+        else if (op == "|") {
+            this.emit_indent(local + " = or i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("or", local, lhs, rhs)
+        }
+        else if (op == "^") {
+            this.emit_indent(local + " = xor i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("xor", local, lhs, rhs)
+        }
+        else if (op == "<<") {
+            this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("shl", local, lhs, rhs)
+        }
+        else if (op == ">>") {
+            this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs)
+            this.verify_binary_op("ashr", local, lhs, rhs)
+        }
         else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
             this.last_type = AST.Type.BoolType
             var cmp_local: String = this.fresh_local()
-            if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
-            else if (op == "!=") { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
-            else if (op == "<") { this.emit_indent(cmp_local + " = icmp slt i64 " + lhs + ", " + rhs) }
-            else if (op == "<=") { this.emit_indent(cmp_local + " = icmp sle i64 " + lhs + ", " + rhs) }
-            else if (op == ">") { this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs + ", " + rhs) }
-            else if (op == ">=") { this.emit_indent(cmp_local + " = icmp sge i64 " + lhs + ", " + rhs) }
+            if (op == "==") {
+                this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("eq", cmp_local, lhs, rhs)
+            }
+            else if (op == "!=") {
+                this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("ne", cmp_local, lhs, rhs)
+            }
+            else if (op == "<") {
+                this.emit_indent(cmp_local + " = icmp slt i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("slt", cmp_local, lhs, rhs)
+            }
+            else if (op == "<=") {
+                this.emit_indent(cmp_local + " = icmp sle i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("sle", cmp_local, lhs, rhs)
+            }
+            else if (op == ">") {
+                this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("sgt", cmp_local, lhs, rhs)
+            }
+            else if (op == ">=") {
+                this.emit_indent(cmp_local + " = icmp sge i64 " + lhs + ", " + rhs)
+                this.verify_icmp_op("sge", cmp_local, lhs, rhs)
+            }
             this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+            this.verify_zext_op(local, cmp_local)
         }
 
         return local

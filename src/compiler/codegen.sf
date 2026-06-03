@@ -2,6 +2,8 @@
 
 import "./ast.sf" as AST
 import "./codegen/methods.sf" as Methods
+import "llvm/types" as LLVMTypes
+import "llvm/instructions" as LLVMInst
 
 // Runtime function prefix — change this to avoid collisions with user code.
 // Currently "__" (e.g., __list_new, __map_get). Could become "__sf_" later.
