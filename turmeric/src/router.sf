@@ -211,6 +211,7 @@ class Router {
         this.dispatch()
     }
 
+
     fun _on_external_change() {
         this.path.set(_js_get_hash())
     }

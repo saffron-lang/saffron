@@ -732,9 +732,20 @@ fun App() {
     }
 
     main(cls="content") {
-        outlet(fun () => {
-            page.get()
-            router.dispatch()
+        var content_el: Float = div()
+        reactive_attr(content_el, "data-route", fun (): String => {
+            var path: String = page.get()
+            _tc_set_html(content_el, "")
+            _tc_push(content_el)
+            if (path == "/counter") { CounterPage() }
+            else if (path == "/todos") { TodoPage() }
+            else if (path == "/timer") { TimerPage() }
+            else if (path == "/theme") { ThemePage() }
+            else if (path == "/form") { FormPage() }
+            else if (path == "/features") { FeaturesPage() }
+            else { section(cls="page") { p { "404" } } }
+            _tc_pop()
+            return path
         })
     }
 

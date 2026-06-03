@@ -1199,14 +1199,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         gen.known_functions.push(pr_prefix + pr_ename)
                     }
                 }
+                var pr_vnames: List<String> = []
                 var pr_vi: Float = 0
                 while (pr_vi < pr_variants.length()) {
                     var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
-                    if (pr_vname.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname)) {
-                        gen.known_functions.push(pr_vname)
+                    var pr_vfields: String = gen.get_variant_fields(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0) {
+                        if (!gen.str_in_list(gen.known_functions,pr_vname)) {
+                            gen.known_functions.push(pr_vname)
+                        }
+                        pr_vnames.push(pr_vname)
+                        gen.enum_variant_tags.set(pr_ename + "." + pr_vname, pr_vi)
+                        gen.enum_variant_fields.set(pr_ename + "." + pr_vname, pr_vfields)
                     }
                     pr_vi = pr_vi + 1
                 }
+                gen.enum_defs.set(pr_ename, pr_vnames)
             }
             pr_si = pr_si + 1
         }

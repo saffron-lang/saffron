@@ -1,0 +1,83 @@
+// Test all patterns of this.field/method access
+class Widget {
+    var x: Number
+    var y: Number
+    var children: List<Widget>
+    var handlers: List<() => Nil>
+
+    fun init(x: Number, y: Number) {
+        this.x = x
+        this.y = y
+        this.children = []
+        this.handlers = []
+    }
+
+    // Pattern 1: this.method() — simple method call
+    fun get_pos(): String {
+        return "(" + this.x.to_string() + "," + this.y.to_string() + ")"
+    }
+
+    // Pattern 2: this.field.method() — field access then method
+    fun child_count(): Number {
+        return this.children.length()
+    }
+
+    // Pattern 3: this.field[i] — field access then index
+    fun get_child(i: Number): Widget {
+        return this.children[i]
+    }
+
+    // Pattern 4: this.field[i]() — field access, index, then call (THE BUG FIX)
+    fun trigger_handler(i: Number) {
+        this.handlers[i]()
+    }
+
+    // Pattern 5: this.field[i].method() — field access, index, then method
+    fun child_pos(i: Number): String {
+        return this.children[i].get_pos()
+    }
+
+    fun add_child(child: Widget) {
+        this.children.push(child)
+    }
+
+    fun add_handler(fn: () => Nil) {
+        this.handlers.push(fn)
+    }
+
+    // Pattern 6: closure capturing self
+    fun make_mover(): () => Nil {
+        return fun () => {
+            this.x = this.x + 10
+            this.y = this.y + 10
+        }
+    }
+}
+
+fun test() {
+    var w = Widget(5, 10)
+    IO.println("pos: " + w.get_pos())
+
+    // Test child access
+    var c1 = Widget(1, 2)
+    var c2 = Widget(3, 4)
+    w.add_child(c1)
+    w.add_child(c2)
+    IO.println("children: " + w.child_count().to_string())
+    IO.println("child 0 pos: " + w.child_pos(0))
+    IO.println("child 1 pos: " + w.child_pos(1))
+
+    // Test handler calling
+    w.add_handler(fun () => { IO.println("handler 0!") })
+    w.add_handler(fun () => { IO.println("handler 1!") })
+    w.trigger_handler(0)
+    w.trigger_handler(1)
+
+    // Test self-capture in closure
+    var mover: () => Nil = w.make_mover()
+    mover()
+    IO.println("after move: " + w.get_pos())
+    mover()
+    IO.println("after move 2: " + w.get_pos())
+}
+test()

@@ -1,9 +1,21 @@
 // Turmeric Signals — fully generic reactive primitives
 
 // =============================================================================
+// Reactive Interface (documented, not applied until codegen supports vtable dispatch)
+// Both Signal<T> and Computed<T> implement subscribe/unsubscribe with compatible
+// memory layouts (subs at offset 1). The codegen dispatches via Signal__subscribe
+// for both, which works due to identical field offsets.
+// =============================================================================
+
+// =============================================================================
 // Dependency Tracking
 // =============================================================================
 
+// _tracker_deps holds both Signal and Computed instances. Both conform to
+// the Reactive interface, but we use Any here because the codegen dispatches
+// .subscribe()/.unsubscribe() via memory-offset compatibility between Signal
+// and Computed (both have `subs: List<Subscription>` at the same field offset).
+// Changing to Reactive would break this accidental-but-relied-upon dispatch.
 var _tracker_stack: List<List<Any>> = []
 var _tracking: Bool = false
 var _tracker_deps: List<Any> = []
@@ -29,6 +41,8 @@ fun stop_tracking(): List<Any> {
     return deps
 }
 
+// record_dep accepts Any because both Signal<T> and Computed<T> call it.
+// The codegen relies on memory-offset dispatch for .subscribe()/.unsubscribe().
 fun record_dep(sig: Any) {
     if (_tracking) {
         _tracker_deps.push(sig)
@@ -137,6 +151,7 @@ class Computed<T> {
     fun recompute() {
         start_tracking()
         this.value = this.compute()
+        // deps is List<Any> — holds mixed Signal/Computed, dispatched by memory offset
         var deps: List<Any> = stop_tracking()
         var i: Float = 0
         while (i < deps.length()) {
@@ -185,6 +200,8 @@ fun computed<T>(compute: () => T): Computed<T> {
 
 class EffectHandle {
     var sub_ids: List<Float>
+    // deps holds mixed Signal<T> and Computed<T> — both conform to Reactive,
+    // but we use Any to preserve codegen's memory-offset dispatch of .unsubscribe().
     var deps: List<Any>
 
     fun init(sub_ids: List<Float>, deps: List<Any>) {
