@@ -899,6 +899,11 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.target = target
     gen.identity_mode = identity_mode
     gen.module_prefixes = alias_map
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
@@ -1425,6 +1430,11 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib
     gen.module_prefixes = alias_map
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
