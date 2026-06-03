@@ -73,35 +73,60 @@ Pantry.project {
 }
 ```
 
-These use trailing closures — the block after `Pantry.project` is the config body. No `fun (p) { ... }` ceremony needed for the simple case.
+These use **receiver closures** — the block after `Pantry.project` has implicit `this` bound to the `Project` instance. All bare names (`name`, `dep`, `script`) resolve as fields/methods on the project. See `docs/design/receiver-closures.md` for the language feature.
+
+The function signature: `fun project(config: Project.() => Nil)` — the `.()` receiver syntax means `this` is the Project inside the block.
 
 ---
 
-## Power Mode: Dynamic Config
-
-When you need logic, use the full trailing closure with a parameter:
+## With Dependencies and Scripts
 
 ```saffron
 import "@pantry" as Pantry
 
-Pantry.project { p =>
-    p.name = "turmeric-demo"
-    p.version = "0.1.0"
-    p.entry = "src/main.sf"
+Pantry.project {
+    name = "turmeric-demo"
+    version = "0.1.0"
+    entry = "src/main.sf"
 
-    p.dep("turmeric", path: "../../turmeric", version: "^0.1.0")
-    p.dep("http", "^2.0.0")
+    dep("turmeric", path: "../../turmeric", version: "^0.1.0")
+    dep("http", "^2.0.0")
 
-    p.dev_dep("benchmark", "*")
+    dev_dep("benchmark", "*")
 
-    p.script("build", "saffron build --target wasm32 src/main.sf -o build/app.wasm")
+    script("build", "saffron build --target wasm32 src/main.sf -o build/app.wasm")
+    script("test", "saffron run test/test_main.sf")
+}
+```
 
-    p.script("dev") {
-        p.run("build")
+---
+
+## Dynamic Scripts (logic inside)
+
+Scripts can be closures too — receiver closures all the way down:
+
+```saffron
+import "@pantry" as Pantry
+
+Pantry.project {
+    name = "fullstack"
+    version = "1.0.0"
+    entry = "src/main.sf"
+
+    dep("http", "^2.0.0")
+
+    script("dev") {
+        run("build")
         OS.exec("cd build && python3 -m http.server 8080")
     }
 
-    p.script("test", "saffron run test/test_main.sf")
+    script("deploy") {
+        var env = OS.env("DEPLOY_ENV")
+        if (env == "") { env = "staging" }
+        run("build")
+        run("test")
+        OS.exec("./scripts/deploy.sh " + env)
+    }
 }
 ```
 
@@ -112,16 +137,16 @@ Pantry.project { p =>
 ### 1. Conditional dependencies
 
 ```saffron
-Pantry.project { p =>
-    p.name = "my-server"
-    p.version = "1.0.0"
+Pantry.project {
+    name = "my-server"
+    version = "1.0.0"
 
-    p.dep("http", "^2.0.0")
+    dep("http", "^2.0.0")
 
     if (OS.platform() == "linux") {
-        p.dep("epoll-io", "^1.0.0")
+        dep("epoll-io", "^1.0.0")
     } else {
-        p.dep("kqueue-io", "^1.0.0")
+        dep("kqueue-io", "^1.0.0")
     }
 }
 ```
@@ -129,39 +154,39 @@ Pantry.project { p =>
 ### 2. Dynamic version computation
 
 ```saffron
-Pantry.project { p =>
-    p.name = "my-app"
+Pantry.project {
+    name = "my-app"
     // Read version from git tags
-    p.version = OS.exec("git describe --tags 2>/dev/null").trim()
-    if (p.version == "") { p.version = "0.0.0-dev" }
+    version = OS.exec("git describe --tags 2>/dev/null").trim()
+    if (version == "") { version = "0.0.0-dev" }
 
-    p.entry = "src/main.sf"
+    entry = "src/main.sf"
 }
 ```
 
 ### 3. Scripts as real functions with logic
 
 ```saffron
-Pantry.project { p =>
-    p.name = "fullstack"
+Pantry.project {
+    name = "fullstack"
 
-    p.script("build") {
+    script("build") {
         IO.println("Building frontend...")
-        p.run_in("frontend", "pantry build")
+        run_in("frontend", "pantry build")
 
         IO.println("Building backend...")
-        p.run_in("backend", "pantry build")
+        run_in("backend", "pantry build")
 
         IO.println("Copying assets...")
         OS.exec("cp -r frontend/build/* backend/static/")
     }
 
-    p.script("deploy") {
+    script("deploy") {
         var env: String = OS.env("DEPLOY_ENV")
         if (env == "") { env = "staging" }
 
-        p.run("build")
-        p.run("test")
+        run("build")
+        run("test")
 
         IO.println("Deploying to ${env}...")
         OS.exec("./scripts/deploy.sh ${env}")
@@ -172,47 +197,47 @@ Pantry.project { p =>
 ### 4. Workspace with computed members
 
 ```saffron
-Pantry.workspace { w =>
+Pantry.workspace {
     // Auto-discover packages in packages/ directory
     var dirs: List<String> = OS.list_dir("packages")
     for (dir in dirs) {
         if (IO.file_exists("packages/${dir}/pantry.sf")) {
-            w.member("packages/${dir}")
+            member("packages/${dir}")
         }
     }
 
-    w.shared_dep("http", "^2.0.0")
-    w.shared_dep("json", "^1.5.0")
+    shared_dep("http", "^2.0.0")
+    shared_dep("json", "^1.5.0")
 }
 ```
 
 ### 5. Environment-specific configuration
 
 ```saffron
-Pantry.project { p =>
-    p.name = "web-api"
-    p.version = "2.0.0"
-    p.entry = "src/main.sf"
+Pantry.project {
+    name = "web-api"
+    version = "2.0.0"
+    entry = "src/main.sf"
 
-    p.env("dev") { e =>
-        e.opt_level = 0
-        e.define("DEBUG", "true")
-        e.define("API_URL", "http://localhost:3000")
+    env("dev") {
+        opt_level = 0
+        define("DEBUG", "true")
+        define("API_URL", "http://localhost:3000")
     }
 
-    p.env("prod") { e =>
-        e.opt_level = 2
-        e.define("DEBUG", "false")
-        e.define("API_URL", "https://api.myapp.com")
+    env("prod") {
+        opt_level = 2
+        define("DEBUG", "false")
+        define("API_URL", "https://api.myapp.com")
     }
 
-    p.script("dev") {
-        p.build(env: "dev")
+    script("dev") {
+        build(env: "dev")
         OS.exec("./build/web-api")
     }
 
-    p.script("release") {
-        p.build(env: "prod")
+    script("release") {
+        build(env: "prod")
         OS.exec("tar czf release.tar.gz build/web-api")
     }
 }
@@ -221,40 +246,40 @@ Pantry.project { p =>
 ### 6. Custom transforms declared inline
 
 ```saffron
-Pantry.project { p =>
-    p.name = "my-app"
-    p.dep("turmeric", path: "../turmeric")
+Pantry.project {
+    name = "my-app"
+    dep("turmeric", path: "../turmeric")
 
     // Register transforms
-    p.transform("sfx", fun (source: String, path: String): String {
+    transform("sfx", fun (source: String, path: String): String {
         // Inline transform — no separate package needed for simple ones
         return source.replace("<div>", "div {").replace("</div>", "}")
     }
 
     // Or from a package
-    p.transform_from("turmeric", extensions: [".sfx"])
+    transform_from("turmeric", extensions: [".sfx"])
 }
 ```
 
 ### 7. Hooks (lifecycle events)
 
 ```saffron
-Pantry.project { p =>
-    p.name = "my-app"
+Pantry.project {
+    name = "my-app"
 
-    p.before_build(fun () {
+    before_build(fun () {
         IO.println("Generating version file...")
         var version: String = OS.exec("git describe --tags").trim()
         IO.write_file("src/version.sf", "var VERSION = \"${version}\"\n")
     }
 
-    p.after_build(fun () {
+    after_build(fun () {
         IO.println("Build complete!")
         var size: String = OS.exec("wc -c < build/my-app").trim()
         IO.println("Binary size: ${size} bytes")
     }
 
-    p.after_test(fun (results: Pantry.TestResults) {
+    after_test(fun (results: Pantry.TestResults) {
         if (results.failed > 0) {
             OS.exec("notify-send 'Tests failed: ${results.failed}'")
         }
@@ -265,53 +290,53 @@ Pantry.project { p =>
 ### 8. Dynamic dependency features / feature flags
 
 ```saffron
-Pantry.project { p =>
-    p.name = "http-client"
-    p.version = "2.0.0"
+Pantry.project {
+    name = "http-client"
+    version = "2.0.0"
 
-    p.feature("tls") {
-        p.dep("openssl", "^3.0.0")
-        p.define("HAS_TLS", "true")
+    feature("tls") {
+        dep("openssl", "^3.0.0")
+        define("HAS_TLS", "true")
     }
 
-    p.feature("http2") {
-        p.dep("nghttp2", "^1.0.0")
-        p.define("HAS_HTTP2", "true")
+    feature("http2") {
+        dep("nghttp2", "^1.0.0")
+        define("HAS_HTTP2", "true")
     }
 
     // Default features
-    p.default_features = ["tls"]
+    default_features = ["tls"]
 }
 ```
 
 Consumers:
 ```saffron
-Pantry.project { p =>
-    p.dep("http-client", version: "^2.0.0", features: ["tls", "http2"])
+Pantry.project {
+    dep("http-client", version: "^2.0.0", features: ["tls", "http2"])
 }
 ```
 
 ### 9. Multi-target builds
 
 ```saffron
-Pantry.project { p =>
-    p.name = "turmeric-demo"
+Pantry.project {
+    name = "turmeric-demo"
 
-    p.target("wasm32") { t =>
-        t.entry = "src/main.sf"
-        t.output = "build/app.wasm"
-        t.dep("turmeric", path: "../turmeric")
+    target("wasm32") {
+        entry = "src/main.sf"
+        output = "build/app.wasm"
+        dep("turmeric", path: "../turmeric")
     }
 
-    p.target("native") { t =>
-        t.entry = "src/server.sf"
-        t.output = "build/server"
-        t.dep("http", "^2.0.0")
+    target("native") {
+        entry = "src/server.sf"
+        output = "build/server"
+        dep("http", "^2.0.0")
     }
 
-    p.script("dev") {
-        p.build_target("wasm32")
-        p.build_target("native")
+    script("dev") {
+        build_target("wasm32")
+        build_target("native")
         // Run both: wasm in browser, native as API server
         Process.spawn("./build/server")
         OS.exec("cd build && python3 -m http.server 8080")
@@ -322,15 +347,15 @@ Pantry.project { p =>
 ### 10. Plugin system
 
 ```saffron
-Pantry.project { p =>
-    p.name = "my-app"
+Pantry.project {
+    name = "my-app"
 
     // Plugins can add commands, transforms, hooks
-    p.plugin("pantry-docker", "^1.0.0")  // adds: pantry docker build
-    p.plugin("pantry-deploy", "^2.0.0")  // adds: pantry deploy staging
+    plugin("pantry-docker", "^1.0.0")  // adds: pantry docker build
+    plugin("pantry-deploy", "^2.0.0")  // adds: pantry deploy staging
 
     // Plugin configuration
-    p.configure("pantry-docker") { docker =>
+    configure("pantry-docker") { docker =>
         docker.set("base_image", "alpine:3.18")
         docker.set("expose", [8080])
     }
