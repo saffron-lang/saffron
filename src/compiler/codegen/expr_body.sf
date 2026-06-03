@@ -67,6 +67,7 @@
                     var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                 }
                 this.emit_indent(local + " = load i64, i64* " + var_ref)
+                this.verify_load(local, "i64", var_ref)
                 local
             }
             Binary(left, op, right) => {
@@ -86,6 +87,7 @@
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                     }
                     this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+                    this.verify_store(val, "i64", var_ref)
                 }
                 val
             }
@@ -354,6 +356,7 @@
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
         var result_ptr: String = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
+        this.verify_alloca(result_ptr, "i64")
 
         var cond_val: String = this.to_i1(this.gen_arg_value(cond))
         var then_label: String = this.fresh_label("ifexpr.then")
@@ -361,22 +364,28 @@
         var end_label: String = this.fresh_label("ifexpr.end")
 
         this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+        this.verify_cond_br(cond_val, then_label, else_label)
 
         this.start_block(then_label)
         this.gen_stmts(then_stmts)
         var then_result: String = this.gen_arg_value(then_val)
         this.emit_indent("store i64 " + then_result + ", i64* " + result_ptr)
+        this.verify_store(then_result, "i64", result_ptr)
         this.emit_terminator("br label %" + end_label)
+        this.verify_br(end_label)
 
         this.start_block(else_label)
         this.gen_stmts(else_stmts)
         var else_result: String = this.gen_arg_value(else_val)
         this.emit_indent("store i64 " + else_result + ", i64* " + result_ptr)
+        this.verify_store(else_result, "i64", result_ptr)
         this.emit_terminator("br label %" + end_label)
+        this.verify_br(end_label)
 
         this.start_block(end_label)
         var result: String = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
+        this.verify_load(result, "i64", result_ptr)
         return result
     }
 
@@ -882,6 +891,7 @@
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
             }
             this.emit_indent(local + " = load i64, i64* " + var_ref)
+            this.verify_load(local, "i64", var_ref)
             return local
         }
         if (expr_kind == "member") {
@@ -1117,10 +1127,12 @@
             var spawn_arg: String = this.gen_arg_value(args[0])
             var hdl: String = this.fresh_local()
             this.emit_indent(hdl + " = inttoptr i64 " + spawn_arg + " to ptr")
+            this.verify_inttoptr(hdl, spawn_arg)
             var task_hdl: String = this.fresh_local()
             this.emit_indent(task_hdl + " = call ptr " + hdl + "()")
             var task_i64: String = this.fresh_local()
             this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+            this.verify_ptrtoint(task_i64, task_hdl)
             this.emit_indent("call i64 @enqueue(i64 " + task_i64 + ")")
             this.called_functions.push("enqueue")
             this.last_type = AST.Type.IntType
@@ -1654,6 +1666,7 @@
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
+            this.verify_call(local, "i64", call_target, arg_strs.join(", "))
             if (this.func_ret_types.has(resolved_callee)) {
                 this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
             } else if (this.func_ret_types.has(callee_name)) {
@@ -1880,6 +1893,7 @@
             }
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
+            this.verify_call(local, "i64", emit_callee, arg_strs.join(", "))
             if (this.func_ret_types.has(emit_callee)) {
                 this.last_type = this.str_to_type(this.func_ret_types.get(emit_callee))
             } else {

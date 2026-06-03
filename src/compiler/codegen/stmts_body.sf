@@ -159,13 +159,19 @@
         var var_ref: String = "%" + this.sanitize_name(name)
         if (this.module_globals.has(this.current_prefix + name)) {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+            this.global_var_types.set(name, vtype)
+            this.global_var_types.set(this.current_prefix + name, vtype)
         }
         this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+        this.verify_store(val, "i64", var_ref)
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
-        // If init is a Call(callee, args) and one arg is a Lambda with explicit ret type,
-        // use that lambda's return type as the inferred generic type param.
+        // If init is a Call(callee, args), try to infer generic type from args:
+        // 1. Lambda args with explicit return type
+        // 2. String literal args → String
+        // 3. Number literal args → Float
+        // 4. Typed variable args → that variable's type
         var ek: String = this.classify_expr(init)
         if (ek == "call") {
             var call_args: List<AST.Expr> = match (init) { Call(c, a) => a   _ => [] }
@@ -176,6 +182,21 @@
                     var lam_ret: String = match (call_args[ai]) { Lambda(p, r, b) => r   _ => "" }
                     if (lam_ret.length() > 0 and lam_ret != "Int" and lam_ret != "Any") {
                         return lam_ret
+                    }
+                }
+                if (arg_kind == "string") {
+                    return "String"
+                }
+                if (arg_kind == "number") {
+                    return "Float"
+                }
+                if (arg_kind == "bool") {
+                    return "Bool"
+                }
+                if (arg_kind == "ident") {
+                    var arg_type: String = this.get_expr_type(call_args[ai])
+                    if (arg_type.length() > 0 and arg_type != "Any" and arg_type != "Int") {
+                        return arg_type
                     }
                 }
                 ai = ai + 1
@@ -828,6 +849,7 @@
         if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
+            this.verify_alloca("%" + this.sanitize_name(vname), "i64")
         }
     }
 
@@ -853,6 +875,7 @@
     fun to_i1(val: String): String {
         var local: String = this.fresh_local()
         this.emit_indent(local + " = trunc i64 " + val + " to i1")
+        this.verify_trunc(local, val, "i64", "i1")
         return local
     }
 
@@ -869,10 +892,12 @@
             var else_label: String = this.fresh_label("else")
 
             this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+            this.verify_cond_br(cond_val, then_label, else_label)
 
             this.start_block(then_label)
             this.gen_stmts(current_then)
             this.emit_terminator("br label %" + end_label)
+            this.verify_br(end_label)
 
             this.start_block(else_label)
 
@@ -1116,14 +1141,17 @@
         this.loop_end_label = end_label + ":" + cond_label
 
         this.emit_terminator("br label %" + cond_label)
+        this.verify_br(cond_label)
 
         this.start_block(cond_label)
         var cond_val: String = this.to_i1(this.gen_arg_value(cond))
         this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
+        this.verify_cond_br(cond_val, body_label, end_label)
 
         this.start_block(body_label)
         this.gen_stmts(body)
         this.emit_terminator("br label %" + cond_label)
+        this.verify_br(cond_label)
 
         this.loop_end_label = saved_loop_end
 

@@ -731,5 +731,179 @@
         }
     }
 
+    // --- Memory operation verification ---
+
+    fun verify_alloca(result_name: String, type_str: String) {
+        // Construct: Instruction.Alloca(result, type, name)
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Alloca(result_val, ty, "")
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = alloca " + type_str
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for alloca:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_load(result_name: String, type_str: String, ptr_name: String) {
+        // Library uses opaque pointers: "load i64, ptr %x"
+        // Codegen uses typed pointers: "load i64, i64* %x"
+        // Verify library output format only
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Load(result_val, ty, ptr_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        // Library format: "  %r = load i64, ptr %ptr"
+        // Codegen format: "  %r = load i64, i64* %ptr"
+        // These differ in pointer syntax — just verify library is self-consistent
+        var lib_expected: String = "  " + result_name + " = load " + type_str + ", ptr " + ptr_name
+        if (lib_ir != lib_expected) {
+            IO.println("[llvm-verify] MISMATCH for load (library format):")
+            IO.println("  expected: " + lib_expected)
+            IO.println("  library:  " + lib_ir)
+        }
+    }
+
+    fun verify_store(val_name: String, type_str: String, ptr_name: String) {
+        // Library uses opaque pointers: "store i64 %v, ptr %p"
+        // Codegen uses typed pointers: "store i64 %v, i64* %p"
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, ty)
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Store(val_v, ptr_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_expected: String = "  store " + type_str + " " + val_name + ", ptr " + ptr_name
+        if (lib_ir != lib_expected) {
+            IO.println("[llvm-verify] MISMATCH for store (library format):")
+            IO.println("  expected: " + lib_expected)
+            IO.println("  library:  " + lib_ir)
+        }
+    }
+
+    // --- Function call verification ---
+
+    fun verify_call(result_name: String, ret_type: String, fn_name: String, args_str: String) {
+        // Codegen format: "  %r = call i64 @fn(i64 %a, i64 %b)"
+        // Library format: "  %r = call i64 @fn(i64 %a, i64 %b)"
+        // These should match when all args are i64
+        var ret_ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (ret_type == "void") { ret_ty = LLVMTypes.Type.Void }
+        else if (ret_type == "i1") { ret_ty = LLVMTypes.Type.I1 }
+        else if (ret_type == "i32") { ret_ty = LLVMTypes.Type.I32 }
+        else if (ret_type == "ptr") { ret_ty = LLVMTypes.Type.Ptr }
+        // Parse args_str into Value list (args_str is like "i64 %a, i64 %b")
+        var arg_vals: List<LLVMTypes.Value> = []
+        if (args_str.length() > 0) {
+            var arg_parts: List<String> = args_str.split(", ")
+            var ai: Float = 0
+            while (ai < arg_parts.length()) {
+                var part: String = arg_parts[ai]
+                var space_idx: Float = part.index_of(" ")
+                if (space_idx > 0) {
+                    var arg_name: String = part.slice(space_idx + 1, part.length())
+                    arg_vals.push(LLVMTypes.Value.Instruction(arg_name, LLVMTypes.Type.I64))
+                }
+                ai = ai + 1
+            }
+        }
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ret_ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Call(result_val, fn_name, ret_ty, arg_vals)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")"
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for call @" + fn_name + ":")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    // --- Conversion verification ---
+
+    fun verify_ptrtoint(result_name: String, val_name: String) {
+        // Codegen: "  %r = ptrtoint ptr %v to i64"
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.PtrToInt(result_val, val_v, LLVMTypes.Type.I64)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = ptrtoint ptr " + val_name + " to i64"
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for ptrtoint:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_inttoptr(result_name: String, val_name: String) {
+        // Codegen: "  %r = inttoptr i64 %v to ptr"
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.IntToPtr(result_val, val_v, LLVMTypes.Type.Ptr)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = inttoptr i64 " + val_name + " to ptr"
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for inttoptr:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_trunc(result_name: String, val_name: String, from_type: String, to_type: String) {
+        // Codegen: "  %r = trunc i64 %v to i1"
+        var from_ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (from_type == "i32") { from_ty = LLVMTypes.Type.I32 }
+        var to_ty: LLVMTypes.Type = LLVMTypes.Type.I1
+        if (to_type == "i32") { to_ty = LLVMTypes.Type.I32 }
+        else if (to_type == "i8") { to_ty = LLVMTypes.Type.I8 }
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, from_ty)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, to_ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Trunc(result_val, val_v, to_ty)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = trunc " + from_type + " " + val_name + " to " + to_type
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for trunc:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    // --- Control flow verification ---
+
+    fun verify_br(target_label: String) {
+        // Codegen: "  br label %target"
+        var term: LLVMInst.Terminator = LLVMInst.Terminator.Br(target_label)
+        var lib_ir: String = LLVMInst.format_terminator(term)
+        var expected: String = "  br label %" + target_label
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for br:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_cond_br(cond_name: String, then_label: String, else_label: String) {
+        // Codegen: "  br i1 %cond, label %then, label %else"
+        var cond_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(cond_name, LLVMTypes.Type.I1)
+        var term: LLVMInst.Terminator = LLVMInst.Terminator.CondBr(cond_val, then_label, else_label)
+        var lib_ir: String = LLVMInst.format_terminator(term)
+        var expected: String = "  br i1 " + cond_name + ", label %" + then_label + ", label %" + else_label
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for cond_br:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
     // --- Statement codegen ---
 
