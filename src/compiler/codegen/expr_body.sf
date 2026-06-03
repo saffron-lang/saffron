@@ -41,7 +41,7 @@
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
@@ -49,14 +49,14 @@
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 if (this.str_in_list(this.known_functions,name)) {
                     if (!this.typed_vars.has(name)) {
-                        if (!this.module_globals.has(this.current_prefix + name)) {
+                        if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
                             return this.gen_func_ref(name)
                         }
                     }
                 }
                 if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                     if (!this.typed_vars.has(name)) {
-                        if (!this.module_globals.has(this.current_prefix + name)) {
+                        if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
                             return this.gen_func_ref(this.current_prefix + name)
                         }
                     }
@@ -65,6 +65,8 @@
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
                     var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                } else if (this.module_globals.has(name)) {
+                    var_ref = "@__g_" + this.sanitize_name(name)
                 }
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_load(local, "i64", var_ref))
@@ -85,10 +87,12 @@
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
+                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
                     if (this.module_globals.has(this.current_prefix + name)) {
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    } else if (this.module_globals.has(name)) {
+                        var_ref = "@__g_" + this.sanitize_name(name)
                     }
                     if (this.use_llvm_lib) {
                         this.emit_indent(this.lib_store(val, "i64", var_ref))
@@ -975,8 +979,8 @@
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Error: undefined variable '" + vname + "' prefix='" + this.current_prefix + "' in_func=" + this.in_function.to_string() + " mg=" + this.module_globals.has(vname).to_string())
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+                IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
             }
@@ -984,6 +988,8 @@
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
+            } else if (this.module_globals.has(vname)) {
+                var_ref = "@__g_" + this.sanitize_name(vname)
             }
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_load(local, "i64", var_ref))

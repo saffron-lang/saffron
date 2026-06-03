@@ -1166,10 +1166,12 @@ class Codegen {
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
+                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
                     if (this.module_globals.has(this.current_prefix + name)) {
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    } else if (this.module_globals.has(name)) {
+                        var_ref = "@__g_" + this.sanitize_name(name)
                     }
                     if (this.use_llvm_lib) {
                         this.emit_indent(this.lib_store(val, "i64", var_ref))
@@ -4623,6 +4625,9 @@ class Codegen {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)
+        } else if (this.module_globals.has(name)) {
+            var_ref = "@__g_" + this.sanitize_name(name)
+            this.global_var_types.set(name, vtype)
         }
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_store(val, "i64", var_ref))
