@@ -1,0 +1,22 @@
+// Test binary operations — triggers dual-emit verification in codegen
+var a: Float = 10
+var b: Float = 3
+var c: Float = a + b
+var d: Float = a - b
+var e: Float = a * b
+var f: Float = a / b
+var g: Float = a % b
+var h: Float = a & b
+var i: Float = a | b
+var j: Float = a ^ b
+var k: Float = a << b
+var l: Float = a >> b
+var m: Bool = a == b
+var n: Bool = a != b
+var o: Bool = a < b
+var p: Bool = a <= b
+var q: Bool = a > b
+var r: Bool = a >= b
+IO.println(c)
+IO.println(d)
+IO.println(e)

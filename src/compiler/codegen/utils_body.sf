@@ -656,5 +656,80 @@
         return false
     }
 
+    // --- LLVM library dual-emit verification ---
+
+    fun verify_binary_op(op_name: String, result_name: String, lhs_name: String, rhs_name: String) {
+        // Construct the same instruction via the @llvm library and compare
+        var lhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(lhs_name, LLVMTypes.Type.I64)
+        var rhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(rhs_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Add(result_val, lhs_val, rhs_val)
+        if (op_name == "sub") {
+            inst = LLVMInst.Instruction.Sub(result_val, lhs_val, rhs_val)
+        } else if (op_name == "mul") {
+            inst = LLVMInst.Instruction.Mul(result_val, lhs_val, rhs_val)
+        } else if (op_name == "sdiv") {
+            inst = LLVMInst.Instruction.SDiv(result_val, lhs_val, rhs_val)
+        } else if (op_name == "srem") {
+            inst = LLVMInst.Instruction.SRem(result_val, lhs_val, rhs_val)
+        } else if (op_name == "and") {
+            inst = LLVMInst.Instruction.And(result_val, lhs_val, rhs_val)
+        } else if (op_name == "or") {
+            inst = LLVMInst.Instruction.Or(result_val, lhs_val, rhs_val)
+        } else if (op_name == "xor") {
+            inst = LLVMInst.Instruction.Xor(result_val, lhs_val, rhs_val)
+        } else if (op_name == "shl") {
+            inst = LLVMInst.Instruction.Shl(result_val, lhs_val, rhs_val)
+        } else if (op_name == "ashr") {
+            inst = LLVMInst.Instruction.AShr(result_val, lhs_val, rhs_val)
+        }
+
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = " + op_name + " i64 " + lhs_name + ", " + rhs_name
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for " + op_name + ":")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_icmp_op(pred_name: String, result_name: String, lhs_name: String, rhs_name: String) {
+        // Construct an icmp instruction via the @llvm library and compare
+        var lhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(lhs_name, LLVMTypes.Type.I64)
+        var rhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(rhs_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I1)
+
+        var pred: LLVMTypes.CmpPred = LLVMTypes.CmpPred.Eq
+        if (pred_name == "ne") { pred = LLVMTypes.CmpPred.Ne }
+        else if (pred_name == "slt") { pred = LLVMTypes.CmpPred.Slt }
+        else if (pred_name == "sle") { pred = LLVMTypes.CmpPred.Sle }
+        else if (pred_name == "sgt") { pred = LLVMTypes.CmpPred.Sgt }
+        else if (pred_name == "sge") { pred = LLVMTypes.CmpPred.Sge }
+
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.ICmp(result_val, pred, lhs_val, rhs_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = icmp " + pred_name + " i64 " + lhs_name + ", " + rhs_name
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for icmp " + pred_name + ":")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
+    fun verify_zext_op(result_name: String, src_name: String) {
+        // Verify zext i1 %src to i64
+        var src_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(src_name, LLVMTypes.Type.I1)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.ZExt(result_val, src_val, LLVMTypes.Type.I64)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var expected: String = "  " + result_name + " = zext i1 " + src_name + " to i64"
+        if (lib_ir != expected) {
+            IO.println("[llvm-verify] MISMATCH for zext:")
+            IO.println("  codegen: " + expected)
+            IO.println("  library: " + lib_ir)
+        }
+    }
+
     // --- Statement codegen ---
 
