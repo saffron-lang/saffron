@@ -484,8 +484,6 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
 
@@ -917,8 +915,6 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
@@ -1448,8 +1444,6 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.use_llvm_lib = use_llvm_lib
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports

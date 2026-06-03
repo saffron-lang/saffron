@@ -1688,7 +1688,9 @@ class Codegen {
                 this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-                var result: String = this.ptr_to_val(buf)
+                var raw_result: String = this.ptr_to_val(buf)
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
                 return result
             }
 
@@ -2258,8 +2260,10 @@ class Codegen {
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-        // Return as i64
-        var result: String = this.ptr_to_val(buf)
+        // Intern the result for O(1) equality
+        var raw_result: String = this.ptr_to_val(buf)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
         return result
     }
 
@@ -7782,6 +7786,7 @@ class Codegen {
         out.append("declare i64 @__float_to_string(i64)\n")
         out.append("declare i64 @__string_eq(i64, i64)\n")
         out.append("declare i64 @__string_ne(i64, i64)\n")
+        out.append("declare i64 @__string_intern(i64)\n")
         if (!this.identity_mode) {
             out.append("; --- NaN-boxing value helpers ---\n")
             out.append("declare i64 @__val_tag_int(i64)\n")
@@ -8617,27 +8622,30 @@ class Codegen {
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
-    // Universal module dispatch for non-builtin modules (Reflect, Task, user imports).
-    // IO/OS/GC have special handling below (coercion, exit truncation).
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name) and obj_name != "IO" and obj_name != "OS" and obj_name != "GC") {
+    // Universal module dispatch: route through module prefix when the module
+    // was properly imported (has a real prefix like "stdlib_os_").
+    // Builtins with empty prefix (IO/OS/GC registered as "") fall through
+    // to their hardcoded blocks below.
+    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
         var __mp: String = this.module_prefixes.get(obj_name)
-        if (__mp.length() == 0) { __mp = "__" + obj_name.to_lower() + "_" }
-        var __mp_func: String = __mp + method
-        this.called_functions.push(__mp_func)
-        var __mp_args: List<String> = []
-        var __mpi: Float = 0
-        while (__mpi < args.length()) {
-            __mp_args.push("i64 " + this.gen_arg_value(args[__mpi]))
-            __mpi = __mpi + 1
+        if (__mp.length() > 0) {
+            var __mp_func: String = __mp + method
+            this.called_functions.push(__mp_func)
+            var __mp_args: List<String> = []
+            var __mpi: Float = 0
+            while (__mpi < args.length()) {
+                __mp_args.push("i64 " + this.gen_arg_value(args[__mpi]))
+                __mpi = __mpi + 1
+            }
+            var __mp_local: String = this.fresh_local()
+            this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
+            if (this.func_ret_types.has(__mp_func)) {
+                this.last_type = this.func_ret_types.get(__mp_func)
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return __mp_local
         }
-        var __mp_local: String = this.fresh_local()
-        this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
-        if (this.func_ret_types.has(__mp_func)) {
-            this.last_type = this.func_ret_types.get(__mp_func)
-        } else {
-            this.last_type = AST.Type.IntType
-        }
-        return __mp_local
     }
 
     // Check for OS module calls
@@ -10242,8 +10250,6 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
 
@@ -10675,8 +10681,6 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
@@ -11206,8 +11210,6 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.use_llvm_lib = use_llvm_lib
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
     gen.module_prefixes.set("Task", "")
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
