@@ -39,8 +39,50 @@ fun race(tasks: List<Int>): Int {
             }
             i = i + 1
         }
-        // None ready yet — yield and try again
         __suspend(0, 0)
     }
     return 0
+}
+
+/// Run a function with a timeout. Returns the result if it completes
+/// within the deadline, or nil if it times out.
+/// Usage: var result = Async.timeout(fun () => Http.get(url), 5.0)
+fun timeout(fn: Fun, seconds: Number): Int {
+    var task = Task.spawn(fn)
+    var elapsed: Number = 0.0
+    var step: Number = 0.01
+    while (elapsed < seconds) {
+        if (task.isReady()) {
+            return task.getResult()
+        }
+        sleep(step)
+        elapsed = elapsed + step
+        // Exponential backoff on polling interval (up to 100ms)
+        if (step < 0.1) { step = step * 1.5 }
+    }
+    return 0
+}
+
+/// Run multiple functions concurrently with bounded parallelism.
+/// Like Python's asyncio.TaskGroup or Elixir's Task.async_stream.
+fun parallel(fns: List<Fun>, max_concurrent: Int): List<Int> {
+    var results: List<Int> = []
+    var i: Int = 0
+    while (i < fns.length()) {
+        // Launch a batch of max_concurrent
+        var batch: List<Int> = []
+        var j: Int = 0
+        while (j < max_concurrent and i + j < fns.length()) {
+            batch.push(Task.spawn(fns[i + j]))
+            j = j + 1
+        }
+        // Await the batch
+        var bi: Int = 0
+        while (bi < batch.length()) {
+            results.push(batch[bi].await())
+            bi = bi + 1
+        }
+        i = i + j
+    }
+    return results
 }
