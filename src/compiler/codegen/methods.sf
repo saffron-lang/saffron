@@ -646,7 +646,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
         // emit the await loop pattern (call as ptr, suspend/resume until done)
-        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var b_hdl: String = this.fresh_local()
             this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
             var b_i64: String = this.fresh_local()
