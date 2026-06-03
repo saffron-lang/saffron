@@ -154,9 +154,6 @@ declare i64 @write(i32, i8*, i64)
 declare i64 @read(i32, i8*, i64)
 declare i64 @__gc_alloc_safe(i64, i64)
 declare i64 @__val_untag_ptr(i64)
-@__g_stdlib_io_SEEK_SET = global i64 0
-@__g_stdlib_io_SEEK_CUR = global i64 0
-@__g_stdlib_io_SEEK_END = global i64 0
 
 define linkonce_odr i64 @Addable__add(i64 %self.arg, i64 %other.arg) {
 entry:
@@ -568,7 +565,7 @@ endif16:
   %t18 = load volatile i64, i64* %t17
   %t19 = inttoptr i64 %t18 to i8*
   %t20 = add i64 0, 0
-  %t21 = load i64, i64* @__g_stdlib_io_SEEK_END
+  %t21 = add i64 0, 2
   %t22 = trunc i64 %t21 to i32
   %t23 = call i32 @fseek(i8* %t19, i64 %t20, i32 %t22)
   %t24 = sext i32 %t23 to i64
@@ -585,7 +582,7 @@ endif16:
   %t34 = load volatile i64, i64* %t33
   %t35 = inttoptr i64 %t34 to i8*
   %t36 = load i64, i64* %cur
-  %t37 = load i64, i64* @__g_stdlib_io_SEEK_SET
+  %t37 = add i64 0, 0
   %t38 = trunc i64 %t37 to i32
   %t39 = call i32 @fseek(i8* %t35, i64 %t36, i32 %t38)
   %t40 = sext i32 %t39 to i64
@@ -794,7 +791,7 @@ endif34:
   %t12 = load volatile i64, i64* %t11
   %t13 = inttoptr i64 %t12 to i8*
   %t14 = load i64, i64* %offset
-  %t15 = load i64, i64* @__g_stdlib_io_SEEK_SET
+  %t15 = add i64 0, 0
   %t16 = trunc i64 %t15 to i32
   %t17 = call i32 @fseek(i8* %t13, i64 %t14, i32 %t16)
   %t18 = sext i32 %t17 to i64
@@ -829,7 +826,7 @@ endif37:
   %t12 = load volatile i64, i64* %t11
   %t13 = inttoptr i64 %t12 to i8*
   %t14 = load i64, i64* %offset
-  %t15 = load i64, i64* @__g_stdlib_io_SEEK_END
+  %t15 = add i64 0, 2
   %t16 = trunc i64 %t15 to i32
   %t17 = call i32 @fseek(i8* %t13, i64 %t14, i32 %t16)
   %t18 = sext i32 %t17 to i64
@@ -891,7 +888,7 @@ endif43:
   %t12 = load volatile i64, i64* %t11
   %t13 = inttoptr i64 %t12 to i8*
   %t14 = add i64 0, 0
-  %t15 = load i64, i64* @__g_stdlib_io_SEEK_SET
+  %t15 = add i64 0, 0
   %t16 = trunc i64 %t15 to i32
   %t17 = call i32 @fseek(i8* %t13, i64 %t14, i32 %t16)
   %t18 = sext i32 %t17 to i64
@@ -1032,7 +1029,7 @@ endif52:
   %t18 = load volatile i64, i64* %t17
   %t19 = inttoptr i64 %t18 to i8*
   %t20 = add i64 0, 0
-  %t21 = load i64, i64* @__g_stdlib_io_SEEK_END
+  %t21 = add i64 0, 2
   %t22 = trunc i64 %t21 to i32
   %t23 = call i32 @fseek(i8* %t19, i64 %t20, i32 %t22)
   %t24 = sext i32 %t23 to i64
@@ -1049,7 +1046,7 @@ endif52:
   %t34 = load volatile i64, i64* %t33
   %t35 = inttoptr i64 %t34 to i8*
   %t36 = load i64, i64* %cur
-  %t37 = load i64, i64* @__g_stdlib_io_SEEK_SET
+  %t37 = add i64 0, 0
   %t38 = trunc i64 %t37 to i32
   %t39 = call i32 @fseek(i8* %t35, i64 %t36, i32 %t38)
   %t40 = sext i32 %t39 to i64
@@ -1276,17 +1273,6 @@ entry:
   %t1 = load i64, i64* %path
   %t2 = call i64 @__io_walk_dir(i64 %t1)
   ret i64 %t2
-}
-
-define i64 @__mod_init_stdlib_io() {
-entry:
-  %t1 = add i64 0, 0
-  store i64 %t1, i64* @__g_stdlib_io_SEEK_SET
-  %t2 = add i64 0, 1
-  store i64 %t2, i64* @__g_stdlib_io_SEEK_CUR
-  %t3 = add i64 0, 2
-  store i64 %t3, i64* @__g_stdlib_io_SEEK_END
-  ret i64 0
 }
 
 define linkonce_odr i64 @__list_new() {

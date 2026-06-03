@@ -28,11 +28,8 @@
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
 
-// --- Seek whence constants ---
-
-var SEEK_SET: Int = 0
-var SEEK_CUR: Int = 1
-var SEEK_END: Int = 2
+// Seek whence constants (inlined to avoid duplicate globals when runtime imports io):
+// 0 = 0, SEEK_CUR = 1, 2 = 2
 
 // =============================================================================
 // File class — wraps a C FILE* for incremental I/O
@@ -90,9 +87,9 @@ class File {
         }
         // Save current position, seek to end, compute remaining
         var cur: Int = _ftell(this._fp)
-        _fseek(this._fp, 0, SEEK_END)
+        _fseek(this._fp, 0, 2)
         var end: Int = _ftell(this._fp)
-        _fseek(this._fp, cur, SEEK_SET)
+        _fseek(this._fp, cur, 0)
         var remaining: Int = end - cur
         if (remaining <= 0) { return "" }
         var buf: Int = _io_malloc(remaining + 1)
@@ -134,7 +131,7 @@ class File {
         if (this._closed) {
             throw "IO: file is closed"
         }
-        _fseek(this._fp, offset, SEEK_SET)
+        _fseek(this._fp, offset, 0)
     }
 
     /// Seek to a byte offset from the end of the file.
@@ -142,7 +139,7 @@ class File {
         if (this._closed) {
             throw "IO: file is closed"
         }
-        _fseek(this._fp, offset, SEEK_END)
+        _fseek(this._fp, offset, 2)
     }
 
     /// Return the current byte offset in the file.
@@ -158,7 +155,7 @@ class File {
         if (this._closed) {
             throw "IO: file is closed"
         }
-        _fseek(this._fp, 0, SEEK_SET)
+        _fseek(this._fp, 0, 0)
     }
 
     /// Flush any buffered data to disk.
@@ -199,9 +196,9 @@ class File {
             throw "IO: file is closed"
         }
         var cur: Int = _ftell(this._fp)
-        _fseek(this._fp, 0, SEEK_END)
+        _fseek(this._fp, 0, 2)
         var end: Int = _ftell(this._fp)
-        _fseek(this._fp, cur, SEEK_SET)
+        _fseek(this._fp, cur, 0)
         return end
     }
 
