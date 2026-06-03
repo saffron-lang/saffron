@@ -4399,7 +4399,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.4395 = private unnamed_addr constant [2 x i8] c",\00"
 @.str.4396 = private unnamed_addr constant [2 x i8] c":\00"
 @.str.4397 = private unnamed_addr constant [3 x i8] c"IO\00"
-@.str.4398 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.4398 = private unnamed_addr constant [11 x i8] c"stdlib_io_\00"
 @.str.4399 = private unnamed_addr constant [3 x i8] c"OS\00"
 @.str.4400 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.4401 = private unnamed_addr constant [3 x i8] c"GC\00"
@@ -4513,7 +4513,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.4509 = private unnamed_addr constant [27 x i8] c"__reflect_number_to_string\00"
 @.str.4510 = private unnamed_addr constant [18 x i8] c"__gc_get_type_tag\00"
 @.str.4511 = private unnamed_addr constant [3 x i8] c"IO\00"
-@.str.4512 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.4512 = private unnamed_addr constant [11 x i8] c"stdlib_io_\00"
 @.str.4513 = private unnamed_addr constant [3 x i8] c"OS\00"
 @.str.4514 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.4515 = private unnamed_addr constant [3 x i8] c"GC\00"
@@ -4630,7 +4630,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.4626 = private unnamed_addr constant [2 x i8] c"}\00"
 @.str.4627 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.4628 = private unnamed_addr constant [3 x i8] c"IO\00"
-@.str.4629 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.4629 = private unnamed_addr constant [11 x i8] c"stdlib_io_\00"
 @.str.4630 = private unnamed_addr constant [3 x i8] c"OS\00"
 @.str.4631 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.4632 = private unnamed_addr constant [3 x i8] c"GC\00"
@@ -56270,17 +56270,19 @@ match.arm3061:
   %t13 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 4
   %t14 = load i64, i64* %t13
   store i64 %t14, i64* %d
-  %t15 = load i64, i64* %t
-  store i64 %t15, i64* %t2
-  br label %match.end3060
-match.arm3062:
-  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.2177, i64 0, i64 0
-  %t17 = ptrtoint i8* %t16 to i64
+  %t15 = load i64, i64* %self
+  %t16 = load i64, i64* %t
+  %t17 = call i64 @Codegen__type_to_string(i64 %t15, i64 %t16)
   store i64 %t17, i64* %t2
   br label %match.end3060
+match.arm3062:
+  %t18 = getelementptr [1 x i8], [1 x i8]* @.str.2177, i64 0, i64 0
+  %t19 = ptrtoint i8* %t18 to i64
+  store i64 %t19, i64* %t2
+  br label %match.end3060
 match.end3060:
-  %t18 = load i64, i64* %t2
-  ret i64 %t18
+  %t20 = load i64, i64* %t2
+  ret i64 %t20
 }
 
 define i64 @Codegen__get_var_init(i64 %self.arg, i64 %stmt.arg) {
@@ -108785,7 +108787,7 @@ entry:
   %t10 = load volatile i64, i64* %t9
   %t11 = getelementptr [3 x i8], [3 x i8]* @.str.4397, i64 0, i64 0
   %t12 = ptrtoint i8* %t11 to i64
-  %t13 = getelementptr [1 x i8], [1 x i8]* @.str.4398, i64 0, i64 0
+  %t13 = getelementptr [11 x i8], [11 x i8]* @.str.4398, i64 0, i64 0
   %t14 = ptrtoint i8* %t13 to i64
   %t15 = call i64 @__map_set(i64 %t10, i64 %t12, i64 %t14)
   %t16 = load i64, i64* %gen
@@ -112473,7 +112475,7 @@ entry:
   %t61 = load volatile i64, i64* %t60
   %t62 = getelementptr [3 x i8], [3 x i8]* @.str.4511, i64 0, i64 0
   %t63 = ptrtoint i8* %t62 to i64
-  %t64 = getelementptr [1 x i8], [1 x i8]* @.str.4512, i64 0, i64 0
+  %t64 = getelementptr [11 x i8], [11 x i8]* @.str.4512, i64 0, i64 0
   %t65 = ptrtoint i8* %t64 to i64
   %t66 = call i64 @__map_set(i64 %t61, i64 %t63, i64 %t65)
   %t67 = load i64, i64* %gen
@@ -116770,7 +116772,7 @@ entry:
   %t30 = load volatile i64, i64* %t29
   %t31 = getelementptr [3 x i8], [3 x i8]* @.str.4628, i64 0, i64 0
   %t32 = ptrtoint i8* %t31 to i64
-  %t33 = getelementptr [1 x i8], [1 x i8]* @.str.4629, i64 0, i64 0
+  %t33 = getelementptr [11 x i8], [11 x i8]* @.str.4629, i64 0, i64 0
   %t34 = ptrtoint i8* %t33 to i64
   %t35 = call i64 @__map_set(i64 %t30, i64 %t32, i64 %t34)
   %t36 = load i64, i64* %gen
