@@ -1,0 +1,192 @@
+//! A concurrent-safe Map for cooperative async tasks.
+//! Wraps a standard Map with a Mutex to ensure atomicity of compound
+//! operations (get-then-set, update-if-exists, etc.) across yield points.
+//!
+//! Individual get/set on a plain Map are already atomic (no yield points
+//! inside them), but multi-step operations can interleave if a task yields
+//! between steps. ConcurrentMap prevents this.
+//!
+//! Usage:
+//!   import "@concurrent_map" as CMap
+//!   var m = CMap.ConcurrentMap()
+//!   m.put("key", "value")
+//!   m.update("counter", fun (old) => old + 1)
+
+import "@sync" as Sync
+
+// ---------------------------------------------------------------------------
+// ConcurrentMap — mutex-protected Map with atomic compound operations
+// ---------------------------------------------------------------------------
+
+/// A cooperative-concurrency-safe map. All operations acquire a mutex before
+/// touching the underlying map, ensuring that no interleaving can occur at
+/// yield points between read and write.
+///
+/// ```saffron
+/// import "@concurrent_map" as CMap
+/// var m = CMap.ConcurrentMap()
+/// m.put("key", "value")
+/// var val = m.get("key")           // "value"
+/// m.update("key", fun (v) => v + "!")  // atomic read-modify-write
+/// m.put_if_absent("other", "default")
+/// ```
+class ConcurrentMap {
+    var _map: Map<String, Any>
+    var _lock: Sync.Mutex
+
+    fun init() {
+        this._map = {}
+        this._lock = Sync.Mutex()
+    }
+
+    // -------------------------------------------------------------------------
+    // Basic operations
+    // -------------------------------------------------------------------------
+
+    /// Store a key-value pair, overwriting any existing value.
+    fun put(key: String, value: Any) {
+        this._lock.acquire()
+        this._map.set(key, value)
+        this._lock.release()
+    }
+
+    /// Retrieve the value for a key. Returns nil if not present.
+    fun get(key: String): Any {
+        this._lock.acquire()
+        var value = this._map.get(key)
+        this._lock.release()
+        return value
+    }
+
+    /// Remove a key from the map. No-op if key is not present.
+    fun delete(key: String) {
+        this._lock.acquire()
+        this._map.delete(key)
+        this._lock.release()
+    }
+
+    /// Returns true if the key exists in the map.
+    fun has(key: String): Bool {
+        this._lock.acquire()
+        var result = this._map.has(key)
+        this._lock.release()
+        return result
+    }
+
+    // -------------------------------------------------------------------------
+    // Atomic compound operations
+    // -------------------------------------------------------------------------
+
+    /// Atomically read-modify-write: applies fn to the current value at key
+    /// and stores the result. If key is absent, fn receives nil.
+    /// Returns the new value.
+    fun update(key: String, fn: Any): Any {
+        this._lock.acquire()
+        var old = this._map.get(key)
+        var new_value = fn(old)
+        this._map.set(key, new_value)
+        this._lock.release()
+        return new_value
+    }
+
+    /// Store value only if key is not already present.
+    /// Returns the existing value if present, or the new value if inserted.
+    fun put_if_absent(key: String, value: Any): Any {
+        this._lock.acquire()
+        if (this._map.has(key)) {
+            var existing = this._map.get(key)
+            this._lock.release()
+            return existing
+        }
+        this._map.set(key, value)
+        this._lock.release()
+        return value
+    }
+
+    /// Get the value for key if present; otherwise compute it via fn,
+    /// store it, and return it. The computation is done under the lock,
+    /// so no other task can interleave.
+    fun get_or_put(key: String, fn: Any): Any {
+        this._lock.acquire()
+        if (this._map.has(key)) {
+            var existing = this._map.get(key)
+            this._lock.release()
+            return existing
+        }
+        var value = fn()
+        this._map.set(key, value)
+        this._lock.release()
+        return value
+    }
+
+    /// Atomically remove and return the value at key. Returns nil if absent.
+    fun remove(key: String): Any {
+        this._lock.acquire()
+        var value = this._map.get(key)
+        this._map.delete(key)
+        this._lock.release()
+        return value
+    }
+
+    // -------------------------------------------------------------------------
+    // Iteration (snapshot-based)
+    // -------------------------------------------------------------------------
+
+    /// Returns a snapshot of all keys. Safe to iterate even if the map is
+    /// modified by other tasks after this call.
+    fun keys(): List<String> {
+        this._lock.acquire()
+        var result = this._map.keys()
+        this._lock.release()
+        return result
+    }
+
+    /// Returns a snapshot of all values.
+    fun values(): List<Any> {
+        this._lock.acquire()
+        var result = this._map.values()
+        this._lock.release()
+        return result
+    }
+
+    /// Returns a snapshot of all entries as a list of [key, value] pairs.
+    fun entries(): List<Any> {
+        this._lock.acquire()
+        var ks = this._map.keys()
+        var result: List<Any> = []
+        for (k in ks) {
+            result.push([k, this._map.get(k)])
+        }
+        this._lock.release()
+        return result
+    }
+
+    // -------------------------------------------------------------------------
+    // Size and utility
+    // -------------------------------------------------------------------------
+
+    /// Returns the number of entries in the map.
+    fun size(): Number {
+        this._lock.acquire()
+        var n = this._map.keys().length()
+        this._lock.release()
+        return n
+    }
+
+    /// Remove all entries from the map.
+    fun clear() {
+        this._lock.acquire()
+        this._map = {}
+        this._lock.release()
+    }
+
+    /// Execute fn with the lock held and the raw map as argument.
+    /// Use for complex multi-step operations not covered by other methods.
+    /// WARNING: fn must NOT yield — doing so while holding the lock will deadlock.
+    fun with_lock(fn: Any): Any {
+        this._lock.acquire()
+        var result = fn(this._map)
+        this._lock.release()
+        return result
+    }
+}

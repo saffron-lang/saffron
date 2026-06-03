@@ -1,0 +1,340 @@
+//! DateTime module — date and time handling with formatting, parsing, and arithmetic.
+//!
+//! ```saffron
+//! import "@datetime" as DateTime
+//!
+//! var now = DateTime.now()
+//! IO.println(now.format("YYYY-MM-DD HH:mm:ss"))
+//! IO.println(now.iso8601())
+//!
+//! var tomorrow = now.add_days(1)
+//! var diff = tomorrow.diff(now)  // 86400
+//! ```
+
+@extern("i64 time(void*)") fun _time_raw(ptr: Int): Int
+
+/// A DateTime instance representing a specific point in time.
+/// Internally stores a Unix timestamp (seconds since 1970-01-01 00:00:00 UTC).
+class DateTime {
+    var _ts: Int
+
+    fun init(ts: Int) {
+        this._ts = ts
+    }
+
+    /// Return the Unix timestamp (seconds since epoch).
+    fun timestamp(): Int {
+        return this._ts
+    }
+
+    /// Return the year component (e.g. 2026).
+    var year: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[0]
+        }
+    }
+
+    /// Return the month component (1-12).
+    var month: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[1]
+        }
+    }
+
+    /// Return the day of month component (1-31).
+    var day: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[2]
+        }
+    }
+
+    /// Return the hour component (0-23).
+    var hour: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[3]
+        }
+    }
+
+    /// Return the minute component (0-59).
+    var minute: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[4]
+        }
+    }
+
+    /// Return the second component (0-59).
+    var second: Number {
+        get {
+            var parts = _decompose(this._ts)
+            return parts[5]
+        }
+    }
+
+    /// Return the day of the week (0=Sunday, 1=Monday, ..., 6=Saturday).
+    fun weekday(): Int {
+        // Jan 1, 1970 was a Thursday (4)
+        var d = this._ts / 86400
+        var wd = (d + 4) % 7
+        if (wd < 0) { wd = wd + 7 }
+        return wd
+    }
+
+    /// Format the datetime using a pattern string.
+    /// Supported tokens: YYYY, MM, DD, HH, mm, ss
+    fun format(pattern: String): String {
+        var parts = _decompose(this._ts)
+        var result = pattern
+        result = result.replace("YYYY", _pad4(parts[0]))
+        result = result.replace("MM", _pad2(parts[1]))
+        result = result.replace("DD", _pad2(parts[2]))
+        result = result.replace("HH", _pad2(parts[3]))
+        result = result.replace("mm", _pad2(parts[4]))
+        result = result.replace("ss", _pad2(parts[5]))
+        return result
+    }
+
+    /// Return the ISO 8601 representation (e.g. "2026-06-03T14:30:45Z").
+    fun iso8601(): String {
+        return this.format("YYYY-MM-DDTHH:mm:ssZ")
+    }
+
+    /// Return a new DateTime with the given number of days added.
+    fun add_days(n: Int): DateTime {
+        return DateTime(this._ts + n * 86400)
+    }
+
+    /// Return a new DateTime with the given number of hours added.
+    fun add_hours(n: Int): DateTime {
+        return DateTime(this._ts + n * 3600)
+    }
+
+    /// Return a new DateTime with the given number of minutes added.
+    fun add_minutes(n: Int): DateTime {
+        return DateTime(this._ts + n * 60)
+    }
+
+    /// Return a new DateTime with the given number of seconds added.
+    fun add_seconds(n: Int): DateTime {
+        return DateTime(this._ts + n)
+    }
+
+    /// Return true if this datetime is before another.
+    fun before(other: DateTime): Bool {
+        return this._ts < other._ts
+    }
+
+    /// Return true if this datetime is after another.
+    fun after(other: DateTime): Bool {
+        return this._ts > other._ts
+    }
+
+    /// Return the difference in seconds between this datetime and another.
+    /// Positive if this is after other, negative if before.
+    fun diff(other: DateTime): Int {
+        return this._ts - other._ts
+    }
+
+    /// Return a human-readable string representation.
+    fun to_string(): String {
+        return this.iso8601()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Module-level functions
+// ---------------------------------------------------------------------------
+
+/// Return a DateTime representing the current time (UTC).
+fun now(): DateTime {
+    var ts = _time_raw(0)
+    return DateTime(ts)
+}
+
+/// Create a DateTime from a Unix timestamp (seconds since epoch).
+fun from_timestamp(ts: Int): DateTime {
+    return DateTime(ts)
+}
+
+/// Create a DateTime from individual components (UTC).
+fun from_parts(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): DateTime {
+    var ts = _compose(year, month, day, hour, minute, second)
+    return DateTime(ts)
+}
+
+/// Parse a datetime string. Supports ISO 8601 format and custom patterns.
+///
+/// ```saffron
+/// import "@datetime" as DateTime
+/// var dt = DateTime.parse("2026-06-03T14:30:45Z")
+/// var dt2 = DateTime.parse("2026-06-03", "YYYY-MM-DD")
+/// ```
+fun parse(s: String, pattern: String): DateTime {
+    if (pattern == "") {
+        return _parse_iso8601(s)
+    }
+    return _parse_with_pattern(s, pattern)
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Decompose a Unix timestamp into [year, month, day, hour, minute, second] (UTC).
+fun _decompose(ts: Int): List<Int> {
+    var second = ts % 60
+    var rem = ts / 60
+    var minute = rem % 60
+    rem = rem / 60
+    var hour = rem % 24
+    var days = rem / 24
+
+    // Compute year, month, day from days since epoch (1970-01-01)
+    // Using the algorithm from http://howardhinnant.github.io/date_algorithms.html
+    var z = days + 719468
+    var era_approx = z / 146097
+    var era = era_approx
+    if (z < 0) { era = (z - 146096) / 146097 }
+    var doe = z - era * 146097
+    var yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    var y = yoe + era * 400
+    var doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    var mp = (5 * doy + 2) / 153
+    var day = doy - (153 * mp + 2) / 5 + 1
+    var month = mp + 3
+    if (mp >= 10) { month = mp - 9 }
+    if (month <= 2) { y = y + 1 }
+
+    return [y, month, day, hour, minute, second]
+}
+
+/// Compose year/month/day/hour/minute/second (UTC) into a Unix timestamp.
+fun _compose(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): Int {
+    // Adjust for the civil calendar algorithm
+    var y = year
+    var m = month
+    if (m <= 2) { y = y - 1 }
+    var era_approx = y / 400
+    var era = era_approx
+    if (y < 0) { era = (y - 399) / 400 }
+    var yoe = y - era * 400
+    var mp = m - 3
+    if (m <= 2) { mp = m + 9 }
+    var doy = (153 * mp + 2) / 5 + day - 1
+    var doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    var days = era * 146097 + doe - 719468
+    return days * 86400 + hour * 3600 + minute * 60 + second
+}
+
+/// Check if a year is a leap year.
+fun _is_leap(year: Int): Bool {
+    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+}
+
+/// Pad a number to 2 digits with leading zero.
+fun _pad2(n: Int): String {
+    if (n < 10) { return "0${n}" }
+    return "${n}"
+}
+
+/// Pad a number to 4 digits with leading zeros.
+fun _pad4(n: Int): String {
+    if (n < 10) { return "000${n}" }
+    if (n < 100) { return "00${n}" }
+    if (n < 1000) { return "0${n}" }
+    return "${n}"
+}
+
+/// Parse an ISO 8601 datetime string.
+/// Accepts: "2026-06-03T14:30:45Z", "2026-06-03T14:30:45", "2026-06-03"
+fun _parse_iso8601(s: String): DateTime {
+    var input = s.trim()
+    // Strip trailing 'Z' if present
+    if (input.ends_with("Z")) {
+        input = input.slice(0, input.length() - 1)
+    }
+
+    var year = 0
+    var month = 1
+    var day = 1
+    var hour = 0
+    var minute = 0
+    var second = 0
+
+    // Split on 'T' to separate date and time
+    var date_part = input
+    var time_part = ""
+    var t_idx = input.index_of("T")
+    if (t_idx >= 0) {
+        date_part = input.slice(0, t_idx)
+        time_part = input.slice(t_idx + 1, input.length())
+    }
+
+    // Parse date: YYYY-MM-DD
+    var date_parts = date_part.split("-")
+    if (date_parts.length() >= 1) { year = date_parts[0].to_number() }
+    if (date_parts.length() >= 2) { month = date_parts[1].to_number() }
+    if (date_parts.length() >= 3) { day = date_parts[2].to_number() }
+
+    // Parse time: HH:mm:ss or HH:mm
+    if (time_part.length() > 0) {
+        var time_parts = time_part.split(":")
+        if (time_parts.length() >= 1) { hour = time_parts[0].to_number() }
+        if (time_parts.length() >= 2) { minute = time_parts[1].to_number() }
+        if (time_parts.length() >= 3) { second = time_parts[2].to_number() }
+    }
+
+    return DateTime(_compose(year, month, day, hour, minute, second))
+}
+
+/// Parse a datetime string using a pattern.
+/// Supported tokens: YYYY, MM, DD, HH, mm, ss
+/// The pattern and string must have the same delimiters in the same positions.
+fun _parse_with_pattern(s: String, pattern: String): DateTime {
+    var year = 1970
+    var month = 1
+    var day = 1
+    var hour = 0
+    var minute = 0
+    var second = 0
+
+    var i = 0
+    var j = 0
+    while (i < pattern.length() and j < s.length()) {
+        if (i + 4 <= pattern.length() and pattern.slice(i, i + 4) == "YYYY") {
+            year = s.slice(j, j + 4).to_number()
+            i = i + 4
+            j = j + 4
+        } else if (i + 2 <= pattern.length() and pattern.slice(i, i + 2) == "MM") {
+            month = s.slice(j, j + 2).to_number()
+            i = i + 2
+            j = j + 2
+        } else if (i + 2 <= pattern.length() and pattern.slice(i, i + 2) == "DD") {
+            day = s.slice(j, j + 2).to_number()
+            i = i + 2
+            j = j + 2
+        } else if (i + 2 <= pattern.length() and pattern.slice(i, i + 2) == "HH") {
+            hour = s.slice(j, j + 2).to_number()
+            i = i + 2
+            j = j + 2
+        } else if (i + 2 <= pattern.length() and pattern.slice(i, i + 2) == "mm") {
+            minute = s.slice(j, j + 2).to_number()
+            i = i + 2
+            j = j + 2
+        } else if (i + 2 <= pattern.length() and pattern.slice(i, i + 2) == "ss") {
+            second = s.slice(j, j + 2).to_number()
+            i = i + 2
+            j = j + 2
+        } else {
+            // Skip delimiter characters (must match between pattern and string)
+            i = i + 1
+            j = j + 1
+        }
+    }
+
+    return DateTime(_compose(year, month, day, hour, minute, second))
+}
