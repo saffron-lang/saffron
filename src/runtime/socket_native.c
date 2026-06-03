@@ -648,3 +648,243 @@ void sf_udp_close(int64_t fd) {
         close((int)fd);
     }
 }
+
+/* ===== Server-side TLS ===== */
+
+/*
+ * Table of server SSL_CTX pointers (supports multiple cert/key configurations).
+ * Indices are 1-based (0 means "no context").
+ */
+#define SF_MAX_TLS_CTX 16
+static SSL_CTX *ctx_table[SF_MAX_TLS_CTX];
+static int ctx_table_initialized = 0;
+
+static void ctx_table_init(void) {
+    if (!ctx_table_initialized) {
+        memset(ctx_table, 0, sizeof(ctx_table));
+        ctx_table_initialized = 1;
+    }
+}
+
+/*
+ * Create a new server SSL_CTX loaded with the given certificate and private key.
+ *
+ * cert_path: path to PEM certificate file (or chain)
+ * key_path:  path to PEM private key file
+ *
+ * Returns: context handle (>0) on success, -1 on error.
+ */
+int64_t sf_tls_ctx_new_server(const char *cert_path, const char *key_path) {
+    if (cert_path == NULL || key_path == NULL) return -1;
+
+    ctx_table_init();
+
+    const SSL_METHOD *method = TLS_server_method();
+    if (method == NULL) return -1;
+
+    SSL_CTX *ctx = SSL_CTX_new(method);
+    if (ctx == NULL) return -1;
+
+    /* Set minimum TLS version to 1.2 */
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+
+    /* Load certificate */
+    if (SSL_CTX_use_certificate_chain_file(ctx, cert_path) != 1) {
+        SSL_CTX_free(ctx);
+        return -1;
+    }
+
+    /* Load private key */
+    if (SSL_CTX_use_PrivateKey_file(ctx, key_path, SSL_FILETYPE_PEM) != 1) {
+        SSL_CTX_free(ctx);
+        return -1;
+    }
+
+    /* Verify key matches certificate */
+    if (SSL_CTX_check_private_key(ctx) != 1) {
+        SSL_CTX_free(ctx);
+        return -1;
+    }
+
+    /* Allocate a slot in the context table */
+    for (int i = 0; i < SF_MAX_TLS_CTX; i++) {
+        if (ctx_table[i] == NULL) {
+            ctx_table[i] = ctx;
+            return (int64_t)(i + 1);
+        }
+    }
+
+    /* Table full */
+    SSL_CTX_free(ctx);
+    return -1;
+}
+
+/*
+ * Create a new client SSL_CTX with custom settings.
+ *
+ * ca_path:     path to CA certificate file (NULL for system default)
+ * verify_peer: 1 = verify server cert, 0 = skip verification
+ *
+ * Returns: context handle (>0) on success, -1 on error.
+ */
+int64_t sf_tls_ctx_new_client(const char *ca_path, int64_t verify_peer) {
+    ctx_table_init();
+
+    const SSL_METHOD *method = TLS_client_method();
+    if (method == NULL) return -1;
+
+    SSL_CTX *ctx = SSL_CTX_new(method);
+    if (ctx == NULL) return -1;
+
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+
+    if (ca_path != NULL && strlen(ca_path) > 0) {
+        if (SSL_CTX_load_verify_locations(ctx, ca_path, NULL) != 1) {
+            SSL_CTX_free(ctx);
+            return -1;
+        }
+    } else {
+        SSL_CTX_set_default_verify_paths(ctx);
+    }
+
+    if (verify_peer) {
+        SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    } else {
+        SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+    }
+
+    for (int i = 0; i < SF_MAX_TLS_CTX; i++) {
+        if (ctx_table[i] == NULL) {
+            ctx_table[i] = ctx;
+            return (int64_t)(i + 1);
+        }
+    }
+
+    SSL_CTX_free(ctx);
+    return -1;
+}
+
+/*
+ * Perform a TLS handshake as SERVER on an accepted client fd.
+ * Uses the given server context (from sf_tls_ctx_new_server).
+ *
+ * Returns: TLS handle (>0) on success, -1 on error.
+ */
+int64_t sf_tls_accept(int64_t client_fd, int64_t ctx_handle) {
+    if (client_fd < 0) return -1;
+    if (ctx_handle < 1 || ctx_handle > SF_MAX_TLS_CTX) return -1;
+
+    SSL_CTX *ctx = ctx_table[ctx_handle - 1];
+    if (ctx == NULL) return -1;
+
+    SSL *ssl = SSL_new(ctx);
+    if (ssl == NULL) return -1;
+
+    if (SSL_set_fd(ssl, (int)client_fd) != 1) {
+        SSL_free(ssl);
+        return -1;
+    }
+
+    /* Non-blocking TLS accept with poll loop */
+    while (1) {
+        int ret = SSL_accept(ssl);
+        if (ret == 1) {
+            break;  /* Handshake complete */
+        }
+
+        int ssl_err = SSL_get_error(ssl, ret);
+        if (ssl_err == SSL_ERROR_WANT_READ) {
+            struct pollfd pfd = { .fd = (int)client_fd, .events = POLLIN, .revents = 0 };
+            int poll_ret = poll(&pfd, 1, 10000);  /* 10s timeout */
+            if (poll_ret <= 0) {
+                SSL_free(ssl);
+                return -1;
+            }
+        } else if (ssl_err == SSL_ERROR_WANT_WRITE) {
+            struct pollfd pfd = { .fd = (int)client_fd, .events = POLLOUT, .revents = 0 };
+            int poll_ret = poll(&pfd, 1, 10000);
+            if (poll_ret <= 0) {
+                SSL_free(ssl);
+                return -1;
+            }
+        } else {
+            /* Fatal handshake error */
+            SSL_free(ssl);
+            return -1;
+        }
+    }
+
+    /* Store in handle table */
+    int64_t handle = tls_table_alloc(ssl);
+    if (handle < 0) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        return -1;
+    }
+
+    return handle;
+}
+
+/*
+ * Perform a TLS client handshake using a specific context (not the global one).
+ * Useful for custom CA certs or skip-verification.
+ *
+ * Returns: TLS handle (>0) on success, -1 on error.
+ */
+int64_t sf_tls_connect_ctx(int64_t fd, const char *hostname, int64_t ctx_handle) {
+    if (fd < 0 || hostname == NULL) return -1;
+    if (ctx_handle < 1 || ctx_handle > SF_MAX_TLS_CTX) return -1;
+
+    SSL_CTX *ctx = ctx_table[ctx_handle - 1];
+    if (ctx == NULL) return -1;
+
+    SSL *ssl = SSL_new(ctx);
+    if (ssl == NULL) return -1;
+
+    if (SSL_set_fd(ssl, (int)fd) != 1) {
+        SSL_free(ssl);
+        return -1;
+    }
+
+    SSL_set_tlsext_host_name(ssl, hostname);
+    SSL_set1_host(ssl, hostname);
+
+    while (1) {
+        int ret = SSL_connect(ssl);
+        if (ret == 1) break;
+
+        int ssl_err = SSL_get_error(ssl, ret);
+        if (ssl_err == SSL_ERROR_WANT_READ) {
+            struct pollfd pfd = { .fd = (int)fd, .events = POLLIN, .revents = 0 };
+            if (poll(&pfd, 1, 10000) <= 0) { SSL_free(ssl); return -1; }
+        } else if (ssl_err == SSL_ERROR_WANT_WRITE) {
+            struct pollfd pfd = { .fd = (int)fd, .events = POLLOUT, .revents = 0 };
+            if (poll(&pfd, 1, 10000) <= 0) { SSL_free(ssl); return -1; }
+        } else {
+            SSL_free(ssl);
+            return -1;
+        }
+    }
+
+    int64_t handle = tls_table_alloc(ssl);
+    if (handle < 0) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        return -1;
+    }
+
+    return handle;
+}
+
+/*
+ * Free a TLS context and release its slot in the context table.
+ */
+void sf_tls_ctx_free(int64_t ctx_handle) {
+    if (ctx_handle < 1 || ctx_handle > SF_MAX_TLS_CTX) return;
+
+    SSL_CTX *ctx = ctx_table[ctx_handle - 1];
+    if (ctx != NULL) {
+        SSL_CTX_free(ctx);
+        ctx_table[ctx_handle - 1] = NULL;
+    }
+}
