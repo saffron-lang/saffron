@@ -242,10 +242,10 @@
 
         this.emit("")
         var linkage: String = "define"
-        // Use linkonce_odr on native targets to allow linker dedup when the same
-        // function appears in multiple compilation units (prelude interfaces, etc.)
-        // Skip for WASM where it breaks function table indirect calls.
-        if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+        // Use linkonce_odr for module-prefixed functions (prelude interfaces, etc.)
+        // that may appear in multiple compilation units. Plain define for same-file
+        // functions so they aren't discarded at -O2 when only referenced externally.
+        if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
             linkage = "define linkonce_odr"
         }
         var coro_attr: String = ""

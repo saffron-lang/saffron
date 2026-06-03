@@ -675,15 +675,20 @@ fun main(): Int {
     }
 
     // Auto-import IO (implicitly available in every program)
-    var io_path: String = stdlib_dir + "/io.sf"
-    if (OS.file_exists(io_path)) {
-        var io_src: String = IO.read_file(io_path)
-        var io_tokens: List = Lexer.lex(io_src)
-        var io_program: List = Parser.parse_with_source(io_tokens, io_src)
-        module_stmts.push(io_program)
-        module_prefixes_list.push("stdlib_io_")
-        visited.set(io_path, true)
-        resolved_aliases.set("IO", "stdlib_io_")
+    // Skip in identity-mode: the bootstrap compiles runtime.sf separately which
+    // already provides IO builtins — auto-importing io.sf would cause duplicate
+    // symbols (SEEK_SET, interface stubs) between main.ll and runtime.ll.
+    if (!identity_mode) {
+        var io_path: String = stdlib_dir + "/io.sf"
+        if (OS.file_exists(io_path)) {
+            var io_src: String = IO.read_file(io_path)
+            var io_tokens: List = Lexer.lex(io_src)
+            var io_program: List = Parser.parse_with_source(io_tokens, io_src)
+            module_stmts.push(io_program)
+            module_prefixes_list.push("stdlib_io_")
+            visited.set(io_path, true)
+            resolved_aliases.set("IO", "stdlib_io_")
+        }
     }
 
     // Auto-import dependency preludes (src/prelude.sf in each lib-path package)
