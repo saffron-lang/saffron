@@ -199,7 +199,11 @@
             This => {
                 this.last_type = this.str_to_type(this.current_class)
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = load i64, i64* %self")
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_load(local, "i64", "%self"))
+                } else {
+                    this.emit_indent(local + " = load i64, i64* %self")
+                }
                 local
             }
             GetField(object, field) => {
@@ -929,7 +933,11 @@
         if (expr_kind == "this") {
             this.last_type = this.str_to_type(this.current_class)
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = load i64, i64* %self")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_load(local, "i64", "%self"))
+            } else {
+                this.emit_indent(local + " = load i64, i64* %self")
+            }
             return local
         }
         if (expr_kind == "set_field") {
@@ -977,8 +985,12 @@
             if (this.module_globals.has(this.current_prefix + vname)) {
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
             }
-            this.emit_indent(local + " = load i64, i64* " + var_ref)
-            if (!this.use_llvm_lib) { this.verify_load(local, "i64", var_ref) }
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_load(local, "i64", var_ref))
+            } else {
+                this.emit_indent(local + " = load i64, i64* " + var_ref)
+                this.verify_load(local, "i64", var_ref)
+            }
             return local
         }
         if (expr_kind == "member") {

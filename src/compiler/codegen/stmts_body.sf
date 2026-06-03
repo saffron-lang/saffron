@@ -162,8 +162,12 @@
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)
         }
-        this.emit_indent("store i64 " + val + ", i64* " + var_ref)
-        if (!this.use_llvm_lib) { this.verify_store(val, "i64", var_ref) }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_store(val, "i64", var_ref))
+        } else {
+            this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+            this.verify_store(val, "i64", var_ref)
+        }
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
@@ -848,8 +852,12 @@
         if (vdoc.starts_with("@import:")) { return }
         if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
-            this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
-            if (!this.use_llvm_lib) { this.verify_alloca("%" + this.sanitize_name(vname), "i64") }
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_alloca("%" + this.sanitize_name(vname), "i64"))
+            } else {
+                this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
+                this.verify_alloca("%" + this.sanitize_name(vname), "i64")
+            }
         }
     }
 
