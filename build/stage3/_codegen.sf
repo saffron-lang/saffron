@@ -9144,6 +9144,28 @@ class Codegen {
     }
 
     // --- Builtin dispatch (only for non-class objects) ---
+    // Module aliases are not evaluable values — route to module dispatch
+    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
+        var mp_prefix: String = this.module_prefixes.get(obj_name)
+        // Builtins with empty prefix use __module_ convention
+        if (mp_prefix.length() == 0) {
+            if (obj_name == "IO") { mp_prefix = "__io_" }
+            else if (obj_name == "OS") { mp_prefix = "__os_" }
+            else if (obj_name == "GC") { mp_prefix = "__gc_" }
+        }
+        var mp_func: String = mp_prefix + method
+        this.called_functions.push(mp_func)
+        var mp_args: List<String> = []
+        var mpi: Float = 0
+        while (mpi < args.length()) {
+            mp_args.push("i64 " + this.gen_arg_value(args[mpi]))
+            mpi = mpi + 1
+        }
+        var mp_local: String = this.fresh_local()
+        this.emit_indent(mp_local + " = call i64 @" + mp_func + "(" + mp_args.join(", ") + ")")
+        this.last_type = AST.Type.IntType
+        return mp_local
+    }
     var obj: String = this.gen_arg_value(object)
     var is_user_class: Bool = false
     if (obj_name.length() > 0) {
