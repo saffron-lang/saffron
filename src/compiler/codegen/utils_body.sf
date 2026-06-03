@@ -2,8 +2,8 @@
         var rt: StringBuilder = StringBuilder()
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
-        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
+        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__io_read_stdin", "__io_readline", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__io_read_stdin(i64)", "i64 @__io_readline()", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.str_in_list(this.defined_funcs,names[di])) {
@@ -903,6 +903,133 @@
             IO.println("  codegen: " + expected)
             IO.println("  library: " + lib_ir)
         }
+    }
+
+    // --- LLVM library emission methods ---
+    // These construct instructions via the @llvm library and return
+    // the formatted instruction string (without leading indent).
+
+    fun lib_binary_op(op_name: String, result_name: String, lhs_name: String, rhs_name: String): String {
+        var lhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(lhs_name, LLVMTypes.Type.I64)
+        var rhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(rhs_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Add(result_val, lhs_val, rhs_val)
+        if (op_name == "sub") {
+            inst = LLVMInst.Instruction.Sub(result_val, lhs_val, rhs_val)
+        } else if (op_name == "mul") {
+            inst = LLVMInst.Instruction.Mul(result_val, lhs_val, rhs_val)
+        } else if (op_name == "sdiv") {
+            inst = LLVMInst.Instruction.SDiv(result_val, lhs_val, rhs_val)
+        } else if (op_name == "srem") {
+            inst = LLVMInst.Instruction.SRem(result_val, lhs_val, rhs_val)
+        } else if (op_name == "and") {
+            inst = LLVMInst.Instruction.And(result_val, lhs_val, rhs_val)
+        } else if (op_name == "or") {
+            inst = LLVMInst.Instruction.Or(result_val, lhs_val, rhs_val)
+        } else if (op_name == "xor") {
+            inst = LLVMInst.Instruction.Xor(result_val, lhs_val, rhs_val)
+        } else if (op_name == "shl") {
+            inst = LLVMInst.Instruction.Shl(result_val, lhs_val, rhs_val)
+        } else if (op_name == "ashr") {
+            inst = LLVMInst.Instruction.AShr(result_val, lhs_val, rhs_val)
+        }
+
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_icmp_op(pred_name: String, result_name: String, lhs_name: String, rhs_name: String): String {
+        var lhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(lhs_name, LLVMTypes.Type.I64)
+        var rhs_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(rhs_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I1)
+
+        var pred: LLVMTypes.CmpPred = LLVMTypes.CmpPred.Eq
+        if (pred_name == "ne") { pred = LLVMTypes.CmpPred.Ne }
+        else if (pred_name == "slt") { pred = LLVMTypes.CmpPred.Slt }
+        else if (pred_name == "sle") { pred = LLVMTypes.CmpPred.Sle }
+        else if (pred_name == "sgt") { pred = LLVMTypes.CmpPred.Sgt }
+        else if (pred_name == "sge") { pred = LLVMTypes.CmpPred.Sge }
+
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.ICmp(result_val, pred, lhs_val, rhs_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_zext_op(result_name: String, src_name: String): String {
+        var src_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(src_name, LLVMTypes.Type.I1)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.ZExt(result_val, src_val, LLVMTypes.Type.I64)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_trunc(result_name: String, val_name: String, from_type: String, to_type: String): String {
+        var from_ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (from_type == "i32") { from_ty = LLVMTypes.Type.I32 }
+        var to_ty: LLVMTypes.Type = LLVMTypes.Type.I1
+        if (to_type == "i32") { to_ty = LLVMTypes.Type.I32 }
+        else if (to_type == "i8") { to_ty = LLVMTypes.Type.I8 }
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, from_ty)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, to_ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Trunc(result_val, val_v, to_ty)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_br(target_label: String): String {
+        var term: LLVMInst.Terminator = LLVMInst.Terminator.Br(target_label)
+        var lib_ir: String = LLVMInst.format_terminator(term)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_cond_br(cond_name: String, then_label: String, else_label: String): String {
+        var cond_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(cond_name, LLVMTypes.Type.I1)
+        var term: LLVMInst.Terminator = LLVMInst.Terminator.CondBr(cond_val, then_label, else_label)
+        var lib_ir: String = LLVMInst.format_terminator(term)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_call(result_name: String, ret_type: String, fn_name: String, args_str: String): String {
+        var ret_ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (ret_type == "void") { ret_ty = LLVMTypes.Type.Void }
+        else if (ret_type == "i1") { ret_ty = LLVMTypes.Type.I1 }
+        else if (ret_type == "i32") { ret_ty = LLVMTypes.Type.I32 }
+        else if (ret_type == "ptr") { ret_ty = LLVMTypes.Type.Ptr }
+        var arg_vals: List<LLVMTypes.Value> = []
+        if (args_str.length() > 0) {
+            var arg_parts: List<String> = args_str.split(", ")
+            var ai: Float = 0
+            while (ai < arg_parts.length()) {
+                var part: String = arg_parts[ai]
+                var space_idx: Float = part.index_of(" ")
+                if (space_idx > 0) {
+                    var arg_name: String = part.slice(space_idx + 1, part.length())
+                    arg_vals.push(LLVMTypes.Value.Instruction(arg_name, LLVMTypes.Type.I64))
+                }
+                ai = ai + 1
+            }
+        }
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ret_ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Call(result_val, fn_name, ret_ty, arg_vals)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_ptrtoint(result_name: String, val_name: String): String {
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.PtrToInt(result_val, val_v, LLVMTypes.Type.I64)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_inttoptr(result_name: String, val_name: String): String {
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.I64)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.IntToPtr(result_val, val_v, LLVMTypes.Type.Ptr)
+        var lib_ir: String = LLVMInst.format_instruction(inst)
+        return lib_ir.slice(2, lib_ir.length())
     }
 
     // --- Statement codegen ---
