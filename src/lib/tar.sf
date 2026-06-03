@@ -1,0 +1,219 @@
+//! Create and extract tar.gz archives using system tar.
+//!
+//! Shells out to the system `tar` command (available on macOS and Linux)
+//! for all operations. Handles platform differences automatically.
+//!
+//! ```saffron
+//! import "@tar" as Tar
+//!
+//! // Create an archive from a list of files
+//! Tar.create("package.tar.gz", "my-package-1.0.0", ["src/", "pantry.toml", "README.md"], [])
+//!
+//! // Extract an archive to a directory
+//! Tar.extract("package.tar.gz", ".pantry/packages/my-package/")
+//!
+//! // List contents without extracting
+//! var files = Tar.list("package.tar.gz")
+//! ```
+
+import "@os" as OS
+import "@process" as Process
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Detect whether we are running on macOS (BSD tar) or Linux (GNU tar).
+/// Returns true if the platform is macOS/darwin.
+fun _is_macos(): Bool {
+    return OS.platform() == "darwin"
+}
+
+/// Build the exclude flags for the tar command.
+/// Each pattern becomes a separate --exclude=<pattern> argument.
+fun _build_excludes(patterns: List<String>): String {
+    var result = ""
+    var i = 0
+    while (i < patterns.length()) {
+        result = result + " --exclude='" + patterns[i] + "'"
+        i = i + 1
+    }
+    return result
+}
+
+/// Build the transform/substitute flag to add a directory prefix inside the archive.
+/// macOS (BSD tar) uses -s, while Linux (GNU tar) uses --transform.
+fun _build_prefix_flag(prefix: String): String {
+    if (prefix.length() == 0) {
+        return ""
+    }
+    if (_is_macos()) {
+        // BSD tar: -s 's,^,prefix/,'
+        return " -s 's,^,./" + prefix + "/,'"
+    }
+    // GNU tar: --transform 's,^,prefix/,'
+    return " --transform 's,^,./" + prefix + "/,'"
+}
+
+/// Join a list of file paths into a space-separated string for shell commands.
+fun _join_files(files: List<String>): String {
+    var result = ""
+    var i = 0
+    while (i < files.length()) {
+        if (i > 0) {
+            result = result + " "
+        }
+        result = result + "'" + files[i] + "'"
+        i = i + 1
+    }
+    return result
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Create a tar.gz archive.
+///
+/// - output_path: where to write the .tar.gz file
+/// - prefix: directory prefix inside the archive (e.g. "my-package-1.0.0")
+/// - files: list of file/directory paths to include (relative to cwd)
+/// - exclude: list of glob patterns to exclude
+///
+/// Returns true on success, false on failure.
+///
+/// ```saffron
+/// import "@tar" as Tar
+///
+/// var ok = Tar.create("dist/app.tar.gz", "app-1.0.0", ["src/", "pantry.toml"], [".git/", "*.ll"])
+/// if (!ok) { IO.println("failed to create archive") }
+/// ```
+fun create(output_path: String, prefix: String, files: List<String>, exclude: List<String>): Bool {
+    var excludes = _build_excludes(exclude)
+    var prefix_flag = _build_prefix_flag(prefix)
+    var file_list = _join_files(files)
+
+    var cmd = "tar czf '" + output_path + "'" + prefix_flag + excludes + " " + file_list
+    var result = Process.run(cmd)
+    return result.success
+}
+
+/// Extract a tar.gz archive to a destination directory.
+/// Creates the destination directory if it doesn't exist.
+/// Strips the top-level directory component (--strip-components=1).
+///
+/// Returns true on success, false on failure.
+///
+/// ```saffron
+/// import "@tar" as Tar
+///
+/// var ok = Tar.extract("package.tar.gz", ".pantry/packages/my-package/")
+/// if (!ok) { IO.println("extraction failed") }
+/// ```
+fun extract(archive_path: String, dest_dir: String): Bool {
+    var cmd = "mkdir -p '" + dest_dir + "' && tar xzf '" + archive_path + "' -C '" + dest_dir + "' --strip-components=1"
+    var result = Process.run(cmd)
+    return result.success
+}
+
+/// List the contents of a tar.gz archive.
+/// Returns a list of file paths inside the archive.
+///
+/// ```saffron
+/// import "@tar" as Tar
+///
+/// var files = Tar.list("package.tar.gz")
+/// for (f in files) { IO.println(f) }
+/// ```
+fun list(archive_path: String): List<String> {
+    var cmd = "tar tzf '" + archive_path + "'"
+    var result = Process.run(cmd)
+    if (!result.success) {
+        return []
+    }
+    var output = result.stdout.trim()
+    if (output.length() == 0) {
+        return []
+    }
+    return output.split("\n")
+}
+
+/// Create a package tarball following pantry conventions.
+///
+/// Collects files from the source directory (respecting exclude patterns),
+/// creates the archive with standard naming at `build/<name>-<version>.tar.gz`.
+/// Returns the path to the created tarball, or an empty string on failure.
+///
+/// Default excludes: .pantry/, build/, .git/, *.ll, pantry.lock, pantry.sf, test/
+///
+/// ```saffron
+/// import "@tar" as Tar
+///
+/// var tarball = Tar.pack("my-lib", "1.2.0", ".", [".env"])
+/// if (tarball != "") {
+///     IO.println("created: ${tarball}")
+/// }
+/// ```
+fun pack(name: String, version: String, source_dir: String, exclude: List<String>): String {
+    // Default excludes for pantry packages
+    var default_excludes = [".pantry/", "build/", ".git/", "*.ll", "pantry.lock", "pantry.sf", "test/"]
+
+    // Merge user excludes with defaults
+    var all_excludes = default_excludes
+    var i = 0
+    while (i < exclude.length()) {
+        all_excludes.push(exclude[i])
+        i = i + 1
+    }
+
+    // Ensure build/ directory exists
+    var mkdir_result = Process.run("mkdir -p '" + source_dir + "/build'")
+    if (!mkdir_result.success) {
+        return ""
+    }
+
+    var prefix = name + "-" + version
+    var output_path = source_dir + "/build/" + prefix + ".tar.gz"
+
+    // Gather all files from source directory
+    var excludes = _build_excludes(all_excludes)
+    var prefix_flag = _build_prefix_flag(prefix)
+
+    var cmd = "cd '" + source_dir + "' && tar czf 'build/" + prefix + ".tar.gz'" + prefix_flag + excludes + " ."
+    var result = Process.run(cmd)
+    if (!result.success) {
+        return ""
+    }
+    return output_path
+}
+
+/// Get the size of an archive file in bytes.
+/// Returns -1 if the file does not exist or cannot be read.
+///
+/// ```saffron
+/// import "@tar" as Tar
+///
+/// var size = Tar.archive_size("build/my-lib-1.0.0.tar.gz")
+/// IO.println("archive is ${size} bytes")
+/// ```
+fun archive_size(path: String): Number {
+    var cmd = ""
+    if (_is_macos()) {
+        cmd = "stat -f '%z' '" + path + "'"
+    } else {
+        cmd = "stat -c '%s' '" + path + "'"
+    }
+    var result = Process.run(cmd)
+    if (!result.success) {
+        return -1
+    }
+    var size_str = result.stdout.trim()
+    if (size_str.length() == 0) {
+        return -1
+    }
+    try {
+        return size_str.to_number()
+    } catch (e) {
+        return -1
+    }
+}

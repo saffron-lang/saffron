@@ -1,0 +1,303 @@
+//! Cryptographic hashing using system utilities.
+//! Uses OpenSSL/shasum for actual computation — no hand-rolled crypto.
+//!
+//! ```saffron
+//! import "@crypto" as Crypto
+//!
+//! var hash = Crypto.sha256("hello world")
+//! // "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+//!
+//! var file_hash = Crypto.sha256_file("package.tar.gz")
+//! ```
+
+import "os" as OS
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Counter for generating unique temp file names.
+var _uid_counter = 0
+
+/// Generate a unique temp file path in /tmp.
+fun _temp_path(): String {
+    _uid_counter = _uid_counter + 1
+    var pid = OS.exec("echo $$").trim()
+    return "/tmp/_sf_crypto_${pid}_${_uid_counter}"
+}
+
+/// Escape single quotes for safe shell embedding.
+fun _escape_sq(s: String): String {
+    return s.replace("'", "'\\''")
+}
+
+/// Write a string to a temp file via shell printf, return the path.
+/// Uses printf '%s' to handle binary data and special characters safely.
+fun _write_temp(input: String): String {
+    var path = _temp_path()
+    var escaped = _escape_sq(input)
+    OS.exec("printf '%s' '${escaped}' > ${path}")
+    return path
+}
+
+/// Remove a temp file silently.
+fun _cleanup(path: String) {
+    try {
+        OS.exec("rm -f ${path} 2>/dev/null")
+    } catch (e) {
+        // Ignore cleanup failures
+    }
+}
+
+/// Try to detect which hash command is available for a given algorithm.
+/// Returns "shasum" or "openssl" or throws if neither is found.
+fun _detect_hasher(): String {
+    var check = OS.exec("which shasum 2>/dev/null").trim()
+    if (check.length() > 0) {
+        return "shasum"
+    }
+    check = OS.exec("which openssl 2>/dev/null").trim()
+    if (check.length() > 0) {
+        return "openssl"
+    }
+    throw "crypto: no hash utility found (need shasum or openssl)"
+}
+
+/// Hash a file using shasum with the given algorithm (256, 512, etc).
+/// Returns the hex digest.
+fun _shasum_file(path: String, algo: String): String {
+    var raw = OS.exec("shasum -a ${algo} '${_escape_sq(path)}' 2>/dev/null")
+    // Output format: "<hex>  <filename>\n" or "<hex> *<filename>\n"
+    var space_idx = raw.index_of(" ")
+    if (space_idx > 0) {
+        return raw.slice(0, space_idx)
+    }
+    throw "crypto: shasum returned unexpected output: ${raw}"
+}
+
+/// Hash a file using openssl dgst with the given algorithm name (sha256, sha512, md5).
+/// Returns the hex digest.
+fun _openssl_file(path: String, algo: String): String {
+    var raw = OS.exec("openssl dgst -${algo} '${_escape_sq(path)}' 2>/dev/null")
+    // Output format: "SHA256(file)= <hex>\n" or "SHA2-256(file)= <hex>\n"
+    var eq_idx = raw.index_of("= ")
+    if (eq_idx >= 0) {
+        return raw.slice(eq_idx + 2, raw.length()).trim()
+    }
+    // Some openssl versions just output the hex
+    return raw.trim()
+}
+
+/// Hash a file with fallback: try shasum first, then openssl.
+/// algo_shasum: "256", "512" etc.  algo_openssl: "sha256", "sha512", "md5" etc.
+fun _hash_file(path: String, algo_shasum: String, algo_openssl: String): String {
+    try {
+        return _shasum_file(path, algo_shasum)
+    } catch (e) {
+        // Fallback to openssl
+    }
+    return _openssl_file(path, algo_openssl)
+}
+
+/// Hash a string by writing it to a temp file, hashing, and cleaning up.
+fun _hash_string(input: String, algo_shasum: String, algo_openssl: String): String {
+    var path = _write_temp(input)
+    try {
+        var result = _hash_file(path, algo_shasum, algo_openssl)
+        _cleanup(path)
+        return result
+    } catch (e) {
+        _cleanup(path)
+        throw e
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Compute SHA-256 hash of a string. Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// Crypto.sha256("hello world")
+/// // "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+/// ```
+fun sha256(input: String): String {
+    return _hash_string(input, "256", "sha256")
+}
+
+/// Compute SHA-256 hash of a file at the given path. Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var hash = Crypto.sha256_file("package.tar.gz")
+/// ```
+fun sha256_file(path: String): String {
+    return _hash_file(path, "256", "sha256")
+}
+
+/// Compute SHA-512 hash of a string. Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// Crypto.sha512("hello world")
+/// // "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd..."
+/// ```
+fun sha512(input: String): String {
+    return _hash_string(input, "512", "sha512")
+}
+
+/// Compute SHA-512 hash of a file at the given path. Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var hash = Crypto.sha512_file("package.tar.gz")
+/// ```
+fun sha512_file(path: String): String {
+    return _hash_file(path, "512", "sha512")
+}
+
+/// Compute MD5 hash of a string (for non-security uses like cache keys).
+/// Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// Crypto.md5("hello world")
+/// // "5eb63bbbe01eeed093cb22bb8f5acdc3"
+/// ```
+fun md5(input: String): String {
+    var path = _write_temp(input)
+    try {
+        // Try md5sum (Linux) first, then openssl
+        var result = ""
+        try {
+            var raw = OS.exec("md5sum '${_escape_sq(path)}' 2>/dev/null")
+            var space_idx = raw.index_of(" ")
+            if (space_idx > 0) {
+                result = raw.slice(0, space_idx)
+            } else {
+                throw "unexpected output"
+            }
+        } catch (e) {
+            // Try openssl as fallback
+            result = _openssl_file(path, "md5")
+        }
+        _cleanup(path)
+        return result
+    } catch (e) {
+        _cleanup(path)
+        throw e
+    }
+}
+
+/// Generate a random hex string of the given byte length.
+/// Uses /dev/urandom on Unix, falling back to openssl rand.
+///
+/// For example, random_bytes(16) returns 32 hex characters (16 bytes).
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var token = Crypto.random_bytes(32)  // 64 hex chars
+/// ```
+fun random_bytes(length: Number): String {
+    try {
+        var raw = OS.exec("openssl rand -hex ${length} 2>/dev/null")
+        return raw.trim()
+    } catch (e) {
+        // Fallback to /dev/urandom + xxd
+    }
+    try {
+        var raw = OS.exec("head -c ${length} /dev/urandom | xxd -p | tr -d '\\n'")
+        return raw.trim()
+    } catch (e) {
+        throw "crypto: cannot generate random bytes (need openssl or /dev/urandom + xxd)"
+    }
+}
+
+/// Compute HMAC-SHA256 for message authentication.
+/// Returns lowercase hex string.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var mac = Crypto.hmac_sha256("secret-key", "message to authenticate")
+/// ```
+fun hmac_sha256(key: String, message: String): String {
+    var msg_path = _write_temp(message)
+    try {
+        var escaped_key = _escape_sq(key)
+        var raw = OS.exec("openssl dgst -sha256 -hmac '${escaped_key}' '${_escape_sq(msg_path)}' 2>/dev/null")
+        _cleanup(msg_path)
+        // Output: "HMAC-SHA256(file)= <hex>\n" or just the hex
+        var eq_idx = raw.index_of("= ")
+        if (eq_idx >= 0) {
+            return raw.slice(eq_idx + 2, raw.length()).trim()
+        }
+        return raw.trim()
+    } catch (e) {
+        _cleanup(msg_path)
+        throw "crypto: hmac_sha256 failed (requires openssl): ${e}"
+    }
+}
+
+/// Constant-time string comparison (for comparing hashes safely).
+/// Returns true if and only if both strings are equal.
+/// Does not short-circuit on the first difference to prevent timing attacks.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var expected = Crypto.sha256("password123")
+/// var provided = Crypto.sha256(user_input)
+/// if (Crypto.secure_compare(expected, provided)) {
+///     IO.println("match")
+/// }
+/// ```
+fun secure_compare(a: String, b: String): Bool {
+    // Different lengths cannot be equal, but we still iterate
+    // to avoid revealing which position differs via timing.
+    var len_a = a.length()
+    var len_b = b.length()
+    var max_len = len_a
+    if (len_b > max_len) {
+        max_len = len_b
+    }
+
+    // Accumulate mismatches without short-circuiting
+    var diff = 0
+    if (len_a != len_b) {
+        diff = 1
+    }
+
+    var i = 0
+    while (i < max_len) {
+        var ca = ""
+        var cb = ""
+        if (i < len_a) {
+            ca = a.char_at(i)
+        }
+        if (i < len_b) {
+            cb = b.char_at(i)
+        }
+        if (ca != cb) {
+            diff = diff + 1
+        }
+        i = i + 1
+    }
+
+    return diff == 0
+}
+
+/// Verify that a hash matches the expected value for a file.
+/// Convenience wrapper that hashes the file and does a secure comparison.
+///
+/// ```saffron
+/// import "@crypto" as Crypto
+/// var expected = "b94d27b9934d3e08..."
+/// if (Crypto.verify_file("package.tar.gz", expected)) {
+///     IO.println("integrity check passed")
+/// }
+/// ```
+fun verify_file(path: String, expected_hash: String): Bool {
+    var actual = sha256_file(path)
+    return secure_compare(actual, expected_hash)
+}
