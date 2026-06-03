@@ -47,8 +47,11 @@ fun _write_manifest(dir: String, name: String, is_lib: Bool) {
 }
 
 fun _write_main(dir: String, name: String) {
-    var content: String = "//! Main entry point for " + name + ".\n\n"
-    content = content + "IO.println(\"Hello from " + name + "!\")\n"
+    var content: String = "//! " + name + " — a Saffron application.\n\n"
+    content = content + "fun main() {\n"
+    content = content + "    IO.println(\"Hello from " + name + "!\")\n"
+    content = content + "}\n\n"
+    content = content + "main()\n"
     IO.write_file(dir + "/src/main.sf", content)
 }
 
@@ -109,19 +112,36 @@ fun _write_cli_manifest(dir: String, name: String) {
 fun _write_cli_main(dir: String, name: String) {
     var content: String = "//! " + name + " — a command-line tool.\n\n"
     content = content + "import \"@args\" as Args\n"
-    content = content + "import \"@os\" as OS\n\n"
-    content = content + "fun main() {\n"
-    content = content + "    var parsed: Args.ParsedArgs = Args.parse()\n"
-    content = content + "    var positional: List<String> = parsed.positional\n\n"
-    content = content + "    if (positional.length() == 0 or parsed.flag(\"help\")) {\n"
-    content = content + "        IO.println(\"" + name + " — a CLI tool\")\n"
-    content = content + "        IO.println(\"\")\n"
-    content = content + "        IO.println(\"Usage: " + name + " <command> [options]\")\n"
-    content = content + "        return\n"
-    content = content + "    }\n\n"
-    content = content + "    IO.println(\"Running: \" + positional[0])\n"
+    content = content + "import \"@os\" as OS\n"
+    content = content + "import \"@process\" as Process\n\n"
+    content = content + "fun usage() {\n"
+    content = content + "    IO.println(\"" + name + " — a command-line tool\")\n"
+    content = content + "    IO.println(\"\")\n"
+    content = content + "    IO.println(\"Usage: " + name + " <command> [options]\")\n"
+    content = content + "    IO.println(\"\")\n"
+    content = content + "    IO.println(\"Commands:\")\n"
+    content = content + "    IO.println(\"  hello       Print a greeting\")\n"
+    content = content + "    IO.println(\"  version     Show version\")\n"
+    content = content + "    IO.println(\"\")\n"
+    content = content + "    IO.println(\"Options:\")\n"
+    content = content + "    IO.println(\"  --help, -h  Show this help\")\n"
     content = content + "}\n\n"
-    content = content + "main()\n"
+    content = content + "var parsed: Args.ParsedArgs = Args.parse()\n"
+    content = content + "var positional: List<String> = parsed.positional\n\n"
+    content = content + "if (positional.length() == 0 or parsed.flag(\"help\") or parsed.flag(\"h\")) {\n"
+    content = content + "    usage()\n"
+    content = content + "} else {\n"
+    content = content + "    var command: String = positional[0]\n"
+    content = content + "    match (command) {\n"
+    content = content + "        \"hello\" => IO.println(\"Hello from " + name + "!\")\n"
+    content = content + "        \"version\" => IO.println(\"" + name + " 0.1.0\")\n"
+    content = content + "        _ => {\n"
+    content = content + "            IO.println(\"Unknown command: \" + command)\n"
+    content = content + "            IO.println(\"Run '" + name + " --help' for usage.\")\n"
+    content = content + "            OS.exit(1)\n"
+    content = content + "        }\n"
+    content = content + "    }\n"
+    content = content + "}\n"
     IO.write_file(dir + "/src/main.sf", content)
 }
 
@@ -143,17 +163,18 @@ fun _write_web_manifest(dir: String, name: String) {
 
 fun _write_web_main(dir: String, name: String) {
     var content: String = "//! " + name + " — a web application built with Turmeric.\n\n"
-    content = content + "import \"turmeric\" as UI\n\n"
-    content = content + "var count = UI.signal(0)\n\n"
-    content = content + "var app = UI.div {\n"
-    content = content + "    UI.h1 { UI.text(\"" + name + "\") }\n"
-    content = content + "    UI.p { UI.text(\"Count: \" + count.get().to_string()) }\n"
-    content = content + "    UI.button {\n"
-    content = content + "        UI.text(\"Increment\")\n"
-    content = content + "        UI.on_click(fun () { count.update(fun (n) => n + 1) })\n"
+    content = content + "import { signal, mount } from \"turmeric/signal\"\n"
+    content = content + "import { div, h1, p, button, text } from \"turmeric/generated_types\"\n"
+    content = content + "import { on_click } from \"turmeric/events\"\n\n"
+    content = content + "var count = signal(0)\n\n"
+    content = content + "var app = div {\n"
+    content = content + "    h1 { text(\"" + name + "\") }\n"
+    content = content + "    p { text(\"Count: \" + count.get().to_string()) }\n"
+    content = content + "    button(on_click=fun () => count.update(fun (n) => n + 1)) {\n"
+    content = content + "        text(\"Increment\")\n"
     content = content + "    }\n"
     content = content + "}\n\n"
-    content = content + "UI.mount(app)\n"
+    content = content + "mount(app)\n"
     IO.write_file(dir + "/src/main.sf", content)
 }
 
