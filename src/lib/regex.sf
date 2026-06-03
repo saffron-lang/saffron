@@ -26,6 +26,7 @@
 @intrinsic fun store8(addr: Int, val: Int)
 @intrinsic fun load64(addr: Int): Int
 @intrinsic fun store64(addr: Int, val: Int)
+@intrinsic fun untag_ptr(s: Int): Int
 
 // --- Constants ---
 
@@ -39,8 +40,9 @@ var _MAX_MATCHES: Int = 10
 // Size of regex_t (128 bytes is safe for all platforms)
 var _REGEX_T_SIZE: Int = 128
 
-// Size of regmatch_t: {rm_so: i32, rm_eo: i32} = 8 bytes
-var _REGMATCH_SIZE: Int = 8
+// Size of regmatch_t: {rm_so: regoff_t, rm_eo: regoff_t}
+// regoff_t is 8 bytes (long) on macOS/64-bit, so regmatch_t = 16 bytes
+var _REGMATCH_SIZE: Int = 16
 
 // --- Internal Helpers ---
 
@@ -57,6 +59,11 @@ fun _load_i32(addr: Int): Int {
         val = val - 4294967296
     }
     return val
+}
+
+/// Read a regoff_t (64-bit signed integer on macOS/64-bit) from memory.
+fun _load_regoff(addr: Int): Int {
+    return load64(addr)
 }
 
 /// Extract a substring from str[start..end) as a new heap-allocated string.
@@ -143,9 +150,10 @@ fun find(pattern: String, text: String): Map<String, Any> {
         return result
     }
     // Read match[0] — the full match
-    var rm_so: Int = _load_i32(pmatch)
-    var rm_eo: Int = _load_i32(pmatch + 4)
-    var match_str: String = _substr(text, rm_so, rm_eo)
+    var rm_so: Int = _load_regoff(pmatch)
+    var rm_eo: Int = _load_regoff(pmatch + 8)
+    var text_ptr: Int = untag_ptr(text)
+    var match_str: String = _substr(text_ptr, rm_so, rm_eo)
     result.set("match", match_str)
     result.set("start", rm_so)
     result.set("end", rm_eo)
@@ -154,13 +162,13 @@ fun find(pattern: String, text: String): Map<String, Any> {
     var i: Int = 1
     while (i < _MAX_MATCHES) {
         var offset: Int = i * _REGMATCH_SIZE
-        var sub_so: Int = _load_i32(pmatch + offset)
-        var sub_eo: Int = _load_i32(pmatch + offset + 4)
+        var sub_so: Int = _load_regoff(pmatch + offset)
+        var sub_eo: Int = _load_regoff(pmatch + offset + 8)
         if (sub_so < 0) {
             // No more subgroups
             break
         }
-        var sub_str: String = _substr(text, sub_so, sub_eo)
+        var sub_str: String = _substr(text_ptr, sub_so, sub_eo)
         groups.push(sub_str)
         i = i + 1
     }
@@ -185,15 +193,16 @@ fun find_all(pattern: String, text: String): List<String> {
     }
     var pmatch: Int = _malloc(_REGMATCH_SIZE)
     var pos: Int = 0
-    var text_len: Int = _strlen(text)
+    var text_ptr: Int = untag_ptr(text)
+    var text_len: Int = _strlen(text_ptr)
     while (pos <= text_len) {
-        var search_ptr: Int = text + pos
+        var search_ptr: Int = text_ptr + pos
         var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
         if (rc != 0) {
             break
         }
-        var rm_so: Int = _load_i32(pmatch)
-        var rm_eo: Int = _load_i32(pmatch + 4)
+        var rm_so: Int = _load_regoff(pmatch)
+        var rm_eo: Int = _load_regoff(pmatch + 8)
         // Prevent infinite loops on zero-length matches
         if (rm_eo == rm_so) {
             pos = pos + 1
@@ -222,43 +231,45 @@ fun replace(pattern: String, text: String, replacement: String): String {
         return text
     }
     var pmatch: Int = _malloc(_REGMATCH_SIZE)
-    var text_len: Int = _strlen(text)
-    var repl_len: Int = _strlen(replacement)
+    var text_ptr: Int = untag_ptr(text)
+    var text_len: Int = _strlen(text_ptr)
+    var repl_ptr: Int = untag_ptr(replacement)
+    var repl_len: Int = _strlen(repl_ptr)
     // Allocate result buffer (grow as needed)
     var buf_cap: Int = text_len * 2 + repl_len + 1
     var buf: Int = _malloc(buf_cap)
     var buf_len: Int = 0
     var pos: Int = 0
     while (pos <= text_len) {
-        var search_ptr: Int = text + pos
+        var search_ptr: Int = text_ptr + pos
         var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
         if (rc != 0) {
             // No more matches — copy remainder
             var remain: Int = text_len - pos
             if (buf_len + remain + 1 > buf_cap) {
                 buf_cap = (buf_len + remain + 1) * 2
-                var new_buf: Int = _malloc(buf_cap)
-                _memcpy(new_buf, buf, buf_len)
+                var grow1: Int = _malloc(buf_cap)
+                _memcpy(grow1, buf, buf_len)
                 _free(buf)
-                buf = new_buf
+                buf = grow1
             }
             _memcpy(buf + buf_len, search_ptr, remain)
             buf_len = buf_len + remain
             break
         }
-        var rm_so: Int = _load_i32(pmatch)
-        var rm_eo: Int = _load_i32(pmatch + 4)
+        var rm_so: Int = _load_regoff(pmatch)
+        var rm_eo: Int = _load_regoff(pmatch + 8)
         // Prevent infinite loops on zero-length matches
         if (rm_eo == rm_so) {
             // Copy one character and advance
             if (pos < text_len) {
-                var needed: Int = buf_len + 1 + repl_len + 1
-                if (needed > buf_cap) {
-                    buf_cap = needed * 2
-                    var new_buf: Int = _malloc(buf_cap)
-                    _memcpy(new_buf, buf, buf_len)
+                var needed_zl: Int = buf_len + 1 + repl_len + 1
+                if (needed_zl > buf_cap) {
+                    buf_cap = needed_zl * 2
+                    var grow2: Int = _malloc(buf_cap)
+                    _memcpy(grow2, buf, buf_len)
                     _free(buf)
-                    buf = new_buf
+                    buf = grow2
                 }
                 store8(buf + buf_len, load8(search_ptr))
                 buf_len = buf_len + 1
@@ -268,20 +279,20 @@ fun replace(pattern: String, text: String, replacement: String): String {
         }
         // Copy text before match
         var pre_len: Int = rm_so
-        var needed: Int = buf_len + pre_len + repl_len + 1
-        if (needed > buf_cap) {
-            buf_cap = needed * 2
-            var new_buf: Int = _malloc(buf_cap)
-            _memcpy(new_buf, buf, buf_len)
+        var needed_pre: Int = buf_len + pre_len + repl_len + 1
+        if (needed_pre > buf_cap) {
+            buf_cap = needed_pre * 2
+            var grow3: Int = _malloc(buf_cap)
+            _memcpy(grow3, buf, buf_len)
             _free(buf)
-            buf = new_buf
+            buf = grow3
         }
         if (pre_len > 0) {
             _memcpy(buf + buf_len, search_ptr, pre_len)
             buf_len = buf_len + pre_len
         }
         // Copy replacement
-        _memcpy(buf + buf_len, replacement, repl_len)
+        _memcpy(buf + buf_len, repl_ptr, repl_len)
         buf_len = buf_len + repl_len
         pos = pos + rm_eo
     }
@@ -308,30 +319,31 @@ fun split(pattern: String, text: String): List<String> {
         return results
     }
     var pmatch: Int = _malloc(_REGMATCH_SIZE)
-    var text_len: Int = _strlen(text)
+    var text_ptr: Int = untag_ptr(text)
+    var text_len: Int = _strlen(text_ptr)
     var pos: Int = 0
     while (pos <= text_len) {
-        var search_ptr: Int = text + pos
+        var search_ptr: Int = text_ptr + pos
         var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
         if (rc != 0) {
             // No more matches — push remainder
-            var remainder: String = _substr(text, pos, text_len)
+            var remainder: String = _substr(text_ptr, pos, text_len)
             results.push(remainder)
             break
         }
-        var rm_so: Int = _load_i32(pmatch)
-        var rm_eo: Int = _load_i32(pmatch + 4)
+        var rm_so: Int = _load_regoff(pmatch)
+        var rm_eo: Int = _load_regoff(pmatch + 8)
         // Prevent infinite loops on zero-length matches
         if (rm_eo == rm_so) {
             if (pos < text_len) {
-                var ch_str: String = _substr(text, pos, pos + 1)
+                var ch_str: String = _substr(text_ptr, pos, pos + 1)
                 results.push(ch_str)
             }
             pos = pos + 1
             continue
         }
         // Push the text before this match
-        var segment: String = _substr(text, pos, pos + rm_so)
+        var segment: String = _substr(text_ptr, pos, pos + rm_so)
         results.push(segment)
         pos = pos + rm_eo
     }
@@ -366,15 +378,16 @@ fun count(pattern: String, text: String): Int {
     }
     var pmatch: Int = _malloc(_REGMATCH_SIZE)
     var pos: Int = 0
-    var text_len: Int = _strlen(text)
+    var text_ptr: Int = untag_ptr(text)
+    var text_len: Int = _strlen(text_ptr)
     while (pos <= text_len) {
-        var search_ptr: Int = text + pos
+        var search_ptr: Int = text_ptr + pos
         var rc: Int = _regexec(preg, search_ptr, 1, pmatch, 0)
         if (rc != 0) {
             break
         }
-        var rm_so: Int = _load_i32(pmatch)
-        var rm_eo: Int = _load_i32(pmatch + 4)
+        var rm_so: Int = _load_regoff(pmatch)
+        var rm_eo: Int = _load_regoff(pmatch + 8)
         if (rm_eo == rm_so) {
             pos = pos + 1
             continue
