@@ -42,7 +42,7 @@ fun enqueue(handle: Int) {
     run_queue.push(handle)
 }
 
-fun has_pending(): Int {
+fun _has_pending(): Int {
     if (run_queue.length() > 0) { return 1 }
     if (sleep_queue.length() > 0) { return 1 }
     if (await_waiters.length() > 0) { return 1 }
@@ -50,7 +50,7 @@ fun has_pending(): Int {
     return 0
 }
 
-fun wake_waiters(finished_handle: Int) {
+fun _wake_waiters(finished_handle: Int) {
     var i: Int = await_targets.length() - 1
     while (i >= 0) {
         if (await_targets[i] == finished_handle) {
@@ -65,7 +65,7 @@ fun wake_waiters(finished_handle: Int) {
 // Poll all parked IO fds for readiness.
 // Moves ready tasks back to the run queue.
 // timeout_ms: how long to block if nothing is immediately ready.
-fun poll_io(timeout_ms: Int) {
+fun _poll_io(timeout_ms: Int) {
     // First pass: check each fd with 0ms timeout (non-blocking)
     var i: Int = io_handles.length() - 1
     while (i >= 0) {
@@ -105,7 +105,7 @@ fun scheduler_tick(): Int {
 
     // Poll IO fds when run queue is empty but IO tasks are waiting
     if (run_queue.length() == 0 and io_handles.length() > 0) {
-        poll_io(10)
+        _poll_io(10)
     }
 
     if (run_queue.length() == 0) {
@@ -123,7 +123,7 @@ fun scheduler_tick(): Int {
         result_handles.push(hdl)
         result_values.push(res)
         store_result(hdl, res)
-        wake_waiters(hdl)
+        _wake_waiters(hdl)
         // Note: do NOT coro_destroy here — other coroutines may still
         // call coro_done(hdl) to check completion (e.g. gather/await).
         // The GC will reclaim the coroutine frame when no longer referenced.
@@ -161,7 +161,7 @@ fun scheduler_tick(): Int {
         reset_yield()
     }
 
-    return has_pending()
+    return _has_pending()
 }
 
 fun scheduler_run() {

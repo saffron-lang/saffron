@@ -339,7 +339,7 @@ class Module {
             var m: Float = 0
             while (m < block.instructions.length()) {
                 var inst: Instructions.Instruction = block.instructions[m]
-                var inst_str: String = Instructions.format_instruction(inst)
+                var inst_str: String = Instructions.format_instruction(inst, false)
                 if (inst_str.length() > 0) {
                     sb.append("${inst_str}\n")
                 }

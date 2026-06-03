@@ -95,7 +95,9 @@ class PhiIncoming {
 }
 
 /// Format an instruction into LLVM IR text.
-fun format_instruction(inst: Instruction): String {
+/// When typed_ptrs is true, emit legacy typed pointer syntax (e.g. i64*)
+/// instead of opaque pointers (ptr).
+fun format_instruction(inst: Instruction, typed_ptrs: Bool): String {
     return match (inst) {
         Add(result, lhs, rhs) => {
             var ty_str: String = Types.format_type(Types.value_type(lhs))
@@ -164,10 +166,17 @@ fun format_instruction(inst: Instruction): String {
             return "  ${Types.format_value(result)} = alloca ${Types.format_type(ty)}"
         }
         Load(result, ty, ptr) => {
-            return "  ${Types.format_value(result)} = load ${Types.format_type(ty)}, ptr ${Types.format_value(ptr)}"
+            var ty_str: String = Types.format_type(ty)
+            if (typed_ptrs) {
+                return "  ${Types.format_value(result)} = load ${ty_str}, ${ty_str}* ${Types.format_value(ptr)}"
+            }
+            return "  ${Types.format_value(result)} = load ${ty_str}, ptr ${Types.format_value(ptr)}"
         }
         Store(val, ptr) => {
             var ty_str: String = Types.format_type(Types.value_type(val))
+            if (typed_ptrs) {
+                return "  store ${ty_str} ${Types.format_value(val)}, ${ty_str}* ${Types.format_value(ptr)}"
+            }
             return "  store ${ty_str} ${Types.format_value(val)}, ptr ${Types.format_value(ptr)}"
         }
         GEP(result, base_ty, ptr, indices) => {
@@ -178,7 +187,11 @@ fun format_instruction(inst: Instruction): String {
                 idx_parts.push("${Types.format_type(Types.value_type(idx))} ${Types.format_value(idx)}")
                 i = i + 1
             }
-            return "  ${Types.format_value(result)} = getelementptr ${Types.format_type(base_ty)}, ptr ${Types.format_value(ptr)}, ${idx_parts.join(", ")}"
+            var base_ty_str: String = Types.format_type(base_ty)
+            if (typed_ptrs) {
+                return "  ${Types.format_value(result)} = getelementptr ${base_ty_str}, ${base_ty_str}* ${Types.format_value(ptr)}, ${idx_parts.join(", ")}"
+            }
+            return "  ${Types.format_value(result)} = getelementptr ${base_ty_str}, ptr ${Types.format_value(ptr)}, ${idx_parts.join(", ")}"
         }
         PtrToInt(result, val, to_ty) => {
             return "  ${Types.format_value(result)} = ptrtoint ptr ${Types.format_value(val)} to ${Types.format_type(to_ty)}"

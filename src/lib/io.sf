@@ -1,38 +1,47 @@
-// IO module — standard input/output operations
-// These functions are available as IO.println(), IO.read_file(), etc.
+//! IO module — standard input/output operations.
+//! These functions are available as IO.println(), IO.read_file(), etc.
 
+/// Print a string followed by a newline to stdout.
 fun println(value: String) {
     __io_println_str(value)
 }
 
+/// Print a string to stdout without a trailing newline.
 fun print(value: String) {
     __io_print_str(value)
 }
 
+/// Read the entire contents of a file as a string.
 fun read_file(path: String): String {
     return __io_read_file(path)
 }
 
+/// Write content to a file, creating or overwriting it.
 fun write_file(path: String, content: String) {
     __io_write_file(path, content)
 }
 
+/// Append content to a file, creating it if it doesn't exist.
 fun append_file(path: String, content: String) {
     __io_append_file(path, content)
 }
 
+/// Return true if a file exists at the given path.
 fun file_exists(path: String): Bool {
     return __io_file_exists(path) == 1
 }
 
+/// Create a directory (and parents) at the given path.
 fun mkdir(path: String) {
     __io_mkdir(path)
 }
 
+/// Walk a directory tree and return all file paths.
 fun walk_dir(path: String): List<String> {
     return __io_walk_dir(path)
 }
 
+/// List the contents of a directory (alias for walk_dir).
 fun list_dir(path: String): List<String> {
     return __io_walk_dir(path)
 }

@@ -140,12 +140,12 @@ class ConsoleHandler extends Handler {
     var use_color: Bool
     var format: String
 
-    // Create a console handler.
-    //
-    // ```saffron
-    // import "@log" as Log
-    // var handler = Log.ConsoleHandler(Log.Level.Debug, true, "text")
-    // ```
+    /// Create a console handler.
+    ///
+    /// ```saffron
+    /// import "@log" as Log
+    /// var handler = Log.ConsoleHandler(Log.Level.Debug, true, "text")
+    /// ```
     fun init(min_level: Level, use_color: Bool, format: String) {
         this.min_level = min_level
         this.use_color = use_color
@@ -178,12 +178,12 @@ class FileHandler extends Handler {
     var path: String
     var format: String
 
-    // Create a file handler.
-    //
-    // ```saffron
-    // import "@log" as Log
-    // var handler = Log.FileHandler(Log.Level.Info, "app.log", "text")
-    // ```
+    /// Create a file handler.
+    ///
+    /// ```saffron
+    /// import "@log" as Log
+    /// var handler = Log.FileHandler(Log.Level.Info, "app.log", "text")
+    /// ```
     fun init(min_level: Level, path: String, format: String) {
         this.min_level = min_level
         this.path = path
@@ -223,12 +223,12 @@ class MemoryHandler extends Handler {
         this.records.push(record)
     }
 
-    // Clear all stored records.
+    /// Clear all stored records.
     fun clear() {
         this.records = []
     }
 
-    // Get the number of stored records.
+    /// Get the number of stored records.
     fun count(): Number {
         return this.records.length()
     }
@@ -241,13 +241,13 @@ class Logger {
     var min_level: Level
     var context: Map<String, String>
 
-    // Create a new logger with a name.
-    //
-    // ```saffron
-    // import "@log" as Log
-    // var logger = Log.Logger("http-server")
-    // logger.info("listening on :8080")
-    // ```
+    /// Create a new logger with a name.
+    ///
+    /// ```saffron
+    /// import "@log" as Log
+    /// var logger = Log.Logger("http-server")
+    /// logger.info("listening on :8080")
+    /// ```
     fun init(name: String) {
         this.name = name
         this.handlers = []
@@ -258,31 +258,31 @@ class Logger {
         this.handlers.push(ConsoleHandler(Level.Trace, true, "text"))
     }
 
-    // Add a handler to this logger.
+    /// Add a handler to this logger.
     fun add_handler(handler: Handler) {
         this.handlers.push(handler)
     }
 
-    // Remove all handlers.
+    /// Remove all handlers.
     fun clear_handlers() {
         this.handlers = []
     }
 
-    // Set the minimum log level. Messages below this level are dropped.
-    //
-    // ```saffron
-    // logger.set_level(Log.Level.Warn)  // only Warn, Error, Fatal
-    // ```
+    /// Set the minimum log level. Messages below this level are dropped.
+    ///
+    /// ```saffron
+    /// logger.set_level(Log.Level.Warn)  // only Warn, Error, Fatal
+    /// ```
     fun set_level(level: Level) {
         this.min_level = level
     }
 
-    // Add persistent context fields that appear on every log record.
-    //
-    // ```saffron
-    // logger.with_context({"request_id": "abc-123", "user": "alice"})
-    // logger.info("processing")  // fields included automatically
-    // ```
+    /// Add persistent context fields that appear on every log record.
+    ///
+    /// ```saffron
+    /// logger.with_context({"request_id": "abc-123", "user": "alice"})
+    /// logger.info("processing")  // fields included automatically
+    /// ```
     fun with_context(fields: Map<String, String>) {
         var keys = fields.keys()
         var i = 0
@@ -293,12 +293,12 @@ class Logger {
         }
     }
 
-    // Create a child logger with additional context.
-    //
-    // ```saffron
-    // var req_logger = logger.child("request", {"id": "abc-123"})
-    // req_logger.info("started")  // includes parent context + id
-    // ```
+    /// Create a child logger with additional context.
+    ///
+    /// ```saffron
+    /// var req_logger = logger.child("request", {"id": "abc-123"})
+    /// req_logger.info("started")  // includes parent context + id
+    /// ```
     fun child(name: String, fields: Map<String, String>): Logger {
         var child_logger = Logger("${this.name}.${name}")
         child_logger.handlers = this.handlers
@@ -325,63 +325,63 @@ class Logger {
         return child_logger
     }
 
-    // Log at TRACE level.
+    /// Log at TRACE level.
     fun trace(message: String) {
         this._log(Level.Trace, message, {})
     }
 
-    // Log at DEBUG level.
+    /// Log at DEBUG level.
     fun debug(message: String) {
         this._log(Level.Debug, message, {})
     }
 
-    // Log at INFO level.
+    /// Log at INFO level.
     fun info(message: String) {
         this._log(Level.Info, message, {})
     }
 
-    // Log at WARN level.
+    /// Log at WARN level.
     fun warn(message: String) {
         this._log(Level.Warn, message, {})
     }
 
-    // Log at ERROR level.
+    /// Log at ERROR level.
     fun error(message: String) {
         this._log(Level.Error, message, {})
     }
 
-    // Log at FATAL level, then exit.
+    /// Log at FATAL level, then exit.
     fun fatal(message: String) {
         this._log(Level.Fatal, message, {})
         OS.exit(1)
     }
 
-    // Log at TRACE level with structured fields.
+    /// Log at TRACE level with structured fields.
     fun trace_f(message: String, fields: Map<String, String>) {
         this._log(Level.Trace, message, fields)
     }
 
-    // Log at DEBUG level with structured fields.
+    /// Log at DEBUG level with structured fields.
     fun debug_f(message: String, fields: Map<String, String>) {
         this._log(Level.Debug, message, fields)
     }
 
-    // Log at INFO level with structured fields.
+    /// Log at INFO level with structured fields.
     fun info_f(message: String, fields: Map<String, String>) {
         this._log(Level.Info, message, fields)
     }
 
-    // Log at WARN level with structured fields.
+    /// Log at WARN level with structured fields.
     fun warn_f(message: String, fields: Map<String, String>) {
         this._log(Level.Warn, message, fields)
     }
 
-    // Log at ERROR level with structured fields.
+    /// Log at ERROR level with structured fields.
     fun error_f(message: String, fields: Map<String, String>) {
         this._log(Level.Error, message, fields)
     }
 
-    // Log at FATAL level with structured fields, then exit.
+    /// Log at FATAL level with structured fields, then exit.
     fun fatal_f(message: String, fields: Map<String, String>) {
         this._log(Level.Fatal, message, fields)
         OS.exit(1)

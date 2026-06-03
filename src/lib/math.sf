@@ -23,10 +23,6 @@ var pi: Float = 3.14159265358979
 var e: Float = 2.71828182845905
 /// Tau (2 * pi).
 var tau: Float = 6.28318530717959
-/// Alias for pi.
-var PI: Float = 3.14159265358979
-/// Alias for e.
-var E: Float = 2.71828182845905
 
 /// Return the absolute value of x.
 ///

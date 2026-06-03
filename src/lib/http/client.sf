@@ -38,28 +38,28 @@ class Response {
         this.url = url
     }
 
-    // True if the status code is 2xx.
+    /// True if the status code is 2xx.
     fun ok(): Bool {
         return this.status >= 200 and this.status < 300
     }
 
-    // True if the status code indicates a client error (4xx).
+    /// True if the status code indicates a client error (4xx).
     fun is_client_error(): Bool {
         return this.status >= 400 and this.status < 500
     }
 
-    // True if the status code indicates a server error (5xx).
+    /// True if the status code indicates a server error (5xx).
     fun is_server_error(): Bool {
         return this.status >= 500 and this.status < 600
     }
 
-    // Parse the response body as JSON.
+    /// Parse the response body as JSON.
     fun json() {
         return JSON.parse(this.body)
     }
 
-    // Get a response header value by name (case-insensitive).
-    // Returns empty string if the header is not present.
+    /// Get a response header value by name (case-insensitive).
+    /// Returns empty string if the header is not present.
     fun header(name: String): String {
         var lower = name.to_lower()
         var keys = this.headers.keys()
@@ -73,7 +73,7 @@ class Response {
         return ""
     }
 
-    // Raise an error if the response status is not 2xx.
+    /// Raise an error if the response status is not 2xx.
     fun raise_for_status() {
         if (this.status >= 400) {
             throw "httpx: ${this.status} ${this.status_text} for url '${this.url}'"
@@ -171,7 +171,7 @@ fun head(url: String): Response {
 /// ```saffron
 /// var resp = Http.post_json("https://api.example.com/users", {"name": "alice", "age": 30})
 /// ```
-fun post_json(url: String, payload): Response {
+fun post_json(url: String, payload: Any): Response {
     var headers: Map<String, String> = {}
     headers.set("Content-Type", "application/json")
     var json_body = JSON.to_string(payload)
@@ -179,7 +179,7 @@ fun post_json(url: String, payload): Response {
 }
 
 /// PUT a JSON-serializable value. Automatically sets Content-Type.
-fun put_json(url: String, payload): Response {
+fun put_json(url: String, payload: Any): Response {
     var headers: Map<String, String> = {}
     headers.set("Content-Type", "application/json")
     var json_body = JSON.to_string(payload)
@@ -187,7 +187,7 @@ fun put_json(url: String, payload): Response {
 }
 
 /// PATCH with a JSON-serializable value. Automatically sets Content-Type.
-fun patch_json(url: String, payload): Response {
+fun patch_json(url: String, payload: Any): Response {
     var headers: Map<String, String> = {}
     headers.set("Content-Type", "application/json")
     var json_body = JSON.to_string(payload)
@@ -199,7 +199,7 @@ fun patch_json(url: String, payload): Response {
 /// ```saffron
 /// var users = Http.get_json("https://api.example.com/users")
 /// ```
-fun get_json(url: String) {
+fun get_json(url: String): Any {
     var resp = get(url)
     resp.raise_for_status()
     return resp.json()

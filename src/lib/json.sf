@@ -8,7 +8,7 @@
 /// data.get("name")     // "saffron"
 /// data.get("version")  // 1
 /// ```
-fun parse(source: String) {
+fun parse(source: String): Any {
     var pos = 0
 
     fun peek(): String {
@@ -209,7 +209,7 @@ fun to_string(value: Any): String {
 /// var config = JSON.parse(IO.read_file("config.json"))
 /// var port = config.get("port")
 /// ```
-fun parse_into(klass: Any, source: String) {
+fun parse_into(klass: Any, source: String): Any {
     var parsed = parse(source)
     return Reflect.construct(klass, parsed)
 }
