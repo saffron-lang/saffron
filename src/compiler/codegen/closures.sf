@@ -33,7 +33,6 @@ extend fun Codegen.gen_lambda(params: List<AST.Param>, ret_type: String, body: L
         var saved_sb: StringBuilder = this.sb
         var saved_terminated: Bool = this.block_terminated
         var saved_counter: Float = this.local_counter
-        var saved_var_types: Map<String, String> = this.var_types
         var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
         var saved_is_coro: Bool = this.is_coroutine
 
@@ -54,7 +53,6 @@ extend fun Codegen.gen_lambda(params: List<AST.Param>, ret_type: String, body: L
         this.sb = saved_sb
         this.block_terminated = saved_terminated
         this.local_counter = saved_counter
-        this.var_types = saved_var_types
         this.typed_vars = saved_typed_vars
         this.is_coroutine = saved_is_coro
         this.globals.push(lambda_ir)
@@ -129,7 +127,6 @@ extend fun Codegen.gen_lambda(params: List<AST.Param>, ret_type: String, body: L
         var saved_sb2: StringBuilder = this.sb
         var saved_terminated2: Bool = this.block_terminated
         var saved_counter2: Float = this.local_counter
-        var saved_var_types2: Map<String, String> = this.var_types
         var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
         this.sb = StringBuilder()
         var full_params: String = "__env:Int"
@@ -141,7 +138,6 @@ extend fun Codegen.gen_lambda(params: List<AST.Param>, ret_type: String, body: L
         this.sb = saved_sb2
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
-        this.var_types = saved_var_types2
         this.typed_vars = saved_typed_vars2b
 
         // Heap-allocate closure pair: [fn_ptr, 0]
@@ -184,7 +180,6 @@ extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: 
             oci = oci + 1
         }
         this.reset_locals()
-        this.var_types = {}
         this.typed_vars = {}
         this.string_vars = []
         var ret_llvm: String = this.llvm_type(ret_type)
@@ -214,7 +209,7 @@ extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: 
         this.emit("entry:")
         this.block_terminated = false
 
-        // Alloca all params and register in var_types/typed_vars
+        // Alloca all params and register in typed_vars
         i = 0
         while (i < param_list.length()) {
             var parts: List<String> = param_list[i].split(":")
@@ -222,7 +217,6 @@ extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: 
             var ptype: String = parts[1]
             this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
-            this.var_types.set(pname, ptype)
             this.typed_vars.set(pname, this.str_to_type(ptype))
             i = i + 1
         }
@@ -244,14 +238,12 @@ extend fun Codegen.gen_closure_function(name: String, params: String, ret_type: 
             // Allocate local storage for captured variable and initialize with env value
             this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
             this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
-            // Register captured variable in typed_vars (source of truth) and var_types (legacy)
+            // Register captured variable in typed_vars
             // Use the outer scope's type if available (preserves generic class types)
             if (outer_typed_vars.has(cap_name)) {
                 this.typed_vars.set(cap_name, outer_typed_vars.get(cap_name))
-                this.var_types.set(cap_name, this.type_to_string(outer_typed_vars.get(cap_name)))
             } else {
                 this.typed_vars.set(cap_name, this.str_to_type("Int"))
-                this.var_types.set(cap_name, "Int")
             }
             ci = ci + 1
         }

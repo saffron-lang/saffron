@@ -133,10 +133,7 @@ extend fun Codegen.gen_var_decl_with_name(name: String, type_ann: String, init: 
                 vtype = post_type
             }
         }
-        this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))
-        // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
-        // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
             this.string_vars.push(name)
         }

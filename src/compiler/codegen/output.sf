@@ -65,12 +65,10 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             var saved_sb2: StringBuilder = this.sb
             var saved_terminated2: Bool = this.block_terminated
             var saved_counter2: Float = this.local_counter
-            var saved_var_types2: Map<String, String> = this.var_types
             var saved_typed_vars2: Map<String, AST.Type> = this.typed_vars
 
             this.sb = StringBuilder()
             this.in_function = true
-            this.var_types = {}
             this.typed_vars = {}
             this.string_vars = []
             this.reset_locals()
@@ -103,7 +101,6 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
                     this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
-                this.var_types.set(pp2[0], pp2[1])
                 this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
                 pi3 = pi3 + 1
             }
@@ -126,18 +123,15 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             this.sb = saved_sb2
             this.block_terminated = saved_terminated2
             this.local_counter = saved_counter2
-            this.var_types = saved_var_types2
             this.typed_vars = saved_typed_vars2
             this.globals.push(nested_ir)
             return
         }
 
         this.in_function = true
-        var saved_vt: Map<String, String> = this.var_types
         var saved_tv: Map<String, AST.Type> = this.typed_vars
         this.reset_locals()
         this.string_vars = []
-        this.var_types = {}
         this.typed_vars = {}
         var ret_llvm: String = this.llvm_type(ret_type)
 
@@ -199,7 +193,6 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             var parts: List<String> = param_list[i].split(":")
             var pname: String = parts[0]
             var ptype: String = parts[1]
-            this.var_types.set(pname, ptype)
             this.typed_vars.set(pname, this.str_to_type(ptype))
             if (ptype == "String") {
                 this.string_vars.push(pname)
@@ -282,7 +275,6 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
 
         this.emit("}")
         this.block_terminated = false
-        this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
     }

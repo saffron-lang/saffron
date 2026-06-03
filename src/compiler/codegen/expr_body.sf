@@ -1532,7 +1532,7 @@
             }
         }
 
-        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
             if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
@@ -1804,8 +1804,7 @@
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        // Also check var_types for captured variables in closures
-        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
+        if (!this.typed_vars.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()

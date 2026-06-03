@@ -926,7 +926,6 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return local
     }
     // --- Ambiguous builtin dispatch (needs obj_type from last_type) ---
-    // Prefer var_types annotation over last_type because the native binary's
     // Prefer typed_vars annotation over last_type (source of truth for variable types).
     var obj_type: String = this.type_to_string(this.last_type)
     if (obj_name.length() > 0) {

@@ -194,7 +194,6 @@ extend fun Codegen.gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): Strin
                 var bi: Float = 0
                 while (bi < bind_count) {
                     var btype: String = this.get_variant_field_type(enum_name, arm_variant, bi)
-                    this.var_types.set(bindings[bi], btype)
                     this.typed_vars.set(bindings[bi], this.str_to_type(btype))
                     if (btype == "String") {
                         this.string_vars.push(bindings[bi])
