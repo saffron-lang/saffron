@@ -8677,9 +8677,10 @@ class Codegen {
             this.last_type = AST.Type.NilType
             return "0"
         }
-        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file" or method == "read_stdin" or method == "readline") {
+        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file" or method == "read_stdin" or method == "readline" or method == "readln" or method == "read_line" or method == "open") {
             var io_func: String = "__io_" + method
             if (method == "list_dir") { io_func = "__io_walk_dir" }
+            if (method == "readln" or method == "read_line") { io_func = "__io_readline" }
             this.called_functions.push(io_func)
             var io_args: List<String> = []
             var ii: Float = 0
