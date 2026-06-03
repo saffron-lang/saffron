@@ -1,0 +1,104 @@
+//! Test for @pantry_config module — verifies the DSL generates correct TOML.
+
+import "@test" as T
+import "@pantry_config" as Pantry
+
+// Test basic project creation
+var p = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "test-app"
+    p.version = "1.2.3"
+    p.description = "A test application"
+    p.license = "MIT"
+    p.entry = "src/app.sf"
+    p.authors = ["Alice", "Bob"]
+})
+
+T.assert_eq(p.name, "test-app", "project name")
+T.assert_eq(p.version, "1.2.3", "project version")
+T.assert_eq(p.description, "A test application", "project description")
+T.assert_eq(p.license, "MIT", "project license")
+T.assert_eq(p.entry, "src/app.sf", "project entry")
+T.assert_eq(p.authors.length(), 2, "project authors count")
+
+// Test dependencies
+var p2 = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "dep-test"
+    p.version = "0.1.0"
+    p.dep("http", "^2.0.0")
+    p.dep("json", "^1.5.0")
+    p.dep_path("turmeric", "../../turmeric", "^0.1.0")
+    p.dep_git("my-lib", "https://github.com/user/lib.git", "v1.0.0")
+    p.dev_dep("benchmark", "*")
+})
+
+T.assert_eq(p2._deps.length(), 4, "dependency count")
+T.assert_eq(p2._dev_deps.length(), 1, "dev dependency count")
+
+// Test scripts
+var p3 = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "script-test"
+    p.version = "0.1.0"
+    p.script("build", "saffron build src/main.sf -o build/app")
+    p.script("test", "saffron run test/test_main.sf")
+})
+
+T.assert_eq(p3._scripts.get("build"), "saffron build src/main.sf -o build/app", "build script")
+T.assert_eq(p3._scripts.get("test"), "saffron run test/test_main.sf", "test script")
+
+// Test TOML generation
+var toml = Pantry._generate_toml(p2)
+T.assert(toml.contains("[package]"), "toml has package section")
+T.assert(toml.contains("name = \"dep-test\""), "toml has name")
+T.assert(toml.contains("[dependencies]"), "toml has deps section")
+T.assert(toml.contains("http = \"^2.0.0\""), "toml has simple dep")
+T.assert(toml.contains("turmeric = {path = \"../../turmeric\""), "toml has path dep")
+T.assert(toml.contains("[dev-dependencies]"), "toml has dev-deps section")
+T.assert(toml.contains("benchmark = \"*\""), "toml has dev dep")
+
+// Test workspace
+var w = Pantry.workspace(fun (w: Pantry.Workspace) {
+    w.member("packages/core")
+    w.member("packages/cli")
+    w.shared_dep("http", "^2.0.0")
+})
+
+T.assert_eq(w._members.length(), 2, "workspace members count")
+T.assert_eq(w._shared_deps.get("http"), "^2.0.0", "workspace shared dep")
+
+// Test workspace TOML generation
+var ws_toml = Pantry._generate_workspace_toml(w)
+T.assert(ws_toml.contains("[workspace]"), "workspace toml has section")
+T.assert(ws_toml.contains("packages/core"), "workspace toml has member")
+T.assert(ws_toml.contains("[workspace.dependencies]"), "workspace toml has shared deps")
+
+// Test get_project retrieves last configured project
+var last = Pantry.get_project()
+T.assert_eq(last.name, "script-test", "get_project returns last project")
+
+// Test environments
+var p4 = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "env-test"
+    p.version = "0.1.0"
+    p.env("dev", {"DEBUG": "true", "API_URL": "http://localhost:3000"})
+    p.env("prod", {"DEBUG": "false", "API_URL": "https://api.example.com"})
+})
+
+var env_toml = Pantry._generate_toml(p4)
+T.assert(env_toml.contains("[environments.dev]"), "toml has dev env section")
+T.assert(env_toml.contains("[environments.prod]"), "toml has prod env section")
+T.assert(env_toml.contains("DEBUG = \"true\""), "toml has dev DEBUG")
+
+// Test features
+var p5 = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "feature-test"
+    p.version = "0.1.0"
+    p.feature("tls", ["openssl"])
+    p.feature("http2", ["nghttp2", "hpack"])
+})
+
+var feat_toml = Pantry._generate_toml(p5)
+T.assert(feat_toml.contains("[features.tls]"), "toml has tls feature section")
+T.assert(feat_toml.contains("[features.http2]"), "toml has http2 feature section")
+T.assert(feat_toml.contains("\"openssl\""), "toml has tls dep")
+
+T.summary()

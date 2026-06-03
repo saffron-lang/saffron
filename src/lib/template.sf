@@ -1,0 +1,358 @@
+//! String template rendering with Mustache-style syntax.
+//!
+//! ```saffron
+//! import "@template" as Template
+//!
+//! var result = Template.render("Hello {{name}}!", {"name": "world"})
+//! // "Hello world!"
+//!
+//! var html = Template.render("{{#if show}}<p>{{msg}}</p>{{/if}}", {"show": true, "msg": "hi"})
+//! // "<p>hi</p>"
+//!
+//! var list = Template.render("{{#each items}}[{{this}}]{{/each}}", {"items": [1, 2, 3]})
+//! // "[1][2][3]"
+//! ```
+
+// =============================================================================
+// Internal helpers — forward-defined before public functions
+// =============================================================================
+
+/// Check if a value is truthy (not "", not nil, not false, not 0).
+fun _is_truthy(value: Any): Bool {
+    if (value == nil) { return false }
+    if (value == false) { return false }
+    if (value == "") { return false }
+    if (value == 0) { return false }
+    return true
+}
+
+/// Convert any value to its string representation.
+fun _to_str(value: Any): String {
+    if (value == nil) { return "" }
+    if (value is String) { return value }
+    if (value is Number) { return value.to_string() }
+    if (value is Bool) { return value.to_string() }
+    return "${value}"
+}
+
+/// Find the index of a substring starting from a given position.
+/// Returns -1 if not found.
+fun _index_from(source: String, needle: String, start: Number): Number {
+    var remaining = source.slice(start, source.length())
+    var idx = remaining.index_of(needle)
+    if (idx == -1) { return -1 }
+    return start + idx
+}
+
+/// Find the matching closing tag for a block (handles nesting).
+/// Returns the index of the opening `{{` of the closing tag.
+/// tag_name is "if", "unless", or "each".
+fun _find_closing_tag(template: String, tag_name: String, start: Number): Number {
+    var open_tag = "{{#" + tag_name
+    var close_tag = "{{/" + tag_name + "}}"
+    var depth = 1
+    var pos = start
+
+    while (pos < template.length()) {
+        var next_open = _index_from(template, open_tag, pos)
+        var next_close = _index_from(template, close_tag, pos)
+
+        if (next_close == -1) {
+            return -1
+        }
+
+        if (next_open != -1 and next_open < next_close) {
+            // Found a nested opening tag — increase depth
+            depth = depth + 1
+            pos = next_open + open_tag.length()
+        } else {
+            // Found a closing tag
+            depth = depth - 1
+            if (depth == 0) {
+                return next_close
+            }
+            pos = next_close + close_tag.length()
+        }
+    }
+
+    return -1
+}
+
+/// Find the {{else}} marker at the current nesting level within a block.
+/// Searches between start and end positions.
+/// Returns -1 if no else found at depth 0.
+fun _find_else(template: String, tag_name: String, start: Number, end: Number): Number {
+    var open_tag = "{{#" + tag_name
+    var close_tag = "{{/" + tag_name + "}}"
+    var else_tag = "{{else}}"
+    var depth = 0
+    var pos = start
+
+    while (pos < end) {
+        var next_open = _index_from(template, open_tag, pos)
+        var next_close = _index_from(template, close_tag, pos)
+        var next_else = _index_from(template, else_tag, pos)
+
+        // If else is found at depth 0 and before any nested blocks
+        if (next_else != -1 and next_else < end and depth == 0) {
+            // Make sure it's not inside a nested block
+            var is_nested = false
+            if (next_open != -1 and next_open < next_else) {
+                is_nested = true
+            }
+            if (!is_nested) {
+                return next_else
+            }
+        }
+
+        // Advance past the nearest structural tag
+        if (next_open != -1 and next_open < end and (next_close == -1 or next_open < next_close)) {
+            depth = depth + 1
+            pos = next_open + open_tag.length()
+        } else if (next_close != -1 and next_close < end) {
+            depth = depth - 1
+            pos = next_close + close_tag.length()
+        } else {
+            // No more structural tags — check for else
+            if (next_else != -1 and next_else < end and depth == 0) {
+                return next_else
+            }
+            return -1
+        }
+    }
+
+    return -1
+}
+
+/// Core rendering engine. Processes template string with context and current_item
+/// (for {{this}} inside each blocks).
+fun _render_core(template: String, context: Map<String, Any>, current_item: Any): String {
+    var result = StringBuilder()
+    var pos = 0
+
+    while (pos < template.length()) {
+        var tag_start = _index_from(template, "{{", pos)
+
+        if (tag_start == -1) {
+            // No more tags — append the rest
+            result.append(template.slice(pos, template.length()))
+            pos = template.length()
+        } else {
+            // Append literal text before the tag
+            if (tag_start > pos) {
+                result.append(template.slice(pos, tag_start))
+            }
+
+            var tag_end = _index_from(template, "}}", tag_start)
+            if (tag_end == -1) {
+                // Unclosed tag — treat rest as literal
+                result.append(template.slice(tag_start, template.length()))
+                pos = template.length()
+            } else {
+                var tag_content = template.slice(tag_start + 2, tag_end)
+                var after_tag = tag_end + 2
+
+                if (tag_content.starts_with("#if ")) {
+                    // {{#if key}}...{{/if}}
+                    var key = tag_content.slice(4, tag_content.length()).trim()
+                    var close_pos = _find_closing_tag(template, "if", after_tag)
+                    if (close_pos == -1) {
+                        // Malformed — skip the tag
+                        result.append("{{")
+                        result.append(tag_content)
+                        result.append("}}")
+                        pos = after_tag
+                    } else {
+                        var block_content = template.slice(after_tag, close_pos)
+                        var close_tag_end = close_pos + "{{/if}}".length()
+
+                        // Check for {{else}}
+                        var else_pos = _find_else(template, "if", after_tag, close_pos)
+                        var value = nil
+                        if (context.has(key)) { value = context.get(key) }
+
+                        if (_is_truthy(value)) {
+                            if (else_pos != -1) {
+                                var true_block = template.slice(after_tag, else_pos)
+                                result.append(_render_core(true_block, context, current_item))
+                            } else {
+                                result.append(_render_core(block_content, context, current_item))
+                            }
+                        } else {
+                            if (else_pos != -1) {
+                                var false_block = template.slice(else_pos + "{{else}}".length(), close_pos)
+                                result.append(_render_core(false_block, context, current_item))
+                            }
+                        }
+                        pos = close_tag_end
+                    }
+
+                } else if (tag_content.starts_with("#unless ")) {
+                    // {{#unless key}}...{{/unless}}
+                    var key = tag_content.slice(8, tag_content.length()).trim()
+                    var close_pos = _find_closing_tag(template, "unless", after_tag)
+                    if (close_pos == -1) {
+                        result.append("{{")
+                        result.append(tag_content)
+                        result.append("}}")
+                        pos = after_tag
+                    } else {
+                        var block_content = template.slice(after_tag, close_pos)
+                        var close_tag_end = close_pos + "{{/unless}}".length()
+
+                        // Check for {{else}}
+                        var else_pos = _find_else(template, "unless", after_tag, close_pos)
+                        var value = nil
+                        if (context.has(key)) { value = context.get(key) }
+
+                        if (!_is_truthy(value)) {
+                            if (else_pos != -1) {
+                                var true_block = template.slice(after_tag, else_pos)
+                                result.append(_render_core(true_block, context, current_item))
+                            } else {
+                                result.append(_render_core(block_content, context, current_item))
+                            }
+                        } else {
+                            if (else_pos != -1) {
+                                var false_block = template.slice(else_pos + "{{else}}".length(), close_pos)
+                                result.append(_render_core(false_block, context, current_item))
+                            }
+                        }
+                        pos = close_tag_end
+                    }
+
+                } else if (tag_content.starts_with("#each ")) {
+                    // {{#each key}}...{{/each}}
+                    var key = tag_content.slice(6, tag_content.length()).trim()
+                    var close_pos = _find_closing_tag(template, "each", after_tag)
+                    if (close_pos == -1) {
+                        result.append("{{")
+                        result.append(tag_content)
+                        result.append("}}")
+                        pos = after_tag
+                    } else {
+                        var block_content = template.slice(after_tag, close_pos)
+                        var close_tag_end = close_pos + "{{/each}}".length()
+
+                        if (context.has(key)) {
+                            var list_val = context.get(key)
+                            var i = 0
+                            while (i < list_val.length()) {
+                                var item = list_val[i]
+                                result.append(_render_core(block_content, context, item))
+                                i = i + 1
+                            }
+                        }
+                        pos = close_tag_end
+                    }
+
+                } else if (tag_content.trim() == "this") {
+                    // {{this}} — current item in each loop
+                    result.append(_to_str(current_item))
+                    pos = after_tag
+
+                } else {
+                    // {{key}} — variable substitution
+                    var key = tag_content.trim()
+                    if (context.has(key)) {
+                        result.append(_to_str(context.get(key)))
+                    }
+                    pos = after_tag
+                }
+            }
+        }
+    }
+
+    return result.to_string()
+}
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+/// Render a template string with the given context map.
+///
+/// Supports: `{{key}}`, `{{#if key}}...{{/if}}`, `{{#unless key}}...{{/unless}}`,
+///           `{{#each key}}...{{/each}}` (with `{{this}}` for current item),
+///           `{{#if key}}...{{else}}...{{/if}}`
+///
+/// ```saffron
+/// import "@template" as Template
+///
+/// var result = Template.render("Hello {{name}}!", {"name": "world"})
+/// // "Hello world!"
+///
+/// var greeting = Template.render(
+///     "{{#if formal}}Dear {{name}}{{else}}Hey {{name}}{{/if}}",
+///     {"formal": true, "name": "Alice"}
+/// )
+/// // "Dear Alice"
+/// ```
+fun render(template: String, context: Map<String, Any>): String {
+    return _render_core(template, context, nil)
+}
+
+/// Load a template from a file and render it with the given context.
+///
+/// ```saffron
+/// import "@template" as Template
+///
+/// var html = Template.render_file("page.html", {"title": "Home", "user": "Alice"})
+/// ```
+fun render_file(path: String, context: Map<String, Any>): String {
+    var source = IO.read_file(path)
+    return _render_core(source, context, nil)
+}
+
+/// Check if a template string is valid (all block tags are balanced).
+///
+/// ```saffron
+/// import "@template" as Template
+///
+/// Template.is_valid("{{#if x}}hello{{/if}}")  // true
+/// Template.is_valid("{{#if x}}hello")         // false (unclosed if)
+/// Template.is_valid("{{#each items}}{{this}}{{/each}}")  // true
+/// ```
+fun is_valid(template: String): Bool {
+    var pos = 0
+    var stack = []
+
+    while (pos < template.length()) {
+        var tag_start = _index_from(template, "{{", pos)
+        if (tag_start == -1) {
+            pos = template.length()
+        } else {
+            var tag_end = _index_from(template, "}}", tag_start)
+            if (tag_end == -1) {
+                // Unclosed {{ — invalid
+                return false
+            }
+            var tag_content = template.slice(tag_start + 2, tag_end)
+            var after_tag = tag_end + 2
+
+            if (tag_content.starts_with("#if ")) {
+                stack.push("if")
+            } else if (tag_content.starts_with("#unless ")) {
+                stack.push("unless")
+            } else if (tag_content.starts_with("#each ")) {
+                stack.push("each")
+            } else if (tag_content == "/if") {
+                if (stack.length() == 0) { return false }
+                var top = stack.pop()
+                if (top != "if") { return false }
+            } else if (tag_content == "/unless") {
+                if (stack.length() == 0) { return false }
+                var top = stack.pop()
+                if (top != "unless") { return false }
+            } else if (tag_content == "/each") {
+                if (stack.length() == 0) { return false }
+                var top = stack.pop()
+                if (top != "each") { return false }
+            }
+
+            pos = after_tag
+        }
+    }
+
+    return stack.length() == 0
+}

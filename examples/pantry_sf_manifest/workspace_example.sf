@@ -1,0 +1,22 @@
+//! Example pantry.sf workspace manifest with dynamic member discovery.
+//!
+//! This demonstrates how an executable manifest can compute configuration
+//! at evaluation time — something static TOML cannot do.
+
+import "@pantry_config" as Pantry
+import "@os" as OS
+
+var w = Pantry.workspace(fun (w: Pantry.Workspace) {
+    // Static members
+    w.member("packages/core")
+    w.member("packages/cli")
+    w.member("packages/server")
+
+    // Shared dependency versions across all members
+    w.shared_dep("http", "^2.0.0")
+    w.shared_dep("json", "^1.5.0")
+    w.shared_dep("test", "^1.0.0")
+})
+
+Pantry.write_workspace_toml(w)
+IO.println("workspace pantry.toml generated")

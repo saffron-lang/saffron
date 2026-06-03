@@ -1,0 +1,43 @@
+//! Example pantry.sf manifest — executable project configuration.
+//!
+//! This file is equivalent to a pantry.toml but written in Saffron.
+//! Pantry will execute this file to generate pantry.toml when it is
+//! newer than the existing .toml (or the .toml doesn't exist).
+//!
+//! Run with: saffron run pantry.sf
+
+import "@pantry_config" as Pantry
+import "@os" as OS
+
+var p = Pantry.project(fun (p: Pantry.Project) {
+    p.name = "my-web-app"
+    p.version = "1.0.0"
+    p.description = "A sample web application built with Saffron"
+    p.license = "MIT"
+    p.entry = "src/main.sf"
+    p.authors = ["Saffron Developer"]
+
+    // Dependencies
+    p.dep("http", "^2.0.0")
+    p.dep("json", "^1.5.0")
+    p.dep_path("turmeric", "../../turmeric", "^0.1.0")
+
+    // Dev dependencies
+    p.dev_dep("benchmark", "*")
+
+    // Scripts
+    p.script("build", "saffron build src/main.sf -o build/app")
+    p.script("test", "saffron run test/test_main.sf")
+    p.script("dev", "saffron run src/main.sf")
+
+    // Environment-specific config
+    p.env("dev", {"DEBUG": "true", "PORT": "3000"})
+    p.env("prod", {"DEBUG": "false", "PORT": "8080"})
+
+    // Feature flags
+    p.feature("tls", ["openssl"])
+})
+
+// Generate pantry.toml
+Pantry.write_toml(p)
+IO.println("pantry.toml generated from pantry.sf")
