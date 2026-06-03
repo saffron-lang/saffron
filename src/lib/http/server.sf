@@ -446,6 +446,26 @@ fun server(port: Int): App {
     return App(port)
 }
 
+/// Create a server with a receiver-closure configuration block.
+/// The block receives the App as implicit `this` (once receiver closures land).
+/// For now, uses explicit callback parameter.
+///
+/// ```saffron
+/// var app = Http.configure(3000) { app =>
+///     app.use(Http.cors())
+///     app.use(Http.logger())
+///     app.get("/api/hello") { req =>
+///         Http.json("{\"message\": \"world\"}")
+///     }
+/// }
+/// app.serve()
+/// ```
+fun configure(port: Int, setup: Fun): App {
+    var app: App = App(port)
+    setup(app)
+    return app
+}
+
 // Alias for backward compat
 fun create(port: Int): App {
     return App(port)

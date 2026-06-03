@@ -12,6 +12,9 @@
 //!   pantry deps              Show dependency tree
 //!   pantry deps.tree         Show dependency tree (ASCII)
 //!   pantry deps.graph        Output dependency graph (DOT format)
+//!   pantry publish           Package and upload to the Bazaar registry
+//!   pantry search <query>    Search the registry for packages
+//!   pantry login             Store API token for publishing
 //!   pantry script <cmd>      Run an arbitrary shell command in project context
 
 import "@os" as OS
@@ -28,6 +31,9 @@ import "./commands/list.sf" as ListCmd
 import "./commands/clean.sf" as Clean
 import "./commands/deps.sf" as Deps
 import "./commands/new.sf" as New
+import "./commands/publish.sf" as Publish
+import "./commands/search.sf" as Search
+import "./commands/login.sf" as Login
 
 fun main() {
     var raw_args = OS.args()
@@ -103,6 +109,16 @@ fun main() {
             }
             Remove.run(positional[1], parsed)
         }
+        "publish" => Publish.run(parsed)
+        "login" => Login.run(parsed)
+        "search" => {
+            if (positional.length() < 2) {
+                IO.println("pantry search: missing query")
+                IO.println("Usage: pantry search <query>")
+                OS.exit(1)
+            }
+            Search.run(positional[1], parsed)
+        }
         "script" => {
             if (positional.length() < 2) {
                 IO.println("pantry script: missing command")
@@ -137,6 +153,9 @@ fun print_usage() {
     IO.println("  deps              Show dependency tree (alias for deps.tree)")
     IO.println("  deps.tree         Show dependency tree with ASCII art")
     IO.println("  deps.graph        Output dependency graph in DOT format")
+    IO.println("  publish           Package and upload to the Bazaar registry")
+    IO.println("  search <query>    Search the registry for packages")
+    IO.println("  login             Store API token for publishing")
     IO.println("  script <cmd>      Run a shell command in the project context")
     IO.println("  version           Show pantry version")
     IO.println("")

@@ -1,0 +1,53 @@
+//! Tarball storage for the Bazaar registry.
+//! Stores package tarballs on the local filesystem.
+//! Storage location: data/packages/<name>/<name>-<version>.tar.gz
+
+import "@os" as OS
+import "@path" as Path
+
+/// Base directory for package tarball storage.
+var STORAGE_DIR = "data/packages"
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Store a tarball for the given package and version.
+/// content is the raw tarball data (or base64-encoded, depending on transport).
+/// Returns the path where the tarball was saved.
+fun store(name: String, version: String, content: String): String {
+    var dir = package_dir(name)
+    if (!OS.file_exists(dir)) {
+        OS.mkdir(dir)
+    }
+    var path = tarball_path(name, version)
+    IO.write_file(path, content)
+    return path
+}
+
+/// Retrieve the tarball content for a given package and version.
+/// Returns the raw file content.
+fun retrieve(name: String, version: String): String {
+    var path = tarball_path(name, version)
+    return IO.read_file(path)
+}
+
+/// Check if a tarball exists for the given package and version.
+fun exists(name: String, version: String): Bool {
+    var path = tarball_path(name, version)
+    return OS.file_exists(path)
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Compute the directory for a package's tarballs.
+fun package_dir(name: String): String {
+    return Path.join([STORAGE_DIR, name])
+}
+
+/// Compute the full path for a specific tarball.
+fun tarball_path(name: String, version: String): String {
+    return Path.join([STORAGE_DIR, name, name + "-" + version + ".tar.gz"])
+}

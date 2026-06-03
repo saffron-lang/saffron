@@ -1,0 +1,197 @@
+//! Git-based index management for the Bazaar registry.
+//! The index stores one JSON line per version for each package,
+//! using the crates.io directory structure (1/ 2/ 3/first/ or first-two/next-two/).
+
+import "@os" as OS
+import "@json" as JSON
+import "@process" as Process
+import "@path" as Path
+
+/// Base directory for the index (relative to CWD).
+var INDEX_DIR = "data/index"
+
+// ---------------------------------------------------------------------------
+// Initialization
+// ---------------------------------------------------------------------------
+
+/// Initialize the index directory as a git repo if it doesn't already exist.
+fun init_index() {
+    if (!OS.file_exists(INDEX_DIR)) {
+        OS.mkdir(INDEX_DIR)
+    }
+    // Check if it's already a git repo
+    var git_dir = Path.join([INDEX_DIR, ".git"])
+    if (!OS.file_exists(git_dir)) {
+        Process.run("git init " + INDEX_DIR)
+        // Create an initial empty commit
+        Process.run("git -C " + INDEX_DIR + " commit --allow-empty -m \"Initialize index\"")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path computation
+// ---------------------------------------------------------------------------
+
+/// Compute the index file path for a given package name.
+/// Uses the crates.io length-based directory scheme:
+///   1 char  -> 1/<name>
+///   2 chars -> 2/<name>
+///   3 chars -> 3/<first-char>/<name>
+///   4+ chars -> <first-two>/<next-two>/<name>
+fun index_path(name: String): String {
+    var len = name.length()
+    if (len == 1) {
+        return Path.join([INDEX_DIR, "1", name])
+    }
+    if (len == 2) {
+        return Path.join([INDEX_DIR, "2", name])
+    }
+    if (len == 3) {
+        var first = name.slice(0, 1)
+        return Path.join([INDEX_DIR, "3", first, name])
+    }
+    // 4+ characters
+    var first_two = name.slice(0, 2)
+    var next_two = name.slice(2, 4)
+    return Path.join([INDEX_DIR, first_two, next_two, name])
+}
+
+// ---------------------------------------------------------------------------
+// Read operations
+// ---------------------------------------------------------------------------
+
+/// Load all version entries for a package. Returns a list of maps (one per version).
+/// Returns an empty list if the package doesn't exist.
+fun load_entry(name: String): List<Map<String, Any>> {
+    var path = index_path(name)
+    if (!OS.file_exists(path)) {
+        return []
+    }
+    var content = IO.read_file(path)
+    var lines = content.split("\n")
+    var entries = []
+    var i = 0
+    while (i < lines.length()) {
+        var line = lines[i].trim()
+        if (line.length() > 0) {
+            var parsed = JSON.parse(line)
+            if (parsed != nil) {
+                entries.push(parsed)
+            }
+        }
+        i = i + 1
+    }
+    return entries
+}
+
+/// List all package names in the index.
+fun list_packages(): List<String> {
+    var names = []
+    if (!OS.file_exists(INDEX_DIR)) {
+        return names
+    }
+    // Walk the index directory and find all leaf files (package entries)
+    var files = OS.list_dir(INDEX_DIR)
+    var i = 0
+    while (i < files.length()) {
+        var file = files[i]
+        // Skip .git directory entries
+        if (!file.contains(".git")) {
+            // The filename (basename) is the package name
+            var base = Path.basename(file)
+            // Only include actual package files (not directories)
+            if (base.length() > 0 and !base.contains(".")) {
+                names.push(base)
+            }
+        }
+        i = i + 1
+    }
+    return names
+}
+
+// ---------------------------------------------------------------------------
+// Write operations
+// ---------------------------------------------------------------------------
+
+/// Append a version entry (as a JSON line) to the index file for a package.
+/// Creates parent directories if they don't exist.
+fun append_entry(name: String, entry: Map<String, Any>) {
+    var path = index_path(name)
+    var dir = Path.dirname(path)
+    if (!OS.file_exists(dir)) {
+        OS.mkdir(dir)
+    }
+    var line = JSON.to_string(entry) + "\n"
+    // Append to existing file or create new
+    if (OS.file_exists(path)) {
+        var existing = IO.read_file(path)
+        IO.write_file(path, existing + line)
+    } else {
+        IO.write_file(path, line)
+    }
+}
+
+/// Rewrite the entire index file for a package with updated entries.
+/// Used when modifying existing entries (e.g., yanking a version).
+fun rewrite_entry(name: String, entries: List<Map<String, Any>>) {
+    var path = index_path(name)
+    var dir = Path.dirname(path)
+    if (!OS.file_exists(dir)) {
+        OS.mkdir(dir)
+    }
+    var content = ""
+    var i = 0
+    while (i < entries.length()) {
+        content = content + JSON.to_string(entries[i]) + "\n"
+        i = i + 1
+    }
+    IO.write_file(path, content)
+}
+
+/// Commit all pending changes in the index with the given message.
+fun commit(message: String) {
+    Process.run("git -C " + INDEX_DIR + " add -A")
+    Process.run("git -C " + INDEX_DIR + " commit -m \"" + message + "\"")
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+/// Simple substring search across all package names and descriptions.
+fun search(query: String): List<Map<String, Any>> {
+    var results = []
+    var names = list_packages()
+    var lower_query = query.to_lower()
+    var i = 0
+    while (i < names.length()) {
+        var name = names[i]
+        if (name.to_lower().contains(lower_query)) {
+            var entries = load_entry(name)
+            if (entries.length() > 0) {
+                var latest = entries[entries.length() - 1]
+                var info = {}
+                info.set("name", name)
+                info.set("version", latest.get("vers"))
+                info.set("description", latest.get("description"))
+                results.push(info)
+            }
+        } else {
+            // Check description of latest version
+            var entries = load_entry(name)
+            if (entries.length() > 0) {
+                var latest = entries[entries.length() - 1]
+                var desc = latest.get("description")
+                if (desc != nil and desc.to_lower().contains(lower_query)) {
+                    var info = {}
+                    info.set("name", name)
+                    info.set("version", latest.get("vers"))
+                    info.set("description", desc)
+                    results.push(info)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return results
+}

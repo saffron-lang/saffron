@@ -1,0 +1,156 @@
+//! `pantry publish` — package the current project and upload to the Bazaar registry.
+//!
+//! Steps:
+//!   1. Load pantry.toml, validate required fields
+//!   2. Check version not already published
+//!   3. Collect files (respect exclude patterns)
+//!   4. Create tarball
+//!   5. Compute SHA-256 checksum
+//!   6. Read auth token from ~/.pantry/credentials.toml
+//!   7. Upload to registry
+//!   8. Print success
+//!
+//! Uses `curl` for HTTP until @http is wired.
+
+import "@args" as Args
+import "@os" as OS
+import "@toml" as TOML
+import "@tar" as Tar
+import "@crypto" as Crypto
+import "@json" as JSON
+import "../config.sf" as Config
+
+fun _registry_url(): String {
+    var env_url: String = OS.env("BAZAAR_URL")
+    if (env_url != "") {
+        return env_url
+    }
+    return "https://bazaar.saffron-lang.org"
+}
+
+fun _load_token(): String {
+    var home: String = OS.env("HOME")
+    var creds_path: String = home + "/.pantry/credentials.toml"
+
+    if (!OS.file_exists(creds_path)) {
+        IO.println("Error: not logged in.")
+        IO.println("Run `pantry login` to store your API token.")
+        OS.exit(1)
+    }
+
+    var creds: TOML.TomlTable = TOML.load(creds_path)
+    if (!creds.has("registry")) {
+        IO.println("Error: credentials file missing [registry] section.")
+        IO.println("Run `pantry login` to configure.")
+        OS.exit(1)
+    }
+
+    var registry: TOML.TomlTable = creds.table("registry")
+    var token: String = registry.string_or("token", "")
+    if (token == "") {
+        IO.println("Error: no token found in credentials.")
+        IO.println("Run `pantry login` to set your API token.")
+        OS.exit(1)
+    }
+
+    return token
+}
+
+fun _check_not_published(name: String, version: String): Bool {
+    var url: String = _registry_url() + "/api/v1/packages/" + name + "/" + version
+    var result: String = OS.exec("curl -s -o /dev/null -w '%{http_code}' " + url)
+    // If the server returns 200, the version already exists
+    if (result.trim() == "200") {
+        return false
+    }
+    return true
+}
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+
+    // Validate required fields
+    if (manifest.name == "") {
+        IO.println("Error: [package].name is required in pantry.toml")
+        OS.exit(1)
+    }
+    if (manifest.version == "") {
+        IO.println("Error: [package].version is required in pantry.toml")
+        OS.exit(1)
+    }
+    if (manifest.description == "") {
+        IO.println("Error: [package].description is required in pantry.toml")
+        IO.println("Add a description to your pantry.toml before publishing.")
+        OS.exit(1)
+    }
+
+    var name: String = manifest.name
+    var version: String = manifest.version
+
+    IO.println("Publishing ${name}@${version}...")
+
+    // Check version not already published
+    if (!parsed.flag("force")) {
+        if (!_check_not_published(name, version)) {
+            IO.println("Error: ${name}@${version} is already published.")
+            IO.println("Bump the version in pantry.toml and try again.")
+            OS.exit(1)
+        }
+    }
+
+    // Collect exclude patterns from pantry.toml [package.exclude]
+    var excludes: List<String> = [".git", ".pantry", "node_modules", "target"]
+
+    // Create tarball
+    IO.println("  Packing...")
+    var tarball_path: String = Tar.pack(name, version, ".", excludes)
+    IO.println("  Created ${tarball_path}")
+
+    // Compute SHA-256 checksum
+    var checksum: String = Crypto.sha256_file(tarball_path)
+    IO.println("  SHA-256: ${checksum}")
+
+    // Load auth token
+    var token: String = _load_token()
+
+    // Upload to registry
+    var url: String = _registry_url() + "/api/v1/packages/new"
+    IO.println("  Uploading to ${_registry_url()}...")
+
+    var curl_cmd: String = "curl -s -w '\\n%{http_code}' -X PUT"
+    curl_cmd = curl_cmd + " -H 'Authorization: Bearer " + token + "'"
+    curl_cmd = curl_cmd + " -H 'X-Package-Name: " + name + "'"
+    curl_cmd = curl_cmd + " -H 'X-Package-Version: " + version + "'"
+    curl_cmd = curl_cmd + " -H 'X-Package-Checksum: " + checksum + "'"
+    curl_cmd = curl_cmd + " -H 'Content-Type: application/octet-stream'"
+    curl_cmd = curl_cmd + " --data-binary '@" + tarball_path + "'"
+    curl_cmd = curl_cmd + " " + url
+
+    var response: String = OS.exec(curl_cmd)
+    var lines: List<String> = response.trim().split("\n")
+
+    if (lines.length() == 0) {
+        IO.println("Error: no response from registry.")
+        OS.exit(1)
+    }
+
+    var status_code: String = lines[lines.length() - 1].trim()
+
+    if (status_code == "200" or status_code == "201") {
+        IO.println("")
+        IO.println("Published ${name}@${version}")
+        IO.println("  ${_registry_url()}/packages/${name}/${version}")
+    } else {
+        IO.println("Error: registry returned HTTP ${status_code}")
+        if (lines.length() > 1) {
+            var body: String = lines[0]
+            IO.println("  ${body}")
+        }
+        // Clean up tarball on failure
+        OS.exec("rm -f " + tarball_path)
+        OS.exit(1)
+    }
+
+    // Clean up tarball
+    OS.exec("rm -f " + tarball_path)
+}

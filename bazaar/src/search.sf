@@ -1,0 +1,28 @@
+//! Package search logic for the Bazaar registry.
+//! Simple substring matching on package names and descriptions.
+
+import "./index.sf" as Index
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Search packages by name or description substring match.
+/// Returns up to `limit` results as a list of maps with {name, version, description}.
+fun search_packages(query: String, limit: Number): List<Map<String, String>> {
+    if (query.length() == 0) {
+        return []
+    }
+
+    var all_results = Index.search(query)
+
+    // Apply limit
+    var results = []
+    var i = 0
+    while (i < all_results.length() and i < limit) {
+        results.push(all_results[i])
+        i = i + 1
+    }
+
+    return results
+}

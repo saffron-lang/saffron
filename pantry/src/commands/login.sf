@@ -1,0 +1,69 @@
+//! `pantry login` — store an API token for the Bazaar registry.
+//!
+//! Stores credentials in ~/.pantry/credentials.toml.
+//! Token can be provided via --token=<value> or entered interactively.
+
+import "@args" as Args
+import "@os" as OS
+import "@toml" as TOML
+
+fun _credentials_path(): String {
+    var home: String = OS.env("HOME")
+    return home + "/.pantry/credentials.toml"
+}
+
+fun _ensure_dir() {
+    var home: String = OS.env("HOME")
+    var dir: String = home + "/.pantry"
+    if (!OS.file_exists(dir)) {
+        OS.exec("mkdir -p " + dir)
+    }
+}
+
+fun _write_token(token: String) {
+    _ensure_dir()
+    var path: String = _credentials_path()
+
+    var content: String = "[registry]\n"
+    content = content + "token = \"" + token + "\"\n"
+
+    IO.write_file(path, content)
+    // Restrict permissions — credentials should be private
+    OS.exec("chmod 600 " + path)
+}
+
+fun run(parsed: Args.ParsedArgs) {
+    var token: String = ""
+
+    // Check if --token was provided
+    if (parsed.has("token")) {
+        token = parsed.get("token")
+    } else {
+        // Prompt user for token
+        IO.print("Enter your Bazaar API token: ")
+        token = IO.read_line()
+    }
+
+    if (token.trim() == "") {
+        IO.println("Error: token cannot be empty.")
+        OS.exit(1)
+    }
+
+    token = token.trim()
+
+    // Validate token format (should start with bz_)
+    if (!token.starts_with("bz_")) {
+        IO.println("Warning: token does not start with 'bz_'. Are you sure this is correct?")
+        IO.print("Continue? [y/N] ")
+        var confirm: String = IO.read_line()
+        if (confirm.trim() != "y" and confirm.trim() != "Y") {
+            IO.println("Aborted.")
+            OS.exit(1)
+        }
+    }
+
+    _write_token(token)
+
+    IO.println("Login successful.")
+    IO.println("Credentials saved to ${_credentials_path()}")
+}
