@@ -223,3 +223,150 @@ fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
     }
     return result
 }
+
+// --- Additional utilities ---
+
+fun drop(list: List, n: Number): List {
+    return skip(list, n)
+}
+
+fun chunk(list: List, size: Number): List {
+    var result: List = []
+    var current: List = []
+    var i = 0
+    while (i < list.length()) {
+        current.push(list[i])
+        if (current.length() == size) {
+            result.push(current)
+            current = []
+        }
+        i = i + 1
+    }
+    if (current.length() > 0) {
+        result.push(current)
+    }
+    return result
+}
+
+fun zip_with(a: List, b: List, func: Fun): List {
+    var result: List = []
+    var len = a.length()
+    if (b.length() < len) { len = b.length() }
+    var i = 0
+    while (i < len) {
+        result.push(func(a[i], b[i]))
+        i = i + 1
+    }
+    return result
+}
+
+fun sort_by(list: List, func: Fun): List {
+    var result: List = []
+    var i = 0
+    while (i < list.length()) {
+        result.push(list[i])
+        i = i + 1
+    }
+    // Insertion sort by key
+    i = 1
+    while (i < result.length()) {
+        var key = func(result[i])
+        var val = result[i]
+        var j = i - 1
+        while (j >= 0 and func(result[j]) > key) {
+            result[j + 1] = result[j]
+            j = j - 1
+        }
+        result[j + 1] = val
+        i = i + 1
+    }
+    return result
+}
+
+fun group_by(list: List, func: Fun): Map {
+    var result: Map = {}
+    var i = 0
+    while (i < list.length()) {
+        var key = func(list[i])
+        if (result.has(key)) {
+            result.get(key).push(list[i])
+        } else {
+            result.set(key, [list[i]])
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun frequencies(list: List): Map {
+    var result: Map = {}
+    var i = 0
+    while (i < list.length()) {
+        var item = list[i]
+        if (result.has(item)) {
+            result.set(item, result.get(item) + 1)
+        } else {
+            result.set(item, 1)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun unique(list: List): List {
+    var seen: Map = {}
+    var result: List = []
+    var i = 0
+    while (i < list.length()) {
+        var item = list[i]
+        if (!seen.has(item)) {
+            seen.set(item, true)
+            result.push(item)
+        }
+        i = i + 1
+    }
+    return result
+}
+
+fun max(list: List): Any {
+    if (list.length() == 0) { return nil }
+    var best = list[0]
+    var i = 1
+    while (i < list.length()) {
+        if (list[i] > best) { best = list[i] }
+        i = i + 1
+    }
+    return best
+}
+
+fun min(list: List): Any {
+    if (list.length() == 0) { return nil }
+    var best = list[0]
+    var i = 1
+    while (i < list.length()) {
+        if (list[i] < best) { best = list[i] }
+        i = i + 1
+    }
+    return best
+}
+
+fun reverse(list: List): List {
+    var result: List = []
+    var i = list.length() - 1
+    while (i >= 0) {
+        result.push(list[i])
+        i = i - 1
+    }
+    return result
+}
+
+fun join(list: List, sep: String): String {
+    var result = ""
+    var i = 0
+    while (i < list.length()) {
+        if (i > 0) { result = result + sep }
+        result = result + list[i].to_string()
+        i = i + 1
+    }
+    return result
+}

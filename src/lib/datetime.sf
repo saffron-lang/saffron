@@ -4,6 +4,7 @@
 //! import "@datetime" as DateTime
 //!
 //! var now = DateTime.now()
+//! IO.println(now.year)                          // 2026
 //! IO.println(now.format("YYYY-MM-DD HH:mm:ss"))
 //! IO.println(now.iso8601())
 //!
@@ -13,66 +14,104 @@
 
 @extern("i64 time(void*)") fun _time_raw(ptr: Int): Int
 
-/// A DateTime instance representing a specific point in time.
-/// Internally stores a Unix timestamp (seconds since 1970-01-01 00:00:00 UTC).
+// ---------------------------------------------------------------------------
+// Internal helpers (defined first to avoid forward-reference issues)
+// ---------------------------------------------------------------------------
+
+/// Decompose a Unix timestamp into [year, month, day, hour, minute, second] (UTC).
+fun _decompose(ts: Int): List<Int> {
+    var s = ts % 60
+    var rem = ts / 60
+    var minute = rem % 60
+    rem = rem / 60
+    var hour = rem % 24
+    var days = rem / 24
+
+    // Compute year, month, day from days since epoch (1970-01-01)
+    // Using the algorithm from http://howardhinnant.github.io/date_algorithms.html
+    var z = days + 719468
+    var era_approx = z / 146097
+    var era = era_approx
+    if (z < 0) { era = (z - 146096) / 146097 }
+    var doe = z - era * 146097
+    var yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    var y = yoe + era * 400
+    var doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    var mp = (5 * doy + 2) / 153
+    var day = doy - (153 * mp + 2) / 5 + 1
+    var month = mp + 3
+    if (mp >= 10) { month = mp - 9 }
+    if (month <= 2) { y = y + 1 }
+
+    return [y, month, day, hour, minute, s]
+}
+
+/// Compose year/month/day/hour/minute/second (UTC) into a Unix timestamp.
+fun _compose(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): Int {
+    // Adjust for the civil calendar algorithm
+    var y = year
+    var m = month
+    if (m <= 2) { y = y - 1 }
+    var era_approx = y / 400
+    var era = era_approx
+    if (y < 0) { era = (y - 399) / 400 }
+    var yoe = y - era * 400
+    var mp = m - 3
+    if (m <= 2) { mp = m + 9 }
+    var doy = (153 * mp + 2) / 5 + day - 1
+    var doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    var days = era * 146097 + doe - 719468
+    return days * 86400 + hour * 3600 + minute * 60 + second
+}
+
+/// Check if a year is a leap year.
+fun _is_leap(year: Int): Bool {
+    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+}
+
+/// Pad a number to 2 digits with leading zero.
+fun _pad2(n: Int): String {
+    if (n < 10) { return "0${n}" }
+    return "${n}"
+}
+
+/// Pad a number to 4 digits with leading zeros.
+fun _pad4(n: Int): String {
+    if (n < 10) { return "000${n}" }
+    if (n < 100) { return "00${n}" }
+    if (n < 1000) { return "0${n}" }
+    return "${n}"
+}
+
+// ---------------------------------------------------------------------------
+// DateTime class
+// ---------------------------------------------------------------------------
+
+/// A DateTime instance representing a specific point in time (UTC).
+/// Fields: year, month (1-12), day (1-31), hour (0-23), minute (0-59), second (0-59).
 class DateTime {
     var _ts: Int
+    var year: Int
+    var month: Int
+    var day: Int
+    var hour: Int
+    var minute: Int
+    var second: Int
 
     fun init(ts: Int) {
         this._ts = ts
+        var parts = _decompose(ts)
+        this.year = parts[0]
+        this.month = parts[1]
+        this.day = parts[2]
+        this.hour = parts[3]
+        this.minute = parts[4]
+        this.second = parts[5]
     }
 
     /// Return the Unix timestamp (seconds since epoch).
     fun timestamp(): Int {
         return this._ts
-    }
-
-    /// Return the year component (e.g. 2026).
-    var year: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[0]
-        }
-    }
-
-    /// Return the month component (1-12).
-    var month: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[1]
-        }
-    }
-
-    /// Return the day of month component (1-31).
-    var day: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[2]
-        }
-    }
-
-    /// Return the hour component (0-23).
-    var hour: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[3]
-        }
-    }
-
-    /// Return the minute component (0-59).
-    var minute: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[4]
-        }
-    }
-
-    /// Return the second component (0-59).
-    var second: Number {
-        get {
-            var parts = _decompose(this._ts)
-            return parts[5]
-        }
     }
 
     /// Return the day of the week (0=Sunday, 1=Monday, ..., 6=Saturday).
@@ -87,14 +126,13 @@ class DateTime {
     /// Format the datetime using a pattern string.
     /// Supported tokens: YYYY, MM, DD, HH, mm, ss
     fun format(pattern: String): String {
-        var parts = _decompose(this._ts)
         var result = pattern
-        result = result.replace("YYYY", _pad4(parts[0]))
-        result = result.replace("MM", _pad2(parts[1]))
-        result = result.replace("DD", _pad2(parts[2]))
-        result = result.replace("HH", _pad2(parts[3]))
-        result = result.replace("mm", _pad2(parts[4]))
-        result = result.replace("ss", _pad2(parts[5]))
+        result = result.replace("YYYY", _pad4(this.year))
+        result = result.replace("MM", _pad2(this.month))
+        result = result.replace("DD", _pad2(this.day))
+        result = result.replace("HH", _pad2(this.hour))
+        result = result.replace("mm", _pad2(this.minute))
+        result = result.replace("ss", _pad2(this.second))
         return result
     }
 
@@ -166,88 +204,31 @@ fun from_parts(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: 
     return DateTime(ts)
 }
 
-/// Parse a datetime string. Supports ISO 8601 format and custom patterns.
+/// Parse an ISO 8601 datetime string.
+/// Accepts: "2026-06-03T14:30:45Z", "2026-06-03T14:30:45", "2026-06-03"
 ///
 /// ```saffron
 /// import "@datetime" as DateTime
 /// var dt = DateTime.parse("2026-06-03T14:30:45Z")
-/// var dt2 = DateTime.parse("2026-06-03", "YYYY-MM-DD")
 /// ```
-fun parse(s: String, pattern: String): DateTime {
-    if (pattern == "") {
-        return _parse_iso8601(s)
-    }
+fun parse(s: String): DateTime {
+    return _parse_iso8601(s)
+}
+
+/// Parse a datetime string using a custom pattern.
+/// Supported tokens: YYYY, MM, DD, HH, mm, ss
+///
+/// ```saffron
+/// import "@datetime" as DateTime
+/// var dt = DateTime.parse_format("2026-06-03", "YYYY-MM-DD")
+/// ```
+fun parse_format(s: String, pattern: String): DateTime {
     return _parse_with_pattern(s, pattern)
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
+// Internal parsing helpers
 // ---------------------------------------------------------------------------
-
-/// Decompose a Unix timestamp into [year, month, day, hour, minute, second] (UTC).
-fun _decompose(ts: Int): List<Int> {
-    var second = ts % 60
-    var rem = ts / 60
-    var minute = rem % 60
-    rem = rem / 60
-    var hour = rem % 24
-    var days = rem / 24
-
-    // Compute year, month, day from days since epoch (1970-01-01)
-    // Using the algorithm from http://howardhinnant.github.io/date_algorithms.html
-    var z = days + 719468
-    var era_approx = z / 146097
-    var era = era_approx
-    if (z < 0) { era = (z - 146096) / 146097 }
-    var doe = z - era * 146097
-    var yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
-    var y = yoe + era * 400
-    var doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
-    var mp = (5 * doy + 2) / 153
-    var day = doy - (153 * mp + 2) / 5 + 1
-    var month = mp + 3
-    if (mp >= 10) { month = mp - 9 }
-    if (month <= 2) { y = y + 1 }
-
-    return [y, month, day, hour, minute, second]
-}
-
-/// Compose year/month/day/hour/minute/second (UTC) into a Unix timestamp.
-fun _compose(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): Int {
-    // Adjust for the civil calendar algorithm
-    var y = year
-    var m = month
-    if (m <= 2) { y = y - 1 }
-    var era_approx = y / 400
-    var era = era_approx
-    if (y < 0) { era = (y - 399) / 400 }
-    var yoe = y - era * 400
-    var mp = m - 3
-    if (m <= 2) { mp = m + 9 }
-    var doy = (153 * mp + 2) / 5 + day - 1
-    var doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
-    var days = era * 146097 + doe - 719468
-    return days * 86400 + hour * 3600 + minute * 60 + second
-}
-
-/// Check if a year is a leap year.
-fun _is_leap(year: Int): Bool {
-    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
-}
-
-/// Pad a number to 2 digits with leading zero.
-fun _pad2(n: Int): String {
-    if (n < 10) { return "0${n}" }
-    return "${n}"
-}
-
-/// Pad a number to 4 digits with leading zeros.
-fun _pad4(n: Int): String {
-    if (n < 10) { return "000${n}" }
-    if (n < 100) { return "00${n}" }
-    if (n < 1000) { return "0${n}" }
-    return "${n}"
-}
 
 /// Parse an ISO 8601 datetime string.
 /// Accepts: "2026-06-03T14:30:45Z", "2026-06-03T14:30:45", "2026-06-03"
