@@ -1,0 +1,51 @@
+//! GC module — garbage collector control.
+//! Usage: import "@gc" as GC
+
+@extern("void __gc_collect()") fun _collect()
+@extern("void __gc_enable()") fun _enable()
+@extern("void __gc_disable()") fun _disable()
+@extern("void __gc_debug_stats()") fun _stats()
+@extern("i64 __gc_stat_alloc_count()") fun _alloc_count(): Int
+@extern("i64 __gc_stat_total_bytes()") fun _total_bytes(): Int
+@extern("i64 __gc_stat_threshold()") fun _threshold(): Int
+@extern("void __gc_set_threshold(i64)") fun _set_threshold(bytes: Int)
+
+/// Run a full garbage collection cycle.
+fun collect() {
+    _collect()
+}
+
+/// Enable automatic garbage collection.
+fun enable() {
+    _enable()
+}
+
+/// Disable automatic garbage collection.
+fun disable() {
+    _disable()
+}
+
+/// Print GC statistics to stderr.
+fun stats() {
+    _stats()
+}
+
+/// Return the number of live GC-tracked allocations.
+fun alloc_count(): Number {
+    return _alloc_count()
+}
+
+/// Return the total bytes allocated (with GC headers).
+fun total_bytes(): Number {
+    return _total_bytes()
+}
+
+/// Return the current auto-collection threshold in bytes.
+fun threshold(): Number {
+    return _threshold()
+}
+
+/// Set the auto-collection threshold in bytes.
+fun set_threshold(bytes: Number) {
+    _set_threshold(bytes)
+}

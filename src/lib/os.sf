@@ -1,47 +1,63 @@
-//! OS module — operating system operations.
-//! These functions are available as OS.args(), OS.exec(), etc.
+//! OS module — operating system interaction.
+//! Usage: import "@os" as OS
+
+@extern("i64 __os_args()") fun _args(): Int
+@extern("i64 __os_exec(void*)") fun _exec(cmd: Int): Int
+@extern("i64 __os_cwd()") fun _cwd(): Int
+@extern("i64 __os_path_sep()") fun _path_sep(): Int
+@extern("i64 __os_platform()") fun _platform(): Int
+@extern("i64 __os_env(void*)") fun _env(name: Int): Int
+@extern("i64 __io_file_exists(void*)") fun _file_exists(path: Int): Int
+@extern("void __io_mkdir(i64)") fun _mkdir(path: Int)
+@extern("i64 __io_walk_dir(void*)") fun _walk_dir(path: Int): Int
+@extern("void exit(i32)") fun _exit(code: Int)
 
 /// Return the command-line arguments as a list of strings.
 fun args(): List<String> {
-    return __os_args()
+    return _args()
 }
 
 /// Execute a shell command and return its stdout as a string.
 fun exec(cmd: String): String {
-    return __os_exec(cmd)
+    return _exec(cmd)
 }
 
 /// Return the current working directory.
 fun cwd(): String {
-    return __os_cwd()
+    return _cwd()
 }
 
 /// Return the platform path separator ("/" on Unix, "\\" on Windows).
 fun path_sep(): String {
-    return __os_path_sep()
+    return _path_sep()
 }
 
 /// Return the platform name (e.g. "darwin", "linux").
 fun platform(): String {
-    return __os_platform()
+    return _platform()
 }
 
 /// Read an environment variable by name.
 fun env(name: String): String {
-    return __os_env(name)
+    return _env(name)
+}
+
+/// Exit the process with the given code.
+fun exit(code: Number) {
+    _exit(code)
 }
 
 /// Return true if a file exists at the given path.
 fun file_exists(path: String): Bool {
-    return __io_file_exists(path)
+    return _file_exists(path) == 1
 }
 
 /// Create a directory (and parents) at the given path.
 fun mkdir(path: String) {
-    __io_mkdir(path)
+    _mkdir(path)
 }
 
 /// List the contents of a directory recursively.
 fun list_dir(path: String): List<String> {
-    return __io_walk_dir(path)
+    return _walk_dir(path)
 }
