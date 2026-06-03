@@ -327,7 +327,11 @@
 
     fun gen_list_lit(elements: List<AST.Expr>): String {
     var list_val: String = this.fresh_local()
-    this.emit_indent(list_val + " = call i64 @__list_new()")
+    if (this.use_llvm_lib) {
+        this.emit_indent(this.lib_call(list_val, "i64", "__list_new", ""))
+    } else {
+        this.emit_indent(list_val + " = call i64 @__list_new()")
+    }
     var elem_type: AST.Type = AST.Type.AnyType
     var i: Float = 0
     while (i < elements.length()) {
@@ -338,7 +342,11 @@
         }
         var elem: String = this.gen_arg_value(elements[i])
         var discard_lp: String = this.fresh_local()
-        this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(discard_lp, "i64", "__list_push", "i64 " + list_val + ", i64 " + elem))
+        } else {
+            this.emit_indent(discard_lp + " = call i64 @__list_push(i64 " + list_val + ", i64 " + elem + ")")
+        }
         i = i + 1
     }
     this.last_type = this.make_generic_type("List", [elem_type])
@@ -363,13 +371,21 @@
     var is_neg: String = this.fresh_local()
     this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
     var len: String = this.fresh_local()
-    this.emit_indent(len + " = call i64 @__list_length(i64 " + obj + ")")
+    if (this.use_llvm_lib) {
+        this.emit_indent(this.lib_call(len, "i64", "__list_length", "i64 " + obj))
+    } else {
+        this.emit_indent(len + " = call i64 @__list_length(i64 " + obj + ")")
+    }
     var adjusted: String = this.fresh_local()
     this.emit_indent(adjusted + " = add i64 " + len + ", " + idx)
     var final_idx: String = this.fresh_local()
     this.emit_indent(final_idx + " = select i1 " + is_neg + ", i64 " + adjusted + ", i64 " + idx)
     var local: String = this.fresh_local()
-    this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
+    if (this.use_llvm_lib) {
+        this.emit_indent(this.lib_call(local, "i64", "__list_get", "i64 " + obj + ", i64 " + final_idx))
+    } else {
+        this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
+    }
     // Extract element type from the list's generic type
     var idx_elem_type: AST.Type = this.get_list_element_type(obj_type)
     if (this.type_to_string(idx_elem_type) == "Any" and obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
@@ -416,7 +432,11 @@
     var idx: String = this.emit_untag_int(idx_tagged)
     var val: String = this.gen_arg_value(value)
     var discard_ls: String = this.fresh_local()
-    this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+    if (this.use_llvm_lib) {
+        this.emit_indent(this.lib_call(discard_ls, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val))
+    } else {
+        this.emit_indent(discard_ls + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+    }
     return val
     }
 
@@ -471,7 +491,11 @@
     if (pattern == "v2") {
         var val: String = this.gen_arg_value(args[0])
         var discard: String = this.fresh_local()
-        this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(discard, "i64", func_name, "i64 " + obj + ", i64 " + val))
+        } else {
+            this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        }
         this.set_result_type(result_type)
         return "0"
     }
@@ -479,33 +503,53 @@
         var a1: String = this.gen_arg_value(args[0])
         var a2: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
-        this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(discard, "i64", func_name, "i64 " + obj + ", i64 " + a1 + ", i64 " + a2))
+        } else {
+            this.emit_indent(discard + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        }
         this.set_result_type(result_type)
         return "0"
     }
     if (pattern == "r1") {
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
     if (pattern == "r2") {
         var val: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj + ", i64 " + val))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
     if (pattern == "p1") {
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
     if (pattern == "p2") {
         var a1: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj + ", i64 " + a1))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
@@ -513,14 +557,22 @@
         var a1: String = this.gen_arg_value(args[0])
         var a2: String = this.gen_arg_value(args[1])
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj + ", i64 " + a1 + ", i64 " + a2))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
     if (pattern == "m2") {
         var a1: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", func_name, "i64 " + obj + ", i64 " + a1))
+        } else {
+            this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
+        }
         this.set_result_type(result_type)
         return local
     }
@@ -583,7 +635,11 @@
     }
     this.called_functions.push(full_method)
     var local: String = this.fresh_local()
-    this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+    if (this.use_llvm_lib) {
+        this.emit_indent(this.lib_call(local, "i64", full_method, arg_strs.join(", ")))
+    } else {
+        this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
+    }
     if (this.func_ret_types.has(full_method)) {
         this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
     } else if (this.func_ret_types.has(canonical)) {
@@ -641,7 +697,11 @@
                 ii = ii + 1
             }
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(local, "i64", io_func, io_args.join(", ")))
+            } else {
+                this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            }
             if (method == "file_exists") { this.last_type = AST.Type.BoolType }
             else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
             else if (method == "list_dir") { this.last_type = this.make_list_str_type() }
@@ -656,7 +716,11 @@
             oi = oi + 1
         }
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", os_func, os_args.join(", ")))
+        } else {
+            this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
+        }
         if (method == "args") { this.last_type = this.make_list_str_type() }
         else { this.last_type = AST.Type.StringType }
         return local
@@ -693,7 +757,11 @@
                 ii = ii + 1
             }
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(local, "i64", io_func, io_args.join(", ")))
+            } else {
+                this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
+            }
             if (method == "file_exists") { this.last_type = AST.Type.BoolType }
             else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
             else if (method == "write_file" or method == "append_file") { this.last_type = AST.Type.NilType; return "0" }
@@ -777,9 +845,17 @@
         // emit the await loop pattern (call as ptr, suspend/resume until done)
         if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
             var b_hdl: String = this.fresh_local()
-            this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
+            } else {
+                this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            }
             var b_i64: String = this.fresh_local()
-            this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_ptrtoint(b_i64, b_hdl))
+            } else {
+                this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            }
             var ac: String = this.fresh_label("await.check")
             var ay: String = this.fresh_label("await.yield")
             var al: String = this.fresh_label("await.loop")
@@ -819,9 +895,17 @@
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
         if (!this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
             var s_hdl: String = this.fresh_local()
-            this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
+            } else {
+                this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            }
             var s_i64: String = this.fresh_local()
-            this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_ptrtoint(s_i64, s_hdl))
+            } else {
+                this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            }
             var sc: String = this.fresh_label("sync.check")
             var sl: String = this.fresh_label("sync.loop")
             var sd: String = this.fresh_label("sync.done")
@@ -848,7 +932,11 @@
             return s_result
         }
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", prefixed_name, arg_strs.join(", ")))
+        } else {
+            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        }
         if (this.func_ret_types.has(prefixed_name)) {
             this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
         } else if (this.func_ret_types.has(method)) {
@@ -959,16 +1047,28 @@
         var env_i64: String = this.fresh_local()
         this.emit_indent(env_i64 + " = load i64, i64* " + env_slot)
         var fn_ptr: String = this.fresh_local()
-        this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_i64 + " to ptr")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_inttoptr(fn_ptr, fn_i64))
+        } else {
+            this.emit_indent(fn_ptr + " = inttoptr i64 " + fn_i64 + " to ptr")
+        }
         var task_hdl: String = this.fresh_local()
         this.emit_indent(task_hdl + " = call ptr " + fn_ptr + "(i64 " + env_i64 + ")")
         var task_i64: String = this.fresh_local()
-        this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_ptrtoint(task_i64, task_hdl))
+        } else {
+            this.emit_indent(task_i64 + " = ptrtoint ptr " + task_hdl + " to i64")
+        }
         // If the task completed synchronously (e.g. no real suspend points),
         // save its result immediately before another spawn could overwrite @__task_result.
         // Don't enqueue already-done tasks (the scheduler would read stale @__task_result).
         var spawn_done: String = this.fresh_local()
-        this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(spawn_done, "i64", "__sched_coro_done", "i64 " + task_i64))
+        } else {
+            this.emit_indent(spawn_done + " = call i64 @__sched_coro_done(i64 " + task_i64 + ")")
+        }
         var spawn_done_cmp: String = this.fresh_local()
         this.emit_indent(spawn_done_cmp + " = icmp eq i64 " + spawn_done + ", 1")
         var spawn_save_label: String = this.fresh_label("spawn.save")
@@ -1180,7 +1280,11 @@
             var idx: String = this.emit_untag_int(idx_tagged)
             var val: String = this.gen_arg_value(args[1])
             var discard: String = this.fresh_local()
-            this.emit_indent(discard + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(discard, "i64", "__list_set", "i64 " + obj + ", i64 " + idx + ", i64 " + val))
+            } else {
+                this.emit_indent(discard + " = call i64 @__list_set(i64 " + obj + ", i64 " + idx + ", i64 " + val + ")")
+            }
             this.last_type = AST.Type.NilType
             return "0"
         }
@@ -1188,7 +1292,11 @@
         var key_val: String = this.gen_arg_value(args[0])
         var val: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
-        this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_val + ", i64 " + val + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_val + ", i64 " + val))
+        } else {
+            this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_val + ", i64 " + val + ")")
+        }
         this.last_type = AST.Type.NilType
         return "0"
     }
@@ -1203,7 +1311,11 @@
         }
         var key_val: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
-        this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_val + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_val))
+        } else {
+            this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_val + ")")
+        }
         var local: String = this.emit_tag_bool(raw)
         this.last_type = AST.Type.BoolType
         return local
@@ -1219,7 +1331,11 @@
         }
         var key_val: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_val + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_val))
+        } else {
+            this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_val + ")")
+        }
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
         if (obj_name.length() > 0) {
@@ -1557,7 +1673,11 @@
         var parent_method: String = this.current_parent + "__" + method
         this.called_functions.push(parent_method)
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", parent_method, arg_strs.join(", ")))
+        } else {
+            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
+        }
         if (this.func_ret_types.has(parent_method)) {
             this.last_type = this.str_to_type(this.func_ret_types.get(parent_method))
         } else {
@@ -1628,9 +1748,17 @@
         }
         if (this.is_coroutine and is_coro_callee) {
             var b_hdl: String = this.fresh_local()
-            this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
+            } else {
+                this.emit_indent(b_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            }
             var b_i64: String = this.fresh_local()
-            this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_ptrtoint(b_i64, b_hdl))
+            } else {
+                this.emit_indent(b_i64 + " = ptrtoint ptr " + b_hdl + " to i64")
+            }
             var ac: String = this.fresh_label("await.check")
             var ay: String = this.fresh_label("await.yield")
             var al: String = this.fresh_label("await.loop")
@@ -1639,7 +1767,11 @@
             this.emit_terminator("br label %" + ac)
             this.start_block(ac)
             var bd: String = this.fresh_local()
-            this.emit_indent(bd + " = call i64 @__sched_coro_done(i64 " + b_i64 + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(bd, "i64", "__sched_coro_done", "i64 " + b_i64))
+            } else {
+                this.emit_indent(bd + " = call i64 @__sched_coro_done(i64 " + b_i64 + ")")
+            }
             var bdc: String = this.fresh_local()
             this.emit_indent(bdc + " = icmp eq i64 " + bd + ", 1")
             this.emit_terminator("br i1 " + bdc + ", label %" + ad + ", label %" + ay)
@@ -1672,9 +1804,17 @@
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
         if (!this.is_coroutine and is_coro_callee) {
             var s_hdl: String = this.fresh_local()
-            this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
+            } else {
+                this.emit_indent(s_hdl + " = call ptr @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+            }
             var s_i64: String = this.fresh_local()
-            this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_ptrtoint(s_i64, s_hdl))
+            } else {
+                this.emit_indent(s_i64 + " = ptrtoint ptr " + s_hdl + " to i64")
+            }
             var sc: String = this.fresh_label("sync.check")
             var sl: String = this.fresh_label("sync.loop")
             var sd: String = this.fresh_label("sync.done")
@@ -1701,7 +1841,11 @@
             return s_result
         }
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(local, "i64", prefixed_name, arg_strs.join(", ")))
+        } else {
+            this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
+        }
         if (this.func_ret_types.has(prefixed_name)) {
             this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
         } else if (this.func_ret_types.has(method)) {
