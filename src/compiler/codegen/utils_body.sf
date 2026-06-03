@@ -182,8 +182,8 @@
         if (sk == "let_pattern") {
             var lp_pat: AST.Pattern = match (stmt) { LetPattern(p, v) => p   _ => AST.Pattern.VariantPattern("", []) }
             var lp_val: AST.Expr = match (stmt) { LetPattern(p, v) => v   _ => AST.Expr.NilLit }
-            var lp_vname: String = match (lp_pat) { VariantPattern(v, b) => v   _ => "" }
-            var lp_bindings: List<String> = match (lp_pat) { VariantPattern(v, b) => b   _ => [] }
+            var lp_vname: String = match (lp_pat) { VariantPattern(v, b) => v   ArrayPattern(e, r) => "__array:" + r   _ => "" }
+            var lp_bindings: List<String> = match (lp_pat) { VariantPattern(v, b) => b   ArrayPattern(e, r) => e   _ => [] }
             var lpi: Float = 0
             while (lpi < lp_bindings.length()) {
                 this.add_var_unique(names, types, lp_bindings[lpi], "Any")

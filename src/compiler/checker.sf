@@ -1524,8 +1524,8 @@ class NullChecker {
     // --- Let-pattern type checking ---
 
     fun check_let_pattern(pattern: AST.Pattern, val_type: String) {
-        var variant: String = match (pattern) { VariantPattern(v, b) => v   _ => "" }
-        var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+        var variant: String = match (pattern) { VariantPattern(v, b) => v   ArrayPattern(e, r) => "__array:" + r   _ => "" }
+        var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   ArrayPattern(e, r) => e   _ => [] }
         if (variant.starts_with("__array:")) {
             var rest: String = variant.slice(8, variant.length())
             var bi: Float = 0
