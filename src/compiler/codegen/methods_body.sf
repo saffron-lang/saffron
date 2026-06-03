@@ -1008,8 +1008,7 @@
         var task_result_type: String = "Int"
         var spawn_expr_kind: String = this.classify_expr(args[0])
         if (spawn_expr_kind == "lambda") {
-            var lambda_ret_type: AST.Type = match (args[0]) { Lambda(p, r, b) => r   _ => AST.Type.IntType }
-            var lambda_ret: String = this.type_to_string(lambda_ret_type)
+            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
             if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
                 task_result_type = lambda_ret
             } else {
