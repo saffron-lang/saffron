@@ -44,7 +44,7 @@ fun create_token(username: String): String {
 // ---------------------------------------------------------------------------
 
 /// Load the tokens map from disk. Returns an empty map if file doesn't exist.
-fun load_tokens(): Map<String, Any> {
+fun load_tokens(): Map<String, String> {
     if (!OS.file_exists(TOKENS_FILE)) {
         return {}
     }
@@ -60,7 +60,7 @@ fun load_tokens(): Map<String, Any> {
 }
 
 /// Save the tokens map to disk as JSON.
-fun save_tokens(tokens: Map<String, Any>) {
+fun save_tokens(tokens: Map<String, String>) {
     // Ensure the data directory exists
     var dir = "data"
     if (!OS.file_exists(dir)) {
