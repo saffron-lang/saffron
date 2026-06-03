@@ -1,14 +1,18 @@
 //! IO module — standard input/output operations.
-//! These functions are available as IO.println(), IO.read_file(), etc.
+//! Available implicitly in every file as IO.println(), IO.read_file(), etc.
 
-/// Print a string followed by a newline to stdout.
-fun println(value: String) {
-    __io_println_str(value)
+@extern("i32 puts(void*)") fun _puts(s: Int): Int
+@extern("void __io_print_str(i64)") fun _print_str(s: Int)
+
+/// Print a value followed by a newline to stdout.
+/// Accepts any type — calls .to_string() automatically.
+fun println(value: Any) {
+    _puts(value.to_string())
 }
 
-/// Print a string to stdout without a trailing newline.
-fun print(value: String) {
-    __io_print_str(value)
+/// Print a value to stdout without a trailing newline.
+fun print(value: Any) {
+    _print_str(value.to_string())
 }
 
 /// Read the entire contents of a file as a string.
