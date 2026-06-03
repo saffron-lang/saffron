@@ -1,20 +1,15 @@
-//! Bazaar Frontend — Single-page app for the Saffron package registry
-//! Built with Turmeric (reactive WASM framework)
+//! Bazaar Frontend — Package registry SPA
+//! Built with Turmeric + Tailwind CSS
 
-import { signal, computed, effect, batch } from "turmeric/signal"
-import { div, h1, h2, h3, p, span, input, button, ul, li, a, nav, section, header, footer, form, code, pre } from "turmeric/generated_types"
-import { class_, id, placeholder, href, type_ } from "turmeric/generated_types"
-import { on_click, on_input, on_submit, on_keydown } from "turmeric/generated_types"
-import { text, _el } from "turmeric/element"
-import { Signal } from "turmeric/signal"
+import { signal, computed, effect } from "turmeric/signal"
+import { Event } from "turmeric/events"
 
 // =============================================================================
-// FFI — fetch from the same-origin API
+// FFI — fetch from same-origin API
 // =============================================================================
 
 @extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Float)
 
-// Callback registry for fetch responses
 var _fetch_next_id: Float = 0
 var _fetch_callbacks: Map<Float, (String) => Nil> = {}
 
@@ -25,7 +20,6 @@ fun fetch_json(url: String, callback: (String) => Nil) {
     _fetch_json(url, id)
 }
 
-// Called from JS when fetch completes
 fun __on_fetch_complete(id: Float, json_str: String) {
     if (_fetch_callbacks.has(id)) {
         _fetch_callbacks.get(id)(json_str)
@@ -34,34 +28,27 @@ fun __on_fetch_complete(id: Float, json_str: String) {
 }
 
 // =============================================================================
-// Application State
+// State
 // =============================================================================
 
-// Current page: "home", "search", "detail"
-var current_page: Signal<String> = signal("home")
-
-// Search state
-var search_query: Signal<String> = signal("")
-var search_results: Signal<List<Map<String, String>>> = signal([])
-var is_loading: Signal<Bool> = signal(false)
-
-// Package detail state
-var detail_name: Signal<String> = signal("")
-var detail_versions: Signal<List<Map<String, String>>> = signal([])
-var detail_description: Signal<String> = signal("")
-var detail_latest: Signal<String> = signal("")
-
-// Featured packages (loaded on home)
-var featured_packages: Signal<List<Map<String, String>>> = signal([])
+var current_page = signal("home")
+var search_query = signal("")
+var search_results = signal([])
+var is_loading = signal(false)
+var detail_name = signal("")
+var detail_versions = signal([])
+var detail_description = signal("")
+var detail_latest = signal("")
+var featured_packages = signal([])
 
 // =============================================================================
-// API Calls
+// API
 // =============================================================================
 
 fun load_featured() {
     is_loading.set(true)
     fetch_json("/api/v1/packages", fun (json_str: String) => {
-        var data: Map<String, Any> = JSON.parse(json_str)
+        var data = JSON.parse(json_str)
         if (data != nil and data.has("packages")) {
             featured_packages.set(data.get("packages"))
         }
@@ -79,7 +66,7 @@ fun do_search() {
     is_loading.set(true)
     current_page.set("search")
     fetch_json("/api/v1/search?q=" + q, fun (json_str: String) => {
-        var data: Map<String, Any> = JSON.parse(json_str)
+        var data = JSON.parse(json_str)
         if (data != nil and data.has("packages")) {
             search_results.set(data.get("packages"))
         }
@@ -92,13 +79,13 @@ fun load_package_detail(name: String) {
     current_page.set("detail")
     is_loading.set(true)
     fetch_json("/api/v1/packages/" + name, fun (json_str: String) => {
-        var data: Map<String, Any> = JSON.parse(json_str)
+        var data = JSON.parse(json_str)
         if (data != nil) {
             detail_name.set(data.get("name"))
-            var versions: List<Map<String, String>> = data.get("versions")
+            var versions = data.get("versions")
             detail_versions.set(versions)
             if (versions.length() > 0) {
-                var latest: Map<String, String> = versions[versions.length() - 1]
+                var latest = versions[versions.length() - 1]
                 detail_latest.set(latest.get("vers"))
                 if (latest.has("description")) {
                     detail_description.set(latest.get("description"))
@@ -129,102 +116,63 @@ fun PackageCard(pkg: Map<String, String>) {
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
-    div([class_("bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer"), on_click(fun (e) => {
-        load_package_detail(name)
-    })]) {
-        div([class_("flex items-center justify-between mb-2")]) {
-            h2([class_("text-lg font-bold text-white")]) {
-                text(name)
-            }
-            span([class_("text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded")]) {
-                text("v" + version)
-            }
+    div(cls="bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer", on_click=fun (e: Event) => load_package_detail(name)) {
+        div(cls="flex items-center justify-between mb-2") {
+            h2(cls="text-lg font-bold text-white") { name }
+            span(cls="text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded") { "v${version}" }
         }
         if (description.length() > 0) {
-            p([class_("text-sm text-gray-400 mb-3")]) {
-                text(description)
-            }
+            p(cls="text-sm text-gray-400 mb-3") { description }
         }
-        div([class_("font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700")]) {
-            code([]) {
-                text("pantry add " + name)
-            }
+        div(cls="font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700") {
+            code { "pantry add ${name}" }
         }
     }
 }
 
 fun SearchBar() {
-    form([class_("w-full max-w-2xl mx-auto mb-8"), on_submit(fun (e) => {
-        do_search()
-    })]) {
-        div([class_("flex gap-2")]) {
-            input([
-                class_("flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all"),
-                type_("text"),
-                placeholder("Search packages..."),
-                on_input(fun (e) => {
-                    search_query.set(e.value)
-                })
-            ]) {}
-            button([class_("px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors"), type_("submit")]) {
-                text("Search")
-            }
+    form(cls="w-full max-w-2xl mx-auto mb-8", on_submit=fun (e: Event) => do_search()) {
+        div(cls="flex gap-2") {
+            input(cls="flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all", type="text", placeholder="Search packages...", on_input=fun (e: Event) => search_query.set(e.target_value)) {}
+            button(cls="px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors", type="submit") { "Search" }
         }
     }
 }
 
 fun NavBar() {
-    nav([class_("sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800")]) {
-        div([class_("max-w-6xl mx-auto px-6 py-3 flex items-center justify-between")]) {
-            a([class_("text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer"), on_click(fun (e) => {
-                navigate_home()
-            })]) {
-                text("Bazaar")
+    nav(cls="sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800") {
+        div(cls="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between") {
+            a(cls="text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer", on_click=fun (e: Event) => navigate_home()) {
+                "Bazaar"
             }
-            div([class_("flex items-center gap-5")]) {
-                a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://saffron-lang.org/docs")]) {
-                    text("Docs")
-                }
-                a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://github.com/henry232323/saffron")]) {
-                    text("GitHub")
-                }
-                a([class_("text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer")]) {
-                    text("Publish")
-                }
-                a([class_("text-sm text-gray-400 hover:text-white transition-colors cursor-pointer")]) {
-                    text("Login")
-                }
+            div(cls="flex items-center gap-5") {
+                a(cls="text-sm text-gray-400 hover:text-white transition-colors", href="https://saffron-lang.org/docs") { "Docs" }
+                a(cls="text-sm text-gray-400 hover:text-white transition-colors", href="https://github.com/henry232323/saffron") { "GitHub" }
+                a(cls="text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer") { "Publish" }
+                a(cls="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer") { "Login" }
             }
         }
     }
 }
 
 fun HomePage() {
-    div([class_("min-h-screen")]) {
-        header([class_("text-center py-16")]) {
-            h1([class_("text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3")]) {
-                text("Bazaar")
-            }
-            p([class_("text-lg text-gray-400")]) {
-                text("The Saffron package registry")
-            }
+    div(cls="min-h-screen") {
+        header(cls="text-center py-16") {
+            h1(cls="text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3") { "Bazaar" }
+            p(cls="text-lg text-gray-400") { "The Saffron package registry" }
         }
         SearchBar()
-        section([class_("max-w-4xl mx-auto px-6")]) {
-            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-4")]) {
-                text("All Packages")
-            }
-            div([class_("grid gap-4")]) {
-                var pkgs: List<Map<String, String>> = featured_packages.get()
+        section(cls="max-w-4xl mx-auto px-6") {
+            h3(cls="text-sm uppercase tracking-wider text-gray-500 mb-4") { "All Packages" }
+            div(cls="grid gap-4") {
+                var pkgs = featured_packages.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
                     PackageCard(pkgs[i])
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    p([class_("text-center text-gray-500 py-12")]) {
-                        text("No packages published yet. Be the first!")
-                    }
+                    p(cls="text-center text-gray-500 py-12") { "No packages published yet. Be the first!" }
                 }
             }
         }
@@ -232,23 +180,21 @@ fun HomePage() {
 }
 
 fun SearchResultsPage() {
-    div([class_("min-h-screen max-w-4xl mx-auto px-6 py-8")]) {
+    div(cls="min-h-screen max-w-4xl mx-auto px-6 py-8") {
         SearchBar()
-        section([]) {
-            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-4")]) {
-                text("Search results for \"" + search_query.get() + "\"")
+        section {
+            h3(cls="text-sm uppercase tracking-wider text-gray-500 mb-4") {
+                "Search results for \"${search_query.get()}\""
             }
-            div([class_("grid gap-4")]) {
-                var pkgs: List<Map<String, String>> = search_results.get()
+            div(cls="grid gap-4") {
+                var pkgs = search_results.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
                     PackageCard(pkgs[i])
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    p([class_("text-center text-gray-500 py-12")]) {
-                        text("No packages found matching your query.")
-                    }
+                    p(cls="text-center text-gray-500 py-12") { "No packages found matching your query." }
                 }
             }
         }
@@ -259,63 +205,42 @@ fun PackageDetailPage() {
     var name: String = detail_name.get()
     var latest: String = detail_latest.get()
     var description: String = detail_description.get()
-    var versions: List<Map<String, String>> = detail_versions.get()
+    var versions = detail_versions.get()
 
-    div([class_("min-h-screen max-w-4xl mx-auto px-6 py-8")]) {
-        // Back navigation
-        a([class_("inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer"), on_click(fun (e) => {
-            navigate_home()
-        })]) {
-            text("← Back to packages")
+    div(cls="min-h-screen max-w-4xl mx-auto px-6 py-8") {
+        a(cls="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer", on_click=fun (e: Event) => navigate_home()) {
+            "← Back to packages"
         }
 
-        // Package header
-        div([class_("flex items-center gap-4 mb-4")]) {
-            h1([class_("text-3xl font-bold text-white")]) {
-                text(name)
-            }
-            span([class_("text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded")]) {
-                text("v" + latest)
-            }
+        div(cls="flex items-center gap-4 mb-4") {
+            h1(cls="text-3xl font-bold text-white") { name }
+            span(cls="text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded") { "v${latest}" }
         }
 
         if (description.length() > 0) {
-            p([class_("text-gray-400 text-lg mb-6")]) {
-                text(description)
+            p(cls="text-gray-400 text-lg mb-6") { description }
+        }
+
+        div(cls="mb-8") {
+            h3(cls="text-sm uppercase tracking-wider text-gray-500 mb-2") { "Install" }
+            div(cls="bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200") {
+                code { "pantry add ${name}" }
             }
         }
 
-        // Install command
-        div([class_("mb-8")]) {
-            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-2")]) { text("Install") }
-            div([class_("bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200 flex items-center justify-between")]) {
-                code([]) {
-                    text("pantry add " + name)
-                }
-                button([class_("text-xs text-gray-500 hover:text-saffron-400 transition-colors ml-4"), on_click(fun (e) => {})]) {
-                    text("Copy")
-                }
-            }
-        }
-
-        // Version history
         if (versions.length() > 0) {
-            section([]) {
-                h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-3")]) {
-                    text("Versions (" + versions.length().to_string() + ")")
+            section {
+                h3(cls="text-sm uppercase tracking-wider text-gray-500 mb-3") {
+                    "Versions (${versions.length().to_string()})"
                 }
-                div([class_("space-y-2")]) {
+                div(cls="space-y-2") {
                     var i: Float = versions.length() - 1
                     while (i >= 0) {
-                        var v: Map<String, String> = versions[i]
-                        div([class_("flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50")]) {
-                            span([class_("font-mono text-sm text-white")]) {
-                                text(v.get("vers"))
-                            }
+                        var v = versions[i]
+                        div(cls="flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50") {
+                            span(cls="font-mono text-sm text-white") { v.get("vers") }
                             if (v.has("yanked") and v.get("yanked") == "true") {
-                                span([class_("text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded")]) {
-                                    text("yanked")
-                                }
+                                span(cls="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded") { "yanked" }
                             }
                         }
                         i = i - 1
@@ -328,55 +253,37 @@ fun PackageDetailPage() {
 
 fun LoadingIndicator() {
     if (is_loading.get()) {
-        div([class_("flex items-center justify-center py-12 gap-3")]) {
-            div([class_("w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin")]) {}
-            span([class_("text-gray-400 text-sm")]) {
-                text("Loading...")
-            }
+        div(cls="flex items-center justify-center py-12 gap-3") {
+            div(cls="w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin") {}
+            span(cls="text-gray-400 text-sm") { "Loading..." }
         }
     }
 }
 
 // =============================================================================
-// App Root
+// App
 // =============================================================================
 
 fun App() {
-    div([id("bazaar-app"), class_("min-h-screen flex flex-col")]) {
+    div(id="bazaar-app", cls="min-h-screen flex flex-col") {
         NavBar()
-        div([class_("flex-1")]) {
+        div(cls="flex-1") {
             LoadingIndicator()
             var page: String = current_page.get()
-            if (page == "home") {
-                HomePage()
-            }
-            if (page == "search") {
-                SearchResultsPage()
-            }
-            if (page == "detail") {
-                PackageDetailPage()
-            }
+            if (page == "home") { HomePage() }
+            if (page == "search") { SearchResultsPage() }
+            if (page == "detail") { PackageDetailPage() }
         }
-        footer([class_("border-t border-gray-800 py-6 text-center")]) {
-            p([class_("text-sm text-gray-500")]) {
-                text("Bazaar — the Saffron package registry")
-            }
-            p([class_("text-xs text-gray-600 mt-1")]) {
-                text("Built with Saffron + Turmeric")
-            }
+        footer(cls="border-t border-gray-800 py-6 text-center") {
+            p(cls="text-sm text-gray-500") { "Bazaar — the Saffron package registry" }
+            p(cls="text-xs text-gray-600 mt-1") { "Built with Saffron + Turmeric" }
         }
     }
 }
 
 // =============================================================================
-// Entry Point
+// Entry
 // =============================================================================
 
-fun main() {
-    // Load featured packages on startup
-    load_featured()
-    // Mount the app
-    App()
-}
-
-main()
+load_featured()
+App()
