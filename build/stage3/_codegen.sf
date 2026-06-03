@@ -1126,17 +1126,22 @@ class Codegen {
                     return "0"
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
+                // Skip for named imports — they should go through gen_call for direct dispatch
                 if (this.str_in_list(this.known_functions,name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
-                            return this.gen_func_ref(name)
+                            if (!this.named_imports.has(name)) {
+                                return this.gen_func_ref(name)
+                            }
                         }
                     }
                 }
                 if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
-                            return this.gen_func_ref(this.current_prefix + name)
+                            if (!this.named_imports.has(name)) {
+                                return this.gen_func_ref(this.current_prefix + name)
+                            }
                         }
                     }
                 }
@@ -1922,14 +1927,18 @@ class Codegen {
             if (this.str_in_list(this.known_functions,__vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
-                        return this.gen_func_ref(__vn)
+                        if (!this.named_imports.has(__vn)) {
+                            return this.gen_func_ref(__vn)
+                        }
                     }
                 }
             }
             if (this.str_in_list(this.known_functions,this.current_prefix + __vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
-                        return this.gen_func_ref(this.current_prefix + __vn)
+                        if (!this.named_imports.has(__vn)) {
+                            return this.gen_func_ref(this.current_prefix + __vn)
+                        }
                     }
                 }
             }
