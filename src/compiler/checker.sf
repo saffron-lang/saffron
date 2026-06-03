@@ -614,7 +614,7 @@ class NullChecker {
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc) => {
-                this.env.define_func_str(name, ret_type)
+                this.env.define_func_str(name, this.type_node_to_string(ret_type))
                 this.env.define_func_params(name, this.params_list_to_string(params))
                 // Detect receiver-typed parameters: Fun[Type](...):Ret
                 var rpi: Float = 0
@@ -652,10 +652,11 @@ class NullChecker {
                         FunDecl(mn, mp, mr, mb, md) => mn
                         _ => ""
                     }
-                    var method_ret: String = match (methods[mi]) {
+                    var method_ret_type: AST.Type = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mr
-                        _ => "Any"
+                        _ => AST.Type.AnyType
                     }
+                    var method_ret: String = this.type_node_to_string(method_ret_type)
                     var method_params: List<AST.Param> = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mp
                         _ => []
@@ -709,15 +710,15 @@ class NullChecker {
             VarDecl(name, type_ann, init, doc) => {
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
-                if (type_ann != "Any") {
+                var type_ann_str: String = this.type_node_to_string(type_ann)
+                if (type_ann_str != "Any") {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.
-                    var ann_node: AST.Type = this.parse_type_node(type_ann)
-                    if (!this.is_nullable_type(ann_node) and this.is_nil_init(init)) {
-                        this.error(name + ": cannot assign nil to non-nullable " + type_ann)
+                    if (!this.is_nullable_type(type_ann) and this.is_nil_init(init)) {
+                        this.error(name + ": cannot assign nil to non-nullable " + type_ann_str)
                     }
-                    this.env.define_var(name, ann_node)
+                    this.env.define_var(name, type_ann)
                 } else if (init_type != "Any") {
                     // Inferred from initializer
                     this.env.define_var(name, init_type_node)
@@ -729,8 +730,9 @@ class NullChecker {
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Register method with class prefix if inside a class
+                var ret_type_str: String = this.type_node_to_string(ret_type)
                 if (this.current_class.length() > 0) {
-                    this.env.define_func_str(this.current_class + "__" + name, ret_type)
+                    this.env.define_func_str(this.current_class + "__" + name, ret_type_str)
                     this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
                     // Track method names for conformance checking
                     var existing: String = ""
@@ -745,7 +747,7 @@ class NullChecker {
                     this.class_method_names.set(this.current_class, existing)
                 }
                 var old_ret: AST.Type = this.current_func_ret
-                this.current_func_ret = this.parse_type_node(ret_type)
+                this.current_func_ret = ret_type
                 this.env.push_scope()
                 var j: Float = 0
                 while (j < params.length()) {
@@ -1783,7 +1785,7 @@ class NullChecker {
         // Transform a Lambda at args[arg_idx] to add 'self' param and rewrite body
         var lambda: AST.Expr = args[arg_idx]
         var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p }
-        var ret_type: String = match (lambda) { Lambda(p, r, b) => r }
+        var ret_type: AST.Type = match (lambda) { Lambda(p, r, b) => r }
         var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b }
 
         // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)

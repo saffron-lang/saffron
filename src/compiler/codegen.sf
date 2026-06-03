@@ -22,7 +22,7 @@ class Codegen {
     var enum_variant_fields: Map<String, String>
     var type_defs: StringBuilder
     var known_functions: List<String>
-    var func_ret_types: Map<String, String>
+    var func_ret_types: Map<String, AST.Type>
     var class_fields: Map<String, String>
     var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
@@ -511,7 +511,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", "StringBuilder")
+    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
     var mi2: Float = 0
@@ -939,7 +939,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", "StringBuilder")
+    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
     var mi: Float = 0
@@ -1465,7 +1465,7 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__os_path_sep")
     gen.known_functions.push("__os_platform")
     gen.known_functions.push("__os_env")
-    gen.func_ret_types.set("StringBuilder", "StringBuilder")
+    gen.func_ret_types.set("StringBuilder", gen.str_to_type("StringBuilder"))
 
     // Pre-scan: register module-level VarDecls as globals
     var mi: Float = 0

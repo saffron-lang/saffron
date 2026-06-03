@@ -95,6 +95,8 @@ class Request {
     var headers: Map<String, String>
     var body: String
     var query: String
+    var params: Map<String, String>
+    var context: Map<String, String>
     var _client_fd: Int
 
     fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
@@ -103,7 +105,13 @@ class Request {
         this.headers = headers
         this.body = body
         this.query = query
+        this.params = {}
+        this.context = {}
         this._client_fd = 0
+    }
+
+    fun param(name: String): String {
+        return this.params.get(name)
     }
 
     fun header(name: String): String {
@@ -261,15 +269,56 @@ class Route {
     }
 }
 
+fun _match_route(pattern: String, path: String): Map<String, String> {
+    var pattern_parts: List<String> = pattern.split("/")
+    var path_parts: List<String> = path.split("/")
+    if (pattern_parts.length() != path_parts.length()) {
+        return nil
+    }
+    var params: Map<String, String> = {}
+    var i: Number = 0
+    while (i < pattern_parts.length()) {
+        var pat: String = pattern_parts[i]
+        var seg: String = path_parts[i]
+        if (pat.length() > 0 and pat.slice(0, 1) == ":") {
+            var name: String = pat.slice(1, pat.length())
+            params.set(name, seg)
+        } else {
+            if (pat != seg) {
+                return nil
+            }
+        }
+        i = i + 1
+    }
+    return params
+}
+
 class App {
     var host: String
     var port: Int
     var routes: List<Route>
+    var _middlewares: List<Fun>
+    var _after_middlewares: List<Fun>
 
     fun init(port: Int) {
         this.host = "0.0.0.0"
         this.port = port
         this.routes = []
+        this._middlewares = []
+        this._after_middlewares = []
+    }
+
+    /// Register a middleware that runs before route handlers.
+    /// The middleware receives a Request and returns either a Response
+    /// (to short-circuit) or nil (to continue to the next middleware/handler).
+    fun use(middleware: Fun) {
+        this._middlewares.push(middleware)
+    }
+
+    /// Register an after-response middleware that can modify the response.
+    /// The function receives (Request, Response) and must return a Response.
+    fun after(middleware: Fun) {
+        this._after_middlewares.push(middleware)
     }
 
     fun get(path: String, handler: Fun) {
@@ -323,11 +372,30 @@ class App {
     }
 
     fun _route(req: Request): Response {
-        var i = 0
+        // First pass: exact matches take priority
+        var i: Number = 0
         while (i < this.routes.length()) {
             var route: Route = this.routes[i]
             if ((route.method == req.method or route.method == "*") and (route.path == req.path or route.path == "*")) {
                 return route.handler(req)
+            }
+            i = i + 1
+        }
+        // Second pass: parameterized route matching
+        i = 0
+        while (i < this.routes.length()) {
+            var route: Route = this.routes[i]
+            if (route.method == req.method or route.method == "*") {
+                var matched: Map<String, String> = _match_route(route.path, req.path)
+                if (matched != nil) {
+                    var keys: List<String> = matched.keys()
+                    var k: Number = 0
+                    while (k < keys.length()) {
+                        req.params.set(keys[k], matched.get(keys[k]))
+                        k = k + 1
+                    }
+                    return route.handler(req)
+                }
             }
             i = i + 1
         }
