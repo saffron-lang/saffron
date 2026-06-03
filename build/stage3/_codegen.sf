@@ -6090,7 +6090,22 @@ class Codegen {
             var captures: List<String> = []
             var cdi: Float = 0
             while (cdi < captures_raw.length()) {
-                if (!captures.contains(captures_raw[cdi])) {
+                var already: Bool = false
+                var cdj: Float = 0
+                while (cdj < captures.length()) {
+                    if (captures[cdj] == captures_raw[cdi]) {
+                        already = true
+                    }
+                    cdj = cdj + 1
+                }
+                // Also skip if it's already a declared parameter
+                var is_param: Bool = false
+                var cdp: Float = 0
+                while (cdp < param_names.length()) {
+                    if (param_names[cdp] == captures_raw[cdi]) { is_param = true }
+                    cdp = cdp + 1
+                }
+                if (!already and !is_param) {
                     captures.push(captures_raw[cdi])
                 }
                 cdi = cdi + 1
@@ -6172,10 +6187,26 @@ class Codegen {
             var var_names2: List<String> = []
             var var_types2: List<String> = []
             this.collect_vars(body, var_names2, var_types2)
+            // Track which names already have allocas (from params above)
+            var allocated: List<String> = []
+            var aai: Float = 0
+            while (aai < all_params.length()) {
+                var aap: List<String> = all_params[aai].split(":")
+                allocated.push(aap[0])
+                aai = aai + 1
+            }
             pi3 = 0
             while (pi3 < var_names2.length()) {
-                if (!captures.contains(var_names2[pi3])) {
-                    this.emit_indent("%" + this.sanitize_name(var_names2[pi3]) + " = alloca i64")
+                var vn2: String = var_names2[pi3]
+                var already_alloc: Bool = false
+                var aaj: Float = 0
+                while (aaj < allocated.length()) {
+                    if (allocated[aaj] == vn2) { already_alloc = true }
+                    aaj = aaj + 1
+                }
+                if (!already_alloc) {
+                    this.emit_indent("%" + this.sanitize_name(vn2) + " = alloca i64")
+                    allocated.push(vn2)
                 }
                 pi3 = pi3 + 1
             }
