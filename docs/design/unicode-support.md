@@ -439,11 +439,47 @@ else if (esc == "u") {
 }
 ```
 
-### 6.3 Multi-byte source files
+### 6.3 UTF-8 source files and literals
 
-The scanner already passes through multi-byte UTF-8 sequences in string literals
-(it only looks for `"`, `\\`, `$`, and `\n` as special). No change needed for source
-files containing non-ASCII characters in strings.
+Saffron source files are UTF-8. You can write Unicode directly in string literals,
+comments, and (in the future) identifiers — no escape sequences required:
+
+```saffron
+// Direct UTF-8 in string literals (works today, formalized here)
+var greeting = "こんにちは世界"
+var emoji = "🎉 Party time!"
+var mixed = "café résumé naïve"
+
+// Direct UTF-8 in comments (works today)
+// Это комментарий на русском
+
+// Future: Unicode identifiers
+var π = 3.14159
+var 名前 = "Saffron"
+fun добавить(a: Number, b: Number): Number { return a + b }
+```
+
+**Source encoding rule:** All `.sf` files MUST be valid UTF-8. The compiler rejects
+files with invalid UTF-8 byte sequences before parsing begins (a fast validation pass
+over the raw bytes). No BOM is required or expected (but a UTF-8 BOM is silently
+skipped if present).
+
+**String literals:** Any valid UTF-8 sequence between quotes is a valid string literal.
+The scanner already passes through multi-byte UTF-8 bytes in strings (it only looks
+for `"`, `\\`, `$`, and `\n` as special characters). This means `"🎉"` has always
+worked — we're formalizing it as guaranteed behavior.
+
+**Character escapes vs direct:** Both are equivalent and interchangeable:
+```saffron
+var a = "é"           // direct UTF-8 (2 bytes in source)
+var b = "\u{E9}"      // escape sequence (produces same 2 bytes)
+a == b                // true
+```
+
+**Unicode identifiers (Phase 3+):** Variable and function names will accept Unicode
+letters (categories Lu, Ll, Lt, Lm, Lo, Nl) and combining marks (Mn, Mc) after the
+first character. Operators and punctuation remain ASCII-only. This follows the
+[UAX #31](https://www.unicode.org/reports/tr31/) identifier specification.
 
 ### 6.4 String interpolation
 
