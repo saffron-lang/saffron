@@ -25,6 +25,7 @@
 import "@server" as Server
 import "@socket" as Socket
 import "@async" as Async
+import "@path" as Path
 import "@ssl" as SSL
 
 // =============================================================================
@@ -619,7 +620,7 @@ fun static_files(url_prefix: String, dir: String): Fun {
             return nil
         }
         // Build full filesystem path
-        var full_path: String = dir + "/" + rel
+        var full_path: String = Path.join([dir, rel])
         if (!IO.file_exists(full_path)) {
             return nil
         }

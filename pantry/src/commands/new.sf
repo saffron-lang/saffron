@@ -1,6 +1,7 @@
 //! `pantry new <name>` — scaffold a new Saffron project.
 import "@args" as Args
 import "@os" as OS
+import "@path" as Path
 import "@process" as Process
 
 fun _validate_name(name: String) {
@@ -43,7 +44,7 @@ fun _write_manifest(dir: String, name: String, is_lib: Bool) {
     } else {
         content = content + "test = \"saffron run test/test_lib.sf\"\n"
     }
-    IO.write_file(dir + "/pantry.toml", content)
+    IO.write_file(Path.join([dir, "pantry.toml"]), content)
 }
 
 fun _write_main(dir: String, name: String) {
@@ -52,7 +53,7 @@ fun _write_main(dir: String, name: String) {
     content = content + "    IO.println(\"Hello from " + name + "!\")\n"
     content = content + "}\n\n"
     content = content + "main()\n"
-    IO.write_file(dir + "/src/main.sf", content)
+    IO.write_file(Path.join([dir, "src", "main.sf"]), content)
 }
 
 fun _write_lib(dir: String, name: String) {
@@ -61,7 +62,7 @@ fun _write_lib(dir: String, name: String) {
     content = content + "fun add(a: Number, b: Number): Number {\n"
     content = content + "    return a + b\n"
     content = content + "}\n"
-    IO.write_file(dir + "/src/lib.sf", content)
+    IO.write_file(Path.join([dir, "src", "lib.sf"]), content)
 }
 
 fun _write_test_app(dir: String, name: String) {
@@ -69,7 +70,7 @@ fun _write_test_app(dir: String, name: String) {
     content = content + "import \"@test\" as Test\n\n"
     content = content + "Test.assert(true, \"placeholder test\")\n"
     content = content + "Test.summary()\n"
-    IO.write_file(dir + "/test/test_main.sf", content)
+    IO.write_file(Path.join([dir, "test", "test_main.sf"]), content)
 }
 
 fun _write_test_lib(dir: String, name: String) {
@@ -78,7 +79,7 @@ fun _write_test_lib(dir: String, name: String) {
     content = content + "import \"../src/lib.sf\" as Lib\n\n"
     content = content + "Test.assert_eq(Lib.add(1, 2), 3, \"add works\")\n"
     content = content + "Test.summary()\n"
-    IO.write_file(dir + "/test/test_lib.sf", content)
+    IO.write_file(Path.join([dir, "test", "test_lib.sf"]), content)
 }
 
 fun _write_readme(dir: String, name: String, is_lib: Bool) {
@@ -88,12 +89,12 @@ fun _write_readme(dir: String, name: String, is_lib: Bool) {
         content = content + "## Run\n\n```bash\n./build/" + name + "\n```\n\n"
     }
     content = content + "## Test\n\n```bash\npantry test\n```\n"
-    IO.write_file(dir + "/README.md", content)
+    IO.write_file(Path.join([dir, "README.md"]), content)
 }
 
 fun _write_gitignore(dir: String) {
     var content: String = "build/\n.pantry/\npantry.lock\n*.ll\n"
-    IO.write_file(dir + "/.gitignore", content)
+    IO.write_file(Path.join([dir, ".gitignore"]), content)
 }
 
 fun _write_cli_manifest(dir: String, name: String) {
@@ -106,7 +107,7 @@ fun _write_cli_manifest(dir: String, name: String) {
     content = content + "\n[scripts]\n"
     content = content + "build = \"saffron build src/main.sf -o build/" + name + "\"\n"
     content = content + "test = \"saffron run test/test_main.sf\"\n"
-    IO.write_file(dir + "/pantry.toml", content)
+    IO.write_file(Path.join([dir, "pantry.toml"]), content)
 }
 
 fun _write_cli_main(dir: String, name: String) {
@@ -142,7 +143,7 @@ fun _write_cli_main(dir: String, name: String) {
     content = content + "        }\n"
     content = content + "    }\n"
     content = content + "}\n"
-    IO.write_file(dir + "/src/main.sf", content)
+    IO.write_file(Path.join([dir, "src", "main.sf"]), content)
 }
 
 fun _write_web_manifest(dir: String, name: String) {
@@ -158,7 +159,7 @@ fun _write_web_manifest(dir: String, name: String) {
     content = content + "build = \"saffron build --target wasm32 src/main.sf -o build/app.wasm\"\n"
     content = content + "dev = \"saffron run dev_server.sf\"\n"
     content = content + "test = \"saffron run test/test_main.sf\"\n"
-    IO.write_file(dir + "/pantry.toml", content)
+    IO.write_file(Path.join([dir, "pantry.toml"]), content)
 }
 
 fun _write_web_main(dir: String, name: String) {
@@ -175,11 +176,11 @@ fun _write_web_main(dir: String, name: String) {
     content = content + "    }\n"
     content = content + "}\n\n"
     content = content + "mount(app)\n"
-    IO.write_file(dir + "/src/main.sf", content)
+    IO.write_file(Path.join([dir, "src", "main.sf"]), content)
 }
 
 fun _write_web_index(dir: String, name: String) {
-    OS.exec("mkdir -p " + dir + "/public")
+    OS.exec("mkdir -p " + Path.join([dir, "public"]))
     var content: String = "<!DOCTYPE html>\n<html>\n<head>\n"
     content = content + "    <meta charset=\"utf-8\">\n"
     content = content + "    <title>" + name + "</title>\n"
@@ -191,14 +192,14 @@ fun _write_web_index(dir: String, name: String) {
     content = content + "        wasm.mount(document.getElementById('app'));\n"
     content = content + "    </script>\n"
     content = content + "</body>\n</html>\n"
-    IO.write_file(dir + "/public/index.html", content)
+    IO.write_file(Path.join([dir, "public", "index.html"]), content)
 }
 
 fun _write_web_dev_server(dir: String, name: String) {
     var content: String = "//! Dev server with hot reload for " + name + "\n\n"
     content = content + "import \"turmeric/tools/dev_server\" as DevServer\n\n"
     content = content + "DevServer.serve(\"build/\", 8080, [\"src/\", \"public/\"])\n"
-    IO.write_file(dir + "/dev_server.sf", content)
+    IO.write_file(Path.join([dir, "dev_server.sf"]), content)
 }
 
 fun _prompt_choice(question: String, options: List<String>): String {
@@ -234,7 +235,7 @@ fun run(name: String, parsed: Args.ParsedArgs) {
     var is_lib: Bool = parsed.flag("lib")
     var no_git: Bool = parsed.flag("no-git")
     var template: String = parsed.get("template")
-    var dir: String = OS.cwd() + "/" + name
+    var dir: String = Path.join([OS.cwd(), name])
 
     // Interactive setup if no flags given
     if (!(is_lib) and template == "") {
@@ -265,8 +266,8 @@ fun run(name: String, parsed: Args.ParsedArgs) {
         OS.exit(1)
     }
 
-    OS.exec("mkdir -p " + dir + "/src")
-    OS.exec("mkdir -p " + dir + "/test")
+    OS.exec("mkdir -p " + Path.join([dir, "src"]))
+    OS.exec("mkdir -p " + Path.join([dir, "test"]))
 
     if (template == "cli") {
         _write_cli_manifest(dir, name)

@@ -9,6 +9,18 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.5 = private unnamed_addr constant [27 x i8] c"Bootstrapped successfully.\00"
 @.str.6 = private unnamed_addr constant [50 x i8] c"The compiler compiled itself. We're self-hosting!\00"
 
+%Addable = type {  }
+%Subtractable = type {  }
+%Multipliable = type {  }
+%Dividable = type {  }
+%Modable = type {  }
+%Comparable = type {  }
+%Equatable = type {  }
+%Indexable = type {  }
+%Stringable = type {  }
+%Iterator = type {  }
+%Iterable = type {  }
+
 declare i32 @puts(i8*)
 declare i32 @printf(i8*, ...)
 declare i32 @snprintf(i8*, i64, i8*, ...)
@@ -172,6 +184,353 @@ declare i64 @__sched_has_stored_result(i64)
 @__g_name = global i64 0
 @__g_version = global i64 0
 
+define i64 @Addable__add(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Addable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 10)
+  %t3 = inttoptr i64 %t2 to %Addable*
+  %t4 = ptrtoint %Addable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Subtractable__sub(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Subtractable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 11)
+  %t3 = inttoptr i64 %t2 to %Subtractable*
+  %t4 = ptrtoint %Subtractable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Multipliable__mul(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Multipliable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 12)
+  %t3 = inttoptr i64 %t2 to %Multipliable*
+  %t4 = ptrtoint %Multipliable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Dividable__div(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Dividable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 13)
+  %t3 = inttoptr i64 %t2 to %Dividable*
+  %t4 = ptrtoint %Dividable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Modable__mod(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Modable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 14)
+  %t3 = inttoptr i64 %t2 to %Modable*
+  %t4 = ptrtoint %Modable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Comparable__lt(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define i64 @Comparable__gt(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Comparable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 15)
+  %t3 = inttoptr i64 %t2 to %Comparable*
+  %t4 = ptrtoint %Comparable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Equatable__eq(i64 %self.arg, i64 %other.arg) {
+entry:
+  %self = alloca i64
+  %other = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %other.arg, i64* %other
+  %t1 = ptrtoint i64* %other to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Equatable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 16)
+  %t3 = inttoptr i64 %t2 to %Equatable*
+  %t4 = ptrtoint %Equatable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Indexable__getItem(i64 %self.arg, i64 %key.arg) {
+entry:
+  %self = alloca i64
+  %key = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %key.arg, i64* %key
+  %t1 = ptrtoint i64* %key to i64
+  call void @__gc_push_root(i64 %t1)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @Indexable() {
+entry:
+  %t2 = call i64 @__gc_alloc(i64 0, i64 17)
+  %t3 = inttoptr i64 %t2 to %Indexable*
+  %t4 = ptrtoint %Indexable* %t3 to i64
+  ret i64 %t4
+}
+
+define i64 @Stringable__to_string(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Stringable() {
+entry:
+  %t1 = call i64 @__gc_alloc(i64 0, i64 18)
+  %t2 = inttoptr i64 %t1 to %Stringable*
+  %t3 = ptrtoint %Stringable* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Iterator__next(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define i64 @Iterator__has_next(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Iterator() {
+entry:
+  %t1 = call i64 @__gc_alloc(i64 0, i64 19)
+  %t2 = inttoptr i64 %t1 to %Iterator*
+  %t3 = ptrtoint %Iterator* %t2 to i64
+  ret i64 %t3
+}
+
+define i64 @Iterable__iter(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  ret i64 0
+}
+
+define linkonce_odr i64 @Iterable() {
+entry:
+  %t1 = call i64 @__gc_alloc(i64 0, i64 20)
+  %t2 = inttoptr i64 %t1 to %Iterable*
+  %t3 = ptrtoint %Iterable* %t2 to i64
+  ret i64 %t3
+}
+
+define linkonce_odr i64 @stdlib_io_println(i64 %value.arg) {
+entry:
+  %value = alloca i64
+  store i64 %value.arg, i64* %value
+  %t1 = ptrtoint i64* %value to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %value
+  %t3 = call i8* @__val_untag_ptr(i64 %t2)
+  %t4 = call i32 @puts(i8* %t3)
+  %t5 = sext i32 %t4 to i64
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t5
+}
+
+define linkonce_odr i64 @stdlib_io_print(i64 %value.arg) {
+entry:
+  %value = alloca i64
+  store i64 %value.arg, i64* %value
+  %t1 = ptrtoint i64* %value to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %value
+  call void @__io_print_str(i64 %t2)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 0
+}
+
+define linkonce_odr i64 @stdlib_io_read_file(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %path
+  %t3 = call i64 @__io_read_file(i64 %t2)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t3
+}
+
+define linkonce_odr i64 @stdlib_io_write_file(i64 %path.arg, i64 %content.arg) {
+entry:
+  %path = alloca i64
+  %content = alloca i64
+  store i64 %path.arg, i64* %path
+  store i64 %content.arg, i64* %content
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = ptrtoint i64* %content to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = load i64, i64* %path
+  %t4 = load i64, i64* %content
+  %t5 = call i64 @__io_write_file(i64 %t3, i64 %t4)
+  call void @__gc_pop_roots(i64 2)
+  ret i64 %t5
+}
+
+define linkonce_odr i64 @stdlib_io_append_file(i64 %path.arg, i64 %content.arg) {
+entry:
+  %path = alloca i64
+  %content = alloca i64
+  store i64 %path.arg, i64* %path
+  store i64 %content.arg, i64* %content
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = ptrtoint i64* %content to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = load i64, i64* %path
+  %t4 = load i64, i64* %content
+  %t5 = call i64 @__io_append_file(i64 %t3, i64 %t4)
+  call void @__gc_pop_roots(i64 2)
+  ret i64 %t5
+}
+
+define linkonce_odr i64 @stdlib_io_file_exists(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %path
+  %t3 = call i64 @__io_file_exists(i64 %t2)
+  %t4 = add i64 0, 1
+  %t6 = icmp eq i64 %t3, %t4
+  %t5 = zext i1 %t6 to i64
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t5
+}
+
+define linkonce_odr i64 @stdlib_io_mkdir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %path
+  %t3 = call i64 @__io_mkdir(i64 %t2)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t3
+}
+
+define linkonce_odr i64 @stdlib_io_walk_dir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %path
+  %t3 = call i64 @__io_walk_dir(i64 %t2)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t3
+}
+
+define linkonce_odr i64 @stdlib_io_list_dir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = ptrtoint i64* %path to i64
+  call void @__gc_push_root(i64 %t1)
+  %t2 = load i64, i64* %path
+  %t3 = call i64 @__io_walk_dir(i64 %t2)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t3
+}
+
 define i64 @__saffron_entry() {
 entry:
   %name = alloca i64
@@ -190,62 +549,58 @@ entry:
   %t7 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
   %t8 = ptrtoint i8* %t7 to i64
   %t9 = load i64, i64* @__g_name
-  %t10 = call i64 @__val_untag_int(i64 %t9)
-  %t11 = call i64 @__int_to_string(i64 %t10)
-  %t12 = inttoptr i64 %t8 to i8*
-  %t13 = inttoptr i64 %t11 to i8*
-  %t14 = call i64 @strlen(i8* %t12)
-  %t15 = call i64 @strlen(i8* %t13)
-  %t16 = add i64 %t14, %t15
-  %t17 = add i64 %t16, 1
-  %t18 = call i8* @malloc(i64 %t17)
-  call i8* @strcpy(i8* %t18, i8* %t12)
-  call i8* @strcat(i8* %t18, i8* %t13)
+  %t10 = inttoptr i64 %t8 to i8*
+  %t11 = inttoptr i64 %t9 to i8*
+  %t12 = call i64 @strlen(i8* %t10)
+  %t13 = call i64 @strlen(i8* %t11)
+  %t14 = add i64 %t12, %t13
+  %t15 = add i64 %t14, 1
+  %t16 = call i8* @malloc(i64 %t15)
+  call i8* @strcpy(i8* %t16, i8* %t10)
+  call i8* @strcat(i8* %t16, i8* %t11)
+  %t17 = ptrtoint i8* %t16 to i64
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i64
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
-  %t21 = ptrtoint i8* %t20 to i64
-  %t22 = inttoptr i64 %t19 to i8*
-  %t23 = inttoptr i64 %t21 to i8*
-  %t24 = call i64 @strlen(i8* %t22)
-  %t25 = call i64 @strlen(i8* %t23)
-  %t26 = add i64 %t24, %t25
-  %t27 = add i64 %t26, 1
-  %t28 = call i8* @malloc(i64 %t27)
-  call i8* @strcpy(i8* %t28, i8* %t22)
-  call i8* @strcat(i8* %t28, i8* %t23)
-  %t29 = ptrtoint i8* %t28 to i64
-  %t30 = load i64, i64* @__g_version
-  %t31 = call i64 @__val_untag_int(i64 %t30)
-  %t32 = call i64 @__int_to_string(i64 %t31)
-  %t33 = inttoptr i64 %t29 to i8*
-  %t34 = inttoptr i64 %t32 to i8*
-  %t35 = call i64 @strlen(i8* %t33)
-  %t36 = call i64 @strlen(i8* %t34)
-  %t37 = add i64 %t35, %t36
-  %t38 = add i64 %t37, 1
-  %t39 = call i8* @malloc(i64 %t38)
-  call i8* @strcpy(i8* %t39, i8* %t33)
-  call i8* @strcat(i8* %t39, i8* %t34)
-  %t40 = ptrtoint i8* %t39 to i64
-  %t41 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
-  %t42 = ptrtoint i8* %t41 to i64
-  %t43 = inttoptr i64 %t40 to i8*
-  %t44 = inttoptr i64 %t42 to i8*
-  %t45 = call i64 @strlen(i8* %t43)
-  %t46 = call i64 @strlen(i8* %t44)
-  %t47 = add i64 %t45, %t46
-  %t48 = add i64 %t47, 1
-  %t49 = call i8* @malloc(i64 %t48)
-  call i8* @strcpy(i8* %t49, i8* %t43)
-  call i8* @strcat(i8* %t49, i8* %t44)
+  %t20 = inttoptr i64 %t17 to i8*
+  %t21 = inttoptr i64 %t19 to i8*
+  %t22 = call i64 @strlen(i8* %t20)
+  %t23 = call i64 @strlen(i8* %t21)
+  %t24 = add i64 %t22, %t23
+  %t25 = add i64 %t24, 1
+  %t26 = call i8* @malloc(i64 %t25)
+  call i8* @strcpy(i8* %t26, i8* %t20)
+  call i8* @strcat(i8* %t26, i8* %t21)
+  %t27 = ptrtoint i8* %t26 to i64
+  %t28 = load i64, i64* @__g_version
+  %t29 = inttoptr i64 %t27 to i8*
+  %t30 = inttoptr i64 %t28 to i8*
+  %t31 = call i64 @strlen(i8* %t29)
+  %t32 = call i64 @strlen(i8* %t30)
+  %t33 = add i64 %t31, %t32
+  %t34 = add i64 %t33, 1
+  %t35 = call i8* @malloc(i64 %t34)
+  call i8* @strcpy(i8* %t35, i8* %t29)
+  call i8* @strcat(i8* %t35, i8* %t30)
+  %t36 = ptrtoint i8* %t35 to i64
+  %t37 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
+  %t38 = ptrtoint i8* %t37 to i64
+  %t39 = inttoptr i64 %t36 to i8*
+  %t40 = inttoptr i64 %t38 to i8*
+  %t41 = call i64 @strlen(i8* %t39)
+  %t42 = call i64 @strlen(i8* %t40)
+  %t43 = add i64 %t41, %t42
+  %t44 = add i64 %t43, 1
+  %t45 = call i8* @malloc(i64 %t44)
+  call i8* @strcpy(i8* %t45, i8* %t39)
+  call i8* @strcat(i8* %t45, i8* %t40)
+  %t46 = ptrtoint i8* %t45 to i64
+  call void @__io_println_str(i64 %t46)
+  %t47 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
+  %t48 = ptrtoint i8* %t47 to i64
+  call void @__io_println_str(i64 %t48)
+  %t49 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
   %t50 = ptrtoint i8* %t49 to i64
   call void @__io_println_str(i64 %t50)
-  %t51 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
-  %t52 = ptrtoint i8* %t51 to i64
-  call void @__io_println_str(i64 %t52)
-  %t53 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
-  %t54 = ptrtoint i8* %t53 to i64
-  call void @__io_println_str(i64 %t54)
   ret i64 0
 }
 

@@ -56270,19 +56270,17 @@ match.arm3061:
   %t13 = getelementptr [5 x i64], [5 x i64]* %t6, i64 0, i64 4
   %t14 = load i64, i64* %t13
   store i64 %t14, i64* %d
-  %t15 = load i64, i64* %self
-  %t16 = load i64, i64* %t
-  %t17 = call i64 @Codegen__type_to_string(i64 %t15, i64 %t16)
-  store i64 %t17, i64* %t2
+  %t15 = load i64, i64* %t
+  store i64 %t15, i64* %t2
   br label %match.end3060
 match.arm3062:
-  %t18 = getelementptr [1 x i8], [1 x i8]* @.str.2177, i64 0, i64 0
-  %t19 = ptrtoint i8* %t18 to i64
-  store i64 %t19, i64* %t2
+  %t16 = getelementptr [1 x i8], [1 x i8]* @.str.2177, i64 0, i64 0
+  %t17 = ptrtoint i8* %t16 to i64
+  store i64 %t17, i64* %t2
   br label %match.end3060
 match.end3060:
-  %t20 = load i64, i64* %t2
-  ret i64 %t20
+  %t18 = load i64, i64* %t2
+  ret i64 %t18
 }
 
 define i64 @Codegen__get_var_init(i64 %self.arg, i64 %stmt.arg) {
