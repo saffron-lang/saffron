@@ -6,7 +6,7 @@
         var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
         var di: Float = 0
         while (di < names.length()) {
-            if (!this.defined_funcs.contains(names[di])) {
+            if (!this.str_in_list(this.defined_funcs,names[di])) {
                 rt.append("declare " + sigs[di] + "\n")
             }
             di = di + 1
@@ -610,7 +610,7 @@
                     while (mpi < mp_keys.length()) {
                         var mp_prefix: String = this.module_prefixes.get(mp_keys[mpi])
                         var mp_name: String = mp_prefix + name
-                        if (!this.coroutine_funcs.contains(mp_name)) {
+                        if (!this.str_in_list(this.coroutine_funcs,mp_name)) {
                             this.coroutine_funcs.push(mp_name)
                         }
                         mpi = mpi + 1
@@ -627,14 +627,14 @@
             var fi: Float = 0
             while (fi < func_names.length()) {
                 var fn_name: String = func_names[fi]
-                if (!this.coroutine_funcs.contains(fn_name)) {
+                if (!this.str_in_list(this.coroutine_funcs,fn_name)) {
                     var calls: List<String> = []
                     this.collect_calls_from_stmts(func_bodies[fi], calls)
                     var ci: Float = 0
                     while (ci < calls.length()) {
                         var callee: String = calls[ci]
                         // Check both bare name and prefixed name
-                        if (this.coroutine_funcs.contains(callee) or this.coroutine_funcs.contains(this.current_prefix + callee)) {
+                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee)) {
                             this.coroutine_funcs.push(fn_name)
                             changed = true
                             ci = calls.length()
@@ -645,6 +645,15 @@
                 fi = fi + 1
             }
         }
+    }
+
+    fun str_in_list(lst: List<String>, needle: String): Bool {
+        var __sil_i: Float = 0
+        while (__sil_i < lst.length()) {
+            if (lst[__sil_i] == needle) { return true }
+            __sil_i = __sil_i + 1
+        }
+        return false
     }
 
     // --- Statement codegen ---

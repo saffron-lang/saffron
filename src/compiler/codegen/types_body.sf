@@ -293,10 +293,10 @@
             var ts_method: String = ts_class + "__to_string"
             if (this.func_prefix_map.has(ts_method)) {
                 ts_method = this.func_prefix_map.get(ts_method)
-            } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
+            } else if (this.str_in_list(this.known_functions,this.current_prefix + ts_method)) {
                 ts_method = this.current_prefix + ts_method
             }
-            if (this.known_functions.contains(ts_method)) {
+            if (this.str_in_list(this.known_functions,ts_method)) {
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
                 return result

@@ -234,7 +234,7 @@
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
-                if (!child_methods.contains(mname) and mname != "init") {
+                if (!this.str_in_list(child_methods,mname) and mname != "init") {
                     // Register parent method as callable on child
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
@@ -271,7 +271,7 @@
                 var pi: Int = 0
                 while (pi < parent_methods.length()) {
                     var required: String = parent_methods[pi]
-                    if (required != "init" and !child_methods.contains(required)) {
+                    if (required != "init" and !this.str_in_list(child_methods,required)) {
                         IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
                     }
                     pi = pi + 1
@@ -307,7 +307,7 @@
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        if (!this.register_only and !this.known_functions.contains("__type_" + type_name)) {
+        if (!this.register_only and !this.str_in_list(this.known_functions,"__type_" + type_name)) {
             this.known_functions.push("__type_" + type_name)
             var field_types_str: String = ""
             var fi: Float = 0
@@ -448,7 +448,7 @@
         this.known_functions.push(type_name)
         this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(type_name)) { return }
+        if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
         this.emit("")
         var ctor_linkage: String = "define linkonce_odr"
@@ -506,7 +506,7 @@
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
-        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+        if (!this.register_only and !this.str_in_list(this.known_functions,"__type_" + name)) {
             this.known_functions.push("__type_" + name)
             this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
         }
@@ -534,7 +534,7 @@
 
     fun emit_enum_to_string(name: String, variants: List<AST.Variant>) {
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(name + "__to_string")) { return }
+        if (this.str_in_list(this.defined_funcs,name + "__to_string")) { return }
         this.defined_funcs.push(name + "__to_string")
         var max_fields: Float = this.get_max_fields(name)
         var func_name: String = name + "__to_string"
@@ -705,7 +705,7 @@
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(vname)) { return }
+        if (this.str_in_list(this.defined_funcs,vname)) { return }
         this.defined_funcs.push(vname)
         var parts: List<String> = this.split_respecting_generics(fields_str, ",")
         var num_fields: Float = parts.length()
@@ -825,7 +825,7 @@
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
-        if (!this.typed_vars.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
+        if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
         }

@@ -23,7 +23,7 @@
             this.collect_calls_from_stmts(body, lambda_calls)
             var lci: Float = 0
             while (lci < lambda_calls.length()) {
-                if (this.coroutine_funcs.contains(lambda_calls[lci]) or this.coroutine_funcs.contains(this.current_prefix + lambda_calls[lci])) {
+                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci])) {
                     this.coroutine_funcs.push(lambda_name)
                     lci = lambda_calls.length()
                 }
@@ -100,7 +100,7 @@
             // Store fn ptr
             var num_params: Float = param_names.length() + 1
             var ret_ty: String = "i64"
-            if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
+            if (this.str_in_list(this.coroutine_funcs,lambda_name)) { ret_ty = "ptr" }
             var fn_type_str: String = ret_ty + " ("
             var ti: Float = 0
             while (ti < num_params) {
@@ -167,7 +167,7 @@
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
         var nocap_ret_ty: String = "i64"
-        if (this.coroutine_funcs.contains(lambda_name)) { nocap_ret_ty = "ptr" }
+        if (this.str_in_list(this.coroutine_funcs,lambda_name)) { nocap_ret_ty = "ptr" }
         var fn_type_str: String = nocap_ret_ty + " ("
         var tti: Float = 0
         while (tti < num_total_params) {
@@ -207,7 +207,7 @@
         this.current_ret_type = ret_llvm
 
         // Check if this closure is a coroutine
-        var is_coro: Bool = this.coroutine_funcs.contains(name)
+        var is_coro: Bool = this.str_in_list(this.coroutine_funcs,name)
         if (is_coro) {
             this.is_coroutine = true
         }
@@ -302,7 +302,7 @@
         i = 0
         while (i < var_names.length()) {
             var vname: String = var_names[i]
-            if (!captures.contains(vname)) {
+            if (!this.str_in_list(captures,vname)) {
                 this.emit_indent("%" + this.sanitize_name(vname) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
@@ -397,13 +397,13 @@
     fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
             Variable(name) => {
-                if (bound.contains(name) or free.contains(name)) {
+                if (this.str_in_list(bound,name) or this.str_in_list(free,name)) {
                     // Already bound or already free — skip
                 } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
                     // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
                 } else {
-                    var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
+                    var is_known: Bool = this.str_in_list(this.known_functions,name) or this.str_in_list(this.known_functions,this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
                     if (!is_known and name.length() > 0) {
                         var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                         if (upper.index_of(name.char_at(0)) >= 0) {
@@ -440,7 +440,7 @@
                             var ci4: Float = 0
                             while (ci4 < cap_list.length()) {
                                 var cn: String = cap_list[ci4]
-                                if (!bound.contains(cn) and !free.contains(cn)) {
+                                if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
                                     free.push(cn)
                                 }
                                 ci4 = ci4 + 1
@@ -451,7 +451,7 @@
             }
             Assign(name, value) => {
                 this.find_free_vars_expr(value, bound, free)
-                if (!bound.contains(name) and !free.contains(name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
+                if (!this.str_in_list(bound,name) and !this.str_in_list(free,name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
                     free.push(name)
                 }
             }
@@ -543,7 +543,7 @@
                 while (fi < inner_free.length()) {
                     var fv: String = inner_free[fi]
                     // Skip module globals — they are accessed via @__g_ not local capture
-                    if (!bound.contains(fv) and !free.contains(fv) and !inner_bound.contains(fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
+                    if (!this.str_in_list(bound,fv) and !this.str_in_list(free,fv) and !this.str_in_list(inner_bound,fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
                         free.push(fv)
                     }
                     fi = fi + 1
@@ -567,7 +567,7 @@
                 }
             }
             This => {
-                if (!bound.contains("self") and !free.contains("self")) {
+                if (!this.str_in_list(bound,"self") and !this.str_in_list(free,"self")) {
                     free.push("self")
                 }
             }
