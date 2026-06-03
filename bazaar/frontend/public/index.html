@@ -4,7 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bazaar — Saffron Package Registry</title>
-    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        saffron: { 400: '#f7a828', 500: '#e89820', 600: '#d08818' },
+                        navy: { 800: '#1a1a2e', 900: '#0f0f1a', 950: '#0a0a12' },
+                    }
+                }
+            }
+        }
+    </script>
     <script src="turmeric.js"></script>
 </head>
 <body>

@@ -129,23 +129,23 @@ fun PackageCard(pkg: Map<String, String>) {
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
-    div([class_("package-card")]) {
-        div([class_("card-header")]) {
-            h2([class_("card-title"), on_click(fun (e) => {
+    div([class_("bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer")]) {
+        div([class_("flex items-center justify-between mb-2")]) {
+            h2([class_("text-lg font-bold text-white hover:text-saffron-400 transition-colors"), on_click(fun (e) => {
                 load_package_detail(name)
             })]) {
                 text(name)
             }
-            span([class_("version-badge")]) {
+            span([class_("text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded")]) {
                 text("v" + version)
             }
         }
         if (description.length() > 0) {
-            p([class_("card-description")]) {
+            p([class_("text-sm text-gray-400 mb-3")]) {
                 text(description)
             }
         }
-        div([class_("install-command")]) {
+        div([class_("font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700")]) {
             code([]) {
                 text("pantry add " + name)
             }
@@ -154,19 +154,19 @@ fun PackageCard(pkg: Map<String, String>) {
 }
 
 fun SearchBar() {
-    form([class_("search-form"), on_submit(fun (e) => {
+    form([class_("w-full max-w-2xl mx-auto mb-8"), on_submit(fun (e) => {
         do_search()
     })]) {
-        div([class_("search-input-wrapper")]) {
+        div([class_("flex gap-2")]) {
             input([
-                class_("search-input"),
+                class_("flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all"),
                 type_("text"),
                 placeholder("Search packages..."),
                 on_input(fun (e) => {
                     search_query.set(e.value)
                 })
             ]) {}
-            button([class_("search-btn"), type_("submit")]) {
+            button([class_("px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors"), type_("submit")]) {
                 text("Search")
             }
         }
@@ -174,18 +174,18 @@ fun SearchBar() {
 }
 
 fun NavBar() {
-    nav([class_("navbar")]) {
-        div([class_("nav-content")]) {
-            a([class_("nav-brand"), on_click(fun (e) => {
+    nav([class_("sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800")]) {
+        div([class_("max-w-6xl mx-auto px-6 py-3 flex items-center justify-between")]) {
+            a([class_("text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer"), on_click(fun (e) => {
                 navigate_home()
             })]) {
                 text("Bazaar")
             }
-            div([class_("nav-links")]) {
-                a([class_("nav-link"), href("https://saffron-lang.org/docs")]) {
+            div([class_("flex gap-4")]) {
+                a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://saffron-lang.org/docs")]) {
                     text("Docs")
                 }
-                a([class_("nav-link"), href("https://github.com/henry232323/saffron")]) {
+                a([class_("text-sm text-gray-400 hover:text-white transition-colors"), href("https://github.com/henry232323/saffron")]) {
                     text("GitHub")
                 }
             }
@@ -194,21 +194,21 @@ fun NavBar() {
 }
 
 fun HomePage() {
-    div([class_("page home-page")]) {
-        header([class_("hero")]) {
-            h1([class_("hero-title")]) {
+    div([class_("min-h-screen")]) {
+        header([class_("text-center py-16")]) {
+            h1([class_("text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3")]) {
                 text("Bazaar")
             }
-            p([class_("hero-subtitle")]) {
+            p([class_("text-lg text-gray-400")]) {
                 text("The Saffron package registry")
             }
         }
         SearchBar()
-        section([class_("featured")]) {
-            h3([class_("section-title")]) {
+        section([class_("max-w-4xl mx-auto px-6")]) {
+            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-4")]) {
                 text("All Packages")
             }
-            div([class_("package-list")]) {
+            div([class_("grid gap-4")]) {
                 var pkgs: List<Map<String, String>> = featured_packages.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
@@ -216,7 +216,7 @@ fun HomePage() {
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    p([class_("empty-state")]) {
+                    p([class_("text-center text-gray-500 py-12")]) {
                         text("No packages published yet. Be the first!")
                     }
                 }
@@ -226,13 +226,13 @@ fun HomePage() {
 }
 
 fun SearchResultsPage() {
-    div([class_("page search-page")]) {
+    div([class_("min-h-screen max-w-4xl mx-auto px-6 py-8")]) {
         SearchBar()
-        section([class_("results")]) {
-            h3([class_("section-title")]) {
+        section([]) {
+            h3([class_("text-sm uppercase tracking-wider text-gray-500 mb-4")]) {
                 text("Search results for \"" + search_query.get() + "\"")
             }
-            div([class_("package-list")]) {
+            div([class_("grid gap-4")]) {
                 var pkgs: List<Map<String, String>> = search_results.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
@@ -240,7 +240,7 @@ fun SearchResultsPage() {
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    p([class_("empty-state")]) {
+                    p([class_("text-center text-gray-500 py-12")]) {
                         text("No packages found matching your query.")
                     }
                 }
