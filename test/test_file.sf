@@ -1,0 +1,102 @@
+//! Test for IO.File class — incremental file I/O with handles.
+
+import "@io" as FileIO
+import "@test" as T
+
+var tmp_path = "/tmp/saffron_test_file.txt"
+
+// Write several lines
+var f = FileIO.open(tmp_path, "w")
+T.assert(f.is_open(), "file should be open after open()")
+T.assert_eq(f.path(), tmp_path, "path() returns correct path")
+T.assert_eq(f.mode(), "w", "mode() returns correct mode")
+
+f.write_line("hello world")
+f.write_line("second line")
+f.write_line("third line")
+f.flush()
+f.close()
+
+T.assert(!f.is_open(), "file should be closed after close()")
+
+// Reopen for reading
+var g = FileIO.open(tmp_path, "r")
+T.assert(g.is_open(), "file reopened for reading")
+
+// Read lines - compare using starts_with since \n handling varies
+var line1 = g.read_line()
+T.assert(line1.starts_with("hello world"), "read_line() returns first line")
+
+var line2 = g.read_line()
+T.assert(line2.starts_with("second line"), "read_line() returns second line")
+
+var line3 = g.read_line()
+T.assert(line3.starts_with("third line"), "read_line() returns third line")
+
+// EOF
+var line4 = g.read_line()
+T.assert_eq(line4, "", "read_line() returns empty string at EOF")
+
+g.close()
+
+// Test read_all
+var h = FileIO.open(tmp_path, "r")
+var all = h.read_all()
+T.assert(all.starts_with("hello world"), "read_all() starts correctly")
+T.assert(all.length() > 30, "read_all() has expected length")
+h.close()
+
+// Test seek and tell
+var s = FileIO.open(tmp_path, "r")
+T.assert_eq(s.tell(), 0, "tell() starts at 0")
+
+s.seek(6)
+T.assert_eq(s.tell(), 6, "tell() after seek(6)")
+
+var partial = s.read(5)
+T.assert_eq(s.tell(), 11, "tell() after reading 5 bytes from offset 6")
+
+s.rewind()
+T.assert_eq(s.tell(), 0, "tell() after rewind()")
+s.close()
+
+// Test size
+var sz = FileIO.open(tmp_path, "r")
+var file_size = sz.size()
+T.assert(file_size > 30, "size() returns reasonable value")
+sz.close()
+
+// Test error on nonexistent file
+var caught = false
+try {
+    FileIO.open("/tmp/saffron_nonexistent_file_xyz.txt", "r")
+} catch (e) {
+    caught = true
+}
+T.assert(caught, "opening nonexistent file throws an error")
+
+// Test write with read(N)
+var w = FileIO.open(tmp_path, "w")
+w.write("ABCDEFGHIJ")
+w.close()
+
+var r = FileIO.open(tmp_path, "r")
+var chunk1 = r.read(3)
+var chunk2 = r.read(4)
+var chunk3 = r.read(100)
+var chunk4 = r.read(10)
+T.assert_eq(chunk4, "", "read() at EOF returns empty string")
+// Verify correct number of bytes were consumed via tell()
+T.assert_eq(r.tell(), 10, "after reading all 10 bytes, tell() is at 10")
+r.close()
+
+// Test error on closed file
+var closed_err = false
+try {
+    r.read(10)
+} catch (e) {
+    closed_err = true
+}
+T.assert(closed_err, "read on closed file throws")
+
+T.summary()

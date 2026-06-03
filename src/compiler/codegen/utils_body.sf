@@ -45,7 +45,7 @@
         rt.append("declare i64 @__gc_closure_new(i64, i64)\n")
         rt.append("declare i64 @__gc_env_alloc(i64)\n")
         rt.append("declare i64 @__gc_instance_alloc(i64)\n")
-        // Scheduler extern functions (always needed when @async or @scheduler imported)
+        rt.append("declare i64 @__gc_get_type_tag(i64)\n")        // Scheduler extern functions (always needed when @async or @scheduler imported)
         rt.append("\n; --- Scheduler runtime ---\n")
         rt.append("declare double @sf_time_now()\n")
         rt.append("declare i64 @sf_tcp_poll(i64, i64, i64)\n")

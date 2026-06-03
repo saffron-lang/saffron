@@ -769,6 +769,32 @@
             else { this.last_type = AST.Type.StringType }
             return local
         }
+        // Fallback: resolve any other IO.xxx method via module prefix (e.g. IO.open)
+        if (this.module_prefixes.has("IO")) {
+            var io_pfx: String = this.module_prefixes.get("IO") + method
+            if (this.str_in_list(this.known_functions, io_pfx)) {
+                var io_args2: List<String> = []
+                var io_i2: Float = 0
+                while (io_i2 < args.length()) {
+                    var io_v2: String = this.gen_arg_value(args[io_i2])
+                    io_args2.push("i64 " + io_v2)
+                    io_i2 = io_i2 + 1
+                }
+                this.called_functions.push(io_pfx)
+                var local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(local, "i64", io_pfx, io_args2.join(", ")))
+                } else {
+                    this.emit_indent(local + " = call i64 @" + io_pfx + "(" + io_args2.join(", ") + ")")
+                }
+                if (this.func_ret_types.has(io_pfx)) {
+                    this.last_type = this.func_ret_types.get(io_pfx)
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                return local
+            }
+        }
     }
 
     // Check for GC module calls
