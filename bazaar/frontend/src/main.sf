@@ -3,6 +3,7 @@
 
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
+import "turmeric/router" as Router
 
 // =============================================================================
 // FFI — fetch from same-origin API
@@ -31,7 +32,7 @@ fun __on_fetch_complete(id: Float, json_str: String) {
 // State
 // =============================================================================
 
-var current_page = signal("home")
+var router = Router.hash()
 var search_query = signal("")
 var search_results = signal([])
 var is_loading = signal(false)
@@ -64,7 +65,7 @@ fun do_search() {
         return
     }
     is_loading.set(true)
-    current_page.set("search")
+    router.go("/search?q=" + q)
     fetch_json("/api/v1/search?q=" + q, fun (json_str: String) => {
         var data = JSON.parse(json_str)
         if (data != nil and data.has("packages")) {
@@ -76,7 +77,7 @@ fun do_search() {
 
 fun load_package_detail(name: String) {
     detail_name.set(name)
-    current_page.set("detail")
+    router.go("/packages/" + name)
     is_loading.set(true)
     fetch_json("/api/v1/packages/" + name, fun (json_str: String) => {
         var data = JSON.parse(json_str)
@@ -99,7 +100,7 @@ fun load_package_detail(name: String) {
 }
 
 fun navigate_home() {
-    current_page.set("home")
+    router.go("/")
     search_query.set("")
     load_featured()
 }
@@ -276,10 +277,7 @@ fun App() {
         {NavBar()}
         <div class="flex-1">
             {LoadingIndicator()}
-            {var page: String = current_page.get()
-            if (page == "home") { HomePage() }
-            if (page == "search") { SearchResultsPage() }
-            if (page == "detail") { PackageDetailPage() }}
+            {router.render()}
         </div>
         <footer class="border-t border-gray-800 py-6 text-center">
             <p class="text-sm text-gray-500">Bazaar — the Saffron package registry</p>
@@ -287,6 +285,17 @@ fun App() {
         </footer>
     </div>
 }
+
+// =============================================================================
+// Routes
+// =============================================================================
+
+router.route("/", fun (p: Router.RouteParams) => HomePage())
+router.route("/search", fun (p: Router.RouteParams) => SearchResultsPage())
+router.route("/packages/:name", fun (p: Router.RouteParams) => {
+    load_package_detail(p.get("name"))
+    PackageDetailPage()
+})
 
 // =============================================================================
 // Entry

@@ -29,7 +29,7 @@ myapp/
 
 ## Write your app
 
-Edit `src/main.sf`:
+Edit `src/main.sf`. Turmeric uses JSX-like inline HTML directly in `.sf` files -- no special extension needed:
 
 ```saffron
 import { signal, computed } from "turmeric/signal"
@@ -39,21 +39,21 @@ var count = signal(0)
 var doubled = computed(fun () => count.get() * 2)
 
 fun App() {
-    div(cls="container") {
-        h1 { "My First Turmeric App" }
+    <div class="container">
+        <h1>My First Turmeric App</h1>
 
-        div(cls="counter") {
-            p { reactive(fun () => "Count: " + count.get().to_string()) }
-            p { reactive(fun () => "Doubled: " + doubled.get().to_string()) }
+        <div class="counter">
+            <p>Count: {count.get()}</p>
+            <p>Doubled: {doubled.get()}</p>
 
-            button(on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
-                "+1"
-            }
-            button(on_click=fun (e: Event) => count.set(0)) {
-                "Reset"
-            }
-        }
-    }
+            <button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+                +1
+            </button>
+            <button on_click={fun (e: Event) => count.set(0)}>
+                Reset
+            </button>
+        </div>
+    </div>
 }
 
 mount("#app", App)
@@ -89,10 +89,10 @@ Open `http://localhost:8080` in your browser.
 
 ## How it works
 
-1. **Signals** hold reactive state. Calling `.get()` inside `reactive()` or `effect()` creates a subscription.
-2. **Element functions** (`div`, `h1`, `button`, etc.) create real DOM nodes via the JS runtime bridge.
-3. **Trailing closures** define children. String literals become text nodes.
-4. **Named args** map to HTML attributes and event handlers (`cls`, `on_click`, `type_`, etc.).
+1. **Inline HTML** -- `<div>`, `<button>`, etc. are compiled by the SFX transform into DOM creation calls. Works in any `.sf` file.
+2. **`{expression}`** -- curly braces inside elements evaluate Saffron expressions. Signals read here are automatically tracked.
+3. **Signals** hold reactive state. When a signal changes, any DOM that depends on it updates surgically.
+4. **Event handlers** -- `on_click={...}`, `on_input={...}` attach typed event listeners.
 5. **`mount("#app", App)`** finds the `#app` element in `index.html` and runs your `App` function to build the DOM tree.
 
 ## Add a todo list
@@ -104,33 +104,34 @@ var todos = signal(["Buy milk", "Write code"])
 var new_todo = signal("")
 
 fun TodoApp() {
-    div(cls="todo-app") {
-        h2 { "Todos" }
-        p { reactive(fun () => todos.get().length().to_string() + " items") }
+    <div class="todo-app">
+        <h2>Todos</h2>
+        <p>{todos.get().length().to_string()} items</p>
 
-        div(cls="input-row") {
-            input(
-                type_="text",
-                placeholder="Add a task...",
-                on_input=fun (e: Event) => new_todo.set("task")
-            )
-            button(on_click=fun (e: Event) => {
+        <div class="input-row">
+            <input
+                type="text"
+                placeholder="Add a task..."
+                on_input={fun (e: Event) => new_todo.set(e.target_value)}
+            />
+            <button on_click={fun (e: Event) => {
                 todos.update(fun (list: List<String>): List<String> => {
-                    list.push("New task")
+                    list.push(new_todo.get())
                     return list
                 })
-            }) { "Add" }
-        }
+                new_todo.set("")
+            }}>Add</button>
+        </div>
 
-        ul {
-            var items = todos.get()
-            var i = 0
+        <ul>
+            {var items = todos.get()
+            var i: Float = 0
             while (i < items.length()) {
-                li { items[i] }
+                <li>{items[i]}</li>
                 i = i + 1
-            }
-        }
-    }
+            }}
+        </ul>
+    </div>
 }
 ```
 
@@ -138,6 +139,7 @@ fun TodoApp() {
 
 ```saffron
 import "turmeric/router" as Router
+import { Event } from "turmeric/events"
 
 var router = Router.hash()
 
@@ -145,30 +147,27 @@ router.route("/", fun (p: Router.RouteParams) => HomePage())
 router.route("/about", fun (p: Router.RouteParams) => AboutPage())
 
 fun NavBar() {
-    nav {
-        button(on_click=fun (e: Event) => router.go("/")) { "Home" }
-        button(on_click=fun (e: Event) => router.go("/about")) { "About" }
-    }
+    <nav class="flex gap-4 p-4 border-b">
+        <button on_click={fun (e: Event) => router.go("/")}>Home</button>
+        <button on_click={fun (e: Event) => router.go("/about")}>About</button>
+    </nav>
 }
 
 fun HomePage() {
-    section { h1 { "Home" } }
+    <section><h1>Home</h1></section>
 }
 
 fun AboutPage() {
-    section { h1 { "About" } }
+    <section><h1>About</h1></section>
 }
 
 fun App() {
-    div {
-        NavBar()
-        main {
-            // Route dispatch
-            var path = router.current_signal().get()
-            if (path == "/about") { AboutPage() }
-            else { HomePage() }
-        }
-    }
+    <div>
+        {NavBar()}
+        <main>
+            {router.render()}
+        </main>
+    </div>
 }
 
 mount("#app", App)
