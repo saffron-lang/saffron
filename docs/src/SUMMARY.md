@@ -53,6 +53,7 @@
 - [Parser](./stdlib/parser.md)
 - [AST](./stdlib/ast.md)
 - [LLVM](./stdlib/llvm.md)
+- [Turmeric](./stdlib/turmeric.md)
 
 # Turmeric (Web Framework)
 
@@ -62,6 +63,11 @@
 - [Component Lifecycle](./turmeric/lifecycle.md)
 - [Router](./turmeric/router.md)
 - [Styling](./turmeric/styling.md)
+
+# Guides
+
+- [Turmeric Quickstart](./guides/turmeric-quickstart.md)
+- [Bazaar Package Registry](./guides/bazaar.md)
 
 # Reference
 
