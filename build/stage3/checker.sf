@@ -148,6 +148,7 @@ class NullChecker {
     var current_class: String
     var class_parents: Map<String, String>
     var class_method_names: Map<String, String>
+    var receiver_params: Map<String, String>
 
     fun init() {
         this.env = TypeEnv()
@@ -157,6 +158,7 @@ class NullChecker {
         this.current_class = ""
         this.class_parents = {}
         this.class_method_names = {}
+        this.receiver_params = {}
     }
 
     fun error(msg: String) {
@@ -614,6 +616,21 @@ class NullChecker {
             FunDecl(name, params, ret_type, body, doc) => {
                 this.env.define_func_str(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
+                // Detect receiver-typed parameters: Fun[Type](...):Ret
+                var rpi: Float = 0
+                while (rpi < params.length()) {
+                    var p: AST.Param = params[rpi]
+                    var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                    var pt_str: String = this.type_node_to_string(pt)
+                    if (pt_str.starts_with("Fun[")) {
+                        // Record: "funcname:index" → receiver class name
+                        var recv_class: String = this.extract_receiver_class(pt_str)
+                        if (recv_class.length() > 0) {
+                            this.receiver_params.set(name + ":" + rpi.floor().to_string(), recv_class)
+                        }
+                    }
+                    rpi = rpi + 1
+                }
             }
             EnumDecl(name, variants, doc) => {
                 this.register_enum(name, variants)
@@ -627,6 +644,8 @@ class NullChecker {
                     this.class_parents.set(name, parent)
                 }
                 // Register methods with their return types and param types
+                // Also populate class_method_names for receiver closure desugaring
+                var method_names_list: List<String> = []
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
@@ -644,8 +663,12 @@ class NullChecker {
                     if (method_name.length() > 0) {
                         this.env.define_func_str(name + "__" + method_name, method_ret)
                         this.env.define_func_params(name + "__" + method_name, this.params_list_to_string(method_params))
+                        method_names_list.push(method_name)
                     }
                     mi = mi + 1
+                }
+                if (method_names_list.length() > 0) {
+                    this.class_method_names.set(name, method_names_list.join(","))
                 }
             }
             VarDecl(n, t, i, d) => {}
@@ -1366,6 +1389,18 @@ class NullChecker {
             Variable(n) => n
             MemberAccess(o, f) => f
         }
+        // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
+        var di: Float = 0
+        while (di < args.length()) {
+            var recv_key: String = name + ":" + di.floor().to_string()
+            var has_recv: Bool = this.receiver_params.has(recv_key)
+            var is_lambda: Bool = this.is_lambda_expr(args[di])
+            if (has_recv and is_lambda) {
+                var recv_class: String = this.receiver_params.get(recv_key)
+                this.desugar_receiver_closure(args, di, recv_class)
+            }
+            di = di + 1
+        }
         // Check args
         var ai: Float = 0
         while (ai < args.length()) {
@@ -1421,6 +1456,28 @@ class NullChecker {
 
     fun infer_method_call(obj: AST.Expr, method: String, args: List<AST.Expr>): String {
         var obj_type: String = this.infer_expr(obj)
+
+        // Desugar receiver closures for method calls too
+        // Check both "ClassName__method:idx" and "method:idx" patterns
+        var obj_name: String = match (obj) {
+            Variable(n) => n
+            _ => ""
+        }
+        var mdi: Float = 0
+        while (mdi < args.length()) {
+            var md_key: String = method + ":" + mdi.floor().to_string()
+            var md_key2: String = obj_name + "__" + method + ":" + mdi.floor().to_string()
+            var md_recv: String = ""
+            if (this.receiver_params.has(md_key)) {
+                md_recv = this.receiver_params.get(md_key)
+            } else if (this.receiver_params.has(md_key2)) {
+                md_recv = this.receiver_params.get(md_key2)
+            }
+            if (md_recv.length() > 0 and this.is_lambda_expr(args[mdi])) {
+                this.desugar_receiver_closure(args, mdi, md_recv)
+            }
+            mdi = mdi + 1
+        }
 
         // Check all argument expressions for null-safety too
         var ai: Float = 0
@@ -1675,6 +1732,282 @@ class NullChecker {
             this.env.define_var(bindings[bi], this.parse_type_node(field_type))
             bi = bi + 1
         }
+    }
+
+    // --- Receiver closure desugaring ---
+
+    fun extract_receiver_class(type_str: String): String {
+        // "Fun[Project]():Nil" → "Project"
+        // "Fun[HttpRequest](String):Nil" → "HttpRequest"
+        if (!type_str.starts_with("Fun[")) return ""
+        var bracket_end: Float = type_str.index_of("]")
+        if (bracket_end < 0) return ""
+        return type_str.slice(4, bracket_end)
+    }
+
+    fun is_lambda_expr(expr: AST.Expr): Bool {
+        return match (expr) {
+            Lambda(p, r, b) => true
+            _ => false
+        }
+    }
+
+    fun get_receiver_fields(class_name: String): List<String> {
+        // Returns list of field names for a class
+        var result: List<String> = []
+        if (!this.env.class_fields.has(class_name)) return result
+        var fields_str: String = this.env.class_fields.get(class_name)
+        if (fields_str.length() == 0) return result
+        var parts: List<String> = fields_str.split(",")
+        var i: Float = 0
+        while (i < parts.length()) {
+            var kv: List<String> = parts[i].split(":")
+            if (kv.length() >= 1 and kv[0].length() > 0) {
+                result.push(kv[0])
+            }
+            i = i + 1
+        }
+        return result
+    }
+
+    fun get_receiver_methods(class_name: String): List<String> {
+        // Returns list of method names for a class
+        var result: List<String> = []
+        if (!this.class_method_names.has(class_name)) return result
+        var methods_str: String = this.class_method_names.get(class_name)
+        if (methods_str.length() == 0) return result
+        return methods_str.split(",")
+    }
+
+    fun desugar_receiver_closure(args: List<AST.Expr>, arg_idx: Float, receiver_class: String) {
+        // Transform a Lambda at args[arg_idx] to add 'self' param and rewrite body
+        var lambda: AST.Expr = args[arg_idx]
+        var params: List<AST.Param> = match (lambda) { Lambda(p, r, b) => p }
+        var ret_type: String = match (lambda) { Lambda(p, r, b) => r }
+        var body: List<AST.Stmt> = match (lambda) { Lambda(p, r, b) => b }
+
+        // Skip if Lambda already has a 'self' parameter (user provided explicit receiver)
+        if (params.length() > 0) {
+            var first_param_name: String = match (params[0]) { Param(n, t, d) => n }
+            if (first_param_name == "self") return nil
+        }
+
+        // Get receiver fields and methods
+        var fields: List<String> = this.get_receiver_fields(receiver_class)
+        var methods: List<String> = this.get_receiver_methods(receiver_class)
+
+        // Rewrite body statements: bare assigns to receiver fields → SetField(This, ...)
+        var new_body: List<AST.Stmt> = []
+        var i: Float = 0
+        while (i < body.length()) {
+            var new_stmt: AST.Stmt = this.rewrite_receiver_stmt(body[i], fields, methods)
+            new_body.push(new_stmt)
+            i = i + 1
+        }
+
+        // Build new params: prepend 'self' parameter
+        var new_params: List<AST.Param> = []
+        new_params.push(AST.Param.Param("self", AST.Type.ClassType(receiver_class), AST.Expr.NilLit))
+        var pi: Float = 0
+        while (pi < params.length()) {
+            new_params.push(params[pi])
+            pi = pi + 1
+        }
+
+        // Replace the Lambda in the args list with the desugared version
+        // Modify body in place
+        var bi: Float = 0
+        while (bi < body.length()) {
+            body[bi] = new_body[bi]
+            bi = bi + 1
+        }
+        // Since we can't prepend to a list in place, create a new Lambda
+        args[arg_idx] = AST.Expr.Lambda(new_params, ret_type, body)
+    }
+
+    fun rewrite_receiver_stmt(stmt: AST.Stmt, fields: List<String>, methods: List<String>): AST.Stmt {
+        return match (stmt) {
+            ExprStmt(expr) => {
+                var rewritten: AST.Expr = this.rewrite_receiver_expr(expr, fields, methods)
+                var result: AST.Stmt = AST.Stmt.ExprStmt(rewritten)
+                result
+            }
+            VarDecl(name, type_ann, init, doc) => {
+                AST.Stmt.VarDecl(name, type_ann, this.rewrite_receiver_expr(init, fields, methods), doc)
+            }
+            Return(value) => {
+                AST.Stmt.Return(this.rewrite_receiver_expr(value, fields, methods))
+            }
+            If(cond, then_b, else_b) => {
+                var new_then: List<AST.Stmt> = this.rewrite_receiver_stmts(then_b, fields, methods)
+                var new_else: List<AST.Stmt> = this.rewrite_receiver_stmts(else_b, fields, methods)
+                AST.Stmt.If(this.rewrite_receiver_expr(cond, fields, methods), new_then, new_else)
+            }
+            While(cond, body) => {
+                var new_body: List<AST.Stmt> = this.rewrite_receiver_stmts(body, fields, methods)
+                AST.Stmt.While(this.rewrite_receiver_expr(cond, fields, methods), new_body)
+            }
+            Block(stmts) => {
+                AST.Stmt.Block(this.rewrite_receiver_stmts(stmts, fields, methods))
+            }
+            _ => stmt
+        }
+    }
+
+    fun rewrite_receiver_stmts(stmts: List<AST.Stmt>, fields: List<String>, methods: List<String>): List<AST.Stmt> {
+        var result: List<AST.Stmt> = []
+        var i: Float = 0
+        while (i < stmts.length()) {
+            result.push(this.rewrite_receiver_stmt(stmts[i], fields, methods))
+            i = i + 1
+        }
+        return result
+    }
+
+    fun rewrite_receiver_expr(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        // Dispatch to specific rewrite functions to avoid complex match-arm value issues
+        var ek: String = this.classify_receiver_expr(expr)
+        if (ek == "assign") return this.rewrite_recv_assign(expr, fields, methods)
+        if (ek == "variable") return this.rewrite_recv_variable(expr, fields, methods)
+        if (ek == "call") return this.rewrite_recv_call(expr, fields, methods)
+        if (ek == "binary") return this.rewrite_recv_binary(expr, fields, methods)
+        if (ek == "unary") return this.rewrite_recv_unary(expr, fields, methods)
+        if (ek == "method_call") return this.rewrite_recv_method_call(expr, fields, methods)
+        if (ek == "set_field") return this.rewrite_recv_set_field(expr, fields, methods)
+        if (ek == "get_field") return this.rewrite_recv_get_field(expr, fields, methods)
+        if (ek == "index_get") return this.rewrite_recv_index_get(expr, fields, methods)
+        if (ek == "index_set") return this.rewrite_recv_index_set(expr, fields, methods)
+        if (ek == "logical") return this.rewrite_recv_logical(expr, fields, methods)
+        if (ek == "list_lit") return this.rewrite_recv_list_lit(expr, fields, methods)
+        return expr
+    }
+
+    fun classify_receiver_expr(expr: AST.Expr): String {
+        return match (expr) {
+            Assign(n, v) => "assign"
+            Variable(n) => "variable"
+            Call(c, a) => "call"
+            Binary(l, o, r) => "binary"
+            Unary(o, r) => "unary"
+            MethodCall(o, m, a) => "method_call"
+            SetField(o, f, v) => "set_field"
+            GetField(o, f) => "get_field"
+            IndexGet(o, i) => "index_get"
+            IndexSet(o, i, v) => "index_set"
+            Logical(l, o, r) => "logical"
+            ListLit(e) => "list_lit"
+            Lambda(p, r, b) => "lambda"
+            _ => "other"
+        }
+    }
+
+    fun rewrite_recv_assign(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var name: String = match (expr) { Assign(n, v) => n }
+        var value: AST.Expr = match (expr) { Assign(n, v) => v }
+        if (fields.contains(name)) {
+            return AST.Expr.SetField(AST.Expr.This, name, this.rewrite_receiver_expr(value, fields, methods))
+        }
+        return AST.Expr.Assign(name, this.rewrite_receiver_expr(value, fields, methods))
+    }
+
+    fun rewrite_recv_variable(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var name: String = match (expr) { Variable(n) => n }
+        if (fields.contains(name)) {
+            return AST.Expr.GetField(AST.Expr.This, name)
+        }
+        return expr
+    }
+
+    fun rewrite_recv_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var callee: AST.Expr = match (expr) { Call(c, a) => c }
+        var args: List<AST.Expr> = match (expr) { Call(c, a) => a }
+        var callee_name: String = match (callee) {
+            Variable(n) => n
+            _ => ""
+        }
+        var name_ok: Bool = callee_name.length() > 0
+        var in_methods: Bool = methods.contains(callee_name)
+        var is_method: Bool = name_ok and in_methods
+        var result: AST.Expr = expr
+        if (is_method) {
+            var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
+            result = AST.Expr.MethodCall(AST.Expr.This, callee_name, new_args)
+        } else {
+            var new_callee: AST.Expr = this.rewrite_receiver_expr(callee, fields, methods)
+            var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
+            result = AST.Expr.Call(new_callee, new_args)
+        }
+        return result
+    }
+
+    fun rewrite_recv_binary(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var left: AST.Expr = match (expr) { Binary(l, o, r) => l }
+        var op: String = match (expr) { Binary(l, o, r) => o }
+        var right: AST.Expr = match (expr) { Binary(l, o, r) => r }
+        return AST.Expr.Binary(this.rewrite_receiver_expr(left, fields, methods), op, this.rewrite_receiver_expr(right, fields, methods))
+    }
+
+    fun rewrite_recv_unary(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var op: String = match (expr) { Unary(o, r) => o }
+        var right: AST.Expr = match (expr) { Unary(o, r) => r }
+        return AST.Expr.Unary(op, this.rewrite_receiver_expr(right, fields, methods))
+    }
+
+    fun rewrite_recv_method_call(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var obj: AST.Expr = match (expr) { MethodCall(o, m, a) => o }
+        var method: String = match (expr) { MethodCall(o, m, a) => m }
+        var args: List<AST.Expr> = match (expr) { MethodCall(o, m, a) => a }
+        var new_obj: AST.Expr = this.rewrite_receiver_expr(obj, fields, methods)
+        var new_args: List<AST.Expr> = this.rewrite_receiver_exprs(args, fields, methods)
+        return AST.Expr.MethodCall(new_obj, method, new_args)
+    }
+
+    fun rewrite_recv_set_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var obj: AST.Expr = match (expr) { SetField(o, f, v) => o }
+        var field: String = match (expr) { SetField(o, f, v) => f }
+        var value: AST.Expr = match (expr) { SetField(o, f, v) => v }
+        return AST.Expr.SetField(this.rewrite_receiver_expr(obj, fields, methods), field, this.rewrite_receiver_expr(value, fields, methods))
+    }
+
+    fun rewrite_recv_get_field(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var obj: AST.Expr = match (expr) { GetField(o, f) => o }
+        var field: String = match (expr) { GetField(o, f) => f }
+        return AST.Expr.GetField(this.rewrite_receiver_expr(obj, fields, methods), field)
+    }
+
+    fun rewrite_recv_index_get(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var obj: AST.Expr = match (expr) { IndexGet(o, i) => o }
+        var index: AST.Expr = match (expr) { IndexGet(o, i) => i }
+        return AST.Expr.IndexGet(this.rewrite_receiver_expr(obj, fields, methods), this.rewrite_receiver_expr(index, fields, methods))
+    }
+
+    fun rewrite_recv_index_set(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var obj: AST.Expr = match (expr) { IndexSet(o, i, v) => o }
+        var index: AST.Expr = match (expr) { IndexSet(o, i, v) => i }
+        var value: AST.Expr = match (expr) { IndexSet(o, i, v) => v }
+        return AST.Expr.IndexSet(this.rewrite_receiver_expr(obj, fields, methods), this.rewrite_receiver_expr(index, fields, methods), this.rewrite_receiver_expr(value, fields, methods))
+    }
+
+    fun rewrite_recv_logical(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var left: AST.Expr = match (expr) { Logical(l, o, r) => l }
+        var op: String = match (expr) { Logical(l, o, r) => o }
+        var right: AST.Expr = match (expr) { Logical(l, o, r) => r }
+        return AST.Expr.Logical(this.rewrite_receiver_expr(left, fields, methods), op, this.rewrite_receiver_expr(right, fields, methods))
+    }
+
+    fun rewrite_recv_list_lit(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
+        var elements: List<AST.Expr> = match (expr) { ListLit(e) => e }
+        return AST.Expr.ListLit(this.rewrite_receiver_exprs(elements, fields, methods))
+    }
+
+    fun rewrite_receiver_exprs(exprs: List<AST.Expr>, fields: List<String>, methods: List<String>): List<AST.Expr> {
+        var result: List<AST.Expr> = []
+        var i: Float = 0
+        while (i < exprs.length()) {
+            result.push(this.rewrite_receiver_expr(exprs[i], fields, methods))
+            i = i + 1
+        }
+        return result
     }
 
     // --- Report ---

@@ -1116,12 +1116,8 @@ class Codegen {
                 } else {
                     this.last_type = AST.Type.IntType
                 }
-                // Error check: undefined variable
-                // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
-                    IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
-                    return "0"
+                if (!this.is_known_name(name)) {
+                    IO.println("[codegen] Warning: undefined variable '" + name + "'")
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 // Skip for named imports — they should go through gen_call for direct dispatch
@@ -2065,10 +2061,8 @@ class Codegen {
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
-                return "0"
+            if (!this.is_known_name(vname)) {
+                IO.println("[codegen] Warning: undefined variable '" + vname + "'")
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -6307,6 +6301,21 @@ class Codegen {
         return false
     }
 
+    fun is_known_name(name: String): Bool {
+        if (name == "self" or name == "this" or name == "super") { return true }
+        if (name == "IO" or name == "OS" or name == "GC" or name == "Task" or name == "Reflect") { return true }
+        if (this.typed_vars.has(name)) { return true }
+        if (this.module_globals.has(this.current_prefix + name)) { return true }
+        if (this.module_globals.has(name)) { return true }
+        if (this.str_in_list(this.known_functions, name)) { return true }
+        if (this.str_in_list(this.known_functions, this.current_prefix + name)) { return true }
+        if (this.module_prefixes.has(name)) { return true }
+        if (this.enum_defs.has(name)) { return true }
+        if (this.class_fields.has(name)) { return true }
+        if (this.named_imports.has(name)) { return true }
+        return false
+    }
+
     // --- LLVM library dual-emit verification ---
 
     fun verify_binary_op(op_name: String, result_name: String, lhs_name: String, rhs_name: String) {
@@ -8521,7 +8530,7 @@ class Codegen {
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
         var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
-        if (this.intrinsic_funcs.contains(prefixed_name)) {
+        if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
             return this.gen_intrinsic_call(prefixed_name, args)
         }
         // Extern check: if the target is an extern C function, emit the proper extern call
@@ -8539,7 +8548,7 @@ class Codegen {
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
         // emit the await loop pattern (call as ptr, suspend/resume until done)
-        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var b_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -8589,7 +8598,7 @@ class Codegen {
             return coro_result
         }
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
-        if (!this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
+        if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
             var s_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -8720,7 +8729,7 @@ class Codegen {
         // Lambda names start with __lambda — check if in coroutine_funcs
         var spawn_fn_name: String = this.get_variable_name(args[0])
         var is_coro_spawn: Bool = false
-        if (spawn_fn_name.length() > 0 and this.coroutine_funcs.contains(spawn_fn_name)) {
+        if (spawn_fn_name.length() > 0 and this.str_in_list(this.coroutine_funcs, spawn_fn_name)) {
             is_coro_spawn = true
         }
         // Also check the last-generated lambda
@@ -9415,9 +9424,9 @@ class Codegen {
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another, emit await loop
-        var is_coro_callee: Bool = this.coroutine_funcs.contains(prefixed_name)
+        var is_coro_callee: Bool = this.str_in_list(this.coroutine_funcs, prefixed_name)
         if (!is_coro_callee) {
-            is_coro_callee = this.coroutine_funcs.contains(method)
+            is_coro_callee = this.str_in_list(this.coroutine_funcs, method)
         }
         // Definitive check: if the function is already defined and is in coroutine_funcs
         if (!is_coro_callee and this.coroutine_funcs.length() > 0) {

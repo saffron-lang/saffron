@@ -656,6 +656,21 @@
         return false
     }
 
+    fun is_known_name(name: String): Bool {
+        if (name == "self" or name == "this" or name == "super") { return true }
+        if (name == "IO" or name == "OS" or name == "GC" or name == "Task" or name == "Reflect") { return true }
+        if (this.typed_vars.has(name)) { return true }
+        if (this.module_globals.has(this.current_prefix + name)) { return true }
+        if (this.module_globals.has(name)) { return true }
+        if (this.str_in_list(this.known_functions, name)) { return true }
+        if (this.str_in_list(this.known_functions, this.current_prefix + name)) { return true }
+        if (this.module_prefixes.has(name)) { return true }
+        if (this.enum_defs.has(name)) { return true }
+        if (this.class_fields.has(name)) { return true }
+        if (this.named_imports.has(name)) { return true }
+        return false
+    }
+
     // --- LLVM library dual-emit verification ---
 
     fun verify_binary_op(op_name: String, result_name: String, lhs_name: String, rhs_name: String) {

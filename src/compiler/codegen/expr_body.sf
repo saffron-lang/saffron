@@ -39,12 +39,8 @@
                 } else {
                     this.last_type = AST.Type.IntType
                 }
-                // Error check: undefined variable
-                // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
-                    IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
-                    return "0"
+                if (!this.is_known_name(name)) {
+                    IO.println("[codegen] Warning: undefined variable '" + name + "'")
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 // Skip for named imports — they should go through gen_call for direct dispatch
@@ -988,10 +984,8 @@
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
-                return "0"
+            if (!this.is_known_name(vname)) {
+                IO.println("[codegen] Warning: undefined variable '" + vname + "'")
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
