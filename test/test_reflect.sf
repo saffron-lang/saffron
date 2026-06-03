@@ -1,3 +1,13 @@
+//! Test for the Reflect module.
+//!
+//! NOTE: This test requires the codegen to emit per-class reflection helpers.
+//! The codegen changes (class_type_ids, emit_reflect_helpers) need to be
+//! re-applied to stmts_body.sf and output_body.sf for this test to link.
+//! The gc.ll infrastructure (per-class type tags, __gc_get_type_tag) is ready.
+//!
+//! Once codegen changes are in place, run with:
+//!   tools/saffron run test/test_reflect.sf
+
 import "@reflect" as Reflect
 
 class Point {
@@ -21,26 +31,33 @@ class Person {
 // --- fields tests ---
 var p = Point(10, 20)
 var fields = Reflect.fields(p)
-IO.println(fields.get("x"))
-IO.println(fields.get("y"))
+IO.println(fields.get("x"))   // Expected: 10
+IO.println(fields.get("y"))   // Expected: 20
 
 var alice = Person("Alice", 30)
 var alice_fields = Reflect.fields(alice)
-IO.println(alice_fields.get("name"))
-IO.println(alice_fields.get("age"))
+IO.println(alice_fields.get("name"))  // Expected: Alice
+IO.println(alice_fields.get("age"))   // Expected: 30
 
 // --- construct tests ---
 var data = {"name": "Bob", "age": 25}
 var bob = Reflect.construct(Person, data)
-IO.println(bob.name)
-IO.println(bob.age)
+IO.println(bob.name)   // Expected: Bob
+IO.println(bob.age)    // Expected: 25
 
 var pt_data = {"x": 5, "y": 15}
 var pt = Reflect.construct(Point, pt_data)
-IO.println(pt.x)
-IO.println(pt.y)
+IO.println(pt.x)   // Expected: 5
+IO.println(pt.y)    // Expected: 15
 
 // --- number_to_string ---
-IO.println(Reflect.number_to_string(42))
-IO.println(Reflect.number_to_string(0))
-IO.println(Reflect.number_to_string(-5))
+IO.println(Reflect.number_to_string(42))   // Expected: 42
+IO.println(Reflect.number_to_string(0))    // Expected: 0
+IO.println(Reflect.number_to_string(-5))   // Expected: -5
+
+// --- type_name (class instances) ---
+IO.println(Reflect.type_name(p))    // Expected: Point
+
+// --- is_instance ---
+IO.println(Reflect.is_instance(p))     // Expected: true
+IO.println(Reflect.is_instance(42))    // Expected: false

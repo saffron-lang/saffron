@@ -39,13 +39,13 @@
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, ret_type)
+                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.intrinsic_funcs.push(emit_name)
                 } else if (doc.starts_with("@extern:")) {
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, ret_type)
+                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.extern_sigs.set(emit_name, c_sig)
                 } else if (doc.starts_with("@extend:")) {
                     var ext_class: String = doc.slice(8, doc.length())
@@ -265,7 +265,11 @@
                     // Map ChildClass__method to ParentClass__method
                     var child_full: String = name + "__" + mname
                     var parent_full: String = parent + "__" + mname
-                    this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
+                    if (this.func_ret_types.has(parent_full)) {
+                        this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
+                    } else {
+                        this.func_ret_types.set(child_full, this.str_to_type("Int"))
+                    }
                     this.known_functions.push(child_full)
                     // Emit a thin forwarder with proper parameter forwarding
                     var fwd_params_def: String = "i64 %self"
@@ -360,8 +364,8 @@
             var mret: String = this.get_fun_ret(methods[i])
             var full_name: String = name + "__" + mname
             var prefixed_full: String = this.current_prefix + full_name
-            this.func_ret_types.set(prefixed_full, mret)
-            this.func_ret_types.set(full_name, mret)
+            this.func_ret_types.set(prefixed_full, this.str_to_type(mret))
+            this.func_ret_types.set(full_name, this.str_to_type(mret))
             this.known_functions.push(prefixed_full)
             this.known_functions.push(full_name)
             this.func_prefix_map.set(full_name, prefixed_full)
@@ -373,8 +377,8 @@
         if (this.current_prefix.length() > 0) {
             this.known_functions.push(name)
         }
-        this.func_ret_types.set(type_name, name)
-        this.func_ret_types.set(name, name)
+        this.func_ret_types.set(type_name, this.str_to_type(name))
+        this.func_ret_types.set(name, this.str_to_type(name))
 
         // Generate methods as functions with name prefix: ClassName__method
         // Methods get 'self' (i64 pointer to instance) as first param
@@ -471,7 +475,7 @@
         var num_fields: Float = field_list.length()
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
-        this.func_ret_types.set(type_name, type_name)
+        this.func_ret_types.set(type_name, this.str_to_type(type_name))
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
@@ -725,7 +729,7 @@
         this.emit("}")
         this.block_terminated = false
         this.known_functions.push(func_name)
-        this.func_ret_types.set(func_name, "String")
+        this.func_ret_types.set(func_name, this.str_to_type("String"))
     }
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {

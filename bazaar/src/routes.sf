@@ -3,34 +3,29 @@
 import "@http/server" as Http
 import "@json" as JSON
 import "@crypto" as Crypto
-import "./index.sf" as Index
+import "./db.sf" as Db
 import "./storage.sf" as Storage
 import "./auth.sf" as Auth
-import "./search.sf" as Search
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/packages — list all packages
 // ---------------------------------------------------------------------------
 
 fun list_packages(req: Http.Request): Http.Response {
-    var names = Index.list_packages()
-    var packages = []
+    var packages = Db.list_packages()
+    var results = []
     var i = 0
-    while (i < names.length()) {
-        var name = names[i]
-        var entries = Index.load_entry(name)
-        if (entries.length() > 0) {
-            var latest = entries[entries.length() - 1]
-            var info = {}
-            info.set("name", name)
-            info.set("latest", latest.get("vers"))
-            info.set("description", latest.get("description"))
-            packages.push(info)
-        }
+    while (i < packages.length()) {
+        var pkg = packages[i]
+        var info = {}
+        info.set("name", pkg.get("name"))
+        info.set("description", pkg.get("description"))
+        info.set("total_downloads", pkg.get("total_downloads"))
+        results.push(info)
         i = i + 1
     }
     var result = {}
-    result.set("packages", packages)
+    result.set("packages", results)
     return Http.json(JSON.to_string(result))
 }
 
@@ -40,29 +35,33 @@ fun list_packages(req: Http.Request): Http.Response {
 
 fun get_package(req: Http.Request): Http.Response {
     var name = req.param("name")
-    var entries = Index.load_entry(name)
-    if (entries.length() == 0) {
+    var pkg = Db.get_package(name)
+    if (pkg == nil) {
         return Http.not_found()
     }
 
-    var versions = []
+    var versions = Db.get_versions(name)
+    var version_list = []
     var i = 0
-    while (i < entries.length()) {
-        var entry = entries[i]
+    while (i < versions.length()) {
+        var v = versions[i]
         var version_info = {}
-        version_info.set("vers", entry.get("vers"))
-        version_info.set("yanked", entry.get("yanked"))
-        version_info.set("cksum", entry.get("cksum"))
-        if (entry.has("deps")) {
-            version_info.set("deps", entry.get("deps"))
-        }
-        versions.push(version_info)
+        version_info.set("vers", v.get("version"))
+        version_info.set("cksum", v.get("checksum"))
+        version_info.set("yanked", v.get("yanked") == "1")
+        version_info.set("published_by", v.get("published_by"))
+        version_info.set("published_at", v.get("published_at"))
+        version_list.push(version_info)
         i = i + 1
     }
 
     var result = {}
     result.set("name", name)
-    result.set("versions", versions)
+    result.set("description", pkg.get("description"))
+    result.set("repository", pkg.get("repository"))
+    result.set("license", pkg.get("license"))
+    result.set("total_downloads", pkg.get("total_downloads"))
+    result.set("versions", version_list)
     return Http.json(JSON.to_string(result))
 }
 
@@ -77,6 +76,9 @@ fun download_package(req: Http.Request): Http.Response {
     if (!Storage.exists(name, version)) {
         return Http.not_found()
     }
+
+    // Record the download
+    Db.record_download(name, version)
 
     var content = Storage.retrieve(name, version)
     return Http.Response(200, content)
@@ -108,10 +110,6 @@ fun publish_package(req: Http.Request): Http.Response {
 
     var name = body.get("name")
     var version = body.get("vers")
-    var deps = []
-    if (body.has("deps")) {
-        deps = body.get("deps")
-    }
     var tarball_data = body.get("tarball")
 
     if (name == nil or version == nil or tarball_data == nil) {
@@ -119,35 +117,48 @@ fun publish_package(req: Http.Request): Http.Response {
     }
 
     // Check if version already exists
-    var existing = Index.load_entry(name)
-    var i = 0
-    while (i < existing.length()) {
-        if (existing[i].get("vers") == version) {
-            return Http.json(JSON.to_string({"error": "version ${version} already exists"})).status_code(409)
-        }
-        i = i + 1
+    var existing = Db.get_version(name, version)
+    if (existing != nil) {
+        return Http.json(JSON.to_string({"error": "version ${version} already exists"})).status_code(409)
     }
 
-    // Store the tarball
+    // Store the tarball on filesystem
     Storage.store(name, version, tarball_data)
 
     // Compute checksum of the tarball data
     var cksum = "sha256:" + Crypto.sha256(tarball_data)
 
-    // Build the index entry
-    var entry = {}
-    entry.set("name", name)
-    entry.set("vers", version)
-    entry.set("deps", deps)
-    entry.set("cksum", cksum)
-    entry.set("yanked", false)
+    // Get description from body
+    var description = ""
     if (body.has("description")) {
-        entry.set("description", body.get("description"))
+        description = body.get("description")
     }
 
-    // Append to the index and commit
-    Index.append_entry(name, entry)
-    Index.commit("Publish ${name} ${version}")
+    // Get optional metadata
+    var repository = ""
+    if (body.has("repository")) {
+        repository = body.get("repository")
+    }
+    var license = ""
+    if (body.has("license")) {
+        license = body.get("license")
+    }
+
+    // Create the package if it doesn't exist, then publish the version
+    var pkg = Db.get_package(name)
+    if (pkg == nil) {
+        Db.create_package(name, description, repository, license)
+        // Add the publishing user as owner
+        var user_id = Db.ensure_user(username)
+        Db.add_owner(name, user_id)
+    } else {
+        // Update description if provided
+        if (description.length() > 0) {
+            Db.update_package_description(name, description)
+        }
+    }
+
+    Db.publish_version(name, version, cksum, username)
 
     var result = {}
     result.set("ok", true)
@@ -175,29 +186,20 @@ fun yank_package(req: Http.Request): Http.Response {
     var name = req.param("name")
     var version = req.param("version")
 
-    var entries = Index.load_entry(name)
-    if (entries.length() == 0) {
+    // Check package exists
+    var pkg = Db.get_package(name)
+    if (pkg == nil) {
         return Http.not_found()
     }
 
-    // Find the version and mark it as yanked
-    var found = false
-    var i = 0
-    while (i < entries.length()) {
-        if (entries[i].get("vers") == version) {
-            entries[i].set("yanked", true)
-            found = true
-        }
-        i = i + 1
-    }
-
-    if (!found) {
+    // Check version exists
+    var ver = Db.get_version(name, version)
+    if (ver == nil) {
         return Http.json(JSON.to_string({"error": "version not found"})).status_code(404)
     }
 
-    // Rewrite the index file with updated entries
-    Index.rewrite_entry(name, entries)
-    Index.commit("Yank ${name} ${version}")
+    // Mark as yanked
+    Db.yank_version(name, version)
 
     var result = {}
     result.set("ok", true)
@@ -224,7 +226,7 @@ fun search_packages(req: Http.Request): Http.Response {
         i = i + 1
     }
 
-    var results = Search.search_packages(q, 20)
+    var results = Db.search(q, "20")
     var response = {}
     response.set("packages", results)
     return Http.json(JSON.to_string(response))

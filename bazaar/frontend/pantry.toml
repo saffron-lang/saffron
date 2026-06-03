@@ -1,0 +1,11 @@
+[package]
+name = "bazaar-frontend"
+version = "0.1.0"
+entry = "src/main.sf"
+target = "wasm32"
+
+[dependencies]
+turmeric = { path = "../../turmeric" }
+
+[scripts]
+build = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm"

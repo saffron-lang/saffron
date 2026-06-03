@@ -5,6 +5,7 @@ import "@http/server" as Http
 import "@os" as OS
 import "./routes.sf" as Routes
 import "./index.sf" as Index
+import "./db.sf" as Db
 
 fun main() {
     // Determine port from environment or default to 3000
@@ -13,6 +14,9 @@ fun main() {
     if (port_str.length() > 0) {
         port = port_str.to_number()
     }
+
+    // Initialize the database (runs migrations)
+    Db.init()
 
     // Initialize the index directory (git repo) on first run
     Index.init_index()
