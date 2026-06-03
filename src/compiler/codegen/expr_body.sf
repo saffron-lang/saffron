@@ -64,10 +64,6 @@
                         }
                     }
                 }
-                // Module aliases are namespaces, not loadable variables
-                if (this.module_prefixes.has(name) or name == "Reflect") {
-                    return "0"
-                }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
