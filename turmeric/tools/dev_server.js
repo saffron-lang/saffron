@@ -79,7 +79,10 @@ const server = http.createServer((req, res) => {
         if (ext === '.html') {
             content = content.toString().replace('</body>', RELOAD_SCRIPT + '</body>');
         }
-        res.writeHead(200, { 'Content-Type': mime });
+        res.writeHead(200, {
+            'Content-Type': mime,
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+        });
         res.end(content);
     } catch (e) {
         res.writeHead(404);

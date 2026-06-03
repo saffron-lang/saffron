@@ -11,6 +11,7 @@
 @extern("void js_dom_append_child(i64, i64)") fun _tc_append(parent: Float, child: Float)
 @extern("void js_dom_set_attr(i64, void*, void*)") fun _tc_set_attr(handle: Float, name: String, value: String)
 @extern("void js_dom_add_event(i64, void*, i64)") fun _tc_add_event_raw(handle: Float, event: String, callback_id: Float)
+@extern("void js_dom_set_inner_html(i64, void*)") fun _tc_set_html(handle: Float, html: String)
 
 // --- Event callback registry ---
 var _tc_callbacks: List<Any> = []
@@ -95,13 +96,37 @@ fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
 }
 
 // --- Reactive visibility: show/hide element based on signal ---
-// Usage: reactive_show(el, fun () => page.get() == "counter")
+// Usage: reactive_show(el, fun () => if (visible) { return "" } return "display:none")
+// Compute must return "" (show) or "display:none" (hide).
 fun reactive_show(rs_el: Float, rs_compute: Any) {
-    reactive_attr(rs_el, "style", fun (): String => {
-        var show: Bool = rs_compute()
-        if (show) { return "" }
-        return "display:none"
+    var rs_handle: Float = rs_el
+    turmeric_signal_effect(fun () => {
+        var style_val: String = rs_compute()
+        _tc_set_attr(rs_handle, "style", style_val)
     })
+}
+
+// --- Router Outlet: clears & rebuilds children whenever deps change ---
+// Usage:
+//   outlet(fun () => {
+//       var path = page.get()  // triggers re-render on change
+//       if (path == "/counter") { CounterPage() }
+//       else if (path == "/todos") { TodoPage() }
+//   })
+// Creates a container div. The builder is wrapped in an effect — any signal
+// read inside it (e.g. page.get()) becomes a dependency. When it changes,
+// the container is cleared and the builder re-executes.
+fun outlet(out_builder: Any): Float {
+    var out_el: Float = _tc_create("div")
+    var parent: Float = _tc_current()
+    _tc_append(parent, out_el)
+    turmeric_signal_effect(fun () => {
+        _tc_set_html(out_el, "")
+        _tc_push(out_el)
+        out_builder()
+        _tc_pop()
+    })
+    return out_el
 }
 
 // --- Attribute application: maps keys to DOM operations ---
