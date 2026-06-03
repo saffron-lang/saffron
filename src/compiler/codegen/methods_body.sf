@@ -662,7 +662,7 @@
             this.last_type = AST.Type.NilType
             return "0"
         }
-        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file") {
+        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file" or method == "read_stdin" or method == "readline") {
             var io_func: String = "__io_" + method
             if (method == "list_dir") { io_func = "__io_walk_dir" }
             this.called_functions.push(io_func)
