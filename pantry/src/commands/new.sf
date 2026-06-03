@@ -93,12 +93,144 @@ fun _write_gitignore(dir: String) {
     IO.write_file(dir + "/.gitignore", content)
 }
 
+fun _write_cli_manifest(dir: String, name: String) {
+    var content: String = "[package]\n"
+    content = content + "name = \"" + name + "\"\n"
+    content = content + "version = \"0.1.0\"\n"
+    content = content + "description = \"A CLI tool\"\n"
+    content = content + "entry = \"src/main.sf\"\n"
+    content = content + "\n[dependencies]\n"
+    content = content + "\n[scripts]\n"
+    content = content + "build = \"saffron build src/main.sf -o build/" + name + "\"\n"
+    content = content + "test = \"saffron run test/test_main.sf\"\n"
+    IO.write_file(dir + "/pantry.toml", content)
+}
+
+fun _write_cli_main(dir: String, name: String) {
+    var content: String = "//! " + name + " — a command-line tool.\n\n"
+    content = content + "import \"@args\" as Args\n"
+    content = content + "import \"@os\" as OS\n\n"
+    content = content + "fun main() {\n"
+    content = content + "    var parsed: Args.ParsedArgs = Args.parse()\n"
+    content = content + "    var positional: List<String> = parsed.positional\n\n"
+    content = content + "    if (positional.length() == 0 or parsed.flag(\"help\")) {\n"
+    content = content + "        IO.println(\"" + name + " — a CLI tool\")\n"
+    content = content + "        IO.println(\"\")\n"
+    content = content + "        IO.println(\"Usage: " + name + " <command> [options]\")\n"
+    content = content + "        return\n"
+    content = content + "    }\n\n"
+    content = content + "    IO.println(\"Running: \" + positional[0])\n"
+    content = content + "}\n\n"
+    content = content + "main()\n"
+    IO.write_file(dir + "/src/main.sf", content)
+}
+
+fun _write_web_manifest(dir: String, name: String) {
+    var content: String = "[package]\n"
+    content = content + "name = \"" + name + "\"\n"
+    content = content + "version = \"0.1.0\"\n"
+    content = content + "description = \"A web application\"\n"
+    content = content + "entry = \"src/main.sf\"\n"
+    content = content + "target = \"wasm32\"\n"
+    content = content + "\n[dependencies]\n"
+    content = content + "turmeric = { git = \"https://github.com/henry232323/saffron\", path = \"turmeric\" }\n"
+    content = content + "\n[scripts]\n"
+    content = content + "build = \"saffron build --target wasm32 src/main.sf -o build/app.wasm\"\n"
+    content = content + "dev = \"build && cd build && python3 -m http.server 8080\"\n"
+    content = content + "test = \"saffron run test/test_main.sf\"\n"
+    IO.write_file(dir + "/pantry.toml", content)
+}
+
+fun _write_web_main(dir: String, name: String) {
+    var content: String = "//! " + name + " — a web application built with Turmeric.\n\n"
+    content = content + "import \"turmeric\" as UI\n\n"
+    content = content + "var count = UI.signal(0)\n\n"
+    content = content + "var app = UI.div {\n"
+    content = content + "    UI.h1 { UI.text(\"" + name + "\") }\n"
+    content = content + "    UI.p { UI.text(\"Count: \" + count.get().to_string()) }\n"
+    content = content + "    UI.button {\n"
+    content = content + "        UI.text(\"Increment\")\n"
+    content = content + "        UI.on_click(fun () { count.update(fun (n) => n + 1) })\n"
+    content = content + "    }\n"
+    content = content + "}\n\n"
+    content = content + "UI.mount(app)\n"
+    IO.write_file(dir + "/src/main.sf", content)
+}
+
+fun _write_web_index(dir: String, name: String) {
+    OS.exec("mkdir -p " + dir + "/public")
+    var content: String = "<!DOCTYPE html>\n<html>\n<head>\n"
+    content = content + "    <meta charset=\"utf-8\">\n"
+    content = content + "    <title>" + name + "</title>\n"
+    content = content + "    <script src=\"turmeric.js\"></script>\n"
+    content = content + "</head>\n<body>\n"
+    content = content + "    <div id=\"app\"></div>\n"
+    content = content + "    <script type=\"module\">\n"
+    content = content + "        const wasm = await Turmeric.load('./app.wasm');\n"
+    content = content + "        wasm.mount(document.getElementById('app'));\n"
+    content = content + "    </script>\n"
+    content = content + "</body>\n</html>\n"
+    IO.write_file(dir + "/public/index.html", content)
+}
+
+fun _prompt_choice(question: String, options: List<String>): String {
+    IO.println(question)
+    var i: Number = 0
+    while (i < options.length()) {
+        IO.println("  [${i + 1}] ${options[i]}")
+        i = i + 1
+    }
+    IO.print("> ")
+    var input: String = IO.readln().trim()
+
+    // Accept number or name
+    var idx: Number = input.to_number()
+    if (idx > 0 and idx <= options.length()) {
+        return options[idx - 1]
+    }
+    // Try matching by name (case-insensitive prefix)
+    i = 0
+    while (i < options.length()) {
+        if (options[i].to_lower().starts_with(input.to_lower())) {
+            return options[i]
+        }
+        i = i + 1
+    }
+    // Default to first option
+    return options[0]
+}
+
 fun run(name: String, parsed: Args.ParsedArgs) {
     _validate_name(name)
 
     var is_lib: Bool = parsed.flag("lib")
     var no_git: Bool = parsed.flag("no-git")
+    var template: String = parsed.get("template")
     var dir: String = OS.cwd() + "/" + name
+
+    // Interactive setup if no flags given
+    if (!(is_lib) and template == "") {
+        IO.println("")
+        IO.println("Creating project: " + name)
+        IO.println("")
+
+        var project_type: String = _prompt_choice("What kind of project?", [
+            "Application",
+            "Library",
+            "CLI tool",
+            "Web app (turmeric)"
+        ])
+
+        if (project_type == "Library") {
+            is_lib = true
+        } else if (project_type == "CLI tool") {
+            template = "cli"
+        } else if (project_type == "Web app (turmeric)") {
+            template = "web"
+        }
+
+        IO.println("")
+    }
 
     if (OS.file_exists(dir)) {
         IO.println("pantry new: directory '" + name + "' already exists")
@@ -108,12 +240,21 @@ fun run(name: String, parsed: Args.ParsedArgs) {
     OS.exec("mkdir -p " + dir + "/src")
     OS.exec("mkdir -p " + dir + "/test")
 
-    _write_manifest(dir, name, is_lib)
-
-    if (is_lib) {
+    if (template == "cli") {
+        _write_cli_manifest(dir, name)
+        _write_cli_main(dir, name)
+        _write_test_app(dir, name)
+    } else if (template == "web") {
+        _write_web_manifest(dir, name)
+        _write_web_main(dir, name)
+        _write_web_index(dir, name)
+        _write_test_app(dir, name)
+    } else if (is_lib) {
+        _write_manifest(dir, name, true)
         _write_lib(dir, name)
         _write_test_lib(dir, name)
     } else {
+        _write_manifest(dir, name, false)
         _write_main(dir, name)
         _write_test_app(dir, name)
     }
