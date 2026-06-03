@@ -7322,15 +7322,24 @@ class Codegen {
                     }
                 }
                 EnumDecl(pr_ename, pr_variants, pr_edoc) => {
-                    // Register enum variant constructor names
+                    // Register enum variant constructor names AND variant tags
+                    // so that match expressions work regardless of declaration order
+                    var pr_vnames: List<String> = []
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        if (pr_vname.length() > 0 and !this.str_in_list(this.known_functions,pr_vname)) {
-                            this.known_functions.push(pr_vname)
+                        var pr_vfields: String = this.get_variant_fields(pr_variants[pr_vi])
+                        if (pr_vname.length() > 0) {
+                            if (!this.str_in_list(this.known_functions,pr_vname)) {
+                                this.known_functions.push(pr_vname)
+                            }
+                            pr_vnames.push(pr_vname)
+                            this.enum_variant_tags.set(pr_ename + "." + pr_vname, pr_vi)
+                            this.enum_variant_fields.set(pr_ename + "." + pr_vname, pr_vfields)
                         }
                         pr_vi = pr_vi + 1
                     }
+                    this.enum_defs.set(pr_ename, pr_vnames)
                 }
                 VarDecl(n, t, init, d) => {}
                 ExprStmt(e) => {}
@@ -10038,14 +10047,22 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
                 gen.known_functions.push(pr_ename2)
             }
+            var pr_vnames2: List<String> = []
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                if (pr_vname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname2)) {
-                    gen.known_functions.push(pr_vname2)
+                var pr_vfields2: String = gen.get_variant_fields(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0) {
+                    if (!gen.str_in_list(gen.known_functions,pr_vname2)) {
+                        gen.known_functions.push(pr_vname2)
+                    }
+                    pr_vnames2.push(pr_vname2)
+                    gen.enum_variant_tags.set(pr_ename2 + "." + pr_vname2, pr_vi2)
+                    gen.enum_variant_fields.set(pr_ename2 + "." + pr_vname2, pr_vfields2)
                 }
                 pr_vi2 = pr_vi2 + 1
             }
+            gen.enum_defs.set(pr_ename2, pr_vnames2)
         }
         pr_pi = pr_pi + 1
     }
@@ -10490,14 +10507,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         gen.known_functions.push(pr_prefix + pr_ename)
                     }
                 }
+                var pr_vnames: List<String> = []
                 var pr_vi: Float = 0
                 while (pr_vi < pr_variants.length()) {
                     var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
-                    if (pr_vname.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname)) {
-                        gen.known_functions.push(pr_vname)
+                    var pr_vfields: String = gen.get_variant_fields(pr_variants[pr_vi])
+                    if (pr_vname.length() > 0) {
+                        if (!gen.str_in_list(gen.known_functions,pr_vname)) {
+                            gen.known_functions.push(pr_vname)
+                        }
+                        pr_vnames.push(pr_vname)
+                        gen.enum_variant_tags.set(pr_ename + "." + pr_vname, pr_vi)
+                        gen.enum_variant_fields.set(pr_ename + "." + pr_vname, pr_vfields)
                     }
                     pr_vi = pr_vi + 1
                 }
+                gen.enum_defs.set(pr_ename, pr_vnames)
             }
             pr_si = pr_si + 1
         }
@@ -10543,14 +10568,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
                 gen.known_functions.push(pr_ename2)
             }
+            var pr_vnames2: List<String> = []
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                if (pr_vname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname2)) {
-                    gen.known_functions.push(pr_vname2)
+                var pr_vfields2: String = gen.get_variant_fields(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0) {
+                    if (!gen.str_in_list(gen.known_functions,pr_vname2)) {
+                        gen.known_functions.push(pr_vname2)
+                    }
+                    pr_vnames2.push(pr_vname2)
+                    gen.enum_variant_tags.set(pr_ename2 + "." + pr_vname2, pr_vi2)
+                    gen.enum_variant_fields.set(pr_ename2 + "." + pr_vname2, pr_vfields2)
                 }
                 pr_vi2 = pr_vi2 + 1
             }
+            gen.enum_defs.set(pr_ename2, pr_vnames2)
         }
         pr_pi = pr_pi + 1
     }
@@ -11044,14 +11077,22 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
             if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
                 gen.known_functions.push(pr_ename2)
             }
+            var pr_vnames2: List<String> = []
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                if (pr_vname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname2)) {
-                    gen.known_functions.push(pr_vname2)
+                var pr_vfields2: String = gen.get_variant_fields(pr_variants2[pr_vi2])
+                if (pr_vname2.length() > 0) {
+                    if (!gen.str_in_list(gen.known_functions,pr_vname2)) {
+                        gen.known_functions.push(pr_vname2)
+                    }
+                    pr_vnames2.push(pr_vname2)
+                    gen.enum_variant_tags.set(pr_ename2 + "." + pr_vname2, pr_vi2)
+                    gen.enum_variant_fields.set(pr_ename2 + "." + pr_vname2, pr_vfields2)
                 }
                 pr_vi2 = pr_vi2 + 1
             }
+            gen.enum_defs.set(pr_ename2, pr_vnames2)
         }
         pr_pi = pr_pi + 1
     }
