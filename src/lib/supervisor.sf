@@ -1,0 +1,117 @@
+//! Supervisor — monitors spawned tasks and restarts them on crash.
+//!
+//! ```saffron
+//! import "@supervisor" as Sup
+//!
+//! var sup = Sup.Supervisor()
+//! sup.add("server", fun () => serve(), "permanent")
+//! sup.add("worker", fun () => process(), "transient")
+//! sup.start()
+//! ```
+
+class ChildSpec {
+    var name: String
+    var factory: Fun
+    var restart: String
+    var task: Int
+    var running: Bool
+
+    fun init(name: String, factory: Fun, restart: String) {
+        this.name = name
+        this.factory = factory
+        this.restart = restart
+        this.task = 0
+        this.running = false
+    }
+}
+
+class Supervisor {
+    var _children: List<ChildSpec>
+    var _running: Bool
+
+    fun init() {
+        this._children = []
+        this._running = false
+    }
+
+    fun add(name: String, factory: Fun, restart: String) {
+        this._children.push(ChildSpec(name, factory, restart))
+    }
+
+    fun start() {
+        this._running = true
+        var i = 0
+        while (i < this._children.length()) {
+            this._spawn(i)
+            i = i + 1
+        }
+        // Monitor loop — check children each tick
+        var sup = this
+        Task.spawn(fun () => sup._monitor())
+    }
+
+    fun _spawn(idx: Int) {
+        var child: ChildSpec = this._children[idx]
+        var factory = child.factory
+        child.task = Task.spawn(fun () => factory())
+        child.running = true
+    }
+
+    fun _monitor() {
+        while (this._running) {
+            var i = 0
+            while (i < this._children.length()) {
+                var child: ChildSpec = this._children[i]
+                if (child.running and child.task != 0) {
+                    if (child.task.isReady()) {
+                        child.running = false
+                        // Decide whether to restart
+                        if (child.restart == "permanent") {
+                            this._spawn(i)
+                        } else if (child.restart == "transient") {
+                            // Restart only if the result indicates an error
+                            // For now: always restart transient (crash = unexpected exit)
+                            this._spawn(i)
+                        }
+                        // "temporary" — don't restart
+                    }
+                }
+                i = i + 1
+            }
+            yield
+        }
+    }
+
+    fun stop(name: String) {
+        var i = 0
+        while (i < this._children.length()) {
+            if (this._children[i].name == name) {
+                this._children[i].running = false
+                this._children[i].restart = "temporary"
+                return
+            }
+            i = i + 1
+        }
+    }
+
+    fun shutdown() {
+        this._running = false
+        var i = 0
+        while (i < this._children.length()) {
+            this._children[i].running = false
+            i = i + 1
+        }
+    }
+
+    fun children(): List<String> {
+        var names: List<String> = []
+        var i = 0
+        while (i < this._children.length()) {
+            if (this._children[i].running) {
+                names.push(this._children[i].name)
+            }
+            i = i + 1
+        }
+        return names
+    }
+}

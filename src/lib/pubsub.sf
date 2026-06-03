@@ -1,0 +1,90 @@
+//! PubSub — typed publish/subscribe messaging between tasks.
+//!
+//! ```saffron
+//! import "@pubsub" as PubSub
+//!
+//! var bus = PubSub.Bus()
+//! var sub = bus.subscribe("events")
+//!
+//! // In another task:
+//! bus.publish("events", "user:joined")
+//!
+//! var msg = sub.recv()  // blocks until message arrives
+//! ```
+
+import "@sync" as Sync
+
+class Subscription {
+    var _channel: Sync.Channel
+    var _topic: String
+    var _bus: Bus
+
+    fun init(channel: Sync.Channel, topic: String, bus: Bus) {
+        this._channel = channel
+        this._topic = topic
+        this._bus = bus
+    }
+
+    fun recv(): Int {
+        return this._channel.recv()
+    }
+
+    fun try_recv(): Int {
+        return this._channel.try_recv()
+    }
+
+    fun close() {
+        this._bus._unsubscribe(this._topic, this._channel)
+        this._channel.close()
+    }
+}
+
+class Bus {
+    var _topics: Map<String, List<Sync.Channel>>
+
+    fun init() {
+        this._topics = {}
+    }
+
+    fun subscribe(topic: String): Subscription {
+        var ch = Sync.Channel(256)
+        if (!this._topics.has(topic)) {
+            this._topics.set(topic, [])
+        }
+        this._topics.get(topic).push(ch)
+        return Subscription(ch, topic, this)
+    }
+
+    fun publish(topic: String, message: Int) {
+        if (!this._topics.has(topic)) { return }
+        var channels: List<Sync.Channel> = this._topics.get(topic)
+        var i = 0
+        while (i < channels.length()) {
+            channels[i].try_send(message)
+            i = i + 1
+        }
+    }
+
+    fun _unsubscribe(topic: String, channel: Sync.Channel) {
+        if (!this._topics.has(topic)) { return }
+        var channels: List<Sync.Channel> = this._topics.get(topic)
+        var new_channels: List<Sync.Channel> = []
+        var i = 0
+        while (i < channels.length()) {
+            if (channels[i] != channel) {
+                new_channels.push(channels[i])
+            }
+            i = i + 1
+        }
+        this._topics.set(topic, new_channels)
+    }
+
+    fun subscriber_count(topic: String): Int {
+        if (!this._topics.has(topic)) { return 0 }
+        return this._topics.get(topic).length()
+    }
+
+    fun topics(): List<String> {
+        return this._topics.keys()
+    }
+}
