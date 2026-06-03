@@ -74,10 +74,9 @@ Store as Latin-1, UCS-2, or UCS-4 depending on the widest codepoint in the strin
 ### 2.4 Recommendation: UTF-8
 
 Saffron should use **UTF-8 as the sole internal representation**. This matches what the
-LLVM compiler already emits (string constants are `[N x i8]` arrays), what the OS
-provides, and what the C VM's `ObjString` already stores. The key change is semantic:
-operations like `length()`, `char_at()`, and `slice()` will count/index **codepoints**
-rather than bytes.
+LLVM compiler already emits (string constants are `[N x i8]` arrays) and what the OS
+provides. The key change is semantic: operations like `length()`, `char_at()`, and
+`slice()` will count/index **codepoints** rather than bytes.
 
 This is the same choice made by Rust (`str`), Go (`string`), and Swift (backing store),
 and avoids the memory and conversion costs of wider encodings.
@@ -88,7 +87,7 @@ and avoids the memory and conversion costs of wider encodings.
 
 ### 3.1 `length()` — codepoint count
 
-**Current:** Returns `str->length` (byte count).
+**Current:** Returns the byte count of the string.
 **New:** Returns the number of Unicode codepoints (scalar values) in the string.
 
 ```saffron
@@ -104,7 +103,7 @@ the byte length directly.
 
 ### 3.2 `char_at(i)` — codepoint access
 
-**Current:** Returns a 1-byte string (`copyString(&str->chars[index], 1)`).
+**Current:** Returns a 1-byte string at the given byte offset.
 **New:** Returns a String containing the i-th codepoint (1-4 bytes of UTF-8).
 
 ```saffron
@@ -118,7 +117,7 @@ the ASCII flag is set.
 
 ### 3.3 `slice(start, end)` — codepoint range
 
-**Current:** Byte offsets passed to `copyString(str->chars + start, end - start)`.
+**Current:** Byte offsets used directly for substring extraction.
 **New:** Codepoint-based start and end. Returns the substring spanning those codepoints.
 
 ```saffron
@@ -423,30 +422,7 @@ var max = "\u{10FFFF}"          // maximum valid codepoint
 
 ### 6.2 Lexer changes
 
-**C VM scanner (`cvm/scanner.c`):** In the `string()` function, after detecting `\\`,
-add a case for `u`:
-
-```c
-case 'u':
-    if (peek() == '{') {
-        advance(); // skip {
-        // Parse 1-6 hex digits
-        uint32_t codepoint = 0;
-        int digits = 0;
-        while (peek() != '}' && !isAtEnd() && digits < 6) {
-            char c = advance();
-            codepoint = (codepoint << 4) | hexValue(c);
-            digits++;
-        }
-        if (peek() == '}') advance(); // skip }
-        // Encode as UTF-8 into the string buffer
-        encodeUTF8(codepoint, buffer, &bufLen);
-    }
-    break;
-```
-
-**Self-hosted lexer (`src/compiler/lexer.sf`):** In `read_string()`, extend the escape
-handling:
+In `src/compiler/lexer.sf`, extend `read_string()` to handle the `\u{...}` escape:
 
 ```saffron
 else if (esc == "u") {
@@ -594,24 +570,11 @@ New method mappings to add:
 
 The vast majority of strings in typical programs are pure ASCII. We can exploit this:
 
-**Strategy:** Store an `is_ascii` flag in the string metadata. Set it at string
-creation time by scanning for any byte > 0x7F. When the flag is true, all codepoint
-operations become byte operations (O(1) indexing, length = byte_length).
+**Strategy:** At string creation time, scan for any byte > 0x7F. When all bytes are
+ASCII, all codepoint operations become byte operations (O(1) indexing, length =
+byte_length).
 
-For the C VM (`ObjString`), add a field:
-
-```c
-struct ObjString {
-    Obj obj;
-    int length;       // byte length (unchanged)
-    int cpLength;     // codepoint length (cached, -1 = not yet computed)
-    bool isAscii;     // true if all bytes < 0x80
-    char *chars;
-    uint32_t hash;
-};
-```
-
-For the LLVM-compiled path, the runtime functions check the flag:
+The runtime functions check inline:
 
 ```c
 int64_t __str_codepoint_count(int64_t str_val) {
@@ -651,9 +614,8 @@ strings. This is an intentional trade-off:
 ### 8.3 Codepoint length caching
 
 For strings accessed repeatedly, cache the codepoint count after first computation.
-In the C VM, the `cpLength` field stores this. In the LLVM path, consider a side
-table or make `__str_codepoint_count` cache-friendly (likely not needed for Phase 1;
-strings are typically processed once).
+Consider a side table or make `__str_codepoint_count` cache-friendly (likely not
+needed for Phase 1; strings are typically processed once).
 
 ### 8.4 Grapheme cluster segmentation cost
 
@@ -729,21 +691,17 @@ try {
 ### Phase 1: Foundation (lexer + validation + byte_length)
 
 **Scope:**
-- Add `\u{XXXX}` escape to both lexers (C VM scanner, self-hosted lexer)
+- Add `\u{XXXX}` escape to the self-hosted lexer
 - Add `byte_length()` method to strings (trivial — return existing byte count)
 - Add `is_ascii()` method
 - Add UTF-8 validation to `IO.read_file()` and string construction
-- Update `ObjString` to cache `isAscii` flag
 
 **Effort:** ~2 days. No breaking changes. Pure additions.
 
 **Files touched:**
-- `cvm/scanner.c` — `\u{XXXX}` in string scanning
-- `cvm/libc/string.c` — add `byte_length`, `is_ascii` methods
-- `cvm/object.h` / `cvm/object.c` — add `isAscii` flag to `ObjString`
 - `src/compiler/lexer.sf` — `\u{XXXX}` in `read_string()`
 - `src/compiler/codegen/methods_body.sf` — register new builtin methods
-- `runtime/string.c` (new) — `__str_byte_length`, `__str_is_ascii` for LLVM path
+- `runtime/string.c` (new) — `__str_byte_length`, `__str_is_ascii`
 
 ### Phase 2: Codepoint-aware operations
 
@@ -758,8 +716,6 @@ try {
 **Effort:** ~3-4 days. Breaking change to existing semantics.
 
 **Files touched:**
-- `cvm/libc/string.c` — rewrite `stringLength`, `stringCharAt`, `stringSlice`,
-  `stringIndexOf` using UTF-8 decoding
 - `runtime/string.c` — add `__str_codepoint_count`, `__str_char_at_cp`,
   `__str_slice_cp`, `__str_index_of_cp`
 - `src/compiler/codegen/methods_body.sf` — update dispatch to new runtime funcs
@@ -775,8 +731,7 @@ try {
 **Effort:** ~1 week. Requires generating/shipping Unicode data tables.
 
 **Files touched:**
-- `cvm/libc/string.c` — rewrite `stringToUpper`, `stringToLower`, `stringTrim`
-- `runtime/unicode.c` (new) — Unicode property lookups
+- `runtime/unicode.c` (new) — Unicode property lookups, case mapping, trim
 - `runtime/unicode_tables.c` (generated) — compressed UCD tables
 - `src/lib/unicode.sf` (new) — stdlib module
 - `tools/gen_unicode_tables.py` (new) — script to generate tables from UCD
