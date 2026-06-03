@@ -1,28 +1,19 @@
 //! Package search logic for the Bazaar registry.
-//! Simple substring matching on package names and descriptions.
+//! Delegates to the database layer for SQLite LIKE queries.
 
-import "./index.sf" as Index
+import "./db.sf" as Db
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /// Search packages by name or description substring match.
-/// Returns up to `limit` results as a list of maps with {name, version, description}.
+/// Returns up to `limit` results as a list of maps with {name, description, total_downloads}.
 fun search_packages(query: String, limit: Number): List<Map<String, String>> {
     if (query.length() == 0) {
         return []
     }
 
-    var all_results = Index.search(query)
-
-    // Apply limit
-    var results = []
-    var i = 0
-    while (i < all_results.length() and i < limit) {
-        results.push(all_results[i])
-        i = i + 1
-    }
-
-    return results
+    var limit_str = "${limit}"
+    return Db.search(query, limit_str)
 }

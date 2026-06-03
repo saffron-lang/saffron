@@ -25,6 +25,7 @@
 import "@server" as Server
 import "@socket" as Socket
 import "@async" as Async
+import "@ssl" as SSL
 
 // =============================================================================
 // Request
@@ -32,12 +33,14 @@ import "@async" as Async
 
 class Stream {
     var _fd: Int
+    var _tls_conn: Any
     var _headers_sent: Bool
     var _extra_headers: List<String>
     var _extra_values: List<String>
 
     fun init(fd: Int) {
         this._fd = fd
+        this._tls_conn = nil
         this._headers_sent = false
         this._extra_headers = []
         this._extra_values = []
@@ -47,6 +50,14 @@ class Stream {
         this._extra_headers.push(name)
         this._extra_values.push(value)
         return this
+    }
+
+    fun _write_raw(data: String) {
+        if (this._tls_conn != nil) {
+            this._tls_conn.write(data)
+        } else {
+            Socket.write(this._fd, data)
+        }
     }
 
     fun _send_headers() {
@@ -66,26 +77,30 @@ class Stream {
             i = i + 1
         }
         sb.append("\r\n")
-        Socket.write(this._fd, sb.to_string())
+        this._write_raw(sb.to_string())
     }
 
     fun send(data: String) {
         this._send_headers()
-        Socket.write(this._fd, "data: " + data + "\n\n")
+        this._write_raw("data: " + data + "\n\n")
     }
 
     fun send_event(event: String, data: String) {
         this._send_headers()
-        Socket.write(this._fd, "event: " + event + "\ndata: " + data + "\n\n")
+        this._write_raw("event: " + event + "\ndata: " + data + "\n\n")
     }
 
     fun write(raw: String) {
         this._send_headers()
-        Socket.write(this._fd, raw)
+        this._write_raw(raw)
     }
 
     fun close() {
-        Socket.close(this._fd)
+        if (this._tls_conn != nil) {
+            this._tls_conn.close()
+        } else {
+            Socket.close(this._fd)
+        }
     }
 }
 
@@ -98,6 +113,7 @@ class Request {
     var params: Map<String, String>
     var context: Map<String, String>
     var _client_fd: Int
+    var _tls_conn: Any
 
     fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
         this.method = method
@@ -108,6 +124,7 @@ class Request {
         this.params = {}
         this.context = {}
         this._client_fd = 0
+        this._tls_conn = nil
     }
 
     fun param(name: String): String {
@@ -129,6 +146,7 @@ class Request {
 
     fun stream(handler: Fun): Response {
         var s = Stream(this._client_fd)
+        s._tls_conn = this._tls_conn
         handler(s)
         s.close()
         // Return a sentinel response that tells _handle not to write/close
@@ -299,6 +317,7 @@ class App {
     var routes: List<Route>
     var _middlewares: List<Fun>
     var _after_middlewares: List<Fun>
+    var _tls_ctx: Any
 
     fun init(port: Int) {
         this.host = "0.0.0.0"
@@ -306,6 +325,13 @@ class App {
         this.routes = []
         this._middlewares = []
         this._after_middlewares = []
+        this._tls_ctx = nil
+    }
+
+    /// Enable TLS on this server. Pass a SSL.Context created via SSL.server_context().
+    /// When set, all accepted connections will be wrapped with TLS before processing.
+    fun tls(ctx: SSL.Context) {
+        this._tls_ctx = ctx
     }
 
     /// Register a middleware that runs before route handlers.
@@ -343,7 +369,11 @@ class App {
 
     fun serve() {
         var listener = Server.listen(this.host, this.port)
-        IO.println("Listening on http://" + this.host + ":" + this.port.to_string())
+        var proto: String = "http"
+        if (this._tls_ctx != nil) {
+            proto = "https"
+        }
+        IO.println("Listening on " + proto + "://" + this.host + ":" + this.port.to_string())
         while (true) {
             var client: Int = listener.accept()
             if (client >= 0) {
@@ -354,13 +384,39 @@ class App {
     }
 
     fun _handle(client: Int) {
-        var raw: String = Socket.read(client, 8192)
+        var tls_conn: Any = nil
+
+        // If TLS is configured, perform the TLS handshake
+        if (this._tls_ctx != nil) {
+            try {
+                tls_conn = SSL.wrap_server(client, this._tls_ctx)
+            } catch (e) {
+                IO.println("TLS handshake failed: " + e.to_string())
+                Socket.close(client)
+                return
+            }
+        }
+
+        // Read request data
+        var raw: String = ""
+        if (tls_conn != nil) {
+            raw = tls_conn.read(8192)
+        } else {
+            raw = Socket.read(client, 8192)
+        }
+
         if (raw.length() == 0) {
-            Socket.close(client)
+            if (tls_conn != nil) {
+                tls_conn.close()
+            } else {
+                Socket.close(client)
+            }
             return
         }
+
         var req: Request = _parse_request(raw)
         req._client_fd = client
+        req._tls_conn = tls_conn
 
         // Run before-middlewares in order
         var resp: Response = this._run_middlewares(req)
@@ -375,10 +431,16 @@ class App {
         }
 
         if (resp._is_stream) {
-            // req.stream already handled writing + closing
+            // For streams with TLS, set the TLS connection on the stream
+            // (handled via req.stream which creates a Stream with _tls_conn)
         } else {
-            Socket.write(client, _serialize_response(resp))
-            Socket.close(client)
+            if (tls_conn != nil) {
+                tls_conn.write(_serialize_response(resp))
+                tls_conn.close()
+            } else {
+                Socket.write(client, _serialize_response(resp))
+                Socket.close(client)
+            }
         }
     }
 
@@ -444,6 +506,24 @@ class App {
 
 fun server(port: Int): App {
     return App(port)
+}
+
+/// Create a server with TLS enabled.
+/// Shorthand for creating an App and calling .tls() on it.
+///
+/// ```saffron
+/// import "@http/server" as Http
+/// import "@ssl" as SSL
+///
+/// var tls_ctx = SSL.server_context({"cert": "cert.pem", "key": "key.pem"})
+/// var app = Http.server_tls(443, tls_ctx)
+/// app.get("/") { req => Http.text("Hello over HTTPS!") }
+/// app.serve()
+/// ```
+fun server_tls(port: Int, tls_ctx: SSL.Context): App {
+    var app = App(port)
+    app.tls(tls_ctx)
+    return app
 }
 
 /// Create a server with a receiver-closure configuration block.

@@ -1,0 +1,358 @@
+//! Bazaar Frontend — Single-page app for the Saffron package registry
+//! Built with Turmeric (reactive WASM framework)
+
+import { signal, computed, effect, batch } from "turmeric/signal"
+import { div, h1, h2, h3, p, span, input, button, ul, li, a, nav, section, header, footer, form, code, pre } from "turmeric/generated_types"
+import { class_, id, placeholder, href, type_ } from "turmeric/generated_types"
+import { on_click, on_input, on_submit, on_keydown } from "turmeric/generated_types"
+import { text, _el } from "turmeric/element"
+import { Signal } from "turmeric/signal"
+
+// =============================================================================
+// FFI — fetch from the same-origin API
+// =============================================================================
+
+@extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Float)
+
+// Callback registry for fetch responses
+var _fetch_next_id: Float = 0
+var _fetch_callbacks: Map<Float, (String) => Nil> = {}
+
+fun fetch_json(url: String, callback: (String) => Nil) {
+    _fetch_next_id = _fetch_next_id + 1
+    var id: Float = _fetch_next_id
+    _fetch_callbacks.set(id, callback)
+    _fetch_json(url, id)
+}
+
+// Called from JS when fetch completes
+fun __on_fetch_complete(id: Float, json_str: String) {
+    if (_fetch_callbacks.has(id)) {
+        _fetch_callbacks.get(id)(json_str)
+        _fetch_callbacks.set(id, nil)
+    }
+}
+
+// =============================================================================
+// Application State
+// =============================================================================
+
+// Current page: "home", "search", "detail"
+var current_page: Signal<String> = signal("home")
+
+// Search state
+var search_query: Signal<String> = signal("")
+var search_results: Signal<List<Map<String, String>>> = signal([])
+var is_loading: Signal<Bool> = signal(false)
+
+// Package detail state
+var detail_name: Signal<String> = signal("")
+var detail_versions: Signal<List<Map<String, String>>> = signal([])
+var detail_description: Signal<String> = signal("")
+var detail_latest: Signal<String> = signal("")
+
+// Featured packages (loaded on home)
+var featured_packages: Signal<List<Map<String, String>>> = signal([])
+
+// =============================================================================
+// API Calls
+// =============================================================================
+
+fun load_featured() {
+    is_loading.set(true)
+    fetch_json("/api/v1/packages", fun (json_str: String) => {
+        var data: Map<String, Any> = JSON.parse(json_str)
+        if (data != nil and data.has("packages")) {
+            featured_packages.set(data.get("packages"))
+        }
+        is_loading.set(false)
+    })
+}
+
+fun do_search() {
+    var q: String = search_query.get()
+    if (q.length() == 0) {
+        load_featured()
+        current_page.set("home")
+        return
+    }
+    is_loading.set(true)
+    current_page.set("search")
+    fetch_json("/api/v1/search?q=" + q, fun (json_str: String) => {
+        var data: Map<String, Any> = JSON.parse(json_str)
+        if (data != nil and data.has("packages")) {
+            search_results.set(data.get("packages"))
+        }
+        is_loading.set(false)
+    })
+}
+
+fun load_package_detail(name: String) {
+    detail_name.set(name)
+    current_page.set("detail")
+    is_loading.set(true)
+    fetch_json("/api/v1/packages/" + name, fun (json_str: String) => {
+        var data: Map<String, Any> = JSON.parse(json_str)
+        if (data != nil) {
+            detail_name.set(data.get("name"))
+            var versions: List<Map<String, String>> = data.get("versions")
+            detail_versions.set(versions)
+            if (versions.length() > 0) {
+                var latest: Map<String, String> = versions[versions.length() - 1]
+                detail_latest.set(latest.get("vers"))
+                if (latest.has("description")) {
+                    detail_description.set(latest.get("description"))
+                } else {
+                    detail_description.set("")
+                }
+            }
+        }
+        is_loading.set(false)
+    })
+}
+
+fun navigate_home() {
+    current_page.set("home")
+    search_query.set("")
+    load_featured()
+}
+
+// =============================================================================
+// Components
+// =============================================================================
+
+fun PackageCard(pkg: Map<String, String>) {
+    var name: String = pkg.get("name")
+    var version: String = ""
+    if (pkg.has("latest")) { version = pkg.get("latest") }
+    if (pkg.has("vers")) { version = pkg.get("vers") }
+    var description: String = ""
+    if (pkg.has("description")) { description = pkg.get("description") }
+
+    div([class_("package-card")]) {
+        div([class_("card-header")]) {
+            h2([class_("card-title"), on_click(fun (e) => {
+                load_package_detail(name)
+            })]) {
+                text(name)
+            }
+            span([class_("version-badge")]) {
+                text("v" + version)
+            }
+        }
+        if (description.length() > 0) {
+            p([class_("card-description")]) {
+                text(description)
+            }
+        }
+        div([class_("install-command")]) {
+            code([]) {
+                text("pantry add " + name)
+            }
+        }
+    }
+}
+
+fun SearchBar() {
+    form([class_("search-form"), on_submit(fun (e) => {
+        do_search()
+    })]) {
+        div([class_("search-input-wrapper")]) {
+            input([
+                class_("search-input"),
+                type_("text"),
+                placeholder("Search packages..."),
+                on_input(fun (e) => {
+                    search_query.set(e.value)
+                })
+            ]) {}
+            button([class_("search-btn"), type_("submit")]) {
+                text("Search")
+            }
+        }
+    }
+}
+
+fun NavBar() {
+    nav([class_("navbar")]) {
+        div([class_("nav-content")]) {
+            a([class_("nav-brand"), on_click(fun (e) => {
+                navigate_home()
+            })]) {
+                text("Bazaar")
+            }
+            div([class_("nav-links")]) {
+                a([class_("nav-link"), href("https://saffron-lang.org/docs")]) {
+                    text("Docs")
+                }
+                a([class_("nav-link"), href("https://github.com/henry232323/saffron")]) {
+                    text("GitHub")
+                }
+            }
+        }
+    }
+}
+
+fun HomePage() {
+    div([class_("page home-page")]) {
+        header([class_("hero")]) {
+            h1([class_("hero-title")]) {
+                text("Bazaar")
+            }
+            p([class_("hero-subtitle")]) {
+                text("The Saffron package registry")
+            }
+        }
+        SearchBar()
+        section([class_("featured")]) {
+            h3([class_("section-title")]) {
+                text("All Packages")
+            }
+            div([class_("package-list")]) {
+                var pkgs: List<Map<String, String>> = featured_packages.get()
+                var i: Float = 0
+                while (i < pkgs.length()) {
+                    PackageCard(pkgs[i])
+                    i = i + 1
+                }
+                if (pkgs.length() == 0 and !is_loading.get()) {
+                    p([class_("empty-state")]) {
+                        text("No packages published yet. Be the first!")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun SearchResultsPage() {
+    div([class_("page search-page")]) {
+        SearchBar()
+        section([class_("results")]) {
+            h3([class_("section-title")]) {
+                text("Search results for \"" + search_query.get() + "\"")
+            }
+            div([class_("package-list")]) {
+                var pkgs: List<Map<String, String>> = search_results.get()
+                var i: Float = 0
+                while (i < pkgs.length()) {
+                    PackageCard(pkgs[i])
+                    i = i + 1
+                }
+                if (pkgs.length() == 0 and !is_loading.get()) {
+                    p([class_("empty-state")]) {
+                        text("No packages found matching your query.")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun PackageDetailPage() {
+    var name: String = detail_name.get()
+    var latest: String = detail_latest.get()
+    var description: String = detail_description.get()
+    var versions: List<Map<String, String>> = detail_versions.get()
+
+    div([class_("page detail-page")]) {
+        div([class_("detail-header")]) {
+            a([class_("back-link"), on_click(fun (e) => {
+                navigate_home()
+            })]) {
+                text("< Back")
+            }
+            h1([class_("detail-title")]) {
+                text(name)
+            }
+            span([class_("version-badge large")]) {
+                text("v" + latest)
+            }
+        }
+        if (description.length() > 0) {
+            p([class_("detail-description")]) {
+                text(description)
+            }
+        }
+        div([class_("install-section")]) {
+            h3([]) { text("Install") }
+            pre([class_("install-block")]) {
+                code([]) {
+                    text("pantry add " + name)
+                }
+            }
+        }
+        if (versions.length() > 0) {
+            section([class_("versions-section")]) {
+                h3([]) { text("Versions") }
+                ul([class_("version-list")]) {
+                    var i: Float = versions.length() - 1
+                    while (i >= 0) {
+                        var v: Map<String, String> = versions[i]
+                        li([class_("version-item")]) {
+                            span([class_("version-number")]) {
+                                text(v.get("vers"))
+                            }
+                            if (v.has("yanked") and v.get("yanked") == "true") {
+                                span([class_("yanked-badge")]) {
+                                    text("yanked")
+                                }
+                            }
+                        }
+                        i = i - 1
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun LoadingIndicator() {
+    if (is_loading.get()) {
+        div([class_("loading")]) {
+            span([class_("spinner")]) {}
+            text("Loading...")
+        }
+    }
+}
+
+// =============================================================================
+// App Root
+// =============================================================================
+
+fun App() {
+    div([id("bazaar-app")]) {
+        NavBar()
+        div([class_("container")]) {
+            LoadingIndicator()
+            var page: String = current_page.get()
+            if (page == "home") {
+                HomePage()
+            }
+            if (page == "search") {
+                SearchResultsPage()
+            }
+            if (page == "detail") {
+                PackageDetailPage()
+            }
+        }
+        footer([class_("site-footer")]) {
+            p([]) {
+                text("Bazaar -- the Saffron package registry")
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Entry Point
+// =============================================================================
+
+fun main() {
+    // Load featured packages on startup
+    load_featured()
+    // Mount the app
+    App()
+}
+
+main()

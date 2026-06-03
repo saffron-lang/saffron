@@ -1,0 +1,191 @@
+//! Database layer for the Bazaar registry.
+//! Wraps @sqlite to provide a central connection and query helpers.
+
+import "@sqlite" as DB
+import "@os" as OS
+
+/// The shared database connection (initialized by init()).
+var _db: DB.Database = nil
+
+// ---------------------------------------------------------------------------
+// Initialization
+// ---------------------------------------------------------------------------
+
+/// Open the database and run pending migrations.
+/// Uses BAZAAR_DB env var or defaults to "data/bazaar.db".
+fun init() {
+    var db_path = OS.env("BAZAAR_DB")
+    if (db_path.length() == 0) {
+        db_path = "data/bazaar.db"
+    }
+
+    // Ensure data directory exists
+    if (!OS.file_exists("data")) {
+        OS.mkdir("data")
+    }
+
+    _db = DB.open(db_path)
+    DB.migrate(_db, "migrations")
+    IO.println("[db] initialized: ${db_path}")
+}
+
+/// Return the shared database connection.
+fun get_db(): DB.Database {
+    return _db
+}
+
+// ---------------------------------------------------------------------------
+// Package queries
+// ---------------------------------------------------------------------------
+
+/// Get package metadata by name. Returns nil if not found.
+fun get_package(name: String): Map<String, String> {
+    var row = _db.query_one("SELECT name, description, repository, license, created_at, total_downloads FROM packages WHERE name = ?", [name])
+    if (row == nil) {
+        return nil
+    }
+    return row.to_map()
+}
+
+/// List all packages (name, description, total_downloads).
+fun list_packages(): List<Map<String, String>> {
+    var rows = _db.query_all("SELECT name, description, total_downloads FROM packages ORDER BY name", [])
+    var results: List<Map<String, String>> = []
+    var i = 0
+    while (i < rows.length()) {
+        results.push(rows[i].to_map())
+        i = i + 1
+    }
+    return results
+}
+
+/// Create a new package entry.
+fun create_package(name: String, description: String, repository: String, license: String) {
+    _db.exec("INSERT INTO packages (name, description, repository, license) VALUES (?, ?, ?, ?)", [name, description, repository, license])
+}
+
+/// Update package description.
+fun update_package_description(name: String, description: String) {
+    _db.exec("UPDATE packages SET description = ? WHERE name = ?", [description, name])
+}
+
+// ---------------------------------------------------------------------------
+// Version queries
+// ---------------------------------------------------------------------------
+
+/// Get all versions for a package.
+fun get_versions(package_name: String): List<Map<String, String>> {
+    var rows = _db.query_all("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = ? ORDER BY id", [package_name])
+    var results: List<Map<String, String>> = []
+    var i = 0
+    while (i < rows.length()) {
+        results.push(rows[i].to_map())
+        i = i + 1
+    }
+    return results
+}
+
+/// Get a specific version of a package.
+fun get_version(package_name: String, version: String): Map<String, String> {
+    var row = _db.query_one("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = ? AND version = ?", [package_name, version])
+    if (row == nil) {
+        return nil
+    }
+    return row.to_map()
+}
+
+/// Publish a new version.
+fun publish_version(package_name: String, version: String, checksum: String, published_by: String) {
+    _db.exec("INSERT INTO versions (package_name, version, checksum, published_by) VALUES (?, ?, ?, ?)", [package_name, version, checksum, published_by])
+}
+
+/// Mark a version as yanked.
+fun yank_version(package_name: String, version: String) {
+    _db.exec("UPDATE versions SET yanked = 1 WHERE package_name = ? AND version = ?", [package_name, version])
+}
+
+// ---------------------------------------------------------------------------
+// Download tracking
+// ---------------------------------------------------------------------------
+
+/// Record a download event.
+fun record_download(package_name: String, version: String) {
+    _db.exec("INSERT INTO downloads (package_name, version) VALUES (?, ?)", [package_name, version])
+    _db.exec("UPDATE packages SET total_downloads = total_downloads + 1 WHERE name = ?", [package_name])
+}
+
+/// Get download count for a specific version.
+fun get_download_count(package_name: String, version: String): Number {
+    var row = _db.query_one("SELECT count(*) as cnt FROM downloads WHERE package_name = ? AND version = ?", [package_name, version])
+    if (row == nil) {
+        return 0
+    }
+    return row.get_int("cnt")
+}
+
+// ---------------------------------------------------------------------------
+// User / token queries
+// ---------------------------------------------------------------------------
+
+/// Find or create a user by username. Returns the user id as a string.
+fun ensure_user(username: String): String {
+    var row = _db.query_one("SELECT id FROM users WHERE username = ?", [username])
+    if (row != nil) {
+        return row.get("id")
+    }
+    _db.exec("INSERT INTO users (username) VALUES (?)", [username])
+    var new_row = _db.query_one("SELECT id FROM users WHERE username = ?", [username])
+    return new_row.get("id")
+}
+
+/// Store a hashed token for a user.
+fun store_token(token_hash: String, user_id: String) {
+    _db.exec("INSERT INTO tokens (token_hash, user_id) VALUES (?, ?)", [token_hash, user_id])
+}
+
+/// Validate a token hash. Returns the username if valid and not revoked, or "" if invalid.
+fun validate_token_hash(token_hash: String): String {
+    var row = _db.query_one("SELECT u.username FROM tokens t JOIN users u ON t.user_id = u.id WHERE t.token_hash = ? AND t.revoked = 0", [token_hash])
+    if (row == nil) {
+        return ""
+    }
+    return row.get("username")
+}
+
+/// Revoke a token by hash.
+fun revoke_token(token_hash: String) {
+    _db.exec("UPDATE tokens SET revoked = 1 WHERE token_hash = ?", [token_hash])
+}
+
+// ---------------------------------------------------------------------------
+// Ownership queries
+// ---------------------------------------------------------------------------
+
+/// Add an owner to a package.
+fun add_owner(package_name: String, user_id: String) {
+    _db.exec("INSERT OR IGNORE INTO owners (package_name, user_id) VALUES (?, ?)", [package_name, user_id])
+}
+
+/// Check if a user owns a package.
+fun is_owner(package_name: String, user_id: String): Bool {
+    var row = _db.query_one("SELECT 1 as ok FROM owners WHERE package_name = ? AND user_id = ?", [package_name, user_id])
+    return row != nil
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+/// Search packages by name or description substring.
+/// Returns up to `limit` results.
+fun search(query: String, limit: String): List<Map<String, String>> {
+    var pattern = "%" + query + "%"
+    var rows = _db.query_all("SELECT name, description, total_downloads FROM packages WHERE name LIKE ? OR description LIKE ? ORDER BY total_downloads DESC LIMIT ?", [pattern, pattern, limit])
+    var results: List<Map<String, String>> = []
+    var i = 0
+    while (i < rows.length()) {
+        results.push(rows[i].to_map())
+        i = i + 1
+    }
+    return results
+}
