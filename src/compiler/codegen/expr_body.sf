@@ -41,20 +41,20 @@
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
-                if (this.known_functions.contains(name)) {
+                if (this.str_in_list(this.known_functions,name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name)) {
                             return this.gen_func_ref(name)
                         }
                     }
                 }
-                if (this.known_functions.contains(this.current_prefix + name)) {
+                if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name)) {
                             return this.gen_func_ref(this.current_prefix + name)
@@ -472,7 +472,7 @@
                         var full_method: String = left_class + "__" + method_name
                         if (this.func_prefix_map.has(full_method)) {
                             full_method = this.func_prefix_map.get(full_method)
-                        } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                        } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + full_method)) {
                             full_method = this.current_prefix + full_method
                         }
                         this.called_functions.push(full_method)
@@ -689,14 +689,14 @@
             var __vn: String = match (expr) { Variable(n) => n
                 _ => ""
             }
-            if (this.known_functions.contains(__vn)) {
+            if (this.str_in_list(this.known_functions,__vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
                         return this.gen_func_ref(__vn)
                     }
                 }
             }
-            if (this.known_functions.contains(this.current_prefix + __vn)) {
+            if (this.str_in_list(this.known_functions,this.current_prefix + __vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
                         return this.gen_func_ref(this.current_prefix + __vn)
@@ -824,7 +824,7 @@
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
@@ -1102,7 +1102,7 @@
                     var full_method: String = class_name + "__" + method_name
                     if (this.func_prefix_map.has(full_method)) {
                         full_method = this.func_prefix_map.get(full_method)
-                    } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                    } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + full_method)) {
                         full_method = this.current_prefix + full_method
                     }
                     this.called_functions.push(full_method)
@@ -1171,14 +1171,14 @@
         // Named imports take highest priority: explicit user directive
         if (this.named_imports.has(callee_name)) {
             var ni_target: String = this.named_imports.get(callee_name)
-            if (this.known_functions.contains(ni_target)) {
+            if (this.str_in_list(this.known_functions,ni_target)) {
                 resolved_callee = ni_target
             } else {
                 // Trust the named import even if target not yet in known_functions
                 resolved_callee = ni_target
             }
         } else if (this.current_prefix.length() > 0) {
-            if (this.known_functions.contains(this.current_prefix + callee_name)) {
+            if (this.str_in_list(this.known_functions,this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
             }
         }
@@ -1192,7 +1192,7 @@
                 resolved_callee = this.func_prefix_map.get(resolved_callee)
             }
         }
-        if (this.intrinsic_funcs.contains(resolved_callee)) {
+        if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
         }
         if (this.extern_sigs.has(resolved_callee)) {
@@ -1201,8 +1201,8 @@
 
         // Coroutine-calls-coroutine: emit await forwarding pattern
         if (this.is_coroutine) {
-            var is_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
-            if (!is_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+            var is_coro_callee: Bool = this.str_in_list(this.coroutine_funcs,resolved_callee)
+            if (!is_coro_callee and this.str_in_list(this.coroutine_funcs,this.current_prefix + resolved_callee)) {
                 is_coro_callee = true
                 resolved_callee = this.current_prefix + resolved_callee
             }
@@ -1271,8 +1271,8 @@
 
         // Sync-calls-coro: non-coroutine calling a coroutine directly — drive to completion
         if (!this.is_coroutine) {
-            var is_sync_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
-            if (!is_sync_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+            var is_sync_coro_callee: Bool = this.str_in_list(this.coroutine_funcs,resolved_callee)
+            if (!is_sync_coro_callee and this.str_in_list(this.coroutine_funcs,this.current_prefix + resolved_callee)) {
                 is_sync_coro_callee = true
                 resolved_callee = this.current_prefix + resolved_callee
             }
@@ -1351,10 +1351,10 @@
             }
         }
 
-        if (this.known_functions.contains(resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
-            if (callee_name == "main" and this.defined_funcs.contains("__saffron_main")) {
+            if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(resolved_callee)
@@ -1377,16 +1377,16 @@
                 this.emit_indent(instance + " = call i64 @" + resolved_callee + "()")
                 // Call init for user-defined classes (not runtime builtins)
                 var init_name: String = resolved_callee + "__init"
-                if (!this.known_functions.contains(init_name)) {
+                if (!this.str_in_list(this.known_functions,init_name)) {
                     init_name = callee_name + "__init"
                 }
                 // Resolve via func_prefix_map (class methods are emitted with module prefix)
                 if (this.func_prefix_map.has(init_name)) {
                     init_name = this.func_prefix_map.get(init_name)
-                } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + init_name)) {
+                } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + init_name)) {
                     init_name = this.current_prefix + init_name
                 }
-                if (this.known_functions.contains(init_name)) {
+                if (this.str_in_list(this.known_functions,init_name)) {
                     var init_args: List<String> = []
                     init_args.push("i64 " + instance)
                     var i: Float = 0
@@ -1631,8 +1631,8 @@
             // Named imports take priority over all other resolution
             if (this.named_imports.has(callee_name)) {
                 emit_callee = this.named_imports.get(callee_name)
-            } else if (!this.known_functions.contains(emit_callee)) {
-                if (this.known_functions.contains(callee_name)) {
+            } else if (!this.str_in_list(this.known_functions,emit_callee)) {
+                if (this.str_in_list(this.known_functions,callee_name)) {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)

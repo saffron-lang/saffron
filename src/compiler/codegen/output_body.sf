@@ -13,7 +13,7 @@
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) {
+        if (this.str_in_list(this.defined_funcs,emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
 
 
@@ -212,7 +212,7 @@
         this.func_param_names.set(emit_name, pnames_list)
 
         // Check if this function is a coroutine (direct or transitive)
-        var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        var is_coro: Bool = this.str_in_list(this.coroutine_funcs,emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
         if (!is_coro) {
             // Check if body calls any known coroutine (transitive)
@@ -221,7 +221,7 @@
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 } else {
@@ -241,7 +241,7 @@
                 bci = bci + 1
             }
         }
-        if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
+        if (is_coro and !this.str_in_list(this.coroutine_funcs,emit_name)) {
             this.coroutine_funcs.push(emit_name)
         }
         this.is_coroutine = is_coro
@@ -552,10 +552,10 @@
                 FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
-                        if (!this.known_functions.contains(pr_emit)) {
+                        if (!this.str_in_list(this.known_functions,pr_emit)) {
                             this.known_functions.push(pr_emit)
                         }
-                        if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
+                        if (this.current_prefix.length() > 0 and !this.str_in_list(this.known_functions,pr_name)) {
                             this.known_functions.push(pr_name)
                         }
                     }
@@ -566,10 +566,10 @@
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
-                    if (!this.known_functions.contains(pr_type_name)) {
+                    if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)
                     }
-                    if (!this.known_functions.contains(pr_cname)) {
+                    if (!this.str_in_list(this.known_functions,pr_cname)) {
                         this.known_functions.push(pr_cname)
                     }
                     // Register all method names as ClassName__method
@@ -579,10 +579,10 @@
                         if (pr_mname.length() > 0) {
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = this.current_prefix + pr_full
-                            if (!this.known_functions.contains(pr_full)) {
+                            if (!this.str_in_list(this.known_functions,pr_full)) {
                                 this.known_functions.push(pr_full)
                             }
-                            if (!this.known_functions.contains(pr_prefixed)) {
+                            if (!this.str_in_list(this.known_functions,pr_prefixed)) {
                                 this.known_functions.push(pr_prefixed)
                             }
                         }
@@ -594,7 +594,7 @@
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        if (pr_vname.length() > 0 and !this.known_functions.contains(pr_vname)) {
+                        if (pr_vname.length() > 0 and !this.str_in_list(this.known_functions,pr_vname)) {
                             this.known_functions.push(pr_vname)
                         }
                         pr_vi = pr_vi + 1
@@ -829,7 +829,7 @@
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
         // Runtime error helpers (bodies in runtime.ll)
-        if (!this.defined_funcs.contains("__runtime_error")) {
+        if (!this.str_in_list(this.defined_funcs,"__runtime_error")) {
             out.append("declare i64 @__division_error()\n")
             out.append("declare i64 @__null_pointer_error()\n")
             out.append("declare i64 @__runtime_error(i64)\n")
@@ -884,7 +884,7 @@
         var ci: Float = 0
         while (ci < this.called_functions.length()) {
             var cfname: String = this.called_functions[ci]
-            if (!this.known_functions.contains(cfname) and !declared.contains(cfname) and !this.defined_funcs.contains(cfname)) {
+            if (!this.str_in_list(this.known_functions,cfname) and !this.str_in_list(declared,cfname) and !this.str_in_list(this.defined_funcs,cfname)) {
                 var arity: Float = 1
                 if (this.called_function_arity.has(cfname)) {
                     arity = this.called_function_arity.get(cfname)
@@ -908,7 +908,7 @@
         // Only emit C main wrapper for native targets (not WASM).
         // For WASM, _start is provided by wasm_base.ll / wasm_base_32.ll and calls __saffron_entry.
         if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
-            if (this.defined_funcs.contains("__saffron_main") or has_top_level) {
+            if (this.str_in_list(this.defined_funcs,"__saffron_main") or has_top_level) {
                 out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
                 out.append("entry:\n")
                 out.append("  store i32 %argc, i32* @__argc\n")
@@ -916,11 +916,11 @@
                 if (has_top_level and entry_is_coro) {
                     // Async main: entry is a coroutine — enqueue and run scheduler
                     var enqueue_fn: String = "stdlib_scheduler_enqueue"
-                    if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                    if (this.str_in_list(this.known_functions,"stdlib_scheduler_enqueue")) {
                         enqueue_fn = "stdlib_scheduler_enqueue"
                     }
                     var sched_fn: String = "stdlib_scheduler_scheduler_run"
-                    if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                    if (this.str_in_list(this.known_functions,"stdlib_scheduler_scheduler_run")) {
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
@@ -939,14 +939,14 @@
                         out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
                         mi3 = mi3 + 1
                     }
-                    if (this.coroutine_funcs.contains("__saffron_main")) {
+                    if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) {
                         // Async main: __saffron_main is a coroutine — enqueue and run scheduler
                         var enqueue_fn2: String = "stdlib_scheduler_enqueue"
-                        if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                        if (this.str_in_list(this.known_functions,"stdlib_scheduler_enqueue")) {
                             enqueue_fn2 = "stdlib_scheduler_enqueue"
                         }
                         var sched_fn2: String = "stdlib_scheduler_scheduler_run"
-                        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                        if (this.str_in_list(this.known_functions,"stdlib_scheduler_scheduler_run")) {
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
@@ -968,3 +968,4 @@
     }
 
     // @codegen-split: methods
+

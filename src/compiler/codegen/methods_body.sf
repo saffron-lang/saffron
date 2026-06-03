@@ -1341,7 +1341,59 @@
             IO.println("[codegen] Warning: dispatching 'contains' on untyped value (type inference failed)")
         }
         var contains_arg_type: String = this.get_expr_type(args[0])
-        if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
+        // Check for List/Map FIRST to avoid gen3 string-comparison misrouting
+        if (obj_type.starts_with("List") or obj_type.starts_with("Map")) {
+            var val: String = this.gen_arg_value(args[0])
+            var list_ptr: String = obj
+            var list_len: String = this.fresh_local()
+            this.emit_indent(list_len + " = call i64 @__list_length(i64 " + list_ptr + ")")
+            var idx_alloca: String = this.fresh_local()
+            this.emit_indent(idx_alloca + " = alloca i64")
+            this.emit_indent("store i64 0, i64* " + idx_alloca)
+            var loop_lbl: String = this.fresh_label("contains.loop")
+            var body_lbl: String = this.fresh_label("contains.body")
+            var found_lbl: String = this.fresh_label("contains.found")
+            var next_lbl: String = this.fresh_label("contains.next")
+            var done_lbl: String = this.fresh_label("contains.done")
+            this.emit_terminator("br label %" + loop_lbl)
+            this.start_block(loop_lbl)
+            var idx_val: String = this.fresh_local()
+            this.emit_indent(idx_val + " = load i64, i64* " + idx_alloca)
+            var cmp_cond: String = this.fresh_local()
+            this.emit_indent(cmp_cond + " = icmp slt i64 " + idx_val + ", " + list_len)
+            this.emit_terminator("br i1 " + cmp_cond + ", label %" + body_lbl + ", label %" + done_lbl)
+            this.start_block(body_lbl)
+            var elem: String = this.fresh_local()
+            this.emit_indent(elem + " = call i64 @__list_get(i64 " + list_ptr + ", i64 " + idx_val + ")")
+            var eq_result: String = this.fresh_local()
+            var list_elem_type: String = "Any"
+            if (obj_type.starts_with("List<") and obj_type.ends_with(">")) {
+                list_elem_type = obj_type.slice(5, obj_type.length() - 1)
+            }
+            if (list_elem_type == "String" or contains_arg_type == "String") {
+                this.emit_indent(eq_result + " = call i64 @__string_eq(i64 " + elem + ", i64 " + val + ")")
+            } else {
+                var icmp_eq: String = this.fresh_local()
+                this.emit_indent(icmp_eq + " = icmp eq i64 " + elem + ", " + val)
+                this.emit_indent(eq_result + " = zext i1 " + icmp_eq + " to i64")
+            }
+            var is_found: String = this.fresh_local()
+            this.emit_indent(is_found + " = icmp ne i64 " + eq_result + ", 0")
+            this.emit_terminator("br i1 " + is_found + ", label %" + found_lbl + ", label %" + next_lbl)
+            this.start_block(next_lbl)
+            var next_idx: String = this.fresh_local()
+            this.emit_indent(next_idx + " = add i64 " + idx_val + ", 1")
+            this.emit_indent("store i64 " + next_idx + ", i64* " + idx_alloca)
+            this.emit_terminator("br label %" + loop_lbl)
+            this.start_block(found_lbl)
+            this.emit_terminator("br label %" + done_lbl)
+            this.start_block(done_lbl)
+            var phi_val: String = this.fresh_local()
+            this.emit_indent(phi_val + " = phi i64 [1, %" + found_lbl + "], [0, %" + loop_lbl + "]")
+            var result: String = this.emit_tag_bool(phi_val)
+            this.last_type = AST.Type.BoolType
+            return result
+        } else if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
             var str_ptr: String = this.emit_untag_ptr(obj)
             var needle: String = this.gen_arg_value(args[0])

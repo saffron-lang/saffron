@@ -705,10 +705,10 @@ class Codegen {
             var ts_method: String = ts_class + "__to_string"
             if (this.func_prefix_map.has(ts_method)) {
                 ts_method = this.func_prefix_map.get(ts_method)
-            } else if (this.known_functions.contains(this.current_prefix + ts_method)) {
+            } else if (this.str_in_list(this.known_functions,this.current_prefix + ts_method)) {
                 ts_method = this.current_prefix + ts_method
             }
-            if (this.known_functions.contains(ts_method)) {
+            if (this.str_in_list(this.known_functions,ts_method)) {
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
                 return result
@@ -1108,20 +1108,20 @@ class Codegen {
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
-                if (this.known_functions.contains(name)) {
+                if (this.str_in_list(this.known_functions,name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name)) {
                             return this.gen_func_ref(name)
                         }
                     }
                 }
-                if (this.known_functions.contains(this.current_prefix + name)) {
+                if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                     if (!this.typed_vars.has(name)) {
                         if (!this.module_globals.has(this.current_prefix + name)) {
                             return this.gen_func_ref(this.current_prefix + name)
@@ -1539,7 +1539,7 @@ class Codegen {
                         var full_method: String = left_class + "__" + method_name
                         if (this.func_prefix_map.has(full_method)) {
                             full_method = this.func_prefix_map.get(full_method)
-                        } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                        } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + full_method)) {
                             full_method = this.current_prefix + full_method
                         }
                         this.called_functions.push(full_method)
@@ -1756,14 +1756,14 @@ class Codegen {
             var __vn: String = match (expr) { Variable(n) => n
                 _ => ""
             }
-            if (this.known_functions.contains(__vn)) {
+            if (this.str_in_list(this.known_functions,__vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
                         return this.gen_func_ref(__vn)
                     }
                 }
             }
-            if (this.known_functions.contains(this.current_prefix + __vn)) {
+            if (this.str_in_list(this.known_functions,this.current_prefix + __vn)) {
                 if (!this.typed_vars.has(__vn)) {
                     if (!this.module_globals.has(this.current_prefix + __vn)) {
                         return this.gen_func_ref(this.current_prefix + __vn)
@@ -1891,7 +1891,7 @@ class Codegen {
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
@@ -2169,7 +2169,7 @@ class Codegen {
                     var full_method: String = class_name + "__" + method_name
                     if (this.func_prefix_map.has(full_method)) {
                         full_method = this.func_prefix_map.get(full_method)
-                    } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + full_method)) {
+                    } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + full_method)) {
                         full_method = this.current_prefix + full_method
                     }
                     this.called_functions.push(full_method)
@@ -2238,14 +2238,14 @@ class Codegen {
         // Named imports take highest priority: explicit user directive
         if (this.named_imports.has(callee_name)) {
             var ni_target: String = this.named_imports.get(callee_name)
-            if (this.known_functions.contains(ni_target)) {
+            if (this.str_in_list(this.known_functions,ni_target)) {
                 resolved_callee = ni_target
             } else {
                 // Trust the named import even if target not yet in known_functions
                 resolved_callee = ni_target
             }
         } else if (this.current_prefix.length() > 0) {
-            if (this.known_functions.contains(this.current_prefix + callee_name)) {
+            if (this.str_in_list(this.known_functions,this.current_prefix + callee_name)) {
                 resolved_callee = this.current_prefix + callee_name
             }
         }
@@ -2259,7 +2259,7 @@ class Codegen {
                 resolved_callee = this.func_prefix_map.get(resolved_callee)
             }
         }
-        if (this.intrinsic_funcs.contains(resolved_callee)) {
+        if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
             return this.gen_intrinsic_call(resolved_callee, args)
         }
         if (this.extern_sigs.has(resolved_callee)) {
@@ -2268,8 +2268,8 @@ class Codegen {
 
         // Coroutine-calls-coroutine: emit await forwarding pattern
         if (this.is_coroutine) {
-            var is_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
-            if (!is_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+            var is_coro_callee: Bool = this.str_in_list(this.coroutine_funcs,resolved_callee)
+            if (!is_coro_callee and this.str_in_list(this.coroutine_funcs,this.current_prefix + resolved_callee)) {
                 is_coro_callee = true
                 resolved_callee = this.current_prefix + resolved_callee
             }
@@ -2338,8 +2338,8 @@ class Codegen {
 
         // Sync-calls-coro: non-coroutine calling a coroutine directly — drive to completion
         if (!this.is_coroutine) {
-            var is_sync_coro_callee: Bool = this.coroutine_funcs.contains(resolved_callee)
-            if (!is_sync_coro_callee and this.coroutine_funcs.contains(this.current_prefix + resolved_callee)) {
+            var is_sync_coro_callee: Bool = this.str_in_list(this.coroutine_funcs,resolved_callee)
+            if (!is_sync_coro_callee and this.str_in_list(this.coroutine_funcs,this.current_prefix + resolved_callee)) {
                 is_sync_coro_callee = true
                 resolved_callee = this.current_prefix + resolved_callee
             }
@@ -2418,10 +2418,10 @@ class Codegen {
             }
         }
 
-        if (this.known_functions.contains(resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
-            if (callee_name == "main" and this.defined_funcs.contains("__saffron_main")) {
+            if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(resolved_callee)
@@ -2444,16 +2444,16 @@ class Codegen {
                 this.emit_indent(instance + " = call i64 @" + resolved_callee + "()")
                 // Call init for user-defined classes (not runtime builtins)
                 var init_name: String = resolved_callee + "__init"
-                if (!this.known_functions.contains(init_name)) {
+                if (!this.str_in_list(this.known_functions,init_name)) {
                     init_name = callee_name + "__init"
                 }
                 // Resolve via func_prefix_map (class methods are emitted with module prefix)
                 if (this.func_prefix_map.has(init_name)) {
                     init_name = this.func_prefix_map.get(init_name)
-                } else if (this.current_prefix.length() > 0 and this.known_functions.contains(this.current_prefix + init_name)) {
+                } else if (this.current_prefix.length() > 0 and this.str_in_list(this.known_functions,this.current_prefix + init_name)) {
                     init_name = this.current_prefix + init_name
                 }
-                if (this.known_functions.contains(init_name)) {
+                if (this.str_in_list(this.known_functions,init_name)) {
                     var init_args: List<String> = []
                     init_args.push("i64 " + instance)
                     var i: Float = 0
@@ -2698,8 +2698,8 @@ class Codegen {
             // Named imports take priority over all other resolution
             if (this.named_imports.has(callee_name)) {
                 emit_callee = this.named_imports.get(callee_name)
-            } else if (!this.known_functions.contains(emit_callee)) {
-                if (this.known_functions.contains(callee_name)) {
+            } else if (!this.str_in_list(this.known_functions,emit_callee)) {
+                if (this.str_in_list(this.known_functions,callee_name)) {
                     emit_callee = callee_name
                 } else if (this.func_prefix_map.has(callee_name)) {
                     emit_callee = this.func_prefix_map.get(callee_name)
@@ -3477,7 +3477,7 @@ class Codegen {
             this.collect_calls_from_stmts(body, lambda_calls)
             var lci: Float = 0
             while (lci < lambda_calls.length()) {
-                if (this.coroutine_funcs.contains(lambda_calls[lci]) or this.coroutine_funcs.contains(this.current_prefix + lambda_calls[lci])) {
+                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci])) {
                     this.coroutine_funcs.push(lambda_name)
                     lci = lambda_calls.length()
                 }
@@ -3554,7 +3554,7 @@ class Codegen {
             // Store fn ptr
             var num_params: Float = param_names.length() + 1
             var ret_ty: String = "i64"
-            if (this.coroutine_funcs.contains(lambda_name)) { ret_ty = "ptr" }
+            if (this.str_in_list(this.coroutine_funcs,lambda_name)) { ret_ty = "ptr" }
             var fn_type_str: String = ret_ty + " ("
             var ti: Float = 0
             while (ti < num_params) {
@@ -3621,7 +3621,7 @@ class Codegen {
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
         var nocap_ret_ty: String = "i64"
-        if (this.coroutine_funcs.contains(lambda_name)) { nocap_ret_ty = "ptr" }
+        if (this.str_in_list(this.coroutine_funcs,lambda_name)) { nocap_ret_ty = "ptr" }
         var fn_type_str: String = nocap_ret_ty + " ("
         var tti: Float = 0
         while (tti < num_total_params) {
@@ -3661,7 +3661,7 @@ class Codegen {
         this.current_ret_type = ret_llvm
 
         // Check if this closure is a coroutine
-        var is_coro: Bool = this.coroutine_funcs.contains(name)
+        var is_coro: Bool = this.str_in_list(this.coroutine_funcs,name)
         if (is_coro) {
             this.is_coroutine = true
         }
@@ -3756,7 +3756,7 @@ class Codegen {
         i = 0
         while (i < var_names.length()) {
             var vname: String = var_names[i]
-            if (!captures.contains(vname)) {
+            if (!this.str_in_list(captures,vname)) {
                 this.emit_indent("%" + this.sanitize_name(vname) + " = alloca " + this.llvm_type(var_types[i]))
             }
             i = i + 1
@@ -3851,13 +3851,13 @@ class Codegen {
     fun find_free_vars_expr(expr: AST.Expr, bound: List<String>, free: List<String>) {
         match (expr) {
             Variable(name) => {
-                if (bound.contains(name) or free.contains(name)) {
+                if (this.str_in_list(bound,name) or this.str_in_list(free,name)) {
                     // Already bound or already free — skip
                 } else if (this.typed_vars.has(name) and !this.module_globals.has(name) and !this.module_globals.has(this.current_prefix + name)) {
                     // Local variable in enclosing scope shadows any function of same name
                     free.push(name)
                 } else {
-                    var is_known: Bool = this.known_functions.contains(name) or this.known_functions.contains(this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
+                    var is_known: Bool = this.str_in_list(this.known_functions,name) or this.str_in_list(this.known_functions,this.current_prefix + name) or this.func_prefix_map.has(name) or this.func_ret_types.has(name) or this.class_fields.has(name) or this.enum_defs.has(name) or this.enum_variant_tags.has(name) or this.module_prefixes.has(name) or this.named_imports.has(name) or this.module_globals.has(name) or this.module_globals.has(this.current_prefix + name)
                     if (!is_known and name.length() > 0) {
                         var upper: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                         if (upper.index_of(name.char_at(0)) >= 0) {
@@ -3894,7 +3894,7 @@ class Codegen {
                             var ci4: Float = 0
                             while (ci4 < cap_list.length()) {
                                 var cn: String = cap_list[ci4]
-                                if (!bound.contains(cn) and !free.contains(cn)) {
+                                if (!this.str_in_list(bound,cn) and !this.str_in_list(free,cn)) {
                                     free.push(cn)
                                 }
                                 ci4 = ci4 + 1
@@ -3905,7 +3905,7 @@ class Codegen {
             }
             Assign(name, value) => {
                 this.find_free_vars_expr(value, bound, free)
-                if (!bound.contains(name) and !free.contains(name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
+                if (!this.str_in_list(bound,name) and !this.str_in_list(free,name) and (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name))) {
                     free.push(name)
                 }
             }
@@ -3997,7 +3997,7 @@ class Codegen {
                 while (fi < inner_free.length()) {
                     var fv: String = inner_free[fi]
                     // Skip module globals — they are accessed via @__g_ not local capture
-                    if (!bound.contains(fv) and !free.contains(fv) and !inner_bound.contains(fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
+                    if (!this.str_in_list(bound,fv) and !this.str_in_list(free,fv) and !this.str_in_list(inner_bound,fv) and !this.module_globals.has(fv) and !this.module_globals.has(this.current_prefix + fv)) {
                         free.push(fv)
                     }
                     fi = fi + 1
@@ -4021,7 +4021,7 @@ class Codegen {
                 }
             }
             This => {
-                if (!bound.contains("self") and !free.contains("self")) {
+                if (!this.str_in_list(bound,"self") and !this.str_in_list(free,"self")) {
                     free.push("self")
                 }
             }
@@ -4504,7 +4504,7 @@ class Codegen {
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
-                if (!child_methods.contains(mname) and mname != "init") {
+                if (!this.str_in_list(child_methods,mname) and mname != "init") {
                     // Register parent method as callable on child
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
@@ -4541,7 +4541,7 @@ class Codegen {
                 var pi: Int = 0
                 while (pi < parent_methods.length()) {
                     var required: String = parent_methods[pi]
-                    if (required != "init" and !child_methods.contains(required)) {
+                    if (required != "init" and !this.str_in_list(child_methods,required)) {
                         IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
                     }
                     pi = pi + 1
@@ -4577,7 +4577,7 @@ class Codegen {
 
         // Emit struct type: { i64 field0, i64 field1, ... }
         var num_fields: Float = field_list.length()
-        if (!this.register_only and !this.known_functions.contains("__type_" + type_name)) {
+        if (!this.register_only and !this.str_in_list(this.known_functions,"__type_" + type_name)) {
             this.known_functions.push("__type_" + type_name)
             var field_types_str: String = ""
             var fi: Float = 0
@@ -4718,7 +4718,7 @@ class Codegen {
         this.known_functions.push(type_name)
         this.func_ret_types.set(type_name, type_name)
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(type_name)) { return }
+        if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
         this.emit("")
         var ctor_linkage: String = "define linkonce_odr"
@@ -4776,7 +4776,7 @@ class Codegen {
             i = i + 1
         }
         this.enum_defs.set(name, variant_names)
-        if (!this.register_only and !this.known_functions.contains("__type_" + name)) {
+        if (!this.register_only and !this.str_in_list(this.known_functions,"__type_" + name)) {
             this.known_functions.push("__type_" + name)
             this.type_defs.append("%" + name + " = type { i8, [16 x i8] }\n")
         }
@@ -4804,7 +4804,7 @@ class Codegen {
 
     fun emit_enum_to_string(name: String, variants: List<AST.Variant>) {
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(name + "__to_string")) { return }
+        if (this.str_in_list(this.defined_funcs,name + "__to_string")) { return }
         this.defined_funcs.push(name + "__to_string")
         var max_fields: Float = this.get_max_fields(name)
         var func_name: String = name + "__to_string"
@@ -4975,7 +4975,7 @@ class Codegen {
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(vname)) { return }
+        if (this.str_in_list(this.defined_funcs,vname)) { return }
         this.defined_funcs.push(vname)
         var parts: List<String> = this.split_respecting_generics(fields_str, ",")
         var num_fields: Float = parts.length()
@@ -5095,7 +5095,7 @@ class Codegen {
             _ => ""
         }
         if (vdoc.starts_with("@import:")) { return }
-        if (!this.typed_vars.has(vname) and !this.known_functions.contains("__alloc_" + vname)) {
+        if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
         }
@@ -5409,7 +5409,7 @@ class Codegen {
         var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)"]
         var di: Float = 0
         while (di < names.length()) {
-            if (!this.defined_funcs.contains(names[di])) {
+            if (!this.str_in_list(this.defined_funcs,names[di])) {
                 rt.append("declare " + sigs[di] + "\n")
             }
             di = di + 1
@@ -6013,7 +6013,7 @@ class Codegen {
                     while (mpi < mp_keys.length()) {
                         var mp_prefix: String = this.module_prefixes.get(mp_keys[mpi])
                         var mp_name: String = mp_prefix + name
-                        if (!this.coroutine_funcs.contains(mp_name)) {
+                        if (!this.str_in_list(this.coroutine_funcs,mp_name)) {
                             this.coroutine_funcs.push(mp_name)
                         }
                         mpi = mpi + 1
@@ -6030,14 +6030,14 @@ class Codegen {
             var fi: Float = 0
             while (fi < func_names.length()) {
                 var fn_name: String = func_names[fi]
-                if (!this.coroutine_funcs.contains(fn_name)) {
+                if (!this.str_in_list(this.coroutine_funcs,fn_name)) {
                     var calls: List<String> = []
                     this.collect_calls_from_stmts(func_bodies[fi], calls)
                     var ci: Float = 0
                     while (ci < calls.length()) {
                         var callee: String = calls[ci]
                         // Check both bare name and prefixed name
-                        if (this.coroutine_funcs.contains(callee) or this.coroutine_funcs.contains(this.current_prefix + callee)) {
+                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee)) {
                             this.coroutine_funcs.push(fn_name)
                             changed = true
                             ci = calls.length()
@@ -6048,6 +6048,15 @@ class Codegen {
                 fi = fi + 1
             }
         }
+    }
+
+    fun str_in_list(lst: List<String>, needle: String): Bool {
+        var __sil_i: Float = 0
+        while (__sil_i < lst.length()) {
+            if (lst[__sil_i] == needle) { return true }
+            __sil_i = __sil_i + 1
+        }
+        return false
     }
 
     // --- Statement codegen ---
@@ -6068,7 +6077,7 @@ class Codegen {
             this.func_prefix_map.set(name, emit_name)
         }
         if (this.register_only) { return }
-        if (this.defined_funcs.contains(emit_name)) {
+        if (this.str_in_list(this.defined_funcs,emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
 
 
@@ -6267,7 +6276,7 @@ class Codegen {
         this.func_param_names.set(emit_name, pnames_list)
 
         // Check if this function is a coroutine (direct or transitive)
-        var is_coro: Bool = this.coroutine_funcs.contains(emit_name)
+        var is_coro: Bool = this.str_in_list(this.coroutine_funcs,emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
         if (!is_coro) {
             // Check if body calls any known coroutine (transitive)
@@ -6276,7 +6285,7 @@ class Codegen {
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.coroutine_funcs.contains(bc) or this.coroutine_funcs.contains(this.current_prefix + bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 } else {
@@ -6296,7 +6305,7 @@ class Codegen {
                 bci = bci + 1
             }
         }
-        if (is_coro and !this.coroutine_funcs.contains(emit_name)) {
+        if (is_coro and !this.str_in_list(this.coroutine_funcs,emit_name)) {
             this.coroutine_funcs.push(emit_name)
         }
         this.is_coroutine = is_coro
@@ -6607,10 +6616,10 @@ class Codegen {
                 FunDecl(pr_name, pr_params, pr_ret, pr_body, pr_doc) => {
                     if (pr_name.length() > 0) {
                         var pr_emit: String = this.current_prefix + pr_name
-                        if (!this.known_functions.contains(pr_emit)) {
+                        if (!this.str_in_list(this.known_functions,pr_emit)) {
                             this.known_functions.push(pr_emit)
                         }
-                        if (this.current_prefix.length() > 0 and !this.known_functions.contains(pr_name)) {
+                        if (this.current_prefix.length() > 0 and !this.str_in_list(this.known_functions,pr_name)) {
                             this.known_functions.push(pr_name)
                         }
                     }
@@ -6621,10 +6630,10 @@ class Codegen {
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
-                    if (!this.known_functions.contains(pr_type_name)) {
+                    if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)
                     }
-                    if (!this.known_functions.contains(pr_cname)) {
+                    if (!this.str_in_list(this.known_functions,pr_cname)) {
                         this.known_functions.push(pr_cname)
                     }
                     // Register all method names as ClassName__method
@@ -6634,10 +6643,10 @@ class Codegen {
                         if (pr_mname.length() > 0) {
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = this.current_prefix + pr_full
-                            if (!this.known_functions.contains(pr_full)) {
+                            if (!this.str_in_list(this.known_functions,pr_full)) {
                                 this.known_functions.push(pr_full)
                             }
-                            if (!this.known_functions.contains(pr_prefixed)) {
+                            if (!this.str_in_list(this.known_functions,pr_prefixed)) {
                                 this.known_functions.push(pr_prefixed)
                             }
                         }
@@ -6649,7 +6658,7 @@ class Codegen {
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        if (pr_vname.length() > 0 and !this.known_functions.contains(pr_vname)) {
+                        if (pr_vname.length() > 0 and !this.str_in_list(this.known_functions,pr_vname)) {
                             this.known_functions.push(pr_vname)
                         }
                         pr_vi = pr_vi + 1
@@ -6884,7 +6893,7 @@ class Codegen {
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
         // Runtime error helpers (bodies in runtime.ll)
-        if (!this.defined_funcs.contains("__runtime_error")) {
+        if (!this.str_in_list(this.defined_funcs,"__runtime_error")) {
             out.append("declare i64 @__division_error()\n")
             out.append("declare i64 @__null_pointer_error()\n")
             out.append("declare i64 @__runtime_error(i64)\n")
@@ -6939,7 +6948,7 @@ class Codegen {
         var ci: Float = 0
         while (ci < this.called_functions.length()) {
             var cfname: String = this.called_functions[ci]
-            if (!this.known_functions.contains(cfname) and !declared.contains(cfname) and !this.defined_funcs.contains(cfname)) {
+            if (!this.str_in_list(this.known_functions,cfname) and !this.str_in_list(declared,cfname) and !this.str_in_list(this.defined_funcs,cfname)) {
                 var arity: Float = 1
                 if (this.called_function_arity.has(cfname)) {
                     arity = this.called_function_arity.get(cfname)
@@ -6963,7 +6972,7 @@ class Codegen {
         // Only emit C main wrapper for native targets (not WASM).
         // For WASM, _start is provided by wasm_base.ll / wasm_base_32.ll and calls __saffron_entry.
         if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
-            if (this.defined_funcs.contains("__saffron_main") or has_top_level) {
+            if (this.str_in_list(this.defined_funcs,"__saffron_main") or has_top_level) {
                 out.append("\ndefine i32 @main(i32 %argc, i8** %argv) {\n")
                 out.append("entry:\n")
                 out.append("  store i32 %argc, i32* @__argc\n")
@@ -6971,11 +6980,11 @@ class Codegen {
                 if (has_top_level and entry_is_coro) {
                     // Async main: entry is a coroutine — enqueue and run scheduler
                     var enqueue_fn: String = "stdlib_scheduler_enqueue"
-                    if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                    if (this.str_in_list(this.known_functions,"stdlib_scheduler_enqueue")) {
                         enqueue_fn = "stdlib_scheduler_enqueue"
                     }
                     var sched_fn: String = "stdlib_scheduler_scheduler_run"
-                    if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                    if (this.str_in_list(this.known_functions,"stdlib_scheduler_scheduler_run")) {
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
@@ -6994,14 +7003,14 @@ class Codegen {
                         out.append("  call i64 @" + this.module_init_names[mi3] + "()\n")
                         mi3 = mi3 + 1
                     }
-                    if (this.coroutine_funcs.contains("__saffron_main")) {
+                    if (this.str_in_list(this.coroutine_funcs,"__saffron_main")) {
                         // Async main: __saffron_main is a coroutine — enqueue and run scheduler
                         var enqueue_fn2: String = "stdlib_scheduler_enqueue"
-                        if (this.known_functions.contains("stdlib_scheduler_enqueue")) {
+                        if (this.str_in_list(this.known_functions,"stdlib_scheduler_enqueue")) {
                             enqueue_fn2 = "stdlib_scheduler_enqueue"
                         }
                         var sched_fn2: String = "stdlib_scheduler_scheduler_run"
-                        if (this.known_functions.contains("stdlib_scheduler_scheduler_run")) {
+                        if (this.str_in_list(this.known_functions,"stdlib_scheduler_scheduler_run")) {
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
@@ -7023,6 +7032,7 @@ class Codegen {
     }
 
     // @codegen-split: methods
+
     // @codegen-split: methods
     fun find_class_for_method(method: String): String {
     var keys: List<String> = this.class_methods.keys()
@@ -8367,7 +8377,59 @@ class Codegen {
             IO.println("[codegen] Warning: dispatching 'contains' on untyped value (type inference failed)")
         }
         var contains_arg_type: String = this.get_expr_type(args[0])
-        if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
+        // Check for List/Map FIRST to avoid gen3 string-comparison misrouting
+        if (obj_type.starts_with("List") or obj_type.starts_with("Map")) {
+            var val: String = this.gen_arg_value(args[0])
+            var list_ptr: String = obj
+            var list_len: String = this.fresh_local()
+            this.emit_indent(list_len + " = call i64 @__list_length(i64 " + list_ptr + ")")
+            var idx_alloca: String = this.fresh_local()
+            this.emit_indent(idx_alloca + " = alloca i64")
+            this.emit_indent("store i64 0, i64* " + idx_alloca)
+            var loop_lbl: String = this.fresh_label("contains.loop")
+            var body_lbl: String = this.fresh_label("contains.body")
+            var found_lbl: String = this.fresh_label("contains.found")
+            var next_lbl: String = this.fresh_label("contains.next")
+            var done_lbl: String = this.fresh_label("contains.done")
+            this.emit_terminator("br label %" + loop_lbl)
+            this.start_block(loop_lbl)
+            var idx_val: String = this.fresh_local()
+            this.emit_indent(idx_val + " = load i64, i64* " + idx_alloca)
+            var cmp_cond: String = this.fresh_local()
+            this.emit_indent(cmp_cond + " = icmp slt i64 " + idx_val + ", " + list_len)
+            this.emit_terminator("br i1 " + cmp_cond + ", label %" + body_lbl + ", label %" + done_lbl)
+            this.start_block(body_lbl)
+            var elem: String = this.fresh_local()
+            this.emit_indent(elem + " = call i64 @__list_get(i64 " + list_ptr + ", i64 " + idx_val + ")")
+            var eq_result: String = this.fresh_local()
+            var list_elem_type: String = "Any"
+            if (obj_type.starts_with("List<") and obj_type.ends_with(">")) {
+                list_elem_type = obj_type.slice(5, obj_type.length() - 1)
+            }
+            if (list_elem_type == "String" or contains_arg_type == "String") {
+                this.emit_indent(eq_result + " = call i64 @__string_eq(i64 " + elem + ", i64 " + val + ")")
+            } else {
+                var icmp_eq: String = this.fresh_local()
+                this.emit_indent(icmp_eq + " = icmp eq i64 " + elem + ", " + val)
+                this.emit_indent(eq_result + " = zext i1 " + icmp_eq + " to i64")
+            }
+            var is_found: String = this.fresh_local()
+            this.emit_indent(is_found + " = icmp ne i64 " + eq_result + ", 0")
+            this.emit_terminator("br i1 " + is_found + ", label %" + found_lbl + ", label %" + next_lbl)
+            this.start_block(next_lbl)
+            var next_idx: String = this.fresh_local()
+            this.emit_indent(next_idx + " = add i64 " + idx_val + ", 1")
+            this.emit_indent("store i64 " + next_idx + ", i64* " + idx_alloca)
+            this.emit_terminator("br label %" + loop_lbl)
+            this.start_block(found_lbl)
+            this.emit_terminator("br label %" + done_lbl)
+            this.start_block(done_lbl)
+            var phi_val: String = this.fresh_local()
+            this.emit_indent(phi_val + " = phi i64 [1, %" + found_lbl + "], [0, %" + loop_lbl + "]")
+            var result: String = this.emit_tag_bool(phi_val)
+            this.last_type = AST.Type.BoolType
+            return result
+        } else if (obj_type == "String" or (obj_type == "Any" and contains_arg_type == "String")) {
             var str_ptr: String = this.fresh_local()
             var str_ptr: String = this.emit_untag_ptr(obj)
             var needle: String = this.gen_arg_value(args[0])
@@ -9152,10 +9214,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 var pr_fname: String = gen.get_fun_name(pr_stmts[pr_si])
                 if (pr_fname.length() > 0) {
                     var pr_emit: String = pr_prefix + pr_fname
-                    if (!gen.known_functions.contains(pr_emit)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_emit)) {
                         gen.known_functions.push(pr_emit)
                     }
-                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                    if (pr_prefix.length() > 0 and !gen.str_in_list(gen.known_functions,pr_fname)) {
                         gen.known_functions.push(pr_fname)
                     }
                 }
@@ -9168,10 +9230,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     if (pr_prefix.length() > 0) {
                         pr_type_name = pr_prefix + pr_cname
                     }
-                    if (!gen.known_functions.contains(pr_type_name)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_type_name)) {
                         gen.known_functions.push(pr_type_name)
                     }
-                    if (!gen.known_functions.contains(pr_cname)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
                     var pr_methods: List<AST.Stmt> = match (pr_stmts[pr_si]) { ClassDecl(n, p, f, m, d) => m
@@ -9183,10 +9245,10 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                         if (pr_mname.length() > 0) {
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = pr_prefix + pr_full
-                            if (!gen.known_functions.contains(pr_full)) {
+                            if (!gen.str_in_list(gen.known_functions,pr_full)) {
                                 gen.known_functions.push(pr_full)
                             }
-                            if (!gen.known_functions.contains(pr_prefixed)) {
+                            if (!gen.str_in_list(gen.known_functions,pr_prefixed)) {
                                 gen.known_functions.push(pr_prefixed)
                             }
                         }
@@ -9201,17 +9263,17 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
-                    if (!gen.known_functions.contains(pr_ename)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_ename)) {
                         gen.known_functions.push(pr_ename)
                     }
-                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                    if (pr_prefix.length() > 0 and !gen.str_in_list(gen.known_functions,pr_prefix + pr_ename)) {
                         gen.known_functions.push(pr_prefix + pr_ename)
                     }
                 }
                 var pr_vi: Float = 0
                 while (pr_vi < pr_variants.length()) {
                     var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
-                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                    if (pr_vname.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname)) {
                         gen.known_functions.push(pr_vname)
                     }
                     pr_vi = pr_vi + 1
@@ -9227,14 +9289,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         var pr_pk: String = gen.classify_stmt(program[pr_pi])
         if (pr_pk == "fun") {
             var pr_fname2: String = gen.get_fun_name(program[pr_pi])
-            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+            if (pr_fname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_fname2)) {
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
             var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
                 _ => ""
             }
-            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+            if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
             var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
@@ -9245,7 +9307,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
                 if (pr_mname2.length() > 0) {
                     var pr_full2: String = pr_cname2 + "__" + pr_mname2
-                    if (!gen.known_functions.contains(pr_full2)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_full2)) {
                         gen.known_functions.push(pr_full2)
                     }
                 }
@@ -9258,13 +9320,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
                 _ => []
             }
-            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+            if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
                 gen.known_functions.push(pr_ename2)
             }
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                if (pr_vname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname2)) {
                     gen.known_functions.push(pr_vname2)
                 }
                 pr_vi2 = pr_vi2 + 1
@@ -9656,10 +9718,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 var pr_fname: String = gen.get_fun_name(all_stmts[pr_si])
                 if (pr_fname.length() > 0) {
                     var pr_emit: String = pr_prefix + pr_fname
-                    if (!gen.known_functions.contains(pr_emit)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_emit)) {
                         gen.known_functions.push(pr_emit)
                     }
-                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_fname)) {
+                    if (pr_prefix.length() > 0 and !gen.str_in_list(gen.known_functions,pr_fname)) {
                         gen.known_functions.push(pr_fname)
                     }
                 }
@@ -9672,10 +9734,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     if (pr_prefix.length() > 0) {
                         pr_type_name = pr_prefix + pr_cname
                     }
-                    if (!gen.known_functions.contains(pr_type_name)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_type_name)) {
                         gen.known_functions.push(pr_type_name)
                     }
-                    if (!gen.known_functions.contains(pr_cname)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_cname)) {
                         gen.known_functions.push(pr_cname)
                     }
                     // Register all method names as ClassName__method
@@ -9688,10 +9750,10 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         if (pr_mname.length() > 0) {
                             var pr_full: String = pr_cname + "__" + pr_mname
                             var pr_prefixed: String = pr_prefix + pr_full
-                            if (!gen.known_functions.contains(pr_full)) {
+                            if (!gen.str_in_list(gen.known_functions,pr_full)) {
                                 gen.known_functions.push(pr_full)
                             }
-                            if (!gen.known_functions.contains(pr_prefixed)) {
+                            if (!gen.str_in_list(gen.known_functions,pr_prefixed)) {
                                 gen.known_functions.push(pr_prefixed)
                             }
                         }
@@ -9706,17 +9768,17 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     _ => []
                 }
                 if (pr_ename.length() > 0) {
-                    if (!gen.known_functions.contains(pr_ename)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_ename)) {
                         gen.known_functions.push(pr_ename)
                     }
-                    if (pr_prefix.length() > 0 and !gen.known_functions.contains(pr_prefix + pr_ename)) {
+                    if (pr_prefix.length() > 0 and !gen.str_in_list(gen.known_functions,pr_prefix + pr_ename)) {
                         gen.known_functions.push(pr_prefix + pr_ename)
                     }
                 }
                 var pr_vi: Float = 0
                 while (pr_vi < pr_variants.length()) {
                     var pr_vname: String = gen.get_variant_name(pr_variants[pr_vi])
-                    if (pr_vname.length() > 0 and !gen.known_functions.contains(pr_vname)) {
+                    if (pr_vname.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname)) {
                         gen.known_functions.push(pr_vname)
                     }
                     pr_vi = pr_vi + 1
@@ -9732,14 +9794,14 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         var pr_pk: String = gen.classify_stmt(program[pr_pi])
         if (pr_pk == "fun") {
             var pr_fname2: String = gen.get_fun_name(program[pr_pi])
-            if (pr_fname2.length() > 0 and !gen.known_functions.contains(pr_fname2)) {
+            if (pr_fname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_fname2)) {
                 gen.known_functions.push(pr_fname2)
             }
         } else if (pr_pk == "class") {
             var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
                 _ => ""
             }
-            if (pr_cname2.length() > 0 and !gen.known_functions.contains(pr_cname2)) {
+            if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
             var pr_methods2: List<AST.Stmt> = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => m
@@ -9750,7 +9812,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 var pr_mname2: String = gen.get_fun_name(pr_methods2[pr_mj2])
                 if (pr_mname2.length() > 0) {
                     var pr_full2: String = pr_cname2 + "__" + pr_mname2
-                    if (!gen.known_functions.contains(pr_full2)) {
+                    if (!gen.str_in_list(gen.known_functions,pr_full2)) {
                         gen.known_functions.push(pr_full2)
                     }
                 }
@@ -9763,13 +9825,13 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             var pr_variants2: List<AST.Variant> = match (program[pr_pi]) { EnumDecl(n, v, d) => v
                 _ => []
             }
-            if (pr_ename2.length() > 0 and !gen.known_functions.contains(pr_ename2)) {
+            if (pr_ename2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_ename2)) {
                 gen.known_functions.push(pr_ename2)
             }
             var pr_vi2: Float = 0
             while (pr_vi2 < pr_variants2.length()) {
                 var pr_vname2: String = gen.get_variant_name(pr_variants2[pr_vi2])
-                if (pr_vname2.length() > 0 and !gen.known_functions.contains(pr_vname2)) {
+                if (pr_vname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_vname2)) {
                     gen.known_functions.push(pr_vname2)
                 }
                 pr_vi2 = pr_vi2 + 1
