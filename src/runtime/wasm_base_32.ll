@@ -76,12 +76,28 @@ entry:
   %mask = and i32 %aligned, -8
   ; Load current heap pointer (i32)
   %heap = load i32, i32* @__heap_ptr
-  %ptr = inttoptr i32 %heap to i8*
   ; Bump heap pointer
   %new_heap = add i32 %heap, %mask
+  ; Grow memory if needed: check if new_heap exceeds current memory size
+  %mem_pages = call i32 @llvm.wasm.memory.size.i32(i32 0)
+  %mem_bytes = mul i32 %mem_pages, 65536
+  %needs_grow = icmp ugt i32 %new_heap, %mem_bytes
+  br i1 %needs_grow, label %grow, label %done
+grow:
+  ; Calculate pages needed: (new_heap - mem_bytes + 65535) / 65536
+  %deficit = sub i32 %new_heap, %mem_bytes
+  %deficit_plus = add i32 %deficit, 65535
+  %pages_needed = udiv i32 %deficit_plus, 65536
+  %grow_result = call i32 @llvm.wasm.memory.grow.i32(i32 0, i32 %pages_needed)
+  br label %done
+done:
   store i32 %new_heap, i32* @__heap_ptr
+  %ptr = inttoptr i32 %heap to i8*
   ret i8* %ptr
 }
+
+declare i32 @llvm.wasm.memory.size.i32(i32)
+declare i32 @llvm.wasm.memory.grow.i32(i32, i32)
 
 define i8* @calloc(i64 %num, i64 %size) {
 entry:
@@ -254,6 +270,49 @@ entry:
 }
 
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
+
+; --- String Equality ---
+; __string_eq: Fast string equality check.
+;   1. Pointer equality (O(1) — same literal or same interned string)
+;   2. Falls back to strcmp for dynamically-created strings
+; Returns 1 (equal) or 0 (not equal) as i64.
+
+define i64 @__string_eq(i64 %a, i64 %b) {
+entry:
+  ; Fast path: same pointer = same string
+  %same = icmp eq i64 %a, %b
+  br i1 %same, label %equal, label %slow
+
+slow:
+  ; Null checks: if either is 0, they're not equal (already checked pointer eq)
+  %a_null = icmp eq i64 %a, 0
+  br i1 %a_null, label %not_equal, label %check_b
+
+check_b:
+  %b_null = icmp eq i64 %b, 0
+  br i1 %b_null, label %not_equal, label %do_strcmp
+
+do_strcmp:
+  ; Fall back to byte-by-byte comparison
+  %a_ptr = inttoptr i64 %a to i8*
+  %b_ptr = inttoptr i64 %b to i8*
+  %cmp = call i32 @strcmp(i8* %a_ptr, i8* %b_ptr)
+  %is_eq = icmp eq i32 %cmp, 0
+  br i1 %is_eq, label %equal, label %not_equal
+
+equal:
+  ret i64 1
+not_equal:
+  ret i64 0
+}
+
+; __string_ne: Fast string inequality (complement of __string_eq)
+define i64 @__string_ne(i64 %a, i64 %b) {
+entry:
+  %eq = call i64 @__string_eq(i64 %a, i64 %b)
+  %ne = xor i64 %eq, 1
+  ret i64 %ne
+}
 
 ; --- I/O Dispatch ---
 
@@ -864,6 +923,14 @@ entry:
   %buf_ptr = inttoptr i64 %buf_addr to i64*
   store i64 %buf, i64* %buf_ptr
   ret i64 %sb
+}
+
+; __gc_alloc_safe: allocate without triggering GC (wasm32: just malloc)
+define i64 @__gc_alloc_safe(i64 %size, i64 %type_tag) {
+entry:
+  %ptr = call i8* @malloc(i64 %size)
+  %r = ptrtoint i8* %ptr to i64
+  ret i64 %r
 }
 
 ; __gc_string_alloc: allocate a string buffer
