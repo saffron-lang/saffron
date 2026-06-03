@@ -7,17 +7,126 @@ import { Event } from "turmeric/events"
 import "turmeric/router" as Router
 ```
 
-Turmeric is a reactive web framework for Saffron that compiles to WebAssembly. It uses fine-grained signal-based reactivity and a builder DSL to produce fast, small web apps with no virtual DOM.
+Turmeric is a reactive web framework for Saffron that compiles to WebAssembly. It uses fine-grained signal-based reactivity and inline HTML syntax to produce fast, small web apps with no virtual DOM.
 
 ## Overview
 
+- **Inline HTML syntax** -- write `<div class="card">...</div>` directly in `.sf` files (JSX-like, recommended)
 - **Signal reactivity** -- surgical DOM updates via `signal`, `computed`, and `effect`
-- **Builder syntax** -- `div(cls="card") { children }` using trailing closures and named args
 - **Typed events** -- `Event` enum with `Click`, `Input`, `KeyDown`, etc.
 - **All HTML elements** -- 112 typed element functions generated from the DOM spec
 - **Client-side router** -- hash or history mode with route params
 - **CSS utilities** -- `cx()` conditional classes, scoped styles, CSS variables
 - **WASM target** -- compiles to < 40KB `.wasm` with a tiny JS loader
+
+## Inline HTML Syntax (Recommended)
+
+Turmeric supports JSX-like inline HTML directly in `.sf` files. No special file extension is needed -- the SFX transform handles it at compile time. This is the preferred way to write Turmeric apps:
+
+```saffron
+import { signal } from "turmeric/signal"
+import { Event } from "turmeric/events"
+
+fun Counter() {
+    var count = signal(0)
+
+    <div class="counter">
+        <h1>Count: {count.get()}</h1>
+        <button on_click={fun (e: Event) => count.update(fun (n) => n + 1)}>
+            Increment
+        </button>
+    </div>
+}
+
+mount("#app", Counter)
+```
+
+### Syntax rules
+
+| Feature | Syntax | Example |
+|---------|--------|---------|
+| Open/close tags | `<tag>...</tag>` | `<div>...</div>` |
+| Attributes | `name="value"` | `<div class="card" id="main">` |
+| Event handlers | `on_event={expr}` | `<button on_click={fun (e: Event) => ...}>` |
+| Dynamic content | `{expression}` | `<span>{count.get()}</span>` |
+| Self-closing tags | `<tag />` | `<input />`, `<br />`, `<img />` |
+| Components | `{Component(args)}` | `{NavBar()}` |
+
+### Conditional rendering
+
+```saffron
+<div>
+    {if (is_logged_in.get()) {
+        <p>Welcome back!</p>
+    }}
+</div>
+```
+
+### List rendering
+
+```saffron
+<ul>
+    {var i: Float = 0
+    while (i < items.length()) {
+        <li>{items[i]}</li>
+        i = i + 1
+    }}
+</ul>
+```
+
+### Attributes and events
+
+Use standard HTML attribute names (`class`, `id`, `href`, etc.) and `on_*` for event handlers:
+
+```saffron
+<input
+    class="px-4 py-2 border rounded"
+    type="text"
+    placeholder="Search..."
+    on_input={fun (e: Event) => query.set(e.target_value)}
+/>
+
+<a class="text-blue-500" href="/about" on_click={fun (e: Event) => navigate("/about")}>
+    About
+</a>
+```
+
+### Component composition
+
+Components are functions -- call them inside `{...}` blocks:
+
+```saffron
+fun App() {
+    <div class="min-h-screen">
+        {NavBar()}
+        <main>
+            {router.render()}
+        </main>
+        {Footer()}
+    </div>
+}
+```
+
+## Function Call Syntax (Alternative)
+
+Turmeric also supports a builder DSL using trailing closures and named args. This was the original syntax and still works:
+
+```saffron
+fun Counter() {
+    var count = signal(0)
+
+    div(cls="counter") {
+        h1 { reactive(fun () => "Count: " + count.get().to_string()) }
+        button(cls="btn", on_click=fun (e: Event) => count.update(fun (n: Float): Float => n + 1)) {
+            "Increment"
+        }
+    }
+}
+
+mount("#app", Counter)
+```
+
+Key differences from inline HTML: use `cls` instead of `class`, `type_` instead of `type`, string literals for static text, and `reactive()` wrappers for dynamic text.
 
 ## Quick Example
 
@@ -29,13 +138,13 @@ var count = signal(0)
 var doubled = computed(fun () => count.get() * 2)
 
 fun App() {
-    div(cls="app") {
-        h1 { reactive(fun () => "Count: " + count.get().to_string()) }
-        p { reactive(fun () => "Doubled: " + doubled.get().to_string()) }
-        button(cls="btn", on_click=fun (e: Event) => count.set(count.get() + 1)) {
-            "Increment"
-        }
-    }
+    <div class="app">
+        <h1>Count: {count.get()}</h1>
+        <p>Doubled: {doubled.get()}</p>
+        <button class="btn" on_click={fun (e: Event) => count.set(count.get() + 1)}>
+            Increment
+        </button>
+    </div>
 }
 
 mount("#app", App)
@@ -98,27 +207,38 @@ effect(fun () => {
 
 ## Elements
 
-HTML elements are functions with named args for attributes and a trailing closure for children:
+With inline HTML syntax, elements use standard HTML tag names and attributes:
 
 ```saffron
-div(cls="card", id="main") {
-    h2 { "Title" }
-    p(cls="body") { "Content here" }
-    a(href="/about") { "Learn more" }
-}
+<div class="card" id="main">
+    <h2>Title</h2>
+    <p class="body">Content here</p>
+    <a href="/about">Learn more</a>
+</div>
 ```
 
-String literals inside trailing closures become text nodes. Use `reactive()` for dynamic text:
+Dynamic content uses `{expression}` interpolation:
 
 ```saffron
-h1 { reactive(fun () => "Hello, " + name.get() + "!") }
+<h1>Hello, {name.get()}!</h1>
 ```
 
-### Common attributes
+### Common attributes (inline HTML)
 
 | Attribute | Notes |
 |-----------|-------|
-| `cls` | CSS class (`class` is reserved) |
+| `class` | CSS class |
+| `id` | Element ID |
+| `style` | Inline CSS string |
+| `type` | Input type |
+| `href`, `src`, `alt` | Standard HTML attrs |
+| `placeholder`, `name`, `value` | Form input attrs |
+
+### Common attributes (function call syntax)
+
+| Attribute | Notes |
+|-----------|-------|
+| `cls` | CSS class (`class` is reserved in Saffron) |
 | `id` | Element ID |
 | `style` | Inline CSS string |
 | `type_` | Input type (`type` is reserved) |
@@ -127,20 +247,20 @@ h1 { reactive(fun () => "Hello, " + name.get() + "!") }
 
 ## Events
 
-Event handlers are passed as `on_*` named arguments. The handler receives a typed `Event` enum:
+Event handlers are passed as `on_*` attributes. The handler receives a typed `Event` enum:
 
 ```saffron
 import { Event } from "turmeric/events"
 
-button(on_click=fun (e: Event) => {
-    count.update(fun (n: Float): Float => n + 1)
-}) { "Click me" }
+<button on_click={fun (e: Event) => count.update(fun (n: Float): Float => n + 1)}>
+    Click me
+</button>
 
-input(
-    type_="text",
-    placeholder="Type here...",
-    on_input=fun (e: Event) => query.set("typed")
-)
+<input
+    type="text"
+    placeholder="Type here..."
+    on_input={fun (e: Event) => query.set(e.target_value)}
+/>
 ```
 
 Available handlers: `on_click`, `on_dblclick`, `on_mousedown`, `on_mouseup`, `on_mousemove`, `on_mouseenter`, `on_mouseleave`, `on_keydown`, `on_keyup`, `on_input`, `on_change`, `on_submit`, `on_focus`, `on_blur`, `on_scroll`, `on_wheel`.
@@ -160,9 +280,17 @@ match (e) {
 
 ## Reactive DOM Updates
 
-### `reactive(fn)`
+With inline HTML, dynamic content is handled by `{expression}` interpolation -- signals are automatically tracked:
 
-Creates a `<span>` that re-renders its text whenever the signals read inside `fn` change:
+```saffron
+<div>
+    <span>{count.get().to_string()} items</span>
+</div>
+```
+
+### `reactive(fn)` (function call syntax)
+
+In function call syntax, `reactive()` creates a `<span>` that re-renders its text when signals change:
 
 ```saffron
 div {
@@ -198,9 +326,9 @@ reactive_attr(box, "style", fun () => "color: " + color.get())
 ```saffron
 import { cx } from "turmeric/style"
 
-div(cls=cx({"card": true, "active": selected.get(), "disabled": !enabled.get()})) {
-    "Content"
-}
+<div class={cx({"card": true, "active": selected.get(), "disabled": !enabled.get()})}>
+    Content
+</div>
 ```
 
 ### Scoped styles
@@ -217,13 +345,13 @@ var s = scoped_styles({
 
 ### Tailwind CSS
 
-Turmeric apps commonly use Tailwind utility classes directly in `cls`:
+Turmeric apps commonly use Tailwind utility classes directly:
 
 ```saffron
-div(cls="flex items-center gap-4 p-6 bg-white rounded-lg shadow") {
-    h2(cls="text-xl font-bold text-gray-900") { "Card Title" }
-    p(cls="text-gray-600") { "Description" }
-}
+<div class="flex items-center gap-4 p-6 bg-white rounded-lg shadow">
+    <h2 class="text-xl font-bold text-gray-900">Card Title</h2>
+    <p class="text-gray-600">Description</p>
+</div>
 ```
 
 ## Routing
@@ -252,21 +380,21 @@ router.go("/users/42")
 
 ## Components
 
-Components are functions that build elements:
+Components are functions that build elements. Call them inside `{...}`:
 
 ```saffron
 fun Card(title: String, body: String) {
-    div(cls="card") {
-        h2 { title }
-        p { body }
-    }
+    <div class="card">
+        <h2>{title}</h2>
+        <p>{body}</p>
+    </div>
 }
 
 fun App() {
-    div {
-        Card("Hello", "This is a card.")
-        Card("World", "Another card.")
-    }
+    <div>
+        {Card("Hello", "This is a card.")}
+        {Card("World", "Another card.")}
+    </div>
 }
 ```
 
@@ -276,7 +404,7 @@ Attach the app to a DOM element:
 
 ```saffron
 fun App() {
-    div { h1 { "Hello World" } }
+    <div><h1>Hello World</h1></div>
 }
 
 mount("#app", App)
