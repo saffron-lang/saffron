@@ -29,7 +29,6 @@ class Codegen {
     var current_parent: String
     var string_vars: List<String>
     var last_type: AST.Type
-    var var_types: Map<String, String>
     var typed_vars: Map<String, AST.Type>
     var loop_end_label: String
     var current_ret_type: String
@@ -81,7 +80,6 @@ class Codegen {
         this.current_parent = ""
         this.string_vars = []
         this.last_type = AST.Type.IntType
-        this.var_types = {}
         this.typed_vars = {}
         this.loop_end_label = ""
         this.current_ret_type = "i64"
@@ -2611,7 +2609,7 @@ class Codegen {
             }
         }
 
-        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name) and !this.var_types.has(callee_name)) {
+        if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
             if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
@@ -2883,8 +2881,7 @@ class Codegen {
         }
 
         // Check if it looks like a direct function call (not a local variable)
-        // Also check var_types for captured variables in closures
-        if (!this.typed_vars.has(callee_name) and !this.var_types.has(callee_name) and callee_name.length() > 0) {
+        if (!this.typed_vars.has(callee_name) and callee_name.length() > 0) {
             // Runtime builtin constructors
             if (callee_name == "Map") {
                 var local: String = this.fresh_local()
@@ -3556,7 +3553,6 @@ class Codegen {
                 var bi: Float = 0
                 while (bi < bind_count) {
                     var btype: String = this.get_variant_field_type(enum_name, arm_variant, bi)
-                    this.var_types.set(bindings[bi], btype)
                     this.typed_vars.set(bindings[bi], this.str_to_type(btype))
                     if (btype == "String") {
                         this.string_vars.push(bindings[bi])
@@ -3704,7 +3700,6 @@ class Codegen {
         var saved_sb: StringBuilder = this.sb
         var saved_terminated: Bool = this.block_terminated
         var saved_counter: Float = this.local_counter
-        var saved_var_types: Map<String, String> = this.var_types
         var saved_typed_vars: Map<String, AST.Type> = this.typed_vars
         var saved_is_coro: Bool = this.is_coroutine
 
@@ -3725,7 +3720,6 @@ class Codegen {
         this.sb = saved_sb
         this.block_terminated = saved_terminated
         this.local_counter = saved_counter
-        this.var_types = saved_var_types
         this.typed_vars = saved_typed_vars
         this.is_coroutine = saved_is_coro
         this.globals.push(lambda_ir)
@@ -3799,7 +3793,6 @@ class Codegen {
         var saved_sb2: StringBuilder = this.sb
         var saved_terminated2: Bool = this.block_terminated
         var saved_counter2: Float = this.local_counter
-        var saved_var_types2: Map<String, String> = this.var_types
         var saved_typed_vars2b: Map<String, AST.Type> = this.typed_vars
         var saved_in_fn2: Bool = this.in_function
         this.in_function = false
@@ -3814,7 +3807,6 @@ class Codegen {
         this.sb = saved_sb2
         this.block_terminated = saved_terminated2
         this.local_counter = saved_counter2
-        this.var_types = saved_var_types2
         this.typed_vars = saved_typed_vars2b
 
         // Heap-allocate closure pair: [fn_ptr, 0]
@@ -3857,7 +3849,6 @@ class Codegen {
             oci = oci + 1
         }
         this.reset_locals()
-        this.var_types = {}
         this.typed_vars = {}
         this.string_vars = []
         var ret_llvm: String = this.llvm_type(ret_type)
@@ -3911,7 +3902,7 @@ class Codegen {
             this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
         }
 
-        // Alloca all params and register in var_types/typed_vars
+        // Alloca all params and register in typed_vars
         i = 0
         while (i < param_list.length()) {
             var parts: List<String> = param_list[i].split(":")
@@ -3919,7 +3910,6 @@ class Codegen {
             var ptype: String = parts[1]
             this.emit_indent("%" + this.sanitize_name(pname) + " = alloca " + this.llvm_type(ptype))
             this.emit_indent("store " + this.llvm_type(ptype) + " %" + this.sanitize_name(pname) + ".arg, " + this.llvm_type(ptype) + "* %" + this.sanitize_name(pname))
-            this.var_types.set(pname, ptype)
             this.typed_vars.set(pname, this.str_to_type(ptype))
             i = i + 1
         }
@@ -3940,14 +3930,12 @@ class Codegen {
             // Allocate local storage for captured variable and initialize with env value
             this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
             this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
-            // Register captured variable in typed_vars (source of truth) and var_types (legacy)
+            // Register captured variable in typed_vars
             // Use the outer scope's type if available (preserves generic class types)
             if (outer_typed_vars.has(cap_name)) {
                 this.typed_vars.set(cap_name, outer_typed_vars.get(cap_name))
-                this.var_types.set(cap_name, this.type_to_string(outer_typed_vars.get(cap_name)))
             } else {
                 this.typed_vars.set(cap_name, this.str_to_type("Int"))
-                this.var_types.set(cap_name, "Int")
             }
             ci = ci + 1
         }
@@ -4622,10 +4610,7 @@ class Codegen {
                 }
             }
         }
-        this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))
-        // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
-        // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
             this.string_vars.push(name)
         }
@@ -5496,7 +5481,6 @@ class Codegen {
                 if (enum_name != "Unknown") {
                     btype = this.get_variant_field_type(enum_name, variant_name, bi)
                 }
-                this.var_types.set(bindings[bi], btype)
                 this.typed_vars.set(bindings[bi], this.str_to_type(btype))
                 if (btype == "String") {
                     this.string_vars.push(bindings[bi])
@@ -5520,7 +5504,6 @@ class Codegen {
             var elem_val: String = this.fresh_local()
             this.emit_indent(elem_val + " = call i64 @__list_get(i64 " + val + ", i64 " + i.floor().to_string() + ")")
             this.emit_indent("store i64 " + elem_val + ", i64* %" + this.sanitize_name(elements[i]))
-            this.var_types.set(elements[i], elem_type_str)
             this.typed_vars.set(elements[i], elem_type)
             if (elem_type_str == "String") {
                 this.string_vars.push(elements[i])
@@ -5533,7 +5516,6 @@ class Codegen {
             var rest_val: String = this.fresh_local()
             this.emit_indent(rest_val + " = call i64 @__list_slice(i64 " + val + ", i64 " + elements.length().floor().to_string() + ", i64 " + len_val + ")")
             this.emit_indent("store i64 " + rest_val + ", i64* %" + this.sanitize_name(rest))
-            this.var_types.set(rest, list_type_str)
             this.typed_vars.set(rest, val_type)
         }
     }
@@ -6828,12 +6810,10 @@ class Codegen {
             var saved_sb2: StringBuilder = this.sb
             var saved_terminated2: Bool = this.block_terminated
             var saved_counter2: Float = this.local_counter
-            var saved_var_types2: Map<String, String> = this.var_types
             var saved_typed_vars2: Map<String, AST.Type> = this.typed_vars
 
             this.sb = StringBuilder()
             this.in_function = true
-            this.var_types = {}
             this.typed_vars = {}
             this.string_vars = []
             this.reset_locals()
@@ -6872,7 +6852,6 @@ class Codegen {
                     this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
-                this.var_types.set(pp2[0], pp2[1])
                 if (pp2[1] == "Float") { this.typed_vars.set(pp2[0], AST.Type.IntType) } else { this.typed_vars.set(pp2[0], this.str_to_type(pp2[1])) }
                 pi3 = pi3 + 1
             }
@@ -6911,19 +6890,16 @@ class Codegen {
             this.sb = saved_sb2
             this.block_terminated = saved_terminated2
             this.local_counter = saved_counter2
-            this.var_types = saved_var_types2
             this.typed_vars = saved_typed_vars2
             this.globals.push(nested_ir)
             return
         }
 
         this.in_function = true
-        var saved_vt: Map<String, String> = this.var_types
         var saved_tv: Map<String, AST.Type> = this.typed_vars
         var saved_is_coro: Bool = this.is_coroutine
         this.reset_locals()
         this.string_vars = []
-        this.var_types = {}
         this.typed_vars = {}
         var ret_llvm: String = this.llvm_type(ret_type)
 
@@ -7048,7 +7024,6 @@ class Codegen {
             var parts: List<String> = param_list[i].split(":")
             var pname: String = parts[0]
             var ptype: String = parts[1]
-            this.var_types.set(pname, ptype)
             if (ptype == "Float") { this.typed_vars.set(pname, AST.Type.IntType) } else { this.typed_vars.set(pname, this.str_to_type(ptype)) }
             if (ptype == "String") {
                 this.string_vars.push(pname)
@@ -7164,7 +7139,6 @@ class Codegen {
 
         this.emit("}")
         this.block_terminated = false
-        this.var_types = saved_vt
         this.typed_vars = saved_tv
         this.in_function = false
         this.is_coroutine = saved_is_coro
