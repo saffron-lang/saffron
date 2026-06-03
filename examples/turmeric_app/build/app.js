@@ -113,8 +113,22 @@ const imports = { env: new Proxy({
         b.copyWithin(Number(dst), Number(src), Number(src) + Number(len));
         return dst;
     },
+    // --- Navigation / Router FFI ---
+    js_set_hash: (ptr) => { location.hash = readCString(ptr); },
+    js_get_hash: () => writeCString(location.hash.replace(/^#\/?/, '') || '/'),
+    js_push_state: (ptr) => history.pushState(null, '', readCString(ptr)),
+    js_get_pathname: () => writeCString(location.pathname),
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
+
+function writeCString(str) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str + '\0');
+    const ptrBig = instance.exports.malloc(BigInt(bytes.length));
+    const mem = new Uint8Array(instance.exports.memory.buffer);
+    mem.set(bytes, Number(ptrBig));
+    return ptrBig;
+}
 
 // Boot the WASM app
 const response = await fetch('./app.wasm');
@@ -122,3 +136,11 @@ const wasmBytes = await response.arrayBuffer();
 const result = await WebAssembly.instantiate(wasmBytes, imports);
 instance = result.instance;
 instance.exports._start();
+
+// Browser navigation → WASM callback
+window.addEventListener('hashchange', () => {
+    if (instance.exports.__on_navigate) instance.exports.__on_navigate();
+});
+window.addEventListener('popstate', () => {
+    if (instance.exports.__on_navigate) instance.exports.__on_navigate();
+});

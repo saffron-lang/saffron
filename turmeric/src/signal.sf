@@ -4,20 +4,28 @@
 // Dependency Tracking
 // =============================================================================
 
-var _tracker_deps: List<Any> = []
+var _tracker_stack: List<List<Any>> = []
 var _tracking: Bool = false
+var _tracker_deps: List<Any> = []
 var _sub_id_counter: Float = 0
 
 
 fun start_tracking() {
+    if (_tracking) {
+        _tracker_stack.push(_tracker_deps)
+    }
     _tracking = true
     _tracker_deps = []
 }
 
 fun stop_tracking(): List<Any> {
-    _tracking = false
     var deps: List<Any> = _tracker_deps
-    _tracker_deps = []
+    if (_tracker_stack.length() > 0) {
+        _tracker_deps = _tracker_stack.pop()
+    } else {
+        _tracker_deps = []
+        _tracking = false
+    }
     return deps
 }
 
@@ -112,8 +120,8 @@ fun signal<T>(initial: T): Signal<T> {
 
 class Computed<T> {
     var value: T
-    var compute: () => T
     var subs: List<Subscription>
+    var compute: () => T
 
     fun init(compute: () => T) {
         this.compute = compute

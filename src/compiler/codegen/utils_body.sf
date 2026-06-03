@@ -685,7 +685,7 @@
             inst = LLVMInst.Instruction.AShr(result_val, lhs_val, rhs_val)
         }
 
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = " + op_name + " i64 " + lhs_name + ", " + rhs_name
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for " + op_name + ":")
@@ -708,7 +708,7 @@
         else if (pred_name == "sge") { pred = LLVMTypes.CmpPred.Sge }
 
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.ICmp(result_val, pred, lhs_val, rhs_val)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = icmp " + pred_name + " i64 " + lhs_name + ", " + rhs_name
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for icmp " + pred_name + ":")
@@ -722,7 +722,7 @@
         var src_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(src_name, LLVMTypes.Type.I1)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.ZExt(result_val, src_val, LLVMTypes.Type.I64)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = zext i1 " + src_name + " to i64"
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for zext:")
@@ -741,7 +741,7 @@
         else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Alloca(result_val, ty, "")
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = alloca " + type_str
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for alloca:")
@@ -753,7 +753,7 @@
     fun verify_load(result_name: String, type_str: String, ptr_name: String) {
         // Library uses opaque pointers: "load i64, ptr %x"
         // Codegen uses typed pointers: "load i64, i64* %x"
-        // Verify library output format only
+        // Verify library output format only (opaque pointer mode)
         var ty: LLVMTypes.Type = LLVMTypes.Type.I64
         if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
         else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
@@ -761,7 +761,7 @@
         var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ty)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Load(result_val, ty, ptr_val)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, false)
         // Library format: "  %r = load i64, ptr %ptr"
         // Codegen format: "  %r = load i64, i64* %ptr"
         // These differ in pointer syntax — just verify library is self-consistent
@@ -783,7 +783,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, ty)
         var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Store(val_v, ptr_val)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, false)
         var lib_expected: String = "  store " + type_str + " " + val_name + ", ptr " + ptr_name
         if (lib_ir != lib_expected) {
             IO.println("[llvm-verify] MISMATCH for store (library format):")
@@ -820,7 +820,7 @@
         }
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ret_ty)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Call(result_val, fn_name, ret_ty, arg_vals)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = call " + ret_type + " @" + fn_name + "(" + args_str + ")"
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for call @" + fn_name + ":")
@@ -836,7 +836,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.PtrToInt(result_val, val_v, LLVMTypes.Type.I64)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = ptrtoint ptr " + val_name + " to i64"
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for ptrtoint:")
@@ -850,7 +850,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.I64)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.IntToPtr(result_val, val_v, LLVMTypes.Type.Ptr)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = inttoptr i64 " + val_name + " to ptr"
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for inttoptr:")
@@ -869,7 +869,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, from_ty)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, to_ty)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Trunc(result_val, val_v, to_ty)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         var expected: String = "  " + result_name + " = trunc " + from_type + " " + val_name + " to " + to_type
         if (lib_ir != expected) {
             IO.println("[llvm-verify] MISMATCH for trunc:")
@@ -935,7 +935,7 @@
             inst = LLVMInst.Instruction.AShr(result_val, lhs_val, rhs_val)
         }
 
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -952,7 +952,7 @@
         else if (pred_name == "sge") { pred = LLVMTypes.CmpPred.Sge }
 
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.ICmp(result_val, pred, lhs_val, rhs_val)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -960,7 +960,7 @@
         var src_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(src_name, LLVMTypes.Type.I1)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.ZExt(result_val, src_val, LLVMTypes.Type.I64)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -973,7 +973,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, from_ty)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, to_ty)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Trunc(result_val, val_v, to_ty)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -1012,7 +1012,7 @@
         }
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ret_ty)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.Call(result_val, fn_name, ret_ty, arg_vals)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -1020,7 +1020,7 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.Ptr)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.I64)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.PtrToInt(result_val, val_v, LLVMTypes.Type.I64)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 
@@ -1028,7 +1028,42 @@
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.I64)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.IntToPtr(result_val, val_v, LLVMTypes.Type.Ptr)
-        var lib_ir: String = LLVMInst.format_instruction(inst)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_alloca(result_name: String, type_str: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Alloca(result_val, ty, "")
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_load(result_name: String, type_str: String, ptr_name: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Load(result_val, ty, ptr_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_store(val_name: String, type_str: String, ptr_name: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, ty)
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Store(val_v, ptr_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
 

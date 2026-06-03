@@ -235,8 +235,9 @@ build_project() {
         "$SAFFRONC" --target wasm32 "$RUNTIME_SRC" "$runtime_ll" 2>/dev/null || true
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
             -fuse-ld="$WASM_LD_PATH" \
-            -Wl,--no-entry -Wl,--export=_start -Wl,--export=malloc -Wl,--export=memory -Wl,--export=__dispatch_event \
+            -Wl,--no-entry -Wl,--export=_start -Wl,--export=malloc -Wl,--export=memory -Wl,--export=__dispatch_event -Wl,--export=__on_hash_change \
             -Wl,--allow-multiple-definition -Wl,--allow-undefined \
+            -Wl,--initial-memory=4194304 -Wl,--max-memory=16777216 \
             -o "$output" "$WASM_BASE" "$ll_path" "$runtime_ll" || {
             echo "saffron: wasm32 linking failed" >&2
             exit 1

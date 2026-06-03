@@ -3,12 +3,41 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { cx } from "turmeric/style"
 import { Event } from "turmeric/events"
+import "turmeric/router" as Router
+
+// =============================================================================
+// Router — hash mode with route registration
+// =============================================================================
+
+var router = Router.hash()
+var page = router.current_signal()
+
+router.route("/counter", fun (params: Router.RouteParams) => CounterPage())
+router.route("/todos", fun (params: Router.RouteParams) => TodoPage())
+router.route("/timer", fun (params: Router.RouteParams) => TimerPage())
+router.route("/theme", fun (params: Router.RouteParams) => ThemePage())
+router.route("/form", fun (params: Router.RouteParams) => FormPage())
+router.route("/features", fun (params: Router.RouteParams) => FeaturesPage())
+router.route("*", fun (params: Router.RouteParams) => {
+    section(cls="page") { p { "404 — Page Not Found" } }
+})
+
+if (page.get() == "/" or page.get() == "") {
+    router.go("/counter")
+}
+
+fun navigate(name: String) {
+    router.go("/" + name)
+}
+
+fun __on_navigate() {
+    router._on_external_change()
+}
 
 // =============================================================================
 // Global State
 // =============================================================================
 
-var page = signal("counter")
 var theme = signal("dark")
 
 // Counter state
@@ -641,12 +670,11 @@ fun FeaturesPage() {
 
 fun App() {
     var shell = div(cls="app-shell theme-dark")
-    reactive_class(shell, fun () => cx({
-        "app-shell": true,
-        "theme-dark": theme.get() == "dark",
-        "theme-light": theme.get() == "light",
-        "theme-midnight": theme.get() == "midnight"
-    }))
+    reactive_class(shell, fun (): String => {
+        if (theme.get() == "light") { return "app-shell theme-light" }
+        if (theme.get() == "midnight") { return "app-shell theme-midnight" }
+        return "app-shell theme-dark"
+    })
 
     _tc_push(shell)
 
@@ -657,23 +685,36 @@ fun App() {
         }
 
         nav(cls="nav") {
-            var nav_counter = button(cls="nav-link active", on_click=fun (e: Event) => page.set("counter")) { "Counter" }
-            reactive_class(nav_counter, fun () => cx({"nav-link": true, "active": page.get() == "counter"}))
-
-            var nav_todos = button(cls="nav-link", on_click=fun (e: Event) => page.set("todos")) { "Todos" }
-            reactive_class(nav_todos, fun () => cx({"nav-link": true, "active": page.get() == "todos"}))
-
-            var nav_timer = button(cls="nav-link", on_click=fun (e: Event) => page.set("timer")) { "Timer" }
-            reactive_class(nav_timer, fun () => cx({"nav-link": true, "active": page.get() == "timer"}))
-
-            var nav_theme = button(cls="nav-link", on_click=fun (e: Event) => page.set("theme")) { "Theme" }
-            reactive_class(nav_theme, fun () => cx({"nav-link": true, "active": page.get() == "theme"}))
-
-            var nav_form = button(cls="nav-link", on_click=fun (e: Event) => page.set("form")) { "Forms" }
-            reactive_class(nav_form, fun () => cx({"nav-link": true, "active": page.get() == "form"}))
-
-            var nav_features = button(cls="nav-link", on_click=fun (e: Event) => page.set("features")) { "Features" }
-            reactive_class(nav_features, fun () => cx({"nav-link": true, "active": page.get() == "features"}))
+            var nav_counter = button(cls="nav-link", on_click=fun (e: Event) => navigate("counter")) { "Counter" }
+            reactive_class(nav_counter, fun (): String => {
+                if (page.get() == "/counter") { return "nav-link active" }
+                return "nav-link"
+            })
+            var nav_todos = button(cls="nav-link", on_click=fun (e: Event) => navigate("todos")) { "Todos" }
+            reactive_class(nav_todos, fun (): String => {
+                if (page.get() == "/todos") { return "nav-link active" }
+                return "nav-link"
+            })
+            var nav_timer = button(cls="nav-link", on_click=fun (e: Event) => navigate("timer")) { "Timer" }
+            reactive_class(nav_timer, fun (): String => {
+                if (page.get() == "/timer") { return "nav-link active" }
+                return "nav-link"
+            })
+            var nav_theme = button(cls="nav-link", on_click=fun (e: Event) => navigate("theme")) { "Theme" }
+            reactive_class(nav_theme, fun (): String => {
+                if (page.get() == "/theme") { return "nav-link active" }
+                return "nav-link"
+            })
+            var nav_form = button(cls="nav-link", on_click=fun (e: Event) => navigate("form")) { "Forms" }
+            reactive_class(nav_form, fun (): String => {
+                if (page.get() == "/form") { return "nav-link active" }
+                return "nav-link"
+            })
+            var nav_features = button(cls="nav-link", on_click=fun (e: Event) => navigate("features")) { "Features" }
+            reactive_class(nav_features, fun (): String => {
+                if (page.get() == "/features") { return "nav-link active" }
+                return "nav-link"
+            })
         }
 
         button(
@@ -691,23 +732,10 @@ fun App() {
     }
 
     main(cls="content") {
-        var pg_counter = div() { CounterPage() }
-        reactive_show(pg_counter, fun () => page.get() == "counter")
-
-        var pg_todos = div() { TodoPage() }
-        reactive_show(pg_todos, fun () => page.get() == "todos")
-
-        var pg_timer = div() { TimerPage() }
-        reactive_show(pg_timer, fun () => page.get() == "timer")
-
-        var pg_theme = div() { ThemePage() }
-        reactive_show(pg_theme, fun () => page.get() == "theme")
-
-        var pg_form = div() { FormPage() }
-        reactive_show(pg_form, fun () => page.get() == "form")
-
-        var pg_features = div() { FeaturesPage() }
-        reactive_show(pg_features, fun () => page.get() == "features")
+        outlet(fun () => {
+            page.get()
+            router.dispatch()
+        })
     }
 
     footer(cls="app-footer") {

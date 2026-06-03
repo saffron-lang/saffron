@@ -176,36 +176,40 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 @.str.171 = private unnamed_addr constant [2 x i8] c"/\00"
 @.str.172 = private unnamed_addr constant [7 x i8] c"locale\00"
 @.str.173 = private unnamed_addr constant [3 x i8] c"en\00"
-@.str.174 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.175 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.176 = private unnamed_addr constant [2 x i8] c"&\00"
-@.str.177 = private unnamed_addr constant [2 x i8] c"=\00"
-@.str.178 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.179 = private unnamed_addr constant [2 x i8] c"*\00"
-@.str.180 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.181 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.174 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.175 = private unnamed_addr constant [1 x i8] c"\00"
+@.str.176 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.177 = private unnamed_addr constant [2 x i8] c"?\00"
+@.str.178 = private unnamed_addr constant [2 x i8] c"&\00"
+@.str.179 = private unnamed_addr constant [2 x i8] c"=\00"
+@.str.180 = private unnamed_addr constant [2 x i8] c"*\00"
+@.str.181 = private unnamed_addr constant [2 x i8] c"*\00"
 @.str.182 = private unnamed_addr constant [2 x i8] c"/\00"
-@.str.183 = private unnamed_addr constant [2 x i8] c"?\00"
-@.str.184 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.185 = private unnamed_addr constant [3 x i8] c"; \00"
-@.str.186 = private unnamed_addr constant [3 x i8] c": \00"
-@.str.187 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.188 = private unnamed_addr constant [3 x i8] c"_s\00"
-@.str.189 = private unnamed_addr constant [2 x i8] c".\00"
-@.str.190 = private unnamed_addr constant [4 x i8] c" { \00"
-@.str.191 = private unnamed_addr constant [3 x i8] c" }\00"
-@.str.192 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.193 = private unnamed_addr constant [3 x i8] c"; \00"
-@.str.194 = private unnamed_addr constant [3 x i8] c": \00"
-@.str.195 = private unnamed_addr constant [3 x i8] c"  \00"
-@.str.196 = private unnamed_addr constant [4 x i8] c" { \00"
-@.str.197 = private unnamed_addr constant [3 x i8] c" }\00"
-@.str.198 = private unnamed_addr constant [5 x i8] c"from\00"
-@.str.199 = private unnamed_addr constant [3 x i8] c"to\00"
-@.str.200 = private unnamed_addr constant [12 x i8] c"@keyframes \00"
-@.str.201 = private unnamed_addr constant [4 x i8] c" {\0A\00"
-@.str.202 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@.str.203 = private unnamed_addr constant [2 x i8] c"}\00"
+@.str.183 = private unnamed_addr constant [2 x i8] c":\00"
+@.str.184 = private unnamed_addr constant [5 x i8] c"Hash\00"
+@.str.185 = private unnamed_addr constant [8 x i8] c"History\00"
+@.str.186 = private unnamed_addr constant [7 x i8] c"Memory\00"
+@.str.187 = private unnamed_addr constant [8 x i8] c"Unknown\00"
+@.str.188 = private unnamed_addr constant [2 x i8] c"/\00"
+@.str.189 = private unnamed_addr constant [3 x i8] c"; \00"
+@.str.190 = private unnamed_addr constant [3 x i8] c": \00"
+@.str.191 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.192 = private unnamed_addr constant [3 x i8] c"_s\00"
+@.str.193 = private unnamed_addr constant [2 x i8] c".\00"
+@.str.194 = private unnamed_addr constant [4 x i8] c" { \00"
+@.str.195 = private unnamed_addr constant [3 x i8] c" }\00"
+@.str.196 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.197 = private unnamed_addr constant [3 x i8] c"; \00"
+@.str.198 = private unnamed_addr constant [3 x i8] c": \00"
+@.str.199 = private unnamed_addr constant [3 x i8] c"  \00"
+@.str.200 = private unnamed_addr constant [4 x i8] c" { \00"
+@.str.201 = private unnamed_addr constant [3 x i8] c" }\00"
+@.str.202 = private unnamed_addr constant [5 x i8] c"from\00"
+@.str.203 = private unnamed_addr constant [3 x i8] c"to\00"
+@.str.204 = private unnamed_addr constant [12 x i8] c"@keyframes \00"
+@.str.205 = private unnamed_addr constant [4 x i8] c" {\0A\00"
+@.str.206 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@.str.207 = private unnamed_addr constant [2 x i8] c"}\00"
 
 %Addable = type {  }
 %Subtractable = type {  }
@@ -237,7 +241,7 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 %Event = type { i8, [16 x i8] }
 %reconcile_Component = type { i64, i64, i64, i64, i64 }
 %reconcile_ConditionalSlot = type { i64, i64, i64, i64, i64 }
-%reconcile_MatchSlot = type { i64, i64, i64, i64, i64, i64 }
+%reconcile_MatchSlot = type { i64, i64, i64 }
 %reconcile_KeyedItem = type { i64, i64 }
 %reconcile_KeyedList = type { i64, i64, i64, i64, i64, i64 }
 %ResourceState = type { i8, [16 x i8] }
@@ -252,8 +256,9 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 %context_AuthState = type { i64, i64, i64, i64 }
 %context_LocaleConfig = type { i64, i64 }
 %router_RouteParams = type { i64, i64, i64 }
-%router_Route = type { i64, i64, i64, i64 }
-%router_Router = type { i64, i64, i64 }
+%Mode = type { i8, [16 x i8] }
+%router_RouteDef = type { i64, i64 }
+%router_Router = type { i64, i64, i64, i64 }
 %style_ScopedStyles = type { i64, i64, i64 }
 %style_Keyframes = type { i64, i64 }
 %style_MediaQuery = type { i64, i64 }
@@ -431,6 +436,10 @@ declare void @js_dom_append_child(i64, i64)
 declare void @js_dom_remove_child(i64, i64)
 declare void @js_dom_insert_before(i64, i64, i64)
 declare void @js_dom_add_event_listener(i64, i8*, i64)
+declare void @js_set_hash(i8*)
+declare i8* @js_get_hash()
+declare void @js_push_state(i8*)
+declare i8* @js_get_pathname()
 @__g_signal__tracker_deps = global i64 0
 @__g_signal__tracking = global i64 0
 @__g_signal__sub_id_counter = global i64 0
@@ -5933,12 +5942,12 @@ entry:
   %t23 = zext i32 %t22 to i64
   %t24 = trunc i64 %t20 to i32
   %t25 = inttoptr i32 %t24 to %reconcile_MatchSlot*
-  %t26 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t25, i32 0, i32 3
+  %t26 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t25, i32 0, i32 0
   store volatile i64 %t23, i64* %t26
   %t27 = load i64, i64* %self
   %t28 = trunc i64 %t27 to i32
   %t29 = inttoptr i32 %t28 to %reconcile_MatchSlot*
-  %t30 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t29, i32 0, i32 4
+  %t30 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t29, i32 0, i32 0
   store volatile i64 0, i64* %t30
   %t31 = load i64, i64* %self
   %t32 = call i64 @reconcile_MatchSlot__sync(i64 %t31)
@@ -5968,7 +5977,7 @@ entry:
   %t53 = call i64 @signal_Signal__subscribe(i64 %t38, i64 %t52)
   %t54 = trunc i64 %t33 to i32
   %t55 = inttoptr i32 %t54 to %reconcile_MatchSlot*
-  %t56 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t55, i32 0, i32 5
+  %t56 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t55, i32 0, i32 0
   store volatile i64 %t53, i64* %t56
   call void @__gc_pop_roots(i64 2)
   ret i64 0
@@ -5994,7 +6003,7 @@ entry:
   %t10 = load i64, i64* %self
   %t11 = trunc i64 %t10 to i32
   %t12 = inttoptr i32 %t11 to %reconcile_MatchSlot*
-  %t13 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t12, i32 0, i32 3
+  %t13 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t12, i32 0, i32 0
   %t14 = load volatile i64, i64* %t13
   %t15 = call i64 @__string_eq(i64 %t9, i64 %t14)
   %t16 = trunc i64 %t15 to i1
@@ -6008,7 +6017,7 @@ endif195:
   %t17 = load i64, i64* %self
   %t18 = trunc i64 %t17 to i32
   %t19 = inttoptr i32 %t18 to %reconcile_MatchSlot*
-  %t20 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t19, i32 0, i32 4
+  %t20 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t19, i32 0, i32 0
   %t21 = load volatile i64, i64* %t20
   %t23 = icmp ne i64 %t21, 0
   %t22 = zext i1 %t23 to i64
@@ -6018,7 +6027,7 @@ then199:
   %t25 = load i64, i64* %self
   %t26 = trunc i64 %t25 to i32
   %t27 = inttoptr i32 %t26 to %reconcile_MatchSlot*
-  %t28 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t27, i32 0, i32 4
+  %t28 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t27, i32 0, i32 0
   %t29 = load volatile i64, i64* %t28
   %t30 = call i64 @reconcile_Component__unmount(i64 %t29)
   br label %endif198
@@ -6029,7 +6038,7 @@ endif198:
   %t32 = load i64, i64* %key
   %t33 = trunc i64 %t31 to i32
   %t34 = inttoptr i32 %t33 to %reconcile_MatchSlot*
-  %t35 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t34, i32 0, i32 3
+  %t35 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t34, i32 0, i32 0
   store volatile i64 %t32, i64* %t35
   %t36 = load i64, i64* %self
   %t37 = trunc i64 %t36 to i32
@@ -6061,12 +6070,12 @@ then202:
   %t61 = call i64 %t60(i64 %t58)
   %t62 = trunc i64 %t45 to i32
   %t63 = inttoptr i32 %t62 to %reconcile_MatchSlot*
-  %t64 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t63, i32 0, i32 4
+  %t64 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t63, i32 0, i32 0
   store volatile i64 %t61, i64* %t64
   %t65 = load i64, i64* %self
   %t66 = trunc i64 %t65 to i32
   %t67 = inttoptr i32 %t66 to %reconcile_MatchSlot*
-  %t68 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t67, i32 0, i32 4
+  %t68 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t67, i32 0, i32 0
   %t69 = load volatile i64, i64* %t68
   %t70 = call i64 @reconcile_Component__mount(i64 %t69)
   br label %endif201
@@ -6074,7 +6083,7 @@ else203:
   %t71 = load i64, i64* %self
   %t72 = trunc i64 %t71 to i32
   %t73 = inttoptr i32 %t72 to %reconcile_MatchSlot*
-  %t74 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t73, i32 0, i32 4
+  %t74 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t73, i32 0, i32 0
   store volatile i64 0, i64* %t74
   br label %endif201
 endif201:
@@ -6089,7 +6098,7 @@ entry:
   %t1 = load i64, i64* %self
   %t2 = trunc i64 %t1 to i32
   %t3 = inttoptr i32 %t2 to %reconcile_MatchSlot*
-  %t4 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t3, i32 0, i32 4
+  %t4 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t3, i32 0, i32 0
   %t5 = load volatile i64, i64* %t4
   %t7 = icmp ne i64 %t5, 0
   %t6 = zext i1 %t7 to i64
@@ -6099,13 +6108,13 @@ then205:
   %t9 = load i64, i64* %self
   %t10 = trunc i64 %t9 to i32
   %t11 = inttoptr i32 %t10 to %reconcile_MatchSlot*
-  %t12 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t11, i32 0, i32 4
+  %t12 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t11, i32 0, i32 0
   %t13 = load volatile i64, i64* %t12
   %t14 = call i64 @reconcile_Component__unmount(i64 %t13)
   %t15 = load i64, i64* %self
   %t16 = trunc i64 %t15 to i32
   %t17 = inttoptr i32 %t16 to %reconcile_MatchSlot*
-  %t18 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t17, i32 0, i32 4
+  %t18 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t17, i32 0, i32 0
   store volatile i64 0, i64* %t18
   br label %endif204
 else206:
@@ -6119,7 +6128,7 @@ endif204:
   %t24 = load i64, i64* %self
   %t25 = trunc i64 %t24 to i32
   %t26 = inttoptr i32 %t25 to %reconcile_MatchSlot*
-  %t27 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t26, i32 0, i32 5
+  %t27 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t26, i32 0, i32 0
   %t28 = load volatile i64, i64* %t27
   %t29 = call i64 @signal_Signal__unsubscribe(i64 %t23, i64 %t28)
   ret i64 0
@@ -6127,7 +6136,7 @@ endif204:
 
 define i64 @reconcile_MatchSlot() {
 entry:
-  %t30 = call i8* @malloc(i64 48)
+  %t30 = call i8* @malloc(i64 24)
   %t31 = bitcast i8* %t30 to %reconcile_MatchSlot*
   %t32 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t31, i32 0, i32 0
   store i64 0, i64* %t32
@@ -6135,15 +6144,9 @@ entry:
   store i64 0, i64* %t33
   %t34 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t31, i32 0, i32 2
   store i64 0, i64* %t34
-  %t35 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t31, i32 0, i32 3
-  store i64 0, i64* %t35
-  %t36 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t31, i32 0, i32 4
-  store i64 0, i64* %t36
-  %t37 = getelementptr %reconcile_MatchSlot, %reconcile_MatchSlot* %t31, i32 0, i32 5
-  store i64 0, i64* %t37
-  %t38 = ptrtoint %reconcile_MatchSlot* %t31 to i32
-  %t39 = zext i32 %t38 to i64
-  ret i64 %t39
+  %t35 = ptrtoint %reconcile_MatchSlot* %t31 to i32
+  %t36 = zext i32 %t35 to i64
+  ret i64 %t36
 }
 
 define i64 @reconcile_match_slot(i64 %parent.arg, i64 %discriminator.arg, i64 %builders.arg) {
@@ -9371,19 +9374,19 @@ entry:
   %t8 = load i64, i64* %path
   %t9 = trunc i64 %t7 to i32
   %t10 = inttoptr i32 %t9 to %router_RouteParams*
-  %t11 = getelementptr %router_RouteParams, %router_RouteParams* %t10, i32 0, i32 2
+  %t11 = getelementptr %router_RouteParams, %router_RouteParams* %t10, i32 0, i32 0
   store volatile i64 %t8, i64* %t11
   %t12 = load i64, i64* %self
   %t13 = load i64, i64* %params
   %t14 = trunc i64 %t12 to i32
   %t15 = inttoptr i32 %t14 to %router_RouteParams*
-  %t16 = getelementptr %router_RouteParams, %router_RouteParams* %t15, i32 0, i32 0
+  %t16 = getelementptr %router_RouteParams, %router_RouteParams* %t15, i32 0, i32 1
   store volatile i64 %t13, i64* %t16
   %t17 = load i64, i64* %self
   %t18 = load i64, i64* %query
   %t19 = trunc i64 %t17 to i32
   %t20 = inttoptr i32 %t19 to %router_RouteParams*
-  %t21 = getelementptr %router_RouteParams, %router_RouteParams* %t20, i32 0, i32 1
+  %t21 = getelementptr %router_RouteParams, %router_RouteParams* %t20, i32 0, i32 2
   store volatile i64 %t18, i64* %t21
   call void @__gc_pop_roots(i64 3)
   ret i64 0
@@ -9401,125 +9404,85 @@ entry:
   %t3 = load i64, i64* %self
   %t4 = trunc i64 %t3 to i32
   %t5 = inttoptr i32 %t4 to %router_RouteParams*
-  %t6 = getelementptr %router_RouteParams, %router_RouteParams* %t5, i32 0, i32 0
+  %t6 = getelementptr %router_RouteParams, %router_RouteParams* %t5, i32 0, i32 1
   %t7 = load volatile i64, i64* %t6
   %t8 = load i64, i64* %name
-  %t9 = call i64 @__map_get(i64 %t7, i64 %t8)
+  %t9 = call i64 @__map_has(i64 %t7, i64 %t8)
+  %t10 = call i64 @__val_tag_bool(i64 %t9)
+  %t11 = trunc i64 %t10 to i1
+  br i1 %t11, label %then375, label %else376
+then375:
+  %t12 = load i64, i64* %self
+  %t13 = trunc i64 %t12 to i32
+  %t14 = inttoptr i32 %t13 to %router_RouteParams*
+  %t15 = getelementptr %router_RouteParams, %router_RouteParams* %t14, i32 0, i32 1
+  %t16 = load volatile i64, i64* %t15
+  %t17 = load i64, i64* %name
+  %t18 = call i64 @__map_get(i64 %t16, i64 %t17)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t9
+  ret i64 %t18
+else376:
+  br label %endif374
+endif374:
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.174, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i32
+  %t21 = zext i32 %t20 to i64
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t21
+}
+
+define i64 @router_RouteParams__query_get(i64 %self.arg, i64 %name.arg) {
+entry:
+  %self = alloca i64
+  %name = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %name.arg, i64* %name
+  %t1 = ptrtoint i64* %name to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = load i64, i64* %self
+  %t4 = trunc i64 %t3 to i32
+  %t5 = inttoptr i32 %t4 to %router_RouteParams*
+  %t6 = getelementptr %router_RouteParams, %router_RouteParams* %t5, i32 0, i32 2
+  %t7 = load volatile i64, i64* %t6
+  %t8 = load i64, i64* %name
+  %t9 = call i64 @__map_has(i64 %t7, i64 %t8)
+  %t10 = call i64 @__val_tag_bool(i64 %t9)
+  %t11 = trunc i64 %t10 to i1
+  br i1 %t11, label %then378, label %else379
+then378:
+  %t12 = load i64, i64* %self
+  %t13 = trunc i64 %t12 to i32
+  %t14 = inttoptr i32 %t13 to %router_RouteParams*
+  %t15 = getelementptr %router_RouteParams, %router_RouteParams* %t14, i32 0, i32 2
+  %t16 = load volatile i64, i64* %t15
+  %t17 = load i64, i64* %name
+  %t18 = call i64 @__map_get(i64 %t16, i64 %t17)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t18
+else379:
+  br label %endif377
+endif377:
+  %t19 = getelementptr [1 x i8], [1 x i8]* @.str.175, i64 0, i64 0
+  %t20 = ptrtoint i8* %t19 to i32
+  %t21 = zext i32 %t20 to i64
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t21
 }
 
 define i64 @router_RouteParams() {
 entry:
-  %t10 = call i8* @malloc(i64 24)
-  %t11 = bitcast i8* %t10 to %router_RouteParams*
-  %t12 = getelementptr %router_RouteParams, %router_RouteParams* %t11, i32 0, i32 0
-  store i64 0, i64* %t12
-  %t13 = getelementptr %router_RouteParams, %router_RouteParams* %t11, i32 0, i32 1
-  store i64 0, i64* %t13
-  %t14 = getelementptr %router_RouteParams, %router_RouteParams* %t11, i32 0, i32 2
-  store i64 0, i64* %t14
-  %t15 = ptrtoint %router_RouteParams* %t11 to i32
-  %t16 = zext i32 %t15 to i64
-  ret i64 %t16
-}
-
-define i64 @router_Route__init(i64 %self.arg, i64 %pattern.arg, i64 %component.arg) {
-entry:
-  %self = alloca i64
-  %pattern = alloca i64
-  %component = alloca i64
-  store i64 %self.arg, i64* %self
-  store i64 %pattern.arg, i64* %pattern
-  store i64 %component.arg, i64* %component
-  %t1 = ptrtoint i64* %pattern to i32
-  %t2 = zext i32 %t1 to i64
-  call void @__gc_push_root(i64 %t2)
-  %t3 = ptrtoint i64* %component to i32
-  %t4 = zext i32 %t3 to i64
-  call void @__gc_push_root(i64 %t4)
-  %t5 = load i64, i64* %self
-  %t6 = load i64, i64* %pattern
-  %t7 = trunc i64 %t5 to i32
-  %t8 = inttoptr i32 %t7 to %router_Route*
-  %t9 = getelementptr %router_Route, %router_Route* %t8, i32 0, i32 0
-  store volatile i64 %t6, i64* %t9
-  %t10 = load i64, i64* %self
-  %t11 = load i64, i64* %component
-  %t12 = trunc i64 %t10 to i32
-  %t13 = inttoptr i32 %t12 to %router_Route*
-  %t14 = getelementptr %router_Route, %router_Route* %t13, i32 0, i32 1
-  store volatile i64 %t11, i64* %t14
-  %t15 = load i64, i64* %self
-  %t16 = trunc i64 %t15 to i32
-  %t17 = inttoptr i32 %t16 to %router_Route*
-  %t18 = getelementptr %router_Route, %router_Route* %t17, i32 0, i32 2
-  store volatile i64 0, i64* %t18
-  %t19 = load i64, i64* %self
-  %t20 = call i64 @__list_new()
-  %t21 = trunc i64 %t19 to i32
-  %t22 = inttoptr i32 %t21 to %router_Route*
-  %t23 = getelementptr %router_Route, %router_Route* %t22, i32 0, i32 3
-  store volatile i64 %t20, i64* %t23
-  call void @__gc_pop_roots(i64 2)
-  ret i64 0
-}
-
-define i64 @router_Route__with_guard(i64 %self.arg, i64 %guard_fn.arg) {
-entry:
-  %self = alloca i64
-  %guard_fn = alloca i64
-  store i64 %self.arg, i64* %self
-  store i64 %guard_fn.arg, i64* %guard_fn
-  %t1 = ptrtoint i64* %guard_fn to i32
-  %t2 = zext i32 %t1 to i64
-  call void @__gc_push_root(i64 %t2)
-  %t3 = load i64, i64* %self
-  %t4 = load i64, i64* %guard_fn
-  %t5 = trunc i64 %t3 to i32
-  %t6 = inttoptr i32 %t5 to %router_Route*
-  %t7 = getelementptr %router_Route, %router_Route* %t6, i32 0, i32 2
-  store volatile i64 %t4, i64* %t7
-  %t8 = load i64, i64* %self
-  call void @__gc_pop_roots(i64 1)
-  ret i64 %t8
-}
-
-define i64 @router_Route__with_children(i64 %self.arg, i64 %routes.arg) {
-entry:
-  %self = alloca i64
-  %routes = alloca i64
-  store i64 %self.arg, i64* %self
-  store i64 %routes.arg, i64* %routes
-  %t1 = ptrtoint i64* %routes to i32
-  %t2 = zext i32 %t1 to i64
-  call void @__gc_push_root(i64 %t2)
-  %t3 = load i64, i64* %self
-  %t4 = load i64, i64* %routes
-  %t5 = trunc i64 %t3 to i32
-  %t6 = inttoptr i32 %t5 to %router_Route*
-  %t7 = getelementptr %router_Route, %router_Route* %t6, i32 0, i32 3
-  store volatile i64 %t4, i64* %t7
-  %t8 = load i64, i64* %self
-  call void @__gc_pop_roots(i64 1)
-  ret i64 %t8
-}
-
-define i64 @router_Route() {
-entry:
-  %t9 = call i8* @malloc(i64 32)
-  %t10 = bitcast i8* %t9 to %router_Route*
-  %t11 = getelementptr %router_Route, %router_Route* %t10, i32 0, i32 0
-  store i64 0, i64* %t11
-  %t12 = getelementptr %router_Route, %router_Route* %t10, i32 0, i32 1
-  store i64 0, i64* %t12
-  %t13 = getelementptr %router_Route, %router_Route* %t10, i32 0, i32 2
-  store i64 0, i64* %t13
-  %t14 = getelementptr %router_Route, %router_Route* %t10, i32 0, i32 3
-  store i64 0, i64* %t14
-  %t15 = ptrtoint %router_Route* %t10 to i32
-  %t16 = zext i32 %t15 to i64
-  ret i64 %t16
+  %t22 = call i8* @malloc(i64 24)
+  %t23 = bitcast i8* %t22 to %router_RouteParams*
+  %t24 = getelementptr %router_RouteParams, %router_RouteParams* %t23, i32 0, i32 0
+  store i64 0, i64* %t24
+  %t25 = getelementptr %router_RouteParams, %router_RouteParams* %t23, i32 0, i32 1
+  store i64 0, i64* %t25
+  %t26 = getelementptr %router_RouteParams, %router_RouteParams* %t23, i32 0, i32 2
+  store i64 0, i64* %t26
+  %t27 = ptrtoint %router_RouteParams* %t23 to i32
+  %t28 = zext i32 %t27 to i64
+  ret i64 %t28
 }
 
 define i64 @router_split_path(i64 %path.arg) {
@@ -9543,23 +9506,23 @@ entry:
   %t7 = call i64 @__list_new()
   store i64 %t7, i64* %segments
   %t8 = load i64, i64* %path
-  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.174, i64 0, i64 0
+  %t9 = getelementptr [2 x i8], [2 x i8]* @.str.176, i64 0, i64 0
   %t10 = ptrtoint i8* %t9 to i32
   %t11 = zext i32 %t10 to i64
   %t12 = call i64 @__str_split(i64 %t8, i64 %t11)
   store i64 %t12, i64* %parts
   %t13 = add i64 0, 0
   store i64 %t13, i64* %i
-  br label %while.cond374
-while.cond374:
+  br label %while.cond380
+while.cond380:
   %t14 = load i64, i64* %i
   %t15 = load i64, i64* %parts
   %t16 = call i64 @__list_length(i64 %t15)
   %t18 = icmp slt i64 %t14, %t16
   %t17 = zext i1 %t18 to i64
   %t19 = trunc i64 %t17 to i1
-  br i1 %t19, label %while.body375, label %while.end376
-while.body375:
+  br i1 %t19, label %while.body381, label %while.end382
+while.body381:
   %t20 = load i64, i64* %parts
   %t21 = load i64, i64* %i
   %t22 = call i64 @__val_untag_int(i64 %t21)
@@ -9574,8 +9537,8 @@ while.body375:
   %t32 = icmp sgt i64 %t29, %t30
   %t31 = zext i1 %t32 to i64
   %t33 = trunc i64 %t31 to i1
-  br i1 %t33, label %then378, label %else379
-then378:
+  br i1 %t33, label %then384, label %else385
+then384:
   %t34 = load i64, i64* %segments
   %t35 = load i64, i64* %parts
   %t36 = load i64, i64* %i
@@ -9586,46 +9549,42 @@ then378:
   %t41 = select i1 %t38, i64 %t40, i64 %t37
   %t42 = call i64 @__list_get(i64 %t35, i64 %t41)
   %t43 = call i64 @__list_push(i64 %t34, i64 %t42)
-  br label %endif377
-else379:
-  br label %endif377
-endif377:
+  br label %endif383
+else385:
+  br label %endif383
+endif383:
   %t44 = load i64, i64* %i
   %t45 = add i64 0, 1
   %t46 = add i64 %t44, %t45
   store i64 %t46, i64* %i
-  br label %while.cond374
-while.end376:
+  br label %while.cond380
+while.end382:
   %t47 = load i64, i64* %segments
   call void @__gc_pop_roots(i64 3)
   ret i64 %t47
 }
 
-define i64 @router_parse_query(i64 %query_str.arg) {
+define i64 @router_parse_query(i64 %qs.arg) {
 entry:
-  %query_str = alloca i64
+  %qs = alloca i64
   %result = alloca i64
   store i64 0, i64* %result
-  %qs = alloca i64
-  store i64 0, i64* %qs
+  %str = alloca i64
+  store i64 0, i64* %str
   %pairs = alloca i64
   store i64 0, i64* %pairs
   %i = alloca i64
   %pair = alloca i64
   store i64 0, i64* %pair
   %eq = alloca i64
-  %key = alloca i64
-  store i64 0, i64* %key
-  %val = alloca i64
-  store i64 0, i64* %val
-  store i64 %query_str.arg, i64* %query_str
-  %t1 = ptrtoint i64* %query_str to i32
+  store i64 %qs.arg, i64* %qs
+  %t1 = ptrtoint i64* %qs to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
   %t3 = ptrtoint i64* %result to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = ptrtoint i64* %qs to i32
+  %t5 = ptrtoint i64* %str to i32
   %t6 = zext i32 %t5 to i64
   call void @__gc_push_root(i64 %t6)
   %t7 = ptrtoint i64* %pairs to i32
@@ -9634,160 +9593,150 @@ entry:
   %t9 = ptrtoint i64* %pair to i32
   %t10 = zext i32 %t9 to i64
   call void @__gc_push_root(i64 %t10)
-  %t11 = ptrtoint i64* %key to i32
-  %t12 = zext i32 %t11 to i64
-  call void @__gc_push_root(i64 %t12)
-  %t13 = ptrtoint i64* %val to i32
-  %t14 = zext i32 %t13 to i64
-  call void @__gc_push_root(i64 %t14)
-  %t15 = call i64 @__map_new()
-  store i64 %t15, i64* %result
-  %t16 = load i64, i64* %query_str
-  %t17 = call i8* @__val_untag_ptr(i64 %t16)
-  %t18 = call i64 @strlen(i8* %t17)
-  %t19 = add i64 0, 0
-  %t21 = icmp eq i64 %t18, %t19
-  %t20 = zext i1 %t21 to i64
-  %t22 = trunc i64 %t20 to i1
-  br i1 %t22, label %then381, label %else382
-then381:
-  %t23 = load i64, i64* %result
-  call void @__gc_pop_roots(i64 7)
-  ret i64 %t23
-else382:
-  br label %endif380
-endif380:
-  %t24 = load i64, i64* %query_str
-  store i64 %t24, i64* %qs
-  %t25 = load i64, i64* %qs
+  %t11 = call i64 @__map_new()
+  store i64 %t11, i64* %result
+  %t12 = load i64, i64* %qs
+  %t13 = call i8* @__val_untag_ptr(i64 %t12)
+  %t14 = call i64 @strlen(i8* %t13)
+  %t15 = add i64 0, 0
+  %t17 = icmp eq i64 %t14, %t15
+  %t16 = zext i1 %t17 to i64
+  %t18 = trunc i64 %t16 to i1
+  br i1 %t18, label %then387, label %else388
+then387:
+  %t19 = load i64, i64* %result
+  call void @__gc_pop_roots(i64 5)
+  ret i64 %t19
+else388:
+  br label %endif386
+endif386:
+  %t20 = load i64, i64* %qs
+  store i64 %t20, i64* %str
+  %t21 = load i64, i64* %str
+  %t22 = call i8* @__val_untag_ptr(i64 %t21)
+  %t23 = getelementptr [2 x i8], [2 x i8]* @.str.177, i64 0, i64 0
+  %t24 = ptrtoint i8* %t23 to i32
+  %t25 = zext i32 %t24 to i64
   %t26 = call i8* @__val_untag_ptr(i64 %t25)
-  %t27 = getelementptr [2 x i8], [2 x i8]* @.str.175, i64 0, i64 0
-  %t28 = ptrtoint i8* %t27 to i32
-  %t29 = zext i32 %t28 to i64
-  %t30 = call i8* @__val_untag_ptr(i64 %t29)
-  %t31 = call i64 @strlen(i8* %t30)
-  %t32 = call i32 @strncmp(i8* %t26, i8* %t30, i64 %t31)
-  %t33 = icmp eq i32 %t32, 0
-  %t34 = zext i1 %t33 to i64
-  %t35 = call i64 @__val_tag_bool(i64 %t34)
-  %t36 = trunc i64 %t35 to i1
-  br i1 %t36, label %then384, label %else385
-then384:
-  %t37 = load i64, i64* %qs
-  %t38 = call i8* @__val_untag_ptr(i64 %t37)
-  %t39 = add i64 0, 1
-  %t40 = call i64 @__val_untag_int(i64 %t39)
-  %t41 = load i64, i64* %qs
-  %t42 = call i8* @__val_untag_ptr(i64 %t41)
-  %t43 = call i64 @strlen(i8* %t42)
-  %t44 = call i64 @__val_untag_int(i64 %t43)
-  %t45 = sub i64 %t44, %t40
-  %t46 = add i64 %t45, 1
-  %t47 = call i8* @malloc(i64 %t46)
-  %t48 = getelementptr i8, i8* %t38, i64 %t40
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t47, i8* %t48, i64 %t45, i1 false)
-  %t49 = getelementptr i8, i8* %t47, i64 %t45
-  store i8 0, i8* %t49
-  %t50 = call i64 @__val_tag_ptr(i8* %t47)
-  store i64 %t50, i64* %qs
-  br label %endif383
-else385:
-  br label %endif383
-endif383:
-  %t51 = load i64, i64* %qs
-  %t52 = getelementptr [2 x i8], [2 x i8]* @.str.176, i64 0, i64 0
-  %t53 = ptrtoint i8* %t52 to i32
-  %t54 = zext i32 %t53 to i64
-  %t55 = call i64 @__str_split(i64 %t51, i64 %t54)
-  store i64 %t55, i64* %pairs
-  %t56 = add i64 0, 0
-  store i64 %t56, i64* %i
-  br label %while.cond386
-while.cond386:
-  %t57 = load i64, i64* %i
-  %t58 = load i64, i64* %pairs
-  %t59 = call i64 @__list_length(i64 %t58)
-  %t61 = icmp slt i64 %t57, %t59
-  %t60 = zext i1 %t61 to i64
-  %t62 = trunc i64 %t60 to i1
-  br i1 %t62, label %while.body387, label %while.end388
-while.body387:
-  %t63 = load i64, i64* %pairs
-  %t64 = load i64, i64* %i
-  %t65 = call i64 @__val_untag_int(i64 %t64)
-  %t66 = icmp slt i64 %t65, 0
-  %t67 = call i64 @__list_length(i64 %t63)
-  %t68 = add i64 %t67, %t65
-  %t69 = select i1 %t66, i64 %t68, i64 %t65
-  %t70 = call i64 @__list_get(i64 %t63, i64 %t69)
-  store i64 %t70, i64* %pair
-  %t71 = load i64, i64* %pair
-  %t72 = getelementptr [2 x i8], [2 x i8]* @.str.177, i64 0, i64 0
-  %t73 = ptrtoint i8* %t72 to i32
-  %t74 = zext i32 %t73 to i64
-  %t75 = call i64 @rt_str_index_of(i64 %t71, i64 %t74)
-  store i64 %t75, i64* %eq
-  %t76 = load i64, i64* %eq
-  %t77 = add i64 0, 0
-  %t79 = icmp sgt i64 %t76, %t77
-  %t78 = zext i1 %t79 to i64
-  %t80 = trunc i64 %t78 to i1
-  br i1 %t80, label %then390, label %else391
+  %t27 = call i64 @strlen(i8* %t26)
+  %t28 = call i32 @strncmp(i8* %t22, i8* %t26, i64 %t27)
+  %t29 = icmp eq i32 %t28, 0
+  %t30 = zext i1 %t29 to i64
+  %t31 = call i64 @__val_tag_bool(i64 %t30)
+  %t32 = trunc i64 %t31 to i1
+  br i1 %t32, label %then390, label %else391
 then390:
-  %t81 = load i64, i64* %pair
-  %t82 = call i8* @__val_untag_ptr(i64 %t81)
-  %t83 = add i64 0, 0
-  %t84 = call i64 @__val_untag_int(i64 %t83)
-  %t85 = load i64, i64* %eq
-  %t86 = call i64 @__val_untag_int(i64 %t85)
-  %t87 = sub i64 %t86, %t84
-  %t88 = add i64 %t87, 1
-  %t89 = call i8* @malloc(i64 %t88)
-  %t90 = getelementptr i8, i8* %t82, i64 %t84
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t89, i8* %t90, i64 %t87, i1 false)
-  %t91 = getelementptr i8, i8* %t89, i64 %t87
-  store i8 0, i8* %t91
-  %t92 = call i64 @__val_tag_ptr(i8* %t89)
-  store i64 %t92, i64* %key
-  %t93 = load i64, i64* %pair
-  %t94 = call i8* @__val_untag_ptr(i64 %t93)
-  %t95 = load i64, i64* %eq
-  %t96 = add i64 0, 1
-  %t97 = add i64 %t95, %t96
-  %t98 = call i64 @__val_untag_int(i64 %t97)
-  %t99 = load i64, i64* %pair
-  %t100 = call i8* @__val_untag_ptr(i64 %t99)
-  %t101 = call i64 @strlen(i8* %t100)
-  %t102 = call i64 @__val_untag_int(i64 %t101)
-  %t103 = sub i64 %t102, %t98
-  %t104 = add i64 %t103, 1
-  %t105 = call i8* @malloc(i64 %t104)
-  %t106 = getelementptr i8, i8* %t94, i64 %t98
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t105, i8* %t106, i64 %t103, i1 false)
-  %t107 = getelementptr i8, i8* %t105, i64 %t103
-  store i8 0, i8* %t107
-  %t108 = call i64 @__val_tag_ptr(i8* %t105)
-  store i64 %t108, i64* %val
-  %t109 = load i64, i64* %result
-  %t110 = load i64, i64* %key
-  %t111 = load i64, i64* %val
-  %t112 = call i64 @__map_set(i64 %t109, i64 %t110, i64 %t111)
+  %t33 = load i64, i64* %str
+  %t34 = call i8* @__val_untag_ptr(i64 %t33)
+  %t35 = add i64 0, 1
+  %t36 = call i64 @__val_untag_int(i64 %t35)
+  %t37 = load i64, i64* %str
+  %t38 = call i8* @__val_untag_ptr(i64 %t37)
+  %t39 = call i64 @strlen(i8* %t38)
+  %t40 = call i64 @__val_untag_int(i64 %t39)
+  %t41 = sub i64 %t40, %t36
+  %t42 = add i64 %t41, 1
+  %t43 = call i8* @malloc(i64 %t42)
+  %t44 = getelementptr i8, i8* %t34, i64 %t36
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t43, i8* %t44, i64 %t41, i1 false)
+  %t45 = getelementptr i8, i8* %t43, i64 %t41
+  store i8 0, i8* %t45
+  %t46 = call i64 @__val_tag_ptr(i8* %t43)
+  store i64 %t46, i64* %str
   br label %endif389
 else391:
   br label %endif389
 endif389:
-  %t113 = load i64, i64* %i
-  %t114 = add i64 0, 1
-  %t115 = add i64 %t113, %t114
-  store i64 %t115, i64* %i
-  br label %while.cond386
-while.end388:
-  %t116 = load i64, i64* %result
-  call void @__gc_pop_roots(i64 7)
-  ret i64 %t116
+  %t47 = load i64, i64* %str
+  %t48 = getelementptr [2 x i8], [2 x i8]* @.str.178, i64 0, i64 0
+  %t49 = ptrtoint i8* %t48 to i32
+  %t50 = zext i32 %t49 to i64
+  %t51 = call i64 @__str_split(i64 %t47, i64 %t50)
+  store i64 %t51, i64* %pairs
+  %t52 = add i64 0, 0
+  store i64 %t52, i64* %i
+  br label %while.cond392
+while.cond392:
+  %t53 = load i64, i64* %i
+  %t54 = load i64, i64* %pairs
+  %t55 = call i64 @__list_length(i64 %t54)
+  %t57 = icmp slt i64 %t53, %t55
+  %t56 = zext i1 %t57 to i64
+  %t58 = trunc i64 %t56 to i1
+  br i1 %t58, label %while.body393, label %while.end394
+while.body393:
+  %t59 = load i64, i64* %pairs
+  %t60 = load i64, i64* %i
+  %t61 = call i64 @__val_untag_int(i64 %t60)
+  %t62 = icmp slt i64 %t61, 0
+  %t63 = call i64 @__list_length(i64 %t59)
+  %t64 = add i64 %t63, %t61
+  %t65 = select i1 %t62, i64 %t64, i64 %t61
+  %t66 = call i64 @__list_get(i64 %t59, i64 %t65)
+  store i64 %t66, i64* %pair
+  %t67 = load i64, i64* %pair
+  %t68 = getelementptr [2 x i8], [2 x i8]* @.str.179, i64 0, i64 0
+  %t69 = ptrtoint i8* %t68 to i32
+  %t70 = zext i32 %t69 to i64
+  %t71 = call i64 @rt_str_index_of(i64 %t67, i64 %t70)
+  store i64 %t71, i64* %eq
+  %t72 = load i64, i64* %eq
+  %t73 = add i64 0, 0
+  %t75 = icmp sgt i64 %t72, %t73
+  %t74 = zext i1 %t75 to i64
+  %t76 = trunc i64 %t74 to i1
+  br i1 %t76, label %then396, label %else397
+then396:
+  %t77 = load i64, i64* %result
+  %t78 = load i64, i64* %pair
+  %t79 = call i8* @__val_untag_ptr(i64 %t78)
+  %t80 = add i64 0, 0
+  %t81 = call i64 @__val_untag_int(i64 %t80)
+  %t82 = load i64, i64* %eq
+  %t83 = call i64 @__val_untag_int(i64 %t82)
+  %t84 = sub i64 %t83, %t81
+  %t85 = add i64 %t84, 1
+  %t86 = call i8* @malloc(i64 %t85)
+  %t87 = getelementptr i8, i8* %t79, i64 %t81
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t86, i8* %t87, i64 %t84, i1 false)
+  %t88 = getelementptr i8, i8* %t86, i64 %t84
+  store i8 0, i8* %t88
+  %t89 = call i64 @__val_tag_ptr(i8* %t86)
+  %t90 = load i64, i64* %pair
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = load i64, i64* %eq
+  %t93 = add i64 0, 1
+  %t94 = add i64 %t92, %t93
+  %t95 = call i64 @__val_untag_int(i64 %t94)
+  %t96 = load i64, i64* %pair
+  %t97 = call i8* @__val_untag_ptr(i64 %t96)
+  %t98 = call i64 @strlen(i8* %t97)
+  %t99 = call i64 @__val_untag_int(i64 %t98)
+  %t100 = sub i64 %t99, %t95
+  %t101 = add i64 %t100, 1
+  %t102 = call i8* @malloc(i64 %t101)
+  %t103 = getelementptr i8, i8* %t91, i64 %t95
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t102, i8* %t103, i64 %t100, i1 false)
+  %t104 = getelementptr i8, i8* %t102, i64 %t100
+  store i8 0, i8* %t104
+  %t105 = call i64 @__val_tag_ptr(i8* %t102)
+  %t106 = call i64 @__map_set(i64 %t77, i64 %t89, i64 %t105)
+  br label %endif395
+else397:
+  br label %endif395
+endif395:
+  %t107 = load i64, i64* %i
+  %t108 = add i64 0, 1
+  %t109 = add i64 %t107, %t108
+  store i64 %t109, i64* %i
+  br label %while.cond392
+while.end394:
+  %t110 = load i64, i64* %result
+  call void @__gc_pop_roots(i64 5)
+  ret i64 %t110
 }
 
-define i64 @router_match_route(i64 %pattern.arg, i64 %path.arg) {
+define i64 @router_match_pattern(i64 %pattern.arg, i64 %path.arg) {
 entry:
   %pattern = alloca i64
   %path = alloca i64
@@ -9798,10 +9747,10 @@ entry:
   %params = alloca i64
   store i64 0, i64* %params
   %i = alloca i64
-  %pat = alloca i64
-  store i64 0, i64* %pat
-  %param_name = alloca i64
-  store i64 0, i64* %param_name
+  %seg = alloca i64
+  store i64 0, i64* %seg
+  %name = alloca i64
+  store i64 0, i64* %name
   %rest = alloca i64
   store i64 0, i64* %rest
   store i64 %pattern.arg, i64* %pattern
@@ -9821,29 +9770,29 @@ entry:
   %t9 = ptrtoint i64* %params to i32
   %t10 = zext i32 %t9 to i64
   call void @__gc_push_root(i64 %t10)
-  %t11 = ptrtoint i64* %pat to i32
+  %t11 = ptrtoint i64* %seg to i32
   %t12 = zext i32 %t11 to i64
   call void @__gc_push_root(i64 %t12)
-  %t13 = ptrtoint i64* %param_name to i32
+  %t13 = ptrtoint i64* %name to i32
   %t14 = zext i32 %t13 to i64
   call void @__gc_push_root(i64 %t14)
   %t15 = ptrtoint i64* %rest to i32
   %t16 = zext i32 %t15 to i64
   call void @__gc_push_root(i64 %t16)
   %t17 = load i64, i64* %pattern
-  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.178, i64 0, i64 0
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.180, i64 0, i64 0
   %t19 = ptrtoint i8* %t18 to i32
   %t20 = zext i32 %t19 to i64
   %t21 = call i64 @__string_eq(i64 %t17, i64 %t20)
   %t22 = trunc i64 %t21 to i1
-  br i1 %t22, label %then393, label %else394
-then393:
+  br i1 %t22, label %then399, label %else400
+then399:
   %t23 = call i64 @__map_new()
   call void @__gc_pop_roots(i64 8)
   ret i64 %t23
-else394:
-  br label %endif392
-endif392:
+else400:
+  br label %endif398
+endif398:
   %t24 = load i64, i64* %pattern
   %t25 = call i64 @router_split_path(i64 %t24)
   store i64 %t25, i64* %pat_segs
@@ -9854,16 +9803,16 @@ endif392:
   store i64 %t28, i64* %params
   %t29 = add i64 0, 0
   store i64 %t29, i64* %i
-  br label %while.cond395
-while.cond395:
+  br label %while.cond401
+while.cond401:
   %t30 = load i64, i64* %i
   %t31 = load i64, i64* %pat_segs
   %t32 = call i64 @__list_length(i64 %t31)
   %t34 = icmp slt i64 %t30, %t32
   %t33 = zext i1 %t34 to i64
   %t35 = trunc i64 %t33 to i1
-  br i1 %t35, label %while.body396, label %while.end397
-while.body396:
+  br i1 %t35, label %while.body402, label %while.end403
+while.body402:
   %t36 = load i64, i64* %pat_segs
   %t37 = load i64, i64* %i
   %t38 = call i64 @__val_untag_int(i64 %t37)
@@ -9872,10 +9821,10 @@ while.body396:
   %t41 = add i64 %t40, %t38
   %t42 = select i1 %t39, i64 %t41, i64 %t38
   %t43 = call i64 @__list_get(i64 %t36, i64 %t42)
-  store i64 %t43, i64* %pat
-  %t44 = load i64, i64* %pat
+  store i64 %t43, i64* %seg
+  %t44 = load i64, i64* %seg
   %t45 = call i8* @__val_untag_ptr(i64 %t44)
-  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.179, i64 0, i64 0
+  %t46 = getelementptr [2 x i8], [2 x i8]* @.str.181, i64 0, i64 0
   %t47 = ptrtoint i8* %t46 to i32
   %t48 = zext i32 %t47 to i64
   %t49 = call i8* @__val_untag_ptr(i64 %t48)
@@ -9885,13 +9834,13 @@ while.body396:
   %t53 = zext i1 %t52 to i64
   %t54 = call i64 @__val_tag_bool(i64 %t53)
   %t55 = trunc i64 %t54 to i1
-  br i1 %t55, label %then399, label %else400
-then399:
-  %t56 = load i64, i64* %pat
+  br i1 %t55, label %then405, label %else406
+then405:
+  %t56 = load i64, i64* %seg
   %t57 = call i8* @__val_untag_ptr(i64 %t56)
   %t58 = add i64 0, 1
   %t59 = call i64 @__val_untag_int(i64 %t58)
-  %t60 = load i64, i64* %pat
+  %t60 = load i64, i64* %seg
   %t61 = call i8* @__val_untag_ptr(i64 %t60)
   %t62 = call i64 @strlen(i8* %t61)
   %t63 = call i64 @__val_untag_int(i64 %t62)
@@ -9903,19 +9852,19 @@ then399:
   %t68 = getelementptr i8, i8* %t66, i64 %t64
   store i8 0, i8* %t68
   %t69 = call i64 @__val_tag_ptr(i8* %t66)
-  store i64 %t69, i64* %param_name
+  store i64 %t69, i64* %name
   %t70 = call i64 @__list_new()
   store i64 %t70, i64* %rest
-  br label %while.cond401
-while.cond401:
+  br label %while.cond407
+while.cond407:
   %t71 = load i64, i64* %i
   %t72 = load i64, i64* %path_segs
   %t73 = call i64 @__list_length(i64 %t72)
   %t75 = icmp slt i64 %t71, %t73
   %t74 = zext i1 %t75 to i64
   %t76 = trunc i64 %t74 to i1
-  br i1 %t76, label %while.body402, label %while.end403
-while.body402:
+  br i1 %t76, label %while.body408, label %while.end409
+while.body408:
   %t77 = load i64, i64* %rest
   %t78 = load i64, i64* %path_segs
   %t79 = load i64, i64* %i
@@ -9930,500 +9879,336 @@ while.body402:
   %t88 = add i64 0, 1
   %t89 = add i64 %t87, %t88
   store i64 %t89, i64* %i
-  br label %while.cond401
-while.end403:
-  %t90 = load i64, i64* %params
-  %t91 = load i64, i64* %param_name
-  %t92 = load i64, i64* %rest
-  %t93 = getelementptr [2 x i8], [2 x i8]* @.str.180, i64 0, i64 0
-  %t94 = ptrtoint i8* %t93 to i32
-  %t95 = zext i32 %t94 to i64
-  %t96 = call i64 @__list_join(i64 %t92, i64 %t95)
-  %t97 = call i64 @__map_set(i64 %t90, i64 %t91, i64 %t96)
-  %t98 = load i64, i64* %params
+  br label %while.cond407
+while.end409:
+  %t90 = load i64, i64* %name
+  %t91 = call i8* @__val_untag_ptr(i64 %t90)
+  %t92 = call i64 @strlen(i8* %t91)
+  %t93 = add i64 0, 0
+  %t95 = icmp sgt i64 %t92, %t93
+  %t94 = zext i1 %t95 to i64
+  %t96 = trunc i64 %t94 to i1
+  br i1 %t96, label %then411, label %else412
+then411:
+  %t97 = load i64, i64* %params
+  %t98 = load i64, i64* %name
+  %t99 = load i64, i64* %rest
+  %t100 = getelementptr [2 x i8], [2 x i8]* @.str.182, i64 0, i64 0
+  %t101 = ptrtoint i8* %t100 to i32
+  %t102 = zext i32 %t101 to i64
+  %t103 = call i64 @__list_join(i64 %t99, i64 %t102)
+  %t104 = call i64 @__map_set(i64 %t97, i64 %t98, i64 %t103)
+  br label %endif410
+else412:
+  br label %endif410
+endif410:
+  %t105 = load i64, i64* %params
   call void @__gc_pop_roots(i64 8)
-  ret i64 %t98
-else400:
-  br label %endif398
-endif398:
-  %t99 = load i64, i64* %i
-  %t100 = load i64, i64* %path_segs
-  %t101 = call i64 @__list_length(i64 %t100)
-  %t103 = icmp sge i64 %t99, %t101
-  %t102 = zext i1 %t103 to i64
-  %t104 = trunc i64 %t102 to i1
-  br i1 %t104, label %then405, label %else406
-then405:
-  call void @__gc_pop_roots(i64 8)
-  ret i64 0
+  ret i64 %t105
 else406:
   br label %endif404
 endif404:
-  %t105 = load i64, i64* %pat
-  %t106 = call i8* @__val_untag_ptr(i64 %t105)
-  %t107 = getelementptr [2 x i8], [2 x i8]* @.str.181, i64 0, i64 0
-  %t108 = ptrtoint i8* %t107 to i32
-  %t109 = zext i32 %t108 to i64
-  %t110 = call i8* @__val_untag_ptr(i64 %t109)
-  %t111 = call i64 @strlen(i8* %t110)
-  %t112 = call i32 @strncmp(i8* %t106, i8* %t110, i64 %t111)
-  %t113 = icmp eq i32 %t112, 0
-  %t114 = zext i1 %t113 to i64
-  %t115 = call i64 @__val_tag_bool(i64 %t114)
-  %t116 = trunc i64 %t115 to i1
-  br i1 %t116, label %then408, label %else409
-then408:
-  %t117 = load i64, i64* %pat
-  %t118 = call i8* @__val_untag_ptr(i64 %t117)
-  %t119 = add i64 0, 1
-  %t120 = call i64 @__val_untag_int(i64 %t119)
-  %t121 = load i64, i64* %pat
-  %t122 = call i8* @__val_untag_ptr(i64 %t121)
-  %t123 = call i64 @strlen(i8* %t122)
-  %t124 = call i64 @__val_untag_int(i64 %t123)
-  %t125 = sub i64 %t124, %t120
-  %t126 = add i64 %t125, 1
-  %t127 = call i8* @malloc(i64 %t126)
-  %t128 = getelementptr i8, i8* %t118, i64 %t120
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t127, i8* %t128, i64 %t125, i1 false)
-  %t129 = getelementptr i8, i8* %t127, i64 %t125
-  store i8 0, i8* %t129
-  %t130 = call i64 @__val_tag_ptr(i8* %t127)
-  store i64 %t130, i64* %param_name
-  %t131 = load i64, i64* %params
-  %t132 = load i64, i64* %param_name
-  %t133 = load i64, i64* %path_segs
-  %t134 = load i64, i64* %i
-  %t135 = call i64 @__val_untag_int(i64 %t134)
-  %t136 = icmp slt i64 %t135, 0
-  %t137 = call i64 @__list_length(i64 %t133)
-  %t138 = add i64 %t137, %t135
-  %t139 = select i1 %t136, i64 %t138, i64 %t135
-  %t140 = call i64 @__list_get(i64 %t133, i64 %t139)
-  %t141 = call i64 @__map_set(i64 %t131, i64 %t132, i64 %t140)
-  br label %endif407
-else409:
-  %t142 = load i64, i64* %pat
-  %t143 = load i64, i64* %path_segs
-  %t144 = load i64, i64* %i
-  %t145 = call i64 @__val_untag_int(i64 %t144)
-  %t146 = icmp slt i64 %t145, 0
-  %t147 = call i64 @__list_length(i64 %t143)
-  %t148 = add i64 %t147, %t145
-  %t149 = select i1 %t146, i64 %t148, i64 %t145
-  %t150 = call i64 @__list_get(i64 %t143, i64 %t149)
-  %t151 = call i64 @__string_ne(i64 %t142, i64 %t150)
-  %t152 = trunc i64 %t151 to i1
-  br i1 %t152, label %then410, label %else411
-then410:
+  %t106 = load i64, i64* %i
+  %t107 = load i64, i64* %path_segs
+  %t108 = call i64 @__list_length(i64 %t107)
+  %t110 = icmp sge i64 %t106, %t108
+  %t109 = zext i1 %t110 to i64
+  %t111 = trunc i64 %t109 to i1
+  br i1 %t111, label %then414, label %else415
+then414:
   call void @__gc_pop_roots(i64 8)
   ret i64 0
-else411:
-  br label %endif407
-endif407:
-  %t153 = load i64, i64* %i
-  %t154 = add i64 0, 1
-  %t155 = add i64 %t153, %t154
-  store i64 %t155, i64* %i
-  br label %while.cond395
-while.end397:
-  %t156 = load i64, i64* %path_segs
-  %t157 = call i64 @__list_length(i64 %t156)
-  %t158 = load i64, i64* %pat_segs
-  %t159 = call i64 @__list_length(i64 %t158)
-  %t161 = icmp ne i64 %t157, %t159
-  %t160 = zext i1 %t161 to i64
-  %t162 = trunc i64 %t160 to i1
-  br i1 %t162, label %then413, label %else414
-then413:
+else415:
+  br label %endif413
+endif413:
+  %t112 = load i64, i64* %seg
+  %t113 = call i8* @__val_untag_ptr(i64 %t112)
+  %t114 = getelementptr [2 x i8], [2 x i8]* @.str.183, i64 0, i64 0
+  %t115 = ptrtoint i8* %t114 to i32
+  %t116 = zext i32 %t115 to i64
+  %t117 = call i8* @__val_untag_ptr(i64 %t116)
+  %t118 = call i64 @strlen(i8* %t117)
+  %t119 = call i32 @strncmp(i8* %t113, i8* %t117, i64 %t118)
+  %t120 = icmp eq i32 %t119, 0
+  %t121 = zext i1 %t120 to i64
+  %t122 = call i64 @__val_tag_bool(i64 %t121)
+  %t123 = trunc i64 %t122 to i1
+  br i1 %t123, label %then417, label %else418
+then417:
+  %t124 = load i64, i64* %seg
+  %t125 = call i8* @__val_untag_ptr(i64 %t124)
+  %t126 = add i64 0, 1
+  %t127 = call i64 @__val_untag_int(i64 %t126)
+  %t128 = load i64, i64* %seg
+  %t129 = call i8* @__val_untag_ptr(i64 %t128)
+  %t130 = call i64 @strlen(i8* %t129)
+  %t131 = call i64 @__val_untag_int(i64 %t130)
+  %t132 = sub i64 %t131, %t127
+  %t133 = add i64 %t132, 1
+  %t134 = call i8* @malloc(i64 %t133)
+  %t135 = getelementptr i8, i8* %t125, i64 %t127
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t134, i8* %t135, i64 %t132, i1 false)
+  %t136 = getelementptr i8, i8* %t134, i64 %t132
+  store i8 0, i8* %t136
+  %t137 = call i64 @__val_tag_ptr(i8* %t134)
+  store i64 %t137, i64* %name
+  %t138 = load i64, i64* %params
+  %t139 = load i64, i64* %name
+  %t140 = load i64, i64* %path_segs
+  %t141 = load i64, i64* %i
+  %t142 = call i64 @__val_untag_int(i64 %t141)
+  %t143 = icmp slt i64 %t142, 0
+  %t144 = call i64 @__list_length(i64 %t140)
+  %t145 = add i64 %t144, %t142
+  %t146 = select i1 %t143, i64 %t145, i64 %t142
+  %t147 = call i64 @__list_get(i64 %t140, i64 %t146)
+  %t148 = call i64 @__map_set(i64 %t138, i64 %t139, i64 %t147)
+  br label %endif416
+else418:
+  %t149 = load i64, i64* %seg
+  %t150 = load i64, i64* %path_segs
+  %t151 = load i64, i64* %i
+  %t152 = call i64 @__val_untag_int(i64 %t151)
+  %t153 = icmp slt i64 %t152, 0
+  %t154 = call i64 @__list_length(i64 %t150)
+  %t155 = add i64 %t154, %t152
+  %t156 = select i1 %t153, i64 %t155, i64 %t152
+  %t157 = call i64 @__list_get(i64 %t150, i64 %t156)
+  %t158 = call i64 @__string_ne(i64 %t149, i64 %t157)
+  %t159 = trunc i64 %t158 to i1
+  br i1 %t159, label %then419, label %else420
+then419:
   call void @__gc_pop_roots(i64 8)
   ret i64 0
-else414:
-  br label %endif412
-endif412:
-  %t163 = load i64, i64* %params
+else420:
+  br label %endif416
+endif416:
+  %t160 = load i64, i64* %i
+  %t161 = add i64 0, 1
+  %t162 = add i64 %t160, %t161
+  store i64 %t162, i64* %i
+  br label %while.cond401
+while.end403:
+  %t163 = load i64, i64* %path_segs
+  %t164 = call i64 @__list_length(i64 %t163)
+  %t165 = load i64, i64* %pat_segs
+  %t166 = call i64 @__list_length(i64 %t165)
+  %t168 = icmp ne i64 %t164, %t166
+  %t167 = zext i1 %t168 to i64
+  %t169 = trunc i64 %t167 to i1
+  br i1 %t169, label %then422, label %else423
+then422:
   call void @__gc_pop_roots(i64 8)
-  ret i64 %t163
+  ret i64 0
+else423:
+  br label %endif421
+endif421:
+  %t170 = load i64, i64* %params
+  call void @__gc_pop_roots(i64 8)
+  ret i64 %t170
 }
 
-define i64 @router_Router__init(i64 %self.arg, i64 %routes.arg, i64 %not_found.arg) {
+define i64 @Mode__to_string(i64 %self) {
+entry:
+  %t1 = lshr i64 %self, 56
+  switch i64 %t1, label %ets.end424 [ i64 0, label %ets.v425 i64 1, label %ets.v426 i64 2, label %ets.v427 ]
+ets.v425:
+  %t2 = getelementptr [5 x i8], [5 x i8]* @.str.184, i64 0, i64 0
+  %t3 = ptrtoint i8* %t2 to i32
+  %t4 = zext i32 %t3 to i64
+  ret i64 %t4
+ets.v426:
+  %t5 = getelementptr [8 x i8], [8 x i8]* @.str.185, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i32
+  %t7 = zext i32 %t6 to i64
+  ret i64 %t7
+ets.v427:
+  %t8 = getelementptr [7 x i8], [7 x i8]* @.str.186, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i32
+  %t10 = zext i32 %t9 to i64
+  ret i64 %t10
+ets.end424:
+  %t11 = getelementptr [8 x i8], [8 x i8]* @.str.187, i64 0, i64 0
+  %t12 = ptrtoint i8* %t11 to i32
+  %t13 = zext i32 %t12 to i64
+  ret i64 %t13
+}
+
+define i64 @router_RouteDef__init(i64 %self.arg, i64 %pattern.arg, i64 %handler.arg) {
 entry:
   %self = alloca i64
-  %routes = alloca i64
-  %not_found = alloca i64
+  %pattern = alloca i64
+  %handler = alloca i64
   store i64 %self.arg, i64* %self
-  store i64 %routes.arg, i64* %routes
-  store i64 %not_found.arg, i64* %not_found
-  %t1 = ptrtoint i64* %routes to i32
+  store i64 %pattern.arg, i64* %pattern
+  store i64 %handler.arg, i64* %handler
+  %t1 = ptrtoint i64* %pattern to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = ptrtoint i64* %not_found to i32
+  %t3 = ptrtoint i64* %handler to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
   %t5 = load i64, i64* %self
-  %t6 = load i64, i64* %routes
+  %t6 = load i64, i64* %pattern
+  %t7 = trunc i64 %t5 to i32
+  %t8 = inttoptr i32 %t7 to %router_RouteDef*
+  %t9 = getelementptr %router_RouteDef, %router_RouteDef* %t8, i32 0, i32 0
+  store volatile i64 %t6, i64* %t9
+  %t10 = load i64, i64* %self
+  %t11 = load i64, i64* %handler
+  %t12 = trunc i64 %t10 to i32
+  %t13 = inttoptr i32 %t12 to %router_RouteDef*
+  %t14 = getelementptr %router_RouteDef, %router_RouteDef* %t13, i32 0, i32 1
+  store volatile i64 %t11, i64* %t14
+  call void @__gc_pop_roots(i64 2)
+  ret i64 0
+}
+
+define i64 @router_RouteDef() {
+entry:
+  %t15 = call i8* @malloc(i64 16)
+  %t16 = bitcast i8* %t15 to %router_RouteDef*
+  %t17 = getelementptr %router_RouteDef, %router_RouteDef* %t16, i32 0, i32 0
+  store i64 0, i64* %t17
+  %t18 = getelementptr %router_RouteDef, %router_RouteDef* %t16, i32 0, i32 1
+  store i64 0, i64* %t18
+  %t19 = ptrtoint %router_RouteDef* %t16 to i32
+  %t20 = zext i32 %t19 to i64
+  ret i64 %t20
+}
+
+define i64 @router_Router__init(i64 %self.arg, i64 %mode.arg, i64 %initial.arg) {
+entry:
+  %self = alloca i64
+  %mode = alloca i64
+  %initial = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %mode.arg, i64* %mode
+  store i64 %initial.arg, i64* %initial
+  %t1 = ptrtoint i64* %mode to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = ptrtoint i64* %initial to i32
+  %t4 = zext i32 %t3 to i64
+  call void @__gc_push_root(i64 %t4)
+  %t5 = load i64, i64* %self
+  %t6 = load i64, i64* %mode
   %t7 = trunc i64 %t5 to i32
   %t8 = inttoptr i32 %t7 to %router_Router*
   %t9 = getelementptr %router_Router, %router_Router* %t8, i32 0, i32 0
   store volatile i64 %t6, i64* %t9
   %t10 = load i64, i64* %self
-  %t11 = call i64 @router_RouteParams()
-  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.182, i64 0, i64 0
-  %t13 = ptrtoint i8* %t12 to i32
-  %t14 = zext i32 %t13 to i64
-  %t15 = call i64 @__map_new()
-  %t16 = call i64 @__map_new()
-  %t17 = call i64 @router_RouteParams__init(i64 %t11, i64 %t14, i64 %t15, i64 %t16)
-  %t18 = call i64 @signal_signal(i64 %t11)
-  %t19 = trunc i64 %t10 to i32
-  %t20 = inttoptr i32 %t19 to %router_Router*
-  %t21 = getelementptr %router_Router, %router_Router* %t20, i32 0, i32 1
-  store volatile i64 %t18, i64* %t21
-  %t22 = load i64, i64* %self
-  %t23 = load i64, i64* %not_found
-  %t24 = trunc i64 %t22 to i32
-  %t25 = inttoptr i32 %t24 to %router_Router*
-  %t26 = getelementptr %router_Router, %router_Router* %t25, i32 0, i32 2
-  store volatile i64 %t23, i64* %t26
+  %t11 = call i64 @__list_new()
+  %t12 = trunc i64 %t10 to i32
+  %t13 = inttoptr i32 %t12 to %router_Router*
+  %t14 = getelementptr %router_Router, %router_Router* %t13, i32 0, i32 2
+  store volatile i64 %t11, i64* %t14
+  %t15 = load i64, i64* %self
+  %t16 = load i64, i64* %initial
+  %t17 = trunc i64 %t15 to i32
+  %t18 = inttoptr i32 %t17 to %router_Router*
+  %t19 = getelementptr %router_Router, %router_Router* %t18, i32 0, i32 3
+  store volatile i64 %t16, i64* %t19
+  %t20 = load i64, i64* %self
+  %t21 = load i64, i64* %initial
+  %t22 = call i64 @signal_signal(i64 %t21)
+  %t23 = trunc i64 %t20 to i32
+  %t24 = inttoptr i32 %t23 to %router_Router*
+  %t25 = getelementptr %router_Router, %router_Router* %t24, i32 0, i32 1
+  store volatile i64 %t22, i64* %t25
   call void @__gc_pop_roots(i64 2)
   ret i64 0
 }
 
-define i64 @router_Router__navigate(i64 %self.arg, i64 %url.arg) {
+define i64 @router_Router__route(i64 %self.arg, i64 %pattern.arg, i64 %handler.arg) {
+entry:
+  %self = alloca i64
+  %pattern = alloca i64
+  %handler = alloca i64
+  store i64 %self.arg, i64* %self
+  store i64 %pattern.arg, i64* %pattern
+  store i64 %handler.arg, i64* %handler
+  %t1 = ptrtoint i64* %pattern to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = ptrtoint i64* %handler to i32
+  %t4 = zext i32 %t3 to i64
+  call void @__gc_push_root(i64 %t4)
+  %t5 = load i64, i64* %self
+  %t6 = trunc i64 %t5 to i32
+  %t7 = inttoptr i32 %t6 to %router_Router*
+  %t8 = getelementptr %router_Router, %router_Router* %t7, i32 0, i32 2
+  %t9 = load volatile i64, i64* %t8
+  %t10 = call i64 @router_RouteDef()
+  %t11 = load i64, i64* %pattern
+  %t12 = load i64, i64* %handler
+  %t13 = call i64 @router_RouteDef__init(i64 %t10, i64 %t11, i64 %t12)
+  %t14 = call i64 @__list_push(i64 %t9, i64 %t10)
+  call void @__gc_pop_roots(i64 2)
+  ret i64 0
+}
+
+define i64 @router_Router__push(i64 %self.arg, i64 %url.arg) {
 entry:
   %self = alloca i64
   %url = alloca i64
-  %qmark = alloca i64
-  %path = alloca i64
-  store i64 0, i64* %path
-  %query_str = alloca i64
-  store i64 0, i64* %query_str
-  %query = alloca i64
-  store i64 0, i64* %query
-  %i = alloca i64
-  %route = alloca i64
-  store i64 0, i64* %route
-  %params = alloca i64
-  store i64 0, i64* %params
-  %route_params = alloca i64
-  store i64 0, i64* %route_params
   store i64 %self.arg, i64* %self
   store i64 %url.arg, i64* %url
   %t1 = ptrtoint i64* %url to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = ptrtoint i64* %path to i32
-  %t4 = zext i32 %t3 to i64
-  call void @__gc_push_root(i64 %t4)
-  %t5 = ptrtoint i64* %query_str to i32
-  %t6 = zext i32 %t5 to i64
-  call void @__gc_push_root(i64 %t6)
-  %t7 = ptrtoint i64* %query to i32
-  %t8 = zext i32 %t7 to i64
-  call void @__gc_push_root(i64 %t8)
-  %t9 = ptrtoint i64* %route to i32
-  %t10 = zext i32 %t9 to i64
-  call void @__gc_push_root(i64 %t10)
-  %t11 = ptrtoint i64* %params to i32
-  %t12 = zext i32 %t11 to i64
-  call void @__gc_push_root(i64 %t12)
-  %t13 = ptrtoint i64* %route_params to i32
-  %t14 = zext i32 %t13 to i64
-  call void @__gc_push_root(i64 %t14)
-  %t15 = load i64, i64* %url
-  %t16 = getelementptr [2 x i8], [2 x i8]* @.str.183, i64 0, i64 0
-  %t17 = ptrtoint i8* %t16 to i32
-  %t18 = zext i32 %t17 to i64
-  %t19 = call i64 @rt_str_index_of(i64 %t15, i64 %t18)
-  store i64 %t19, i64* %qmark
-  %t20 = load i64, i64* %url
-  store i64 %t20, i64* %path
-  %t21 = getelementptr [1 x i8], [1 x i8]* @.str.184, i64 0, i64 0
-  %t22 = ptrtoint i8* %t21 to i32
-  %t23 = zext i32 %t22 to i64
-  store i64 %t23, i64* %query_str
-  %t24 = load i64, i64* %qmark
-  %t25 = add i64 0, 0
-  %t27 = icmp sge i64 %t24, %t25
-  %t26 = zext i1 %t27 to i64
-  %t28 = trunc i64 %t26 to i1
-  br i1 %t28, label %then416, label %else417
-then416:
-  %t29 = load i64, i64* %url
-  %t30 = call i8* @__val_untag_ptr(i64 %t29)
-  %t31 = add i64 0, 0
-  %t32 = call i64 @__val_untag_int(i64 %t31)
-  %t33 = load i64, i64* %qmark
-  %t34 = call i64 @__val_untag_int(i64 %t33)
-  %t35 = sub i64 %t34, %t32
-  %t36 = add i64 %t35, 1
-  %t37 = call i8* @malloc(i64 %t36)
-  %t38 = getelementptr i8, i8* %t30, i64 %t32
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t37, i8* %t38, i64 %t35, i1 false)
-  %t39 = getelementptr i8, i8* %t37, i64 %t35
-  store i8 0, i8* %t39
-  %t40 = call i64 @__val_tag_ptr(i8* %t37)
-  store i64 %t40, i64* %path
-  %t41 = load i64, i64* %url
-  %t42 = call i8* @__val_untag_ptr(i64 %t41)
-  %t43 = load i64, i64* %qmark
-  %t44 = call i64 @__val_untag_int(i64 %t43)
-  %t45 = load i64, i64* %url
-  %t46 = call i8* @__val_untag_ptr(i64 %t45)
-  %t47 = call i64 @strlen(i8* %t46)
-  %t48 = call i64 @__val_untag_int(i64 %t47)
-  %t49 = sub i64 %t48, %t44
-  %t50 = add i64 %t49, 1
-  %t51 = call i8* @malloc(i64 %t50)
-  %t52 = getelementptr i8, i8* %t42, i64 %t44
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %t51, i8* %t52, i64 %t49, i1 false)
-  %t53 = getelementptr i8, i8* %t51, i64 %t49
-  store i8 0, i8* %t53
-  %t54 = call i64 @__val_tag_ptr(i8* %t51)
-  store i64 %t54, i64* %query_str
-  br label %endif415
-else417:
-  br label %endif415
-endif415:
-  %t55 = load i64, i64* %query_str
-  %t56 = call i64 @router_parse_query(i64 %t55)
-  store i64 %t56, i64* %query
-  %t57 = add i64 0, 0
-  store i64 %t57, i64* %i
-  br label %while.cond418
-while.cond418:
-  %t58 = load i64, i64* %i
-  %t59 = load i64, i64* %self
-  %t60 = trunc i64 %t59 to i32
-  %t61 = inttoptr i32 %t60 to %router_Router*
-  %t62 = getelementptr %router_Router, %router_Router* %t61, i32 0, i32 0
-  %t63 = load volatile i64, i64* %t62
-  %t64 = call i64 @__list_length(i64 %t63)
-  %t66 = icmp slt i64 %t58, %t64
-  %t65 = zext i1 %t66 to i64
-  %t67 = trunc i64 %t65 to i1
-  br i1 %t67, label %while.body419, label %while.end420
-while.body419:
-  %t68 = load i64, i64* %self
-  %t69 = trunc i64 %t68 to i32
-  %t70 = inttoptr i32 %t69 to %router_Router*
-  %t71 = getelementptr %router_Router, %router_Router* %t70, i32 0, i32 0
-  %t72 = load volatile i64, i64* %t71
-  %t73 = load i64, i64* %i
-  %t74 = call i64 @__val_untag_int(i64 %t73)
-  %t75 = icmp slt i64 %t74, 0
-  %t76 = call i64 @__list_length(i64 %t72)
-  %t77 = add i64 %t76, %t74
-  %t78 = select i1 %t75, i64 %t77, i64 %t74
-  %t79 = call i64 @__list_get(i64 %t72, i64 %t78)
-  store i64 %t79, i64* %route
-  %t80 = load i64, i64* %route
-  %t81 = trunc i64 %t80 to i32
-  %t82 = inttoptr i32 %t81 to %router_Route*
-  %t83 = getelementptr %router_Route, %router_Route* %t82, i32 0, i32 0
-  %t84 = load volatile i64, i64* %t83
-  %t85 = load i64, i64* %path
-  %t86 = call i64 @router_match_route(i64 %t84, i64 %t85)
-  store i64 %t86, i64* %params
-  %t87 = load i64, i64* %params
-  %t89 = icmp ne i64 %t87, 0
-  %t88 = zext i1 %t89 to i64
-  %t90 = trunc i64 %t88 to i1
-  br i1 %t90, label %then422, label %else423
-then422:
-  %t91 = call i64 @router_RouteParams()
-  %t92 = load i64, i64* %path
-  %t93 = load i64, i64* %params
-  %t94 = load i64, i64* %query
-  %t95 = call i64 @router_RouteParams__init(i64 %t91, i64 %t92, i64 %t93, i64 %t94)
-  store i64 %t91, i64* %route_params
-  %t96 = load i64, i64* %route
-  %t97 = trunc i64 %t96 to i32
-  %t98 = inttoptr i32 %t97 to %router_Route*
-  %t99 = getelementptr %router_Route, %router_Route* %t98, i32 0, i32 2
-  %t100 = load volatile i64, i64* %t99
-  %t102 = icmp ne i64 %t100, 0
-  %t101 = zext i1 %t102 to i64
-  %t103 = trunc i64 %t101 to i1
-  br i1 %t103, label %then425, label %else426
-then425:
-  %t104 = load i64, i64* %route
-  %t105 = trunc i64 %t104 to i32
-  %t106 = inttoptr i32 %t105 to %router_Route*
-  %t107 = getelementptr %router_Route, %router_Route* %t106, i32 0, i32 2
-  %t108 = load i64, i64* %t107
-  %t109 = trunc i64 %t108 to i32
-  %t110 = inttoptr i32 %t109 to [2 x i64]*
-  %t111 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 0
-  %t112 = load i64, i64* %t111
-  %t113 = getelementptr [2 x i64], [2 x i64]* %t110, i64 0, i64 1
-  %t114 = load i64, i64* %t113
-  %t115 = load i64, i64* %route_params
-  %t116 = trunc i64 %t112 to i32
-  %t117 = inttoptr i32 %t116 to i64 (i64, i64)*
-  %t118 = call i64 %t117(i64 %t114, i64 %t115)
-  %t119 = call i64 @__val_untag_bool(i64 %t118)
-  %t120 = xor i64 %t119, 1
-  %t121 = call i64 @__val_tag_bool(i64 %t120)
-  %t122 = trunc i64 %t121 to i1
-  br i1 %t122, label %then428, label %else429
-then428:
-  call void @__gc_pop_roots(i64 7)
-  ret i64 0
-else429:
-  br label %endif427
-endif427:
-  br label %endif424
-else426:
-  br label %endif424
-endif424:
-  %t123 = load i64, i64* %self
-  %t124 = trunc i64 %t123 to i32
-  %t125 = inttoptr i32 %t124 to %router_Router*
-  %t126 = getelementptr %router_Router, %router_Router* %t125, i32 0, i32 1
-  %t127 = load volatile i64, i64* %t126
-  %t128 = load i64, i64* %route_params
-  %t129 = call i64 @signal_Signal__set(i64 %t127, i64 %t128)
-  call void @__gc_pop_roots(i64 7)
-  ret i64 0
-else423:
-  br label %endif421
-endif421:
-  %t130 = load i64, i64* %i
-  %t131 = add i64 0, 1
-  %t132 = add i64 %t130, %t131
-  store i64 %t132, i64* %i
-  br label %while.cond418
-while.end420:
-  %t133 = load i64, i64* %self
-  %t134 = trunc i64 %t133 to i32
-  %t135 = inttoptr i32 %t134 to %router_Router*
-  %t136 = getelementptr %router_Router, %router_Router* %t135, i32 0, i32 1
-  %t137 = load volatile i64, i64* %t136
-  %t138 = call i64 @router_RouteParams()
-  %t139 = load i64, i64* %path
-  %t140 = call i64 @__map_new()
-  %t141 = load i64, i64* %query
-  %t142 = call i64 @router_RouteParams__init(i64 %t138, i64 %t139, i64 %t140, i64 %t141)
-  %t143 = call i64 @signal_Signal__set(i64 %t137, i64 %t138)
-  call void @__gc_pop_roots(i64 7)
+  %t3 = load i64, i64* %self
+  %t4 = trunc i64 %t3 to i32
+  %t5 = inttoptr i32 %t4 to %router_Router*
+  %t6 = getelementptr %router_Router, %router_Router* %t5, i32 0, i32 0
+  %t7 = load volatile i64, i64* %t6
+  %t8 = alloca i64
+  %t10 = lshr i64 %t7, 56
+  %t9 = trunc i64 %t10 to i8
+  switch i8 %t9, label %match.end428 [ i8 0, label %match.arm429 i8 1, label %match.arm430 i8 2, label %match.arm431 ]
+match.arm429:
+  %t11 = load i64, i64* %url
+  %t12 = call i8* @__val_untag_ptr(i64 %t11)
+  call void @js_set_hash(i8* %t12)
+  store i64 0, i64* %t8
+  br label %match.end428
+match.arm430:
+  %t13 = load i64, i64* %url
+  %t14 = call i8* @__val_untag_ptr(i64 %t13)
+  call void @js_push_state(i8* %t14)
+  store i64 0, i64* %t8
+  br label %match.end428
+match.arm431:
+  %t15 = call i64 @__map_new()
+  store i64 %t15, i64* %t8
+  br label %match.end428
+match.end428:
+  %t16 = load i64, i64* %t8
+  %t17 = load i64, i64* %self
+  %t18 = trunc i64 %t17 to i32
+  %t19 = inttoptr i32 %t18 to %router_Router*
+  %t20 = getelementptr %router_Router, %router_Router* %t19, i32 0, i32 1
+  %t21 = load volatile i64, i64* %t20
+  %t22 = load i64, i64* %url
+  %t23 = call i64 @signal_Signal__set(i64 %t21, i64 %t22)
+  call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
 
-define i64 @router_Router__back(i64 %self.arg) {
+define i64 @router_Router__current(i64 %self.arg) {
 entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
-  ret i64 0
+  %t1 = load i64, i64* %self
+  %t2 = trunc i64 %t1 to i32
+  %t3 = inttoptr i32 %t2 to %router_Router*
+  %t4 = getelementptr %router_Router, %router_Router* %t3, i32 0, i32 1
+  %t5 = load volatile i64, i64* %t4
+  %t6 = call i64 @signal_Signal__get(i64 %t5)
+  ret i64 %t6
 }
 
-define i64 @router_Router__forward(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  store i64 %self.arg, i64* %self
-  ret i64 0
-}
-
-define i64 @router_Router__resolve(i64 %self.arg) {
-entry:
-  %self = alloca i64
-  %route_params = alloca i64
-  store i64 0, i64* %route_params
-  %i = alloca i64
-  %route = alloca i64
-  store i64 0, i64* %route
-  %params = alloca i64
-  store i64 0, i64* %params
-  store i64 %self.arg, i64* %self
-  %t1 = ptrtoint i64* %route_params to i32
-  %t2 = zext i32 %t1 to i64
-  call void @__gc_push_root(i64 %t2)
-  %t3 = ptrtoint i64* %route to i32
-  %t4 = zext i32 %t3 to i64
-  call void @__gc_push_root(i64 %t4)
-  %t5 = ptrtoint i64* %params to i32
-  %t6 = zext i32 %t5 to i64
-  call void @__gc_push_root(i64 %t6)
-  %t7 = load i64, i64* %self
-  %t8 = trunc i64 %t7 to i32
-  %t9 = inttoptr i32 %t8 to %router_Router*
-  %t10 = getelementptr %router_Router, %router_Router* %t9, i32 0, i32 1
-  %t11 = load volatile i64, i64* %t10
-  %t12 = call i64 @signal_Signal__get(i64 %t11)
-  store i64 %t12, i64* %route_params
-  %t13 = add i64 0, 0
-  store i64 %t13, i64* %i
-  br label %while.cond430
-while.cond430:
-  %t14 = load i64, i64* %i
-  %t15 = load i64, i64* %self
-  %t16 = trunc i64 %t15 to i32
-  %t17 = inttoptr i32 %t16 to %router_Router*
-  %t18 = getelementptr %router_Router, %router_Router* %t17, i32 0, i32 0
-  %t19 = load volatile i64, i64* %t18
-  %t20 = call i64 @__list_length(i64 %t19)
-  %t22 = icmp slt i64 %t14, %t20
-  %t21 = zext i1 %t22 to i64
-  %t23 = trunc i64 %t21 to i1
-  br i1 %t23, label %while.body431, label %while.end432
-while.body431:
-  %t24 = load i64, i64* %self
-  %t25 = trunc i64 %t24 to i32
-  %t26 = inttoptr i32 %t25 to %router_Router*
-  %t27 = getelementptr %router_Router, %router_Router* %t26, i32 0, i32 0
-  %t28 = load volatile i64, i64* %t27
-  %t29 = load i64, i64* %i
-  %t30 = call i64 @__val_untag_int(i64 %t29)
-  %t31 = icmp slt i64 %t30, 0
-  %t32 = call i64 @__list_length(i64 %t28)
-  %t33 = add i64 %t32, %t30
-  %t34 = select i1 %t31, i64 %t33, i64 %t30
-  %t35 = call i64 @__list_get(i64 %t28, i64 %t34)
-  store i64 %t35, i64* %route
-  %t36 = load i64, i64* %route
-  %t37 = trunc i64 %t36 to i32
-  %t38 = inttoptr i32 %t37 to %router_Route*
-  %t39 = getelementptr %router_Route, %router_Route* %t38, i32 0, i32 0
-  %t40 = load volatile i64, i64* %t39
-  %t41 = load i64, i64* %route_params
-  %t42 = trunc i64 %t41 to i32
-  %t43 = inttoptr i32 %t42 to %router_RouteParams*
-  %t44 = getelementptr %router_RouteParams, %router_RouteParams* %t43, i32 0, i32 2
-  %t45 = load volatile i64, i64* %t44
-  %t46 = call i64 @router_match_route(i64 %t40, i64 %t45)
-  store i64 %t46, i64* %params
-  %t47 = load i64, i64* %params
-  %t49 = icmp ne i64 %t47, 0
-  %t48 = zext i1 %t49 to i64
-  %t50 = trunc i64 %t48 to i1
-  br i1 %t50, label %then434, label %else435
-then434:
-  %t51 = load i64, i64* %route
-  %t52 = trunc i64 %t51 to i32
-  %t53 = inttoptr i32 %t52 to %router_Route*
-  %t54 = getelementptr %router_Route, %router_Route* %t53, i32 0, i32 1
-  %t55 = load volatile i64, i64* %t54
-  call void @__gc_pop_roots(i64 3)
-  ret i64 %t55
-else435:
-  br label %endif433
-endif433:
-  %t56 = load i64, i64* %i
-  %t57 = add i64 0, 1
-  %t58 = add i64 %t56, %t57
-  store i64 %t58, i64* %i
-  br label %while.cond430
-while.end432:
-  %t59 = load i64, i64* %self
-  %t60 = trunc i64 %t59 to i32
-  %t61 = inttoptr i32 %t60 to %router_Router*
-  %t62 = getelementptr %router_Router, %router_Router* %t61, i32 0, i32 2
-  %t63 = load volatile i64, i64* %t62
-  call void @__gc_pop_roots(i64 3)
-  ret i64 %t63
-}
-
-define i64 @router_Router__current_route(i64 %self.arg) {
+define i64 @router_Router__current_signal(i64 %self.arg) {
 entry:
   %self = alloca i64
   store i64 %self.arg, i64* %self
@@ -10435,39 +10220,332 @@ entry:
   ret i64 %t5
 }
 
-define i64 @router_Router() {
+define i64 @router_Router__resolve(i64 %self.arg) {
 entry:
-  %t6 = call i8* @malloc(i64 24)
-  %t7 = bitcast i8* %t6 to %router_Router*
-  %t8 = getelementptr %router_Router, %router_Router* %t7, i32 0, i32 0
-  store i64 0, i64* %t8
-  %t9 = getelementptr %router_Router, %router_Router* %t7, i32 0, i32 1
-  store i64 0, i64* %t9
-  %t10 = getelementptr %router_Router, %router_Router* %t7, i32 0, i32 2
-  store i64 0, i64* %t10
-  %t11 = ptrtoint %router_Router* %t7 to i32
-  %t12 = zext i32 %t11 to i64
-  ret i64 %t12
-}
-
-define i64 @router_create(i64 %routes.arg, i64 %not_found.arg) {
-entry:
-  %routes = alloca i64
-  %not_found = alloca i64
-  store i64 %routes.arg, i64* %routes
-  store i64 %not_found.arg, i64* %not_found
-  %t1 = ptrtoint i64* %routes to i32
+  %self = alloca i64
+  %current_path = alloca i64
+  store i64 0, i64* %current_path
+  %i = alloca i64
+  %r = alloca i64
+  store i64 0, i64* %r
+  %params = alloca i64
+  store i64 0, i64* %params
+  store i64 %self.arg, i64* %self
+  %t1 = ptrtoint i64* %current_path to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = ptrtoint i64* %not_found to i32
+  %t3 = ptrtoint i64* %r to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
+  %t5 = ptrtoint i64* %params to i32
+  %t6 = zext i32 %t5 to i64
+  call void @__gc_push_root(i64 %t6)
+  %t7 = load i64, i64* %self
+  %t8 = trunc i64 %t7 to i32
+  %t9 = inttoptr i32 %t8 to %router_Router*
+  %t10 = getelementptr %router_Router, %router_Router* %t9, i32 0, i32 1
+  %t11 = load volatile i64, i64* %t10
+  %t12 = call i64 @signal_Signal__get(i64 %t11)
+  store i64 %t12, i64* %current_path
+  %t13 = add i64 0, 0
+  store i64 %t13, i64* %i
+  br label %while.cond432
+while.cond432:
+  %t14 = load i64, i64* %i
+  %t15 = load i64, i64* %self
+  %t16 = trunc i64 %t15 to i32
+  %t17 = inttoptr i32 %t16 to %router_Router*
+  %t18 = getelementptr %router_Router, %router_Router* %t17, i32 0, i32 2
+  %t19 = load volatile i64, i64* %t18
+  %t20 = call i64 @__list_length(i64 %t19)
+  %t22 = icmp slt i64 %t14, %t20
+  %t21 = zext i1 %t22 to i64
+  %t23 = trunc i64 %t21 to i1
+  br i1 %t23, label %while.body433, label %while.end434
+while.body433:
+  %t24 = load i64, i64* %self
+  %t25 = trunc i64 %t24 to i32
+  %t26 = inttoptr i32 %t25 to %router_Router*
+  %t27 = getelementptr %router_Router, %router_Router* %t26, i32 0, i32 2
+  %t28 = load volatile i64, i64* %t27
+  %t29 = load i64, i64* %i
+  %t30 = call i64 @__val_untag_int(i64 %t29)
+  %t31 = icmp slt i64 %t30, 0
+  %t32 = call i64 @__list_length(i64 %t28)
+  %t33 = add i64 %t32, %t30
+  %t34 = select i1 %t31, i64 %t33, i64 %t30
+  %t35 = call i64 @__list_get(i64 %t28, i64 %t34)
+  store i64 %t35, i64* %r
+  %t36 = load i64, i64* %r
+  %t37 = trunc i64 %t36 to i32
+  %t38 = inttoptr i32 %t37 to %router_RouteDef*
+  %t39 = getelementptr %router_RouteDef, %router_RouteDef* %t38, i32 0, i32 0
+  %t40 = load volatile i64, i64* %t39
+  %t41 = load i64, i64* %current_path
+  %t42 = call i64 @router_match_pattern(i64 %t40, i64 %t41)
+  store i64 %t42, i64* %params
+  %t43 = load i64, i64* %params
+  %t45 = icmp ne i64 %t43, 0
+  %t44 = zext i1 %t45 to i64
+  %t46 = trunc i64 %t44 to i1
+  br i1 %t46, label %then436, label %else437
+then436:
+  %t47 = call i64 @router_RouteParams()
+  %t48 = load i64, i64* %current_path
+  %t49 = load i64, i64* %params
+  %t50 = call i64 @__map_new()
+  %t51 = call i64 @router_RouteParams__init(i64 %t47, i64 %t48, i64 %t49, i64 %t50)
+  call void @__gc_pop_roots(i64 3)
+  ret i64 %t47
+else437:
+  br label %endif435
+endif435:
+  %t52 = load i64, i64* %i
+  %t53 = add i64 0, 1
+  %t54 = add i64 %t52, %t53
+  store i64 %t54, i64* %i
+  br label %while.cond432
+while.end434:
+  %t55 = call i64 @router_RouteParams()
+  %t56 = load i64, i64* %current_path
+  %t57 = call i64 @__map_new()
+  %t58 = call i64 @__map_new()
+  %t59 = call i64 @router_RouteParams__init(i64 %t55, i64 %t56, i64 %t57, i64 %t58)
+  call void @__gc_pop_roots(i64 3)
+  ret i64 %t55
+}
+
+define i64 @router_Router__dispatch(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  %current_path = alloca i64
+  store i64 0, i64* %current_path
+  %i = alloca i64
+  %r = alloca i64
+  store i64 0, i64* %r
+  %params = alloca i64
+  store i64 0, i64* %params
+  store i64 %self.arg, i64* %self
+  %t1 = ptrtoint i64* %current_path to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = ptrtoint i64* %r to i32
+  %t4 = zext i32 %t3 to i64
+  call void @__gc_push_root(i64 %t4)
+  %t5 = ptrtoint i64* %params to i32
+  %t6 = zext i32 %t5 to i64
+  call void @__gc_push_root(i64 %t6)
+  %t7 = load i64, i64* %self
+  %t8 = trunc i64 %t7 to i32
+  %t9 = inttoptr i32 %t8 to %router_Router*
+  %t10 = getelementptr %router_Router, %router_Router* %t9, i32 0, i32 1
+  %t11 = load volatile i64, i64* %t10
+  %t12 = call i64 @signal_Signal__get(i64 %t11)
+  store i64 %t12, i64* %current_path
+  %t13 = add i64 0, 0
+  store i64 %t13, i64* %i
+  br label %while.cond438
+while.cond438:
+  %t14 = load i64, i64* %i
+  %t15 = load i64, i64* %self
+  %t16 = trunc i64 %t15 to i32
+  %t17 = inttoptr i32 %t16 to %router_Router*
+  %t18 = getelementptr %router_Router, %router_Router* %t17, i32 0, i32 2
+  %t19 = load volatile i64, i64* %t18
+  %t20 = call i64 @__list_length(i64 %t19)
+  %t22 = icmp slt i64 %t14, %t20
+  %t21 = zext i1 %t22 to i64
+  %t23 = trunc i64 %t21 to i1
+  br i1 %t23, label %while.body439, label %while.end440
+while.body439:
+  %t24 = load i64, i64* %self
+  %t25 = trunc i64 %t24 to i32
+  %t26 = inttoptr i32 %t25 to %router_Router*
+  %t27 = getelementptr %router_Router, %router_Router* %t26, i32 0, i32 2
+  %t28 = load volatile i64, i64* %t27
+  %t29 = load i64, i64* %i
+  %t30 = call i64 @__val_untag_int(i64 %t29)
+  %t31 = icmp slt i64 %t30, 0
+  %t32 = call i64 @__list_length(i64 %t28)
+  %t33 = add i64 %t32, %t30
+  %t34 = select i1 %t31, i64 %t33, i64 %t30
+  %t35 = call i64 @__list_get(i64 %t28, i64 %t34)
+  store i64 %t35, i64* %r
+  %t36 = load i64, i64* %r
+  %t37 = trunc i64 %t36 to i32
+  %t38 = inttoptr i32 %t37 to %router_RouteDef*
+  %t39 = getelementptr %router_RouteDef, %router_RouteDef* %t38, i32 0, i32 0
+  %t40 = load volatile i64, i64* %t39
+  %t41 = load i64, i64* %current_path
+  %t42 = call i64 @router_match_pattern(i64 %t40, i64 %t41)
+  store i64 %t42, i64* %params
+  %t43 = load i64, i64* %params
+  %t45 = icmp ne i64 %t43, 0
+  %t44 = zext i1 %t45 to i64
+  %t46 = trunc i64 %t44 to i1
+  br i1 %t46, label %then442, label %else443
+then442:
+  %t47 = load i64, i64* %r
+  %t48 = trunc i64 %t47 to i32
+  %t49 = inttoptr i32 %t48 to %router_RouteDef*
+  %t50 = getelementptr %router_RouteDef, %router_RouteDef* %t49, i32 0, i32 1
+  %t51 = load i64, i64* %t50
+  %t52 = trunc i64 %t51 to i32
+  %t53 = inttoptr i32 %t52 to [2 x i64]*
+  %t54 = getelementptr [2 x i64], [2 x i64]* %t53, i64 0, i64 0
+  %t55 = load i64, i64* %t54
+  %t56 = getelementptr [2 x i64], [2 x i64]* %t53, i64 0, i64 1
+  %t57 = load i64, i64* %t56
+  %t58 = call i64 @router_RouteParams()
+  %t59 = load i64, i64* %current_path
+  %t60 = load i64, i64* %params
+  %t61 = call i64 @__map_new()
+  %t62 = call i64 @router_RouteParams__init(i64 %t58, i64 %t59, i64 %t60, i64 %t61)
+  %t63 = trunc i64 %t55 to i32
+  %t64 = inttoptr i32 %t63 to i64 (i64, i64)*
+  %t65 = call i64 %t64(i64 %t57, i64 %t58)
+  call void @__gc_pop_roots(i64 3)
+  ret i64 0
+else443:
+  br label %endif441
+endif441:
+  %t66 = load i64, i64* %i
+  %t67 = add i64 0, 1
+  %t68 = add i64 %t66, %t67
+  store i64 %t68, i64* %i
+  br label %while.cond438
+while.end440:
+  call void @__gc_pop_roots(i64 3)
+  ret i64 0
+}
+
+define i64 @router_Router___on_external_change(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  %t1 = load i64, i64* %self
+  %t2 = trunc i64 %t1 to i32
+  %t3 = inttoptr i32 %t2 to %router_Router*
+  %t4 = getelementptr %router_Router, %router_Router* %t3, i32 0, i32 0
+  %t5 = load volatile i64, i64* %t4
+  %t6 = alloca i64
+  %t8 = lshr i64 %t5, 56
+  %t7 = trunc i64 %t8 to i8
+  switch i8 %t7, label %match.end444 [ i8 0, label %match.arm445 i8 1, label %match.arm446 i8 2, label %match.arm447 ]
+match.arm445:
+  %t9 = load i64, i64* %self
+  %t10 = trunc i64 %t9 to i32
+  %t11 = inttoptr i32 %t10 to %router_Router*
+  %t12 = getelementptr %router_Router, %router_Router* %t11, i32 0, i32 1
+  %t13 = load volatile i64, i64* %t12
+  %t14 = call i8* @js_get_hash()
+  %t15 = call i64 @__val_tag_ptr(i8* %t14)
+  %t16 = call i64 @signal_Signal__set(i64 %t13, i64 %t15)
+  store i64 %t16, i64* %t6
+  br label %match.end444
+match.arm446:
+  %t17 = load i64, i64* %self
+  %t18 = trunc i64 %t17 to i32
+  %t19 = inttoptr i32 %t18 to %router_Router*
+  %t20 = getelementptr %router_Router, %router_Router* %t19, i32 0, i32 1
+  %t21 = load volatile i64, i64* %t20
+  %t22 = call i8* @js_get_pathname()
+  %t23 = call i64 @__val_tag_ptr(i8* %t22)
+  %t24 = call i64 @signal_Signal__set(i64 %t21, i64 %t23)
+  store i64 %t24, i64* %t6
+  br label %match.end444
+match.arm447:
+  %t25 = call i64 @__map_new()
+  store i64 %t25, i64* %t6
+  br label %match.end444
+match.end444:
+  %t26 = load i64, i64* %t6
+  ret i64 0
+}
+
+define i64 @router_Router() {
+entry:
+  %t27 = call i8* @malloc(i64 32)
+  %t28 = bitcast i8* %t27 to %router_Router*
+  %t29 = getelementptr %router_Router, %router_Router* %t28, i32 0, i32 0
+  store i64 0, i64* %t29
+  %t30 = getelementptr %router_Router, %router_Router* %t28, i32 0, i32 1
+  store i64 0, i64* %t30
+  %t31 = getelementptr %router_Router, %router_Router* %t28, i32 0, i32 2
+  store i64 0, i64* %t31
+  %t32 = getelementptr %router_Router, %router_Router* %t28, i32 0, i32 3
+  store i64 0, i64* %t32
+  %t33 = ptrtoint %router_Router* %t28 to i32
+  %t34 = zext i32 %t33 to i64
+  ret i64 %t34
+}
+
+define i64 @router_hash() {
+entry:
+  %initial = alloca i64
+  store i64 0, i64* %initial
+  %t1 = ptrtoint i64* %initial to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = call i8* @js_get_hash()
+  %t4 = call i64 @__val_tag_ptr(i8* %t3)
+  store i64 %t4, i64* %initial
+  %t5 = load i64, i64* %initial
+  %t6 = call i8* @__val_untag_ptr(i64 %t5)
+  %t7 = call i64 @strlen(i8* %t6)
+  %t8 = add i64 0, 0
+  %t10 = icmp eq i64 %t7, %t8
+  %t9 = zext i1 %t10 to i64
+  %t11 = trunc i64 %t9 to i1
+  br i1 %t11, label %then449, label %else450
+then449:
+  %t12 = getelementptr [2 x i8], [2 x i8]* @.str.188, i64 0, i64 0
+  %t13 = ptrtoint i8* %t12 to i32
+  %t14 = zext i32 %t13 to i64
+  store i64 %t14, i64* %initial
+  br label %endif448
+else450:
+  br label %endif448
+endif448:
+  %t15 = call i64 @router_Router()
+  %t16 = shl i64 0, 56
+  %t17 = load i64, i64* %initial
+  %t18 = call i64 @router_Router__init(i64 %t15, i64 %t16, i64 %t17)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t15
+}
+
+define i64 @router_history() {
+entry:
+  %initial = alloca i64
+  store i64 0, i64* %initial
+  %t1 = ptrtoint i64* %initial to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = call i8* @js_get_pathname()
+  %t4 = call i64 @__val_tag_ptr(i8* %t3)
+  store i64 %t4, i64* %initial
   %t5 = call i64 @router_Router()
-  %t6 = load i64, i64* %routes
-  %t7 = load i64, i64* %not_found
+  %t6 = shl i64 1, 56
+  %t7 = load i64, i64* %initial
   %t8 = call i64 @router_Router__init(i64 %t5, i64 %t6, i64 %t7)
-  call void @__gc_pop_roots(i64 2)
+  call void @__gc_pop_roots(i64 1)
   ret i64 %t5
+}
+
+define i64 @router_memory(i64 %initial.arg) {
+entry:
+  %initial = alloca i64
+  store i64 %initial.arg, i64* %initial
+  %t1 = ptrtoint i64* %initial to i32
+  %t2 = zext i32 %t1 to i64
+  call void @__gc_push_root(i64 %t2)
+  %t3 = call i64 @router_Router()
+  %t4 = shl i64 2, 56
+  %t5 = load i64, i64* %initial
+  %t6 = call i64 @router_Router__init(i64 %t3, i64 %t4, i64 %t5)
+  call void @__gc_pop_roots(i64 1)
+  ret i64 %t3
 }
 
 define i64 @style_styles(i64 %pairs.arg) {
@@ -10495,35 +10573,35 @@ entry:
   store i64 %t9, i64* %keys
   %t10 = add i64 0, 0
   store i64 %t10, i64* %i
-  br label %while.cond436
-while.cond436:
+  br label %while.cond451
+while.cond451:
   %t11 = load i64, i64* %i
   %t12 = load i64, i64* %keys
   %t13 = call i64 @__list_length(i64 %t12)
   %t15 = icmp slt i64 %t11, %t13
   %t14 = zext i1 %t15 to i64
   %t16 = trunc i64 %t14 to i1
-  br i1 %t16, label %while.body437, label %while.end438
-while.body437:
+  br i1 %t16, label %while.body452, label %while.end453
+while.body452:
   %t17 = load i64, i64* %i
   %t18 = add i64 0, 0
   %t20 = icmp sgt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %then440, label %else441
-then440:
+  br i1 %t21, label %then455, label %else456
+then455:
   %t22 = load i64, i64* %sb
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.185, i64 0, i64 0
+  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.189, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i32
   %t25 = zext i32 %t24 to i64
   %t26 = call i8* @__val_untag_ptr(i64 %t25)
   %t27 = ptrtoint i8* %t26 to i32
   %t28 = zext i32 %t27 to i64
   %t29 = call i64 @__sb_append(i64 %t22, i64 %t28)
-  br label %endif439
-else441:
-  br label %endif439
-endif439:
+  br label %endif454
+else456:
+  br label %endif454
+endif454:
   %t30 = load i64, i64* %sb
   %t31 = load i64, i64* %keys
   %t32 = load i64, i64* %i
@@ -10538,7 +10616,7 @@ endif439:
   %t41 = zext i32 %t40 to i64
   %t42 = call i64 @__sb_append(i64 %t30, i64 %t41)
   %t43 = load i64, i64* %sb
-  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.186, i64 0, i64 0
+  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.190, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i32
   %t46 = zext i32 %t45 to i64
   %t47 = call i8* @__val_untag_ptr(i64 %t46)
@@ -10564,8 +10642,8 @@ endif439:
   %t67 = add i64 0, 1
   %t68 = add i64 %t66, %t67
   store i64 %t68, i64* %i
-  br label %while.cond436
-while.end438:
+  br label %while.cond451
+while.end453:
   %t69 = load i64, i64* %sb
   %t70 = call i64 @__sb_to_string(i64 %t69)
   call void @__gc_pop_roots(i64 3)
@@ -10597,16 +10675,16 @@ entry:
   store i64 %t9, i64* %keys
   %t10 = add i64 0, 0
   store i64 %t10, i64* %i
-  br label %while.cond442
-while.cond442:
+  br label %while.cond457
+while.cond457:
   %t11 = load i64, i64* %i
   %t12 = load i64, i64* %keys
   %t13 = call i64 @__list_length(i64 %t12)
   %t15 = icmp slt i64 %t11, %t13
   %t14 = zext i1 %t15 to i64
   %t16 = trunc i64 %t14 to i1
-  br i1 %t16, label %while.body443, label %while.end444
-while.body443:
+  br i1 %t16, label %while.body458, label %while.end459
+while.body458:
   %t17 = load i64, i64* %classes
   %t18 = load i64, i64* %keys
   %t19 = load i64, i64* %i
@@ -10618,8 +10696,8 @@ while.body443:
   %t25 = call i64 @__list_get(i64 %t18, i64 %t24)
   %t26 = call i64 @__map_get(i64 %t17, i64 %t25)
   %t27 = trunc i64 %t26 to i1
-  br i1 %t27, label %then446, label %else447
-then446:
+  br i1 %t27, label %then461, label %else462
+then461:
   %t28 = load i64, i64* %result
   %t29 = load i64, i64* %keys
   %t30 = load i64, i64* %i
@@ -10630,18 +10708,18 @@ then446:
   %t35 = select i1 %t32, i64 %t34, i64 %t31
   %t36 = call i64 @__list_get(i64 %t29, i64 %t35)
   %t37 = call i64 @__list_push(i64 %t28, i64 %t36)
-  br label %endif445
-else447:
-  br label %endif445
-endif445:
+  br label %endif460
+else462:
+  br label %endif460
+endif460:
   %t38 = load i64, i64* %i
   %t39 = add i64 0, 1
   %t40 = add i64 %t38, %t39
   store i64 %t40, i64* %i
-  br label %while.cond442
-while.end444:
+  br label %while.cond457
+while.end459:
   %t41 = load i64, i64* %result
-  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.187, i64 0, i64 0
+  %t42 = getelementptr [2 x i8], [2 x i8]* @.str.191, i64 0, i64 0
   %t43 = ptrtoint i8* %t42 to i32
   %t44 = zext i32 %t43 to i64
   %t45 = call i64 @__list_join(i64 %t41, i64 %t44)
@@ -10655,7 +10733,7 @@ entry:
   %t2 = add i64 0, 1
   %t3 = add i64 %t1, %t2
   store i64 %t3, i64* @__g_style__scope_counter
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.188, i64 0, i64 0
+  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.192, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i32
   %t6 = zext i32 %t5 to i64
   %t7 = load i64, i64* @__g_style__scope_counter
@@ -10730,16 +10808,16 @@ entry:
   store i64 %t27, i64* %keys
   %t28 = add i64 0, 0
   store i64 %t28, i64* %i
-  br label %while.cond448
-while.cond448:
+  br label %while.cond463
+while.cond463:
   %t29 = load i64, i64* %i
   %t30 = load i64, i64* %keys
   %t31 = call i64 @__list_length(i64 %t30)
   %t33 = icmp slt i64 %t29, %t31
   %t32 = zext i1 %t33 to i64
   %t34 = trunc i64 %t32 to i1
-  br i1 %t34, label %while.body449, label %while.end450
-while.body449:
+  br i1 %t34, label %while.body464, label %while.end465
+while.body464:
   %t35 = load i64, i64* %keys
   %t36 = load i64, i64* %i
   %t37 = call i64 @__val_untag_int(i64 %t36)
@@ -10786,7 +10864,7 @@ while.body449:
   %t73 = inttoptr i32 %t72 to %style_ScopedStyles*
   %t74 = getelementptr %style_ScopedStyles, %style_ScopedStyles* %t73, i32 0, i32 1
   %t75 = load volatile i64, i64* %t74
-  %t76 = getelementptr [2 x i8], [2 x i8]* @.str.189, i64 0, i64 0
+  %t76 = getelementptr [2 x i8], [2 x i8]* @.str.193, i64 0, i64 0
   %t77 = ptrtoint i8* %t76 to i32
   %t78 = zext i32 %t77 to i64
   %t79 = load i64, i64* %scoped_name
@@ -10803,7 +10881,7 @@ while.body449:
   call i8* @strcat(i8* %t88, i8* %t83)
   %t89 = ptrtoint i8* %t88 to i32
   %t90 = zext i32 %t89 to i64
-  %t91 = getelementptr [4 x i8], [4 x i8]* @.str.190, i64 0, i64 0
+  %t91 = getelementptr [4 x i8], [4 x i8]* @.str.194, i64 0, i64 0
   %t92 = ptrtoint i8* %t91 to i32
   %t93 = zext i32 %t92 to i64
   %t94 = trunc i64 %t90 to i32
@@ -10833,7 +10911,7 @@ while.body449:
   call i8* @strcat(i8* %t114, i8* %t109)
   %t115 = ptrtoint i8* %t114 to i32
   %t116 = zext i32 %t115 to i64
-  %t117 = getelementptr [3 x i8], [3 x i8]* @.str.191, i64 0, i64 0
+  %t117 = getelementptr [3 x i8], [3 x i8]* @.str.195, i64 0, i64 0
   %t118 = ptrtoint i8* %t117 to i32
   %t119 = zext i32 %t118 to i64
   %t120 = trunc i64 %t116 to i32
@@ -10854,8 +10932,8 @@ while.body449:
   %t133 = add i64 0, 1
   %t134 = add i64 %t132, %t133
   store i64 %t134, i64* %i
-  br label %while.cond448
-while.end450:
+  br label %while.cond463
+while.end465:
   call void @__gc_pop_roots(i64 5)
   ret i64 0
 }
@@ -10889,7 +10967,7 @@ entry:
   %t3 = inttoptr i32 %t2 to %style_ScopedStyles*
   %t4 = getelementptr %style_ScopedStyles, %style_ScopedStyles* %t3, i32 0, i32 1
   %t5 = load volatile i64, i64* %t4
-  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.192, i64 0, i64 0
+  %t6 = getelementptr [2 x i8], [2 x i8]* @.str.196, i64 0, i64 0
   %t7 = ptrtoint i8* %t6 to i32
   %t8 = zext i32 %t7 to i64
   %t9 = call i64 @__list_join(i64 %t5, i64 %t8)
@@ -10950,35 +11028,35 @@ entry:
   store i64 %t9, i64* %keys
   %t10 = add i64 0, 0
   store i64 %t10, i64* %i
-  br label %while.cond451
-while.cond451:
+  br label %while.cond466
+while.cond466:
   %t11 = load i64, i64* %i
   %t12 = load i64, i64* %keys
   %t13 = call i64 @__list_length(i64 %t12)
   %t15 = icmp slt i64 %t11, %t13
   %t14 = zext i1 %t15 to i64
   %t16 = trunc i64 %t14 to i1
-  br i1 %t16, label %while.body452, label %while.end453
-while.body452:
+  br i1 %t16, label %while.body467, label %while.end468
+while.body467:
   %t17 = load i64, i64* %i
   %t18 = add i64 0, 0
   %t20 = icmp sgt i64 %t17, %t18
   %t19 = zext i1 %t20 to i64
   %t21 = trunc i64 %t19 to i1
-  br i1 %t21, label %then455, label %else456
-then455:
+  br i1 %t21, label %then470, label %else471
+then470:
   %t22 = load i64, i64* %sb
-  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.193, i64 0, i64 0
+  %t23 = getelementptr [3 x i8], [3 x i8]* @.str.197, i64 0, i64 0
   %t24 = ptrtoint i8* %t23 to i32
   %t25 = zext i32 %t24 to i64
   %t26 = call i8* @__val_untag_ptr(i64 %t25)
   %t27 = ptrtoint i8* %t26 to i32
   %t28 = zext i32 %t27 to i64
   %t29 = call i64 @__sb_append(i64 %t22, i64 %t28)
-  br label %endif454
-else456:
-  br label %endif454
-endif454:
+  br label %endif469
+else471:
+  br label %endif469
+endif469:
   %t30 = load i64, i64* %sb
   %t31 = load i64, i64* %keys
   %t32 = load i64, i64* %i
@@ -10993,7 +11071,7 @@ endif454:
   %t41 = zext i32 %t40 to i64
   %t42 = call i64 @__sb_append(i64 %t30, i64 %t41)
   %t43 = load i64, i64* %sb
-  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.194, i64 0, i64 0
+  %t44 = getelementptr [3 x i8], [3 x i8]* @.str.198, i64 0, i64 0
   %t45 = ptrtoint i8* %t44 to i32
   %t46 = zext i32 %t45 to i64
   %t47 = call i8* @__val_untag_ptr(i64 %t46)
@@ -11019,8 +11097,8 @@ endif454:
   %t67 = add i64 0, 1
   %t68 = add i64 %t66, %t67
   store i64 %t68, i64* %i
-  br label %while.cond451
-while.end453:
+  br label %while.cond466
+while.end468:
   %t69 = load i64, i64* %sb
   %t70 = call i64 @__sb_to_string(i64 %t69)
   call void @__gc_pop_roots(i64 3)
@@ -11071,7 +11149,7 @@ entry:
   %t7 = inttoptr i32 %t6 to %style_Keyframes*
   %t8 = getelementptr %style_Keyframes, %style_Keyframes* %t7, i32 0, i32 1
   %t9 = load volatile i64, i64* %t8
-  %t10 = getelementptr [3 x i8], [3 x i8]* @.str.195, i64 0, i64 0
+  %t10 = getelementptr [3 x i8], [3 x i8]* @.str.199, i64 0, i64 0
   %t11 = ptrtoint i8* %t10 to i32
   %t12 = zext i32 %t11 to i64
   %t13 = load i64, i64* %pct
@@ -11088,7 +11166,7 @@ entry:
   call i8* @strcat(i8* %t22, i8* %t17)
   %t23 = ptrtoint i8* %t22 to i32
   %t24 = zext i32 %t23 to i64
-  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.196, i64 0, i64 0
+  %t25 = getelementptr [4 x i8], [4 x i8]* @.str.200, i64 0, i64 0
   %t26 = ptrtoint i8* %t25 to i32
   %t27 = zext i32 %t26 to i64
   %t28 = trunc i64 %t24 to i32
@@ -11118,7 +11196,7 @@ entry:
   call i8* @strcat(i8* %t48, i8* %t43)
   %t49 = ptrtoint i8* %t48 to i32
   %t50 = zext i32 %t49 to i64
-  %t51 = getelementptr [3 x i8], [3 x i8]* @.str.197, i64 0, i64 0
+  %t51 = getelementptr [3 x i8], [3 x i8]* @.str.201, i64 0, i64 0
   %t52 = ptrtoint i8* %t51 to i32
   %t53 = zext i32 %t52 to i64
   %t54 = trunc i64 %t50 to i32
@@ -11150,7 +11228,7 @@ entry:
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.198, i64 0, i64 0
+  %t4 = getelementptr [5 x i8], [5 x i8]* @.str.202, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i32
   %t6 = zext i32 %t5 to i64
   %t7 = load i64, i64* %css
@@ -11169,7 +11247,7 @@ entry:
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
   %t3 = load i64, i64* %self
-  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.199, i64 0, i64 0
+  %t4 = getelementptr [3 x i8], [3 x i8]* @.str.203, i64 0, i64 0
   %t5 = ptrtoint i8* %t4 to i32
   %t6 = zext i32 %t5 to i64
   %t7 = load i64, i64* %css
@@ -11191,7 +11269,7 @@ entry:
   %t3 = call i64 @StringBuilder()
   store i64 %t3, i64* %sb
   %t4 = load i64, i64* %sb
-  %t5 = getelementptr [12 x i8], [12 x i8]* @.str.200, i64 0, i64 0
+  %t5 = getelementptr [12 x i8], [12 x i8]* @.str.204, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i32
   %t7 = zext i32 %t6 to i64
   %t8 = load i64, i64* %self
@@ -11212,7 +11290,7 @@ entry:
   call i8* @strcat(i8* %t21, i8* %t16)
   %t22 = ptrtoint i8* %t21 to i32
   %t23 = zext i32 %t22 to i64
-  %t24 = getelementptr [4 x i8], [4 x i8]* @.str.201, i64 0, i64 0
+  %t24 = getelementptr [4 x i8], [4 x i8]* @.str.205, i64 0, i64 0
   %t25 = ptrtoint i8* %t24 to i32
   %t26 = zext i32 %t25 to i64
   %t27 = trunc i64 %t23 to i32
@@ -11234,8 +11312,8 @@ entry:
   %t41 = call i64 @__sb_append(i64 %t4, i64 %t40)
   %t42 = add i64 0, 0
   store i64 %t42, i64* %i
-  br label %while.cond457
-while.cond457:
+  br label %while.cond472
+while.cond472:
   %t43 = load i64, i64* %i
   %t44 = load i64, i64* %self
   %t45 = trunc i64 %t44 to i32
@@ -11246,8 +11324,8 @@ while.cond457:
   %t51 = icmp slt i64 %t43, %t49
   %t50 = zext i1 %t51 to i64
   %t52 = trunc i64 %t50 to i1
-  br i1 %t52, label %while.body458, label %while.end459
-while.body458:
+  br i1 %t52, label %while.body473, label %while.end474
+while.body473:
   %t53 = load i64, i64* %sb
   %t54 = load i64, i64* %self
   %t55 = trunc i64 %t54 to i32
@@ -11266,7 +11344,7 @@ while.body458:
   %t68 = zext i32 %t67 to i64
   %t69 = call i64 @__sb_append(i64 %t53, i64 %t68)
   %t70 = load i64, i64* %sb
-  %t71 = getelementptr [2 x i8], [2 x i8]* @.str.202, i64 0, i64 0
+  %t71 = getelementptr [2 x i8], [2 x i8]* @.str.206, i64 0, i64 0
   %t72 = ptrtoint i8* %t71 to i32
   %t73 = zext i32 %t72 to i64
   %t74 = call i8* @__val_untag_ptr(i64 %t73)
@@ -11277,10 +11355,10 @@ while.body458:
   %t79 = add i64 0, 1
   %t80 = add i64 %t78, %t79
   store i64 %t80, i64* %i
-  br label %while.cond457
-while.end459:
+  br label %while.cond472
+while.end474:
   %t81 = load i64, i64* %sb
-  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.203, i64 0, i64 0
+  %t82 = getelementptr [2 x i8], [2 x i8]* @.str.207, i64 0, i64 0
   %t83 = ptrtoint i8* %t82 to i32
   %t84 = zext i32 %t83 to i64
   %t85 = call i8* @__val_untag_ptr(i64 %t84)
