@@ -1507,7 +1507,9 @@ class Parser {
         }
         // Build the initial expression and continue chaining (dots, indexes, calls)
         var expr: AST.Expr = AST.Expr.GetField(AST.Expr.This, field)
+        var chained: Bool = false
         while (this.match_kind_check(".") or this.match_kind_check("[")) {
+            chained = true
             if (this.match_kind_check("[")) {
                 this.advance()
                 var idx: AST.Expr = this.parse_expr()
@@ -1538,7 +1540,7 @@ class Parser {
                 }
             }
         }
-        // Check for direct method call: this.method(args)
+        // Check for trailing call: this.field[idx]() or this.method(args)
         if (this.match_kind("(")) {
             var args: List<AST.Expr> = []
             if (!this.match_kind_check(")")) {
@@ -1548,6 +1550,10 @@ class Parser {
                 }
             }
             this.consume(")")
+            if (chained) {
+                // expr was modified by indexing/chaining — this is an indirect call
+                return AST.Stmt.ExprStmt(AST.Expr.Call(expr, args))
+            }
             return AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.This, field, args))
         }
         return AST.Stmt.ExprStmt(expr)
