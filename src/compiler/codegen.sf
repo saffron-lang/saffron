@@ -907,7 +907,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     // Reflect runtime functions (generated at end of compilation)
     gen.known_functions.push("__reflect_get_fields")
     gen.known_functions.push("__reflect_class_name")
-    gen.known_functions.push("__reflect_construct_from_map")
+    gen.known_functions.push("__reflect_is_class")    gen.known_functions.push("__reflect_construct_from_map")
     gen.known_functions.push("__reflect_number_to_string")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
