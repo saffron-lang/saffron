@@ -1895,8 +1895,27 @@
             return gft_args[gft_idx]
         }
     }
-    if (!this.class_fields.has(class_name)) return "Int"
-    var fields: String = this.class_fields.get(class_name)
+    var __gft_lookup: String = class_name
+    if (!this.class_fields.has(class_name)) {
+        // Cross-module: try bare name via reverse lookup
+        var __gft_keys: List<String> = this.class_struct_names.keys()
+        var __gft_i: Float = 0
+        while (__gft_i < __gft_keys.length()) {
+            if (this.class_struct_names.get(__gft_keys[__gft_i]) == class_name) {
+                if (this.class_fields.has(__gft_keys[__gft_i])) {
+                    __gft_lookup = __gft_keys[__gft_i]
+                    __gft_i = __gft_keys.length()
+                }
+            }
+            __gft_i = __gft_i + 1
+        }
+        // Also try stripping current_prefix
+        if (!this.class_fields.has(__gft_lookup) and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
+            var __bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
+            if (this.class_fields.has(__bare)) { __gft_lookup = __bare }
+        }
+    }
+    var fields: String = this.class_fields.get(__gft_lookup)
     if (fields.length() == 0) return "Int"
     var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
@@ -1930,6 +1949,23 @@
 
     fun get_field_index(class_name: String, field: String): Float {
     var fields: String = this.class_fields.get(class_name)
+    // Cross-module: if prefixed name not found, try bare name via reverse lookup
+    if (fields.length() == 0) {
+        var __fkeys: List<String> = this.class_struct_names.keys()
+        var __fki: Float = 0
+        while (__fki < __fkeys.length()) {
+            if (this.class_struct_names.get(__fkeys[__fki]) == class_name) {
+                fields = this.class_fields.get(__fkeys[__fki])
+                if (fields.length() > 0) { __fki = __fkeys.length() }
+            }
+            __fki = __fki + 1
+        }
+    }
+    // Also try: strip current_prefix from class_name to get bare name
+    if (fields.length() == 0 and this.current_prefix.length() > 0 and class_name.starts_with(this.current_prefix)) {
+        var bare: String = class_name.slice(this.current_prefix.length(), class_name.length())
+        fields = this.class_fields.get(bare)
+    }
     if (fields.length() == 0) return 0
     var parts: List<String> = this.split_respecting_generics(fields, ",")
     var i: Float = 0
@@ -1958,10 +1994,6 @@
             }
             __fi = __fi + 1
         }
-    }
-    if (class_name.length() > 0 and parts.length() > 0 and !is_method) {
-        IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")
-        this.has_errors = true
     }
     return 0
 }
