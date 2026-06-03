@@ -163,7 +163,7 @@
             this.global_var_types.set(this.current_prefix + name, vtype)
         }
         this.emit_indent("store i64 " + val + ", i64* " + var_ref)
-        this.verify_store(val, "i64", var_ref)
+        if (!this.use_llvm_lib) { this.verify_store(val, "i64", var_ref) }
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
@@ -849,7 +849,7 @@
         if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
             this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
-            this.verify_alloca("%" + this.sanitize_name(vname), "i64")
+            if (!this.use_llvm_lib) { this.verify_alloca("%" + this.sanitize_name(vname), "i64") }
         }
     }
 
@@ -874,8 +874,12 @@
 
     fun to_i1(val: String): String {
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = trunc i64 " + val + " to i1")
-        this.verify_trunc(local, val, "i64", "i1")
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_trunc(local, val, "i64", "i1"))
+        } else {
+            this.emit_indent(local + " = trunc i64 " + val + " to i1")
+            this.verify_trunc(local, val, "i64", "i1")
+        }
         return local
     }
 
@@ -891,13 +895,21 @@
             var then_label: String = this.fresh_label("then")
             var else_label: String = this.fresh_label("else")
 
-            this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
-            this.verify_cond_br(cond_val, then_label, else_label)
+            if (this.use_llvm_lib) {
+                this.emit_terminator(this.lib_cond_br(cond_val, then_label, else_label))
+            } else {
+                this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
+                this.verify_cond_br(cond_val, then_label, else_label)
+            }
 
             this.start_block(then_label)
             this.gen_stmts(current_then)
-            this.emit_terminator("br label %" + end_label)
-            this.verify_br(end_label)
+            if (this.use_llvm_lib) {
+                this.emit_terminator(this.lib_br(end_label))
+            } else {
+                this.emit_terminator("br label %" + end_label)
+                this.verify_br(end_label)
+            }
 
             this.start_block(else_label)
 
@@ -1140,18 +1152,30 @@
         var saved_loop_end: String = this.loop_end_label
         this.loop_end_label = end_label + ":" + cond_label
 
-        this.emit_terminator("br label %" + cond_label)
-        this.verify_br(cond_label)
+        if (this.use_llvm_lib) {
+            this.emit_terminator(this.lib_br(cond_label))
+        } else {
+            this.emit_terminator("br label %" + cond_label)
+            this.verify_br(cond_label)
+        }
 
         this.start_block(cond_label)
         var cond_val: String = this.to_i1(this.gen_arg_value(cond))
-        this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
-        this.verify_cond_br(cond_val, body_label, end_label)
+        if (this.use_llvm_lib) {
+            this.emit_terminator(this.lib_cond_br(cond_val, body_label, end_label))
+        } else {
+            this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
+            this.verify_cond_br(cond_val, body_label, end_label)
+        }
 
         this.start_block(body_label)
         this.gen_stmts(body)
-        this.emit_terminator("br label %" + cond_label)
-        this.verify_br(cond_label)
+        if (this.use_llvm_lib) {
+            this.emit_terminator(this.lib_br(cond_label))
+        } else {
+            this.emit_terminator("br label %" + cond_label)
+            this.verify_br(cond_label)
+        }
 
         this.loop_end_label = saved_loop_end
 
