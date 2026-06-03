@@ -1,8 +1,235 @@
 //! IO module — standard input/output operations.
 //! Available implicitly in every file as IO.println(), IO.read_file(), etc.
+//!
+//! Also provides the File class for incremental file I/O:
+//!   var f = IO.open("data.txt", "r")
+//!   var line = f.read_line()
+//!   f.close()
 
 @extern("i32 puts(void*)") fun _puts(s: Int): Int
 @extern("void __io_print_str(i64)") fun _print_str(s: Int)
+
+// --- C Library Bindings for File I/O ---
+
+@extern("void* fopen(void*, void*)") fun _fopen(path: Int, mode: Int): Int
+@extern("i32 fclose(void*)") fun _fclose(fp: Int): Int
+@extern("i64 fread(void*, i64, i64, void*)") fun _fread(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fwrite(void*, i64, i64, void*)") fun _fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i32 fseek(void*, i64, i32)") fun _fseek(fp: Int, offset: Int, whence: Int): Int
+@extern("i64 ftell(void*)") fun _ftell(fp: Int): Int
+@extern("void* fgets(void*, i32, void*)") fun _fgets(buf: Int, size: Int, fp: Int): Int
+@extern("i32 feof(void*)") fun _feof(fp: Int): Int
+@extern("i32 fflush(void*)") fun _fflush(fp: Int): Int
+@extern("void* malloc(i64)") fun _io_malloc(size: Int): Int
+@extern("void free(void*)") fun _io_free(ptr: Int)
+@extern("i64 strlen(void*)") fun _io_strlen(s: Int): Int
+@extern("void* memcpy(void*, void*, i64)") fun _io_memcpy(dst: Int, src: Int, n: Int): Int
+
+@intrinsic fun load8(addr: Int): Int
+@intrinsic fun store8(addr: Int, val: Int)
+
+// --- Seek whence constants ---
+
+var SEEK_SET: Int = 0
+var SEEK_CUR: Int = 1
+var SEEK_END: Int = 2
+
+// =============================================================================
+// File class — wraps a C FILE* for incremental I/O
+// =============================================================================
+
+class File {
+    var _fp: Int
+    var _path: String
+    var _mode: String
+    var _closed: Bool
+
+    fun init(fp: Int, path: String, mode: String) {
+        this._fp = fp
+        this._path = path
+        this._mode = mode
+        this._closed = false
+    }
+
+    /// Read up to max_bytes bytes from the file. Returns "" at EOF.
+    fun read(max_bytes: Int): String {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        if (max_bytes <= 0) { return "" }
+        var buf: Int = _io_malloc(max_bytes + 1)
+        var n: Int = _fread(buf, 1, max_bytes, this._fp)
+        store8(buf + n, 0)
+        if (n == 0) {
+            _io_free(buf)
+            return ""
+        }
+        return buf
+    }
+
+    /// Read one line from the file (including trailing newline).
+    /// Returns "" at EOF.
+    fun read_line(): String {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        var buf_size: Int = 4096
+        var buf: Int = _io_malloc(buf_size)
+        var result: Int = _fgets(buf, buf_size, this._fp)
+        if (result == 0) {
+            _io_free(buf)
+            return ""
+        }
+        return buf
+    }
+
+    /// Read the entire remaining content of the file as a string.
+    fun read_all(): String {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        // Save current position, seek to end, compute remaining
+        var cur: Int = _ftell(this._fp)
+        _fseek(this._fp, 0, SEEK_END)
+        var end: Int = _ftell(this._fp)
+        _fseek(this._fp, cur, SEEK_SET)
+        var remaining: Int = end - cur
+        if (remaining <= 0) { return "" }
+        var buf: Int = _io_malloc(remaining + 1)
+        var n: Int = _fread(buf, 1, remaining, this._fp)
+        store8(buf + n, 0)
+        return buf
+    }
+
+    /// Write a string to the file.
+    fun write(data: String) {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        var len: Int = _io_strlen(data)
+        if (len > 0) {
+            _fwrite(data, 1, len, this._fp)
+        }
+    }
+
+    /// Write a string followed by a newline to the file.
+    fun write_line(data: String) {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        var len: Int = _io_strlen(data)
+        if (len > 0) {
+            _fwrite(data, 1, len, this._fp)
+        }
+        // Write newline
+        var nl: Int = _io_malloc(2)
+        store8(nl, 10)
+        store8(nl + 1, 0)
+        _fwrite(nl, 1, 1, this._fp)
+        _io_free(nl)
+    }
+
+    /// Seek to a byte offset from the beginning of the file.
+    fun seek(offset: Int) {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        _fseek(this._fp, offset, SEEK_SET)
+    }
+
+    /// Seek to a byte offset from the end of the file.
+    fun seek_end(offset: Int) {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        _fseek(this._fp, offset, SEEK_END)
+    }
+
+    /// Return the current byte offset in the file.
+    fun tell(): Int {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        return _ftell(this._fp)
+    }
+
+    /// Rewind to the beginning of the file.
+    fun rewind() {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        _fseek(this._fp, 0, SEEK_SET)
+    }
+
+    /// Flush any buffered data to disk.
+    fun flush() {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        _fflush(this._fp)
+    }
+
+    /// Close the file handle.
+    fun close() {
+        if (this._closed) { return }
+        _fclose(this._fp)
+        this._fp = 0
+        this._closed = true
+    }
+
+    /// Return true if the file is still open.
+    fun is_open(): Bool {
+        return !this._closed
+    }
+
+    /// Return the path this file was opened with.
+    fun path(): String {
+        return this._path
+    }
+
+    /// Return the mode this file was opened with.
+    fun mode(): String {
+        return this._mode
+    }
+
+    /// Return the file size in bytes.
+    /// Seeks to end and restores the current position.
+    fun size(): Int {
+        if (this._closed) {
+            throw "IO: file is closed"
+        }
+        var cur: Int = _ftell(this._fp)
+        _fseek(this._fp, 0, SEEK_END)
+        var end: Int = _ftell(this._fp)
+        _fseek(this._fp, cur, SEEK_SET)
+        return end
+    }
+
+    /// Return true if the file is at EOF.
+    fun eof(): Bool {
+        if (this._closed) { return true }
+        return _feof(this._fp) != 0
+    }
+}
+
+// =============================================================================
+// File open function
+// =============================================================================
+
+/// Open a file at the given path with the given mode.
+/// Modes: "r", "w", "a", "rb", "wb", "ab", "r+", "w+".
+/// Throws if the file cannot be opened.
+fun open(path: String, mode: String): File {
+    var fp: Int = _fopen(path, mode)
+    if (fp == 0) {
+        throw "IO: cannot open file '${path}' with mode '${mode}'"
+    }
+    return File(fp, path, mode)
+}
+
+// =============================================================================
+// Original convenience functions
+// =============================================================================
 
 /// Print a value followed by a newline to stdout.
 /// The compiler coerces the argument to String at the call site.
