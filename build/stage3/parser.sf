@@ -1394,7 +1394,10 @@ class Parser {
             ret_type = this.parse_type()
         }
         var body: List<AST.Stmt> = []
-        if (this.match_kind_check("{")) {
+        if (this.match_kind("=")) {
+            var expr: AST.Expr = this.parse_expr()
+            body = [AST.Stmt.Return(expr)]
+        } else if (this.match_kind_check("{")) {
             body = this.parse_block_stmts()
         }
         if (pattern_prepend.length() > 0) {
