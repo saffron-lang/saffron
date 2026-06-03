@@ -1,0 +1,142 @@
+//! `pantry new <name>` — scaffold a new Saffron project.
+import "@args" as Args
+import "@os" as OS
+import "@process" as Process
+
+fun _validate_name(name: String) {
+    if (name.length() == 0) {
+        IO.println("pantry new: project name cannot be empty")
+        OS.exit(1)
+    }
+    var first: String = name.char_at(0)
+    var alpha: String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    if (!(alpha.contains(first))) {
+        IO.println("pantry new: project name must start with a letter or underscore")
+        OS.exit(1)
+    }
+    var valid_chars: String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+    var i: Number = 0
+    while (i < name.length()) {
+        if (!(valid_chars.contains(name.char_at(i)))) {
+            IO.println("pantry new: invalid character in project name (use letters, digits, hyphens, underscores)")
+            OS.exit(1)
+        }
+        i = i + 1
+    }
+}
+
+fun _write_manifest(dir: String, name: String, is_lib: Bool) {
+    var content: String = "[package]\n"
+    content = content + "name = \"" + name + "\"\n"
+    content = content + "version = \"0.1.0\"\n"
+    content = content + "description = \"\"\n"
+    if (is_lib) {
+        content = content + "entry = \"src/lib.sf\"\n"
+    } else {
+        content = content + "entry = \"src/main.sf\"\n"
+    }
+    content = content + "\n[dependencies]\n"
+    content = content + "\n[scripts]\n"
+    if (!(is_lib)) {
+        content = content + "build = \"saffron build src/main.sf -o build/" + name + "\"\n"
+        content = content + "test = \"saffron run test/test_main.sf\"\n"
+    } else {
+        content = content + "test = \"saffron run test/test_lib.sf\"\n"
+    }
+    IO.write_file(dir + "/pantry.toml", content)
+}
+
+fun _write_main(dir: String, name: String) {
+    var content: String = "//! Main entry point for " + name + ".\n\n"
+    content = content + "IO.println(\"Hello from " + name + "!\")\n"
+    IO.write_file(dir + "/src/main.sf", content)
+}
+
+fun _write_lib(dir: String, name: String) {
+    var content: String = "//! " + name + " — a Saffron library.\n\n"
+    content = content + "/// Add two numbers together.\n"
+    content = content + "fun add(a: Number, b: Number): Number {\n"
+    content = content + "    return a + b\n"
+    content = content + "}\n"
+    IO.write_file(dir + "/src/lib.sf", content)
+}
+
+fun _write_test_app(dir: String, name: String) {
+    var content: String = "//! Tests for " + name + ".\n"
+    content = content + "import \"@test\" as Test\n\n"
+    content = content + "Test.assert(true, \"placeholder test\")\n"
+    content = content + "Test.summary()\n"
+    IO.write_file(dir + "/test/test_main.sf", content)
+}
+
+fun _write_test_lib(dir: String, name: String) {
+    var content: String = "//! Tests for " + name + ".\n"
+    content = content + "import \"@test\" as Test\n"
+    content = content + "import \"../src/lib.sf\" as Lib\n\n"
+    content = content + "Test.assert_eq(Lib.add(1, 2), 3, \"add works\")\n"
+    content = content + "Test.summary()\n"
+    IO.write_file(dir + "/test/test_lib.sf", content)
+}
+
+fun _write_readme(dir: String, name: String, is_lib: Bool) {
+    var content: String = "# " + name + "\n\nA Saffron project.\n\n"
+    if (!(is_lib)) {
+        content = content + "## Build\n\n```bash\npantry build\n```\n\n"
+        content = content + "## Run\n\n```bash\n./build/" + name + "\n```\n\n"
+    }
+    content = content + "## Test\n\n```bash\npantry test\n```\n"
+    IO.write_file(dir + "/README.md", content)
+}
+
+fun _write_gitignore(dir: String) {
+    var content: String = "build/\n.pantry/\npantry.lock\n*.ll\n"
+    IO.write_file(dir + "/.gitignore", content)
+}
+
+fun run(name: String, parsed: Args.ParsedArgs) {
+    _validate_name(name)
+
+    var is_lib: Bool = parsed.flag("lib")
+    var no_git: Bool = parsed.flag("no-git")
+    var dir: String = OS.cwd() + "/" + name
+
+    if (OS.file_exists(dir)) {
+        IO.println("pantry new: directory '" + name + "' already exists")
+        OS.exit(1)
+    }
+
+    OS.exec("mkdir -p " + dir + "/src")
+    OS.exec("mkdir -p " + dir + "/test")
+
+    _write_manifest(dir, name, is_lib)
+
+    if (is_lib) {
+        _write_lib(dir, name)
+        _write_test_lib(dir, name)
+    } else {
+        _write_main(dir, name)
+        _write_test_app(dir, name)
+    }
+
+    _write_readme(dir, name, is_lib)
+
+    if (!(no_git)) {
+        _write_gitignore(dir)
+        var git_path: String = Process.which("git")
+        if (git_path != "") {
+            OS.exec("cd " + dir + " && git init --quiet")
+        } else {
+            IO.println("  note: git not found, skipping repository initialization")
+        }
+    }
+
+    IO.println("Created project '" + name + "' in ./" + name + "/")
+    IO.println("")
+    IO.println("  cd " + name)
+    if (is_lib) {
+        IO.println("  pantry test")
+    } else {
+        IO.println("  pantry build")
+        IO.println("  pantry test")
+    }
+}
