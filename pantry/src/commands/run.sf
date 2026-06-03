@@ -140,7 +140,7 @@ fun _collect_scripts(manifest: Config.Manifest): Map<String, String> {
         if (pkg_config.has("scripts")) {
             var pkg_scripts: TOML.TomlTable = pkg_config.table("scripts")
             if (pkg_scripts.has("bin")) {
-                var bin_scripts: Map<String, String> = pkg_scripts.get("bin")
+                var bin_scripts: Map<String, String> = pkg_scripts.table("bin").to_map()
                 var bin_keys: List<String> = bin_scripts.keys()
                 var j: Int = 0
                 while (j < bin_keys.length()) {
