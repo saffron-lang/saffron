@@ -24,6 +24,7 @@ class Codegen {
     var known_functions: List<String>
     var func_ret_types: Map<String, AST.Type>
     var class_fields: Map<String, String>
+    var class_field_list: Map<String, List<String>>
     var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
     var current_class: String
@@ -77,6 +78,7 @@ class Codegen {
         this.known_functions = []
         this.func_ret_types = {}
         this.class_fields = {}
+        this.class_field_list = {}
         this.class_struct_names = {}
         this.class_methods = {}
         this.current_class = ""
