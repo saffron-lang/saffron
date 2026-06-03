@@ -8607,9 +8607,8 @@ class Codegen {
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
-    // Universal module dispatch: any module alias goes through prefix resolution.
-    // This handles IO.readline, OS.env, GC.collect, Reflect.fields, etc.
-    // The hardcoded IO/OS/GC blocks below handle special cases (println coercion, exit truncation).
+    // Universal module dispatch for non-builtin modules (Reflect, Task, user imports).
+    // IO/OS/GC have special handling below (coercion, exit truncation).
     if (obj_name.length() > 0 and this.module_prefixes.has(obj_name) and obj_name != "IO" and obj_name != "OS" and obj_name != "GC") {
         var __mp: String = this.module_prefixes.get(obj_name)
         if (__mp.length() == 0) { __mp = "__" + obj_name.to_lower() + "_" }
