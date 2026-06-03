@@ -7,8 +7,11 @@
 //!   pantry test              Run tests
 //!   pantry add <package>     Add a dependency
 //!   pantry remove <package>  Remove a dependency
-//!   pantry install            Install dependencies
+//!   pantry install           Install dependencies
 //!   pantry list              List installed packages
+//!   pantry deps              Show dependency tree
+//!   pantry deps.tree         Show dependency tree (ASCII)
+//!   pantry deps.graph        Output dependency graph (DOT format)
 //!   pantry script <cmd>      Run an arbitrary shell command in project context
 
 import "@os" as OS
@@ -23,6 +26,8 @@ import "./commands/remove.sf" as Remove
 import "./commands/install.sf" as Install
 import "./commands/list.sf" as ListCmd
 import "./commands/clean.sf" as Clean
+import "./commands/deps.sf" as Deps
+import "./commands/new.sf" as New
 
 fun main() {
     var raw_args = OS.args()
@@ -61,6 +66,17 @@ fun main() {
         "install" => Install.run(parsed)
         "list" => ListCmd.run(parsed)
         "clean" => Clean.run(parsed)
+        "new" => {
+            if (positional.length() < 2) {
+                IO.println("pantry new: missing project name")
+                IO.println("Usage: pantry new <name> [--lib] [--no-git]")
+                OS.exit(1)
+            }
+            New.run(positional[1], parsed)
+        }
+        "deps" => Deps.run_tree(parsed)
+        "deps.tree" => Deps.run_tree(parsed)
+        "deps.graph" => Deps.run_graph(parsed)
         "version" => IO.println("pantry 0.1.0")
         "--version" => IO.println("pantry 0.1.0")
         "run" => {
@@ -118,6 +134,9 @@ fun print_usage() {
     IO.println("  install           Install all dependencies from pantry.toml")
     IO.println("  list              List installed packages")
     IO.println("  clean             Remove build artifacts and lockfile")
+    IO.println("  deps              Show dependency tree (alias for deps.tree)")
+    IO.println("  deps.tree         Show dependency tree with ASCII art")
+    IO.println("  deps.graph        Output dependency graph in DOT format")
     IO.println("  script <cmd>      Run a shell command in the project context")
     IO.println("  version           Show pantry version")
     IO.println("")

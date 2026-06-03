@@ -1,0 +1,416 @@
+//! `pantry deps` — dependency tree and graph visualization.
+import "@args" as Args
+import "@os" as OS
+import "@toml" as TOML
+import "../config.sf" as Config
+import "../resolver.sf" as Resolver
+
+/// A node in the dependency tree.
+class DepNode {
+    var name: String
+    var version: String
+    var source_type: String
+    var source_detail: String
+    var children: List<DepNode>
+    var is_circular: Bool
+    var hidden_count: Number
+
+    fun init(name: String, version: String, source_type: String, source_detail: String) {
+        this.name = name
+        this.version = version
+        this.source_type = source_type
+        this.source_detail = source_detail
+        this.children = []
+        this.is_circular = false
+        this.hidden_count = 0
+    }
+}
+
+fun _manifest_dir(): String {
+    var path: String = Config.find_manifest()
+    var last_slash: Number = -1
+    var i: Number = 0
+    while (i < path.length()) {
+        if (path.char_at(i) == "/") {
+            last_slash = i
+        }
+        i = i + 1
+    }
+    if (last_slash <= 0) { return "." }
+    return path.slice(0, last_slash)
+}
+
+/// Format source info for display.
+fun _format_source(source_type: String, source_detail: String): String {
+    if (source_type == "path") {
+        return "(path: " + source_detail + ")"
+    }
+    if (source_type == "git") {
+        return "(git: " + source_detail + ")"
+    }
+    return "(registry)"
+}
+
+/// Build the dependency tree recursively.
+/// visited tracks the current ancestor chain for cycle detection.
+fun _build_tree(name: String, dep_value: Any, manifest_dir: String, visited: List<String>, max_depth: Number, current_depth: Number): DepNode {
+    // Parse the dep spec to get source type and details
+    var spec: Map<String, String> = Resolver.parse_dep_spec(name, dep_value)
+    var source_type: String = spec.get("type")
+    var source_detail: String = ""
+
+    if (source_type == "path") {
+        source_detail = spec.get("path")
+    } else if (source_type == "git") {
+        source_detail = spec.get("url")
+    }
+
+    // Resolve to get version info
+    var version: String = "?"
+    var resolved_path: String = ""
+
+    if (source_type == "path") {
+        var abs_path: String = source_detail
+        if (!(abs_path.starts_with("/"))) {
+            abs_path = manifest_dir + "/" + abs_path
+        }
+        var dep_manifest: String = abs_path + "/pantry.toml"
+        if (OS.file_exists(dep_manifest)) {
+            var dep_config: TOML.TomlTable = TOML.load(dep_manifest)
+            if (dep_config.has("package")) {
+                var pkg: TOML.TomlTable = dep_config.table("package")
+                version = pkg.string_or("version", "0.0.0")
+            }
+            resolved_path = abs_path
+        }
+    } else if (source_type == "git") {
+        var cache_path: String = manifest_dir + "/.pantry/git/" + name
+        if (OS.file_exists(cache_path + "/pantry.toml")) {
+            var dep_config: TOML.TomlTable = TOML.load(cache_path + "/pantry.toml")
+            if (dep_config.has("package")) {
+                var pkg: TOML.TomlTable = dep_config.table("package")
+                version = pkg.string_or("version", "0.0.0")
+            }
+            resolved_path = cache_path
+        }
+    } else if (source_type == "registry") {
+        if (spec.has("version")) {
+            version = spec.get("version")
+        }
+        var pkg_path: String = manifest_dir + "/.pantry/packages/" + name
+        if (OS.file_exists(pkg_path + "/pantry.toml")) {
+            var dep_config: TOML.TomlTable = TOML.load(pkg_path + "/pantry.toml")
+            if (dep_config.has("package")) {
+                var pkg: TOML.TomlTable = dep_config.table("package")
+                version = pkg.string_or("version", version)
+            }
+            resolved_path = pkg_path
+        }
+    }
+
+    var node: DepNode = DepNode(name, version, source_type, source_detail)
+
+    // Check for circular dependency
+    var vi: Number = 0
+    while (vi < visited.length()) {
+        if (visited[vi] == name) {
+            node.is_circular = true
+            return node
+        }
+        vi = vi + 1
+    }
+
+    // Check depth limit
+    if (max_depth > 0 and current_depth >= max_depth) {
+        // Count transitive deps if we can
+        if (resolved_path != "" and OS.file_exists(resolved_path + "/pantry.toml")) {
+            var dep_config: TOML.TomlTable = TOML.load(resolved_path + "/pantry.toml")
+            if (dep_config.has("dependencies")) {
+                var sub_deps: Map<String, Any> = dep_config.table("dependencies").to_map()
+                node.hidden_count = sub_deps.length()
+            }
+        }
+        return node
+    }
+
+    // Recurse into transitive dependencies
+    if (resolved_path != "" and OS.file_exists(resolved_path + "/pantry.toml")) {
+        var dep_config: TOML.TomlTable = TOML.load(resolved_path + "/pantry.toml")
+        if (dep_config.has("dependencies")) {
+            var sub_deps: Map<String, Any> = dep_config.table("dependencies").to_map()
+            var sub_keys: List<String> = sub_deps.keys()
+            var si: Number = 0
+            // Build new visited list (copy + add current)
+            var new_visited: List<String> = []
+            var cv: Number = 0
+            while (cv < visited.length()) {
+                new_visited.push(visited[cv])
+                cv = cv + 1
+            }
+            new_visited.push(name)
+
+            while (si < sub_keys.length()) {
+                var sub_name: String = sub_keys[si]
+                var sub_value: Any = sub_deps.get(sub_name)
+                var child: DepNode = _build_tree(sub_name, sub_value, resolved_path, new_visited, max_depth, current_depth + 1)
+                node.children.push(child)
+                si = si + 1
+            }
+        }
+    }
+
+    return node
+}
+
+/// Print a single node line.
+fun _node_label(node: DepNode): String {
+    var label: String = node.name + " v" + node.version
+    if (node.source_type != "") {
+        label = label + " " + _format_source(node.source_type, node.source_detail)
+    }
+    if (node.is_circular) {
+        label = label + " (*circular*)"
+    } else if (node.hidden_count > 0) {
+        label = label + " [+" + node.hidden_count.to_string() + " deps]"
+    }
+    return label
+}
+
+/// Print the dependency tree with box-drawing characters.
+fun _print_tree(node: DepNode, prefix: String, is_last: Bool) {
+    var connector: String = ""
+    if (prefix == "" and is_last) {
+        connector = "\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 "
+    } else if (prefix == "") {
+        connector = "\xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 "
+    } else if (is_last) {
+        connector = prefix + "\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 "
+    } else {
+        connector = prefix + "\xe2\x94\x9c\xe2\x94\x80\xe2\x94\x80 "
+    }
+
+    IO.println(connector + _node_label(node))
+
+    // Don't recurse if circular
+    if (node.is_circular) { return }
+
+    var child_prefix: String = ""
+    if (prefix == "" and is_last) {
+        child_prefix = "    "
+    } else if (prefix == "") {
+        child_prefix = "\xe2\x94\x82   "
+    } else if (is_last) {
+        child_prefix = prefix + "    "
+    } else {
+        child_prefix = prefix + "\xe2\x94\x82   "
+    }
+
+    var ci: Number = 0
+    while (ci < node.children.length()) {
+        var child: DepNode = node.children[ci]
+        var child_is_last: Bool = (ci == node.children.length() - 1)
+        _print_tree(child, child_prefix, child_is_last)
+        ci = ci + 1
+    }
+}
+
+/// Collect all unique nodes and edges for DOT output.
+fun _collect_edges(node: DepNode, nodes: List<String>, edges: List<String>, circular_edges: List<String>, seen: Map<String, Bool>) {
+    var node_id: String = node.name + " v" + node.version
+    if (!(seen.has(node_id))) {
+        seen.set(node_id, true)
+        nodes.push("    \"" + node_id + "\";")
+    }
+
+    if (node.is_circular) { return }
+
+    var ci: Number = 0
+    while (ci < node.children.length()) {
+        var child: DepNode = node.children[ci]
+        var child_id: String = child.name + " v" + child.version
+        if (child.is_circular) {
+            circular_edges.push("    \"" + node_id + "\" -> \"" + child_id + "\" [style=dashed, color=red, label=\"circular\"];")
+        } else {
+            edges.push("    \"" + node_id + "\" -> \"" + child_id + "\";")
+        }
+        _collect_edges(child, nodes, edges, circular_edges, seen)
+        ci = ci + 1
+    }
+}
+
+/// Emit DOT format for Graphviz.
+fun _emit_dot(root: DepNode) {
+    IO.println("digraph dependencies {")
+    IO.println("    rankdir=LR;")
+    IO.println("    node [shape=box, style=rounded];")
+    IO.println("")
+
+    var nodes: List<String> = []
+    var edges: List<String> = []
+    var circular_edges: List<String> = []
+    var seen: Map<String, Bool> = {}
+
+    // Add root node
+    var root_id: String = root.name + " v" + root.version
+    seen.set(root_id, true)
+    nodes.push("    \"" + root_id + "\";")
+
+    // Collect from children
+    var ci: Number = 0
+    while (ci < root.children.length()) {
+        var child: DepNode = root.children[ci]
+        var child_id: String = child.name + " v" + child.version
+        if (child.is_circular) {
+            circular_edges.push("    \"" + root_id + "\" -> \"" + child_id + "\" [style=dashed, color=red, label=\"circular\"];")
+        } else {
+            edges.push("    \"" + root_id + "\" -> \"" + child_id + "\";")
+        }
+        _collect_edges(child, nodes, edges, circular_edges, seen)
+        ci = ci + 1
+    }
+
+    // Print nodes
+    var ni: Number = 0
+    while (ni < nodes.length()) {
+        IO.println(nodes[ni])
+        ni = ni + 1
+    }
+
+    IO.println("")
+
+    // Print edges
+    var ei: Number = 0
+    while (ei < edges.length()) {
+        IO.println(edges[ei])
+        ei = ei + 1
+    }
+
+    // Print circular edges
+    var cir: Number = 0
+    while (cir < circular_edges.length()) {
+        IO.println(circular_edges[cir])
+        cir = cir + 1
+    }
+
+    IO.println("}")
+}
+
+/// Find a node by name in the tree (DFS).
+fun _find_node(node: DepNode, name: String): DepNode {
+    if (node.name == name) {
+        return node
+    }
+    var i: Number = 0
+    while (i < node.children.length()) {
+        var result: DepNode = _find_node(node.children[i], name)
+        if (result != nil) {
+            return result
+        }
+        i = i + 1
+    }
+    return nil
+}
+
+/// Run the `pantry deps` / `pantry deps.tree` command (ASCII tree output).
+fun run_tree(parsed: Args.ParsedArgs) {
+    var manifest: Config.Manifest = Config.load()
+    var dir: String = _manifest_dir()
+
+    var max_depth: Number = 0
+    if (parsed.has("depth")) {
+        var depth_str: String = parsed.get("depth")
+        max_depth = depth_str.to_number()
+    }
+
+    // Filter to a specific package subtree
+    var filter_name: String = ""
+    if (parsed.positional.length() > 1) {
+        filter_name = parsed.positional[1]
+    }
+
+    if (manifest.dependencies.length() == 0) {
+        IO.println(manifest.name + " v" + manifest.version)
+        IO.println("  (no dependencies)")
+        return
+    }
+
+    // Build tree for all dependencies
+    var root: DepNode = DepNode(manifest.name, manifest.version, "", "")
+    var keys: List<String> = manifest.dependencies.keys()
+    var i: Number = 0
+    while (i < keys.length()) {
+        var name: String = keys[i]
+        var value: Any = manifest.dependencies.get(name)
+        var visited: List<String> = [manifest.name]
+        var child: DepNode = _build_tree(name, value, dir, visited, max_depth, 1)
+        root.children.push(child)
+        i = i + 1
+    }
+
+    // If filter_name is set, find that subtree
+    if (filter_name != "") {
+        var found: DepNode = _find_node(root, filter_name)
+        if (found == nil) {
+            IO.println("pantry deps: package '" + filter_name + "' not found in dependency tree")
+            OS.exit(1)
+        }
+        // Print just that subtree
+        IO.println(_node_label(found))
+        var fi: Number = 0
+        while (fi < found.children.length()) {
+            var child: DepNode = found.children[fi]
+            var child_is_last: Bool = (fi == found.children.length() - 1)
+            _print_tree(child, "", child_is_last)
+            fi = fi + 1
+        }
+        return
+    }
+
+    // Print root
+    IO.println(root.name + " v" + root.version)
+
+    // Print children
+    var ci: Number = 0
+    while (ci < root.children.length()) {
+        var child: DepNode = root.children[ci]
+        var child_is_last: Bool = (ci == root.children.length() - 1)
+        _print_tree(child, "", child_is_last)
+        ci = ci + 1
+    }
+}
+
+/// Run the `pantry deps.graph` command (DOT format output).
+fun run_graph(parsed: Args.ParsedArgs) {
+    var manifest: Config.Manifest = Config.load()
+    var dir: String = _manifest_dir()
+
+    var max_depth: Number = 0
+    if (parsed.has("depth")) {
+        var depth_str: String = parsed.get("depth")
+        max_depth = depth_str.to_number()
+    }
+
+    if (manifest.dependencies.length() == 0) {
+        IO.println("digraph dependencies {")
+        IO.println("    rankdir=LR;")
+        IO.println("    node [shape=box, style=rounded];")
+        IO.println("    \"" + manifest.name + " v" + manifest.version + "\";")
+        IO.println("}")
+        return
+    }
+
+    // Build tree
+    var root: DepNode = DepNode(manifest.name, manifest.version, "", "")
+    var keys: List<String> = manifest.dependencies.keys()
+    var i: Number = 0
+    while (i < keys.length()) {
+        var name: String = keys[i]
+        var value: Any = manifest.dependencies.get(name)
+        var visited: List<String> = [manifest.name]
+        var child: DepNode = _build_tree(name, value, dir, visited, max_depth, 1)
+        root.children.push(child)
+        i = i + 1
+    }
+
+    _emit_dot(root)
+}
