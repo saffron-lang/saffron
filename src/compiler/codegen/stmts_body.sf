@@ -149,10 +149,7 @@
                 }
             }
         }
-        this.var_types.set(name, vtype)
         this.typed_vars.set(name, this.str_to_type(vtype))
-        // DEBUG: verify var_types.set roundtrip (uncomment to diagnose)
-        // IO.println("VAR_TYPES_SET: " + name + " = " + vtype + " has=" + this.var_types.has(name).to_string())
         if (vtype == "String") {
             this.string_vars.push(name)
         }
@@ -1023,7 +1020,6 @@
                 if (enum_name != "Unknown") {
                     btype = this.get_variant_field_type(enum_name, variant_name, bi)
                 }
-                this.var_types.set(bindings[bi], btype)
                 this.typed_vars.set(bindings[bi], this.str_to_type(btype))
                 if (btype == "String") {
                     this.string_vars.push(bindings[bi])
@@ -1047,7 +1043,6 @@
             var elem_val: String = this.fresh_local()
             this.emit_indent(elem_val + " = call i64 @__list_get(i64 " + val + ", i64 " + i.floor().to_string() + ")")
             this.emit_indent("store i64 " + elem_val + ", i64* %" + this.sanitize_name(elements[i]))
-            this.var_types.set(elements[i], elem_type_str)
             this.typed_vars.set(elements[i], elem_type)
             if (elem_type_str == "String") {
                 this.string_vars.push(elements[i])
@@ -1060,7 +1055,6 @@
             var rest_val: String = this.fresh_local()
             this.emit_indent(rest_val + " = call i64 @__list_slice(i64 " + val + ", i64 " + elements.length().floor().to_string() + ", i64 " + len_val + ")")
             this.emit_indent("store i64 " + rest_val + ", i64* %" + this.sanitize_name(rest))
-            this.var_types.set(rest, list_type_str)
             this.typed_vars.set(rest, val_type)
         }
     }

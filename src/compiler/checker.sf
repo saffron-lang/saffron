@@ -80,21 +80,6 @@ class TypeEnv {
         scope.narrowed.set(name, typ)
     }
 
-    // String-based narrow helper for callers that still pass strings
-    fun narrow_str(name: String, typ: String) {
-        var scope: Scope = this.current_scope()
-        scope.narrowed.set(name, this.parse_type_str(typ))
-    }
-
-    fun parse_type_str(s: String): AST.Type {
-        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
-        if (s == "Bool") return AST.Type.BoolType
-        if (s == "String") return AST.Type.StringType
-        if (s == "Nil") return AST.Type.NilType
-        if (s == "Any") return AST.Type.AnyType
-        return AST.Type.ClassType(s)
-    }
-
     fun mark_used(name: String) {
         var i: Float = this.scopes.length() - 1
         while (i >= 0) {
@@ -116,9 +101,18 @@ class TypeEnv {
         this.funcs.set(name, ret_type)
     }
 
-    // String-based define_func for callers passing string ret types
+    // String-based define_func for callers passing string ret types from AST
     fun define_func_str(name: String, ret_type: String) {
         this.funcs.set(name, this.parse_type_str(ret_type))
+    }
+
+    fun parse_type_str(s: String): AST.Type {
+        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Bool") return AST.Type.BoolType
+        if (s == "String") return AST.Type.StringType
+        if (s == "Nil") return AST.Type.NilType
+        if (s == "Any") return AST.Type.AnyType
+        return AST.Type.ClassType(s)
     }
 
     fun define_func_params(name: String, params_str: String) {
@@ -279,6 +273,23 @@ class NullChecker {
         return AST.type_to_string(t)
     }
 
+    fun is_any_type(t: AST.Type): Bool {
+        return match (t) {
+            AnyType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(b, a) => false
+            UnionType(ts) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
+        }
+    }
+
     fun is_nullable_type(t: AST.Type): Bool {
         return match (t) {
             NullableType(inner) => true
@@ -287,8 +298,7 @@ class NullChecker {
                 var has_nil: Bool = false
                 var i: Float = 0
                 while (i < types.length()) {
-                    var sub: String = AST.type_to_string(types[i])
-                    if (sub == "Nil") { has_nil = true }
+                    if (this.is_nil_type_node(types[i])) { has_nil = true }
                     i = i + 1
                 }
                 has_nil
@@ -303,6 +313,23 @@ class NullChecker {
             EnumType(n) => false
             GenericType(b, a) => false
             FuncType(p, r) => false
+        }
+    }
+
+    fun is_nil_type_node(t: AST.Type): Bool {
+        return match (t) {
+            NilType => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            AnyType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(b, a) => false
+            UnionType(ts) => false
+            FuncType(p, r) => false
+            NullableType(inner) => false
         }
     }
 
@@ -353,8 +380,7 @@ class NullChecker {
                 var i: Float = 0
                 while (i < types.length()) {
                     var sub: AST.Type = types[i]
-                    var sub_str: String = this.type_to_str(sub)
-                    if (sub_str != "Nil") {
+                    if (!this.is_nil_type_node(sub)) {
                         filtered.push(sub)
                     }
                     i = i + 1
@@ -379,6 +405,54 @@ class NullChecker {
             GenericType(b, a) => AST.Type.GenericType(b, a)
             FuncType(p, r) => AST.Type.FuncType(p, r)
         }
+    }
+
+    // --- Node-based generic type extraction ---
+
+    fun extract_generic_args_node(t: AST.Type): List<AST.Type> {
+        return match (t) {
+            GenericType(base, args) => args
+            IntType => []
+            FloatType => []
+            BoolType => []
+            StringType => []
+            NilType => []
+            AnyType => []
+            ClassType(n) => []
+            EnumType(n) => []
+            UnionType(ts) => []
+            FuncType(p, r) => []
+            NullableType(inner) => []
+        }
+    }
+
+    fun extract_nth_generic_arg_node(t: AST.Type, n: Float): AST.Type {
+        var args: List<AST.Type> = this.extract_generic_args_node(t)
+        if (n < args.length()) {
+            return args[n.floor()]
+        }
+        return AST.Type.AnyType
+    }
+
+    fun extract_list_element_type_node(t: AST.Type): AST.Type {
+        return this.extract_nth_generic_arg_node(t, 0)
+    }
+
+    fun extract_map_value_type_node(t: AST.Type): AST.Type {
+        var args: List<AST.Type> = this.extract_generic_args_node(t)
+        if (args.length() >= 2) return args[1]
+        if (args.length() == 1) return args[0]
+        return AST.Type.AnyType
+    }
+
+    fun extract_map_key_type_node(t: AST.Type): AST.Type {
+        return this.extract_nth_generic_arg_node(t, 0)
+    }
+
+    fun make_nullable_type(t: AST.Type): AST.Type {
+        if (this.is_nullable_type(t)) return t
+        if (this.is_nil_type_node(t)) return t
+        return AST.Type.UnionType([t, AST.Type.NilType])
     }
 
     fun type_to_str(t: AST.Type): String {
@@ -424,22 +498,24 @@ class NullChecker {
     }
 
     fun is_subtype_node(child: AST.Type, parent: AST.Type): Bool {
+        // Quick checks using node structure
+        if (this.is_any_type(parent)) return true
+        if (this.is_any_type(child)) return true
         var cs: String = this.type_to_str(child)
         var ps: String = this.type_to_str(parent)
         if (cs == ps) return true
-        if (ps == "Any") return true
-        if (cs == "Any") return true
         // T is subtype of T|Nil (nullable) only when T is subtype of the non-Nil part
         if (this.is_nullable_type(parent) and !this.is_nullable_type(child)) {
             var inner: AST.Type = this.strip_nil_from_node(parent)
             return this.is_subtype_node(child, inner)
         }
-        // Check inheritance chain
+        // Check inheritance chain via stored parent types
         var current: String = cs
         while (current.length() > 0) {
             if (current == ps) return true
             var parent_key: String = current + "__parent"
-            var next: String = this.env.get_var(parent_key)
+            var next_type: AST.Type = this.env.get_var_type(parent_key)
+            var next: String = this.type_to_str(next_type)
             if (next == "Any" or next == current) return false
             current = next
         }
@@ -608,30 +684,30 @@ class NullChecker {
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
             VarDecl(name, type_ann, init, doc) => {
-                var init_type: String = this.infer_expr(init)
+                var init_type_node: AST.Type = this.infer_type(init)
+                var init_type: String = this.type_to_str(init_type_node)
                 if (type_ann != "Any") {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.
-                    if (!this.is_nullable(type_ann) and this.is_nil_init(init)) {
+                    var ann_node: AST.Type = this.parse_type_node(type_ann)
+                    if (!this.is_nullable_type(ann_node) and this.is_nil_init(init)) {
                         this.error(name + ": cannot assign nil to non-nullable " + type_ann)
                     }
-                    this.env.define_var(name, type_ann)
+                    this.env.define_var(name, ann_node)
                 } else if (init_type != "Any") {
                     // Inferred from initializer
-                    this.env.define_var(name, init_type)
+                    this.env.define_var(name, init_type_node)
                 } else {
                     // Cannot infer type — warning (not blocking)
-                    // This fires when the checker can't resolve the return type
-                    // of a function call; it's advisory, not a safety issue.
                     this.warn(name + ": cannot infer type, add explicit annotation")
-                    this.env.define_var(name, "Any")
+                    this.env.define_var(name, AST.Type.AnyType)
                 }
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Register method with class prefix if inside a class
                 if (this.current_class.length() > 0) {
-                    this.env.define_func(this.current_class + "__" + name, ret_type)
+                    this.env.define_func_str(this.current_class + "__" + name, ret_type)
                     this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
                     // Track method names for conformance checking
                     var existing: String = ""
@@ -645,16 +721,15 @@ class NullChecker {
                     }
                     this.class_method_names.set(this.current_class, existing)
                 }
-                var old_ret: String = this.current_func_ret
-                this.current_func_ret = ret_type
+                var old_ret: AST.Type = this.current_func_ret
+                this.current_func_ret = this.parse_type_node(ret_type)
                 this.env.push_scope()
                 var j: Float = 0
                 while (j < params.length()) {
                     var p: AST.Param = params[j]
                     var pname: String = match (p) { Param(n, t, d) => n }
                     var pt: AST.Type = match (p) { Param(n, t, d) => t }
-                    var ptype: String = this.type_node_to_string(pt)
-                    this.env.define_var(pname, ptype)
+                    this.env.define_var(pname, pt)
                     j = j + 1
                 }
                 this.check_stmts(body)
@@ -663,10 +738,12 @@ class NullChecker {
                 this.current_func_ret = old_ret
             }
             Return(value) => {
-                var val_type: String = this.infer_expr(value)
-                if (this.current_func_ret != "Any") {
-                    if (!this.is_nullable(this.current_func_ret) and this.is_nullable(val_type)) {
-                        this.error("return: cannot return nullable " + val_type + " from function expecting " + this.current_func_ret)
+                var val_type_node: AST.Type = this.infer_type(value)
+                if (!this.is_any_type(this.current_func_ret)) {
+                    if (!this.is_nullable_type(this.current_func_ret) and this.is_nullable_type(val_type_node)) {
+                        var val_str: String = this.type_to_str(val_type_node)
+                        var ret_str: String = this.type_to_str(this.current_func_ret)
+                        this.error("return: cannot return nullable " + val_str + " from function expecting " + ret_str)
                     }
                 }
             }
@@ -704,7 +781,7 @@ class NullChecker {
             ClassDecl(name, parent, fields, methods, doc) => {
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 if (parent.length() > 0) {
-                    this.env.define_var(name + "__parent", parent)
+                    this.env.define_var(name + "__parent", this.parse_type_node(parent))
                     this.class_parents.set(name, parent)
                 }
             }
@@ -717,7 +794,7 @@ class NullChecker {
                 this.check_unused_in_scope()
                 this.env.pop_scope()
                 this.env.push_scope()
-                this.env.define_var(catch_name, "String")
+                this.env.define_var(catch_name, AST.Type.StringType)
                 this.check_stmts(catch_body)
                 this.check_unused_in_scope()
                 this.env.pop_scope()
@@ -750,7 +827,7 @@ class NullChecker {
             MethodCall(o, m, a) => {
                 // map.has() guard
                 if (m == "has") {
-                    this.env.narrow("__has_guard", "active")
+                    this.env.narrow("__has_guard", AST.Type.ClassType("active"))
                 }
             }
             Binary(l, op, r) => {
@@ -758,9 +835,9 @@ class NullChecker {
                     // x != nil → narrow x to non-nullable
                     var var_name: String = this.nil_check_var_from_binary(l, r)
                     if (var_name.length() > 0) {
-                        var var_type: String = this.env.get_var(var_name)
-                        if (this.is_nullable(var_type)) {
-                            this.env.narrow(var_name, this.strip_nil(var_type))
+                        var var_type_node: AST.Type = this.env.get_var_type(var_name)
+                        if (this.is_nullable_type(var_type_node)) {
+                            this.env.narrow(var_name, this.strip_nil_from_node(var_type_node))
                         }
                     }
                 }
@@ -768,25 +845,25 @@ class NullChecker {
                     // x == nil → narrow x to Nil in then-branch
                     var var_name: String = this.nil_check_var_from_binary(l, r)
                     if (var_name.length() > 0) {
-                        var var_type: String = this.env.get_var(var_name)
-                        if (this.is_nullable(var_type)) {
-                            this.env.narrow(var_name, "Nil")
+                        var var_type_node: AST.Type = this.env.get_var_type(var_name)
+                        if (this.is_nullable_type(var_type_node)) {
+                            this.env.narrow(var_name, AST.Type.NilType)
                         }
                     }
                 }
             }
             Variable(n) => {
                 // Truthy check: if (x) { ... } → x is non-nullable
-                var var_type: String = this.env.get_var(n)
-                if (this.is_nullable(var_type)) {
-                    this.env.narrow(n, this.strip_nil(var_type))
+                var var_type_node: AST.Type = this.env.get_var_type(n)
+                if (this.is_nullable_type(var_type_node)) {
+                    this.env.narrow(n, this.strip_nil_from_node(var_type_node))
                 }
             }
             IsCheck(val, typ) => {
                 // if (x is Type) → narrow x to Type
                 var is_var: String = this.get_variable_name_from_expr(val)
                 if (is_var.length() > 0) {
-                    this.env.narrow(is_var, typ)
+                    this.env.narrow(is_var, this.parse_type_node(typ))
                 }
             }
             Logical(l, op, r) => {
@@ -808,9 +885,9 @@ class NullChecker {
                     // Inverse of x != nil: in else branch, x is Nil
                     var var_name: String = this.nil_check_var_from_binary(l, r)
                     if (var_name.length() > 0) {
-                        var var_type: String = this.env.get_var(var_name)
-                        if (this.is_nullable(var_type)) {
-                            this.env.narrow(var_name, "Nil")
+                        var var_type_node: AST.Type = this.env.get_var_type(var_name)
+                        if (this.is_nullable_type(var_type_node)) {
+                            this.env.narrow(var_name, AST.Type.NilType)
                         }
                     }
                 }
@@ -818,9 +895,9 @@ class NullChecker {
                     // Inverse of x == nil: in else branch, x is non-nullable
                     var var_name: String = this.nil_check_var_from_binary(l, r)
                     if (var_name.length() > 0) {
-                        var var_type: String = this.env.get_var(var_name)
-                        if (this.is_nullable(var_type)) {
-                            this.env.narrow(var_name, this.strip_nil(var_type))
+                        var var_type_node: AST.Type = this.env.get_var_type(var_name)
+                        if (this.is_nullable_type(var_type_node)) {
+                            this.env.narrow(var_name, this.strip_nil_from_node(var_type_node))
                         }
                     }
                 }
@@ -951,7 +1028,7 @@ class NullChecker {
             NilLit => AST.Type.NilType
             Variable(name) => {
                 this.env.mark_used(name)
-                this.parse_type_node(this.env.get_var(name))
+                this.env.get_var_type(name)
             }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
             Unary(op, right) => this.infer_type(right)
@@ -999,7 +1076,7 @@ class NullChecker {
                 this.check_stmts(try_body)
                 var try_type: AST.Type = this.infer_type(try_val)
                 this.env.push_scope()
-                this.env.define_var(catch_name, "String")
+                this.env.define_var(catch_name, AST.Type.StringType)
                 this.check_stmts(catch_body)
                 var catch_type: AST.Type = this.infer_type(catch_val)
                 this.env.pop_scope()
@@ -1473,7 +1550,7 @@ class NullChecker {
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
                 var field_type: String = this.get_enum_binding_type(subj_type, variant_name, bi)
-                this.env.define_var(bindings[bi], field_type)
+                this.env.define_var(bindings[bi], this.parse_type_node(field_type))
                 bi = bi + 1
             }
 
@@ -1562,11 +1639,11 @@ class NullChecker {
             var rest: String = variant.slice(8, variant.length())
             var bi: Float = 0
             while (bi < bindings.length()) {
-                this.env.define_var(bindings[bi], "Any")
+                this.env.define_var(bindings[bi], AST.Type.AnyType)
                 bi = bi + 1
             }
             if (rest.length() > 0) {
-                this.env.define_var(rest, "List<Any>")
+                this.env.define_var(rest, AST.Type.GenericType("List", [AST.Type.AnyType]))
             }
             return
         }
@@ -1577,7 +1654,7 @@ class NullChecker {
             this.warn("let " + variant + "(...): cannot verify pattern against type Any")
             var bi: Float = 0
             while (bi < bindings.length()) {
-                this.env.define_var(bindings[bi], "Any")
+                this.env.define_var(bindings[bi], AST.Type.AnyType)
                 bi = bi + 1
             }
             return
@@ -1587,7 +1664,7 @@ class NullChecker {
             this.error("let " + variant + "(...): " + variant + " is not a variant of " + val_type)
             var bi: Float = 0
             while (bi < bindings.length()) {
-                this.env.define_var(bindings[bi], "Any")
+                this.env.define_var(bindings[bi], AST.Type.AnyType)
                 bi = bi + 1
             }
             return
@@ -1595,7 +1672,7 @@ class NullChecker {
         var bi: Float = 0
         while (bi < bindings.length()) {
             var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
-            this.env.define_var(bindings[bi], field_type)
+            this.env.define_var(bindings[bi], this.parse_type_node(field_type))
             bi = bi + 1
         }
     }

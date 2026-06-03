@@ -30,7 +30,6 @@ class Codegen {
     var current_parent: String
     var string_vars: List<String>
     var last_type: AST.Type
-    var var_types: Map<String, String>
     var typed_vars: Map<String, AST.Type>
     var loop_end_label: String
     var current_ret_type: String
@@ -82,7 +81,6 @@ class Codegen {
         this.current_parent = ""
         this.string_vars = []
         this.last_type = AST.Type.IntType
-        this.var_types = {}
         this.typed_vars = {}
         this.loop_end_label = ""
         this.current_ret_type = "i64"
