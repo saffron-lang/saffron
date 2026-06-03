@@ -942,18 +942,18 @@
     }
 
     fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
-        // LetPattern destructures value into bindings from pattern.
         var variant_name: String = match (pattern) {
             VariantPattern(v, b) => v
+            ArrayPattern(e, r) => "__array:" + r
             _ => ""
         }
         var bindings: List<String> = match (pattern) {
             VariantPattern(v, b) => b
+            ArrayPattern(e, r) => e
             _ => []
         }
         var val: String = this.gen_arg_value(value)
         var val_type: AST.Type = this.last_type
-        // Check for array pattern (encoded as __array:rest_name)
         if (variant_name.starts_with("__array:")) {
             this.gen_let_array_pattern(bindings, variant_name, val, val_type)
             return
