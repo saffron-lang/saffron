@@ -1,3 +1,6 @@
+[workspace]
+members = ["frontend"]
+
 [package]
 name = "bazaar"
 version = "0.1.0"
@@ -8,5 +11,7 @@ authors = ["henry232323"]
 [dependencies]
 
 [scripts]
-build = "saffron build src/main.sf -o build/bazaar"
+build = "pantry build --member frontend && saffron build src/main.sf -o build/bazaar"
 dev = "saffron run src/main.sf"
+frontend = "cd frontend && pantry build"
+migrate = "saffron run src/migrate.sf"
