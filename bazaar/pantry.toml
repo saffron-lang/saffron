@@ -1,0 +1,12 @@
+[package]
+name = "bazaar"
+version = "0.1.0"
+description = "Bazaar — the Saffron package registry"
+entry = "src/main.sf"
+authors = ["henry232323"]
+
+[dependencies]
+
+[scripts]
+build = "saffron build src/main.sf -o build/bazaar"
+dev = "saffron run src/main.sf"

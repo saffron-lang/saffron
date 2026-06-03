@@ -1,0 +1,58 @@
+//! `pantry search <query>` — search the Bazaar package registry.
+//!
+//! Queries the registry API and displays matching packages.
+//! Uses `curl` for HTTP until @http is wired.
+
+import "@args" as Args
+import "@os" as OS
+import "@json" as JSON
+
+fun _registry_url(): String {
+    var env_url: String = OS.env("BAZAAR_URL")
+    if (env_url != "") {
+        return env_url
+    }
+    return "https://bazaar.saffron-lang.org"
+}
+
+fun run(query: String, parsed: Args.ParsedArgs) {
+    if (query == "") {
+        IO.println("Usage: pantry search <query>")
+        OS.exit(1)
+    }
+
+    var url: String = _registry_url() + "/api/v1/search?q=" + query
+    var response: String = OS.exec("curl -s " + url)
+
+    if (response.trim() == "") {
+        IO.println("Error: no response from registry at ${_registry_url()}")
+        IO.println("Is the registry running?")
+        OS.exit(1)
+    }
+
+    // Parse JSON response — expects { "packages": [...] }
+    var data: Any = JSON.parse(response)
+    var packages: List<Any> = data.get("packages")
+
+    if (packages.length() == 0) {
+        IO.println("No packages found for '${query}'.")
+        return
+    }
+
+    IO.println("Search results for '${query}':")
+    IO.println("")
+
+    var i: Int = 0
+    while (i < packages.length()) {
+        var pkg: Map<String, Any> = packages[i]
+        var name: String = pkg.get("name")
+        var version: String = pkg.get("version")
+        var description: String = pkg.get("description")
+
+        IO.println("  ${name} (${version}) — ${description}")
+        i = i + 1
+    }
+
+    IO.println("")
+    IO.println("${packages.length()} package(s) found.")
+}

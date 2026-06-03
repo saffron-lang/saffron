@@ -1,0 +1,70 @@
+//! Token-based authentication for the Bazaar registry.
+//! Tokens are stored hashed in data/tokens.toml.
+
+import "@os" as OS
+import "@crypto" as Crypto
+import "@json" as JSON
+
+/// Path to the tokens storage file.
+var TOKENS_FILE = "data/tokens.json"
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// Validate an API token. Returns the username if valid, or "" if invalid.
+fun validate_token(token: String): String {
+    var tokens = load_tokens()
+    var hash = Crypto.sha256(token)
+    if (tokens.has(hash)) {
+        var entry = tokens.get(hash)
+        return entry.get("username")
+    }
+    return ""
+}
+
+/// Create a new API token for a user. Returns the raw token string.
+/// The token is stored hashed — the raw value is only returned once.
+fun create_token(username: String): String {
+    var raw_token = "bzr_" + Crypto.random_bytes(32)
+    var hash = Crypto.sha256(raw_token)
+
+    var tokens = load_tokens()
+    var entry = {}
+    entry.set("username", username)
+    entry.set("created", "2026-06-03")
+    tokens.set(hash, entry)
+
+    save_tokens(tokens)
+    return raw_token
+}
+
+// ---------------------------------------------------------------------------
+// Internal — token storage
+// ---------------------------------------------------------------------------
+
+/// Load the tokens map from disk. Returns an empty map if file doesn't exist.
+fun load_tokens(): Map<String, Any> {
+    if (!OS.file_exists(TOKENS_FILE)) {
+        return {}
+    }
+    var content = IO.read_file(TOKENS_FILE)
+    if (content.trim().length() == 0) {
+        return {}
+    }
+    var parsed = JSON.parse(content)
+    if (parsed == nil) {
+        return {}
+    }
+    return parsed
+}
+
+/// Save the tokens map to disk as JSON.
+fun save_tokens(tokens: Map<String, Any>) {
+    // Ensure the data directory exists
+    var dir = "data"
+    if (!OS.file_exists(dir)) {
+        OS.mkdir(dir)
+    }
+    IO.write_file(TOKENS_FILE, JSON.pretty(tokens))
+}

@@ -1,0 +1,42 @@
+//! Bazaar — the Saffron package registry server.
+//! Entry point: configures middleware, registers routes, starts server.
+
+import "@http/server" as Http
+import "@os" as OS
+import "./routes.sf" as Routes
+import "./index.sf" as Index
+
+fun main() {
+    // Determine port from environment or default to 3000
+    var port_str = OS.env("BAZAAR_PORT")
+    var port = 3000
+    if (port_str.length() > 0) {
+        port = port_str.to_number()
+    }
+
+    // Initialize the index directory (git repo) on first run
+    Index.init_index()
+
+    // Create the HTTP server
+    var app = Http.server(port)
+
+    // Middleware
+    app.use(Http.cors())
+    app.use(Http.logger())
+    app.use(Http.static_files("/", "static"))
+    app.after(Http.cors_headers())
+
+    // API routes
+    app.get("/api/v1/packages", Routes.list_packages)
+    app.get("/api/v1/packages/:name", Routes.get_package)
+    app.get("/api/v1/packages/:name/:version/download", Routes.download_package)
+    app.put("/api/v1/packages/new", Routes.publish_package)
+    app.delete("/api/v1/packages/:name/:version/yank", Routes.yank_package)
+    app.get("/api/v1/search", Routes.search_packages)
+
+    // Start serving
+    IO.println("Bazaar registry server v0.1.0")
+    app.serve()
+}
+
+main()
