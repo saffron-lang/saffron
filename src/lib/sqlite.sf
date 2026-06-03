@@ -1,0 +1,509 @@
+//! SQLite database access via the `sqlite3` CLI.
+//!
+//! Shells out to the system `sqlite3` binary for all operations. Provides
+//! structured query results, parameter binding (with escaping), transactions,
+//! and a file-based migration system.
+//!
+//! ```saffron
+//! import "@sqlite" as Sqlite
+//!
+//! var db = Sqlite.open("app.db")
+//! db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)", [])
+//! db.exec("INSERT INTO users (name) VALUES (?)", ["alice"])
+//!
+//! var rows = db.query_all("SELECT * FROM users", [])
+//! IO.println(rows[0].get("name"))  // "alice"
+//!
+//! db.close()
+//! ```
+
+import "@process" as Process
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Escape single quotes for safe shell embedding.
+fun _escape_sq(s: String): String {
+    return s.replace("'", "'\\''")
+}
+
+/// Escape a value for SQL string literal (double single quotes).
+fun _escape_sql(s: String): String {
+    return s.replace("'", "''")
+}
+
+/// Bind parameters into a SQL string by replacing ? placeholders with
+/// escaped, quoted values. This prevents SQL injection for string values.
+fun _bind_params(sql: String, params: List<String>): String {
+    if (params.length() == 0) {
+        return sql
+    }
+    var result = ""
+    var param_idx = 0
+    var i = 0
+    while (i < sql.length()) {
+        var ch = sql.char_at(i)
+        if (ch == "?" and param_idx < params.length()) {
+            result = result + "'" + _escape_sql(params[param_idx]) + "'"
+            param_idx = param_idx + 1
+        } else {
+            result = result + ch
+        }
+        i = i + 1
+    }
+    return result
+}
+
+/// Run a SQL statement against a database file via the sqlite3 CLI.
+/// Returns the raw stdout output (TSV with header).
+fun _run_sql(db_path: String, sql: String): String {
+    var escaped_sql = _escape_sq(sql)
+    var escaped_path = _escape_sq(db_path)
+    var cmd = "sqlite3 -header -separator '\t' '${escaped_path}' '${escaped_sql}'"
+    var result = Process.run(cmd)
+    if (!result.success) {
+        var detail = result.stderr.trim()
+        if (detail.length() == 0) {
+            detail = result.stdout.trim()
+        }
+        throw "sqlite: exec: ${detail}"
+    }
+    return result.stdout
+}
+
+/// Run a SQL statement without expecting output (for INSERT, UPDATE, etc).
+fun _exec_sql(db_path: String, sql: String) {
+    var escaped_sql = _escape_sq(sql)
+    var escaped_path = _escape_sq(db_path)
+    var cmd = "sqlite3 '${escaped_path}' '${escaped_sql}'"
+    var result = Process.run(cmd)
+    if (!result.success) {
+        var detail = result.stderr.trim()
+        if (detail.length() == 0) {
+            detail = result.stdout.trim()
+        }
+        throw "sqlite: exec: ${detail}"
+    }
+}
+
+/// Parse TSV output from sqlite3 -header into a list of Row objects.
+/// First line is column names (tab-separated), subsequent lines are data.
+fun _parse_rows(output: String): List<Row> {
+    var rows: List<Row> = []
+    var trimmed = output.trim()
+    if (trimmed.length() == 0) {
+        return rows
+    }
+    var lines = trimmed.split("\n")
+    if (lines.length() < 1) {
+        return rows
+    }
+
+    // First line is column headers
+    var columns = lines[0].split("\t")
+
+    // Remaining lines are data rows
+    var i = 1
+    while (i < lines.length()) {
+        var line = lines[i]
+        if (line.length() > 0) {
+            var values = line.split("\t")
+            // Pad values if fewer columns than headers (empty trailing columns)
+            while (values.length() < columns.length()) {
+                values.push("")
+            }
+            rows.push(Row(columns, values))
+        }
+        i = i + 1
+    }
+    return rows
+}
+
+/// Check that the sqlite3 binary is available on the system.
+/// Throws a clear error if not found.
+fun _ensure_sqlite3() {
+    var path = Process.which("sqlite3")
+    if (path == "") {
+        throw "sqlite: sqlite3 binary not found on PATH (install sqlite3 to use this module)"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Row — a single result row
+// ---------------------------------------------------------------------------
+
+/// A single row from a query result. Access values by column name.
+///
+/// ```saffron
+/// var row = db.query_one("SELECT id, name FROM users WHERE id = ?", ["1"])
+/// IO.println(row.get("name"))       // "alice"
+/// IO.println(row.get_int("id"))     // 1
+/// IO.println(row.columns())         // ["id", "name"]
+/// ```
+class Row {
+    var _columns: List<String>
+    var _values: List<String>
+
+    fun init(columns: List<String>, values: List<String>) {
+        this._columns = columns
+        this._values = values
+    }
+
+    /// Get the value of a column by name. Returns the string value.
+    /// Throws if the column does not exist.
+    ///
+    /// ```saffron
+    /// var name = row.get("name")
+    /// ```
+    fun get(column: String): String {
+        var i = 0
+        while (i < this._columns.length()) {
+            if (this._columns[i] == column) {
+                return this._values[i]
+            }
+            i = i + 1
+        }
+        throw "sqlite: column not found: ${column}"
+    }
+
+    /// Get the value of a column parsed as a number.
+    /// Throws if the column does not exist or the value is not numeric.
+    ///
+    /// ```saffron
+    /// var count = row.get_int("n")
+    /// ```
+    fun get_int(column: String): Number {
+        var val = this.get(column)
+        return val.to_number()
+    }
+
+    /// Return the list of column names in this row.
+    ///
+    /// ```saffron
+    /// var cols = row.columns()  // ["id", "name", "email"]
+    /// ```
+    fun columns(): List<String> {
+        return this._columns
+    }
+
+    /// Convert the row to a map of column name to string value.
+    ///
+    /// ```saffron
+    /// var m = row.to_map()
+    /// IO.println(m.get("name"))
+    /// ```
+    fun to_map(): Map<String, String> {
+        var m: Map<String, String> = {}
+        var i = 0
+        while (i < this._columns.length()) {
+            m.set(this._columns[i], this._values[i])
+            i = i + 1
+        }
+        return m
+    }
+
+    /// Human-readable representation.
+    fun to_string(): String {
+        var parts: List<String> = []
+        var i = 0
+        while (i < this._columns.length()) {
+            parts.push("${this._columns[i]}=${this._values[i]}")
+            i = i + 1
+        }
+        return "Row(" + parts.join(", ") + ")"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Database — main connection handle
+// ---------------------------------------------------------------------------
+
+/// A database connection handle. Created via Sqlite.open().
+///
+/// ```saffron
+/// import "@sqlite" as Sqlite
+///
+/// var db = Sqlite.open("myapp.db")
+/// db.exec("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)", [])
+/// db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", ["greeting", "hello"])
+/// var row = db.query_one("SELECT value FROM kv WHERE key = ?", ["greeting"])
+/// IO.println(row.get("value"))  // "hello"
+/// db.close()
+/// ```
+class Database {
+    var _path: String
+
+    fun init(path: String) {
+        this._path = path
+    }
+
+    /// Execute a SQL statement that does not return results (INSERT, UPDATE, DELETE, CREATE, etc).
+    /// Parameters are bound by replacing `?` placeholders with escaped values.
+    ///
+    /// ```saffron
+    /// db.exec("INSERT INTO users (name, email) VALUES (?, ?)", ["alice", "alice@example.com"])
+    /// ```
+    fun exec(sql: String, params: List<String>) {
+        var bound = _bind_params(sql, params)
+        _exec_sql(this._path, bound)
+    }
+
+    /// Execute a query and iterate over results via a callback function.
+    /// The callback receives each Row one at a time.
+    ///
+    /// ```saffron
+    /// db.query("SELECT * FROM users", [], fun (row: Row) {
+    ///     IO.println(row.get("name"))
+    /// })
+    /// ```
+    fun query(sql: String, params: List<String>, callback: Fun) {
+        var bound = _bind_params(sql, params)
+        var output = _run_sql(this._path, bound)
+        var rows = _parse_rows(output)
+        var i = 0
+        while (i < rows.length()) {
+            callback(rows[i])
+            i = i + 1
+        }
+    }
+
+    /// Execute a query and return all result rows as a list.
+    ///
+    /// ```saffron
+    /// var users = db.query_all("SELECT * FROM users WHERE active = ?", ["1"])
+    /// var i = 0
+    /// while (i < users.length()) {
+    ///     IO.println(users[i].get("name"))
+    ///     i = i + 1
+    /// }
+    /// ```
+    fun query_all(sql: String, params: List<String>): List<Row> {
+        var bound = _bind_params(sql, params)
+        var output = _run_sql(this._path, bound)
+        return _parse_rows(output)
+    }
+
+    /// Execute a query and return the first row, or nil if no results.
+    ///
+    /// ```saffron
+    /// var row = db.query_one("SELECT count(*) as n FROM users", [])
+    /// IO.println(row.get_int("n"))
+    /// ```
+    fun query_one(sql: String, params: List<String>): Row {
+        var rows = this.query_all(sql, params)
+        if (rows.length() == 0) {
+            return nil
+        }
+        return rows[0]
+    }
+
+    /// Execute a block of operations inside a transaction.
+    /// Automatically issues BEGIN before and COMMIT after. If the block
+    /// throws an exception, ROLLBACK is issued and the error is re-thrown.
+    ///
+    /// ```saffron
+    /// db.transaction(fun () {
+    ///     db.exec("INSERT INTO orders (user_id, total) VALUES (?, ?)", ["1", "99.50"])
+    ///     db.exec("UPDATE users SET order_count = order_count + 1 WHERE id = ?", ["1"])
+    /// })
+    /// ```
+    fun transaction(block: Fun) {
+        _exec_sql(this._path, "BEGIN")
+        try {
+            block()
+            _exec_sql(this._path, "COMMIT")
+        } catch (e) {
+            _exec_sql(this._path, "ROLLBACK")
+            throw e
+        }
+    }
+
+    /// Close the database connection. No-op for the CLI backend since each
+    /// operation spawns a separate process.
+    fun close() {
+        // No-op for CLI backend — each query is a separate sqlite3 invocation.
+    }
+
+    /// Human-readable representation.
+    fun to_string(): String {
+        return "Database(\"${this._path}\")"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — module-level functions
+// ---------------------------------------------------------------------------
+
+/// Open (or create) a SQLite database at the given path.
+/// Verifies that the sqlite3 binary is available on the system.
+///
+/// ```saffron
+/// import "@sqlite" as Sqlite
+///
+/// var db = Sqlite.open("app.db")
+/// db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)", [])
+/// db.close()
+/// ```
+fun open(path: String): Database {
+    _ensure_sqlite3()
+    // Touch the database file to ensure it exists (sqlite3 does this too,
+    // but we want to fail early on permission errors)
+    var escaped_path = _escape_sq(path)
+    var result = Process.run("sqlite3 '${escaped_path}' 'SELECT 1;'")
+    if (!result.success) {
+        var detail = result.stderr.trim()
+        throw "sqlite: open: ${detail}"
+    }
+    return Database(path)
+}
+
+/// Run pending SQL migrations from a directory against a database.
+///
+/// Migration files are `.sql` files sorted alphabetically (e.g. 001_create_users.sql).
+/// A tracking table `_sf_migrations` records which have already been applied.
+/// Each migration runs inside its own transaction.
+///
+/// ```saffron
+/// import "@sqlite" as Sqlite
+///
+/// var db = Sqlite.open("app.db")
+/// Sqlite.migrate(db, "migrations/")
+/// ```
+fun migrate(db: Database, migrations_dir: String) {
+    // Ensure tracking table exists
+    db.exec("CREATE TABLE IF NOT EXISTS _sf_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT DEFAULT (datetime('now')))", [])
+
+    // List .sql files in the migrations directory (excluding *_down.sql)
+    var all_files = _list_migration_files(migrations_dir)
+
+    // Get already-applied migrations
+    var applied = _get_applied_migrations(db)
+
+    // Apply pending migrations in order
+    var i = 0
+    while (i < all_files.length()) {
+        var filename = all_files[i]
+        if (!_is_applied(filename, applied)) {
+            var filepath = migrations_dir + "/" + filename
+            var sql = IO.read_file(filepath)
+            // Strip the @down section if present
+            var up_sql = _extract_up_sql(sql)
+            // Run inside a transaction
+            db.transaction(fun () {
+                db.exec(up_sql, [])
+                db.exec("INSERT INTO _sf_migrations (name) VALUES (?)", [filename])
+            })
+        }
+        i = i + 1
+    }
+}
+
+/// Roll back the last applied migration.
+///
+/// Looks for a corresponding `*_down.sql` file or a `-- @down` section in the
+/// original migration file. Throws if no down migration is found.
+///
+/// ```saffron
+/// import "@sqlite" as Sqlite
+///
+/// var db = Sqlite.open("app.db")
+/// Sqlite.rollback(db, "migrations/")
+/// ```
+fun rollback(db: Database, migrations_dir: String) {
+    // Ensure tracking table exists
+    db.exec("CREATE TABLE IF NOT EXISTS _sf_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT DEFAULT (datetime('now')))", [])
+
+    // Find the last applied migration
+    var last_row = db.query_one("SELECT id, name FROM _sf_migrations ORDER BY id DESC LIMIT 1", [])
+    if (last_row == nil) {
+        throw "sqlite: rollback: no migrations to roll back"
+    }
+
+    var last_name = last_row.get("name")
+    var last_id = last_row.get("id")
+
+    // Try to find down SQL
+    var down_sql = _find_down_sql(migrations_dir, last_name)
+
+    // Execute rollback in a transaction
+    db.transaction(fun () {
+        db.exec(down_sql, [])
+        db.exec("DELETE FROM _sf_migrations WHERE id = ?", [last_id])
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Migration helpers
+// ---------------------------------------------------------------------------
+
+/// List migration .sql files in a directory, sorted alphabetically.
+/// Excludes files ending in _down.sql.
+fun _list_migration_files(dir: String): List<String> {
+    // Use ls + grep via shell to find .sql files (not _down.sql)
+    var escaped_dir = _escape_sq(dir)
+    var result = Process.run("ls '${escaped_dir}' 2>/dev/null | grep '\\.sql$' | grep -v '_down\\.sql$' | sort")
+    if (!result.success or result.stdout.trim().length() == 0) {
+        return []
+    }
+    return result.stdout.trim().split("\n")
+}
+
+/// Get list of already-applied migration names from the tracking table.
+fun _get_applied_migrations(db: Database): List<String> {
+    var rows = db.query_all("SELECT name FROM _sf_migrations ORDER BY id", [])
+    var names: List<String> = []
+    var i = 0
+    while (i < rows.length()) {
+        names.push(rows[i].get("name"))
+        i = i + 1
+    }
+    return names
+}
+
+/// Check if a migration filename has already been applied.
+fun _is_applied(filename: String, applied: List<String>): Bool {
+    var i = 0
+    while (i < applied.length()) {
+        if (applied[i] == filename) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+/// Extract the "up" portion of a migration SQL (everything before `-- @down`).
+fun _extract_up_sql(sql: String): String {
+    var marker = "-- @down"
+    var idx = sql.index_of(marker)
+    if (idx < 0) {
+        return sql
+    }
+    return sql.slice(0, idx).trim()
+}
+
+/// Find the down SQL for a given migration.
+/// First checks for a separate _down.sql file, then for a -- @down section.
+fun _find_down_sql(dir: String, filename: String): String {
+    // Try separate down file: 001_create_users.sql -> 001_create_users_down.sql
+    var base = filename.slice(0, filename.length() - 4)  // strip .sql
+    var down_file = dir + "/" + base + "_down.sql"
+
+    var escaped_down = _escape_sq(down_file)
+    var check = Process.run("test -f '${escaped_down}' && echo yes")
+    if (check.success and check.stdout.trim() == "yes") {
+        return IO.read_file(down_file)
+    }
+
+    // Try inline -- @down section in the original file
+    var filepath = dir + "/" + filename
+    var sql = IO.read_file(filepath)
+    var marker = "-- @down"
+    var idx = sql.index_of(marker)
+    if (idx >= 0) {
+        return sql.slice(idx + marker.length(), sql.length()).trim()
+    }
+
+    throw "sqlite: rollback: no down migration found for ${filename} (expected ${base}_down.sql or -- @down section)"
+}

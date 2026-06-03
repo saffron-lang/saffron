@@ -1,0 +1,451 @@
+//! TLS/SSL module — optional TLS support for secure connections.
+//! Wraps OpenSSL for certificate management, context creation, and
+//! TLS-wrapped socket I/O. Client-side TLS works today via the socket layer;
+//! server-side TLS requires C runtime extensions (planned).
+//!
+//! ```saffron
+//! import "@ssl" as SSL
+//!
+//! // Check availability
+//! if (!SSL.is_available()) {
+//!     throw "OpenSSL not installed"
+//! }
+//!
+//! // Generate self-signed certs for development
+//! SSL.generate_self_signed("localhost", "certs/dev.crt", "certs/dev.key")
+//!
+//! // Create a client context with defaults (system CA, verify peer)
+//! var ctx = SSL.client_context()
+//!
+//! // Create a server context (for future use with native TLS accept)
+//! var sctx = SSL.server_context({"cert": "server.crt", "key": "server.key"})
+//! ```
+
+import "os" as OS
+import "@process" as Process
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/// TLS 1.2 protocol version identifier.
+var TLS_1_2: String = "tls1.2"
+
+/// TLS 1.3 protocol version identifier.
+var TLS_1_3: String = "tls1.3"
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Escape single quotes for safe shell embedding.
+fun _escape_sq(s: String): String {
+    return s.replace("'", "'\\''")
+}
+
+/// Shell-escape a value by wrapping in single quotes.
+fun _shell_escape(s: String): String {
+    return "'" + _escape_sq(s) + "'"
+}
+
+// ---------------------------------------------------------------------------
+// Context — TLS configuration object
+// ---------------------------------------------------------------------------
+
+/// TLS context holding configuration for client or server connections.
+/// Created via `client_context()` or `server_context()`.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// var ctx = SSL.client_context({"ca": "/etc/ssl/custom-ca.pem"})
+/// IO.println(ctx.mode)       // "client"
+/// IO.println(ctx.verify_peer) // true
+/// ```
+class Context {
+    var mode: String
+    var cert_file: String
+    var key_file: String
+    var ca_file: String
+    var verify_peer: Bool
+    var min_version: String
+
+    fun init(mode: String, cert_file: String, key_file: String, ca_file: String, verify_peer: Bool, min_version: String) {
+        this.mode = mode
+        this.cert_file = cert_file
+        this.key_file = key_file
+        this.ca_file = ca_file
+        this.verify_peer = verify_peer
+        this.min_version = min_version
+    }
+
+    /// Return a human-readable description of the context.
+    fun to_string(): String {
+        return "Context(mode=${this.mode}, verify=${this.verify_peer}, min_version=${this.min_version})"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TlsConnection — a TLS-wrapped connection handle
+// ---------------------------------------------------------------------------
+
+/// A TLS-wrapped socket connection. Provides read/write/close over an
+/// encrypted channel. Obtained from `wrap_client()` or (future) `wrap_server()`.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+/// import "@socket" as Socket
+///
+/// var fd = Socket.connect("example.com", 443)
+/// var ctx = SSL.client_context()
+/// var conn = SSL.wrap_client(fd, "example.com", ctx)
+/// conn.write("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
+/// var response = conn.read(4096)
+/// conn.close()
+/// ```
+class TlsConnection {
+    var fd: Number
+    var tls_handle: Number
+
+    fun init(fd: Number, tls_handle: Number) {
+        this.fd = fd
+        this.tls_handle = tls_handle
+    }
+
+    /// Read up to `n` bytes of decrypted data from the TLS connection.
+    /// Returns the data as a string. Returns empty string on EOF.
+    ///
+    /// NOTE: Delegates to the Socket module's TLS read using the packed handle.
+    fun read(n: Number): String {
+        var packed: Number = this.fd | (this.tls_handle << 32)
+        // Use OS.exec to call through — in production this would use @extern TLS read
+        // For now, delegate to the socket layer's tls_read via the packed handle
+        return _tls_read_via_socket(packed, n)
+    }
+
+    /// Write data through the TLS connection. Returns the number of bytes written.
+    ///
+    /// NOTE: Delegates to the Socket module's TLS write using the packed handle.
+    fun write(data: String): Number {
+        var packed: Number = this.fd | (this.tls_handle << 32)
+        return _tls_write_via_socket(packed, data)
+    }
+
+    /// Close the TLS connection. Sends close_notify and closes the underlying socket.
+    fun close() {
+        var packed: Number = this.fd | (this.tls_handle << 32)
+        _tls_close_via_socket(packed)
+    }
+
+    /// Return a human-readable description.
+    fun to_string(): String {
+        return "TlsConnection(fd=${this.fd}, tls_handle=${this.tls_handle})"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Internal: Socket layer delegates
+// These call through to the existing C TLS primitives via the socket module's
+// extern functions. When the full C server TLS layer is implemented, these
+// will be replaced with direct @extern calls to sf_tls_read/write/close.
+// ---------------------------------------------------------------------------
+
+@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Number, buf: Number, len: Number): Number
+@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Number, buf: Number, len: Number): Number
+@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Number)
+@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Number, hostname: Number): Number
+@extern("void* malloc(i64)") fun _ssl_malloc(size: Number): Number
+@extern("void free(void*)") fun _ssl_free(ptr: Number)
+@extern("i64 strlen(void*)") fun _ssl_strlen(s: Number): Number
+
+/// Read decrypted data from a packed TLS handle.
+fun _tls_read_via_socket(packed: Number, max_bytes: Number): String {
+    var tls: Number = packed >> 32
+    var buf: Number = _ssl_malloc(max_bytes + 1)
+    var n: Number = _tls_read_raw(tls, buf, max_bytes)
+    if (n < 0) { n = 0 }
+    // Null-terminate
+    @intrinsic fun store8(addr: Number, val: Number)
+    store8(buf + n, 0)
+    return buf
+}
+
+/// Write data through a packed TLS handle.
+fun _tls_write_via_socket(packed: Number, data: String): Number {
+    var tls: Number = packed >> 32
+    var ptr: Number = data
+    var len: Number = _ssl_strlen(ptr)
+    var written: Number = _tls_write_raw(tls, ptr, len)
+    if (written < 0) { written = 0 }
+    return written
+}
+
+/// Close a packed TLS handle.
+fun _tls_close_via_socket(packed: Number) {
+    var tls: Number = packed >> 32
+    _tls_close_raw(tls)
+}
+
+// ---------------------------------------------------------------------------
+// Public API — module-level functions
+// ---------------------------------------------------------------------------
+
+/// Check if OpenSSL is installed and available on the system.
+/// Returns true if the `openssl` CLI binary is on PATH.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// if (SSL.is_available()) {
+///     IO.println("TLS support available")
+/// } else {
+///     IO.println("Install OpenSSL for TLS support")
+/// }
+/// ```
+fun is_available(): Bool {
+    return Process.which("openssl") != ""
+}
+
+/// Create a server TLS context from a configuration map.
+///
+/// Required config keys:
+/// - `"cert"` — path to the certificate file (PEM)
+/// - `"key"` — path to the private key file (PEM)
+///
+/// Optional config keys:
+/// - `"ca"` — path to CA bundle for client cert verification
+/// - `"verify"` — "true" or "false" for client cert verification (default: "false")
+/// - `"min_version"` — minimum TLS version: "tls1.2" or "tls1.3" (default: "tls1.2")
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// var ctx = SSL.server_context({"cert": "server.crt", "key": "server.key"})
+/// var ctx_strict = SSL.server_context({
+///     "cert": "server.crt",
+///     "key": "server.key",
+///     "min_version": SSL.TLS_1_3
+/// })
+/// ```
+///
+/// NOTE: The context object is created immediately. Actual certificate loading
+/// happens when `wrap_server()` is called (pending C runtime support).
+fun server_context(config: Map<String, String>): Context {
+    var cert = ""
+    var key = ""
+    var ca = ""
+    var verify = false
+    var min_ver = TLS_1_2
+
+    if (config.has("cert")) {
+        cert = config.get("cert")
+    } else {
+        throw "ssl: context: 'cert' is required for server context"
+    }
+
+    if (config.has("key")) {
+        key = config.get("key")
+    } else {
+        throw "ssl: context: 'key' is required for server context"
+    }
+
+    if (config.has("ca")) {
+        ca = config.get("ca")
+    }
+
+    if (config.has("verify")) {
+        verify = config.get("verify") == "true"
+    }
+
+    if (config.has("min_version")) {
+        min_ver = config.get("min_version")
+    }
+
+    // Validate that cert and key files exist (early error detection)
+    if (!OS.file_exists(cert)) {
+        throw "ssl: context: unable to load certificate: ${cert}"
+    }
+    if (!OS.file_exists(key)) {
+        throw "ssl: context: unable to load private key: ${key}"
+    }
+
+    return Context("server", cert, key, ca, verify, min_ver)
+}
+
+/// Create a client TLS context with custom configuration.
+///
+/// Optional config keys:
+/// - `"ca"` — path to custom CA bundle (default: system CA)
+/// - `"verify"` — "true" or "false" for peer verification (default: "true")
+/// - `"min_version"` — minimum TLS version: "tls1.2" or "tls1.3" (default: "tls1.2")
+/// - `"cert"` — path to client certificate for mTLS
+/// - `"key"` — path to client private key for mTLS
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// // Custom CA for corporate environments
+/// var ctx = SSL.client_context({"ca": "/etc/corp/ca-bundle.pem"})
+///
+/// // Skip verification (development only!)
+/// var dev_ctx = SSL.client_context({"verify": "false"})
+///
+/// // mTLS client certificate
+/// var mtls_ctx = SSL.client_context({
+///     "cert": "client.crt",
+///     "key": "client.key"
+/// })
+/// ```
+fun client_context(config: Map<String, String>): Context {
+    var cert = ""
+    var key = ""
+    var ca = ""
+    var verify = true
+    var min_ver = TLS_1_2
+
+    if (config.has("ca")) {
+        ca = config.get("ca")
+    }
+
+    if (config.has("verify")) {
+        verify = config.get("verify") != "false"
+    }
+
+    if (config.has("min_version")) {
+        min_ver = config.get("min_version")
+    }
+
+    if (config.has("cert")) {
+        cert = config.get("cert")
+    }
+
+    if (config.has("key")) {
+        key = config.get("key")
+    }
+
+    return Context("client", cert, key, ca, verify, min_ver)
+}
+
+/// Create a client TLS context with default settings.
+/// Uses system CA bundle and verifies peer certificates.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// var ctx = SSL.client_context_default()
+/// // Equivalent to: SSL.client_context({"verify": "true"})
+/// ```
+fun client_context_default(): Context {
+    return Context("client", "", "", "", true, TLS_1_2)
+}
+
+/// Wrap a connected socket fd as a TLS client connection.
+/// Performs the TLS handshake with the given hostname for SNI verification.
+///
+/// The `ctx` parameter provides TLS settings. Currently, custom CA and
+/// skip-verify options require the C runtime enhancement (sf_tls_ctx_new_client).
+/// The basic case (system CA + verify) works today via the existing sf_tls_connect.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+/// import "@socket" as Socket
+///
+/// var fd = Socket.connect("example.com", 443)
+/// var ctx = SSL.client_context_default()
+/// var conn = SSL.wrap_client(fd, "example.com", ctx)
+/// conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+/// var data = conn.read(4096)
+/// conn.close()
+/// ```
+///
+/// NOTE: Custom context options (custom CA, skip-verify, mTLS) require the
+/// planned C runtime extensions. For now, all wrap_client calls use the default
+/// system TLS settings regardless of ctx configuration.
+fun wrap_client(fd: Number, hostname: String, ctx: Context): TlsConnection {
+    // Delegate to existing C TLS connect (uses system defaults)
+    var tls_handle: Number = _tls_connect_raw(fd, hostname)
+    if (tls_handle < 0) {
+        throw "ssl: handshake: TLS connect failed for ${hostname}"
+    }
+    return TlsConnection(fd, tls_handle)
+}
+
+/// Wrap an accepted socket fd as a TLS server connection.
+/// Performs the TLS accept handshake using the server context's certificate.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// var ctx = SSL.server_context({"cert": "server.crt", "key": "server.key"})
+/// // After accepting a TCP connection:
+/// var conn = SSL.wrap_server(fd, ctx)
+/// var request = conn.read(4096)
+/// conn.write("HTTP/1.1 200 OK\r\n\r\nhello")
+/// conn.close()
+/// ```
+///
+/// STATUS: Not yet implemented. Requires C runtime extensions:
+/// - sf_tls_ctx_new_server(cert, key, min_version)
+/// - sf_tls_accept(ctx, fd)
+///
+/// For production HTTPS today, use nginx/caddy for TLS termination and proxy
+/// to your Saffron HTTP server on a local port.
+fun wrap_server(fd: Number, ctx: Context): TlsConnection {
+    throw "ssl: server-side TLS requires native runtime support (use nginx for TLS termination). Planned: sf_tls_ctx_new_server + sf_tls_accept in tls_native.c"
+}
+
+/// Generate a self-signed certificate and private key for development use.
+/// Shells out to the `openssl` CLI to create an RSA 2048-bit certificate
+/// valid for 365 days with the given hostname as CN and SAN.
+///
+/// ```saffron
+/// import "@ssl" as SSL
+///
+/// SSL.generate_self_signed("localhost", "certs/dev.crt", "certs/dev.key")
+/// // Creates certs/dev.crt and certs/dev.key
+/// ```
+///
+/// Throws if openssl is not available or the command fails.
+fun generate_self_signed(hostname: String, cert_path: String, key_path: String) {
+    if (!is_available()) {
+        throw "ssl: generate_self_signed requires openssl CLI on PATH"
+    }
+
+    var escaped_host = _escape_sq(hostname)
+    var escaped_cert = _escape_sq(cert_path)
+    var escaped_key = _escape_sq(key_path)
+
+    // Ensure parent directories exist
+    var cert_dir_result = Process.run("dirname '${escaped_cert}'")
+    if (cert_dir_result.success) {
+        var cert_dir = cert_dir_result.stdout.trim()
+        if (cert_dir != "" and cert_dir != ".") {
+            OS.exec("mkdir -p '${_escape_sq(cert_dir)}' 2>/dev/null")
+        }
+    }
+
+    var key_dir_result = Process.run("dirname '${escaped_key}'")
+    if (key_dir_result.success) {
+        var key_dir = key_dir_result.stdout.trim()
+        if (key_dir != "" and key_dir != ".") {
+            OS.exec("mkdir -p '${_escape_sq(key_dir)}' 2>/dev/null")
+        }
+    }
+
+    // Generate the self-signed certificate
+    var cmd = "openssl req -x509 -newkey rsa:2048"
+    cmd = cmd + " -keyout '${escaped_key}'"
+    cmd = cmd + " -out '${escaped_cert}'"
+    cmd = cmd + " -days 365 -nodes"
+    cmd = cmd + " -subj '/CN=${escaped_host}'"
+    cmd = cmd + " -addext 'subjectAltName=DNS:${escaped_host},IP:127.0.0.1'"
+
+    var result = Process.run(cmd)
+    if (!result.success) {
+        var detail = result.stderr.trim()
+        if (detail == "") {
+            detail = "openssl command failed (exit ${result.exit_code})"
+        }
+        throw "ssl: generate_self_signed: ${detail}"
+    }
+}
