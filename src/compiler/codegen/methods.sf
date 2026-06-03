@@ -737,6 +737,21 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
     }
 
+    // If receiver type is unknown ("Any") but a user class defines this method,
+    // skip builtin dispatch and fall through to class method resolution.
+    if (!is_user_class and this.builtin_methods.has(method)) {
+        var bd_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var bd_ot: String = this.get_var_type_str(obj_name)
+            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
+        }
+        if (bd_obj_type == "Any") {
+            var fcm_class: String = this.find_class_for_method(method)
+            if (fcm_class.length() > 0) {
+                is_user_class = true
+            }
+        }
+    }
     if (!is_user_class and this.builtin_methods.has(method)) {
         // Warn when dispatching on untyped value
         var bd_obj_type: String = this.type_to_string(this.last_type)

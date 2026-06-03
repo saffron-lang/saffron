@@ -1120,7 +1120,7 @@ class Codegen {
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
@@ -1128,14 +1128,14 @@ class Codegen {
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 if (this.str_in_list(this.known_functions,name)) {
                     if (!this.typed_vars.has(name)) {
-                        if (!this.module_globals.has(this.current_prefix + name)) {
+                        if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
                             return this.gen_func_ref(name)
                         }
                     }
                 }
                 if (this.str_in_list(this.known_functions,this.current_prefix + name)) {
                     if (!this.typed_vars.has(name)) {
-                        if (!this.module_globals.has(this.current_prefix + name)) {
+                        if (!this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name)) {
                             return this.gen_func_ref(this.current_prefix + name)
                         }
                     }
@@ -1144,9 +1144,15 @@ class Codegen {
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
                     var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                } else if (this.module_globals.has(name)) {
+                    var_ref = "@__g_" + this.sanitize_name(name)
                 }
-                this.emit_indent(local + " = load i64, i64* " + var_ref)
-                if (!this.use_llvm_lib) { this.verify_load(local, "i64", var_ref) }
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_load(local, "i64", var_ref))
+                } else {
+                    this.emit_indent(local + " = load i64, i64* " + var_ref)
+                    this.verify_load(local, "i64", var_ref)
+                }
                 local
             }
             Binary(left, op, right) => {
@@ -1165,8 +1171,12 @@ class Codegen {
                     if (this.module_globals.has(this.current_prefix + name)) {
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
                     }
-                    this.emit_indent("store i64 " + val + ", i64* " + var_ref)
-                    if (!this.use_llvm_lib) { this.verify_store(val, "i64", var_ref) }
+                    if (this.use_llvm_lib) {
+                        this.emit_indent(this.lib_store(val, "i64", var_ref))
+                    } else {
+                        this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+                        this.verify_store(val, "i64", var_ref)
+                    }
                 }
                 val
             }
@@ -1270,7 +1280,11 @@ class Codegen {
             This => {
                 this.last_type = this.str_to_type(this.current_class)
                 var local: String = this.fresh_local()
-                this.emit_indent(local + " = load i64, i64* %self")
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_load(local, "i64", "%self"))
+                } else {
+                    this.emit_indent(local + " = load i64, i64* %self")
+                }
                 local
             }
             GetField(object, field) => {
@@ -1434,8 +1448,12 @@ class Codegen {
 
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
         var result_ptr: String = this.fresh_local()
-        this.emit_indent(result_ptr + " = alloca i64")
-        if (!this.use_llvm_lib) { this.verify_alloca(result_ptr, "i64") }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_alloca(result_ptr, "i64"))
+        } else {
+            this.emit_indent(result_ptr + " = alloca i64")
+            this.verify_alloca(result_ptr, "i64")
+        }
 
         var cond_val: String = this.to_i1(this.gen_arg_value(cond))
         var then_label: String = this.fresh_label("ifexpr.then")
@@ -1452,8 +1470,12 @@ class Codegen {
         this.start_block(then_label)
         this.gen_stmts(then_stmts)
         var then_result: String = this.gen_arg_value(then_val)
-        this.emit_indent("store i64 " + then_result + ", i64* " + result_ptr)
-        if (!this.use_llvm_lib) { this.verify_store(then_result, "i64", result_ptr) }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_store(then_result, "i64", result_ptr))
+        } else {
+            this.emit_indent("store i64 " + then_result + ", i64* " + result_ptr)
+            this.verify_store(then_result, "i64", result_ptr)
+        }
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(end_label))
         } else {
@@ -1464,8 +1486,12 @@ class Codegen {
         this.start_block(else_label)
         this.gen_stmts(else_stmts)
         var else_result: String = this.gen_arg_value(else_val)
-        this.emit_indent("store i64 " + else_result + ", i64* " + result_ptr)
-        if (!this.use_llvm_lib) { this.verify_store(else_result, "i64", result_ptr) }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_store(else_result, "i64", result_ptr))
+        } else {
+            this.emit_indent("store i64 " + else_result + ", i64* " + result_ptr)
+            this.verify_store(else_result, "i64", result_ptr)
+        }
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(end_label))
         } else {
@@ -1475,8 +1501,12 @@ class Codegen {
 
         this.start_block(end_label)
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = load i64, i64* " + result_ptr)
-        if (!this.use_llvm_lib) { this.verify_load(result, "i64", result_ptr) }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_load(result, "i64", result_ptr))
+        } else {
+            this.emit_indent(result + " = load i64, i64* " + result_ptr)
+            this.verify_load(result, "i64", result_ptr)
+        }
         return result
     }
 
@@ -1984,7 +2014,11 @@ class Codegen {
         if (expr_kind == "this") {
             this.last_type = this.str_to_type(this.current_class)
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = load i64, i64* %self")
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_load(local, "i64", "%self"))
+            } else {
+                this.emit_indent(local + " = load i64, i64* %self")
+            }
             return local
         }
         if (expr_kind == "set_field") {
@@ -2022,7 +2056,7 @@ class Codegen {
             }
             // Error check: undefined variable
             // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
@@ -2031,9 +2065,15 @@ class Codegen {
             var var_ref: String = "%" + this.sanitize_name(vname)
             if (this.module_globals.has(this.current_prefix + vname)) {
                 var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
+            } else if (this.module_globals.has(vname)) {
+                var_ref = "@__g_" + this.sanitize_name(vname)
             }
-            this.emit_indent(local + " = load i64, i64* " + var_ref)
-            if (!this.use_llvm_lib) { this.verify_load(local, "i64", var_ref) }
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_load(local, "i64", var_ref))
+            } else {
+                this.emit_indent(local + " = load i64, i64* " + var_ref)
+                this.verify_load(local, "i64", var_ref)
+            }
             return local
         }
         if (expr_kind == "member") {
@@ -4584,8 +4624,12 @@ class Codegen {
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)
         }
-        this.emit_indent("store i64 " + val + ", i64* " + var_ref)
-        if (!this.use_llvm_lib) { this.verify_store(val, "i64", var_ref) }
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_store(val, "i64", var_ref))
+        } else {
+            this.emit_indent("store i64 " + val + ", i64* " + var_ref)
+            this.verify_store(val, "i64", var_ref)
+        }
     }
 
     fun infer_generic_from_init(init: AST.Expr): String {
@@ -5270,8 +5314,12 @@ class Codegen {
         if (vdoc.starts_with("@import:")) { return }
         if (!this.typed_vars.has(vname) and !this.str_in_list(this.known_functions,"__alloc_" + vname)) {
             this.known_functions.push("__alloc_" + vname)
-            this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
-            if (!this.use_llvm_lib) { this.verify_alloca("%" + this.sanitize_name(vname), "i64") }
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_alloca("%" + this.sanitize_name(vname), "i64"))
+            } else {
+                this.emit_indent("%" + this.sanitize_name(vname) + " = alloca i64")
+                this.verify_alloca("%" + this.sanitize_name(vname), "i64")
+            }
         }
     }
 
@@ -6635,6 +6683,41 @@ class Codegen {
         var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, LLVMTypes.Type.I64)
         var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
         var inst: LLVMInst.Instruction = LLVMInst.Instruction.IntToPtr(result_val, val_v, LLVMTypes.Type.Ptr)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_alloca(result_name: String, type_str: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Alloca(result_val, ty, "")
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_load(result_name: String, type_str: String, ptr_name: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var result_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(result_name, ty)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Load(result_val, ty, ptr_val)
+        var lib_ir: String = LLVMInst.format_instruction(inst, true)
+        return lib_ir.slice(2, lib_ir.length())
+    }
+
+    fun lib_store(val_name: String, type_str: String, ptr_name: String): String {
+        var ty: LLVMTypes.Type = LLVMTypes.Type.I64
+        if (type_str == "i1") { ty = LLVMTypes.Type.I1 }
+        else if (type_str == "i8") { ty = LLVMTypes.Type.I8 }
+        else if (type_str == "i32") { ty = LLVMTypes.Type.I32 }
+        var val_v: LLVMTypes.Value = LLVMTypes.Value.Instruction(val_name, ty)
+        var ptr_val: LLVMTypes.Value = LLVMTypes.Value.Instruction(ptr_name, LLVMTypes.Type.Ptr)
+        var inst: LLVMInst.Instruction = LLVMInst.Instruction.Store(val_v, ptr_val)
         var lib_ir: String = LLVMInst.format_instruction(inst, true)
         return lib_ir.slice(2, lib_ir.length())
     }
@@ -8700,6 +8783,21 @@ class Codegen {
         }
     }
 
+    // If receiver type is unknown ("Any") but a user class defines this method,
+    // skip builtin dispatch and fall through to class method resolution.
+    if (!is_user_class and this.builtin_methods.has(method)) {
+        var bd_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var bd_ot: String = this.get_var_type_str(obj_name)
+            if (bd_ot.length() > 0) { bd_obj_type = bd_ot }
+        }
+        if (bd_obj_type == "Any") {
+            var fcm_class: String = this.find_class_for_method(method)
+            if (fcm_class.length() > 0) {
+                is_user_class = true
+            }
+        }
+    }
     if (!is_user_class and this.builtin_methods.has(method)) {
         // Warn when dispatching on untyped value
         var bd_obj_type: String = this.type_to_string(this.last_type)
