@@ -1,0 +1,542 @@
+//! Build configuration API for pantry.sf manifests.
+//!
+//! Provides classes and functions that `pantry.sf` manifest files use to declare
+//! project metadata, dependencies, scripts, and configuration. When a `pantry.sf`
+//! file is executed, it calls `Pantry.project { p => ... }` to configure the project,
+//! then `Pantry.write_toml(p)` to generate the equivalent `pantry.toml`.
+//!
+//! ```saffron
+//! import "@pantry_config" as Pantry
+//!
+//! var p = Pantry.project(fun (p: Pantry.Project) {
+//!     p.name = "my-app"
+//!     p.version = "1.0.0"
+//!     p.dep("http", "^2.0.0")
+//!     p.script("test", "saffron run test/test_main.sf")
+//! })
+//!
+//! Pantry.write_toml(p)
+//! ```
+
+import "@os" as OS
+
+// ---------------------------------------------------------------------------
+// Project — the primary manifest configuration object
+// ---------------------------------------------------------------------------
+
+/// Represents a Saffron project manifest (equivalent to pantry.toml).
+class Project {
+    var name: String
+    var version: String
+    var description: String
+    var entry: String
+    var target: String
+    var type: String
+    var license: String
+    var authors: List<String>
+    var _deps: List<Map<String, String>>
+    var _dev_deps: List<Map<String, String>>
+    var _scripts: Map<String, String>
+    var _env_vars: Map<String, Map<String, String>>
+    var _features: Map<String, List<String>>
+
+    fun init() {
+        this.name = ""
+        this.version = "0.1.0"
+        this.description = ""
+        this.entry = "src/main.sf"
+        this.target = "native"
+        this.type = "application"
+        this.license = ""
+        this.authors = []
+        this._deps = []
+        this._dev_deps = []
+        this._scripts = {}
+        this._env_vars = {}
+        this._features = {}
+    }
+
+    /// Add a dependency with a version constraint.
+    ///
+    /// ```saffron
+    /// p.dep("http", "^2.0.0")
+    /// ```
+    fun dep(name: String, version: String) {
+        var entry: Map<String, String> = {}
+        entry.set("name", name)
+        entry.set("version", version)
+        this._deps.push(entry)
+    }
+
+    /// Add a dependency with a local path and version constraint.
+    ///
+    /// ```saffron
+    /// p.dep_path("turmeric", "../../turmeric", "^0.1.0")
+    /// ```
+    fun dep_path(name: String, path: String, version: String) {
+        var entry: Map<String, String> = {}
+        entry.set("name", name)
+        entry.set("path", path)
+        entry.set("version", version)
+        this._deps.push(entry)
+    }
+
+    /// Add a dependency from a git repository.
+    ///
+    /// ```saffron
+    /// p.dep_git("my-lib", "https://github.com/user/lib.git", "v1.0.0")
+    /// ```
+    fun dep_git(name: String, git: String, tag: String) {
+        var entry: Map<String, String> = {}
+        entry.set("name", name)
+        entry.set("git", git)
+        entry.set("tag", tag)
+        this._deps.push(entry)
+    }
+
+    /// Add a dev-only dependency with a version constraint.
+    ///
+    /// ```saffron
+    /// p.dev_dep("benchmark", "*")
+    /// ```
+    fun dev_dep(name: String, version: String) {
+        var entry: Map<String, String> = {}
+        entry.set("name", name)
+        entry.set("version", version)
+        this._dev_deps.push(entry)
+    }
+
+    /// Add a dev-only dependency with a local path.
+    fun dev_dep_path(name: String, path: String, version: String) {
+        var entry: Map<String, String> = {}
+        entry.set("name", name)
+        entry.set("path", path)
+        entry.set("version", version)
+        this._dev_deps.push(entry)
+    }
+
+    /// Register a named script command.
+    ///
+    /// ```saffron
+    /// p.script("build", "saffron build src/main.sf -o build/app")
+    /// p.script("test", "saffron run test/test_main.sf")
+    /// ```
+    fun script(name: String, cmd: String) {
+        this._scripts.set(name, cmd)
+    }
+
+    /// Configure an environment with key-value defines.
+    ///
+    /// ```saffron
+    /// p.env("dev", {"DEBUG": "true", "API_URL": "http://localhost:3000"})
+    /// p.env("prod", {"DEBUG": "false", "API_URL": "https://api.myapp.com"})
+    /// ```
+    fun env(name: String, config: Map<String, String>) {
+        this._env_vars.set(name, config)
+    }
+
+    /// Declare a feature flag with its associated dependency names.
+    ///
+    /// ```saffron
+    /// p.feature("tls", ["openssl"])
+    /// p.feature("http2", ["nghttp2"])
+    /// ```
+    fun feature(name: String, deps: List<String>) {
+        this._features.set(name, deps)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace — multi-package workspace configuration
+// ---------------------------------------------------------------------------
+
+/// Represents a workspace containing multiple packages.
+class Workspace {
+    var _members: List<String>
+    var _shared_deps: Map<String, String>
+
+    fun init() {
+        this._members = []
+        this._shared_deps = {}
+    }
+
+    /// Add a member package by its relative path.
+    ///
+    /// ```saffron
+    /// w.member("packages/core")
+    /// w.member("packages/cli")
+    /// ```
+    fun member(path: String) {
+        this._members.push(path)
+    }
+
+    /// Declare a shared dependency version across all workspace members.
+    ///
+    /// ```saffron
+    /// w.shared_dep("http", "^2.0.0")
+    /// w.shared_dep("json", "^1.5.0")
+    /// ```
+    fun shared_dep(name: String, version: String) {
+        this._shared_deps.set(name, version)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Module state — stores the configured project/workspace
+// ---------------------------------------------------------------------------
+
+var _current_project: Project = nil
+var _current_workspace: Workspace = nil
+
+// ---------------------------------------------------------------------------
+// Public API — top-level functions
+// ---------------------------------------------------------------------------
+
+/// Configure a project by passing a callback that receives a Project instance.
+/// The callback should set fields and call methods on the project.
+///
+/// ```saffron
+/// import "@pantry_config" as Pantry
+///
+/// var p = Pantry.project(fun (p: Pantry.Project) {
+///     p.name = "my-app"
+///     p.version = "1.0.0"
+///     p.entry = "src/main.sf"
+///     p.dep("http", "^2.0.0")
+/// })
+/// ```
+fun project(config: (Project) => Nil): Project {
+    var p: Project = Project()
+    config(p)
+    _current_project = p
+    return p
+}
+
+/// Configure a workspace by passing a callback that receives a Workspace instance.
+///
+/// ```saffron
+/// import "@pantry_config" as Pantry
+///
+/// var w = Pantry.workspace(fun (w: Pantry.Workspace) {
+///     w.member("packages/core")
+///     w.member("packages/cli")
+///     w.shared_dep("http", "^2.0.0")
+/// })
+/// ```
+fun workspace(config: (Workspace) => Nil): Workspace {
+    var w: Workspace = Workspace()
+    config(w)
+    _current_workspace = w
+    return w
+}
+
+/// Get the most recently configured project (set by `project()`).
+fun get_project(): Project {
+    return _current_project
+}
+
+/// Get the most recently configured workspace (set by `workspace()`).
+fun get_workspace(): Workspace {
+    return _current_workspace
+}
+
+// ---------------------------------------------------------------------------
+// TOML generation — escape helpers
+// ---------------------------------------------------------------------------
+
+/// Escape a string value for TOML output (handles backslash and quotes).
+fun _escape_toml_string(s: String): String {
+    var result = StringBuilder()
+    var i: Number = 0
+    while (i < s.length()) {
+        var c = s.char_at(i)
+        if (c == "\\") {
+            result.append("\\\\")
+        } else if (c == "\"") {
+            result.append("\\\"")
+        } else if (c == "\n") {
+            result.append("\\n")
+        } else if (c == "\t") {
+            result.append("\\t")
+        } else if (c == "\r") {
+            result.append("\\r")
+        } else {
+            result.append(c)
+        }
+        i = i + 1
+    }
+    return result.to_string()
+}
+
+// ---------------------------------------------------------------------------
+// TOML generation — write_toml
+// ---------------------------------------------------------------------------
+
+/// Generate pantry.toml content from a Project and write it to disk.
+///
+/// This is the bridge between `pantry.sf` (executable manifest) and `pantry.toml`
+/// (the format pantry reads). A `pantry.sf` file should end with:
+///
+/// ```saffron
+/// Pantry.write_toml(p)
+/// ```
+///
+/// This writes `pantry.toml` in the current directory.
+fun write_toml(proj: Project) {
+    var content = _generate_toml(proj)
+    IO.write_file("pantry.toml", content)
+}
+
+/// Generate pantry.toml content from a Project and write it to a specific path.
+fun write_toml_to(proj: Project, path: String) {
+    var content = _generate_toml(proj)
+    IO.write_file(path, content)
+}
+
+/// Generate the TOML string representation of a Project.
+fun _generate_toml(proj: Project): String {
+    var sb = StringBuilder()
+
+    // [package] section
+    sb.append("[package]\n")
+    sb.append("name = \"")
+    sb.append(_escape_toml_string(proj.name))
+    sb.append("\"\n")
+
+    sb.append("version = \"")
+    sb.append(_escape_toml_string(proj.version))
+    sb.append("\"\n")
+
+    if (proj.description != "") {
+        sb.append("description = \"")
+        sb.append(_escape_toml_string(proj.description))
+        sb.append("\"\n")
+    }
+
+    if (proj.entry != "src/main.sf") {
+        sb.append("entry = \"")
+        sb.append(_escape_toml_string(proj.entry))
+        sb.append("\"\n")
+    }
+
+    if (proj.license != "") {
+        sb.append("license = \"")
+        sb.append(_escape_toml_string(proj.license))
+        sb.append("\"\n")
+    }
+
+    if (proj.type != "application") {
+        sb.append("type = \"")
+        sb.append(_escape_toml_string(proj.type))
+        sb.append("\"\n")
+    }
+
+    if (proj.target != "native") {
+        sb.append("target = \"")
+        sb.append(_escape_toml_string(proj.target))
+        sb.append("\"\n")
+    }
+
+    if (proj.authors.length() > 0) {
+        sb.append("authors = [")
+        var i: Number = 0
+        while (i < proj.authors.length()) {
+            if (i > 0) { sb.append(", ") }
+            sb.append("\"")
+            sb.append(_escape_toml_string(proj.authors[i]))
+            sb.append("\"")
+            i = i + 1
+        }
+        sb.append("]\n")
+    }
+
+    // [dependencies] section
+    if (proj._deps.length() > 0) {
+        sb.append("\n[dependencies]\n")
+        var i: Number = 0
+        while (i < proj._deps.length()) {
+            var dep: Map<String, String> = proj._deps[i]
+            var dep_name: String = dep.get("name")
+            sb.append(dep_name)
+            sb.append(" = ")
+
+            if (dep.has("path") or dep.has("git")) {
+                // Inline table for complex dependencies
+                sb.append("{")
+                var first = true
+                if (dep.has("path")) {
+                    sb.append("path = \"")
+                    sb.append(_escape_toml_string(dep.get("path")))
+                    sb.append("\"")
+                    first = false
+                }
+                if (dep.has("git")) {
+                    if (!first) { sb.append(", ") }
+                    sb.append("git = \"")
+                    sb.append(_escape_toml_string(dep.get("git")))
+                    sb.append("\"")
+                    first = false
+                }
+                if (dep.has("tag")) {
+                    if (!first) { sb.append(", ") }
+                    sb.append("tag = \"")
+                    sb.append(_escape_toml_string(dep.get("tag")))
+                    sb.append("\"")
+                    first = false
+                }
+                if (dep.has("version")) {
+                    if (!first) { sb.append(", ") }
+                    sb.append("version = \"")
+                    sb.append(_escape_toml_string(dep.get("version")))
+                    sb.append("\"")
+                }
+                sb.append("}")
+            } else {
+                // Simple version string
+                sb.append("\"")
+                sb.append(_escape_toml_string(dep.get("version")))
+                sb.append("\"")
+            }
+            sb.append("\n")
+            i = i + 1
+        }
+    }
+
+    // [dev-dependencies] section
+    if (proj._dev_deps.length() > 0) {
+        sb.append("\n[dev-dependencies]\n")
+        var i: Number = 0
+        while (i < proj._dev_deps.length()) {
+            var dep: Map<String, String> = proj._dev_deps[i]
+            var dep_name: String = dep.get("name")
+            sb.append(dep_name)
+            sb.append(" = ")
+
+            if (dep.has("path")) {
+                sb.append("{path = \"")
+                sb.append(_escape_toml_string(dep.get("path")))
+                sb.append("\"")
+                if (dep.has("version")) {
+                    sb.append(", version = \"")
+                    sb.append(_escape_toml_string(dep.get("version")))
+                    sb.append("\"")
+                }
+                sb.append("}")
+            } else {
+                sb.append("\"")
+                sb.append(_escape_toml_string(dep.get("version")))
+                sb.append("\"")
+            }
+            sb.append("\n")
+            i = i + 1
+        }
+    }
+
+    // [scripts] section
+    if (proj._scripts.keys().length() > 0) {
+        sb.append("\n[scripts]\n")
+        var keys = proj._scripts.keys()
+        var i: Number = 0
+        while (i < keys.length()) {
+            var key: String = keys[i]
+            sb.append(key)
+            sb.append(" = \"")
+            sb.append(_escape_toml_string(proj._scripts.get(key)))
+            sb.append("\"\n")
+            i = i + 1
+        }
+    }
+
+    // [environments.*] sections
+    if (proj._env_vars.keys().length() > 0) {
+        var env_names = proj._env_vars.keys()
+        var i: Number = 0
+        while (i < env_names.length()) {
+            var env_name: String = env_names[i]
+            sb.append("\n[environments.")
+            sb.append(env_name)
+            sb.append("]\n")
+            var config: Map<String, String> = proj._env_vars.get(env_name)
+            var config_keys = config.keys()
+            var j: Number = 0
+            while (j < config_keys.length()) {
+                var k: String = config_keys[j]
+                sb.append(k)
+                sb.append(" = \"")
+                sb.append(_escape_toml_string(config.get(k)))
+                sb.append("\"\n")
+                j = j + 1
+            }
+            i = i + 1
+        }
+    }
+
+    // [features.*] sections
+    if (proj._features.keys().length() > 0) {
+        var feat_names = proj._features.keys()
+        var i: Number = 0
+        while (i < feat_names.length()) {
+            var feat_name: String = feat_names[i]
+            sb.append("\n[features.")
+            sb.append(feat_name)
+            sb.append("]\n")
+            sb.append("deps = [")
+            var deps: List<String> = proj._features.get(feat_name)
+            var j: Number = 0
+            while (j < deps.length()) {
+                if (j > 0) { sb.append(", ") }
+                sb.append("\"")
+                sb.append(_escape_toml_string(deps[j]))
+                sb.append("\"")
+                j = j + 1
+            }
+            sb.append("]\n")
+            i = i + 1
+        }
+    }
+
+    return sb.to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Workspace TOML generation
+// ---------------------------------------------------------------------------
+
+/// Generate pantry.toml content from a Workspace and write it to disk.
+fun write_workspace_toml(ws: Workspace) {
+    var content = _generate_workspace_toml(ws)
+    IO.write_file("pantry.toml", content)
+}
+
+/// Generate the TOML string for a Workspace.
+fun _generate_workspace_toml(ws: Workspace): String {
+    var sb = StringBuilder()
+
+    sb.append("[workspace]\n")
+    sb.append("members = [")
+    var i: Number = 0
+    while (i < ws._members.length()) {
+        if (i > 0) { sb.append(", ") }
+        sb.append("\"")
+        sb.append(_escape_toml_string(ws._members[i]))
+        sb.append("\"")
+        i = i + 1
+    }
+    sb.append("]\n")
+
+    if (ws._shared_deps.keys().length() > 0) {
+        sb.append("\n[workspace.dependencies]\n")
+        var keys = ws._shared_deps.keys()
+        i = 0
+        while (i < keys.length()) {
+            var key: String = keys[i]
+            sb.append(key)
+            sb.append(" = \"")
+            sb.append(_escape_toml_string(ws._shared_deps.get(key)))
+            sb.append("\"\n")
+            i = i + 1
+        }
+    }
+
+    return sb.to_string()
+}

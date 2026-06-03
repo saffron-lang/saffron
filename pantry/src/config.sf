@@ -1,10 +1,19 @@
 //! Load and manage pantry.toml configuration.
+//!
+//! Supports both static `pantry.toml` manifests and executable `pantry.sf` manifests.
+//! When a `pantry.sf` file is present and newer than `pantry.toml` (or the .toml does
+//! not exist), pantry will execute the .sf file to regenerate pantry.toml before reading.
 
 import "@toml" as TOML
 import "@os" as OS
+import "@process" as Process
 
 fun manifest_name(): String {
     return "pantry.toml"
+}
+
+fun script_manifest_name(): String {
+    return "pantry.sf"
 }
 
 /// Represents a parsed pantry.toml manifest.
@@ -47,17 +56,73 @@ fun _parent_dir(path: String): String {
     return path.slice(0, last_slash)
 }
 
-/// Find the pantry.toml by walking up from the current directory.
+/// Check if `pantry.sf` is newer than `pantry.toml` by comparing modification times.
+/// Uses `stat` to get mtime. Returns true if .sf is newer or .toml does not exist.
+fun _sf_is_newer(sf_path: String, toml_path: String): Bool {
+    if (!OS.file_exists(toml_path)) {
+        return true
+    }
+    // Use stat to compare modification timestamps (Unix epoch seconds)
+    var sf_mtime_raw = Process.run("stat -f '%m' '" + sf_path + "' 2>/dev/null || stat -c '%Y' '" + sf_path + "' 2>/dev/null")
+    var toml_mtime_raw = Process.run("stat -f '%m' '" + toml_path + "' 2>/dev/null || stat -c '%Y' '" + toml_path + "' 2>/dev/null")
+    if (!sf_mtime_raw.success or !toml_mtime_raw.success) {
+        // If stat fails, assume we need to regenerate
+        return true
+    }
+    var sf_mtime = sf_mtime_raw.stdout.trim()
+    var toml_mtime = toml_mtime_raw.stdout.trim()
+    // Compare as numbers — sf is newer if its mtime >= toml mtime
+    try {
+        return sf_mtime.to_number() >= toml_mtime.to_number()
+    } catch (e) {
+        return true
+    }
+}
+
+/// Execute a pantry.sf file to regenerate pantry.toml.
+/// The .sf file is expected to call Pantry.write_toml() which writes pantry.toml.
+fun _regenerate_from_sf(sf_path: String) {
+    var result = Process.run("saffron run " + sf_path)
+    if (!result.success) {
+        var msg = "pantry: failed to execute " + sf_path
+        if (result.stderr.length() > 0) {
+            msg = msg + "\n" + result.stderr
+        }
+        if (result.stdout.length() > 0) {
+            msg = msg + "\n" + result.stdout
+        }
+        throw msg
+    }
+}
+
+/// Find the manifest by walking up from the current directory.
+/// Checks for `pantry.sf` first — if present and newer than `pantry.toml`,
+/// executes it to regenerate the TOML. Then returns the path to `pantry.toml`.
 fun find_manifest(): String {
     var dir = OS.cwd()
     while (true) {
-        var candidate = dir + "/" + manifest_name()
-        if (OS.file_exists(candidate)) {
-            return candidate
+        var sf_candidate = dir + "/" + script_manifest_name()
+        var toml_candidate = dir + "/" + manifest_name()
+
+        // Check for pantry.sf first
+        if (OS.file_exists(sf_candidate)) {
+            if (_sf_is_newer(sf_candidate, toml_candidate)) {
+                _regenerate_from_sf(sf_candidate)
+            }
+            // After regeneration, pantry.toml should exist
+            if (OS.file_exists(toml_candidate)) {
+                return toml_candidate
+            }
         }
+
+        // Fall back to checking for pantry.toml directly
+        if (OS.file_exists(toml_candidate)) {
+            return toml_candidate
+        }
+
         var parent = _parent_dir(dir)
         if (parent == dir or parent == "") {
-            throw "pantry: no ${manifest_name()} found in ${OS.cwd()} or any parent directory"
+            throw "pantry: no ${manifest_name()} or ${script_manifest_name()} found in ${OS.cwd()} or any parent directory"
         }
         dir = parent
     }
