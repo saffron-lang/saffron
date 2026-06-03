@@ -8,6 +8,7 @@
 import "@http/server" as Http
 import "@async" as Async
 import "@watch" as Watch
+import "@path" as Path
 
 var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
 
@@ -65,12 +66,12 @@ fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
     // Static files with reload script injection
     app.all("*") { req =>
         var path = req.path
-        var file_path: String = build_dir + path
+        var file_path: String = Path.join([build_dir, path])
         if (path == "/" or path == "") {
-            file_path = build_dir + "/index.html"
+            file_path = Path.join([build_dir, "index.html"])
         }
         if (!IO.file_exists(file_path)) {
-            file_path = build_dir + "/index.html"
+            file_path = Path.join([build_dir, "index.html"])
         }
         if (!IO.file_exists(file_path)) {
             Http.not_found()
