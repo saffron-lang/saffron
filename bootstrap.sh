@@ -119,7 +119,7 @@ sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf
 GEN2_OK=true
 for src in "${SOURCES[@]}"; do
     [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-    if ! timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
+    if ! timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" 2>/dev/null; then
         GEN2_OK=false
         break
     fi
@@ -127,7 +127,7 @@ done
 
 if [[ "$GEN2_OK" == true ]]; then
     [[ "$VERBOSE" == true ]] && echo "  compile: codegen.sf (assembled)"
-    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
+    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage3/codegen.ll" \
         || GEN2_OK=false
 fi
 
@@ -142,14 +142,14 @@ if [[ "$GEN2_OK" == true ]]; then
     # Rewrite the codegen import to use the assembled file and strip methods import
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
-    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
+    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
         || GEN2_OK=false
 fi
 
 if [[ "$GEN2_OK" == true ]]; then
     # Compile runtime.sf
     [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-    timeout 60 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+    timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
         || fail "STAGE 1" "gen2 failed to compile runtime.sf"
 fi
 
@@ -168,7 +168,7 @@ if [[ "$GEN2_OK" == false ]]; then
     # Now use gen3 to recompile itself from current source
     for src in "${SOURCES[@]}"; do
         [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
-        timeout 60 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
+        timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage3/${src}.ll" \
             || fail "STAGE 1" "gen3 failed to compile $src.sf"
     done
 
@@ -188,7 +188,7 @@ if [[ "$GEN2_OK" == false ]]; then
         || fail "STAGE 1" "gen3 failed to compile main.sf"
 
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
-    timeout 60 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
+    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$RUNTIME_SRC" "$BUILD_DIR/stage3/runtime.ll" \
         || fail "STAGE 1" "gen3 failed to compile runtime.sf"
 fi
 
