@@ -1,18 +1,34 @@
-//! Minimal HTTP/1.1 server built on `@server` and `@socket`.
-//! Single-threaded, async-compatible.
+//! HTTP/1.1 server with async I/O and streaming support.
 //!
 //! ```saffron
-//! import "@http/server" as HttpServer
+//! import "@http/server" as Http
 //!
-//! var app = HttpServer.create(8080)
-//! app.get("/", fun (req: HttpServer.Request): HttpServer.Response => {
-//!     return HttpServer.html("<h1>Hello from Saffron!</h1>")
-//! })
+//! var app = Http.server(8080)
+//!
+//! app.get("/", fun (req) => Response.html("<h1>Hello!</h1>"))
+//!
+//! app.get("/api/users", fun (req) =>
+//!     Response.json("{\"users\": []}")
+//!         .header("Cache-Control", "max-age=60"))
+//!
+//! app.get("/events", fun (req) =>
+//!     Response.event_stream(fun (send) => {
+//!         while (true) {
+//!             send("heartbeat")
+//!             Async.sleep(5.0)
+//!         }
+//!     }))
+//!
 //! app.serve()
 //! ```
 
 import "@server" as Server
 import "@socket" as Socket
+import "@async" as Async
+
+// =============================================================================
+// Request
+// =============================================================================
 
 class Request {
     var method: String
@@ -28,201 +44,299 @@ class Request {
         this.body = body
         this.query = query
     }
-}
 
-class Response {
-    var status: Number
-    var status_text: String
-    var headers: Map<String, String>
-    var body: String
-
-    fun init(status: Number, status_text: String, headers: Map<String, String>, body: String) {
-        this.status = status
-        this.status_text = status_text
-        this.headers = headers
-        this.body = body
-    }
-
-    fun to_http(): String {
-        var lines: List<String> = []
-        lines.push("HTTP/1.1 " + this.status.to_string() + " " + this.status_text)
-        lines.push("Content-Length: " + this.body.length().to_string())
+    fun header(name: String): String {
+        var lower = name.to_lower()
         var keys = this.headers.keys()
         var i = 0
         while (i < keys.length()) {
-            lines.push(keys[i] + ": " + this.headers.get(keys[i]))
+            if (keys[i].to_lower() == lower) {
+                return this.headers.get(keys[i])
+            }
             i = i + 1
         }
-        lines.push("Connection: close")
-        lines.push("")
-        lines.push(this.body)
-        var result = ""
-        i = 0
-        while (i < lines.length()) {
-            if (i > 0) { result = result + "\r\n" }
-            result = result + lines[i]
-            i = i + 1
-        }
-        return result
+        return ""
     }
 }
 
-fun ok(body: String): Response {
-    var h: Map<String, String> = {}
-    h.set("Content-Type", "text/plain")
-    return Response(200, "OK", h, body)
+// =============================================================================
+// Response — immutable builder pattern
+// =============================================================================
+
+class Response {
+    var status: Int
+    var status_text: String
+    var _headers: List<String>
+    var _header_values: List<String>
+    var body: String
+    var _is_stream: Bool
+    var _stream_fn: Fun
+
+    fun init(status: Int, body: String) {
+        this.status = status
+        this.status_text = "OK"
+        if (status == 404) { this.status_text = "Not Found" }
+        if (status == 500) { this.status_text = "Internal Server Error" }
+        if (status == 301) { this.status_text = "Moved Permanently" }
+        if (status == 302) { this.status_text = "Found" }
+        this._headers = []
+        this._header_values = []
+        this.body = body
+        this._is_stream = false
+        this._stream_fn = fun () => {}
+    }
+
+    fun header(name: String, value: String): Response {
+        this._headers.push(name)
+        this._header_values.push(value)
+        return this
+    }
+
+    fun status_code(code: Int): Response {
+        this.status = code
+        return this
+    }
+}
+
+// --- Response builders ---
+
+fun text(body: String): Response {
+    return Response(200, body).header("Content-Type", "text/plain; charset=utf-8")
 }
 
 fun html(body: String): Response {
-    var h: Map<String, String> = {}
-    h.set("Content-Type", "text/html; charset=utf-8")
-    return Response(200, "OK", h, body)
+    return Response(200, body).header("Content-Type", "text/html; charset=utf-8")
 }
 
 fun json(body: String): Response {
-    var h: Map<String, String> = {}
-    h.set("Content-Type", "application/json")
-    return Response(200, "OK", h, body)
+    return Response(200, body).header("Content-Type", "application/json")
 }
 
 fun file(content: String, mime: String): Response {
-    var h: Map<String, String> = {}
-    h.set("Content-Type", mime)
-    return Response(200, "OK", h, content)
+    return Response(200, content).header("Content-Type", mime)
+}
+
+fun redirect(url: String): Response {
+    return Response(302, "").header("Location", url)
 }
 
 fun not_found(): Response {
-    var h: Map<String, String> = {}
-    h.set("Content-Type", "text/plain")
-    return Response(404, "Not Found", h, "404 Not Found")
+    return Response(404, "Not Found").header("Content-Type", "text/plain")
 }
+
+fun error(message: String): Response {
+    return Response(500, message).header("Content-Type", "text/plain")
+}
+
+fun event_stream(handler: Fun): Response {
+    var resp = Response(200, "")
+    resp._is_stream = true
+    resp._stream_fn = handler
+    resp = resp.header("Content-Type", "text/event-stream")
+    resp = resp.header("Cache-Control", "no-cache")
+    resp = resp.header("Connection", "keep-alive")
+    return resp
+}
+
+// =============================================================================
+// Internal — HTTP serialization
+// =============================================================================
+
+fun _serialize_response(resp: Response): String {
+    var sb = StringBuilder()
+    sb.append("HTTP/1.1 ")
+    sb.append(resp.status.to_string())
+    sb.append(" ")
+    sb.append(resp.status_text)
+    sb.append("\r\n")
+    // Content-Length (only for non-stream)
+    if (!resp._is_stream) {
+        sb.append("Content-Length: ")
+        sb.append(resp.body.length().to_string())
+        sb.append("\r\n")
+    }
+    // Custom headers
+    var i = 0
+    while (i < resp._headers.length()) {
+        sb.append(resp._headers[i])
+        sb.append(": ")
+        sb.append(resp._header_values[i])
+        sb.append("\r\n")
+        i = i + 1
+    }
+    if (!resp._is_stream) {
+        sb.append("Connection: close\r\n")
+    }
+    sb.append("\r\n")
+    if (!resp._is_stream) {
+        sb.append(resp.body)
+    }
+    return sb.to_string()
+}
+
+// =============================================================================
+// Router
+// =============================================================================
 
 class Route {
     var method: String
     var path: String
-    var handler: (Request) => Response
+    var handler: Fun
 
-    fun init(method: String, path: String, handler: (Request) => Response) {
+    fun init(method: String, path: String, handler: Fun) {
         this.method = method
         this.path = path
         this.handler = handler
     }
 }
 
-class HttpApp {
+class App {
     var host: String
-    var port: Number
+    var port: Int
     var routes: List<Route>
-    var fallback: (Request) => Response
 
-    fun init(host: String, port: Number) {
-        this.host = host
+    fun init(port: Int) {
+        this.host = "0.0.0.0"
         this.port = port
         this.routes = []
-        this.fallback = fun (req: Request): Response => not_found()
     }
 
-    fun get(path: String, handler: (Request) => Response) {
+    fun get(path: String, handler: Fun) {
         this.routes.push(Route("GET", path, handler))
     }
 
-    fun post(path: String, handler: (Request) => Response) {
+    fun post(path: String, handler: Fun) {
         this.routes.push(Route("POST", path, handler))
     }
 
-    fun all(path: String, handler: (Request) => Response) {
+    fun put(path: String, handler: Fun) {
+        this.routes.push(Route("PUT", path, handler))
+    }
+
+    fun delete(path: String, handler: Fun) {
+        this.routes.push(Route("DELETE", path, handler))
+    }
+
+    fun all(path: String, handler: Fun) {
         this.routes.push(Route("*", path, handler))
     }
 
     fun serve() {
         var listener = Server.listen(this.host, this.port)
-        IO.println("Listening on " + this.host + ":" + this.port.to_string())
+        IO.println("Listening on http://" + this.host + ":" + this.port.to_string())
         while (true) {
             var client: Int = listener.accept()
             if (client >= 0) {
-                // Spawn each client handler as a concurrent task
                 var app = this
-                Task.spawn(fun () => app.handle_client(client))
+                Task.spawn(fun () => app._handle(client))
             }
         }
     }
 
-    fun handle_client(client: Int) {
+    fun _handle(client: Int) {
         var raw: String = Socket.read(client, 8192)
         if (raw.length() == 0) {
             Socket.close(client)
             return
         }
-        var req: Request = parse_request(raw)
-        var resp: Response = this.route(req)
-        Socket.write(client, resp.to_http())
-        Socket.close(client)
+        var req: Request = _parse_request(raw)
+        var resp: Response = this._route(req)
+
+        if (resp._is_stream) {
+            // Stream response — send headers, then run stream function
+            Socket.write(client, _serialize_response(resp))
+            // Create a send function that writes SSE format
+            var send_fn = fun (data: String) => {
+                Socket.write(client, "data: " + data + "\n\n")
+            }
+            resp._stream_fn(send_fn)
+            Socket.close(client)
+        } else {
+            // Normal response — send and close
+            Socket.write(client, _serialize_response(resp))
+            Socket.close(client)
+        }
     }
 
-    fun route(req: Request): Response {
+    fun _route(req: Request): Response {
         var i = 0
         while (i < this.routes.length()) {
-            var r: Route = this.routes[i]
-            if ((r.method == "*" or r.method == req.method) and r.path == req.path) {
-                return r.handler(req)
+            var route: Route = this.routes[i]
+            if ((route.method == req.method or route.method == "*") and (route.path == req.path or route.path == "*")) {
+                return route.handler(req)
             }
             i = i + 1
         }
-        return this.fallback(req)
+        return not_found()
     }
 }
 
-fun create(port: Number): HttpApp {
-    return HttpApp("0.0.0.0", port)
+// =============================================================================
+// Constructor
+// =============================================================================
+
+fun server(port: Int): App {
+    return App(port)
 }
 
-fun create_on(host: String, port: Number): HttpApp {
-    return HttpApp(host, port)
+// Alias for backward compat
+fun create(port: Int): App {
+    return App(port)
 }
 
-fun parse_request(raw: String): Request {
-    var header_end = raw.index_of("\r\n\r\n")
-    var body = ""
-    var header_section = raw
-    if (header_end >= 0) {
-        header_section = raw.slice(0, header_end)
-        body = raw.slice(header_end + 4, raw.length())
-    }
+// =============================================================================
+// Request parsing
+// =============================================================================
 
-    var lines = header_section.split("\r\n")
+fun _parse_request(raw: String): Request {
+    var lines: List<String> = raw.split("\r\n")
     if (lines.length() == 0) {
         return Request("GET", "/", {}, "", "")
     }
-
-    var request_line = lines[0]
-    var parts = request_line.split(" ")
-    var method = "GET"
-    var full_path = "/"
+    var first_line: String = lines[0]
+    var parts: List<String> = first_line.split(" ")
+    var method: String = "GET"
+    var full_path: String = "/"
     if (parts.length() >= 2) {
         method = parts[0]
         full_path = parts[1]
     }
-
-    var path = full_path
-    var query = ""
-    var qmark = full_path.index_of("?")
-    if (qmark >= 0) {
-        path = full_path.slice(0, qmark)
-        query = full_path.slice(qmark + 1, full_path.length())
+    // Split path and query
+    var path: String = full_path
+    var query: String = ""
+    var qidx = full_path.index_of("?")
+    if (qidx >= 0) {
+        path = full_path.slice(0, qidx)
+        query = full_path.slice(qidx + 1, full_path.length())
     }
-
+    // Parse headers
     var headers: Map<String, String> = {}
     var i = 1
+    var body_start = lines.length()
     while (i < lines.length()) {
-        var line = lines[i]
-        var colon = line.index_of(":")
-        if (colon > 0) {
-            var key = line.slice(0, colon).trim()
-            var value = line.slice(colon + 1, line.length()).trim()
-            headers.set(key, value)
+        if (lines[i].length() == 0) {
+            body_start = i + 1
+            i = lines.length()
+        } else {
+            var colon = lines[i].index_of(":")
+            if (colon > 0) {
+                var name = lines[i].slice(0, colon)
+                var value = lines[i].slice(colon + 2, lines[i].length())
+                headers.set(name, value)
+            }
         }
         i = i + 1
     }
-
+    // Body
+    var body: String = ""
+    if (body_start < lines.length()) {
+        var body_lines: List<String> = []
+        i = body_start
+        while (i < lines.length()) {
+            body_lines.push(lines[i])
+            i = i + 1
+        }
+        body = body_lines.join("\r\n")
+    }
     return Request(method, path, headers, body, query)
 }

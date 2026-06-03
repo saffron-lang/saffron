@@ -1,4 +1,4 @@
-//! Turmeric Dev Server — serves static files with SSE hot reload.
+//! Turmeric Dev Server — serves static files with hot reload via SSE.
 //!
 //! ```saffron
 //! import "turmeric/tools/dev_server" as DevServer
@@ -6,12 +6,12 @@
 //! ```
 
 import "@http/server" as Http
-import "@socket" as Socket
+import "@async" as Async
 import "@watch" as Watch
 
-var _sse_clients: List<Int> = []
-
 var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
+
+var _pending_reload: Bool = false
 
 fun mime_for(path: String): String {
     if (path.ends_with(".html")) { return "text/html; charset=utf-8" }
@@ -26,17 +26,8 @@ fun mime_for(path: String): String {
     return "application/octet-stream"
 }
 
-fun notify_reload() {
-    var i = 0
-    while (i < _sse_clients.length()) {
-        Socket.write(_sse_clients[i], "data: reload\n\n")
-        Socket.close(_sse_clients[i])
-        i = i + 1
-    }
-    _sse_clients = []
-}
-
-fun serve(build_dir: String, port: Number, watch_dirs: List<String>) {
+fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
+    // Set up file watcher in background
     var watcher = Watch.create()
     var wi = 0
     while (wi < watch_dirs.length()) {
@@ -44,18 +35,37 @@ fun serve(build_dir: String, port: Number, watch_dirs: List<String>) {
         wi = wi + 1
     }
 
-    var app = Http.create(port)
-
-    app.get("/__reload", fun (req: Http.Request): Http.Response => {
-        // SSE handled below in the custom serve loop
-        var h: Map<String, String> = {}
-        h.set("Content-Type", "text/event-stream")
-        h.set("Cache-Control", "no-cache")
-        h.set("Access-Control-Allow-Origin", "*")
-        return Http.Response(200, "OK", h, "data: connected\n\n")
+    // File watch task — sets reload flag when files change
+    Task.spawn(fun () => {
+        while (true) {
+            if (watcher.poll(100)) {
+                IO.println("  [reload] file changed")
+                _pending_reload = true
+            }
+            Async.sleep(0.1)
+        }
     })
 
-    app.all("*", fun (req: Http.Request): Http.Response => {
+    // HTTP server
+    var app = Http.server(port)
+
+    // SSE endpoint — streams reload events to browser
+    app.get("/__reload") { req =>
+        Http.event_stream() { send =>
+            send("connected")
+            while (true) {
+                if (_pending_reload) {
+                    send("reload")
+                    _pending_reload = false
+                    return
+                }
+                Async.sleep(0.2)
+            }
+        }
+    }
+
+    // Static file serving with reload script injection
+    app.all("*") { req =>
         var path = req.path
         var file_path: String = build_dir + path
         if (path == "/" or path == "") {
@@ -65,15 +75,16 @@ fun serve(build_dir: String, port: Number, watch_dirs: List<String>) {
             file_path = build_dir + "/index.html"
         }
         if (!IO.file_exists(file_path)) {
-            return Http.not_found()
+            Http.not_found()
+        } else {
+            var content: String = IO.read_file(file_path)
+            var mime: String = mime_for(file_path)
+            if (mime.starts_with("text/html")) {
+                content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
+            }
+            Http.file(content, mime)
         }
-        var content: String = IO.read_file(file_path)
-        var mime: String = mime_for(file_path)
-        if (mime.starts_with("text/html")) {
-            content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
-        }
-        return Http.file(content, mime)
-    })
+    }
 
     IO.println("")
     IO.println("  Turmeric dev server")
@@ -82,32 +93,5 @@ fun serve(build_dir: String, port: Number, watch_dirs: List<String>) {
     IO.println("  Press Ctrl+C to stop")
     IO.println("")
 
-    // Custom serve loop with file watching integrated
-    import "@server" as Server
-    var listener = Server.listen("0.0.0.0", port)
-    while (true) {
-        if (watcher.poll(0)) {
-            IO.println("  [reload] file changed")
-            notify_reload()
-        }
-
-        var client: Int = listener.accept()
-        if (client >= 0) {
-            var raw: String = Socket.read(client, 8192)
-            if (raw.length() == 0) {
-                Socket.close(client)
-            } else {
-                var req: Http.Request = Http.parse_request(raw)
-                if (req.path == "/__reload") {
-                    var sse_headers: String = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\ndata: connected\n\n"
-                    Socket.write(client, sse_headers)
-                    _sse_clients.push(client)
-                } else {
-                    var resp: Http.Response = app.route(req)
-                    Socket.write(client, resp.to_http())
-                    Socket.close(client)
-                }
-            }
-        }
-    }
+    app.serve()
 }
