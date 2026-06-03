@@ -1,15 +1,26 @@
     fun find_class_for_method(method: String): String {
     var keys: List<String> = this.class_methods.keys()
     var i: Float = 0
+    var interface_fallback: String = ""
     while (i < keys.length()) {
         var class_name: String = keys[i]
         var methods: List = this.class_methods.get(class_name)
         if (methods.contains(method)) {
-            return class_name
+            // Skip interfaces (classes with no fields) — prefer concrete classes.
+            // Interfaces have empty class_fields and register stub methods.
+            var cf: String = this.class_fields.get(class_name)
+            if (cf.length() == 0) {
+                // Could be an interface — save as fallback, keep searching
+                if (interface_fallback.length() == 0) {
+                    interface_fallback = class_name
+                }
+            } else {
+                return class_name
+            }
         }
         i = i + 1
     }
-    return ""
+    return interface_fallback
     }
 
     fun get_method_ret(class_name: String, method: String): String {

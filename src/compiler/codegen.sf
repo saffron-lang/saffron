@@ -111,7 +111,7 @@ class Codegen {
         this.identity_mode = false
         this.coroutine_funcs = []
         this.is_coroutine = false
-        this.use_llvm_lib = false
+        this.use_llvm_lib = true
         this.gc_root_count = 0
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
