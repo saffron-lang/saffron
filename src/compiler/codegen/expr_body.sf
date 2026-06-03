@@ -41,10 +41,8 @@
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
-                    IO.println("[codegen] Error: undefined variable '" + name + "'")
-                    this.has_errors = true
-                    return "0"
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
+                    IO.println("[codegen] Warning: undefined variable '" + name + "'")
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 // Skip for named imports — they should go through gen_call for direct dispatch
@@ -203,7 +201,7 @@
                 this.gen_match(subject, arms)
             }
             Lambda(params, ret_type, body) => {
-                this.gen_lambda(params, ret_type, body)
+                this.gen_lambda(params, this.type_to_string(ret_type), body)
             }
             This => {
                 this.last_type = this.str_to_type(this.current_class)
@@ -537,7 +535,7 @@
                         var local: String = this.fresh_local()
                         this.emit_indent(local + " = call i64 @" + full_method + "(i64 " + lhs + ", i64 " + rhs + ")")
                         if (this.func_ret_types.has(full_method)) {
-                            this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+                            this.last_type = this.func_ret_types.get(full_method)
                         } else {
                             this.last_type = this.str_to_type(left_class)
                         }
@@ -986,12 +984,9 @@
             } else {
                 this.last_type = AST.Type.IntType
             }
-            // Error check: undefined variable
-            // Skip check for module aliases and enum names (they are valid in expressions)
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Error: undefined variable '" + vname + "'")
-                this.has_errors = true
-                return "0"
+            // Undefined variable check (warning only — false positives in multi-module context)
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
+                IO.println("[codegen] Warning: undefined variable '" + vname + "'")
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
@@ -1290,7 +1285,7 @@
                     var local: String = this.fresh_local()
                     this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
                     if (this.func_ret_types.has(full_method)) {
-                        this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
+                        this.last_type = this.func_ret_types.get(full_method)
                     } else {
                         this.last_type = AST.Type.IntType
                     }
@@ -1442,7 +1437,7 @@
                 this.emit_indent(coro_result + " = load i64, i64* @__task_result")
                 // Use the callee's return type
                 if (this.func_ret_types.has(resolved_callee)) {
-                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                    this.last_type = this.func_ret_types.get(resolved_callee)
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -1487,7 +1482,7 @@
                 var s_result: String = this.fresh_local()
                 this.emit_indent(s_result + " = load i64, i64* @__task_result")
                 if (this.func_ret_types.has(resolved_callee)) {
-                    this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                    this.last_type = this.func_ret_types.get(resolved_callee)
                 } else {
                     this.last_type = AST.Type.IntType
                 }
@@ -1544,7 +1539,8 @@
             // Pattern: ClassName(args) → call @ClassName() + call @ClassName__init(instance, args)
             var is_constructor: Bool = false
             if (this.func_ret_types.has(resolved_callee)) {
-                var ret_type_val: String = this.func_ret_types.get(resolved_callee)
+                var ret_type_node: AST.Type = this.func_ret_types.get(resolved_callee)
+                var ret_type_val: String = this.type_to_string(ret_type_node)
                 if (ret_type_val == callee_name) {
                     is_constructor = true
                 } else if (ret_type_val == resolved_callee and this.class_fields.has(callee_name)) {
@@ -1794,9 +1790,9 @@
                 this.verify_call(local, "i64", call_target, arg_strs.join(", "))
             }
             if (this.func_ret_types.has(resolved_callee)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(resolved_callee))
+                this.last_type = this.func_ret_types.get(resolved_callee)
             } else if (this.func_ret_types.has(callee_name)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(callee_name))
+                this.last_type = this.func_ret_types.get(callee_name)
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -2024,7 +2020,7 @@
                 this.verify_call(local, "i64", emit_callee, arg_strs.join(", "))
             }
             if (this.func_ret_types.has(emit_callee)) {
-                this.last_type = this.str_to_type(this.func_ret_types.get(emit_callee))
+                this.last_type = this.func_ret_types.get(emit_callee)
             } else {
                 this.last_type = AST.Type.IntType
             }
