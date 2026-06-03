@@ -31,6 +31,9 @@ fun create_context<T>(name: String, default_value: T): Context<T> {
 
 var _context_stack: List<Map<String, ContextEntry>> = []
 
+// ContextEntry wraps Signal<Any> for type erasure — contexts store heterogeneous
+// values (ThemeConfig, AuthState, String, etc.) in a single map. The generic type
+// is recovered at the use_context<T> call site via an unchecked cast.
 class ContextEntry {
     var value: Sig.Signal<Any>
 
@@ -51,6 +54,8 @@ fun _pop_scope() {
 // Provide — make a value available to all descendants
 // =============================================================================
 
+// Signal<T> is implicitly widened to Signal<Any> for storage in ContextEntry.
+// The type parameter T is erased at this boundary and recovered by use_context<T>.
 fun provide<T>(ctx: Context<T>, value: T) {
     if (_context_stack.length() == 0) {
         _push_scope()

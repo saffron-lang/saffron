@@ -590,15 +590,24 @@
                     }
                 }
                 EnumDecl(pr_ename, pr_variants, pr_edoc) => {
-                    // Register enum variant constructor names
+                    // Register enum variant constructor names AND variant tags
+                    // so that match expressions work regardless of declaration order
+                    var pr_vnames: List<String> = []
                     var pr_vi: Float = 0
                     while (pr_vi < pr_variants.length()) {
                         var pr_vname: String = this.get_variant_name(pr_variants[pr_vi])
-                        if (pr_vname.length() > 0 and !this.str_in_list(this.known_functions,pr_vname)) {
-                            this.known_functions.push(pr_vname)
+                        var pr_vfields: String = this.get_variant_fields(pr_variants[pr_vi])
+                        if (pr_vname.length() > 0) {
+                            if (!this.str_in_list(this.known_functions,pr_vname)) {
+                                this.known_functions.push(pr_vname)
+                            }
+                            pr_vnames.push(pr_vname)
+                            this.enum_variant_tags.set(pr_ename + "." + pr_vname, pr_vi)
+                            this.enum_variant_fields.set(pr_ename + "." + pr_vname, pr_vfields)
                         }
                         pr_vi = pr_vi + 1
                     }
+                    this.enum_defs.set(pr_ename, pr_vnames)
                 }
                 VarDecl(n, t, init, d) => {}
                 ExprStmt(e) => {}

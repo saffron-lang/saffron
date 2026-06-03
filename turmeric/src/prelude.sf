@@ -14,6 +14,9 @@
 @extern("void js_dom_set_inner_html(i64, void*)") fun _tc_set_html(handle: Float, html: String)
 
 // --- Event callback registry ---
+// Callbacks have varying signatures: () => Nil, (Event) => Nil, etc.
+// Must remain Any because the list is heterogeneous and the codegen dispatches
+// handler() via a dynamic call that works regardless of the actual function arity.
 var _tc_callbacks: List<Any> = []
 
 fun _tc_register_callback(handler: Any): Float {
@@ -21,6 +24,7 @@ fun _tc_register_callback(handler: Any): Float {
     return _tc_callbacks.length() - 1
 }
 
+// handler is Any because callers pass both () => Nil and (Event) => Nil callbacks.
 fun _tc_add_event(handle: Float, event: String, handler: Any) {
     var id: Float = _tc_register_callback(handler)
     _tc_add_event_raw(handle, event, id)
@@ -64,6 +68,8 @@ fun text(content: String) {
 // Usage: reactive(fun () => count.get().to_string())
 // Creates a <span>, renders initial value, and re-renders when deps change.
 // Uses the turmeric signal module's effect() for dependency tracking.
+// compute is logically () => String, but must remain Any because the prelude
+// has no module prefix and the codegen can't resolve generic function types here.
 fun reactive(compute: Any) {
     var parent: Float = _tc_current()
     var text_el: Float = _tc_create("span")
@@ -76,6 +82,8 @@ fun reactive(compute: Any) {
 
 // --- Reactive class: updates element className when deps change ---
 // Usage: var el = div(); reactive_class(el, fun () => cx({"active": sig.get()}))
+// rc_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
 fun reactive_class(rc_el: Float, rc_compute: Any) {
     var rc_handle: Float = rc_el
     turmeric_signal_effect(fun () => {
@@ -86,6 +94,8 @@ fun reactive_class(rc_el: Float, rc_compute: Any) {
 
 // --- Reactive attr: updates any attribute reactively ---
 // Usage: reactive_attr(el, "style", fun () => "color:" + color.get())
+// ra_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
 fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
     var ra_handle: Float = ra_el
     var ra_attr: String = ra_name
@@ -98,6 +108,8 @@ fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
 // --- Reactive visibility: show/hide element based on signal ---
 // Usage: reactive_show(el, fun () => if (visible) { return "" } return "display:none")
 // Compute must return "" (show) or "display:none" (hide).
+// rs_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
 fun reactive_show(rs_el: Float, rs_compute: Any) {
     var rs_handle: Float = rs_el
     turmeric_signal_effect(fun () => {
@@ -106,30 +118,22 @@ fun reactive_show(rs_el: Float, rs_compute: Any) {
     })
 }
 
-// --- Router Outlet: clears & rebuilds children whenever deps change ---
-// Usage:
-//   outlet(fun () => {
-//       var path = page.get()  // triggers re-render on change
-//       if (path == "/counter") { CounterPage() }
-//       else if (path == "/todos") { TodoPage() }
-//   })
-// Creates a container div. The builder is wrapped in an effect — any signal
-// read inside it (e.g. page.get()) becomes a dependency. When it changes,
-// the container is cleared and the builder re-executes.
-fun outlet(out_builder: Any): Float {
-    var out_el: Float = _tc_create("div")
-    var parent: Float = _tc_current()
-    _tc_append(parent, out_el)
-    turmeric_signal_effect(fun () => {
-        _tc_set_html(out_el, "")
-        _tc_push(out_el)
-        out_builder()
-        _tc_pop()
-    })
-    return out_el
+// --- Render Into: clears a container and executes a builder into it ---
+// Used by router outlet. Temporarily disables tracking so inner signal
+// reads don't subscribe the caller's effect.
+fun render_into(container: Float, builder: () => Nil) {
+    var was: Bool = turmeric_signal__tracking
+    turmeric_signal__tracking = false
+    _tc_set_html(container, "")
+    _tc_push(container)
+    builder()
+    _tc_pop()
+    turmeric_signal__tracking = was
 }
 
 // --- Attribute application: maps keys to DOM operations ---
+// attrs values are heterogeneous: String for attributes, () => Nil for on_ handlers.
+// Map<String, Any> is intentional — no union type covers both cleanly.
 fun _tc_apply_attrs(el: Float, attrs: Map<String, Any>) {
     var keys = attrs.keys()
     var i = 0
@@ -790,11 +794,11 @@ fun input(cls: String = "", id: String = "", style: String = "",
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
-    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    if (on_input != nil) { _tc_add_event(el, "input", fun () => on_input(nil)) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(nil)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(nil)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(nil)) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", fun () => on_keydown(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1202,9 +1206,9 @@ fun select(cls: String = "", id: String = "", style: String = "",
     if (size != 0) { _tc_set_attr(el, "size", size.to_string()) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(nil)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(nil)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1361,11 +1365,11 @@ fun textarea(cls: String = "", id: String = "", style: String = "",
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (wrap.length() > 0) { _tc_set_attr(el, "wrap", wrap) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
-    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    if (on_input != nil) { _tc_add_event(el, "input", fun () => on_input(nil)) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(nil)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(nil)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(nil)) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", fun () => on_keydown(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
