@@ -1,20 +1,28 @@
 //! PubSub — typed publish/subscribe messaging between tasks.
 //!
+//! The type parameter T specifies the message type for the bus.
+//! All subscriptions and publications on a Bus<T> carry values of type T.
+//!
 //! ```saffron
 //! import "@pubsub" as PubSub
 //!
-//! var bus = PubSub.Bus()
-//! var sub = bus.subscribe("events")
+//! var bus: PubSub.Bus<String> = PubSub.Bus()
+//! var sub: PubSub.Subscription<String> = bus.subscribe("events")
 //!
 //! // In another task:
-//! bus.publish("events", "user:joined")
+//! bus.publish("events", "user:joined")   // OK: String matches T
 //!
-//! var msg = sub.recv()  // blocks until message arrives
+//! var msg: String = sub.recv()  // blocks until message arrives, typed as T
 //! ```
 
 import "@sync" as Sync
 
-class Subscription {
+/// A typed subscription handle. Receives messages of type T from a topic.
+///
+/// Type parameter: T — the message type carried by this subscription.
+/// Once the checker supports generic class resolution, recv() will
+/// return T and the type will be enforced at compile time.
+class Subscription<T> {
     var _channel: Sync.Channel
     var _topic: String
     var _bus: Bus
@@ -25,28 +33,43 @@ class Subscription {
         this._bus = bus
     }
 
-    fun recv(): Int {
+    /// Receive the next message. Blocks (yields) until a message arrives.
+    fun recv(): T {
         return this._channel.recv()
     }
 
-    fun try_recv(): Int {
+    /// Try to receive without blocking. Returns nil if no message available.
+    fun try_recv(): T {
         return this._channel.try_recv()
     }
 
+    /// Unsubscribe and close the underlying channel.
     fun close() {
         this._bus._unsubscribe(this._topic, this._channel)
         this._channel.close()
     }
 }
 
-class Bus {
+/// A typed publish/subscribe message bus.
+///
+/// Type parameter: T — the message type for all topics on this bus.
+/// All publish() calls must provide a value of type T; all recv() calls
+/// on subscriptions return T.
+///
+/// ```saffron
+/// var bus: PubSub.Bus<String> = PubSub.Bus()
+/// bus.publish("chat", "hello")        // T=String
+/// bus.publish("chat", 42)             // future: type error
+/// ```
+class Bus<T> {
     var _topics: Map<String, List<Sync.Channel>>
 
     fun init() {
         this._topics = {}
     }
 
-    fun subscribe(topic: String): Subscription {
+    /// Subscribe to a topic. Returns a Subscription<T> for receiving messages.
+    fun subscribe(topic: String): Subscription<T> {
         var ch = Sync.Channel(256)
         if (!this._topics.has(topic)) {
             this._topics.set(topic, [])
@@ -55,7 +78,9 @@ class Bus {
         return Subscription(ch, topic, this)
     }
 
-    fun publish(topic: String, message: Int) {
+    /// Publish a message to all subscribers of a topic.
+    /// The message must be of type T.
+    fun publish(topic: String, message: T) {
         if (!this._topics.has(topic)) { return }
         var channels: List<Sync.Channel> = this._topics.get(topic)
         var i = 0
@@ -79,12 +104,35 @@ class Bus {
         this._topics.set(topic, new_channels)
     }
 
+    /// Returns the number of active subscribers for a topic.
     fun subscriber_count(topic: String): Int {
         if (!this._topics.has(topic)) { return 0 }
         return this._topics.get(topic).length()
     }
 
+    /// Returns a list of all topic names that have subscribers.
     fun topics(): List<String> {
         return this._topics.keys()
+    }
+
+    /// Subscribe to a topic and spawn a handler task.
+    /// The handler is called for each message received.
+    /// Returns the Subscription (can be closed to stop).
+    ///
+    /// ```saffron
+    /// bus.on("chat") { msg =>
+    ///     IO.println("Got: " + msg)
+    /// }
+    /// ```
+    fun on(topic: String, handler: Fun): Subscription<T> {
+        var sub: Subscription<T> = this.subscribe(topic)
+        var s = sub
+        Task.spawn(fun () => {
+            while (!s._channel.is_closed()) {
+                var msg: T = s.recv()
+                handler(msg)
+            }
+        })
+        return sub
     }
 }
