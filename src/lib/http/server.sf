@@ -2,7 +2,7 @@
 //! Single-threaded, async-compatible.
 //!
 //! ```saffron
-//! import "@http_server" as HttpServer
+//! import "@http/server" as HttpServer
 //!
 //! var app = HttpServer.create(8080)
 //! app.get("/", fun (req: HttpServer.Request): HttpServer.Response => {
@@ -140,13 +140,19 @@ class HttpApp {
         while (true) {
             var client: Int = listener.accept()
             if (client >= 0) {
-                this.handle_client(client)
+                // Spawn each client handler as a concurrent task
+                var app = this
+                Task.spawn(fun () => app.handle_client(client))
             }
         }
     }
 
     fun handle_client(client: Int) {
         var raw: String = Socket.read(client, 8192)
+        if (raw.length() == 0) {
+            Socket.close(client)
+            return
+        }
         var req: Request = parse_request(raw)
         var resp: Response = this.route(req)
         Socket.write(client, resp.to_http())

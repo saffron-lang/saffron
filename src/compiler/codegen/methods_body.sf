@@ -735,6 +735,15 @@
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
+        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -742,7 +751,6 @@
             arg_strs.push("i64 " + val)
             ai = ai + 1
         }
-        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
@@ -1475,13 +1483,6 @@
 
     // Check for imported module function calls (module alias or unknown name)
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
-        var arg_strs: List<String> = []
-        var ai: Float = 0
-        while (ai < args.length()) {
-            var val: String = this.gen_arg_value(args[ai])
-            arg_strs.push("i64 " + val)
-            ai = ai + 1
-        }
         var prefixed_name: String = method
         if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
@@ -1492,6 +1493,21 @@
             if (this.known_functions.contains(guessed)) {
                 prefixed_name = guessed
             }
+        }
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
+        var arg_strs: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
         }
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
@@ -1641,6 +1657,46 @@
             var __cm: List = this.class_methods.get(class_name)
             if (__cm.contains(method)) { __method_exists = true }
         }
+        // Cross-module: class_methods is keyed by bare name (e.g. "TomlTable") but
+        // class_name may be the prefixed struct name (e.g. "stdlib_toml_TomlTable").
+        // Reverse-lookup via class_struct_names to find the bare name.
+        if (!__method_exists) {
+            var __cm_keys: List<String> = this.class_methods.keys()
+            var __cmi: Float = 0
+            while (__cmi < __cm_keys.length()) {
+                var __cmk: String = __cm_keys[__cmi]
+                if (this.class_struct_names.has(__cmk)) {
+                    if (this.class_struct_names.get(__cmk) == class_name) {
+                        var __cm3: List = this.class_methods.get(__cmk)
+                        if (__cm3.contains(method)) { __method_exists = true }
+                    }
+                }
+                __cmi = __cmi + 1
+            }
+        }
+        // Also check func_prefix_map with bare class name
+        if (!__method_exists) {
+            var __cm_keys2: List<String> = this.class_methods.keys()
+            var __cmi2: Float = 0
+            while (__cmi2 < __cm_keys2.length()) {
+                var __cmk2: String = __cm_keys2[__cmi2]
+                if (this.class_struct_names.has(__cmk2)) {
+                    if (this.class_struct_names.get(__cmk2) == class_name) {
+                        var __bare_fn: String = __cmk2 + "__" + method
+                        if (this.known_functions.contains(__bare_fn)) { __method_exists = true }
+                        if (this.func_prefix_map.has(__bare_fn)) { __method_exists = true }
+                    }
+                }
+                __cmi2 = __cmi2 + 1
+            }
+        }
+        // Also allow callable fields (function-typed fields)
+        if (!__method_exists and this.class_fields.has(class_name)) {
+            var __ft: String = this.get_field_type(class_name, method)
+            if (__ft.starts_with("Fun(") or __ft.contains("=>")) { __method_exists = true }
+            var __fields_str: String = this.class_fields.get(class_name)
+            if (__fields_str.contains(method + ":")) { __method_exists = true }
+        }
         if (!__method_exists) {
             IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
             this.has_errors = true
@@ -1695,8 +1751,30 @@
     if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { is_builtin_type = true }
     if (obj_type == "StringBuilder" or obj_type == "SB") { is_builtin_type = true }
     if (!is_builtin_type and obj_type.length() > 0 and this.class_fields.has(obj_type)) {
-        IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
-        this.has_errors = true
+        // Before erroring, check if the method exists via cross-module resolution
+        var __ft_exists: Bool = false
+        if (this.class_methods.has(obj_type)) {
+            var __ftm: List = this.class_methods.get(obj_type)
+            if (__ftm.contains(method)) { __ft_exists = true }
+        }
+        if (!__ft_exists) {
+            var __ftk: List<String> = this.class_methods.keys()
+            var __fti: Float = 0
+            while (__fti < __ftk.length()) {
+                var __ftkey: String = __ftk[__fti]
+                if (this.class_struct_names.has(__ftkey)) {
+                    if (this.class_struct_names.get(__ftkey) == obj_type) {
+                        var __ftm2: List = this.class_methods.get(__ftkey)
+                        if (__ftm2.contains(method)) { __ft_exists = true }
+                    }
+                }
+                __fti = __fti + 1
+            }
+        }
+        if (!__ft_exists) {
+            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+            this.has_errors = true
+        }
     }
     this.last_type = AST.Type.IntType
     return "0"
@@ -1813,6 +1891,21 @@
     if (this.class_methods.has(class_name)) {
         var __methods: List = this.class_methods.get(class_name)
         if (__methods.contains(field)) { is_method = true }
+    }
+    // Cross-module: also check bare class name via class_struct_names reverse lookup
+    if (!is_method) {
+        var __fk: List<String> = this.class_methods.keys()
+        var __fi: Float = 0
+        while (__fi < __fk.length()) {
+            var __fkey: String = __fk[__fi]
+            if (this.class_struct_names.has(__fkey)) {
+                if (this.class_struct_names.get(__fkey) == class_name) {
+                    var __fm: List = this.class_methods.get(__fkey)
+                    if (__fm.contains(field)) { is_method = true }
+                }
+            }
+            __fi = __fi + 1
+        }
     }
     if (class_name.length() > 0 and parts.length() > 0 and !is_method) {
         IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")

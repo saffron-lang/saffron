@@ -1425,6 +1425,7 @@ class NullChecker {
 
             var variant_name: String = match (pattern) {
                 VariantPattern(v, bindings) => v
+                _ => "_"
             }
 
             if (variant_name == "_") {
@@ -1435,7 +1436,7 @@ class NullChecker {
 
             // Push scope for arm bindings
             this.env.push_scope()
-            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b }
+            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
             var bi: Float = 0
             while (bi < bindings.length()) {
                 // Bindings from enum fields — try to get type from enum_fields
@@ -1523,39 +1524,47 @@ class NullChecker {
     // --- Let-pattern type checking ---
 
     fun check_let_pattern(pattern: AST.Pattern, val_type: String) {
-        var pat_kind: String = match (pattern) {
-            VariantPattern(v, b) => "variant"
-            WildcardPattern => "wildcard"
-            _ => "other"
-        }
-        if (pat_kind == "variant") {
-            var variant: String = match (pattern) { VariantPattern(v, b) => v   _ => "" }
-            var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
-            if (val_type == "Any") {
-                this.warn("let " + variant + "(...): cannot verify pattern against type Any")
-                var bi: Float = 0
-                while (bi < bindings.length()) {
-                    this.env.define_var(bindings[bi], "Any")
-                    bi = bi + 1
-                }
-                return
-            }
-            var key: String = val_type + "." + variant
-            if (!this.env.enum_fields.has(key)) {
-                this.error("let " + variant + "(...): " + variant + " is not a variant of " + val_type)
-                var bi: Float = 0
-                while (bi < bindings.length()) {
-                    this.env.define_var(bindings[bi], "Any")
-                    bi = bi + 1
-                }
-                return
-            }
+        var variant: String = match (pattern) { VariantPattern(v, b) => v   _ => "" }
+        var bindings: List<String> = match (pattern) { VariantPattern(v, b) => b   _ => [] }
+        if (variant.starts_with("__array:")) {
+            var rest: String = variant.slice(8, variant.length())
             var bi: Float = 0
             while (bi < bindings.length()) {
-                var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
-                this.env.define_var(bindings[bi], field_type)
+                this.env.define_var(bindings[bi], "Any")
                 bi = bi + 1
             }
+            if (rest.length() > 0) {
+                this.env.define_var(rest, "List<Any>")
+            }
+            return
+        }
+        if (variant == "_" or variant.length() == 0) {
+            return
+        }
+        if (val_type == "Any") {
+            this.warn("let " + variant + "(...): cannot verify pattern against type Any")
+            var bi: Float = 0
+            while (bi < bindings.length()) {
+                this.env.define_var(bindings[bi], "Any")
+                bi = bi + 1
+            }
+            return
+        }
+        var key: String = val_type + "." + variant
+        if (!this.env.enum_fields.has(key)) {
+            this.error("let " + variant + "(...): " + variant + " is not a variant of " + val_type)
+            var bi: Float = 0
+            while (bi < bindings.length()) {
+                this.env.define_var(bindings[bi], "Any")
+                bi = bi + 1
+            }
+            return
+        }
+        var bi: Float = 0
+        while (bi < bindings.length()) {
+            var field_type: String = this.get_enum_binding_type(val_type, variant, bi)
+            this.env.define_var(bindings[bi], field_type)
+            bi = bi + 1
         }
     }
 

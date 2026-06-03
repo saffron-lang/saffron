@@ -1107,7 +1107,8 @@ class Codegen {
                     this.last_type = AST.Type.IntType
                 }
                 // Error check: undefined variable
-                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this" and name != "super") {
+                // Skip check for module aliases and enum names (they are valid in expressions)
+                if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.known_functions.contains(name) and !this.known_functions.contains(this.current_prefix + name) and name != "self" and name != "this" and name != "super" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
                     IO.println("[codegen] Error: undefined variable '" + name + "'")
                     this.has_errors = true
                     return "0"
@@ -1889,7 +1890,8 @@ class Codegen {
                 this.last_type = AST.Type.IntType
             }
             // Error check: undefined variable
-            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super") {
+            // Skip check for module aliases and enum names (they are valid in expressions)
+            if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.known_functions.contains(vname) and !this.known_functions.contains(this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
                 IO.println("[codegen] Error: undefined variable '" + vname + "'")
                 this.has_errors = true
                 return "0"
@@ -5211,7 +5213,6 @@ class Codegen {
 
     fun gen_let_pattern(pattern: AST.Pattern, value: AST.Expr) {
         // LetPattern destructures value into bindings from pattern.
-        var val: String = this.gen_arg_value(value)
         var variant_name: String = match (pattern) {
             VariantPattern(v, b) => v
             _ => ""
@@ -5219,6 +5220,13 @@ class Codegen {
         var bindings: List<String> = match (pattern) {
             VariantPattern(v, b) => b
             _ => []
+        }
+        var val: String = this.gen_arg_value(value)
+        var val_type: AST.Type = this.last_type
+        // Check for array pattern (encoded as __array:rest_name)
+        if (variant_name.starts_with("__array:")) {
+            this.gen_let_array_pattern(bindings, variant_name, val, val_type)
+            return
         }
         // For variant patterns, extract fields from the tagged value
         if (bindings.length() > 0) {
@@ -5244,6 +5252,38 @@ class Codegen {
                 }
                 bi = bi + 1
             }
+        }
+    }
+
+    fun gen_let_array_pattern(elements: List<String>, variant_name: String, val: String, val_type: AST.Type) {
+        var rest: String = variant_name.slice(8, variant_name.length())
+        // Infer element type from list type
+        var elem_type_str: String = "Int"
+        var list_type_str: String = this.type_to_string(val_type)
+        if (list_type_str.starts_with("List<") and list_type_str.ends_with(">")) {
+            elem_type_str = list_type_str.slice(5, list_type_str.length() - 1)
+        }
+        var elem_type: AST.Type = this.str_to_type(elem_type_str)
+        var i: Float = 0
+        while (i < elements.length()) {
+            var elem_val: String = this.fresh_local()
+            this.emit_indent(elem_val + " = call i64 @__list_get(i64 " + val + ", i64 " + i.floor().to_string() + ")")
+            this.emit_indent("store i64 " + elem_val + ", i64* %" + this.sanitize_name(elements[i]))
+            this.var_types.set(elements[i], elem_type_str)
+            this.typed_vars.set(elements[i], elem_type)
+            if (elem_type_str == "String") {
+                this.string_vars.push(elements[i])
+            }
+            i = i + 1
+        }
+        if (rest.length() > 0) {
+            var len_val: String = this.fresh_local()
+            this.emit_indent(len_val + " = call i64 @__list_length(i64 " + val + ")")
+            var rest_val: String = this.fresh_local()
+            this.emit_indent(rest_val + " = call i64 @__list_slice(i64 " + val + ", i64 " + elements.length().floor().to_string() + ", i64 " + len_val + ")")
+            this.emit_indent("store i64 " + rest_val + ", i64* %" + this.sanitize_name(rest))
+            this.var_types.set(rest, list_type_str)
+            this.typed_vars.set(rest, val_type)
         }
     }
 
@@ -5545,11 +5585,18 @@ class Codegen {
         if (sk == "let_pattern") {
             var lp_pat: AST.Pattern = match (stmt) { LetPattern(p, v) => p   _ => AST.Pattern.VariantPattern("", []) }
             var lp_val: AST.Expr = match (stmt) { LetPattern(p, v) => v   _ => AST.Expr.NilLit }
+            var lp_vname: String = match (lp_pat) { VariantPattern(v, b) => v   _ => "" }
             var lp_bindings: List<String> = match (lp_pat) { VariantPattern(v, b) => b   _ => [] }
             var lpi: Float = 0
             while (lpi < lp_bindings.length()) {
                 this.add_var_unique(names, types, lp_bindings[lpi], "Any")
                 lpi = lpi + 1
+            }
+            if (lp_vname.starts_with("__array:")) {
+                var lp_rest: String = lp_vname.slice(8, lp_vname.length())
+                if (lp_rest.length() > 0) {
+                    this.add_var_unique(names, types, lp_rest, "Any")
+                }
             }
             this.collect_vars_expr(lp_val, names, types)
             return
@@ -7668,6 +7715,15 @@ class Codegen {
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
+        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
         var arg_strs: List<String> = []
         var ai: Float = 0
         while (ai < args.length()) {
@@ -7675,7 +7731,6 @@ class Codegen {
             arg_strs.push("i64 " + val)
             ai = ai + 1
         }
-        var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
@@ -8408,13 +8463,6 @@ class Codegen {
 
     // Check for imported module function calls (module alias or unknown name)
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
-        var arg_strs: List<String> = []
-        var ai: Float = 0
-        while (ai < args.length()) {
-            var val: String = this.gen_arg_value(args[ai])
-            arg_strs.push("i64 " + val)
-            ai = ai + 1
-        }
         var prefixed_name: String = method
         if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
@@ -8425,6 +8473,21 @@ class Codegen {
             if (this.known_functions.contains(guessed)) {
                 prefixed_name = guessed
             }
+        }
+        // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
+            return this.gen_intrinsic_call(prefixed_name, args)
+        }
+        // Extern check: if the target is an extern C function, emit the proper extern call
+        if (this.extern_sigs.has(prefixed_name)) {
+            return this.gen_extern_call(prefixed_name, args)
+        }
+        var arg_strs: List<String> = []
+        var ai: Float = 0
+        while (ai < args.length()) {
+            var val: String = this.gen_arg_value(args[ai])
+            arg_strs.push("i64 " + val)
+            ai = ai + 1
         }
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
@@ -8574,6 +8637,46 @@ class Codegen {
             var __cm: List = this.class_methods.get(class_name)
             if (__cm.contains(method)) { __method_exists = true }
         }
+        // Cross-module: class_methods is keyed by bare name (e.g. "TomlTable") but
+        // class_name may be the prefixed struct name (e.g. "stdlib_toml_TomlTable").
+        // Reverse-lookup via class_struct_names to find the bare name.
+        if (!__method_exists) {
+            var __cm_keys: List<String> = this.class_methods.keys()
+            var __cmi: Float = 0
+            while (__cmi < __cm_keys.length()) {
+                var __cmk: String = __cm_keys[__cmi]
+                if (this.class_struct_names.has(__cmk)) {
+                    if (this.class_struct_names.get(__cmk) == class_name) {
+                        var __cm3: List = this.class_methods.get(__cmk)
+                        if (__cm3.contains(method)) { __method_exists = true }
+                    }
+                }
+                __cmi = __cmi + 1
+            }
+        }
+        // Also check func_prefix_map with bare class name
+        if (!__method_exists) {
+            var __cm_keys2: List<String> = this.class_methods.keys()
+            var __cmi2: Float = 0
+            while (__cmi2 < __cm_keys2.length()) {
+                var __cmk2: String = __cm_keys2[__cmi2]
+                if (this.class_struct_names.has(__cmk2)) {
+                    if (this.class_struct_names.get(__cmk2) == class_name) {
+                        var __bare_fn: String = __cmk2 + "__" + method
+                        if (this.known_functions.contains(__bare_fn)) { __method_exists = true }
+                        if (this.func_prefix_map.has(__bare_fn)) { __method_exists = true }
+                    }
+                }
+                __cmi2 = __cmi2 + 1
+            }
+        }
+        // Also allow callable fields (function-typed fields)
+        if (!__method_exists and this.class_fields.has(class_name)) {
+            var __ft: String = this.get_field_type(class_name, method)
+            if (__ft.starts_with("Fun(") or __ft.contains("=>")) { __method_exists = true }
+            var __fields_str: String = this.class_fields.get(class_name)
+            if (__fields_str.contains(method + ":")) { __method_exists = true }
+        }
         if (!__method_exists) {
             IO.println("[codegen] Error: type '" + class_name + "' has no method '" + method + "'")
             this.has_errors = true
@@ -8628,8 +8731,30 @@ class Codegen {
     if (obj_type.starts_with("List") or obj_type.starts_with("Map") or obj_type.starts_with("Tuple")) { is_builtin_type = true }
     if (obj_type == "StringBuilder" or obj_type == "SB") { is_builtin_type = true }
     if (!is_builtin_type and obj_type.length() > 0 and this.class_fields.has(obj_type)) {
-        IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
-        this.has_errors = true
+        // Before erroring, check if the method exists via cross-module resolution
+        var __ft_exists: Bool = false
+        if (this.class_methods.has(obj_type)) {
+            var __ftm: List = this.class_methods.get(obj_type)
+            if (__ftm.contains(method)) { __ft_exists = true }
+        }
+        if (!__ft_exists) {
+            var __ftk: List<String> = this.class_methods.keys()
+            var __fti: Float = 0
+            while (__fti < __ftk.length()) {
+                var __ftkey: String = __ftk[__fti]
+                if (this.class_struct_names.has(__ftkey)) {
+                    if (this.class_struct_names.get(__ftkey) == obj_type) {
+                        var __ftm2: List = this.class_methods.get(__ftkey)
+                        if (__ftm2.contains(method)) { __ft_exists = true }
+                    }
+                }
+                __fti = __fti + 1
+            }
+        }
+        if (!__ft_exists) {
+            IO.println("[codegen] Error: type '" + obj_type + "' has no method '" + method + "'")
+            this.has_errors = true
+        }
     }
     this.last_type = AST.Type.IntType
     return "0"
@@ -8746,6 +8871,21 @@ class Codegen {
     if (this.class_methods.has(class_name)) {
         var __methods: List = this.class_methods.get(class_name)
         if (__methods.contains(field)) { is_method = true }
+    }
+    // Cross-module: also check bare class name via class_struct_names reverse lookup
+    if (!is_method) {
+        var __fk: List<String> = this.class_methods.keys()
+        var __fi: Float = 0
+        while (__fi < __fk.length()) {
+            var __fkey: String = __fk[__fi]
+            if (this.class_struct_names.has(__fkey)) {
+                if (this.class_struct_names.get(__fkey) == class_name) {
+                    var __fm: List = this.class_methods.get(__fkey)
+                    if (__fm.contains(field)) { is_method = true }
+                }
+            }
+            __fi = __fi + 1
+        }
     }
     if (class_name.length() > 0 and parts.length() > 0 and !is_method) {
         IO.println("[codegen] Error: '" + class_name + "' has no field '" + field + "'")

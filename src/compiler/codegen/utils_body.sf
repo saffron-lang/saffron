@@ -182,11 +182,18 @@
         if (sk == "let_pattern") {
             var lp_pat: AST.Pattern = match (stmt) { LetPattern(p, v) => p   _ => AST.Pattern.VariantPattern("", []) }
             var lp_val: AST.Expr = match (stmt) { LetPattern(p, v) => v   _ => AST.Expr.NilLit }
+            var lp_vname: String = match (lp_pat) { VariantPattern(v, b) => v   _ => "" }
             var lp_bindings: List<String> = match (lp_pat) { VariantPattern(v, b) => b   _ => [] }
             var lpi: Float = 0
             while (lpi < lp_bindings.length()) {
                 this.add_var_unique(names, types, lp_bindings[lpi], "Any")
                 lpi = lpi + 1
+            }
+            if (lp_vname.starts_with("__array:")) {
+                var lp_rest: String = lp_vname.slice(8, lp_vname.length())
+                if (lp_rest.length() > 0) {
+                    this.add_var_unique(names, types, lp_rest, "Any")
+                }
             }
             this.collect_vars_expr(lp_val, names, types)
             return

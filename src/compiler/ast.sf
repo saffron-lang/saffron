@@ -51,6 +51,8 @@ enum MatchArm {
 
 enum Pattern {
     VariantPattern(variant: String, bindings: List<String>),
+    ArrayPattern(elements: List<String>, rest: String),
+    NamedWildcard(name: String),
     WildcardPattern,
     LiteralPattern(value: Expr)
 }
