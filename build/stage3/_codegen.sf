@@ -4725,7 +4725,7 @@ class Codegen {
                     if (this.func_ret_types.has(parent_full)) {
                         this.func_ret_types.set(child_full, this.func_ret_types.get(parent_full))
                     } else {
-                        this.func_ret_types.set(child_full, AST.Type.IntType)
+                        this.func_ret_types.set(child_full, this.str_to_type("Int"))
                     }
                     this.known_functions.push(child_full)
                     // Emit a thin forwarder with proper parameter forwarding
@@ -5186,7 +5186,7 @@ class Codegen {
         this.emit("}")
         this.block_terminated = false
         this.known_functions.push(func_name)
-        this.func_ret_types.set(func_name, AST.Type.StringType)
+        this.func_ret_types.set(func_name, this.str_to_type("String"))
     }
 
     fun emit_enum_constructor(vname: String, tag: Float, fields_str: String, max_fields: Float) {
