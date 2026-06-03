@@ -59,8 +59,6 @@ class Codegen {
     var is_coroutine: Bool
     var use_llvm_lib: Bool
     var gc_root_count: Float
-    var class_type_ids: Map<String, Float>
-    var next_class_type_id: Float
 
     fun init() {
         this.sb = StringBuilder()
@@ -112,8 +110,6 @@ class Codegen {
         this.is_coroutine = false
         this.use_llvm_lib = true
         this.gc_root_count = 0
-        this.class_type_ids = {}
-        this.next_class_type_id = 10
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
@@ -4497,25 +4493,24 @@ class Codegen {
                 // in nested gen_stmt calls
                 var saved_extend: String = this.pending_extend_class
                 this.pending_extend_class = ""
-                var ret_type_str: String = this.type_to_string(ret_type)
                 if (doc.starts_with("@intrinsic")) {
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, ret_type)
+                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.intrinsic_funcs.push(emit_name)
                 } else if (doc.starts_with("@extern:")) {
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
                     this.known_functions.push(emit_name)
-                    this.func_ret_types.set(emit_name, ret_type)
+                    this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.extern_sigs.set(emit_name, c_sig)
                 } else if (doc.starts_with("@extend:")) {
                     var ext_class: String = doc.slice(8, doc.length())
-                    this.gen_extend_method(ext_class, name, params, ret_type_str, body)
+                    this.gen_extend_method(ext_class, name, params, ret_type, body)
                 } else if (saved_extend.length() > 0) {
                     // Fallback: doc field was unreadable for cross-module FunDecl
                     // but pre-scan identified this as an extension method
-                    this.gen_extend_method(saved_extend, name, params, ret_type_str, body)
+                    this.gen_extend_method(saved_extend, name, params, ret_type, body)
                 } else {
                     var params_str: String = this.params_to_string(params)
                     // Register default values for optional params
@@ -4534,7 +4529,7 @@ class Codegen {
                     this.func_defaults.set(emit_name, defaults)
                     this.func_param_count.set(emit_name, params.length())
                     this.func_param_names.set(emit_name, param_names)
-                    this.gen_function(name, params_str, ret_type_str, body)
+                    this.gen_function(name, params_str, ret_type, body)
                 }
             }
             EnumDecl(name, variants, doc) => {
@@ -4938,11 +4933,6 @@ class Codegen {
         var struct_size: Float = num_fields * 8
         this.known_functions.push(type_name)
         this.func_ret_types.set(type_name, this.str_to_type(type_name))
-        // Assign a unique type ID for reflection (tags >= 10 are per-class)
-        if (!this.class_type_ids.has(type_name)) {
-            this.class_type_ids.set(type_name, this.next_class_type_id)
-            this.next_class_type_id = this.next_class_type_id + 1
-        }
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,type_name)) { return }
         this.defined_funcs.push(type_name)
@@ -4954,23 +4944,11 @@ class Codegen {
         this.emit(ctor_linkage + " i64 @" + type_name + "() {")
         this.emit("entry:")
         this.block_terminated = false
-        // Allocate instance on GC-tracked heap with per-class type tag
-        var class_tag: Float = this.class_type_ids.get(type_name)
+        // Allocate instance on heap
         var raw: String = this.fresh_local()
-        if (this.identity_mode) {
-            // In identity mode (bootstrap), use malloc (no GC)
-            this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
-        } else {
-            this.emit_indent(raw + " = call i64 @__gc_alloc(i64 " + struct_size.floor().to_string() + ", i64 " + class_tag.floor().to_string() + ")")
-        }
-        var ptr: String = ""
-        if (this.identity_mode) {
-            ptr = this.fresh_local()
-            this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
-        } else {
-            ptr = this.fresh_local()
-            this.emit_indent(ptr + " = inttoptr i64 " + raw + " to %" + type_name + "*")
-        }
+        this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+        var ptr: String = this.fresh_local()
+        this.emit_indent(ptr + " = bitcast i8* " + raw + " to %" + type_name + "*")
         // Zero-initialize fields
         var i: Float = 0
         while (i < num_fields) {
@@ -5670,204 +5648,6 @@ class Codegen {
         this.start_block(end_label)
     }
 
-    fun emit_reflect_helpers() {
-        var class_names: List<String> = this.class_type_ids.keys()
-        if (class_names.length() == 0) { return }
-        this.emit("")
-        this.emit("define i64 @__reflect_class_name(i64 %val) {")
-        this.emit("entry:")
-        this.block_terminated = false
-        this.reset_locals()
-        var tag_r: String = this.fresh_local()
-        this.emit_indent(tag_r + " = call i64 @__gc_get_type_tag(i64 %val)")
-        var end_lbl: String = this.fresh_label("rcn.end")
-        var switch_str: String = ""
-        var arm_labels: List<String> = []
-        var ci: Float = 0
-        while (ci < class_names.length()) {
-            var lbl: String = this.fresh_label("rcn.c")
-            arm_labels.push(lbl)
-            var tid: Float = this.class_type_ids.get(class_names[ci])
-            switch_str = switch_str + " i64 " + tid.floor().to_string() + ", label %" + lbl
-            ci = ci + 1
-        }
-        this.emit_indent("switch i64 " + tag_r + ", label %" + end_lbl + " [" + switch_str + " ]")
-        this.block_terminated = true
-        ci = 0
-        while (ci < class_names.length()) {
-            this.start_block(arm_labels[ci])
-            var cname: String = class_names[ci]
-            var display_name: String = cname
-            var all_struct_keys: List<String> = this.class_struct_names.keys()
-            var ski: Float = 0
-            while (ski < all_struct_keys.length()) {
-                var sk: String = all_struct_keys[ski]
-                if (this.class_struct_names.get(sk) == cname and sk.length() < display_name.length()) { display_name = sk }
-                ski = ski + 1
-            }
-            var str_const: String = this.add_string_constant(display_name)
-            var str_len: Float = display_name.length() + 1
-            var gep: String = this.fresh_local()
-            this.emit_indent(gep + " = getelementptr [" + str_len.to_string() + " x i8], [" + str_len.to_string() + " x i8]* " + str_const + ", i64 0, i64 0")
-            var as_i64: String = this.ptr_to_val(gep)
-            this.emit_terminator("ret i64 " + as_i64)
-            ci = ci + 1
-        }
-        this.start_block(end_lbl)
-        var unk_const: String = this.add_string_constant("Unknown")
-        var unk_gep: String = this.fresh_local()
-        this.emit_indent(unk_gep + " = getelementptr [8 x i8], [8 x i8]* " + unk_const + ", i64 0, i64 0")
-        var unk_i64: String = this.ptr_to_val(unk_gep)
-        this.emit_terminator("ret i64 " + unk_i64)
-        this.emit("}")
-        this.block_terminated = false
-        this.emit("")
-        this.emit("define i64 @__reflect_is_class(i64 %val) {")
-        this.emit("entry:")
-        this.block_terminated = false
-        this.reset_locals()
-        var is_tag: String = this.fresh_local()
-        this.emit_indent(is_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
-        var cmp: String = this.fresh_local()
-        this.emit_indent(cmp + " = icmp uge i64 " + is_tag + ", 10")
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = zext i1 " + cmp + " to i64")
-        this.emit_terminator("ret i64 " + result)
-        this.emit("}")
-        this.block_terminated = false
-        this.emit("")
-        this.emit("define i64 @__reflect_get_fields(i64 %val) {")
-        this.emit("entry:")
-        this.block_terminated = false
-        this.reset_locals()
-        var gf_tag: String = this.fresh_local()
-        this.emit_indent(gf_tag + " = call i64 @__gc_get_type_tag(i64 %val)")
-        var gf_end: String = this.fresh_label("rgf.end")
-        var gf_switch: String = ""
-        var gf_arms: List<String> = []
-        ci = 0
-        while (ci < class_names.length()) {
-            var gf_lbl: String = this.fresh_label("rgf.c")
-            gf_arms.push(gf_lbl)
-            var gf_tid: Float = this.class_type_ids.get(class_names[ci])
-            gf_switch = gf_switch + " i64 " + gf_tid.floor().to_string() + ", label %" + gf_lbl
-            ci = ci + 1
-        }
-        this.emit_indent("switch i64 " + gf_tag + ", label %" + gf_end + " [" + gf_switch + " ]")
-        this.block_terminated = true
-        ci = 0
-        while (ci < class_names.length()) {
-            this.start_block(gf_arms[ci])
-            var cname2: String = class_names[ci]
-            var fields_str: String = ""
-            if (this.class_fields.has(cname2)) { fields_str = this.class_fields.get(cname2) }
-            var map_val: String = this.fresh_local()
-            this.emit_indent(map_val + " = call i64 @__map_new()")
-            if (fields_str.length() > 0) {
-                var parts: List<String> = this.split_respecting_generics(fields_str, ",")
-                var fi: Float = 0
-                while (fi < parts.length()) {
-                    var fp: List<String> = parts[fi].split(":")
-                    var fname: String = fp[0]
-                    var fname_const: String = this.add_string_constant(fname)
-                    var fname_len: Float = fname.length() + 1
-                    var fname_gep: String = this.fresh_local()
-                    this.emit_indent(fname_gep + " = getelementptr [" + fname_len.to_string() + " x i8], [" + fname_len.to_string() + " x i8]* " + fname_const + ", i64 0, i64 0")
-                    var fname_i64: String = this.ptr_to_val(fname_gep)
-                    var inst_ptr: String = this.fresh_local()
-                    this.emit_indent(inst_ptr + " = inttoptr i64 %val to %" + cname2 + "*")
-                    var field_ptr: String = this.fresh_local()
-                    this.emit_indent(field_ptr + " = getelementptr %" + cname2 + ", %" + cname2 + "* " + inst_ptr + ", i32 0, i32 " + fi.floor().to_string())
-                    var field_val: String = this.fresh_local()
-                    this.emit_indent(field_val + " = load i64, i64* " + field_ptr)
-                    this.emit_indent("call i64 @__map_set(i64 " + map_val + ", i64 " + fname_i64 + ", i64 " + field_val + ")")
-                    fi = fi + 1
-                }
-            }
-            this.emit_terminator("ret i64 " + map_val)
-            ci = ci + 1
-        }
-        this.start_block(gf_end)
-        var empty_map: String = this.fresh_local()
-        this.emit_indent(empty_map + " = call i64 @__map_new()")
-        this.emit_terminator("ret i64 " + empty_map)
-        this.emit("}")
-        this.block_terminated = false
-        this.emit("")
-        this.emit("define i64 @__reflect_construct_from_map(i64 %klass, i64 %map) {")
-        this.emit("entry:")
-        this.block_terminated = false
-        this.reset_locals()
-        var rc_end: String = this.fresh_label("rcon.end")
-        var rc_arms: List<String> = []
-        ci = 0
-        while (ci < class_names.length()) {
-            rc_arms.push(this.fresh_label("rcon.c"))
-            ci = ci + 1
-        }
-        ci = 0
-        while (ci < class_names.length()) {
-            var cname3: String = class_names[ci]
-            var fn_ptr_val: String = this.fresh_local()
-            this.emit_indent(fn_ptr_val + " = ptrtoint i64 (...)* bitcast (i64 ()* @" + cname3 + " to i64 (...)*) to i64")
-            var cmp_r: String = this.fresh_local()
-            this.emit_indent(cmp_r + " = icmp eq i64 %klass, " + fn_ptr_val)
-            if (ci < class_names.length() - 1) {
-                var next_cmp: String = this.fresh_label("rcon.next")
-                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arms[ci] + ", label %" + next_cmp)
-                this.start_block(next_cmp)
-            } else {
-                this.emit_terminator("br i1 " + cmp_r + ", label %" + rc_arms[ci] + ", label %" + rc_end)
-            }
-            ci = ci + 1
-        }
-        ci = 0
-        while (ci < class_names.length()) {
-            this.start_block(rc_arms[ci])
-            var cname4: String = class_names[ci]
-            var new_inst: String = this.fresh_local()
-            this.emit_indent(new_inst + " = call i64 @" + cname4 + "()")
-            var c_fields: String = ""
-            if (this.class_fields.has(cname4)) { c_fields = this.class_fields.get(cname4) }
-            if (c_fields.length() > 0) {
-                var c_parts: List<String> = this.split_respecting_generics(c_fields, ",")
-                var c_ptr: String = this.fresh_local()
-                this.emit_indent(c_ptr + " = inttoptr i64 " + new_inst + " to %" + cname4 + "*")
-                var cfi: Float = 0
-                while (cfi < c_parts.length()) {
-                    var cfp: List<String> = c_parts[cfi].split(":")
-                    var cf_name: String = cfp[0]
-                    var cf_key_const: String = this.add_string_constant(cf_name)
-                    var cf_key_len: Float = cf_name.length() + 1
-                    var cf_key_gep: String = this.fresh_local()
-                    this.emit_indent(cf_key_gep + " = getelementptr [" + cf_key_len.to_string() + " x i8], [" + cf_key_len.to_string() + " x i8]* " + cf_key_const + ", i64 0, i64 0")
-                    var cf_key_i64: String = this.ptr_to_val(cf_key_gep)
-                    var cf_val: String = this.fresh_local()
-                    this.emit_indent(cf_val + " = call i64 @__map_get(i64 %map, i64 " + cf_key_i64 + ")")
-                    var cf_fld_ptr: String = this.fresh_local()
-                    this.emit_indent(cf_fld_ptr + " = getelementptr %" + cname4 + ", %" + cname4 + "* " + c_ptr + ", i32 0, i32 " + cfi.floor().to_string())
-                    this.emit_indent("store i64 " + cf_val + ", i64* " + cf_fld_ptr)
-                    cfi = cfi + 1
-                }
-            }
-            this.emit_terminator("ret i64 " + new_inst)
-            ci = ci + 1
-        }
-        this.start_block(rc_end)
-        this.emit_terminator("ret i64 0")
-        this.emit("}")
-        this.block_terminated = false
-        this.emit("")
-        this.emit("define i64 @__reflect_number_to_string(i64 %val) {")
-        this.emit("entry:")
-        this.block_terminated = false
-        this.reset_locals()
-        var ns_result: String = this.fresh_local()
-        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 %val)")
-        this.emit_terminator("ret i64 " + ns_result)
-        this.emit("}")
-        this.block_terminated = false
-    }
     // @codegen-split: utils
     fun runtime_declares(): String {
         var rt: StringBuilder = StringBuilder()
@@ -5916,7 +5696,7 @@ class Codegen {
         rt.append("declare i64 @__gc_closure_new(i64, i64)\n")
         rt.append("declare i64 @__gc_env_alloc(i64)\n")
         rt.append("declare i64 @__gc_instance_alloc(i64)\n")
-        rt.append("declare i64 @__gc_get_type_tag(i64)\n")        // Scheduler extern functions (always needed when @async or @scheduler imported)
+        // Scheduler extern functions (always needed when @async or @scheduler imported)
         rt.append("\n; --- Scheduler runtime ---\n")
         rt.append("declare double @sf_time_now()\n")
         rt.append("declare i64 @sf_tcp_poll(i64, i64, i64)\n")
@@ -7200,11 +6980,13 @@ class Codegen {
 
         this.emit("")
         var linkage: String = "define"
-        // Use linkonce_odr for module-prefixed functions (prelude interfaces, etc.)
-        // that may appear in multiple compilation units. Plain define for same-file
-        // functions so they aren't discarded at -O2 when only referenced externally.
-        if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
-            linkage = "define linkonce_odr"
+        if (this.current_prefix.length() > 0) {
+            // On WASM targets, linkonce_odr breaks indirect calls through function table
+            // index mismatch after linker deduplication. Use plain define with module-prefixed
+            // names to ensure each function has a stable table entry.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
@@ -7592,10 +7374,6 @@ class Codegen {
             i = i + 1
         }
 
-        // Emit reflect helper functions
-        if (!this.identity_mode) {
-            this.emit_reflect_helpers()
-        }
         // Second pass: wrap top-level statements in __saffron_entry
         var has_top_level: Bool = false
         i = 0
@@ -8701,32 +8479,6 @@ class Codegen {
             else if (method == "walk_dir" or method == "list_dir") { this.last_type = this.make_list_str_type() }
             else { this.last_type = AST.Type.StringType }
             return local
-        }
-        // Fallback: resolve any other IO.xxx method via module prefix (e.g. IO.open)
-        if (this.module_prefixes.has("IO")) {
-            var io_pfx: String = this.module_prefixes.get("IO") + method
-            if (this.str_in_list(this.known_functions, io_pfx)) {
-                var io_args2: List<String> = []
-                var io_i2: Float = 0
-                while (io_i2 < args.length()) {
-                    var io_v2: String = this.gen_arg_value(args[io_i2])
-                    io_args2.push("i64 " + io_v2)
-                    io_i2 = io_i2 + 1
-                }
-                this.called_functions.push(io_pfx)
-                var local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(local, "i64", io_pfx, io_args2.join(", ")))
-                } else {
-                    this.emit_indent(local + " = call i64 @" + io_pfx + "(" + io_args2.join(", ") + ")")
-                }
-                if (this.func_ret_types.has(io_pfx)) {
-                    this.last_type = this.func_ret_types.get(io_pfx)
-                } else {
-                    this.last_type = AST.Type.IntType
-                }
-                return local
-            }
         }
     }
 
@@ -10189,13 +9941,6 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
 
-    // Register builtin modules as module aliases with empty prefixes
-    // so that IO, OS, GC, Task are recognized as modules (not undefined vars)
-    gen.module_prefixes.set("IO", "stdlib_io_")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
-    gen.module_prefixes.set("Task", "")
-    // Reflect is now a stdlib module (not a builtin) — resolved via import alias
     // Register runtime functions first
     gen.known_functions.push("StringBuilder")
     gen.known_functions.push("__list_new")
@@ -10615,22 +10360,9 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     var gen: Codegen = Codegen()
     gen.target = target
     gen.identity_mode = identity_mode
-    // Reflect runtime functions (generated at end of compilation)
-    gen.known_functions.push("__reflect_get_fields")
-    gen.known_functions.push("__reflect_class_name")
-    gen.known_functions.push("__reflect_is_class")    gen.known_functions.push("__reflect_construct_from_map")
-    gen.known_functions.push("__reflect_number_to_string")
-    gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.named_imports = named_imports
     gen.register_only = false
-
-    // Register builtin modules as module aliases with empty prefixes
-    gen.module_prefixes.set("IO", "stdlib_io_")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
-    gen.module_prefixes.set("Task", "")
-    // Reflect is now a stdlib module (not a builtin) — resolved via import alias
     var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
     while (dbgi < prefixes.length()) {
@@ -11157,13 +10889,6 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.module_prefixes = alias_map
     gen.named_imports = named_imports
     gen.register_only = false
-
-    // Register builtin modules as module aliases with empty prefixes
-    gen.module_prefixes.set("IO", "stdlib_io_")
-    gen.module_prefixes.set("OS", "")
-    gen.module_prefixes.set("GC", "")
-    gen.module_prefixes.set("Task", "")
-    // Reflect is now a stdlib module (not a builtin) — resolved via import alias
     var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
     while (dbgi < prefixes.length()) {

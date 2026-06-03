@@ -242,11 +242,13 @@
 
         this.emit("")
         var linkage: String = "define"
-        // Use linkonce_odr for module-prefixed functions (prelude interfaces, etc.)
-        // that may appear in multiple compilation units. Plain define for same-file
-        // functions so they aren't discarded at -O2 when only referenced externally.
-        if (this.current_prefix.length() > 0 and this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
-            linkage = "define linkonce_odr"
+        if (this.current_prefix.length() > 0) {
+            // On WASM targets, linkonce_odr breaks indirect calls through function table
+            // index mismatch after linker deduplication. Use plain define with module-prefixed
+            // names to ensure each function has a stable table entry.
+            if (this.target != "wasm" and this.target != "wasm64" and this.target != "wasm32") {
+                linkage = "define linkonce_odr"
+            }
         }
         var coro_attr: String = ""
         if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
@@ -634,10 +636,6 @@
             i = i + 1
         }
 
-        // Emit reflect helper functions
-        if (!this.identity_mode) {
-            this.emit_reflect_helpers()
-        }
         // Second pass: wrap top-level statements in __saffron_entry
         var has_top_level: Bool = false
         i = 0
