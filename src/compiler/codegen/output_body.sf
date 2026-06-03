@@ -35,8 +35,17 @@
                     pi2 = pi2 + 1
                 }
             }
+            var captures_raw: List<String> = []
+            this.find_free_vars_stmts(body, param_names, captures_raw)
+            // Deduplicate captures (find_free_vars may report the same var multiple times)
             var captures: List<String> = []
-            this.find_free_vars_stmts(body, param_names, captures)
+            var cdi: Float = 0
+            while (cdi < captures_raw.length()) {
+                if (!captures.contains(captures_raw[cdi])) {
+                    captures.push(captures_raw[cdi])
+                }
+                cdi = cdi + 1
+            }
 
             // Build extended params: captures (with actual types from parent) + original params
             var full_params: String = ""
