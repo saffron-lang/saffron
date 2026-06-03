@@ -1,0 +1,46 @@
+import "@reflect" as Reflect
+
+class Point {
+    var x: Number
+    var y: Number
+    fun init(x: Number, y: Number) {
+        this.x = x
+        this.y = y
+    }
+}
+
+class Person {
+    var name: String
+    var age: Number
+    fun init(name: String, age: Number) {
+        this.name = name
+        this.age = age
+    }
+}
+
+// --- fields tests ---
+var p = Point(10, 20)
+var fields = Reflect.fields(p)
+IO.println(fields.get("x"))
+IO.println(fields.get("y"))
+
+var alice = Person("Alice", 30)
+var alice_fields = Reflect.fields(alice)
+IO.println(alice_fields.get("name"))
+IO.println(alice_fields.get("age"))
+
+// --- construct tests ---
+var data = {"name": "Bob", "age": 25}
+var bob = Reflect.construct(Person, data)
+IO.println(bob.name)
+IO.println(bob.age)
+
+var pt_data = {"x": 5, "y": 15}
+var pt = Reflect.construct(Point, pt_data)
+IO.println(pt.x)
+IO.println(pt.y)
+
+// --- number_to_string ---
+IO.println(Reflect.number_to_string(42))
+IO.println(Reflect.number_to_string(0))
+IO.println(Reflect.number_to_string(-5))

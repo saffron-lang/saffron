@@ -216,14 +216,14 @@
         if (mc_resolved.length() > 0) {
             var full_mc: String = mc_resolved + "__" + mc_method
             if (this.func_ret_types.has(full_mc)) {
-                return this.type_to_string(this.func_ret_types.get(full_mc))
+                return this.func_ret_types.get(full_mc)
             }
         }
         // Also check with prefix for user class methods
         if (mc_obj_type.length() > 0) {
             var prefixed_mc: String = this.current_prefix + mc_obj_type + "__" + mc_method
             if (this.func_ret_types.has(prefixed_mc)) {
-                return this.type_to_string(this.func_ret_types.get(prefixed_mc))
+                return this.func_ret_types.get(prefixed_mc)
             }
         }
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
@@ -263,7 +263,7 @@
         }
         var callee_name: String = this.resolve_callee(call_callee)
         if (this.func_ret_types.has(callee_name)) {
-            return this.type_to_string(this.func_ret_types.get(callee_name))
+            return this.func_ret_types.get(callee_name)
         }
     }
     if (ek == "is_check") return "Bool"
@@ -452,8 +452,8 @@
     var prefixed: String = class_prefix + full_name
     this.known_functions.push(prefixed)
     this.known_functions.push(full_name)
-    this.func_ret_types.set(prefixed, this.str_to_type(ret_type))
-    this.func_ret_types.set(full_name, this.str_to_type(ret_type))
+    this.func_ret_types.set(prefixed, ret_type)
+    this.func_ret_types.set(full_name, ret_type)
     this.func_prefix_map.set(full_name, prefixed)
     if (this.class_methods.has(ext_class)) {
         var methods: List = this.class_methods.get(ext_class)
@@ -641,9 +641,9 @@
         this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
     }
     if (this.func_ret_types.has(full_method)) {
-        this.last_type = this.func_ret_types.get(full_method)
+        this.last_type = this.str_to_type(this.func_ret_types.get(full_method))
     } else if (this.func_ret_types.has(canonical)) {
-        this.last_type = this.func_ret_types.get(canonical)
+        this.last_type = this.str_to_type(this.func_ret_types.get(canonical))
     } else {
         this.last_type = AST.Type.IntType
     }
@@ -825,7 +825,7 @@
     if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
         var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
-        if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
+        if (this.intrinsic_funcs.contains(prefixed_name)) {
             return this.gen_intrinsic_call(prefixed_name, args)
         }
         // Extern check: if the target is an extern C function, emit the proper extern call
@@ -843,7 +843,7 @@
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another coroutine,
         // emit the await loop pattern (call as ptr, suspend/resume until done)
-        if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
+        if (this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
             var b_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(b_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -884,16 +884,16 @@
             var coro_result: String = this.fresh_local()
             this.emit_indent(coro_result + " = load i64, i64* @__task_result")
             if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.func_ret_types.get(prefixed_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
             } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.func_ret_types.get(method)
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
             } else {
                 this.last_type = AST.Type.IntType
             }
             return coro_result
         }
         // Sync-calls-coro: non-coroutine calling a coroutine — drive to completion
-        if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, prefixed_name)) {
+        if (!this.is_coroutine and this.coroutine_funcs.contains(prefixed_name)) {
             var s_hdl: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(s_hdl, "ptr", prefixed_name, arg_strs.join(", ")))
@@ -923,9 +923,9 @@
             var s_result: String = this.fresh_local()
             this.emit_indent(s_result + " = load i64, i64* @__task_result")
             if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.func_ret_types.get(prefixed_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
             } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.func_ret_types.get(method)
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -938,9 +938,9 @@
             this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
         }
         if (this.func_ret_types.has(prefixed_name)) {
-            this.last_type = this.func_ret_types.get(prefixed_name)
+            this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
         } else if (this.func_ret_types.has(method)) {
-            this.last_type = this.func_ret_types.get(method)
+            this.last_type = this.str_to_type(this.func_ret_types.get(method))
         } else {
             this.last_type = AST.Type.IntType
         }
@@ -981,8 +981,7 @@
         var task_result_type: String = "Int"
         var spawn_expr_kind: String = this.classify_expr(args[0])
         if (spawn_expr_kind == "lambda") {
-            var lambda_ret_type: AST.Type = match (args[0]) { Lambda(p, r, b) => r   _ => AST.Type.IntType }
-            var lambda_ret: String = this.type_to_string(lambda_ret_type)
+            var lambda_ret: String = match (args[0]) { Lambda(p, r, b) => r   _ => "Int" }
             if (lambda_ret.length() > 0 and lambda_ret != "Any" and lambda_ret != "Int") {
                 task_result_type = lambda_ret
             } else {
@@ -999,9 +998,9 @@
                             if (ret_callee_name.length() > 0) {
                                 var prefixed_callee: String = this.current_prefix + ret_callee_name
                                 if (this.func_ret_types.has(prefixed_callee)) {
-                                    task_result_type = this.type_to_string(this.func_ret_types.get(prefixed_callee))
+                                    task_result_type = this.func_ret_types.get(prefixed_callee)
                                 } else if (this.func_ret_types.has(ret_callee_name)) {
-                                    task_result_type = this.type_to_string(this.func_ret_types.get(ret_callee_name))
+                                    task_result_type = this.func_ret_types.get(ret_callee_name)
                                 }
                             }
                         } else if (ret_ek == "method_call") {
@@ -1011,7 +1010,7 @@
                             if (mc_ns.length() > 0 and this.module_prefixes.has(mc_ns)) {
                                 var mc_full: String = this.module_prefixes.get(mc_ns) + mc_method_name
                                 if (this.func_ret_types.has(mc_full)) {
-                                    task_result_type = this.type_to_string(this.func_ret_types.get(mc_full))
+                                    task_result_type = this.func_ret_types.get(mc_full)
                                 }
                             }
                         }
@@ -1025,7 +1024,7 @@
         // Lambda names start with __lambda — check if in coroutine_funcs
         var spawn_fn_name: String = this.get_variable_name(args[0])
         var is_coro_spawn: Bool = false
-        if (spawn_fn_name.length() > 0 and this.str_in_list(this.coroutine_funcs, spawn_fn_name)) {
+        if (spawn_fn_name.length() > 0 and this.coroutine_funcs.contains(spawn_fn_name)) {
             is_coro_spawn = true
         }
         // Also check the last-generated lambda
@@ -1680,7 +1679,7 @@
             this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
         }
         if (this.func_ret_types.has(parent_method)) {
-            this.last_type = this.func_ret_types.get(parent_method)
+            this.last_type = this.str_to_type(this.func_ret_types.get(parent_method))
         } else {
             this.last_type = AST.Type.StringType
         }
@@ -1720,9 +1719,9 @@
         this.called_functions.push(prefixed_name)
         this.called_function_arity.set(prefixed_name, args.length())
         // Coro-calls-coro: if this is a coroutine calling another, emit await loop
-        var is_coro_callee: Bool = this.str_in_list(this.coroutine_funcs, prefixed_name)
+        var is_coro_callee: Bool = this.coroutine_funcs.contains(prefixed_name)
         if (!is_coro_callee) {
-            is_coro_callee = this.str_in_list(this.coroutine_funcs, method)
+            is_coro_callee = this.coroutine_funcs.contains(method)
         }
         // Definitive check: if the function is already defined and is in coroutine_funcs
         if (!is_coro_callee and this.coroutine_funcs.length() > 0) {
@@ -1794,9 +1793,9 @@
             this.emit_indent(coro_result + " = load i64, i64* @__task_result")
             // Use the callee's return type (same as the non-coro path below)
             if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.func_ret_types.get(prefixed_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
             } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.func_ret_types.get(method)
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -1833,9 +1832,9 @@
             var s_result: String = this.fresh_local()
             this.emit_indent(s_result + " = load i64, i64* @__task_result")
             if (this.func_ret_types.has(prefixed_name)) {
-                this.last_type = this.func_ret_types.get(prefixed_name)
+                this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
             } else if (this.func_ret_types.has(method)) {
-                this.last_type = this.func_ret_types.get(method)
+                this.last_type = this.str_to_type(this.func_ret_types.get(method))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -1848,9 +1847,9 @@
             this.emit_indent(local + " = call i64 @" + prefixed_name + "(" + arg_strs.join(", ") + ")")
         }
         if (this.func_ret_types.has(prefixed_name)) {
-            this.last_type = this.func_ret_types.get(prefixed_name)
+            this.last_type = this.str_to_type(this.func_ret_types.get(prefixed_name))
         } else if (this.func_ret_types.has(method)) {
-            this.last_type = this.func_ret_types.get(method)
+            this.last_type = this.str_to_type(this.func_ret_types.get(method))
         } else {
             this.last_type = AST.Type.IntType
         }

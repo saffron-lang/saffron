@@ -1,68 +1,44 @@
 //! Runtime type introspection — type checking, field access, and construction.
 //
-// This module exposes type-checking and field access as a stable API for the
-// LLVM-compiled native path. The codegen emits per-class reflection helpers
-// (__reflect_fields_X, __reflect_construct_X) and a dispatch function
-// (__reflect_get_fields, __reflect_construct_from_map) that this module calls.
+// This module provides runtime reflection for the LLVM-compiled native path.
+// The codegen emits per-class reflection helpers and dispatch functions.
 //
 // Usage:
 //   import "@reflect" as Reflect
-//   Reflect.type_name(value)       // "Number", "String", "Bool", etc.
-//   Reflect.is_instance(value)     // true if class instance
 //   Reflect.fields(instance)       // Map<String, Any> of field names to values
 //   Reflect.construct(klass, map)  // construct instance from map
 //   Reflect.number_to_string(val)  // convert number to string
+//   Reflect.type_name(value)       // type name (class instances via GC tag)
+//   Reflect.is_instance(value)     // true if class instance
 
 /// Returns the type name of a value as a string.
-/// Possible results: "Number", "String", "Bool", "List", "Map", "Nil",
-/// or the class name for class instances.
+/// For class instances, returns the class name via GC type tag dispatch.
 fun type_name(value: Any): String {
-    if (value == nil) { return "Nil" }
-    if (value == true or value == false) { return "Bool" }
-    if (value is Number) { return "Number" }
-    if (value is String) { return "String" }
-    if (value is List) { return "List" }
-    if (value is Map) { return "Map" }
-    // Class instance — the codegen emits __reflect_class_name for dispatch
     return __reflect_class_name(value)
 }
 
 /// Returns true if the value is a class instance (not a primitive/collection).
 fun is_instance(value: Any): Bool {
-    if (value == nil) { return false }
-    if (value == true or value == false) { return false }
-    if (value is Number) { return false }
-    if (value is String) { return false }
-    if (value is List) { return false }
-    if (value is Map) { return false }
-    return true
+    var tag: Number = __reflect_is_class(value)
+    if (tag > 0) { return true }
+    return false
 }
 
 /// Returns a Map<String, Any> of field names to current values for a class instance.
-/// If the value is not a class instance, returns an empty map.
+/// Dispatches to per-class reflection functions via GC type tag.
 fun fields(instance: Any): Map<String, Any> {
-    if (!is_instance(instance)) {
-        return Map()
-    }
     return __reflect_get_fields(instance)
 }
 
 /// Constructs an instance of the given class, populating fields from the map.
-/// The klass argument should be the class constructor (e.g., the class name).
+/// The klass argument should be the class itself (e.g., the class name as a value).
 /// The data argument is a Map<String, Any> where keys are field names.
 fun construct(klass: Any, data: Map<String, Any>): Any {
     return __reflect_construct_from_map(klass, data)
 }
 
 /// Converts a number to its string representation.
-/// Handles both integers and floats.
+/// Handles both integers and floats via runtime dispatch.
 fun number_to_string(value: Number): String {
     return __reflect_number_to_string(value)
 }
-
-// --- Runtime intrinsics (provided by codegen-generated functions) ---
-
-@intrinsic fun __reflect_class_name(value: Any): String
-@intrinsic fun __reflect_get_fields(instance: Any): Map<String, Any>
-@intrinsic fun __reflect_construct_from_map(klass: Any, data: Map<String, Any>): Any
-@intrinsic fun __reflect_number_to_string(value: Any): String
