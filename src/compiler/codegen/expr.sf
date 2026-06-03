@@ -133,7 +133,7 @@ extend fun Codegen.gen_expr(expr: AST.Expr): String {
                 this.gen_match(subject, arms)
             }
             Lambda(params, ret_type, body) => {
-                this.gen_lambda(params, ret_type, body)
+                this.gen_lambda(params, this.type_to_string(ret_type), body)
             }
             This => {
                 this.last_type = this.str_to_type(this.current_class)

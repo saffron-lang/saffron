@@ -636,6 +636,9 @@
             i = i + 1
         }
 
+        // Emit reflection dispatch functions for all compiled classes
+        this.emit_reflect_helpers()
+
         // Second pass: wrap top-level statements in __saffron_entry
         var has_top_level: Bool = false
         i = 0

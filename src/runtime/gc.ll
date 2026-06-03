@@ -690,7 +690,7 @@ pop:
   %info = load i64, i64* %info_ptr
   %tag = call i64 @__gc_info_tag(i64 %info)
   %size = call i64 @__gc_info_size(i64 %info)
-  switch i64 %tag, label %loop [
+  switch i64 %tag, label %check_class_tag [
     i64 0, label %loop           ; raw - no inner ptrs
     i64 1, label %loop           ; string - no inner ptrs
     i64 2, label %trace_list
@@ -702,6 +702,11 @@ pop:
     i64 8, label %loop           ; kv array - scanned by parent map
     i64 9, label %trace_array    ; env - scan all slots
   ]
+
+check_class_tag:
+  ; Tags >= 10 are per-class instance tags — scan all fields like tag 5
+  %is_class_instance = icmp uge i64 %tag, 10
+  br i1 %is_class_instance, label %trace_instance, label %loop
 
 trace_list:
   ; List: { count@0, capacity@8, data_ptr@16 }
@@ -1191,6 +1196,29 @@ entry:
   ret i64 %ptr
 }
 
+; Get the GC type tag for a heap-allocated object.
+; Returns the type tag from the GC header (0 if not a GC object).
+; Tags 0-9 are built-in types, tags >= 10 are per-class instance tags.
+define i64 @__gc_get_type_tag(i64 %ptr) {
+entry:
+  %is_null = icmp eq i64 %ptr, 0
+  br i1 %is_null, label %ret_zero, label %read_header
+
+read_header:
+  ; Header is 24 bytes before the user pointer: header_addr = ptr - 24
+  %header_addr = sub i64 %ptr, 24
+  ; info field is at header + 8
+  %info_addr = add i64 %header_addr, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
+  ; Extract type tag from info (bits 8-15)
+  %tag = call i64 @__gc_info_tag(i64 %info)
+  ret i64 %tag
+
+ret_zero:
+  ret i64 0
+}
+
 ; =============================================================================
 ; GC-Aware list push (handles realloc with GC tracking)
 ; =============================================================================
@@ -1536,7 +1564,7 @@ do_mark:
   ; Trace children
   %tag = call i64 @__gc_info_tag(i64 %info)
   %size = call i64 @__gc_info_size(i64 %info)
-  switch i64 %tag, label %done [
+  switch i64 %tag, label %check_class_tag [
     i64 0, label %done
     i64 1, label %done
     i64 2, label %trace_list
@@ -1548,6 +1576,11 @@ do_mark:
     i64 8, label %done
     i64 9, label %trace_env
   ]
+
+check_class_tag:
+  ; Tags >= 10 are per-class instance tags — scan all fields like tag 5
+  %is_class_inst = icmp uge i64 %tag, 10
+  br i1 %is_class_inst, label %trace_instance, label %done
 
 trace_list:
   %list_data_addr = add i64 %val, 16

@@ -60,6 +60,8 @@ class Codegen {
     var is_coroutine: Bool
     var use_llvm_lib: Bool
     var gc_root_count: Float
+    var class_type_ids: Map<String, Float>
+    var next_class_type_id: Float
 
     fun init() {
         this.sb = StringBuilder()
@@ -111,6 +113,8 @@ class Codegen {
         this.is_coroutine = false
         this.use_llvm_lib = true
         this.gc_root_count = 0
+        this.class_type_ids = {}
+        this.next_class_type_id = 10
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
