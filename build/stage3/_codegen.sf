@@ -1141,6 +1141,10 @@ class Codegen {
                         }
                     }
                 }
+                // Module aliases are namespaces, not loadable variables
+                if (this.module_prefixes.has(name) or name == "Reflect") {
+                    return "0"
+                }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
                 if (this.module_globals.has(this.current_prefix + name)) {
@@ -9940,6 +9944,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     // Each module's functions get prefixed via current_prefix during gen_stmt
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
 
     // Register runtime functions first
     gen.known_functions.push("StringBuilder")
