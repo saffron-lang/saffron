@@ -4,40 +4,17 @@
 import "@reflect" as Reflect
 ```
 
-Runtime type introspection.
+Runtime type introspection for the native LLVM compiler.
 
-## Type checking
-
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `Reflect.type_of(value)` | `String` | Runtime type name |
-| `Reflect.is_number(value)` | `Bool` | Check if value is a Number |
-| `Reflect.is_string(value)` | `Bool` | Check if value is a String |
-| `Reflect.is_bool(value)` | `Bool` | Check if value is a Bool |
-| `Reflect.is_nil(value)` | `Bool` | Check if value is nil |
-| `Reflect.is_list(value)` | `Bool` | Check if value is a List |
-| `Reflect.is_map(value)` | `Bool` | Check if value is a Map |
-| `Reflect.is_instance(value)` | `Bool` | Check if value is a class instance |
-| `Reflect.is_class(value)` | `Bool` | Check if value is a class |
-
-## Introspection
+## Functions
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `Reflect.fields(instance)` | `List<String>` | Field names of a class instance |
-| `Reflect.field_types(instance)` | `Map<String, String>` | Field name to type mapping |
-| `Reflect.class_name(instance)` | `String` | Name of the instance's class |
-| `Reflect.doc(value)` | `String` | Docstring (if defined with `///`) |
-| `Reflect.construct(class, args)` | instance | Construct a class from a class value and arg list |
-
-## Conversion
-
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `Reflect.as_string(value)` | `String` | Convert value to string representation |
-| `Reflect.as_list(value)` | `List` | Cast/convert to list |
-| `Reflect.as_map(value)` | `Map` | Cast/convert to map |
-| `Reflect.number_to_string(n)` | `String` | Convert number to string |
+| `Reflect.type_name(value)` | `String` | Runtime type/class name of a value |
+| `Reflect.is_instance(value)` | `Bool` | True if value is a class instance (not a primitive) |
+| `Reflect.fields(instance)` | `Map<String, Any>` | Map of field names to current values |
+| `Reflect.construct(class, data)` | instance | Construct a class instance from a class value and a field map |
+| `Reflect.number_to_string(n)` | `String` | Convert a number to its string representation |
 
 ## Example
 
@@ -54,22 +31,14 @@ class Point {
 }
 
 var p = Point(1.0, 2.0)
-IO.println(Reflect.type_of(p))       // "Point"
-IO.println(Reflect.class_name(p))    // "Point"
-IO.println(Reflect.fields(p))        // ["x", "y"]
+IO.println(Reflect.type_name(p))     // "Point"
 IO.println(Reflect.is_instance(p))   // true
-IO.println(Reflect.is_number(42))    // true
+IO.println(Reflect.fields(p))        // {"x": 1.0, "y": 2.0}
+IO.println(Reflect.number_to_string(42))  // "42"
 ```
 
-## Docstrings
+## Notes
 
-Functions and classes documented with `///` comments expose their docs at runtime:
-
-```saffron
-/// Compute the square of a number.
-fun square(x: Number): Number {
-    return x * x
-}
-
-IO.println(Reflect.doc(square))  // "Compute the square of a number."
-```
+- `Reflect.fields()` returns a `Map<String, Any>` (not a list of names), where keys are field names and values are current field values
+- The `is` operator can be used for type checks in user code: `42 is Number`, `"hi" is String`, `value is MyClass`
+- These functions are only available in the LLVM-compiled native path, not the C VM interpreter

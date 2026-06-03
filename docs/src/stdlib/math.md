@@ -11,8 +11,6 @@ import "@math" as Math
 | `Math.pi` | 3.14159265358979... |
 | `Math.e` | 2.71828182845905... |
 | `Math.tau` | 6.28318530717959... (2pi) |
-| `Math.PI` | Alias for `pi` |
-| `Math.E` | Alias for `e` |
 
 ## Basic functions
 

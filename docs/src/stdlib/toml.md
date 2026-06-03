@@ -49,6 +49,40 @@ IO.println(TOML.stringify(config))
 - Array of tables (`[[items]]`)
 - Comments (`#`)
 
+### `TOML.load(path: String): TomlTable`
+
+Parse a TOML file and return a typed `TomlTable` wrapper with typed accessors:
+
+```saffron
+var config = TOML.load("pantry.toml")
+var pkg = config.table("package")
+var name: String = pkg.string("name")
+var version: String = pkg.string_or("version", "0.1.0")
+```
+
+### `TOML.load_string(source: String): TomlTable`
+
+Same as `load` but takes a string instead of a file path.
+
+### TomlTable methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `t.string(key)` | `String` | Get string value (throws if missing) |
+| `t.string_or(key, default)` | `String` | Get string or default |
+| `t.number(key)` | `Number` | Get number value |
+| `t.number_or(key, default)` | `Number` | Get number or default |
+| `t.bool(key)` | `Bool` | Get boolean value |
+| `t.bool_or(key, default)` | `Bool` | Get boolean or default |
+| `t.table(key)` | `TomlTable` | Get sub-table |
+| `t.table_or(key)` | `TomlTable` | Get sub-table or empty |
+| `t.list(key)` | `List<Any>` | Get array value |
+| `t.list_or(key)` | `List<Any>` | Get array or empty list |
+| `t.has(key)` | `Bool` | Check if key exists |
+| `t.keys()` | `List<String>` | All keys |
+| `t.get(key)` | `Any` | Raw value access |
+| `t.to_map()` | `Map<String, Any>` | Get underlying map |
+
 ## Example
 
 ```saffron

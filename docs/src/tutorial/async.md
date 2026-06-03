@@ -19,7 +19,7 @@ The task begins running when the scheduler gets control (at the next yield point
 
 ## Awaiting results
 
-Use `Async.await` to wait for a task to complete and get its return value:
+Use `task.await()` to wait for a task to complete and get its return value:
 
 ```saffron
 import "@async" as Async
@@ -30,7 +30,7 @@ fun compute(): Number {
 }
 
 var task = Task.spawn(compute)
-var result = Async.await(task)
+var result = task.await()
 IO.println(result)  // 42
 ```
 
@@ -63,9 +63,9 @@ var t1 = Task.spawn(fun () => fetch("api/users"))
 var t2 = Task.spawn(fun () => fetch("api/posts"))
 var t3 = Task.spawn(fun () => fetch("api/comments"))
 
-IO.println(Async.await(t1))
-IO.println(Async.await(t2))
-IO.println(Async.await(t3))
+IO.println(t1.await())
+IO.println(t2.await())
+IO.println(t3.await())
 ```
 
 All three tasks run concurrently — total time is ~0.1s, not 0.3s.
@@ -90,6 +90,6 @@ fun long_computation(): Number {
 Saffron's async model is cooperative, not preemptive. Tasks only switch at:
 - `yield` expressions
 - `Async.sleep()` calls
-- `Async.await()` calls
+- `task.await()` calls
 
 This means no data races — if you don't yield, you have exclusive access to all state.

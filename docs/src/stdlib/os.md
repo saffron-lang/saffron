@@ -48,6 +48,12 @@ var output = OS.exec("echo hello")
 IO.println(output)  // "hello\n"
 ```
 
-## Note
+### `OS.exit(code)`
 
-`OS.exit(code)` is available in the C VM interpreter but not yet in the LLVM compiler backend. Use `throw` for non-zero exits in compiled code.
+Exit the process with the given status code:
+
+```saffron
+if (error_occurred) {
+    OS.exit(1)
+}
+```
