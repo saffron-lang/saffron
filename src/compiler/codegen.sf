@@ -478,6 +478,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
 
+    // Register builtin modules as module aliases with empty prefixes
+    // so that IO, OS, GC, Task are recognized as modules (not undefined vars)
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
     // Register runtime functions first
     gen.known_functions.push("StringBuilder")
     gen.known_functions.push("__list_new")
@@ -897,9 +904,22 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     var gen: Codegen = Codegen()
     gen.target = target
     gen.identity_mode = identity_mode
+    // Reflect runtime functions (generated at end of compilation)
+    gen.known_functions.push("__reflect_get_fields")
+    gen.known_functions.push("__reflect_class_name")
+    gen.known_functions.push("__reflect_construct_from_map")
+    gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.named_imports = named_imports
     gen.register_only = false
+
+    // Register builtin modules as module aliases with empty prefixes
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
     var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
     while (dbgi < prefixes.length()) {
@@ -1426,6 +1446,13 @@ fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AS
     gen.module_prefixes = alias_map
     gen.named_imports = named_imports
     gen.register_only = false
+
+    // Register builtin modules as module aliases with empty prefixes
+    gen.module_prefixes.set("IO", "")
+    gen.module_prefixes.set("OS", "")
+    gen.module_prefixes.set("GC", "")
+    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("Reflect", "")
     var prefixes: List<String> = prefixes_joined.split("|")
     var dbgi: Float = 0
     while (dbgi < prefixes.length()) {
