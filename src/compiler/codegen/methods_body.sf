@@ -676,27 +676,30 @@
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
-    // Universal module dispatch for non-builtin modules (Reflect, Task, user imports).
-    // IO/OS/GC have special handling below (coercion, exit truncation).
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name) and obj_name != "IO" and obj_name != "OS" and obj_name != "GC") {
+    // Universal module dispatch: route through module prefix when the module
+    // was properly imported (has a real prefix like "stdlib_os_").
+    // Builtins with empty prefix (IO/OS/GC registered as "") fall through
+    // to their hardcoded blocks below.
+    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
         var __mp: String = this.module_prefixes.get(obj_name)
-        if (__mp.length() == 0) { __mp = "__" + obj_name.to_lower() + "_" }
-        var __mp_func: String = __mp + method
-        this.called_functions.push(__mp_func)
-        var __mp_args: List<String> = []
-        var __mpi: Float = 0
-        while (__mpi < args.length()) {
-            __mp_args.push("i64 " + this.gen_arg_value(args[__mpi]))
-            __mpi = __mpi + 1
+        if (__mp.length() > 0) {
+            var __mp_func: String = __mp + method
+            this.called_functions.push(__mp_func)
+            var __mp_args: List<String> = []
+            var __mpi: Float = 0
+            while (__mpi < args.length()) {
+                __mp_args.push("i64 " + this.gen_arg_value(args[__mpi]))
+                __mpi = __mpi + 1
+            }
+            var __mp_local: String = this.fresh_local()
+            this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
+            if (this.func_ret_types.has(__mp_func)) {
+                this.last_type = this.func_ret_types.get(__mp_func)
+            } else {
+                this.last_type = AST.Type.IntType
+            }
+            return __mp_local
         }
-        var __mp_local: String = this.fresh_local()
-        this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")
-        if (this.func_ret_types.has(__mp_func)) {
-            this.last_type = this.func_ret_types.get(__mp_func)
-        } else {
-            this.last_type = AST.Type.IntType
-        }
-        return __mp_local
     }
 
     // Check for OS module calls
