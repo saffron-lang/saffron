@@ -149,14 +149,14 @@ fun _write_web_manifest(dir: String, name: String) {
     var content: String = "[package]\n"
     content = content + "name = \"" + name + "\"\n"
     content = content + "version = \"0.1.0\"\n"
-    content = content + "description = \"A web application\"\n"
+    content = content + "description = \"A web application built with Turmeric\"\n"
     content = content + "entry = \"src/main.sf\"\n"
     content = content + "target = \"wasm32\"\n"
     content = content + "\n[dependencies]\n"
     content = content + "turmeric = { git = \"https://github.com/henry232323/saffron\", path = \"turmeric\" }\n"
     content = content + "\n[scripts]\n"
     content = content + "build = \"saffron build --target wasm32 src/main.sf -o build/app.wasm\"\n"
-    content = content + "dev = \"build && cd build && python3 -m http.server 8080\"\n"
+    content = content + "dev = \"saffron run dev_server.sf\"\n"
     content = content + "test = \"saffron run test/test_main.sf\"\n"
     IO.write_file(dir + "/pantry.toml", content)
 }
@@ -192,6 +192,13 @@ fun _write_web_index(dir: String, name: String) {
     content = content + "    </script>\n"
     content = content + "</body>\n</html>\n"
     IO.write_file(dir + "/public/index.html", content)
+}
+
+fun _write_web_dev_server(dir: String, name: String) {
+    var content: String = "//! Dev server with hot reload for " + name + "\n\n"
+    content = content + "import \"turmeric/tools/dev_server\" as DevServer\n\n"
+    content = content + "DevServer.serve(\"build/\", 8080, [\"src/\", \"public/\"])\n"
+    IO.write_file(dir + "/dev_server.sf", content)
 }
 
 fun _prompt_choice(question: String, options: List<String>): String {
@@ -269,6 +276,7 @@ fun run(name: String, parsed: Args.ParsedArgs) {
         _write_web_manifest(dir, name)
         _write_web_main(dir, name)
         _write_web_index(dir, name)
+        _write_web_dev_server(dir, name)
         _write_test_app(dir, name)
     } else if (is_lib) {
         _write_manifest(dir, name, true)
