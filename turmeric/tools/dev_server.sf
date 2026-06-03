@@ -1,20 +1,17 @@
 //! Turmeric Dev Server — serves static files with SSE hot reload.
 //!
 //! ```saffron
-//! import "@dev_server" as DevServer
-//!
+//! import "turmeric/tools/dev_server" as DevServer
 //! DevServer.serve("build/", 8080, ["src/", "build/"])
 //! ```
-//!
-//! Injects a reload script into HTML files. When watched files change,
-//! sends an SSE event that triggers browser reload.
 
-import "@server" as Server
+import "@http/server" as Http
 import "@socket" as Socket
 import "@watch" as Watch
 
 var _sse_clients: List<Int> = []
-var _reload_pending: Bool = false
+
+var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
 
 fun mime_for(path: String): String {
     if (path.ends_with(".html")) { return "text/html; charset=utf-8" }
@@ -29,34 +26,6 @@ fun mime_for(path: String): String {
     return "application/octet-stream"
 }
 
-var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
-
-fun serve_file(build_dir: String, path: String): String {
-    var file_path: String = build_dir + path
-    if (path == "/" or path == "") {
-        file_path = build_dir + "/index.html"
-    }
-    if (!IO.file_exists(file_path)) {
-        file_path = build_dir + "/index.html"
-    }
-    if (!IO.file_exists(file_path)) {
-        return "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nConnection: close\r\n\r\nNot Found"
-    }
-    var content: String = IO.read_file(file_path)
-    var mime: String = mime_for(file_path)
-    if (mime.starts_with("text/html")) {
-        content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
-    }
-    var resp: String = "HTTP/1.1 200 OK\r\nContent-Type: " + mime + "\r\nContent-Length: " + content.length().to_string() + "\r\nConnection: close\r\n\r\n" + content
-    return resp
-}
-
-fun handle_sse(client: Int) {
-    var headers: String = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\ndata: connected\n\n"
-    Socket.write(client, headers)
-    _sse_clients.push(client)
-}
-
 fun notify_reload() {
     var i = 0
     while (i < _sse_clients.length()) {
@@ -67,7 +36,7 @@ fun notify_reload() {
     _sse_clients = []
 }
 
-fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
+fun serve(build_dir: String, port: Number, watch_dirs: List<String>) {
     var watcher = Watch.create()
     var wi = 0
     while (wi < watch_dirs.length()) {
@@ -75,14 +44,47 @@ fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
         wi = wi + 1
     }
 
-    var listener = Server.listen("0.0.0.0", port)
+    var app = Http.create(port)
+
+    app.get("/__reload", fun (req: Http.Request): Http.Response => {
+        // SSE handled below in the custom serve loop
+        var h: Map<String, String> = {}
+        h.set("Content-Type", "text/event-stream")
+        h.set("Cache-Control", "no-cache")
+        h.set("Access-Control-Allow-Origin", "*")
+        return Http.Response(200, "OK", h, "data: connected\n\n")
+    })
+
+    app.all("*", fun (req: Http.Request): Http.Response => {
+        var path = req.path
+        var file_path: String = build_dir + path
+        if (path == "/" or path == "") {
+            file_path = build_dir + "/index.html"
+        }
+        if (!IO.file_exists(file_path)) {
+            file_path = build_dir + "/index.html"
+        }
+        if (!IO.file_exists(file_path)) {
+            return Http.not_found()
+        }
+        var content: String = IO.read_file(file_path)
+        var mime: String = mime_for(file_path)
+        if (mime.starts_with("text/html")) {
+            content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
+        }
+        return Http.file(content, mime)
+    })
+
     IO.println("")
-    IO.println("  Turmeric dev server (Saffron)")
+    IO.println("  Turmeric dev server")
     IO.println("  http://localhost:" + port.to_string())
     IO.println("  Watching: " + watch_dirs.join(", "))
     IO.println("  Press Ctrl+C to stop")
     IO.println("")
 
+    // Custom serve loop with file watching integrated
+    import "@server" as Server
+    var listener = Server.listen("0.0.0.0", port)
     while (true) {
         if (watcher.poll(0)) {
             IO.println("  [reload] file changed")
@@ -91,20 +93,20 @@ fun serve(build_dir: String, port: Int, watch_dirs: List<String>) {
 
         var client: Int = listener.accept()
         if (client >= 0) {
-            var raw: String = Socket.read(client, 4096)
-            var first_line: String = raw.split("\r\n")[0]
-            var parts = first_line.split(" ")
-            var path = "/"
-            if (parts.length() >= 2) {
-                path = parts[1]
-            }
-
-            if (path == "/__reload") {
-                handle_sse(client)
-            } else {
-                var resp: String = serve_file(build_dir, path)
-                Socket.write(client, resp)
+            var raw: String = Socket.read(client, 8192)
+            if (raw.length() == 0) {
                 Socket.close(client)
+            } else {
+                var req: Http.Request = Http.parse_request(raw)
+                if (req.path == "/__reload") {
+                    var sse_headers: String = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\ndata: connected\n\n"
+                    Socket.write(client, sse_headers)
+                    _sse_clients.push(client)
+                } else {
+                    var resp: Http.Response = app.route(req)
+                    Socket.write(client, resp.to_http())
+                    Socket.close(client)
+                }
             }
         }
     }
