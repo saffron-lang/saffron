@@ -502,6 +502,12 @@
         if (this.typed_vars.has(name)) {
             return this.type_to_string(this.typed_vars.get(name))
         }
+        if (this.global_var_types.has(name)) {
+            return this.global_var_types.get(name)
+        }
+        if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + name)) {
+            return this.global_var_types.get(this.current_prefix + name)
+        }
         return ""
     }
 
