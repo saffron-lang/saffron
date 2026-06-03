@@ -32,6 +32,8 @@ class Codegen {
     var last_type: AST.Type
     var typed_vars: Map<String, AST.Type>
     var loop_end_label: String
+    var loop_break_label: String
+    var loop_continue_label: String
     var current_ret_type: String
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
@@ -86,6 +88,8 @@ class Codegen {
         this.last_type = AST.Type.IntType
         this.typed_vars = {}
         this.loop_end_label = ""
+        this.loop_break_label = ""
+        this.loop_continue_label = ""
         this.current_ret_type = "i64"
         this.called_functions = []
         this.called_function_arity = {}
@@ -4476,13 +4480,13 @@ class Codegen {
             While(cond, body) => { this.gen_while(cond, body) }
             Block(stmts) => { this.gen_stmts(stmts) }
             Break => {
-                if (this.loop_end_label.contains(":")) {
-                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[0])
+                if (this.loop_break_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_break_label)
                 }
             }
             Continue => {
-                if (this.loop_end_label.contains(":")) {
-                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[1])
+                if (this.loop_continue_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_continue_label)
                 }
             }
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -5645,7 +5649,11 @@ class Codegen {
         var end_label: String = this.fresh_label("while.end")
 
         var saved_loop_end: String = this.loop_end_label
+        var saved_break: String = this.loop_break_label
+        var saved_continue: String = this.loop_continue_label
         this.loop_end_label = end_label + ":" + cond_label
+        this.loop_break_label = end_label
+        this.loop_continue_label = cond_label
 
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
@@ -5673,6 +5681,8 @@ class Codegen {
         }
 
         this.loop_end_label = saved_loop_end
+        this.loop_break_label = saved_break
+        this.loop_continue_label = saved_continue
 
         this.start_block(end_label)
     }

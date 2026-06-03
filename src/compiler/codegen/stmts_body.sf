@@ -13,13 +13,13 @@
             While(cond, body) => { this.gen_while(cond, body) }
             Block(stmts) => { this.gen_stmts(stmts) }
             Break => {
-                if (this.loop_end_label.contains(":")) {
-                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[0])
+                if (this.loop_break_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_break_label)
                 }
             }
             Continue => {
-                if (this.loop_end_label.contains(":")) {
-                    this.emit_terminator("br label %" + this.loop_end_label.split(":")[1])
+                if (this.loop_continue_label.length() > 0) {
+                    this.emit_terminator("br label %" + this.loop_continue_label)
                 }
             }
             TryCatch(try_body, catch_name, catch_body, finally_body) => {
@@ -1182,7 +1182,11 @@
         var end_label: String = this.fresh_label("while.end")
 
         var saved_loop_end: String = this.loop_end_label
+        var saved_break: String = this.loop_break_label
+        var saved_continue: String = this.loop_continue_label
         this.loop_end_label = end_label + ":" + cond_label
+        this.loop_break_label = end_label
+        this.loop_continue_label = cond_label
 
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
@@ -1210,6 +1214,8 @@
         }
 
         this.loop_end_label = saved_loop_end
+        this.loop_break_label = saved_break
+        this.loop_continue_label = saved_continue
 
         this.start_block(end_label)
     }
