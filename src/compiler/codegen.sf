@@ -33,6 +33,8 @@ class Codegen {
     var last_type: AST.Type
     var typed_vars: Map<String, AST.Type>
     var loop_end_label: String
+    var loop_break_label: String
+    var loop_continue_label: String
     var current_ret_type: String
     var called_functions: List<String>
     var called_function_arity: Map<String, Float>
@@ -87,6 +89,8 @@ class Codegen {
         this.last_type = AST.Type.IntType
         this.typed_vars = {}
         this.loop_end_label = ""
+        this.loop_break_label = ""
+        this.loop_continue_label = ""
         this.current_ret_type = "i64"
         this.called_functions = []
         this.called_function_arity = {}
