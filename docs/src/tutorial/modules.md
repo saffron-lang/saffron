@@ -18,10 +18,11 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 | `@math` | Math functions and constants |
 | `@iter` | Functional iteration utilities |
 | `@time` | Time and date utilities |
+| `@datetime` | Date/time with formatting, parsing, and arithmetic |
 | `@os` | Operating system interaction |
 | `@json` | JSON parsing and serialization |
 | `@toml` | TOML parsing and serialization |
-| `@csv` | CSV parsing |
+| `@csv` | CSV parsing and serialization |
 | `@reflect` | Runtime type introspection |
 | `@random` | Random number generation |
 | `@test` | Test framework |
@@ -30,12 +31,19 @@ All built-in modules use the `@` prefix. These are bundled with the interpreter 
 | `@path` | File path manipulation |
 | `@glob` | Glob pattern matching and file discovery |
 | `@url` | URL parsing and manipulation |
-| `@http` | HTTP client |
+| `@http/client` | Async HTTP client |
+| `@http/server` | Async HTTP server with routing and middleware |
 | `@base64` | Base64 encoding/decoding |
 | `@uuid` | UUID generation and parsing |
 | `@semver` | Semantic version parsing and comparison |
 | `@log` | Structured logging |
-| `@async` | Async task utilities |
+| `@async` | Async task utilities (sleep, gather, race, timeout, parallel) |
+| `@sync` | Sync primitives (Mutex, Semaphore, WaitGroup, Once, Channel) |
+| `@supervisor` | Task supervision with automatic restart |
+| `@pubsub` | Typed publish/subscribe messaging |
+| `@concurrent_map` | Mutex-protected map for concurrent access |
+| `@socket` | Async TCP/TLS sockets |
+| `@dns` | Async DNS resolution |
 | `@lexer` | Tokenize Saffron source |
 | `@parser` | Parse source into AST |
 | `@ast` | AST types and traversal |

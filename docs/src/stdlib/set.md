@@ -25,32 +25,37 @@ s.add(1).add(2).add(3)
 | `s.size()` | `Number` | Number of elements |
 | `s.values()` | `List` | All values as a list |
 
+## Creating from a list
+
+```saffron
+var s = Sets.from([1, 2, 3, 2, 1])
+s.size()  // 3
+```
+
 ## Set Operations
 
 | Function | Returns | Description |
 |----------|---------|-------------|
+| `Sets.from(items)` | `Set` | Create a Set from a list |
 | `Sets.union(a, b)` | `Set` | Elements in either set |
-| `Sets.intersection(a, b)` | `Set` | Elements in both sets |
-| `Sets.difference(a, b)` | `Set` | Elements in a but not b |
+| `Sets.intersect(a, b)` | `Set` | Elements in both sets |
+| `Sets.diff(a, b)` | `Set` | Elements in a but not b |
 
 ## Example
 
 ```saffron
 import "@set" as Sets
 
-var a = Sets.Set()
-a.add(1).add(2).add(3).add(4)
+var a = Sets.from([1, 2, 3, 4])
+var b = Sets.from([3, 4, 5, 6])
 
-var b = Sets.Set()
-b.add(3).add(4).add(5).add(6)
-
-var both = Sets.intersection(a, b)
+var both = Sets.intersect(a, b)
 IO.println(both.values())  // [3, 4]
 
 var either = Sets.union(a, b)
 IO.println(either.size())  // 6
 
-var only_a = Sets.difference(a, b)
+var only_a = Sets.diff(a, b)
 IO.println(only_a.values())  // [1, 2]
 
 // Membership

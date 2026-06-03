@@ -139,3 +139,89 @@ Pair each element with its index:
 Iter.enumerate(["a", "b", "c"])
 // [[0, "a"], [1, "b"], [2, "c"]]
 ```
+
+## Sorting and grouping
+
+### `sort_by(list, key_func) -> List`
+
+Sort a list by a key function:
+
+```saffron
+Iter.sort_by(["banana", "apple", "fig"], fun (s: String): Number => s.length())
+// ["fig", "apple", "banana"]
+```
+
+### `group_by(list, key_func) -> Map`
+
+Group elements by a key function:
+
+```saffron
+Iter.group_by([1, 2, 3, 4, 5], fun (x: Number): String => if (x % 2 == 0) { "even" } else { "odd" })
+// {"odd": [1, 3, 5], "even": [2, 4]}
+```
+
+### `frequencies(list) -> Map`
+
+Count occurrences of each element:
+
+```saffron
+Iter.frequencies(["a", "b", "a", "c", "a"])
+// {"a": 3, "b": 1, "c": 1}
+```
+
+### `unique(list) -> List`
+
+Remove duplicates (preserving first occurrence order):
+
+```saffron
+Iter.unique([1, 2, 3, 2, 1])  // [1, 2, 3]
+```
+
+## Additional utilities
+
+### `drop(list, n) -> List`
+
+Alias for `skip`.
+
+### `chunk(list, size) -> List`
+
+Split a list into chunks of the given size:
+
+```saffron
+Iter.chunk([1, 2, 3, 4, 5], 2)
+// [[1, 2], [3, 4], [5]]
+```
+
+### `zip_with(a, b, func) -> List`
+
+Combine two lists element-wise using a function:
+
+```saffron
+Iter.zip_with([1, 2, 3], [10, 20, 30], fun (a: Number, b: Number): Number => a + b)
+// [11, 22, 33]
+```
+
+### `max(list)` / `min(list)`
+
+Return the maximum/minimum element:
+
+```saffron
+Iter.max([3, 1, 4, 1, 5])  // 5
+Iter.min([3, 1, 4, 1, 5])  // 1
+```
+
+### `reverse(list) -> List`
+
+Return a reversed copy:
+
+```saffron
+Iter.reverse([1, 2, 3])  // [3, 2, 1]
+```
+
+### `join(list, sep) -> String`
+
+Join elements into a string with a separator:
+
+```saffron
+Iter.join(["a", "b", "c"], ", ")  // "a, b, c"
+```

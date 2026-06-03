@@ -10,11 +10,11 @@ String formatting utilities.
 
 ### `Fmt.format(template: String, values: List<Any>): String`
 
-Format a string with positional `{}` placeholders:
+Format a string with indexed `{0}`, `{1}`, etc. placeholders:
 
 ```saffron
-Fmt.format("{} + {} = {}", [1, 2, 3])  // "1 + 2 = 3"
-Fmt.format("Hello, {}!", ["world"])    // "Hello, world!"
+Fmt.format("{0} + {1} = {2}", [1, 2, 3])  // "1 + 2 = 3"
+Fmt.format("Hello, {0}!", ["world"])       // "Hello, world!"
 ```
 
 ### `Fmt.pad_left(text: String, width: Number, fill: String): String`
