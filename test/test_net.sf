@@ -1,0 +1,117 @@
+//! Tests for the @net module.
+//!
+//! NOTE: Some tests require network access and a running server.
+//! Tests marked with [MANUAL] need to be run interactively.
+//!
+//! Runnable tests:
+//!   - DNS resolution (requires network)
+//!   - Module import and class instantiation
+//!
+//! Manual tests (documented below):
+//!   - TCP listener accept (needs a client to connect)
+//!   - TCP client connect (needs a server to connect to)
+//!   - TLS connect (needs network + TLS library linked)
+
+import "@net" as Net
+import "@test" as T
+
+// =============================================================================
+// Test: Module imports and classes are accessible
+// =============================================================================
+
+T.assert(true, "net module imported successfully")
+
+// =============================================================================
+// Test: DNS resolution
+// =============================================================================
+
+// Resolve a well-known hostname
+var ips: List<String> = Net.resolve("example.com")
+T.assert(ips.length() > 0, "resolve('example.com') returned at least one IP")
+
+// Check that the result looks like an IPv4 address (contains dots)
+var ip: String = ips[0]
+T.assert(ip.contains("."), "resolved IP contains dots (IPv4 format)")
+IO.println("Resolved example.com -> " + ip)
+
+// Resolve with a specific nameserver (Cloudflare)
+var ips2: List<String> = Net.resolve_with("example.com", "1.1.1.1")
+T.assert(ips2.length() > 0, "resolve_with using Cloudflare DNS returned result")
+
+// Non-existent domain should return empty list
+var bad: List<String> = Net.resolve("this-domain-definitely-does-not-exist-xyz123.invalid")
+T.assert(bad.length() == 0, "resolve of non-existent domain returns empty list")
+
+// =============================================================================
+// Test: TcpListener creation and addr()
+// =============================================================================
+
+// Bind to a random high port — this tests that listen() works without error.
+// We close immediately since we don't have a client connecting.
+var listener = Net.listen("127.0.0.1", 19876)
+T.assert(listener.addr() == "127.0.0.1:19876", "listener addr() returns correct host:port")
+listener.close()
+IO.println("Listener bound and closed on " + listener.addr())
+
+// =============================================================================
+// Test: TcpConnection construction (unit test, no real socket)
+// =============================================================================
+
+// We can construct a TcpConnection directly for testing the object interface.
+// Using fd=0 (invalid) just to verify methods exist and fields are set correctly.
+var conn = Net.TcpConnection(0, "10.0.0.1:80", false)
+T.assert(conn.remote_addr() == "10.0.0.1:80", "remote_addr() returns constructor value")
+T.assert(conn.is_tls() == false, "is_tls() returns false for plain connection")
+
+var tls_conn = Net.TcpConnection(0, "secure.example.com:443", true)
+T.assert(tls_conn.is_tls() == true, "is_tls() returns true for TLS connection")
+
+// =============================================================================
+// Summary
+// =============================================================================
+
+T.summary()
+
+// =============================================================================
+// [MANUAL] TCP echo server test
+// =============================================================================
+//
+// To test accept/read/write manually, run this in one terminal:
+//
+//   import "@net" as Net
+//   var listener = Net.listen("127.0.0.1", 9999)
+//   IO.println("Waiting for connection...")
+//   var client = listener.accept()
+//   IO.println("Client connected from: " + client.remote_addr())
+//   var data = client.read(1024)
+//   IO.println("Received: " + data)
+//   client.write("Echo: " + data)
+//   client.close()
+//   listener.close()
+//
+// Then in another terminal (or use netcat):
+//   echo "hello" | nc 127.0.0.1 9999
+
+// =============================================================================
+// [MANUAL] TCP client connect test
+// =============================================================================
+//
+// Start a simple server first (e.g., `nc -l 9999`), then run:
+//
+//   import "@net" as Net
+//   var conn = Net.connect("127.0.0.1", 9999)
+//   conn.write("Hello from Saffron!\n")
+//   var reply = conn.read(1024)
+//   IO.println("Got: " + reply)
+//   conn.close()
+
+// =============================================================================
+// [MANUAL] TLS client test
+// =============================================================================
+//
+//   import "@net" as Net
+//   var conn = Net.connect_tls("example.com", 443)
+//   conn.write("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+//   var body = conn.read_all()
+//   IO.println(body)
+//   conn.close()

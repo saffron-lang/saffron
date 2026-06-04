@@ -1,0 +1,222 @@
+//! High-level networking module.
+//! Wraps @socket, @server, and @dns with typed connection objects.
+//!
+//! ```saffron
+//! import "@net" as Net
+//!
+//! // TCP client
+//! var conn = Net.connect("example.com", 80)
+//! conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+//! var data = conn.read(4096)
+//! conn.close()
+//!
+//! // TCP server
+//! var listener = Net.listen("0.0.0.0", 8080)
+//! while (true) {
+//!     var client = listener.accept()
+//!     client.write("Hello!\n")
+//!     client.close()
+//! }
+//! listener.close()
+//!
+//! // TLS client
+//! var tls = Net.connect_tls("example.com", 443)
+//! tls.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+//! var body = tls.read(8192)
+//! tls.close()
+//!
+//! // DNS resolution
+//! var ips = Net.resolve("example.com")
+//! ```
+
+import "@socket" as Socket
+import "@server" as Server
+import "@dns" as DNS
+
+// =============================================================================
+// TcpConnection
+// =============================================================================
+
+/// A TCP connection, either plain or TLS.
+/// Wraps a socket file descriptor (and optional TLS handle) with read/write
+/// operations that yield to the async scheduler when they would block.
+class TcpConnection {
+    var _handle: Int
+    var _remote: String
+    var _is_tls: Bool
+
+    fun init(handle: Int, remote: String, is_tls: Bool) {
+        this._handle = handle
+        this._remote = remote
+        this._is_tls = is_tls
+    }
+
+    /// Read up to max_bytes from the connection.
+    /// Yields to the scheduler if the socket would block.
+    /// Returns the data as a string, or empty string on EOF/error.
+    fun read(max_bytes: Int): String {
+        if (this._is_tls) {
+            return Socket.tls_read(this._handle, max_bytes)
+        }
+        return Socket.read(this._handle, max_bytes)
+    }
+
+    /// Read all available data until EOF.
+    /// Accumulates chunks from repeated reads until the connection is closed
+    /// by the remote side or an error occurs.
+    fun read_all(): String {
+        var chunks: List<String> = []
+        while (true) {
+            var chunk: String = this.read(4096)
+            if (chunk.length() == 0) { break }
+            chunks.push(chunk)
+        }
+        return chunks.join("")
+    }
+
+    /// Write data to the connection.
+    /// Yields to the scheduler if the socket would block.
+    /// Returns the number of bytes written.
+    fun write(data: String): Int {
+        if (this._is_tls) {
+            return Socket.tls_write(this._handle, data)
+        }
+        return Socket.write(this._handle, data)
+    }
+
+    /// Close the connection and release the underlying file descriptor.
+    fun close() {
+        Socket.close(this._handle)
+    }
+
+    /// Returns the remote address as "host:port" (or whatever was provided
+    /// at connection time).
+    fun remote_addr(): String {
+        return this._remote
+    }
+
+    /// Returns true if this connection uses TLS.
+    fun is_tls(): Bool {
+        return this._is_tls
+    }
+}
+
+// =============================================================================
+// TcpListener
+// =============================================================================
+
+/// A TCP listener that accepts incoming connections.
+/// Wraps @server.Listener with higher-level TcpConnection objects.
+class TcpListener {
+    var _listener: Server.Listener
+    var _host: String
+    var _port: Int
+
+    fun init(listener: Server.Listener, host: String, port: Int) {
+        this._listener = listener
+        this._host = host
+        this._port = port
+    }
+
+    /// Accept a new incoming connection.
+    /// Blocks (yields to scheduler) until a client connects.
+    /// Returns a TcpConnection wrapping the accepted socket.
+    fun accept(): TcpConnection {
+        var fd: Int = this._listener.accept()
+        if (fd < 0) {
+            throw "net: accept failed"
+        }
+        // The raw accept does not give us a remote address string directly,
+        // so we use a placeholder. A future version could extract the peer
+        // address from the accepted fd via getpeername().
+        return TcpConnection(fd, "unknown", false)
+    }
+
+    /// Close the listener and stop accepting connections.
+    fun close() {
+        this._listener.close()
+    }
+
+    /// Returns the bound address as "host:port".
+    fun addr(): String {
+        return "${this._host}:${this._port}"
+    }
+}
+
+// =============================================================================
+// Module-level functions
+// =============================================================================
+
+/// Bind and listen on the given host and port.
+/// Returns a TcpListener ready to accept connections.
+///
+/// ```saffron
+/// var listener = Net.listen("0.0.0.0", 8080)
+/// var conn = listener.accept()
+/// ```
+fun listen(host: String, port: Int): TcpListener {
+    var listener: Server.Listener = Server.listen(host, port)
+    return TcpListener(listener, host, port)
+}
+
+/// Connect to a remote TCP host:port.
+/// Returns a TcpConnection for reading and writing.
+///
+/// ```saffron
+/// var conn = Net.connect("example.com", 80)
+/// conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+/// var resp = conn.read(4096)
+/// conn.close()
+/// ```
+fun connect(host: String, port: Int): TcpConnection {
+    var fd: Int = Socket.connect(host, port)
+    if (fd < 0) {
+        throw "net: failed to connect to ${host}:${port}"
+    }
+    return TcpConnection(fd, "${host}:${port}", false)
+}
+
+/// Connect to a remote host:port with TLS encryption.
+/// Returns a TcpConnection that transparently handles TLS read/write.
+///
+/// ```saffron
+/// var conn = Net.connect_tls("example.com", 443)
+/// conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+/// var body = conn.read(8192)
+/// conn.close()
+/// ```
+fun connect_tls(host: String, port: Int): TcpConnection {
+    var handle: Int = Socket.connect_tls(host, port)
+    if (handle < 0) {
+        throw "net: failed to TLS connect to ${host}:${port}"
+    }
+    return TcpConnection(handle, "${host}:${port}", true)
+}
+
+/// Resolve a hostname to a list of IPv4 address strings.
+/// Uses the @dns module which queries via UDP (Google DNS 8.8.8.8 by default).
+///
+/// ```saffron
+/// var ips = Net.resolve("example.com")
+/// // ips = ["93.184.216.34"]
+/// ```
+fun resolve(hostname: String): List<String> {
+    var ip: String = DNS.resolve(hostname)
+    if (ip == "") {
+        return []
+    }
+    return [ip]
+}
+
+/// Resolve a hostname using a specific nameserver.
+///
+/// ```saffron
+/// var ips = Net.resolve_with("example.com", "1.1.1.1")
+/// ```
+fun resolve_with(hostname: String, nameserver: String): List<String> {
+    var ip: String = DNS.resolve_with(hostname, nameserver)
+    if (ip == "") {
+        return []
+    }
+    return [ip]
+}
