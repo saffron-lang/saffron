@@ -4,6 +4,12 @@
                 this.last_type = AST.Type.IntType
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                // LLVM lib parallel path — disabled until gen_function wires up real builders
+                // if (!this.identity_mode) {
+                //     var llvm_zero = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
+                //     var llvm_val = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
+                //     var llvm_result = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                // }
                 local
             }
             FloatLit(v) => {
