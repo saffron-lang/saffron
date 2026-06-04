@@ -799,34 +799,13 @@
                 return __mp_instance
             }
 
-            // IO.println / IO.print: coerce argument to string at compile time
-            // so identity mode (no NaN-box tags) can safely puts the pointer.
-            // Use starts_with on __mp_func to avoid identity-mode pointer comparison issues.
+            // IO.println / IO.print: pass value directly to runtime dispatch.
+            // __io_println / __io_print handle all NaN-boxed types at runtime.
+            // In identity mode (bootstrap), only strings reach here so raw pointer is safe.
             if ((__mp_func.starts_with("__io_println") or __mp_func.starts_with("__io_print")) and args.length() > 0) {
-                var __io_pre_type: String = this.get_expr_type(args[0])
                 var __io_arg: String = this.gen_arg_value(args[0])
-                var __io_arg_type: String = this.type_to_string(this.last_type)
-                // Determine the best known type for the argument:
-                // 1. If pre_type is specific (not Any/Int), use it
-                // 2. If last_type after gen is specific, use it
-                // 3. If both are generic (Any/Int default), treat as String (safe pass-through)
-                if (__io_pre_type != "Any" and __io_pre_type != "Int") {
-                    __io_arg_type = __io_pre_type
-                } else if (__io_arg_type == "Int" and __io_pre_type == "Any") {
-                    // Type unknown — could be string or anything. Pass directly.
-                    __io_arg_type = "String"
-                }
-                // String/Any: pass directly (strings are already pointers)
-                if (__io_arg_type == "String" or __io_arg_type == "Any") {
-                    var __io_discard: String = this.fresh_local()
-                    this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_arg + ")")
-                    this.last_type = AST.Type.NilType
-                    return "0"
-                }
-                // For known non-string types (Int, Float, Bool), coerce to string
-                var __io_str: String = this.coerce_to_string(__io_arg, __io_arg_type)
                 var __io_discard: String = this.fresh_local()
-                this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_str + ")")
+                this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_arg + ")")
                 this.last_type = AST.Type.NilType
                 return "0"
             }
@@ -1378,6 +1357,135 @@
             }
             this.last_type = this.make_list_str_type()
             return __mk_local
+        }
+    }
+
+    // --- String method dispatch (type-aware, replaces builtin_methods for String) ---
+    if (!is_user_class) {
+        var __str_obj_type: String = this.type_to_string(this.last_type)
+        if (obj_name.length() > 0) {
+            var __sot: String = this.get_var_type_str(obj_name)
+            if (__sot.length() > 0) { __str_obj_type = __sot }
+        }
+        var __str_is_any: Bool = __str_obj_type == "Any"
+        var __str_any_skip: Bool = false
+        if (__str_is_any) {
+            var __sfcm: String = this.find_class_for_method(method)
+            if (__sfcm.length() > 0 and __sfcm != "String" and __sfcm != "List" and __sfcm != "Map" and __sfcm != "Int" and __sfcm != "Float" and __sfcm != "Bool") {
+                __str_any_skip = true
+            }
+        }
+        var __str_type_match: Bool = __str_obj_type == "String" or __str_is_any
+        var __str_meth_match: Bool = method == "trim" or method == "to_upper" or method == "to_lower" or method == "index_of" or method == "repeat" or method == "split" or method == "ends_with" or method == "replace"
+        if (!__str_any_skip and __str_type_match and __str_meth_match) {
+            if (method == "trim") {
+                this.called_functions.push("rt_str_trim")
+                var __st_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__st_local, "i64", "rt_str_trim", "i64 " + obj))
+                } else {
+                    this.emit_indent(__st_local + " = call i64 @rt_str_trim(i64 " + obj + ")")
+                }
+                var __st_ptr: String = this.fresh_local()
+                this.emit_indent(__st_ptr + " = inttoptr i64 " + __st_local + " to i8*")
+                var __st_tagged: String = this.emit_tag_ptr(__st_ptr)
+                this.last_type = AST.Type.StringType
+                return __st_tagged
+            }
+            if (method == "to_upper") {
+                this.called_functions.push("rt_str_to_upper")
+                var __su_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__su_local, "i64", "rt_str_to_upper", "i64 " + obj))
+                } else {
+                    this.emit_indent(__su_local + " = call i64 @rt_str_to_upper(i64 " + obj + ")")
+                }
+                var __su_ptr: String = this.fresh_local()
+                this.emit_indent(__su_ptr + " = inttoptr i64 " + __su_local + " to i8*")
+                var __su_tagged: String = this.emit_tag_ptr(__su_ptr)
+                this.last_type = AST.Type.StringType
+                return __su_tagged
+            }
+            if (method == "to_lower") {
+                this.called_functions.push("rt_str_to_lower")
+                var __sl_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__sl_local, "i64", "rt_str_to_lower", "i64 " + obj))
+                } else {
+                    this.emit_indent(__sl_local + " = call i64 @rt_str_to_lower(i64 " + obj + ")")
+                }
+                var __sl_ptr: String = this.fresh_local()
+                this.emit_indent(__sl_ptr + " = inttoptr i64 " + __sl_local + " to i8*")
+                var __sl_tagged: String = this.emit_tag_ptr(__sl_ptr)
+                this.last_type = AST.Type.StringType
+                return __sl_tagged
+            }
+            if (method == "index_of") {
+                this.called_functions.push("rt_str_index_of")
+                var __si_arg: String = this.gen_arg_value(args[0])
+                var __si_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__si_local, "i64", "rt_str_index_of", "i64 " + obj + ", i64 " + __si_arg))
+                } else {
+                    this.emit_indent(__si_local + " = call i64 @rt_str_index_of(i64 " + obj + ", i64 " + __si_arg + ")")
+                }
+                var __si_tagged: String = this.emit_tag_int(__si_local)
+                this.last_type = AST.Type.IntType
+                return __si_tagged
+            }
+            if (method == "repeat") {
+                this.called_functions.push("rt_str_repeat")
+                var __sr_arg: String = this.gen_arg_value(args[0])
+                var __sr_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__sr_local, "i64", "rt_str_repeat", "i64 " + obj + ", i64 " + __sr_arg))
+                } else {
+                    this.emit_indent(__sr_local + " = call i64 @rt_str_repeat(i64 " + obj + ", i64 " + __sr_arg + ")")
+                }
+                var __sr_ptr: String = this.fresh_local()
+                this.emit_indent(__sr_ptr + " = inttoptr i64 " + __sr_local + " to i8*")
+                var __sr_tagged: String = this.emit_tag_ptr(__sr_ptr)
+                this.last_type = AST.Type.StringType
+                return __sr_tagged
+            }
+            if (method == "split") {
+                var __ss_arg: String = this.gen_arg_value(args[0])
+                var __ss_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__ss_local, "i64", "__str_split", "i64 " + obj + ", i64 " + __ss_arg))
+                } else {
+                    this.emit_indent(__ss_local + " = call i64 @__str_split(i64 " + obj + ", i64 " + __ss_arg + ")")
+                }
+                this.last_type = this.make_list_str_type()
+                return __ss_local
+            }
+            if (method == "ends_with") {
+                var __se_arg: String = this.gen_arg_value(args[0])
+                var __se_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__se_local, "i64", "__str_ends_with", "i64 " + obj + ", i64 " + __se_arg))
+                } else {
+                    this.emit_indent(__se_local + " = call i64 @__str_ends_with(i64 " + obj + ", i64 " + __se_arg + ")")
+                }
+                var __se_tagged: String = this.emit_tag_bool(__se_local)
+                this.last_type = AST.Type.BoolType
+                return __se_tagged
+            }
+            if (method == "replace") {
+                var __sre_arg1: String = this.gen_arg_value(args[0])
+                var __sre_arg2: String = this.gen_arg_value(args[1])
+                var __sre_local: String = this.fresh_local()
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_call(__sre_local, "i64", "__str_replace", "i64 " + obj + ", i64 " + __sre_arg1 + ", i64 " + __sre_arg2))
+                } else {
+                    this.emit_indent(__sre_local + " = call i64 @__str_replace(i64 " + obj + ", i64 " + __sre_arg1 + ", i64 " + __sre_arg2 + ")")
+                }
+                var __sre_ptr: String = this.fresh_local()
+                this.emit_indent(__sre_ptr + " = inttoptr i64 " + __sre_local + " to i8*")
+                var __sre_tagged: String = this.emit_tag_ptr(__sre_ptr)
+                this.last_type = AST.Type.StringType
+                return __sre_tagged
+            }
         }
     }
 
