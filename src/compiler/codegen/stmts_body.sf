@@ -1188,6 +1188,15 @@
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
+        // --- LLVM lib: create blocks for while structure ---
+        // Blocked on identity-mode cross-module class field access bug.
+        // After gen2 promotion, enable:
+        //   var llvm_cond_bb = this.llvm_func_builder.new_block(cond_label)
+        //   var llvm_body_bb = this.llvm_func_builder.new_block(body_label)
+        //   var llvm_end_bb = this.llvm_func_builder.new_block(end_label)
+        //   this.llvm_block_builder.br(llvm_cond_bb)
+        //   this.llvm_block_builder = BlockBuilder(this.llvm_func_builder, llvm_cond_bb)
+
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
         } else {

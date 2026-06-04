@@ -3,6 +3,10 @@
 import "./ast.sf" as AST
 import "llvm/types" as LLVMTypes
 import "llvm/instructions" as LLVMInst
+import "llvm/module" as LLVMMod
+import "llvm/function" as LLVMFunc
+import "llvm/block" as LLVMBlock
+import "llvm/nanbox" as LLVMNanBox
 
 // Runtime function prefix — change this to avoid collisions with user code.
 // Currently "__" (e.g., __list_new, __map_get). Could become "__sf_" later.
@@ -64,6 +68,9 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
+    var llvm_module: LLVMMod.Module
+    var llvm_func_builder: LLVMFunc.FunctionBuilder
+    var llvm_block_builder: LLVMBlock.BlockBuilder
 
     fun init() {
         this.sb = StringBuilder()
@@ -120,6 +127,11 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.llvm_module = LLVMMod.Module("saffron_program")
+        var dummy_params: List<LLVMFunc.Param> = []
+        this.llvm_func_builder = LLVMFunc.FunctionBuilder("__dummy", LLVMTypes.Type.I64, dummy_params)
+        var dummy_bb: LLVMFunc.BasicBlock = LLVMFunc.BasicBlock("entry")
+        this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
@@ -5659,6 +5671,15 @@ class Codegen {
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
+        // --- LLVM lib: create blocks for while structure ---
+        // Blocked on identity-mode cross-module class field access bug.
+        // After gen2 promotion, enable:
+        //   var llvm_cond_bb = this.llvm_func_builder.new_block(cond_label)
+        //   var llvm_body_bb = this.llvm_func_builder.new_block(body_label)
+        //   var llvm_end_bb = this.llvm_func_builder.new_block(end_label)
+        //   this.llvm_block_builder.br(llvm_cond_bb)
+        //   this.llvm_block_builder = BlockBuilder(this.llvm_func_builder, llvm_cond_bb)
+
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
         } else {
@@ -7172,6 +7193,12 @@ class Codegen {
         }
         this.func_param_names.set(emit_name, pnames_list)
 
+        // --- LLVM lib: create FunctionBuilder in parallel ---
+        // Blocked on identity-mode cross-module class field access bug.
+        // After gen2 promotion, enable:
+        //   this.llvm_func_builder = this.llvm_module.add_function(emit_name, ...)
+        //   this.llvm_block_builder = BlockBuilder(this.llvm_func_builder, entry)
+
         // Check if this function is a coroutine (direct or transitive)
         var is_coro: Bool = this.str_in_list(this.coroutine_funcs,emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
@@ -7937,6 +7964,17 @@ class Codegen {
                 out.append("}\n")
             }
         }
+
+        // --- LLVM lib verification: emit_ir() to validate module builds correctly ---
+        // Disabled during identity-mode-compiled builds due to cross-module class
+        // field access limitations. Will be enabled after gen2 promotion.
+        // When active: this.llvm_module.emit_ir() serializes the parallel IR module
+        // for verification against the string-based output.
+        //
+        // if (this.use_llvm_lib and !this.identity_mode) {
+        //     var llvm_ir_check: String = this.llvm_module.emit_ir()
+        //     if (llvm_ir_check.length() == 0) { this.has_errors = true }
+        // }
 
         return out.to_string()
     }
