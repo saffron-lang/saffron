@@ -4,6 +4,10 @@ import "./ast.sf" as AST
 import "./codegen/methods.sf" as Methods
 import "llvm/types" as LLVMTypes
 import "llvm/instructions" as LLVMInst
+import "llvm/module" as LLVMMod
+import "llvm/function" as LLVMFunc
+import "llvm/block" as LLVMBlock
+import "llvm/nanbox" as LLVMNanBox
 
 // Runtime function prefix — change this to avoid collisions with user code.
 // Currently "__" (e.g., __list_new, __map_get). Could become "__sf_" later.
@@ -65,6 +69,9 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
+    var llvm_module: LLVMMod.Module
+    var llvm_func_builder: LLVMFunc.FunctionBuilder
+    var llvm_block_builder: LLVMBlock.BlockBuilder
 
     fun init() {
         this.sb = StringBuilder()
@@ -121,6 +128,11 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.llvm_module = LLVMMod.Module("saffron_program")
+        var dummy_params: List<LLVMFunc.Param> = []
+        this.llvm_func_builder = LLVMFunc.FunctionBuilder("__dummy", LLVMTypes.Type.I64, dummy_params)
+        var dummy_bb: LLVMFunc.BasicBlock = LLVMFunc.BasicBlock("entry")
+        this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")

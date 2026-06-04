@@ -205,6 +205,12 @@
         }
         this.func_param_names.set(emit_name, pnames_list)
 
+        // --- LLVM lib: create FunctionBuilder in parallel ---
+        // Blocked on identity-mode cross-module class field access bug.
+        // After gen2 promotion, enable:
+        //   this.llvm_func_builder = this.llvm_module.add_function(emit_name, ...)
+        //   this.llvm_block_builder = BlockBuilder(this.llvm_func_builder, entry)
+
         // Check if this function is a coroutine (direct or transitive)
         var is_coro: Bool = this.str_in_list(this.coroutine_funcs,emit_name)
         if (!is_coro) { is_coro = this.stmts_have_yield(body) }
@@ -970,6 +976,17 @@
                 out.append("}\n")
             }
         }
+
+        // --- LLVM lib verification: emit_ir() to validate module builds correctly ---
+        // Disabled during identity-mode-compiled builds due to cross-module class
+        // field access limitations. Will be enabled after gen2 promotion.
+        // When active: this.llvm_module.emit_ir() serializes the parallel IR module
+        // for verification against the string-based output.
+        //
+        // if (this.use_llvm_lib and !this.identity_mode) {
+        //     var llvm_ir_check: String = this.llvm_module.emit_ir()
+        //     if (llvm_ir_check.length() == 0) { this.has_errors = true }
+        // }
 
         return out.to_string()
     }

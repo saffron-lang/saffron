@@ -1,0 +1,193 @@
+//! Integration test: Module + FunctionBuilder + BlockBuilder end-to-end.
+//! Validates that the LLVM lib can build a complete function with blocks
+//! and serialize it via emit_ir().
+//!
+//! NOTE: This test currently fails because gen3 (compiled in identity mode)
+//! cannot properly handle field access on class instances from imported modules.
+//! This is a known gen2 limitation. After gen2 promotion with the fix for
+//! cross-module class field access, all tests below will pass.
+//!
+//! Run: tools/saffron run test/llvm_lib/test_module_builder.sf
+
+import "llvm/module" as LLVMMod
+import "llvm/function" as LLVMFunc
+import "llvm/block" as LLVMBlock
+import "llvm/types" as Types
+import "llvm/instructions" as Instructions
+import "llvm/nanbox" as NanBox
+
+fun test_module_creation(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    mod.set_target_triple("arm64-apple-macosx15.0.0")
+    if (mod.name != "test_prog") {
+        IO.println("FAIL: module name")
+        return false
+    }
+    if (mod.target_triple != "arm64-apple-macosx15.0.0") {
+        IO.println("FAIL: target triple")
+        return false
+    }
+    IO.println("PASS: module creation")
+    return true
+}
+
+fun test_function_builder(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    var params: List<LLVMFunc.Param> = []
+    params.push(LLVMFunc.Param("%x.arg", Types.Type.I64))
+    params.push(LLVMFunc.Param("%y.arg", Types.Type.I64))
+    var fb: LLVMFunc.FunctionBuilder = mod.add_function("add_two", Types.Type.I64, params)
+    if (fb.func.name != "add_two") {
+        IO.println("FAIL: function name")
+        return false
+    }
+    if (fb.func.params.length() != 2) {
+        IO.println("FAIL: param count")
+        return false
+    }
+    IO.println("PASS: function builder")
+    return true
+}
+
+fun test_block_builder_arithmetic(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    var params: List<LLVMFunc.Param> = []
+    params.push(LLVMFunc.Param("%x.arg", Types.Type.I64))
+    params.push(LLVMFunc.Param("%y.arg", Types.Type.I64))
+    var fb: LLVMFunc.FunctionBuilder = mod.add_function("add_two", Types.Type.I64, params)
+    var entry: LLVMFunc.BasicBlock = fb.entry_block()
+    var bb: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, entry)
+
+    // Build: %t1 = add i64 %x.arg, %y.arg
+    var x: Types.Value = fb.param_value(0)
+    var y: Types.Value = fb.param_value(1)
+    var result: Types.Value = bb.add(x, y)
+
+    // Terminate with ret
+    bb.ret(result)
+
+    // Verify the block has instructions
+    if (entry.instructions.length() != 1) {
+        IO.println("FAIL: expected 1 instruction, got " + entry.instructions.length().to_string())
+        return false
+    }
+    if (!entry.is_terminated) {
+        IO.println("FAIL: block not terminated")
+        return false
+    }
+    IO.println("PASS: block builder arithmetic")
+    return true
+}
+
+fun test_while_blocks(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    var params: List<LLVMFunc.Param> = []
+    params.push(LLVMFunc.Param("%n.arg", Types.Type.I64))
+    var fb: LLVMFunc.FunctionBuilder = mod.add_function("count_down", Types.Type.I64, params)
+    var entry: LLVMFunc.BasicBlock = fb.entry_block()
+    var bb: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, entry)
+
+    // Create while loop blocks
+    var cond_bb: LLVMFunc.BasicBlock = fb.new_block("while.cond")
+    var body_bb: LLVMFunc.BasicBlock = fb.new_block("while.body")
+    var end_bb: LLVMFunc.BasicBlock = fb.new_block("while.end")
+
+    // entry -> cond
+    bb.br(cond_bb)
+
+    // cond: check n > 0
+    var cond_builder: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, cond_bb)
+    var zero: Types.Value = Types.Value.Constant(Types.int_const(0))
+    var n: Types.Value = fb.param_value(0)
+    var cmp: Types.Value = cond_builder.icmp_sgt(n, zero)
+    cond_builder.cond_br(cmp, body_bb, end_bb)
+
+    // body -> cond (loop back)
+    var body_builder: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, body_bb)
+    body_builder.br(cond_bb)
+
+    // end: ret 0
+    var end_builder: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, end_bb)
+    end_builder.ret(zero)
+
+    // Verify block count (entry + cond + body + end = 4)
+    if (fb.func.blocks.length() != 4) {
+        IO.println("FAIL: expected 4 blocks, got " + fb.func.blocks.length().to_string())
+        return false
+    }
+    IO.println("PASS: while loop blocks")
+    return true
+}
+
+fun test_emit_ir(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    mod.set_target_triple("arm64-apple-macosx15.0.0")
+
+    // Add a simple function
+    var params: List<LLVMFunc.Param> = []
+    params.push(LLVMFunc.Param("%x.arg", Types.Type.I64))
+    var fb: LLVMFunc.FunctionBuilder = mod.add_function("identity", Types.Type.I64, params)
+    var entry: LLVMFunc.BasicBlock = fb.entry_block()
+    var bb: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, entry)
+    var x: Types.Value = fb.param_value(0)
+    bb.ret(x)
+
+    // Serialize
+    var ir: String = mod.emit_ir()
+    if (ir.length() == 0) {
+        IO.println("FAIL: emit_ir produced empty output")
+        return false
+    }
+    if (!ir.contains("define")) {
+        IO.println("FAIL: emit_ir missing 'define' keyword")
+        return false
+    }
+    if (!ir.contains("@identity")) {
+        IO.println("FAIL: emit_ir missing function name")
+        return false
+    }
+    if (!ir.contains("ret i64")) {
+        IO.println("FAIL: emit_ir missing ret instruction")
+        return false
+    }
+    IO.println("PASS: emit_ir serialization")
+    return true
+}
+
+fun test_nanbox_helpers(): Bool {
+    var mod: LLVMMod.Module = LLVMMod.Module("test_prog")
+    var params: List<LLVMFunc.Param> = []
+    var fb: LLVMFunc.FunctionBuilder = mod.add_function("test_nb", Types.Type.I64, params)
+    var entry: LLVMFunc.BasicBlock = fb.entry_block()
+    var bb: LLVMBlock.BlockBuilder = LLVMBlock.BlockBuilder(fb, entry)
+
+    var nb: NanBox.NanBox = NanBox.NanBox(bb, "native")
+    var raw: Types.Value = Types.Value.Constant(Types.int_const(42))
+    var tagged: Types.Value = nb.tag_int(raw)
+    bb.ret(tagged)
+
+    if (entry.instructions.length() != 1) {
+        IO.println("FAIL: expected 1 instruction from tag_int, got " + entry.instructions.length().to_string())
+        return false
+    }
+    IO.println("PASS: nanbox helpers")
+    return true
+}
+
+fun main() {
+    IO.println("=== LLVM Module/Builder Integration Test ===")
+    IO.println("")
+
+    var passed: Float = 0
+    var failed: Float = 0
+
+    if (test_module_creation()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_function_builder()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_block_builder_arithmetic()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_while_blocks()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_emit_ir()) { passed = passed + 1 } else { failed = failed + 1 }
+    if (test_nanbox_helpers()) { passed = passed + 1 } else { failed = failed + 1 }
+
+    IO.println("")
+    IO.println("Results: " + passed.floor().to_string() + "/6 passed, " + failed.floor().to_string() + " failed")
+}
