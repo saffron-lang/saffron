@@ -219,17 +219,16 @@ fun __sb_to_string(sb: Int): Int {
 // Map: { count@0, capacity@8, keys*@16, values*@24 } — 32 bytes
 // =============================================================================
 
-fun __safe_strcmp(a: Int, b: Int): Int {
-    if (a == 0) { return 1 }
-    if (b == 0) { return 1 }
-    // Values may be NaN-boxed tagged pointers from user code;
-    // rt_strcmp's extern void* params auto-untag via codegen,
-    // but in identity-mode (runtime compilation) this is a no-op.
-    // Either way, strcmp gets the raw pointer correctly.
-    return rt_strcmp(a, b)
-}
-
 @extern("i64 __val_untag_ptr(i64)") fun __rt_untag_ptr(val: Int): Int
+@extern("i64 __val_untag_int(i64)") fun __rt_untag_int(val: Int): Int
+
+fun __safe_strcmp(a: Int, b: Int): Int {
+    var ra: Int = __rt_untag_ptr(a)
+    var rb: Int = __rt_untag_ptr(b)
+    if (ra == 0) { return 1 }
+    if (rb == 0) { return 1 }
+    return rt_strcmp(ra, rb)
+}
 
 fun __string_contains_str(haystack: Int, needle: Int): Int {
     var h: Int = __rt_untag_ptr(haystack)
@@ -580,12 +579,14 @@ fun __null_pointer_error() {
 }
 
 fun __str_ends_with(str: Int, suffix: Int): Int {
-    if (str == 0 or suffix == 0) { return 0 }
-    var slen: Int = rt_strlen(str)
-    var plen: Int = rt_strlen(suffix)
+    var rs: Int = __rt_untag_ptr(str)
+    var rx: Int = __rt_untag_ptr(suffix)
+    if (rs == 0 or rx == 0) { return 0 }
+    var slen: Int = rt_strlen(rs)
+    var plen: Int = rt_strlen(rx)
     if (plen > slen) { return 0 }
     var offset: Int = slen - plen
-    var cmp: Int = rt_strcmp(str + offset, suffix)
+    var cmp: Int = rt_strcmp(rs + offset, rx)
     if (cmp == 0) { return 1 }
     return 0
 }
@@ -597,14 +598,16 @@ fun __str_split(input: Int, delim: Int): Int {
     store64(list, 0)
     store64(list + 8, 64)
     store64(list + 16, __gc_alloc_safe(64 * 8, 7))
-    if (input == 0 or delim == 0) { return list }
-    var slen: Int = rt_strlen(input)
+    var ri: Int = __rt_untag_ptr(input)
+    var rd: Int = __rt_untag_ptr(delim)
+    if (ri == 0 or rd == 0) { return list }
+    var slen: Int = rt_strlen(ri)
     var buf: Int = rt_malloc(slen + 1)
-    rt_strcpy(buf, input)
-    var dlen: Int = rt_strlen(delim)
+    rt_strcpy(buf, ri)
+    var dlen: Int = rt_strlen(rd)
     var pos: Int = buf
     while (rt_strlen(pos) > 0) {
-        var m: Int = rt_strstr(pos, delim)
+        var m: Int = rt_strstr(pos, rd)
         if (m == 0) {
             var lb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
             rt_strcpy(lb, pos)
@@ -643,15 +646,18 @@ fun __join_append(buf_p: Int, len_p: Int, cap_p: Int, src: Int, src_len: Int) {
 }
 
 fun __str_replace(str: Int, old: Int, replacement: Int): Int {
-    if (str == 0) {
+    var rs: Int = __rt_untag_ptr(str)
+    var ro: Int = __rt_untag_ptr(old)
+    var rr: Int = __rt_untag_ptr(replacement)
+    if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
         return empty
     }
-    if (old == 0 or replacement == 0) { return rt_strdup(str) }
-    var slen: Int = rt_strlen(str)
-    var olen: Int = rt_strlen(old)
-    var nlen: Int = rt_strlen(replacement)
+    if (ro == 0 or rr == 0) { return rt_strdup(rs) }
+    var slen: Int = rt_strlen(rs)
+    var olen: Int = rt_strlen(ro)
+    var nlen: Int = rt_strlen(rr)
     var init_cap: Int = (slen + 1) * 2
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
@@ -661,16 +667,16 @@ fun __str_replace(str: Int, old: Int, replacement: Int): Int {
     store64(buf_p, init_buf)
     store64(len_p, 0)
     store64(cap_p, init_cap)
-    var src: Int = str
+    var src: Int = rs
     while (rt_strlen(src) > 0) {
-        var found: Int = rt_strstr(src, old)
+        var found: Int = rt_strstr(src, ro)
         if (found == 0) {
             __join_append(buf_p, len_p, cap_p, src, rt_strlen(src))
             return load64(buf_p)
         }
         var plen: Int = found - src
         __join_append(buf_p, len_p, cap_p, src, plen)
-        __join_append(buf_p, len_p, cap_p, replacement, nlen)
+        __join_append(buf_p, len_p, cap_p, rr, nlen)
         src = found + olen
     }
     return load64(buf_p)
@@ -682,11 +688,12 @@ fun __list_join(list: Int, sep: Int): Int {
         store8(empty, 0)
         return empty
     }
+    var rs: Int = __rt_untag_ptr(sep)
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
     var sep_len: Int = 0
-    if (sep != 0) {
-        sep_len = rt_strlen(sep)
+    if (rs != 0) {
+        sep_len = rt_strlen(rs)
     }
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
@@ -699,12 +706,13 @@ fun __list_join(list: Int, sep: Int): Int {
     var i: Int = 0
     while (i < count) {
         if (i > 0) {
-            __join_append(buf_p, len_p, cap_p, sep, sep_len)
+            __join_append(buf_p, len_p, cap_p, rs, sep_len)
         }
         var elem: Int = load64(data + i * 8)
-        if (elem != 0) {
-            var elem_len: Int = rt_strlen(elem)
-            __join_append(buf_p, len_p, cap_p, elem, elem_len)
+        var re: Int = __rt_untag_ptr(elem)
+        if (re != 0) {
+            var elem_len: Int = rt_strlen(re)
+            __join_append(buf_p, len_p, cap_p, re, elem_len)
         }
         i = i + 1
     }
@@ -713,12 +721,16 @@ fun __list_join(list: Int, sep: Int): Int {
 
 fun __list_contains(list: Int, val: Int): Int {
     if (list == 0) { return 0 }
+    var rv: Int = __rt_untag_ptr(val)
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
     var i: Int = 0
     while (i < count) {
         var elem: Int = load64(data + i * 8)
-        if (__safe_strcmp(val, elem) == 0) {
+        var re: Int = __rt_untag_ptr(elem)
+        if (rv == 0 and re == 0) { return 1 }
+        if (rv == 0 or re == 0) { i = i + 1; continue }
+        if (rt_strcmp(rv, re) == 0) {
             return 1
         }
         i = i + 1
@@ -731,7 +743,8 @@ fun __list_contains(list: Int, val: Int): Int {
 // =============================================================================
 
 fun __io_read_file(path: Int): Int {
-    if (path == 0) {
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
         return empty
@@ -739,7 +752,7 @@ fun __io_read_file(path: Int): Int {
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
     store8(mode + 1, 0)
-    var fp: Int = rt_fopen(path, mode)
+    var fp: Int = rt_fopen(rp, mode)
     rt_free(mode)
     if (fp == 0) {
         var empty: Int = rt_malloc(1)
@@ -757,55 +770,62 @@ fun __io_read_file(path: Int): Int {
 }
 
 fun __io_write_file(path: Int, content: Int) {
-    if (path == 0) { return }
+    var rp: Int = __rt_untag_ptr(path)
+    var rc: Int = __rt_untag_ptr(content)
+    if (rp == 0) { return }
     var mode: Int = rt_malloc(2)
     store8(mode, 119)
     store8(mode + 1, 0)
-    var fp: Int = rt_fopen(path, mode)
+    var fp: Int = rt_fopen(rp, mode)
     rt_free(mode)
     if (fp == 0) { return }
-    if (content == 0) {
+    if (rc == 0) {
         rt_fclose(fp)
         return
     }
-    var len: Int = rt_strlen(content)
-    rt_fwrite(content, 1, len, fp)
+    var len: Int = rt_strlen(rc)
+    rt_fwrite(rc, 1, len, fp)
     rt_fclose(fp)
 }
 
 fun __io_file_exists(path: Int): Int {
-    if (path == 0) { return 0 }
-    var rc: Int = rt_access(path, 0)
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return 0 }
+    var rc: Int = rt_access(rp, 0)
     if (rc == 0) { return 1 }
     return 0
 }
 
 fun __io_mkdir(path: Int) {
-    if (path == 0) { return }
-    rt_mkdir(path, 493)
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return }
+    rt_mkdir(rp, 493)
 }
 
 fun __io_append_file(path: Int, content: Int) {
-    if (path == 0) { return }
+    var rp: Int = __rt_untag_ptr(path)
+    var rc: Int = __rt_untag_ptr(content)
+    if (rp == 0) { return }
     var mode: Int = rt_malloc(2)
     store8(mode, 97)
     store8(mode + 1, 0)
-    var fp: Int = rt_fopen(path, mode)
+    var fp: Int = rt_fopen(rp, mode)
     rt_free(mode)
     if (fp == 0) { return }
-    if (content == 0) {
+    if (rc == 0) {
         rt_fclose(fp)
         return
     }
-    var len: Int = rt_strlen(content)
-    rt_fwrite(content, 1, len, fp)
+    var len: Int = rt_strlen(rc)
+    rt_fwrite(rc, 1, len, fp)
     rt_fclose(fp)
 }
 
 fun __io_walk_dir(path: Int): Int {
     var list: Int = __list_new()
-    if (path == 0) { return list }
-    var path_len: Int = rt_strlen(path)
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return list }
+    var path_len: Int = rt_strlen(rp)
     var cmd: Int = rt_malloc(path_len + 16)
     store8(cmd, 108)
     store8(cmd + 1, 115)
@@ -814,7 +834,7 @@ fun __io_walk_dir(path: Int): Int {
     store8(cmd + 4, 49)
     store8(cmd + 5, 32)
     store8(cmd + 6, 0)
-    rt_strcat(cmd, path)
+    rt_strcat(cmd, rp)
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
     store8(mode + 1, 0)
@@ -844,15 +864,16 @@ fun __io_walk_dir(path: Int): Int {
 }
 
 fun __io_read_stdin(n: Int): Int {
-    if (n <= 0) {
+    var rn: Int = __rt_untag_int(n)
+    if (rn <= 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
         return empty
     }
-    var buf: Int = rt_malloc(n + 1)
+    var buf: Int = rt_malloc(rn + 1)
     var total: Int = 0
-    while (total < n) {
-        var got: Int = rt_read(0, buf + total, n - total)
+    while (total < rn) {
+        var got: Int = rt_read(0, buf + total, rn - total)
         if (got <= 0) { break }
         total = total + got
     }
@@ -906,7 +927,8 @@ fun __os_platform(): Int {
 }
 
 fun __os_env(name: Int): Int {
-    var val: Int = rt_getenv(name)
+    var rn: Int = __rt_untag_ptr(name)
+    var val: Int = rt_getenv(rn)
     if (val == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
@@ -916,7 +938,8 @@ fun __os_env(name: Int): Int {
 }
 
 fun __os_exec(cmd: Int): Int {
-    if (cmd == 0) {
+    var rc: Int = __rt_untag_ptr(cmd)
+    if (rc == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
         return empty
@@ -924,7 +947,7 @@ fun __os_exec(cmd: Int): Int {
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
     store8(mode + 1, 0)
-    var fp: Int = rt_popen(cmd, mode)
+    var fp: Int = rt_popen(rc, mode)
     rt_free(mode)
     if (fp == 0) {
         var empty: Int = rt_malloc(1)
@@ -999,16 +1022,17 @@ fun __io_read_line(): Int {
 // =============================================================================
 
 fun rt_str_trim(s: Int): Int {
-    if (s == 0) {
+    var rs: Int = __rt_untag_ptr(s)
+    if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
         return empty
     }
-    var len: Int = rt_strlen(s)
+    var len: Int = rt_strlen(rs)
     var start: Int = 0
     var end: Int = len
     while (start < end) {
-        var ch: Int = load8(s + start)
+        var ch: Int = load8(rs + start)
         if (ch == 32 or ch == 9 or ch == 10 or ch == 13) {
             start = start + 1
         } else {
@@ -1016,7 +1040,7 @@ fun rt_str_trim(s: Int): Int {
         }
     }
     while (end > start) {
-        var ch: Int = load8(s + end - 1)
+        var ch: Int = load8(rs + end - 1)
         if (ch == 32 or ch == 9 or ch == 10 or ch == 13) {
             end = end - 1
         } else {
@@ -1025,47 +1049,52 @@ fun rt_str_trim(s: Int): Int {
     }
     var new_len: Int = end - start
     var buf: Int = __gc_alloc(new_len + 1, 1)
-    rt_memcpy(buf, s + start, new_len)
+    rt_memcpy(buf, rs + start, new_len)
     store8(buf + new_len, 0)
     return buf
 }
 
 fun rt_str_index_of(s: Int, needle: Int): Int {
-    if (s == 0 or needle == 0) { return 0 - 1 }
-    var found: Int = rt_strstr(s, needle)
+    var rs: Int = __rt_untag_ptr(s)
+    var rn: Int = __rt_untag_ptr(needle)
+    if (rs == 0 or rn == 0) { return 0 - 1 }
+    var found: Int = rt_strstr(rs, rn)
     if (found == 0) { return 0 - 1 }
-    return found - s
+    return found - rs
 }
 
 fun rt_str_repeat(s: Int, count: Int): Int {
-    if (s == 0 or count <= 0) {
+    var rs: Int = __rt_untag_ptr(s)
+    var rc: Int = __rt_untag_int(count)
+    if (rs == 0 or rc <= 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
         return empty
     }
-    var len: Int = rt_strlen(s)
-    var total: Int = len * count
+    var len: Int = rt_strlen(rs)
+    var total: Int = len * rc
     var buf: Int = __gc_alloc(total + 1, 1)
     store8(buf, 0)
     var i: Int = 0
-    while (i < count) {
-        rt_strcat(buf, s)
+    while (i < rc) {
+        rt_strcat(buf, rs)
         i = i + 1
     }
     return buf
 }
 
 fun rt_str_to_upper(s: Int): Int {
-    if (s == 0) {
+    var rs: Int = __rt_untag_ptr(s)
+    if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
         return empty
     }
-    var len: Int = rt_strlen(s)
+    var len: Int = rt_strlen(rs)
     var buf: Int = __gc_alloc(len + 1, 1)
     var i: Int = 0
     while (i < len) {
-        var ch: Int = load8(s + i)
+        var ch: Int = load8(rs + i)
         if (ch >= 97 and ch <= 122) {
             store8(buf + i, ch - 32)
         } else {
@@ -1078,16 +1107,17 @@ fun rt_str_to_upper(s: Int): Int {
 }
 
 fun rt_str_to_lower(s: Int): Int {
-    if (s == 0) {
+    var rs: Int = __rt_untag_ptr(s)
+    if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
         return empty
     }
-    var len: Int = rt_strlen(s)
+    var len: Int = rt_strlen(rs)
     var buf: Int = __gc_alloc(len + 1, 1)
     var i: Int = 0
     while (i < len) {
-        var ch: Int = load8(s + i)
+        var ch: Int = load8(rs + i)
         if (ch >= 65 and ch <= 90) {
             store8(buf + i, ch + 32)
         } else {

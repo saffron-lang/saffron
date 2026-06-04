@@ -377,6 +377,26 @@
             IO.println("[codegen] Error: use ._0, ._1 etc. to access tuple fields (not indexing)")
         }
     }
+    // Map indexing: map["key"] → __map_get(map, key)
+    if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
+        var ig_otype: String = this.type_to_string(this.typed_vars.get(obj_name))
+        if (ig_otype.starts_with("Map")) {
+            var map_obj: String = this.gen_arg_value(object)
+            var key_val: String = this.gen_arg_value(index)
+            var key_ptr: String = this.emit_untag_ptr(key_val)
+            var key_raw: String = this.fresh_local()
+            this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_get(i64 " + map_obj + ", i64 " + key_raw + ")")
+            if (ig_otype.starts_with("Map<")) {
+                var val_type_str: String = this.get_map_value_type(ig_otype)
+                this.last_type = this.str_to_type(val_type_str)
+            } else {
+                this.last_type = AST.Type.AnyType
+            }
+            return local
+        }
+    }
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
     var idx_tagged: String = this.gen_arg_value(index)
@@ -500,6 +520,21 @@
     else if (result_type == "ListStr") { this.last_type = this.make_list_str_type() }
     }
 
+    fun tag_builtin_result(raw: String, result_type: String): String {
+    if (result_type == "String") {
+        var ptr: String = this.fresh_local()
+        this.emit_indent(ptr + " = inttoptr i64 " + raw + " to i8*")
+        return this.emit_tag_ptr(ptr)
+    }
+    if (result_type == "Bool") {
+        return this.emit_tag_bool(raw)
+    }
+    if (result_type == "Int") {
+        return this.emit_tag_int(raw)
+    }
+    return raw
+    }
+
     fun emit_builtin_dispatch(obj: String, method: String, args: List<AST.Expr>): String {
     var desc: String = this.builtin_methods.get(method)
     var parts: List<String> = desc.split("|")
@@ -539,7 +574,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     if (pattern == "r2") {
         var val: String = this.gen_arg_value(args[0])
@@ -550,7 +585,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + val + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     if (pattern == "p1") {
         var local: String = this.fresh_local()
@@ -560,7 +595,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     if (pattern == "p2") {
         var a1: String = this.gen_arg_value(args[0])
@@ -571,7 +606,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     if (pattern == "p3") {
         var a1: String = this.gen_arg_value(args[0])
@@ -583,7 +618,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ", i64 " + a2 + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     if (pattern == "m2") {
         var a1: String = this.gen_arg_value(args[0])
@@ -594,7 +629,7 @@
             this.emit_indent(local + " = call i64 @" + func_name + "(i64 " + obj + ", i64 " + a1 + ")")
         }
         this.set_result_type(result_type)
-        return local
+        return this.tag_builtin_result(local, result_type)
     }
     this.set_result_type(result_type)
     return "0"
@@ -801,6 +836,21 @@
                 this.last_type = this.func_ret_types.get(__mp_func)
             } else {
                 this.last_type = AST.Type.IntType
+            }
+            // Tag results from builtin runtime functions that return raw values.
+            // String-returning functions: tag raw pointer as string
+            if (__mp_func == "__io_read_file" or __mp_func == "__io_readline" or __mp_func == "__io_read_stdin" or __mp_func == "__os_exec" or __mp_func == "__os_env" or __mp_func == "__os_cwd" or __mp_func == "__os_path_sep" or __mp_func == "__os_platform") {
+                var __tag_ptr: String = this.fresh_local()
+                this.emit_indent(__tag_ptr + " = inttoptr i64 " + __mp_local + " to i8*")
+                var __tagged: String = this.emit_tag_ptr(__tag_ptr)
+                this.last_type = AST.Type.StringType
+                return __tagged
+            }
+            // Bool-returning functions: tag raw 0/1 as bool
+            if (__mp_func == "__io_file_exists") {
+                var __tagged: String = this.emit_tag_bool(__mp_local)
+                this.last_type = AST.Type.BoolType
+                return __tagged
             }
             return __mp_local
         }
