@@ -233,9 +233,18 @@
             if (this.gc_root_count > 0) {
                 this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
             }
-            // LLVM lib parallel path: explicit returns are handled by the implicit
-            // return path in gen_function (output_body.sf). Calling ret() from stmts_body
-            // triggers a gen2 codegen bug with enum field writes through nested dispatch.
+            // LLVM lib parallel path: ret via block builder
+            // NOTE: bb.ret() writes to block.terminator (an enum field).
+            // gen2 segfaults on enum field writes through nested dispatch.
+            // Enable after gen2 promotion that fixes this specific case:
+            // if (!this.identity_mode and this.use_llvm_lib) {
+            //     if (this.llvm_values.has(val)) {
+            //         this.llvm_block_builder.ret(this.llvm_values.get(val))
+            //     } else {
+            //         var nil_v = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
+            //         this.llvm_block_builder.ret(nil_v)
+            //     }
+            // }
             this.emit_terminator("ret i64 " + val)
         }
     }
@@ -918,6 +927,11 @@
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_trunc(local, val, "i64", "i1"))
+            // LLVM lib parallel path: track trunc to i1
+            if (!this.identity_mode and this.llvm_values.has(val)) {
+                var trunc_v: Any = this.llvm_block_builder.trunc(this.llvm_values.get(val), LLVMTypes.Type.I1)
+                this.llvm_values.set(local, trunc_v)
+            }
         } else {
             this.emit_indent(local + " = trunc i64 " + val + " to i1")
             this.verify_trunc(local, val, "i64", "i1")
@@ -1195,14 +1209,10 @@
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
-        // --- LLVM lib: create blocks for while structure ---
-        // Blocked on identity-mode cross-module class field access bug.
-        // After gen2 promotion, enable:
-        //   var llvm_cond_bb = this.llvm_func_builder.new_block(cond_label)
-        //   var llvm_body_bb = this.llvm_func_builder.new_block(body_label)
-        //   var llvm_end_bb = this.llvm_func_builder.new_block(end_label)
-        //   this.llvm_block_builder.br(llvm_cond_bb)
-        //   this.llvm_block_builder = BlockBuilder(this.llvm_func_builder, llvm_cond_bb)
+        // LLVM lib parallel path for branching (br_label, cond_br_labels, new_block)
+        // is deferred: these write to block.terminator (enum field), which triggers
+        // gen2 segfault. Enable after gen2 promotion fixes enum field writes.
+        // Then: create blocks, call cond_br_labels/br_label, switch llvm_block_builder.
 
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
