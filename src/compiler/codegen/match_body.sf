@@ -69,6 +69,11 @@
             var result: String = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
             this.last_type = match_result_type
+            // LLVM lib parallel path: track string match result
+            if (!this.identity_mode) {
+                var smr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                this.llvm_values.set(result, smr)
+            }
             return result
         }
 
@@ -111,6 +116,11 @@
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             var result: String = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
+            // LLVM lib parallel path: track unknown-enum match result
+            if (!this.identity_mode) {
+                var umr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                this.llvm_values.set(result, umr)
+            }
             return result
         }
 
@@ -211,6 +221,11 @@
         var result: String = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
         this.last_type = match_result_type
+        // LLVM lib parallel path: track match result as opaque call placeholder
+        if (!this.identity_mode) {
+            var match_res: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+            this.llvm_values.set(result, match_res)
+        }
         return result
     }
 

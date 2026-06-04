@@ -392,6 +392,11 @@
     var local: String = this.fresh_local()
     if (this.use_llvm_lib) {
         this.emit_indent(this.lib_call(local, "i64", "__list_get", "i64 " + obj + ", i64 " + final_idx))
+        // LLVM lib parallel path: track index_get result
+        if (!this.identity_mode) {
+            var ig_res: LLVMTypes.Value = this.llvm_block_builder.call("__list_get", LLVMTypes.Type.I64, [])
+            this.llvm_values.set(local, ig_res)
+        }
     } else {
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
     }
