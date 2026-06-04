@@ -117,7 +117,7 @@
     }
 
     fun type_to_string(t: AST.Type): String {
-        return match (t) {
+        var result: String = match (t) {
             IntType => "Int"
             FloatType => "Float"
             BoolType => "Bool"
@@ -131,6 +131,9 @@
             FuncType(p, r) => this.func_type_string(p, r)
             NullableType(inner) => this.type_to_string(inner) + "|Nil"
         }
+        // In identity mode, Float and Int are both i64 — treat Float as Int
+        if (this.identity_mode and result == "Float") { return "Int" }
+        return result
     }
 
     fun union_type_string(types: List<AST.Type>): String {
@@ -499,16 +502,17 @@
     // Get the type string for a variable from typed_vars (the single source of truth).
     // Returns "" if the variable is not registered.
     fun get_var_type_str(name: String): String {
+        var result: String = ""
         if (this.typed_vars.has(name)) {
-            return this.type_to_string(this.typed_vars.get(name))
+            result = this.type_to_string(this.typed_vars.get(name))
+        } else if (this.global_var_types.has(name)) {
+            result = this.global_var_types.get(name)
+        } else if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + name)) {
+            result = this.global_var_types.get(this.current_prefix + name)
         }
-        if (this.global_var_types.has(name)) {
-            return this.global_var_types.get(name)
-        }
-        if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + name)) {
-            return this.global_var_types.get(this.current_prefix + name)
-        }
-        return ""
+        // In identity mode, Float and Int are both i64 — treat Float as Int
+        if (this.identity_mode and result == "Float") { return "Int" }
+        return result
     }
 
     // Resolve a type string to the class name registered in class_fields.

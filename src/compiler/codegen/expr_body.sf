@@ -686,7 +686,7 @@
         var rhs: String = this.gen_arg_value(right)
         if (right_type2 == "Any") { right_type2 = this.type_to_string(this.last_type) }
 
-        if (left_type2 == "Float" or right_type2 == "Float") {
+        if ((left_type2 == "Float" or right_type2 == "Float") and (op == "-" or op == "*" or op == "/" or op == "%")) {
             this.last_type = AST.Type.FloatType
             var ld: String = this.emit_untag_float(lhs)
             var rd: String = this.emit_untag_float(rhs)
@@ -697,10 +697,8 @@
                 this.emit_indent(fd + " = fmul double " + ld + ", " + rd)
             } else if (op == "/") {
                 this.emit_indent(fd + " = fdiv double " + ld + ", " + rd)
-            } else if (op == "%") {
-                this.emit_indent(fd + " = frem double " + ld + ", " + rd)
             } else {
-                this.emit_indent(fd + " = fsub double " + ld + ", " + rd)
+                this.emit_indent(fd + " = frem double " + ld + ", " + rd)
             }
             return this.emit_tag_float(fd)
         }

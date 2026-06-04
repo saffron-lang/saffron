@@ -101,13 +101,19 @@
     if (ek == "variable") {
         var vname: String = this.get_variable_name(expr)
         if (vname.length() > 0 and this.typed_vars.has(vname)) {
-            return this.type_to_string(this.typed_vars.get(vname))
+            var vt: String = this.type_to_string(this.typed_vars.get(vname))
+            // In identity mode, Float and Int are both i64 — treat Float as Int
+            if (this.identity_mode and vt == "Float") { return "Int" }
+            return vt
         }
         return "Any"
     }
     if (ek == "string") return "String"
     if (ek == "int") return "Int"
-    if (ek == "float") return "Float"
+    if (ek == "float") {
+        if (this.identity_mode) { return "Int" }
+        return "Float"
+    }
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
     if (ek == "list_lit") {
@@ -2249,7 +2255,12 @@
     var i: Float = 0
     while (i < parts.length()) {
         var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) return fp[1]
+        if (fp[0] == field) {
+            var ft: String = fp[1]
+            // In identity mode, Float and Int are both i64 — treat Float as Int
+            if (this.identity_mode and ft == "Float") { return "Int" }
+            return ft
+        }
         i = i + 1
     }
     return "Int"
