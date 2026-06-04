@@ -164,6 +164,10 @@
         }
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_store(val, "i64", var_ref))
+            // LLVM lib parallel path: associate the variable's alloca with the stored Value
+            if (!this.identity_mode and this.llvm_values.has(val)) {
+                this.llvm_values.set(var_ref, this.llvm_values.get(val))
+            }
         } else {
             this.emit_indent("store i64 " + val + ", i64* " + var_ref)
             this.verify_store(val, "i64", var_ref)
