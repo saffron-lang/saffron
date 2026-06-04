@@ -9,6 +9,7 @@
                     var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
                     var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
                     var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                    this.llvm_values.set(local, llvm_result)
                 }
                 local
             }
