@@ -29,6 +29,14 @@ class BasicBlock {
         this.terminator_str = ""
         this.is_terminated = false
     }
+
+    /// Set the terminator as a pre-formatted string.
+    /// Use this instead of direct field writes to avoid gen2 segfault
+    /// on nested cross-module field assignment.
+    fun set_terminator_text(text: String) {
+        this.terminator_str = text
+        this.is_terminated = true
+    }
 }
 
 /// A complete function definition (or declaration).

@@ -1710,6 +1710,16 @@ class Codegen {
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
             this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+            // LLVM lib parallel path: track Value for == / != integer comparison
+            if (this.use_llvm_lib and !this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                var lhs_v: Any = this.llvm_values.get(lhs)
+                var rhs_v: Any = this.llvm_values.get(rhs)
+                var cmp_v: Any = lhs_v
+                if (op == "==") { cmp_v = this.llvm_block_builder.icmp_eq(lhs_v, rhs_v) }
+                else { cmp_v = this.llvm_block_builder.icmp_ne(lhs_v, rhs_v) }
+                var zext_v: Any = this.llvm_block_builder.zext(cmp_v, LLVMTypes.Type.I64)
+                this.llvm_values.set(local, zext_v)
+            }
             this.last_type = AST.Type.BoolType
             return local
         }
@@ -1920,6 +1930,13 @@ class Codegen {
             } else if (op == "==") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("eq", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_eq value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_eq(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs)
                 }
@@ -1927,6 +1944,13 @@ class Codegen {
             else if (op == "!=") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("ne", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_ne value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_ne(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs)
                 }
@@ -1934,6 +1958,13 @@ class Codegen {
             else if (op == "<") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("slt", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_slt value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_slt(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp slt i64 " + lhs + ", " + rhs)
                 }
@@ -1941,6 +1972,13 @@ class Codegen {
             else if (op == "<=") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("sle", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_sle value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_sle(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp sle i64 " + lhs + ", " + rhs)
                 }
@@ -1948,6 +1986,13 @@ class Codegen {
             else if (op == ">") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("sgt", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_sgt value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_sgt(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs + ", " + rhs)
                 }
@@ -1955,12 +2000,25 @@ class Codegen {
             else if (op == ">=") {
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_icmp_op("sge", cmp_local, lhs, rhs))
+                    // LLVM lib parallel path: track icmp_sge value
+                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs)
+                        var rhs_v: Any = this.llvm_values.get(rhs)
+                        var cmp_v: Any = this.llvm_block_builder.icmp_sge(lhs_v, rhs_v)
+                        this.llvm_values.set(cmp_local, cmp_v)
+                    }
                 } else {
                     this.emit_indent(cmp_local + " = icmp sge i64 " + lhs + ", " + rhs)
                 }
             }
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_zext_op(local, cmp_local))
+                // LLVM lib parallel path: track zext value
+                if (!this.identity_mode and this.llvm_values.has(cmp_local)) {
+                    var cmp_v: Any = this.llvm_values.get(cmp_local)
+                    var ext_v: Any = this.llvm_block_builder.zext(cmp_v, LLVMTypes.Type.I64)
+                    this.llvm_values.set(local, ext_v)
+                }
             } else {
                 this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
             }
@@ -4845,6 +4903,16 @@ class Codegen {
                 this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
             }
             this.emit_terminator("ret i64 " + val)
+            // LLVM lib parallel path: ret
+            // NOTE: Cannot call bb.ret(val_v) directly — it writes to
+            // block.terminator_str and block.is_terminated through nested
+            // cross-module field access, which triggers a gen2 segfault.
+            // Workaround: call ret_set() which delegates to block.set_terminator_text()
+            // (method dispatch works), avoiding direct field assignment.
+            if (!this.identity_mode and this.use_llvm_lib and this.llvm_values.has(val)) {
+                var ret_val_v: Any = this.llvm_values.get(val)
+                this.llvm_block_builder.ret_set(ret_val_v)
+            }
         }
     }
 
@@ -5526,6 +5594,12 @@ class Codegen {
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_trunc(local, val, "i64", "i1"))
+            // LLVM lib parallel path: track trunc value
+            if (!this.identity_mode and this.llvm_values.has(val)) {
+                var val_v: Any = this.llvm_values.get(val)
+                var tr_v: Any = this.llvm_block_builder.trunc(val_v, LLVMTypes.Type.I1)
+                this.llvm_values.set(local, tr_v)
+            }
         } else {
             this.emit_indent(local + " = trunc i64 " + val + " to i1")
             this.verify_trunc(local, val, "i64", "i1")
