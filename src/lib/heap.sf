@@ -1,0 +1,153 @@
+//! Binary heap (priority queue) with configurable comparator.
+
+/// Iterator that pops elements in priority order (destructive).
+class HeapIter {
+    var _heap: Heap
+    var _has_next: Bool
+
+    fun init(heap: Heap) {
+        this._heap = heap
+        this._has_next = heap.length() > 0
+    }
+
+    fun next?(): Bool {
+        return this._heap.length() > 0
+    }
+
+    fun next(): Any {
+        return this._heap.pop()
+    }
+}
+
+/// A binary heap (priority queue) backed by a flat list.
+///
+/// ```saffron
+/// import "@heap" as Heap
+/// var h = Heap.min()
+/// h.push(5)
+/// h.push(1)
+/// h.push(3)
+/// h.peek()   // 1
+/// h.pop()    // 1
+/// ```
+class Heap {
+    var _data: List<Any>
+    var _cmp: Fun
+
+    fun init(cmp: Fun) {
+        this._data = []
+        this._cmp = cmp
+    }
+
+    /// Insert a value into the heap.
+    fun push(value: Any): Heap {
+        this._data.push(value)
+        this._sift_up(this._data.length() - 1)
+        return this
+    }
+
+    /// Remove and return the highest-priority element. Returns nil if empty.
+    fun pop(): Any {
+        if (this._data.length() == 0) { return nil }
+        var top = this._data[0]
+        var last = this._data.pop()
+        if (this._data.length() > 0) {
+            this._data[0] = last
+            this._sift_down(0)
+        }
+        return top
+    }
+
+    /// Return the highest-priority element without removing it.
+    fun peek(): Any {
+        if (this._data.length() == 0) { return nil }
+        return this._data[0]
+    }
+
+    /// Return the number of elements.
+    fun length(): Number {
+        return this._data.length()
+    }
+
+    /// Return true if the heap is empty.
+    fun is_empty(): Bool {
+        return this._data.length() == 0
+    }
+
+    /// Return elements as a list (heap order, not sorted).
+    fun to_list(): List<Any> {
+        var result: List<Any> = []
+        var i = 0
+        while (i < this._data.length()) {
+            result.push(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Return an iterator that pops elements in priority order.
+    fun iter(): HeapIter {
+        return HeapIter(this)
+    }
+
+    fun to_string(): String {
+        return "Heap(${this._data})"
+    }
+
+    // Restore heap property by moving element at idx upward.
+    fun _sift_up(idx: Number) {
+        while (idx > 0) {
+            var parent = ((idx - 1) / 2).floor()
+            if (this._cmp(this._data[idx], this._data[parent])) {
+                // Swap
+                var tmp = this._data[idx]
+                this._data[idx] = this._data[parent]
+                this._data[parent] = tmp
+                idx = parent
+            } else {
+                return
+            }
+        }
+    }
+
+    // Restore heap property by moving element at idx downward.
+    fun _sift_down(idx: Number) {
+        var size = this._data.length()
+        while (true) {
+            var smallest = idx
+            var left = 2 * idx + 1
+            var right = 2 * idx + 2
+
+            if (left < size and this._cmp(this._data[left], this._data[smallest])) {
+                smallest = left
+            }
+            if (right < size and this._cmp(this._data[right], this._data[smallest])) {
+                smallest = right
+            }
+
+            if (smallest == idx) { return }
+
+            // Swap
+            var tmp = this._data[idx]
+            this._data[idx] = this._data[smallest]
+            this._data[smallest] = tmp
+            idx = smallest
+        }
+    }
+}
+
+/// Create a min-heap (smallest element has highest priority).
+fun min(): Heap {
+    return Heap(fun (a: Any, b: Any): Bool => a < b)
+}
+
+/// Create a max-heap (largest element has highest priority).
+fun max(): Heap {
+    return Heap(fun (a: Any, b: Any): Bool => a > b)
+}
+
+/// Create a heap with a custom comparator.
+/// The comparator should return true if a has higher priority than b.
+fun new(cmp: Fun): Heap {
+    return Heap(cmp)
+}

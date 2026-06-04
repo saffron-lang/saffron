@@ -1,0 +1,110 @@
+//! LIFO stack backed by a list.
+
+/// Iterator for traversing a Stack from top to bottom.
+class StackIter {
+    var _items: List<Any>
+    var _pos: Number
+
+    fun init(items: List<Any>) {
+        this._items = items
+        this._pos = items.length() - 1
+    }
+
+    fun next?(): Bool {
+        return this._pos >= 0
+    }
+
+    fun next(): Any {
+        var item = this._items[this._pos]
+        this._pos = this._pos - 1
+        return item
+    }
+}
+
+/// A last-in, first-out stack.
+///
+/// ```saffron
+/// import "@stack" as Stack
+/// var s = Stack.new()
+/// s.push(1)
+/// s.push(2)
+/// s.peek()   // 2
+/// s.pop()    // 2
+/// ```
+class Stack {
+    var _data: List<Any>
+
+    fun init() {
+        this._data = []
+    }
+
+    /// Push a value onto the top of the stack.
+    fun push(value: Any): Stack {
+        this._data.push(value)
+        return this
+    }
+
+    /// Pop and return the top value. Returns nil if empty.
+    fun pop(): Any {
+        if (this._data.length() == 0) { return nil }
+        return this._data.pop()
+    }
+
+    /// Return the top value without removing it.
+    fun peek(): Any {
+        if (this._data.length() == 0) { return nil }
+        return this._data[this._data.length() - 1]
+    }
+
+    /// Return the number of elements.
+    fun length(): Number {
+        return this._data.length()
+    }
+
+    /// Return true if the stack is empty.
+    fun is_empty(): Bool {
+        return this._data.length() == 0
+    }
+
+    /// Return elements as a list (bottom to top).
+    fun to_list(): List<Any> {
+        var result: List<Any> = []
+        var i = 0
+        while (i < this._data.length()) {
+            result.push(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Remove all elements from the stack.
+    fun clear(): Stack {
+        this._data = []
+        return this
+    }
+
+    /// Return an iterator over elements from top to bottom.
+    fun iter(): StackIter {
+        return StackIter(this._data)
+    }
+
+    fun to_string(): String {
+        return "Stack(${this._data})"
+    }
+}
+
+/// Create an empty Stack.
+fun new(): Stack {
+    return Stack()
+}
+
+/// Create a Stack from a list (last element is top).
+fun from(items: List<Any>): Stack {
+    var s = Stack()
+    var i = 0
+    while (i < items.length()) {
+        s.push(items[i])
+        i = i + 1
+    }
+    return s
+}

@@ -1,0 +1,174 @@
+import "@test" as T
+import "@deque" as Deque
+import "@heap" as Heap
+import "@queue" as Queue
+import "@stack" as Stack
+
+// === Deque tests ===
+
+var dq = Deque.new()
+T.assert(dq.is_empty(), "deque starts empty")
+T.assert_eq(dq.length(), 0, "deque initial length")
+
+dq.push_back(1)
+dq.push_back(2)
+dq.push_back(3)
+T.assert_eq(dq.length(), 3, "deque length after push_back")
+T.assert_eq(dq.peek_front(), 1, "deque peek_front")
+T.assert_eq(dq.peek_back(), 3, "deque peek_back")
+
+T.assert_eq(dq.pop_front(), 1, "deque pop_front")
+T.assert_eq(dq.pop_back(), 3, "deque pop_back")
+T.assert_eq(dq.length(), 1, "deque length after pops")
+
+dq.push_front(10)
+T.assert_eq(dq.peek_front(), 10, "deque push_front then peek")
+T.assert_eq(dq.to_list(), [10, 2], "deque to_list")
+
+// Deque from list
+var dq2 = Deque.from([4, 5, 6])
+T.assert_eq(dq2.pop_front(), 4, "deque from list pop_front")
+T.assert_eq(dq2.pop_back(), 6, "deque from list pop_back")
+
+// Deque clear
+dq2.clear()
+T.assert(dq2.is_empty(), "deque clear empties")
+
+// Deque pop on empty
+var dq3 = Deque.new()
+T.assert_eq(dq3.pop_front(), nil, "deque pop_front on empty")
+T.assert_eq(dq3.pop_back(), nil, "deque pop_back on empty")
+
+// Deque iterator
+var dq4 = Deque.from([7, 8, 9])
+var dq_items: List<Any> = []
+var dq_iter = dq4.iter()
+while (dq_iter.next?()) {
+    dq_items.push(dq_iter.next())
+}
+T.assert_eq(dq_items, [7, 8, 9], "deque iter front-to-back")
+
+// === Heap tests ===
+
+var h = Heap.min()
+T.assert(h.is_empty(), "heap starts empty")
+
+h.push(5)
+h.push(1)
+h.push(3)
+h.push(2)
+h.push(4)
+T.assert_eq(h.length(), 5, "heap length")
+T.assert_eq(h.peek(), 1, "min-heap peek is smallest")
+
+T.assert_eq(h.pop(), 1, "min-heap pop 1st")
+T.assert_eq(h.pop(), 2, "min-heap pop 2nd")
+T.assert_eq(h.pop(), 3, "min-heap pop 3rd")
+T.assert_eq(h.pop(), 4, "min-heap pop 4th")
+T.assert_eq(h.pop(), 5, "min-heap pop 5th")
+T.assert(h.is_empty(), "heap empty after all pops")
+
+// Max-heap
+var mh = Heap.max()
+mh.push(1)
+mh.push(5)
+mh.push(3)
+T.assert_eq(mh.peek(), 5, "max-heap peek is largest")
+T.assert_eq(mh.pop(), 5, "max-heap pop 1st")
+T.assert_eq(mh.pop(), 3, "max-heap pop 2nd")
+T.assert_eq(mh.pop(), 1, "max-heap pop 3rd")
+
+// Heap pop on empty
+T.assert_eq(mh.pop(), nil, "heap pop on empty")
+
+// Heap iterator (destructive, priority order)
+var h2 = Heap.min()
+h2.push(30)
+h2.push(10)
+h2.push(20)
+var h_items: List<Any> = []
+var h_iter = h2.iter()
+while (h_iter.next?()) {
+    h_items.push(h_iter.next())
+}
+T.assert_eq(h_items, [10, 20, 30], "heap iter in priority order")
+
+// === Queue tests ===
+
+var q = Queue.new()
+T.assert(q.is_empty(), "queue starts empty")
+T.assert_eq(q.length(), 0, "queue initial length")
+
+q.enqueue("a")
+q.enqueue("b")
+q.enqueue("c")
+T.assert_eq(q.length(), 3, "queue length after enqueue")
+T.assert_eq(q.peek(), "a", "queue peek is front")
+
+T.assert_eq(q.dequeue(), "a", "queue dequeue 1st")
+T.assert_eq(q.dequeue(), "b", "queue dequeue 2nd")
+T.assert_eq(q.length(), 1, "queue length after dequeues")
+T.assert_eq(q.to_list(), ["c"], "queue to_list")
+
+// Queue from list
+var q2 = Queue.from([10, 20, 30])
+T.assert_eq(q2.dequeue(), 10, "queue from list dequeue")
+T.assert_eq(q2.peek(), 20, "queue from list peek")
+
+// Queue clear
+q2.clear()
+T.assert(q2.is_empty(), "queue clear empties")
+
+// Queue dequeue on empty
+var q3 = Queue.new()
+T.assert_eq(q3.dequeue(), nil, "queue dequeue on empty")
+
+// Queue iterator
+var q4 = Queue.from([1, 2, 3])
+var q_items: List<Any> = []
+var q_iter = q4.iter()
+while (q_iter.next?()) {
+    q_items.push(q_iter.next())
+}
+T.assert_eq(q_items, [1, 2, 3], "queue iter front-to-back")
+
+// === Stack tests ===
+
+var s = Stack.new()
+T.assert(s.is_empty(), "stack starts empty")
+T.assert_eq(s.length(), 0, "stack initial length")
+
+s.push(1)
+s.push(2)
+s.push(3)
+T.assert_eq(s.length(), 3, "stack length after pushes")
+T.assert_eq(s.peek(), 3, "stack peek is top")
+
+T.assert_eq(s.pop(), 3, "stack pop 1st")
+T.assert_eq(s.pop(), 2, "stack pop 2nd")
+T.assert_eq(s.length(), 1, "stack length after pops")
+T.assert_eq(s.to_list(), [1], "stack to_list bottom-to-top")
+
+// Stack from list
+var s2 = Stack.from([10, 20, 30])
+T.assert_eq(s2.peek(), 30, "stack from list peek is last")
+T.assert_eq(s2.pop(), 30, "stack from list pop")
+
+// Stack clear
+s2.clear()
+T.assert(s2.is_empty(), "stack clear empties")
+
+// Stack pop on empty
+var s3 = Stack.new()
+T.assert_eq(s3.pop(), nil, "stack pop on empty")
+
+// Stack iterator (top-to-bottom)
+var s4 = Stack.from([1, 2, 3])
+var s_items: List<Any> = []
+var s_iter = s4.iter()
+while (s_iter.next?()) {
+    s_items.push(s_iter.next())
+}
+T.assert_eq(s_items, [3, 2, 1], "stack iter top-to-bottom")
+
+T.summary()
