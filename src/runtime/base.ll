@@ -609,8 +609,8 @@ no:
 }
 
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
-; TAG_INT_CONST  = 9221120237041090560  (0x7FF9000000000000)
-; TAG_PTR_CONST  = 9218868437227405312  (0x7FF8000000000000)
+; TAG_INT_CONST  = 9221401712017801216  (0x7FF9000000000000)
+; TAG_PTR_CONST  = 9221120237041090560  (0x7FF8000000000000)
 ; VAL_TRUE       = 9222246136947933185  (0x7FFA000000000001)
 ; VAL_FALSE      = 9222246136947933184  (0x7FFA000000000000)
 ; VAL_NIL        = 9222246136947933186  (0x7FFA000000000002)
@@ -883,6 +883,30 @@ entry:
 ; __gc_init_shadow_stack: no-op without GC.
 define weak void @__gc_init_shadow_stack() {
 entry:
+  ret void
+}
+
+; =============================================================================
+; __any_to_string — Identity mode stub
+; =============================================================================
+; In identity mode, values are NOT NaN-boxed so we cannot distinguish types
+; at runtime. This stub just calls __int_to_string as a reasonable fallback.
+; The real runtime-dispatch version lives in base_nanbox.ll.
+
+declare i64 @__int_to_string(i64)
+
+define i64 @__any_to_string(i64 %val) {
+entry:
+  %str = call i64 @__int_to_string(i64 %val)
+  ret i64 %str
+}
+
+; __io_println_any — Identity mode: print value as integer string + newline.
+define void @__io_println_any(i64 %val) {
+entry:
+  %str = call i64 @__any_to_string(i64 %val)
+  %ptr = inttoptr i64 %str to i8*
+  call i32 @puts(i8* %ptr)
   ret void
 }
 

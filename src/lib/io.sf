@@ -8,6 +8,8 @@
 
 @extern("i32 puts(void*)") fun _puts(s: Int): Int
 @extern("void __io_print_str(i64)") fun _print_str(s: Int)
+@extern("i64 __any_to_string(i64)") fun _any_to_string(val: Int): Int
+@extern("void __io_println_any(i64)") fun _println_any(val: Int)
 
 // --- C Library Bindings for File I/O ---
 
@@ -229,8 +231,13 @@ fun open(path: String, mode: String): File {
 // =============================================================================
 
 /// Print a value followed by a newline to stdout.
-/// The compiler coerces the argument to String at the call site.
-fun println(value: String) {
+/// Accepts Any type — runtime dispatch converts to string via __any_to_string.
+fun println(value: Any) {
+    _println_any(value)
+}
+
+/// Print a string followed by a newline to stdout (typed variant).
+fun println_str(value: String) {
     _puts(value)
 }
 
