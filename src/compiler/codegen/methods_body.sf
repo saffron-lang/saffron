@@ -6,6 +6,13 @@
         var class_name: String = keys[i]
         var methods: List = this.class_methods.get(class_name)
         if (methods.contains(method)) {
+            // Skip built-in types (String, List, Map, etc.) that are registered
+            // in class_methods but not in class_fields. Their methods are handled
+            // by builtin method dispatch, not class method dispatch.
+            if (!this.class_fields.has(class_name)) {
+                i = i + 1
+                continue
+            }
             // Skip interfaces (classes with no fields) — prefer concrete classes.
             // Interfaces have empty class_fields and register stub methods.
             var cf: String = this.class_fields.get(class_name)
