@@ -325,64 +325,27 @@ class Logger {
         return child_logger
     }
 
-    /// Log at TRACE level.
-    fun trace(message: String) {
-        this._log(Level.Trace, message, {})
-    }
-
-    /// Log at DEBUG level.
-    fun debug(message: String) {
-        this._log(Level.Debug, message, {})
-    }
-
-    /// Log at INFO level.
-    fun info(message: String) {
-        this._log(Level.Info, message, {})
-    }
-
-    /// Log at WARN level.
-    fun warn(message: String) {
-        this._log(Level.Warn, message, {})
-    }
-
-    /// Log at ERROR level.
-    fun error(message: String) {
-        this._log(Level.Error, message, {})
-    }
-
-    /// Log at FATAL level, then exit.
-    fun fatal(message: String) {
-        this._log(Level.Fatal, message, {})
-        OS.exit(1)
-    }
-
-    /// Log at TRACE level with structured fields.
-    fun trace_f(message: String, fields: Map<String, String>) {
+    fun trace(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Trace, message, fields)
     }
 
-    /// Log at DEBUG level with structured fields.
-    fun debug_f(message: String, fields: Map<String, String>) {
+    fun debug(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Debug, message, fields)
     }
 
-    /// Log at INFO level with structured fields.
-    fun info_f(message: String, fields: Map<String, String>) {
+    fun info(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Info, message, fields)
     }
 
-    /// Log at WARN level with structured fields.
-    fun warn_f(message: String, fields: Map<String, String>) {
+    fun warn(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Warn, message, fields)
     }
 
-    /// Log at ERROR level with structured fields.
-    fun error_f(message: String, fields: Map<String, String>) {
+    fun error(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Error, message, fields)
     }
 
-    /// Log at FATAL level with structured fields, then exit.
-    fun fatal_f(message: String, fields: Map<String, String>) {
+    fun fatal(message: String, fields: Map<String, String> = {}) {
         this._log(Level.Fatal, message, fields)
         OS.exit(1)
     }

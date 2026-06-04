@@ -1753,6 +1753,11 @@ class Codegen {
                 var raw_result: String = this.ptr_to_val(buf)
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
+                // LLVM lib parallel path: track string concatenation result
+                if (!this.identity_mode) {
+                    var sc_res: LLVMTypes.Value = this.llvm_block_builder.call("__string_concat", LLVMTypes.Type.I64, [])
+                    this.llvm_values.set(result, sc_res)
+                }
                 return result
             }
 
@@ -3377,6 +3382,11 @@ class Codegen {
         var fn_ptr: String = this.val_to_fn_ptr(fn_int, fn_type)
         var local: String = this.fresh_local()
         this.emit_indent(local + " = call i64 " + fn_ptr + "(" + arg_strs.join(", ") + ")")
+        // LLVM lib parallel path: track indirect call result as opaque placeholder
+        if (!this.identity_mode) {
+            var ic_res: LLVMTypes.Value = this.llvm_block_builder.call("__indirect_call", LLVMTypes.Type.I64, [])
+            this.llvm_values.set(local, ic_res)
+        }
         return local
     }
 
@@ -3641,6 +3651,11 @@ class Codegen {
             var result: String = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
             this.last_type = match_result_type
+            // LLVM lib parallel path: track string match result
+            if (!this.identity_mode) {
+                var smr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                this.llvm_values.set(result, smr)
+            }
             return result
         }
 
@@ -3683,6 +3698,11 @@ class Codegen {
             this.emit_indent("store i64 " + val + ", i64* " + result_ptr)
             var result: String = this.fresh_local()
             this.emit_indent(result + " = load i64, i64* " + result_ptr)
+            // LLVM lib parallel path: track unknown-enum match result
+            if (!this.identity_mode) {
+                var umr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                this.llvm_values.set(result, umr)
+            }
             return result
         }
 
@@ -3783,6 +3803,11 @@ class Codegen {
         var result: String = this.fresh_local()
         this.emit_indent(result + " = load i64, i64* " + result_ptr)
         this.last_type = match_result_type
+        // LLVM lib parallel path: track match result as opaque call placeholder
+        if (!this.identity_mode) {
+            var match_res: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+            this.llvm_values.set(result, match_res)
+        }
         return result
     }
 
@@ -8682,6 +8707,11 @@ class Codegen {
     var local: String = this.fresh_local()
     if (this.use_llvm_lib) {
         this.emit_indent(this.lib_call(local, "i64", "__list_get", "i64 " + obj + ", i64 " + final_idx))
+        // LLVM lib parallel path: track index_get result
+        if (!this.identity_mode) {
+            var ig_res: LLVMTypes.Value = this.llvm_block_builder.call("__list_get", LLVMTypes.Type.I64, [])
+            this.llvm_values.set(local, ig_res)
+        }
     } else {
         this.emit_indent(local + " = call i64 @__list_get(i64 " + obj + ", i64 " + final_idx + ")")
     }
