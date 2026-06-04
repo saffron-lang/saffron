@@ -276,9 +276,13 @@
         }
         var coro_attr: String = ""
         if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
+        var inline_attr: String = ""
+        if (!is_coro and this.str_in_list(this.inline_funcs, emit_name)) {
+            inline_attr = " alwaysinline"
+        }
         var ret_type_ll: String = ret_llvm
         if (is_coro) { ret_type_ll = "ptr" }
-        this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + " {")
+        this.emit(linkage + " " + ret_type_ll + " @" + emit_name + "(" + param_strs.join(", ") + ")" + coro_attr + inline_attr + " {")
         this.emit("entry:")
         this.block_terminated = false
 

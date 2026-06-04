@@ -1729,6 +1729,24 @@ class Parser {
                         AST.Expr.SetField(AST.Expr.This, fname, default_val)))
                 }
                 fields.push(AST.Param.Param(fname, this.parse_type_ast(ftype), AST.Expr.NilLit))
+            } else if (this.is_ident_named("@")) {
+                // Decorator on method: @inline, @intrinsic, etc.
+                this.advance()
+                var method_decorator: String = this.expect_ident()
+                var method_annotation: String = "@" + method_decorator
+                if (this.match_kind_check("(")) {
+                    this.advance()
+                    if (this.match_kind_check("string")) {
+                        var mdarg_kind: Lexer.TokenKind = this.current_kind()
+                        var mdarg: String = match (mdarg_kind) { TkString(s) => s }
+                        this.advance()
+                        method_annotation = method_annotation + ":" + mdarg
+                    }
+                    this.consume(")")
+                }
+                if (this.match_kind_check("fun")) {
+                    methods.push(this.parse_fun_decl_with_doc(method_annotation))
+                }
             } else if (this.match_kind_check("fun")) {
                 // Method declaration (doc comment passed via parse_fun_decl_with_doc)
                 methods.push(this.parse_fun_decl_with_doc(member_doc))
