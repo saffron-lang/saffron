@@ -10038,13 +10038,15 @@ class Codegen {
         if (obj_type == "String" or obj_type == "Any") {
             // For Any type, default to strlen (common case: untyped vars hold strings)
             var str_ptr: String = this.emit_untag_ptr(obj)
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @strlen(i8* " + str_ptr + ")")
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @strlen(i8* " + str_ptr + ")")
+            var local: String = this.emit_tag_int(raw)
             this.last_type = AST.Type.IntType
             return local
         } else {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__list_length(i64 " + obj + ")")
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__list_length(i64 " + obj + ")")
+            var local: String = this.emit_tag_int(raw)
             this.last_type = AST.Type.IntType
             return local
         }
@@ -10133,8 +10135,9 @@ class Codegen {
             IO.println("[codegen] Warning: dispatching 'to_number' on untyped value (type inference failed)")
         }
         var str_ptr: String = this.emit_untag_ptr(obj)
-        var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @atol(i8* " + str_ptr + ")")
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = call i64 @atol(i8* " + str_ptr + ")")
+        var local: String = this.emit_tag_int(raw)
         this.last_type = AST.Type.IntType
         return local
     }
