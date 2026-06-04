@@ -1,0 +1,172 @@
+import "@test" as T
+import "@sorted_map" as SortedMap
+import "@sorted_set" as SortedSet
+
+// --- SortedMap tests ---
+
+T.section("SortedMap: basic operations")
+var sm = SortedMap.new()
+T.assert(sm.is_empty(), "new map is empty")
+T.assert_eq(sm.length(), 0, "new map has length 0")
+
+sm.set("banana", 2)
+sm.set("apple", 1)
+sm.set("cherry", 3)
+T.assert_eq(sm.length(), 3, "length after 3 inserts")
+T.assert(sm.is_empty() == false, "not empty after inserts")
+
+T.section("SortedMap: sorted key order")
+T.assert_eq(sm.keys()[0], "apple", "first key is apple")
+T.assert_eq(sm.keys()[1], "banana", "second key is banana")
+T.assert_eq(sm.keys()[2], "cherry", "third key is cherry")
+
+T.section("SortedMap: get and has")
+T.assert_eq(sm.get("apple"), 1, "get apple")
+T.assert_eq(sm.get("banana"), 2, "get banana")
+T.assert_eq(sm.get("cherry"), 3, "get cherry")
+T.assert_eq(sm.get("missing"), nil, "get missing key returns nil")
+T.assert(sm.has("apple"), "has apple")
+T.assert(sm.has("banana"), "has banana")
+T.assert(sm.has("missing") == false, "does not have missing")
+
+T.section("SortedMap: update existing key")
+sm.set("banana", 99)
+T.assert_eq(sm.get("banana"), 99, "update existing key")
+T.assert_eq(sm.length(), 3, "length unchanged after update")
+
+T.section("SortedMap: remove")
+sm.remove("banana")
+T.assert_eq(sm.length(), 2, "length after remove")
+T.assert(sm.has("banana") == false, "banana removed")
+T.assert_eq(sm.keys()[0], "apple", "apple still first")
+T.assert_eq(sm.keys()[1], "cherry", "cherry still second")
+
+T.section("SortedMap: first and last")
+T.assert_eq(sm.first()[0], "apple", "first key")
+T.assert_eq(sm.first()[1], 1, "first value")
+T.assert_eq(sm.last()[0], "cherry", "last key")
+T.assert_eq(sm.last()[1], 3, "last value")
+
+T.section("SortedMap: first/last on empty")
+var empty_map = SortedMap.new()
+T.assert_eq(empty_map.first(), nil, "first on empty is nil")
+T.assert_eq(empty_map.last(), nil, "last on empty is nil")
+
+T.section("SortedMap: range queries")
+var rm = SortedMap.new()
+rm.set("a", 1)
+rm.set("b", 2)
+rm.set("c", 3)
+rm.set("d", 4)
+rm.set("e", 5)
+var ranged = rm.range("b", "d")
+T.assert_eq(ranged.length(), 2, "range [b, d) has 2 entries")
+T.assert_eq(ranged[0][0], "b", "range first is b")
+T.assert_eq(ranged[1][0], "c", "range second is c")
+
+T.section("SortedMap: values in key order")
+T.assert_eq(rm.values()[0], 1, "values[0] = 1")
+T.assert_eq(rm.values()[4], 5, "values[4] = 5")
+
+T.section("SortedMap: to_map")
+var converted = rm.to_map()
+T.assert(converted.has("a"), "to_map has key a")
+T.assert_eq(converted.get("c"), 3, "to_map get c")
+
+T.section("SortedMap: from(map)")
+var from_map = SortedMap.from({"z": 26, "a": 1, "m": 13})
+T.assert_eq(from_map.keys()[0], "a", "from map first key is a")
+T.assert_eq(from_map.keys()[2], "z", "from map last key is z")
+T.assert_eq(from_map.get("m"), 13, "from map get m")
+
+// --- SortedSet tests ---
+
+T.section("SortedSet: basic operations")
+var ss = SortedSet.new()
+T.assert(ss.is_empty(), "new set is empty")
+T.assert_eq(ss.length(), 0, "new set has length 0")
+
+ss.add(5)
+ss.add(1)
+ss.add(3)
+T.assert_eq(ss.length(), 3, "length after 3 adds")
+T.assert(ss.is_empty() == false, "not empty after adds")
+
+T.section("SortedSet: sorted order")
+var items = ss.to_list()
+T.assert_eq(items[0], 1, "first is 1")
+T.assert_eq(items[1], 3, "second is 3")
+T.assert_eq(items[2], 5, "third is 5")
+
+T.section("SortedSet: deduplication")
+ss.add(3)
+ss.add(1)
+T.assert_eq(ss.length(), 3, "length unchanged after duplicate adds")
+
+T.section("SortedSet: has")
+T.assert(ss.has(1), "has 1")
+T.assert(ss.has(3), "has 3")
+T.assert(ss.has(5), "has 5")
+T.assert(ss.has(2) == false, "does not have 2")
+T.assert(ss.has(99) == false, "does not have 99")
+
+T.section("SortedSet: min and max")
+T.assert_eq(ss.min(), 1, "min is 1")
+T.assert_eq(ss.max(), 5, "max is 5")
+
+T.section("SortedSet: min/max on empty")
+var empty_set = SortedSet.new()
+T.assert_eq(empty_set.min(), nil, "min on empty is nil")
+T.assert_eq(empty_set.max(), nil, "max on empty is nil")
+
+T.section("SortedSet: remove")
+ss.remove(3)
+T.assert_eq(ss.length(), 2, "length after remove")
+T.assert(ss.has(3) == false, "3 removed")
+T.assert_eq(ss.to_list()[0], 1, "1 still first")
+T.assert_eq(ss.to_list()[1], 5, "5 still second")
+
+T.section("SortedSet: range")
+var rs = SortedSet.from([1, 2, 3, 4, 5, 6, 7, 8, 9])
+var range_result = rs.range(3, 7)
+T.assert_eq(range_result.length(), 4, "range [3, 7) has 4 elements")
+T.assert_eq(range_result[0], 3, "range starts at 3")
+T.assert_eq(range_result[3], 6, "range ends at 6")
+
+T.section("SortedSet: from(list)")
+var from_list = SortedSet.from([5, 3, 1, 3, 5, 2])
+T.assert_eq(from_list.length(), 4, "from list deduplicates")
+T.assert_eq(from_list.to_list()[0], 1, "from list sorted first")
+T.assert_eq(from_list.to_list()[3], 5, "from list sorted last")
+
+T.section("SortedSet: union")
+var a = SortedSet.from([1, 3, 5])
+var b = SortedSet.from([2, 3, 4])
+var u = SortedSet.union(a, b)
+T.assert_eq(u.length(), 5, "union has 5 elements")
+T.assert_eq(u.to_list()[0], 1, "union first is 1")
+T.assert_eq(u.to_list()[4], 5, "union last is 5")
+T.assert(u.has(3), "union contains shared element")
+
+T.section("SortedSet: intersection")
+var inter = SortedSet.intersection(a, b)
+T.assert_eq(inter.length(), 1, "intersection has 1 element")
+T.assert_eq(inter.to_list()[0], 3, "intersection contains 3")
+
+T.section("SortedSet: difference")
+var diff = SortedSet.difference(a, b)
+T.assert_eq(diff.length(), 2, "difference has 2 elements")
+T.assert(diff.has(1), "difference contains 1")
+T.assert(diff.has(5), "difference contains 5")
+T.assert(diff.has(3) == false, "difference does not contain 3")
+
+T.section("SortedSet: string elements")
+var str_set = SortedSet.new()
+str_set.add("cherry")
+str_set.add("apple")
+str_set.add("banana")
+T.assert_eq(str_set.to_list()[0], "apple", "string set sorted first")
+T.assert_eq(str_set.to_list()[1], "banana", "string set sorted second")
+T.assert_eq(str_set.to_list()[2], "cherry", "string set sorted third")
+
+T.summary()

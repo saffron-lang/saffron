@@ -22,8 +22,7 @@
 //! app.serve()
 //! ```
 
-import "@server" as Server
-import "@socket" as Socket
+import "@net" as Net
 import "@async" as Async
 import "@path" as Path
 import "@ssl" as SSL
@@ -33,14 +32,14 @@ import "@ssl" as SSL
 // =============================================================================
 
 class Stream {
-    var _fd: Int
+    var _conn: Net.TcpConnection
     var _tls_conn: Any
     var _headers_sent: Bool
     var _extra_headers: List<String>
     var _extra_values: List<String>
 
-    fun init(fd: Int) {
-        this._fd = fd
+    fun init(conn: Net.TcpConnection) {
+        this._conn = conn
         this._tls_conn = nil
         this._headers_sent = false
         this._extra_headers = []
@@ -57,7 +56,7 @@ class Stream {
         if (this._tls_conn != nil) {
             this._tls_conn.write(data)
         } else {
-            Socket.write(this._fd, data)
+            this._conn.write(data)
         }
     }
 
@@ -100,7 +99,7 @@ class Stream {
         if (this._tls_conn != nil) {
             this._tls_conn.close()
         } else {
-            Socket.close(this._fd)
+            this._conn.close()
         }
     }
 }
@@ -113,7 +112,7 @@ class Request {
     var query: String
     var params: Map<String, String>
     var context: Map<String, String>
-    var _client_fd: Int
+    var _conn: Net.TcpConnection
     var _tls_conn: Any
 
     fun init(method: String, path: String, headers: Map<String, String>, body: String, query: String) {
@@ -124,7 +123,7 @@ class Request {
         this.query = query
         this.params = {}
         this.context = {}
-        this._client_fd = 0
+        this._conn = nil
         this._tls_conn = nil
     }
 
@@ -146,7 +145,7 @@ class Request {
     }
 
     fun stream(handler: Fun): Response {
-        var s = Stream(this._client_fd)
+        var s = Stream(this._conn)
         s._tls_conn = this._tls_conn
         handler(s)
         s.close()
@@ -369,31 +368,29 @@ class App {
     }
 
     fun serve() {
-        var listener = Server.listen(this.host, this.port)
+        var listener: Net.TcpListener = Net.listen(this.host, this.port)
         var proto: String = "http"
         if (this._tls_ctx != nil) {
             proto = "https"
         }
         IO.println("Listening on " + proto + "://" + this.host + ":" + this.port.to_string())
         while (true) {
-            var client: Int = listener.accept()
-            if (client >= 0) {
-                var app = this
-                Task.spawn(fun () => app._handle(client))
-            }
+            var conn: Net.TcpConnection = listener.accept()
+            var app = this
+            Task.spawn(fun () => app._handle(conn))
         }
     }
 
-    fun _handle(client: Int) {
+    fun _handle(conn: Net.TcpConnection) {
         var tls_conn: Any = nil
 
         // If TLS is configured, perform the TLS handshake
         if (this._tls_ctx != nil) {
             try {
-                tls_conn = SSL.wrap_server(client, this._tls_ctx)
+                tls_conn = SSL.wrap_server(conn.raw_fd(), this._tls_ctx)
             } catch (e) {
                 IO.println("TLS handshake failed: " + e.to_string())
-                Socket.close(client)
+                conn.close()
                 return
             }
         }
@@ -403,20 +400,20 @@ class App {
         if (tls_conn != nil) {
             raw = tls_conn.read(8192)
         } else {
-            raw = Socket.read(client, 8192)
+            raw = conn.read(8192)
         }
 
         if (raw.length() == 0) {
             if (tls_conn != nil) {
                 tls_conn.close()
             } else {
-                Socket.close(client)
+                conn.close()
             }
             return
         }
 
         var req: Request = _parse_request(raw)
-        req._client_fd = client
+        req._conn = conn
         req._tls_conn = tls_conn
 
         // Run before-middlewares in order
@@ -439,8 +436,8 @@ class App {
                 tls_conn.write(_serialize_response(resp))
                 tls_conn.close()
             } else {
-                Socket.write(client, _serialize_response(resp))
-                Socket.close(client)
+                conn.write(_serialize_response(resp))
+                conn.close()
             }
         }
     }

@@ -2,7 +2,7 @@
 //! Spawn tasks trivially to parallelize work. Async is invisible by default.
 
 import "@scheduler" as Scheduler
-import "@socket" as Socket
+import "@net" as Net
 
 fun sleep(duration: Number) {
     yield [1, duration]
@@ -10,12 +10,11 @@ fun sleep(duration: Number) {
 
 // A simple HTTP GET — would be async if socket blocks
 fun http_get(host: String, port: Int, path: String): String {
-    var fd = Socket.connect(host, port)
-    if (fd < 0) { return "ERROR: connection failed" }
+    var conn = Net.connect(host, port)
     var req = "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\n\r\n"
-    Socket.write(fd, req)
-    var response = Socket.read(fd, 4096)
-    Socket.close(fd)
+    conn.write(req)
+    var response = conn.read(4096)
+    conn.close()
     return response
 }
 

@@ -1565,14 +1565,13 @@ entry:
   %t6 = inttoptr i32 %t5 to %signal_Signal*
   %t7 = getelementptr %signal_Signal, %signal_Signal* %t6, i32 0, i32 1
   %t8 = load volatile i64, i64* %t7
-  %t9 = call i64 @signal_Subscription()
-  %t10 = load i64, i64* %id
-  %t11 = load i64, i64* %fn
-  %t12 = call i64 @signal_Subscription__init(i64 %t9, i64 %t10, i64 %t11)
-  %t13 = call i64 @__list_push(i64 %t8, i64 %t9)
-  %t14 = load i64, i64* %id
+  %t9 = load i64, i64* %id
+  %t10 = load i64, i64* %fn
+  %t11 = call i64 @signal_Subscription(i64 %t9, i64 %t10)
+  %t12 = call i64 @__list_push(i64 %t8, i64 %t11)
+  %t13 = load i64, i64* %id
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t14
+  ret i64 %t13
 }
 
 define i64 @signal_Signal__unsubscribe(i64 %self.arg, i64 %id.arg) {
@@ -1670,11 +1669,10 @@ entry:
   %t1 = ptrtoint i64* %initial to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @signal_Signal()
-  %t4 = load i64, i64* %initial
-  %t5 = call i64 @signal_Signal__init(i64 %t3, i64 %t4)
+  %t3 = load i64, i64* %initial
+  %t4 = call i64 @signal_Signal(i64 %t3)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t4
 }
 
 define i64 @signal_Computed__init(i64 %self.arg, i64 %compute.arg) {
@@ -1894,14 +1892,13 @@ entry:
   %t6 = inttoptr i32 %t5 to %signal_Computed*
   %t7 = getelementptr %signal_Computed, %signal_Computed* %t6, i32 0, i32 1
   %t8 = load volatile i64, i64* %t7
-  %t9 = call i64 @signal_Subscription()
-  %t10 = load i64, i64* %id
-  %t11 = load i64, i64* %fn
-  %t12 = call i64 @signal_Subscription__init(i64 %t9, i64 %t10, i64 %t11)
-  %t13 = call i64 @__list_push(i64 %t8, i64 %t9)
-  %t14 = load i64, i64* %id
+  %t9 = load i64, i64* %id
+  %t10 = load i64, i64* %fn
+  %t11 = call i64 @signal_Subscription(i64 %t9, i64 %t10)
+  %t12 = call i64 @__list_push(i64 %t8, i64 %t11)
+  %t13 = load i64, i64* %id
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t14
+  ret i64 %t13
 }
 
 define i64 @signal_Computed__unsubscribe(i64 %self.arg, i64 %id.arg) {
@@ -2001,11 +1998,10 @@ entry:
   %t1 = ptrtoint i64* %compute to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @signal_Computed()
-  %t4 = load i64, i64* %compute
-  %t5 = call i64 @signal_Computed__init(i64 %t3, i64 %t4)
+  %t3 = load i64, i64* %compute
+  %t4 = call i64 @signal_Computed(i64 %t3)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t4
 }
 
 define i64 @signal_EffectHandle__init(i64 %self.arg, i64 %sub_ids.arg, i64 %deps.arg) {
@@ -2169,12 +2165,11 @@ while.body42:
   store i64 %t41, i64* %i
   br label %while.cond41
 while.end43:
-  %t42 = call i64 @signal_EffectHandle()
-  %t43 = load i64, i64* %sub_ids
-  %t44 = load i64, i64* %deps
-  %t45 = call i64 @signal_EffectHandle__init(i64 %t42, i64 %t43, i64 %t44)
+  %t42 = load i64, i64* %sub_ids
+  %t43 = load i64, i64* %deps
+  %t44 = call i64 @signal_EffectHandle(i64 %t42, i64 %t43)
   call void @__gc_pop_roots(i64 3)
-  ret i64 %t42
+  ret i64 %t44
 }
 
 define i64 @signal_batch(i64 %fn.arg) {
@@ -2648,14 +2643,13 @@ entry:
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
   %t3 = call i64 @element_Context()
-  %t4 = call i64 @element_Context__init(i64 %t3)
   store i64 %t3, i64* %ctx
-  %t5 = load i64, i64* @__g_element__ctx_stack
-  %t6 = load i64, i64* %ctx
-  %t7 = call i64 @__list_push(i64 %t5, i64 %t6)
-  %t8 = load i64, i64* %ctx
+  %t4 = load i64, i64* @__g_element__ctx_stack
+  %t5 = load i64, i64* %ctx
+  %t6 = call i64 @__list_push(i64 %t4, i64 %t5)
+  %t7 = load i64, i64* %ctx
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t8
+  ret i64 %t7
 }
 
 define i64 @element__pop_ctx() {
@@ -4410,122 +4404,121 @@ else128:
   br label %endif126
 endif126:
   %t23 = call i64 @events_MouseEventData()
-  %t24 = call i64 @events_MouseEventData__init(i64 %t23)
   store i64 %t23, i64* %data
-  %t25 = load i64, i64* %data
-  %t26 = load i64, i64* %event_ptr
-  %t27 = getelementptr [8 x i8], [8 x i8]* @.str.86, i64 0, i64 0
-  %t28 = ptrtoint i8* %t27 to i32
-  %t29 = zext i32 %t28 to i64
-  %t30 = call i8* @__val_untag_ptr(i64 %t29)
-  %t31 = call i64 @js_event_get_float(i64 %t26, i8* %t30)
-  %t32 = trunc i64 %t25 to i32
-  %t33 = inttoptr i32 %t32 to %events_MouseEventData*
-  %t34 = getelementptr %events_MouseEventData, %events_MouseEventData* %t33, i32 0, i32 0
-  store volatile i64 %t31, i64* %t34
-  %t35 = load i64, i64* %data
-  %t36 = load i64, i64* %event_ptr
-  %t37 = getelementptr [8 x i8], [8 x i8]* @.str.87, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i32
-  %t39 = zext i32 %t38 to i64
-  %t40 = call i8* @__val_untag_ptr(i64 %t39)
-  %t41 = call i64 @js_event_get_float(i64 %t36, i8* %t40)
-  %t42 = trunc i64 %t35 to i32
-  %t43 = inttoptr i32 %t42 to %events_MouseEventData*
-  %t44 = getelementptr %events_MouseEventData, %events_MouseEventData* %t43, i32 0, i32 1
-  store volatile i64 %t41, i64* %t44
-  %t45 = load i64, i64* %data
-  %t46 = load i64, i64* %event_ptr
-  %t47 = getelementptr [8 x i8], [8 x i8]* @.str.88, i64 0, i64 0
-  %t48 = ptrtoint i8* %t47 to i32
-  %t49 = zext i32 %t48 to i64
-  %t50 = call i8* @__val_untag_ptr(i64 %t49)
-  %t51 = call i64 @js_event_get_float(i64 %t46, i8* %t50)
-  %t52 = trunc i64 %t45 to i32
-  %t53 = inttoptr i32 %t52 to %events_MouseEventData*
-  %t54 = getelementptr %events_MouseEventData, %events_MouseEventData* %t53, i32 0, i32 2
-  store volatile i64 %t51, i64* %t54
-  %t55 = load i64, i64* %data
-  %t56 = load i64, i64* %event_ptr
-  %t57 = getelementptr [8 x i8], [8 x i8]* @.str.89, i64 0, i64 0
-  %t58 = ptrtoint i8* %t57 to i32
-  %t59 = zext i32 %t58 to i64
-  %t60 = call i8* @__val_untag_ptr(i64 %t59)
-  %t61 = call i64 @js_event_get_float(i64 %t56, i8* %t60)
-  %t62 = trunc i64 %t55 to i32
-  %t63 = inttoptr i32 %t62 to %events_MouseEventData*
-  %t64 = getelementptr %events_MouseEventData, %events_MouseEventData* %t63, i32 0, i32 3
-  store volatile i64 %t61, i64* %t64
-  %t65 = load i64, i64* %data
-  %t66 = load i64, i64* %event_ptr
-  %t67 = getelementptr [7 x i8], [7 x i8]* @.str.90, i64 0, i64 0
-  %t68 = ptrtoint i8* %t67 to i32
-  %t69 = zext i32 %t68 to i64
-  %t70 = call i8* @__val_untag_ptr(i64 %t69)
-  %t71 = call i64 @js_event_get_float(i64 %t66, i8* %t70)
-  %t72 = trunc i64 %t65 to i32
-  %t73 = inttoptr i32 %t72 to %events_MouseEventData*
-  %t74 = getelementptr %events_MouseEventData, %events_MouseEventData* %t73, i32 0, i32 4
-  store volatile i64 %t71, i64* %t74
-  %t75 = load i64, i64* %data
-  %t76 = load i64, i64* %event_ptr
-  %t77 = getelementptr [7 x i8], [7 x i8]* @.str.91, i64 0, i64 0
-  %t78 = ptrtoint i8* %t77 to i32
-  %t79 = zext i32 %t78 to i64
-  %t80 = call i8* @__val_untag_ptr(i64 %t79)
-  %t81 = call i64 @js_event_get_bool(i64 %t76, i8* %t80)
-  %t82 = trunc i64 %t75 to i32
-  %t83 = inttoptr i32 %t82 to %events_MouseEventData*
-  %t84 = getelementptr %events_MouseEventData, %events_MouseEventData* %t83, i32 0, i32 6
-  store volatile i64 %t81, i64* %t84
-  %t85 = load i64, i64* %data
-  %t86 = load i64, i64* %event_ptr
-  %t87 = getelementptr [8 x i8], [8 x i8]* @.str.92, i64 0, i64 0
-  %t88 = ptrtoint i8* %t87 to i32
-  %t89 = zext i32 %t88 to i64
-  %t90 = call i8* @__val_untag_ptr(i64 %t89)
-  %t91 = call i64 @js_event_get_bool(i64 %t86, i8* %t90)
-  %t92 = trunc i64 %t85 to i32
-  %t93 = inttoptr i32 %t92 to %events_MouseEventData*
-  %t94 = getelementptr %events_MouseEventData, %events_MouseEventData* %t93, i32 0, i32 7
-  store volatile i64 %t91, i64* %t94
-  %t95 = load i64, i64* %data
-  %t96 = load i64, i64* %event_ptr
-  %t97 = getelementptr [9 x i8], [9 x i8]* @.str.93, i64 0, i64 0
-  %t98 = ptrtoint i8* %t97 to i32
-  %t99 = zext i32 %t98 to i64
-  %t100 = call i8* @__val_untag_ptr(i64 %t99)
-  %t101 = call i64 @js_event_get_bool(i64 %t96, i8* %t100)
-  %t102 = trunc i64 %t95 to i32
-  %t103 = inttoptr i32 %t102 to %events_MouseEventData*
-  %t104 = getelementptr %events_MouseEventData, %events_MouseEventData* %t103, i32 0, i32 8
-  store volatile i64 %t101, i64* %t104
-  %t105 = load i64, i64* %data
-  %t106 = load i64, i64* %event_ptr
-  %t107 = getelementptr [8 x i8], [8 x i8]* @.str.94, i64 0, i64 0
-  %t108 = ptrtoint i8* %t107 to i32
-  %t109 = zext i32 %t108 to i64
-  %t110 = call i8* @__val_untag_ptr(i64 %t109)
-  %t111 = call i64 @js_event_get_bool(i64 %t106, i8* %t110)
-  %t112 = trunc i64 %t105 to i32
-  %t113 = inttoptr i32 %t112 to %events_MouseEventData*
-  %t114 = getelementptr %events_MouseEventData, %events_MouseEventData* %t113, i32 0, i32 9
-  store volatile i64 %t111, i64* %t114
-  %t115 = load i64, i64* @__g_events__callbacks
-  %t116 = load i64, i64* %callback_id
-  %t117 = call i64 @__map_get(i64 %t115, i64 %t116)
-  %t118 = trunc i64 %t117 to i32
-  %t119 = inttoptr i32 %t118 to [2 x i64]*
-  %t120 = getelementptr [2 x i64], [2 x i64]* %t119, i64 0, i64 0
-  %t121 = load i64, i64* %t120
-  %t122 = getelementptr [2 x i64], [2 x i64]* %t119, i64 0, i64 1
-  %t123 = load i64, i64* %t122
-  %t124 = load i64, i64* %data
-  %t125 = shl i64 0, 56
-  %t126 = or i64 %t125, %t124
-  %t127 = trunc i64 %t121 to i32
-  %t128 = inttoptr i32 %t127 to i64 (i64, i64)*
-  %t129 = call i64 %t128(i64 %t123, i64 %t126)
+  %t24 = load i64, i64* %data
+  %t25 = load i64, i64* %event_ptr
+  %t26 = getelementptr [8 x i8], [8 x i8]* @.str.86, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i32
+  %t28 = zext i32 %t27 to i64
+  %t29 = call i8* @__val_untag_ptr(i64 %t28)
+  %t30 = call i64 @js_event_get_float(i64 %t25, i8* %t29)
+  %t31 = trunc i64 %t24 to i32
+  %t32 = inttoptr i32 %t31 to %events_MouseEventData*
+  %t33 = getelementptr %events_MouseEventData, %events_MouseEventData* %t32, i32 0, i32 0
+  store volatile i64 %t30, i64* %t33
+  %t34 = load i64, i64* %data
+  %t35 = load i64, i64* %event_ptr
+  %t36 = getelementptr [8 x i8], [8 x i8]* @.str.87, i64 0, i64 0
+  %t37 = ptrtoint i8* %t36 to i32
+  %t38 = zext i32 %t37 to i64
+  %t39 = call i8* @__val_untag_ptr(i64 %t38)
+  %t40 = call i64 @js_event_get_float(i64 %t35, i8* %t39)
+  %t41 = trunc i64 %t34 to i32
+  %t42 = inttoptr i32 %t41 to %events_MouseEventData*
+  %t43 = getelementptr %events_MouseEventData, %events_MouseEventData* %t42, i32 0, i32 1
+  store volatile i64 %t40, i64* %t43
+  %t44 = load i64, i64* %data
+  %t45 = load i64, i64* %event_ptr
+  %t46 = getelementptr [8 x i8], [8 x i8]* @.str.88, i64 0, i64 0
+  %t47 = ptrtoint i8* %t46 to i32
+  %t48 = zext i32 %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = call i64 @js_event_get_float(i64 %t45, i8* %t49)
+  %t51 = trunc i64 %t44 to i32
+  %t52 = inttoptr i32 %t51 to %events_MouseEventData*
+  %t53 = getelementptr %events_MouseEventData, %events_MouseEventData* %t52, i32 0, i32 2
+  store volatile i64 %t50, i64* %t53
+  %t54 = load i64, i64* %data
+  %t55 = load i64, i64* %event_ptr
+  %t56 = getelementptr [8 x i8], [8 x i8]* @.str.89, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i32
+  %t58 = zext i32 %t57 to i64
+  %t59 = call i8* @__val_untag_ptr(i64 %t58)
+  %t60 = call i64 @js_event_get_float(i64 %t55, i8* %t59)
+  %t61 = trunc i64 %t54 to i32
+  %t62 = inttoptr i32 %t61 to %events_MouseEventData*
+  %t63 = getelementptr %events_MouseEventData, %events_MouseEventData* %t62, i32 0, i32 3
+  store volatile i64 %t60, i64* %t63
+  %t64 = load i64, i64* %data
+  %t65 = load i64, i64* %event_ptr
+  %t66 = getelementptr [7 x i8], [7 x i8]* @.str.90, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i32
+  %t68 = zext i32 %t67 to i64
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  %t70 = call i64 @js_event_get_float(i64 %t65, i8* %t69)
+  %t71 = trunc i64 %t64 to i32
+  %t72 = inttoptr i32 %t71 to %events_MouseEventData*
+  %t73 = getelementptr %events_MouseEventData, %events_MouseEventData* %t72, i32 0, i32 4
+  store volatile i64 %t70, i64* %t73
+  %t74 = load i64, i64* %data
+  %t75 = load i64, i64* %event_ptr
+  %t76 = getelementptr [7 x i8], [7 x i8]* @.str.91, i64 0, i64 0
+  %t77 = ptrtoint i8* %t76 to i32
+  %t78 = zext i32 %t77 to i64
+  %t79 = call i8* @__val_untag_ptr(i64 %t78)
+  %t80 = call i64 @js_event_get_bool(i64 %t75, i8* %t79)
+  %t81 = trunc i64 %t74 to i32
+  %t82 = inttoptr i32 %t81 to %events_MouseEventData*
+  %t83 = getelementptr %events_MouseEventData, %events_MouseEventData* %t82, i32 0, i32 6
+  store volatile i64 %t80, i64* %t83
+  %t84 = load i64, i64* %data
+  %t85 = load i64, i64* %event_ptr
+  %t86 = getelementptr [8 x i8], [8 x i8]* @.str.92, i64 0, i64 0
+  %t87 = ptrtoint i8* %t86 to i32
+  %t88 = zext i32 %t87 to i64
+  %t89 = call i8* @__val_untag_ptr(i64 %t88)
+  %t90 = call i64 @js_event_get_bool(i64 %t85, i8* %t89)
+  %t91 = trunc i64 %t84 to i32
+  %t92 = inttoptr i32 %t91 to %events_MouseEventData*
+  %t93 = getelementptr %events_MouseEventData, %events_MouseEventData* %t92, i32 0, i32 7
+  store volatile i64 %t90, i64* %t93
+  %t94 = load i64, i64* %data
+  %t95 = load i64, i64* %event_ptr
+  %t96 = getelementptr [9 x i8], [9 x i8]* @.str.93, i64 0, i64 0
+  %t97 = ptrtoint i8* %t96 to i32
+  %t98 = zext i32 %t97 to i64
+  %t99 = call i8* @__val_untag_ptr(i64 %t98)
+  %t100 = call i64 @js_event_get_bool(i64 %t95, i8* %t99)
+  %t101 = trunc i64 %t94 to i32
+  %t102 = inttoptr i32 %t101 to %events_MouseEventData*
+  %t103 = getelementptr %events_MouseEventData, %events_MouseEventData* %t102, i32 0, i32 8
+  store volatile i64 %t100, i64* %t103
+  %t104 = load i64, i64* %data
+  %t105 = load i64, i64* %event_ptr
+  %t106 = getelementptr [8 x i8], [8 x i8]* @.str.94, i64 0, i64 0
+  %t107 = ptrtoint i8* %t106 to i32
+  %t108 = zext i32 %t107 to i64
+  %t109 = call i8* @__val_untag_ptr(i64 %t108)
+  %t110 = call i64 @js_event_get_bool(i64 %t105, i8* %t109)
+  %t111 = trunc i64 %t104 to i32
+  %t112 = inttoptr i32 %t111 to %events_MouseEventData*
+  %t113 = getelementptr %events_MouseEventData, %events_MouseEventData* %t112, i32 0, i32 9
+  store volatile i64 %t110, i64* %t113
+  %t114 = load i64, i64* @__g_events__callbacks
+  %t115 = load i64, i64* %callback_id
+  %t116 = call i64 @__map_get(i64 %t114, i64 %t115)
+  %t117 = trunc i64 %t116 to i32
+  %t118 = inttoptr i32 %t117 to [2 x i64]*
+  %t119 = getelementptr [2 x i64], [2 x i64]* %t118, i64 0, i64 0
+  %t120 = load i64, i64* %t119
+  %t121 = getelementptr [2 x i64], [2 x i64]* %t118, i64 0, i64 1
+  %t122 = load i64, i64* %t121
+  %t123 = load i64, i64* %data
+  %t124 = shl i64 0, 56
+  %t125 = or i64 %t124, %t123
+  %t126 = trunc i64 %t120 to i32
+  %t127 = inttoptr i32 %t126 to i64 (i64, i64)*
+  %t128 = call i64 %t127(i64 %t122, i64 %t125)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4583,100 +4576,99 @@ else137:
   br label %endif135
 endif135:
   %t23 = call i64 @events_KeyboardEventData()
-  %t24 = call i64 @events_KeyboardEventData__init(i64 %t23)
   store i64 %t23, i64* %data
-  %t25 = load i64, i64* %data
-  %t26 = load i64, i64* %event_ptr
-  %t27 = getelementptr [4 x i8], [4 x i8]* @.str.95, i64 0, i64 0
-  %t28 = ptrtoint i8* %t27 to i32
-  %t29 = zext i32 %t28 to i64
-  %t30 = call i8* @__val_untag_ptr(i64 %t29)
-  %t31 = call i64 @js_event_get_string(i64 %t26, i8* %t30)
-  %t32 = trunc i64 %t25 to i32
-  %t33 = inttoptr i32 %t32 to %events_KeyboardEventData*
-  %t34 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t33, i32 0, i32 0
-  store volatile i64 %t31, i64* %t34
-  %t35 = load i64, i64* %data
-  %t36 = load i64, i64* %event_ptr
-  %t37 = getelementptr [5 x i8], [5 x i8]* @.str.96, i64 0, i64 0
-  %t38 = ptrtoint i8* %t37 to i32
-  %t39 = zext i32 %t38 to i64
-  %t40 = call i8* @__val_untag_ptr(i64 %t39)
-  %t41 = call i64 @js_event_get_string(i64 %t36, i8* %t40)
-  %t42 = trunc i64 %t35 to i32
-  %t43 = inttoptr i32 %t42 to %events_KeyboardEventData*
-  %t44 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t43, i32 0, i32 1
-  store volatile i64 %t41, i64* %t44
-  %t45 = load i64, i64* %data
-  %t46 = load i64, i64* %event_ptr
-  %t47 = getelementptr [7 x i8], [7 x i8]* @.str.97, i64 0, i64 0
-  %t48 = ptrtoint i8* %t47 to i32
-  %t49 = zext i32 %t48 to i64
-  %t50 = call i8* @__val_untag_ptr(i64 %t49)
-  %t51 = call i64 @js_event_get_bool(i64 %t46, i8* %t50)
-  %t52 = trunc i64 %t45 to i32
-  %t53 = inttoptr i32 %t52 to %events_KeyboardEventData*
-  %t54 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t53, i32 0, i32 3
-  store volatile i64 %t51, i64* %t54
-  %t55 = load i64, i64* %data
-  %t56 = load i64, i64* %event_ptr
-  %t57 = getelementptr [7 x i8], [7 x i8]* @.str.98, i64 0, i64 0
-  %t58 = ptrtoint i8* %t57 to i32
-  %t59 = zext i32 %t58 to i64
-  %t60 = call i8* @__val_untag_ptr(i64 %t59)
-  %t61 = call i64 @js_event_get_bool(i64 %t56, i8* %t60)
-  %t62 = trunc i64 %t55 to i32
-  %t63 = inttoptr i32 %t62 to %events_KeyboardEventData*
-  %t64 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t63, i32 0, i32 4
-  store volatile i64 %t61, i64* %t64
-  %t65 = load i64, i64* %data
-  %t66 = load i64, i64* %event_ptr
-  %t67 = getelementptr [8 x i8], [8 x i8]* @.str.99, i64 0, i64 0
-  %t68 = ptrtoint i8* %t67 to i32
-  %t69 = zext i32 %t68 to i64
-  %t70 = call i8* @__val_untag_ptr(i64 %t69)
-  %t71 = call i64 @js_event_get_bool(i64 %t66, i8* %t70)
-  %t72 = trunc i64 %t65 to i32
-  %t73 = inttoptr i32 %t72 to %events_KeyboardEventData*
-  %t74 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t73, i32 0, i32 5
-  store volatile i64 %t71, i64* %t74
-  %t75 = load i64, i64* %data
-  %t76 = load i64, i64* %event_ptr
-  %t77 = getelementptr [9 x i8], [9 x i8]* @.str.100, i64 0, i64 0
-  %t78 = ptrtoint i8* %t77 to i32
-  %t79 = zext i32 %t78 to i64
-  %t80 = call i8* @__val_untag_ptr(i64 %t79)
-  %t81 = call i64 @js_event_get_bool(i64 %t76, i8* %t80)
-  %t82 = trunc i64 %t75 to i32
-  %t83 = inttoptr i32 %t82 to %events_KeyboardEventData*
-  %t84 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t83, i32 0, i32 6
-  store volatile i64 %t81, i64* %t84
-  %t85 = load i64, i64* %data
-  %t86 = load i64, i64* %event_ptr
-  %t87 = getelementptr [8 x i8], [8 x i8]* @.str.101, i64 0, i64 0
-  %t88 = ptrtoint i8* %t87 to i32
-  %t89 = zext i32 %t88 to i64
-  %t90 = call i8* @__val_untag_ptr(i64 %t89)
-  %t91 = call i64 @js_event_get_bool(i64 %t86, i8* %t90)
-  %t92 = trunc i64 %t85 to i32
-  %t93 = inttoptr i32 %t92 to %events_KeyboardEventData*
-  %t94 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t93, i32 0, i32 7
-  store volatile i64 %t91, i64* %t94
-  %t95 = load i64, i64* @__g_events__callbacks
-  %t96 = load i64, i64* %callback_id
-  %t97 = call i64 @__map_get(i64 %t95, i64 %t96)
-  %t98 = trunc i64 %t97 to i32
-  %t99 = inttoptr i32 %t98 to [2 x i64]*
-  %t100 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 0
-  %t101 = load i64, i64* %t100
-  %t102 = getelementptr [2 x i64], [2 x i64]* %t99, i64 0, i64 1
-  %t103 = load i64, i64* %t102
-  %t104 = load i64, i64* %data
-  %t105 = shl i64 7, 56
-  %t106 = or i64 %t105, %t104
-  %t107 = trunc i64 %t101 to i32
-  %t108 = inttoptr i32 %t107 to i64 (i64, i64)*
-  %t109 = call i64 %t108(i64 %t103, i64 %t106)
+  %t24 = load i64, i64* %data
+  %t25 = load i64, i64* %event_ptr
+  %t26 = getelementptr [4 x i8], [4 x i8]* @.str.95, i64 0, i64 0
+  %t27 = ptrtoint i8* %t26 to i32
+  %t28 = zext i32 %t27 to i64
+  %t29 = call i8* @__val_untag_ptr(i64 %t28)
+  %t30 = call i64 @js_event_get_string(i64 %t25, i8* %t29)
+  %t31 = trunc i64 %t24 to i32
+  %t32 = inttoptr i32 %t31 to %events_KeyboardEventData*
+  %t33 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t32, i32 0, i32 0
+  store volatile i64 %t30, i64* %t33
+  %t34 = load i64, i64* %data
+  %t35 = load i64, i64* %event_ptr
+  %t36 = getelementptr [5 x i8], [5 x i8]* @.str.96, i64 0, i64 0
+  %t37 = ptrtoint i8* %t36 to i32
+  %t38 = zext i32 %t37 to i64
+  %t39 = call i8* @__val_untag_ptr(i64 %t38)
+  %t40 = call i64 @js_event_get_string(i64 %t35, i8* %t39)
+  %t41 = trunc i64 %t34 to i32
+  %t42 = inttoptr i32 %t41 to %events_KeyboardEventData*
+  %t43 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t42, i32 0, i32 1
+  store volatile i64 %t40, i64* %t43
+  %t44 = load i64, i64* %data
+  %t45 = load i64, i64* %event_ptr
+  %t46 = getelementptr [7 x i8], [7 x i8]* @.str.97, i64 0, i64 0
+  %t47 = ptrtoint i8* %t46 to i32
+  %t48 = zext i32 %t47 to i64
+  %t49 = call i8* @__val_untag_ptr(i64 %t48)
+  %t50 = call i64 @js_event_get_bool(i64 %t45, i8* %t49)
+  %t51 = trunc i64 %t44 to i32
+  %t52 = inttoptr i32 %t51 to %events_KeyboardEventData*
+  %t53 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t52, i32 0, i32 3
+  store volatile i64 %t50, i64* %t53
+  %t54 = load i64, i64* %data
+  %t55 = load i64, i64* %event_ptr
+  %t56 = getelementptr [7 x i8], [7 x i8]* @.str.98, i64 0, i64 0
+  %t57 = ptrtoint i8* %t56 to i32
+  %t58 = zext i32 %t57 to i64
+  %t59 = call i8* @__val_untag_ptr(i64 %t58)
+  %t60 = call i64 @js_event_get_bool(i64 %t55, i8* %t59)
+  %t61 = trunc i64 %t54 to i32
+  %t62 = inttoptr i32 %t61 to %events_KeyboardEventData*
+  %t63 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t62, i32 0, i32 4
+  store volatile i64 %t60, i64* %t63
+  %t64 = load i64, i64* %data
+  %t65 = load i64, i64* %event_ptr
+  %t66 = getelementptr [8 x i8], [8 x i8]* @.str.99, i64 0, i64 0
+  %t67 = ptrtoint i8* %t66 to i32
+  %t68 = zext i32 %t67 to i64
+  %t69 = call i8* @__val_untag_ptr(i64 %t68)
+  %t70 = call i64 @js_event_get_bool(i64 %t65, i8* %t69)
+  %t71 = trunc i64 %t64 to i32
+  %t72 = inttoptr i32 %t71 to %events_KeyboardEventData*
+  %t73 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t72, i32 0, i32 5
+  store volatile i64 %t70, i64* %t73
+  %t74 = load i64, i64* %data
+  %t75 = load i64, i64* %event_ptr
+  %t76 = getelementptr [9 x i8], [9 x i8]* @.str.100, i64 0, i64 0
+  %t77 = ptrtoint i8* %t76 to i32
+  %t78 = zext i32 %t77 to i64
+  %t79 = call i8* @__val_untag_ptr(i64 %t78)
+  %t80 = call i64 @js_event_get_bool(i64 %t75, i8* %t79)
+  %t81 = trunc i64 %t74 to i32
+  %t82 = inttoptr i32 %t81 to %events_KeyboardEventData*
+  %t83 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t82, i32 0, i32 6
+  store volatile i64 %t80, i64* %t83
+  %t84 = load i64, i64* %data
+  %t85 = load i64, i64* %event_ptr
+  %t86 = getelementptr [8 x i8], [8 x i8]* @.str.101, i64 0, i64 0
+  %t87 = ptrtoint i8* %t86 to i32
+  %t88 = zext i32 %t87 to i64
+  %t89 = call i8* @__val_untag_ptr(i64 %t88)
+  %t90 = call i64 @js_event_get_bool(i64 %t85, i8* %t89)
+  %t91 = trunc i64 %t84 to i32
+  %t92 = inttoptr i32 %t91 to %events_KeyboardEventData*
+  %t93 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t92, i32 0, i32 7
+  store volatile i64 %t90, i64* %t93
+  %t94 = load i64, i64* @__g_events__callbacks
+  %t95 = load i64, i64* %callback_id
+  %t96 = call i64 @__map_get(i64 %t94, i64 %t95)
+  %t97 = trunc i64 %t96 to i32
+  %t98 = inttoptr i32 %t97 to [2 x i64]*
+  %t99 = getelementptr [2 x i64], [2 x i64]* %t98, i64 0, i64 0
+  %t100 = load i64, i64* %t99
+  %t101 = getelementptr [2 x i64], [2 x i64]* %t98, i64 0, i64 1
+  %t102 = load i64, i64* %t101
+  %t103 = load i64, i64* %data
+  %t104 = shl i64 7, 56
+  %t105 = or i64 %t104, %t103
+  %t106 = trunc i64 %t100 to i32
+  %t107 = inttoptr i32 %t106 to i64 (i64, i64)*
+  %t108 = call i64 %t107(i64 %t102, i64 %t105)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4708,45 +4700,44 @@ else140:
   br label %endif138
 endif138:
   %t11 = call i64 @events_KeyboardEventData()
-  %t12 = call i64 @events_KeyboardEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* %data
-  %t14 = load i64, i64* %event_ptr
-  %t15 = getelementptr [4 x i8], [4 x i8]* @.str.102, i64 0, i64 0
-  %t16 = ptrtoint i8* %t15 to i32
-  %t17 = zext i32 %t16 to i64
-  %t18 = call i8* @__val_untag_ptr(i64 %t17)
-  %t19 = call i64 @js_event_get_string(i64 %t14, i8* %t18)
-  %t20 = trunc i64 %t13 to i32
-  %t21 = inttoptr i32 %t20 to %events_KeyboardEventData*
-  %t22 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t21, i32 0, i32 0
-  store volatile i64 %t19, i64* %t22
-  %t23 = load i64, i64* %data
-  %t24 = load i64, i64* %event_ptr
-  %t25 = getelementptr [5 x i8], [5 x i8]* @.str.103, i64 0, i64 0
-  %t26 = ptrtoint i8* %t25 to i32
-  %t27 = zext i32 %t26 to i64
-  %t28 = call i8* @__val_untag_ptr(i64 %t27)
-  %t29 = call i64 @js_event_get_string(i64 %t24, i8* %t28)
-  %t30 = trunc i64 %t23 to i32
-  %t31 = inttoptr i32 %t30 to %events_KeyboardEventData*
-  %t32 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t31, i32 0, i32 1
-  store volatile i64 %t29, i64* %t32
-  %t33 = load i64, i64* @__g_events__callbacks
-  %t34 = load i64, i64* %callback_id
-  %t35 = call i64 @__map_get(i64 %t33, i64 %t34)
-  %t36 = trunc i64 %t35 to i32
-  %t37 = inttoptr i32 %t36 to [2 x i64]*
-  %t38 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 0
-  %t39 = load i64, i64* %t38
-  %t40 = getelementptr [2 x i64], [2 x i64]* %t37, i64 0, i64 1
-  %t41 = load i64, i64* %t40
-  %t42 = load i64, i64* %data
-  %t43 = shl i64 8, 56
-  %t44 = or i64 %t43, %t42
-  %t45 = trunc i64 %t39 to i32
-  %t46 = inttoptr i32 %t45 to i64 (i64, i64)*
-  %t47 = call i64 %t46(i64 %t41, i64 %t44)
+  %t12 = load i64, i64* %data
+  %t13 = load i64, i64* %event_ptr
+  %t14 = getelementptr [4 x i8], [4 x i8]* @.str.102, i64 0, i64 0
+  %t15 = ptrtoint i8* %t14 to i32
+  %t16 = zext i32 %t15 to i64
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = call i64 @js_event_get_string(i64 %t13, i8* %t17)
+  %t19 = trunc i64 %t12 to i32
+  %t20 = inttoptr i32 %t19 to %events_KeyboardEventData*
+  %t21 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t20, i32 0, i32 0
+  store volatile i64 %t18, i64* %t21
+  %t22 = load i64, i64* %data
+  %t23 = load i64, i64* %event_ptr
+  %t24 = getelementptr [5 x i8], [5 x i8]* @.str.103, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i32
+  %t26 = zext i32 %t25 to i64
+  %t27 = call i8* @__val_untag_ptr(i64 %t26)
+  %t28 = call i64 @js_event_get_string(i64 %t23, i8* %t27)
+  %t29 = trunc i64 %t22 to i32
+  %t30 = inttoptr i32 %t29 to %events_KeyboardEventData*
+  %t31 = getelementptr %events_KeyboardEventData, %events_KeyboardEventData* %t30, i32 0, i32 1
+  store volatile i64 %t28, i64* %t31
+  %t32 = load i64, i64* @__g_events__callbacks
+  %t33 = load i64, i64* %callback_id
+  %t34 = call i64 @__map_get(i64 %t32, i64 %t33)
+  %t35 = trunc i64 %t34 to i32
+  %t36 = inttoptr i32 %t35 to [2 x i64]*
+  %t37 = getelementptr [2 x i64], [2 x i64]* %t36, i64 0, i64 0
+  %t38 = load i64, i64* %t37
+  %t39 = getelementptr [2 x i64], [2 x i64]* %t36, i64 0, i64 1
+  %t40 = load i64, i64* %t39
+  %t41 = load i64, i64* %data
+  %t42 = shl i64 8, 56
+  %t43 = or i64 %t42, %t41
+  %t44 = trunc i64 %t38 to i32
+  %t45 = inttoptr i32 %t44 to i64 (i64, i64)*
+  %t46 = call i64 %t45(i64 %t40, i64 %t43)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4778,56 +4769,55 @@ else143:
   br label %endif141
 endif141:
   %t11 = call i64 @events_InputEventData()
-  %t12 = call i64 @events_InputEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* %data
-  %t14 = load i64, i64* %event_ptr
-  %t15 = getelementptr [13 x i8], [13 x i8]* @.str.104, i64 0, i64 0
-  %t16 = ptrtoint i8* %t15 to i32
-  %t17 = zext i32 %t16 to i64
-  %t18 = call i8* @__val_untag_ptr(i64 %t17)
-  %t19 = call i64 @js_event_get_string(i64 %t14, i8* %t18)
-  %t20 = trunc i64 %t13 to i32
-  %t21 = inttoptr i32 %t20 to %events_InputEventData*
-  %t22 = getelementptr %events_InputEventData, %events_InputEventData* %t21, i32 0, i32 0
-  store volatile i64 %t19, i64* %t22
-  %t23 = load i64, i64* %data
-  %t24 = load i64, i64* %event_ptr
-  %t25 = getelementptr [10 x i8], [10 x i8]* @.str.105, i64 0, i64 0
-  %t26 = ptrtoint i8* %t25 to i32
-  %t27 = zext i32 %t26 to i64
-  %t28 = call i8* @__val_untag_ptr(i64 %t27)
-  %t29 = call i64 @js_event_get_string(i64 %t24, i8* %t28)
-  %t30 = trunc i64 %t23 to i32
-  %t31 = inttoptr i32 %t30 to %events_InputEventData*
-  %t32 = getelementptr %events_InputEventData, %events_InputEventData* %t31, i32 0, i32 1
-  store volatile i64 %t29, i64* %t32
-  %t33 = load i64, i64* %data
-  %t34 = load i64, i64* %event_ptr
-  %t35 = getelementptr [5 x i8], [5 x i8]* @.str.106, i64 0, i64 0
-  %t36 = ptrtoint i8* %t35 to i32
-  %t37 = zext i32 %t36 to i64
-  %t38 = call i8* @__val_untag_ptr(i64 %t37)
-  %t39 = call i64 @js_event_get_string(i64 %t34, i8* %t38)
-  %t40 = trunc i64 %t33 to i32
-  %t41 = inttoptr i32 %t40 to %events_InputEventData*
-  %t42 = getelementptr %events_InputEventData, %events_InputEventData* %t41, i32 0, i32 2
-  store volatile i64 %t39, i64* %t42
-  %t43 = load i64, i64* @__g_events__callbacks
-  %t44 = load i64, i64* %callback_id
-  %t45 = call i64 @__map_get(i64 %t43, i64 %t44)
-  %t46 = trunc i64 %t45 to i32
-  %t47 = inttoptr i32 %t46 to [2 x i64]*
-  %t48 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 0
-  %t49 = load i64, i64* %t48
-  %t50 = getelementptr [2 x i64], [2 x i64]* %t47, i64 0, i64 1
-  %t51 = load i64, i64* %t50
-  %t52 = load i64, i64* %data
-  %t53 = shl i64 9, 56
-  %t54 = or i64 %t53, %t52
-  %t55 = trunc i64 %t49 to i32
-  %t56 = inttoptr i32 %t55 to i64 (i64, i64)*
-  %t57 = call i64 %t56(i64 %t51, i64 %t54)
+  %t12 = load i64, i64* %data
+  %t13 = load i64, i64* %event_ptr
+  %t14 = getelementptr [13 x i8], [13 x i8]* @.str.104, i64 0, i64 0
+  %t15 = ptrtoint i8* %t14 to i32
+  %t16 = zext i32 %t15 to i64
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = call i64 @js_event_get_string(i64 %t13, i8* %t17)
+  %t19 = trunc i64 %t12 to i32
+  %t20 = inttoptr i32 %t19 to %events_InputEventData*
+  %t21 = getelementptr %events_InputEventData, %events_InputEventData* %t20, i32 0, i32 0
+  store volatile i64 %t18, i64* %t21
+  %t22 = load i64, i64* %data
+  %t23 = load i64, i64* %event_ptr
+  %t24 = getelementptr [10 x i8], [10 x i8]* @.str.105, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i32
+  %t26 = zext i32 %t25 to i64
+  %t27 = call i8* @__val_untag_ptr(i64 %t26)
+  %t28 = call i64 @js_event_get_string(i64 %t23, i8* %t27)
+  %t29 = trunc i64 %t22 to i32
+  %t30 = inttoptr i32 %t29 to %events_InputEventData*
+  %t31 = getelementptr %events_InputEventData, %events_InputEventData* %t30, i32 0, i32 1
+  store volatile i64 %t28, i64* %t31
+  %t32 = load i64, i64* %data
+  %t33 = load i64, i64* %event_ptr
+  %t34 = getelementptr [5 x i8], [5 x i8]* @.str.106, i64 0, i64 0
+  %t35 = ptrtoint i8* %t34 to i32
+  %t36 = zext i32 %t35 to i64
+  %t37 = call i8* @__val_untag_ptr(i64 %t36)
+  %t38 = call i64 @js_event_get_string(i64 %t33, i8* %t37)
+  %t39 = trunc i64 %t32 to i32
+  %t40 = inttoptr i32 %t39 to %events_InputEventData*
+  %t41 = getelementptr %events_InputEventData, %events_InputEventData* %t40, i32 0, i32 2
+  store volatile i64 %t38, i64* %t41
+  %t42 = load i64, i64* @__g_events__callbacks
+  %t43 = load i64, i64* %callback_id
+  %t44 = call i64 @__map_get(i64 %t42, i64 %t43)
+  %t45 = trunc i64 %t44 to i32
+  %t46 = inttoptr i32 %t45 to [2 x i64]*
+  %t47 = getelementptr [2 x i64], [2 x i64]* %t46, i64 0, i64 0
+  %t48 = load i64, i64* %t47
+  %t49 = getelementptr [2 x i64], [2 x i64]* %t46, i64 0, i64 1
+  %t50 = load i64, i64* %t49
+  %t51 = load i64, i64* %data
+  %t52 = shl i64 9, 56
+  %t53 = or i64 %t52, %t51
+  %t54 = trunc i64 %t48 to i32
+  %t55 = inttoptr i32 %t54 to i64 (i64, i64)*
+  %t56 = call i64 %t55(i64 %t50, i64 %t53)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4859,34 +4849,33 @@ else146:
   br label %endif144
 endif144:
   %t11 = call i64 @events_InputEventData()
-  %t12 = call i64 @events_InputEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* %data
-  %t14 = load i64, i64* %event_ptr
-  %t15 = getelementptr [13 x i8], [13 x i8]* @.str.107, i64 0, i64 0
-  %t16 = ptrtoint i8* %t15 to i32
-  %t17 = zext i32 %t16 to i64
-  %t18 = call i8* @__val_untag_ptr(i64 %t17)
-  %t19 = call i64 @js_event_get_string(i64 %t14, i8* %t18)
-  %t20 = trunc i64 %t13 to i32
-  %t21 = inttoptr i32 %t20 to %events_InputEventData*
-  %t22 = getelementptr %events_InputEventData, %events_InputEventData* %t21, i32 0, i32 0
-  store volatile i64 %t19, i64* %t22
-  %t23 = load i64, i64* @__g_events__callbacks
-  %t24 = load i64, i64* %callback_id
-  %t25 = call i64 @__map_get(i64 %t23, i64 %t24)
-  %t26 = trunc i64 %t25 to i32
-  %t27 = inttoptr i32 %t26 to [2 x i64]*
-  %t28 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 0
-  %t29 = load i64, i64* %t28
-  %t30 = getelementptr [2 x i64], [2 x i64]* %t27, i64 0, i64 1
-  %t31 = load i64, i64* %t30
-  %t32 = load i64, i64* %data
-  %t33 = shl i64 10, 56
-  %t34 = or i64 %t33, %t32
-  %t35 = trunc i64 %t29 to i32
-  %t36 = inttoptr i32 %t35 to i64 (i64, i64)*
-  %t37 = call i64 %t36(i64 %t31, i64 %t34)
+  %t12 = load i64, i64* %data
+  %t13 = load i64, i64* %event_ptr
+  %t14 = getelementptr [13 x i8], [13 x i8]* @.str.107, i64 0, i64 0
+  %t15 = ptrtoint i8* %t14 to i32
+  %t16 = zext i32 %t15 to i64
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = call i64 @js_event_get_string(i64 %t13, i8* %t17)
+  %t19 = trunc i64 %t12 to i32
+  %t20 = inttoptr i32 %t19 to %events_InputEventData*
+  %t21 = getelementptr %events_InputEventData, %events_InputEventData* %t20, i32 0, i32 0
+  store volatile i64 %t18, i64* %t21
+  %t22 = load i64, i64* @__g_events__callbacks
+  %t23 = load i64, i64* %callback_id
+  %t24 = call i64 @__map_get(i64 %t22, i64 %t23)
+  %t25 = trunc i64 %t24 to i32
+  %t26 = inttoptr i32 %t25 to [2 x i64]*
+  %t27 = getelementptr [2 x i64], [2 x i64]* %t26, i64 0, i64 0
+  %t28 = load i64, i64* %t27
+  %t29 = getelementptr [2 x i64], [2 x i64]* %t26, i64 0, i64 1
+  %t30 = load i64, i64* %t29
+  %t31 = load i64, i64* %data
+  %t32 = shl i64 10, 56
+  %t33 = or i64 %t32, %t31
+  %t34 = trunc i64 %t28 to i32
+  %t35 = inttoptr i32 %t34 to i64 (i64, i64)*
+  %t36 = call i64 %t35(i64 %t30, i64 %t33)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4920,23 +4909,22 @@ endif147:
   %t11 = load i64, i64* %event_ptr
   call void @js_event_prevent_default(i64 %t11)
   %t12 = call i64 @events_SubmitEventData()
-  %t13 = call i64 @events_SubmitEventData__init(i64 %t12)
   store i64 %t12, i64* %data
-  %t14 = load i64, i64* @__g_events__callbacks
-  %t15 = load i64, i64* %callback_id
-  %t16 = call i64 @__map_get(i64 %t14, i64 %t15)
-  %t17 = trunc i64 %t16 to i32
-  %t18 = inttoptr i32 %t17 to [2 x i64]*
-  %t19 = getelementptr [2 x i64], [2 x i64]* %t18, i64 0, i64 0
-  %t20 = load i64, i64* %t19
-  %t21 = getelementptr [2 x i64], [2 x i64]* %t18, i64 0, i64 1
-  %t22 = load i64, i64* %t21
-  %t23 = load i64, i64* %data
-  %t24 = shl i64 13, 56
-  %t25 = or i64 %t24, %t23
-  %t26 = trunc i64 %t20 to i32
-  %t27 = inttoptr i32 %t26 to i64 (i64, i64)*
-  %t28 = call i64 %t27(i64 %t22, i64 %t25)
+  %t13 = load i64, i64* @__g_events__callbacks
+  %t14 = load i64, i64* %callback_id
+  %t15 = call i64 @__map_get(i64 %t13, i64 %t14)
+  %t16 = trunc i64 %t15 to i32
+  %t17 = inttoptr i32 %t16 to [2 x i64]*
+  %t18 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 0
+  %t19 = load i64, i64* %t18
+  %t20 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 1
+  %t21 = load i64, i64* %t20
+  %t22 = load i64, i64* %data
+  %t23 = shl i64 13, 56
+  %t24 = or i64 %t23, %t22
+  %t25 = trunc i64 %t19 to i32
+  %t26 = inttoptr i32 %t25 to i64 (i64, i64)*
+  %t27 = call i64 %t26(i64 %t21, i64 %t24)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -4968,23 +4956,22 @@ else152:
   br label %endif150
 endif150:
   %t11 = call i64 @events_FocusEventData()
-  %t12 = call i64 @events_FocusEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* @__g_events__callbacks
-  %t14 = load i64, i64* %callback_id
-  %t15 = call i64 @__map_get(i64 %t13, i64 %t14)
-  %t16 = trunc i64 %t15 to i32
-  %t17 = inttoptr i32 %t16 to [2 x i64]*
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 0
-  %t19 = load i64, i64* %t18
-  %t20 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 1
-  %t21 = load i64, i64* %t20
-  %t22 = load i64, i64* %data
-  %t23 = shl i64 11, 56
-  %t24 = or i64 %t23, %t22
-  %t25 = trunc i64 %t19 to i32
-  %t26 = inttoptr i32 %t25 to i64 (i64, i64)*
-  %t27 = call i64 %t26(i64 %t21, i64 %t24)
+  %t12 = load i64, i64* @__g_events__callbacks
+  %t13 = load i64, i64* %callback_id
+  %t14 = call i64 @__map_get(i64 %t12, i64 %t13)
+  %t15 = trunc i64 %t14 to i32
+  %t16 = inttoptr i32 %t15 to [2 x i64]*
+  %t17 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 0
+  %t18 = load i64, i64* %t17
+  %t19 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 1
+  %t20 = load i64, i64* %t19
+  %t21 = load i64, i64* %data
+  %t22 = shl i64 11, 56
+  %t23 = or i64 %t22, %t21
+  %t24 = trunc i64 %t18 to i32
+  %t25 = inttoptr i32 %t24 to i64 (i64, i64)*
+  %t26 = call i64 %t25(i64 %t20, i64 %t23)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -5016,23 +5003,22 @@ else155:
   br label %endif153
 endif153:
   %t11 = call i64 @events_FocusEventData()
-  %t12 = call i64 @events_FocusEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* @__g_events__callbacks
-  %t14 = load i64, i64* %callback_id
-  %t15 = call i64 @__map_get(i64 %t13, i64 %t14)
-  %t16 = trunc i64 %t15 to i32
-  %t17 = inttoptr i32 %t16 to [2 x i64]*
-  %t18 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 0
-  %t19 = load i64, i64* %t18
-  %t20 = getelementptr [2 x i64], [2 x i64]* %t17, i64 0, i64 1
-  %t21 = load i64, i64* %t20
-  %t22 = load i64, i64* %data
-  %t23 = shl i64 12, 56
-  %t24 = or i64 %t23, %t22
-  %t25 = trunc i64 %t19 to i32
-  %t26 = inttoptr i32 %t25 to i64 (i64, i64)*
-  %t27 = call i64 %t26(i64 %t21, i64 %t24)
+  %t12 = load i64, i64* @__g_events__callbacks
+  %t13 = load i64, i64* %callback_id
+  %t14 = call i64 @__map_get(i64 %t12, i64 %t13)
+  %t15 = trunc i64 %t14 to i32
+  %t16 = inttoptr i32 %t15 to [2 x i64]*
+  %t17 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 0
+  %t18 = load i64, i64* %t17
+  %t19 = getelementptr [2 x i64], [2 x i64]* %t16, i64 0, i64 1
+  %t20 = load i64, i64* %t19
+  %t21 = load i64, i64* %data
+  %t22 = shl i64 12, 56
+  %t23 = or i64 %t22, %t21
+  %t24 = trunc i64 %t18 to i32
+  %t25 = inttoptr i32 %t24 to i64 (i64, i64)*
+  %t26 = call i64 %t25(i64 %t20, i64 %t23)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -5064,67 +5050,66 @@ else158:
   br label %endif156
 endif156:
   %t11 = call i64 @events_WheelEventData()
-  %t12 = call i64 @events_WheelEventData__init(i64 %t11)
   store i64 %t11, i64* %data
-  %t13 = load i64, i64* %data
-  %t14 = load i64, i64* %event_ptr
-  %t15 = getelementptr [7 x i8], [7 x i8]* @.str.108, i64 0, i64 0
-  %t16 = ptrtoint i8* %t15 to i32
-  %t17 = zext i32 %t16 to i64
-  %t18 = call i8* @__val_untag_ptr(i64 %t17)
-  %t19 = call i64 @js_event_get_float(i64 %t14, i8* %t18)
-  %t20 = trunc i64 %t13 to i32
-  %t21 = inttoptr i32 %t20 to %events_WheelEventData*
-  %t22 = getelementptr %events_WheelEventData, %events_WheelEventData* %t21, i32 0, i32 0
-  store volatile i64 %t19, i64* %t22
-  %t23 = load i64, i64* %data
-  %t24 = load i64, i64* %event_ptr
-  %t25 = getelementptr [7 x i8], [7 x i8]* @.str.109, i64 0, i64 0
-  %t26 = ptrtoint i8* %t25 to i32
-  %t27 = zext i32 %t26 to i64
-  %t28 = call i8* @__val_untag_ptr(i64 %t27)
-  %t29 = call i64 @js_event_get_float(i64 %t24, i8* %t28)
-  %t30 = trunc i64 %t23 to i32
-  %t31 = inttoptr i32 %t30 to %events_WheelEventData*
-  %t32 = getelementptr %events_WheelEventData, %events_WheelEventData* %t31, i32 0, i32 1
-  store volatile i64 %t29, i64* %t32
-  %t33 = load i64, i64* %data
-  %t34 = load i64, i64* %event_ptr
-  %t35 = getelementptr [7 x i8], [7 x i8]* @.str.110, i64 0, i64 0
-  %t36 = ptrtoint i8* %t35 to i32
-  %t37 = zext i32 %t36 to i64
-  %t38 = call i8* @__val_untag_ptr(i64 %t37)
-  %t39 = call i64 @js_event_get_float(i64 %t34, i8* %t38)
-  %t40 = trunc i64 %t33 to i32
-  %t41 = inttoptr i32 %t40 to %events_WheelEventData*
-  %t42 = getelementptr %events_WheelEventData, %events_WheelEventData* %t41, i32 0, i32 2
-  store volatile i64 %t39, i64* %t42
-  %t43 = load i64, i64* %data
-  %t44 = load i64, i64* %event_ptr
-  %t45 = getelementptr [10 x i8], [10 x i8]* @.str.111, i64 0, i64 0
-  %t46 = ptrtoint i8* %t45 to i32
-  %t47 = zext i32 %t46 to i64
-  %t48 = call i8* @__val_untag_ptr(i64 %t47)
-  %t49 = call i64 @js_event_get_float(i64 %t44, i8* %t48)
-  %t50 = trunc i64 %t43 to i32
-  %t51 = inttoptr i32 %t50 to %events_WheelEventData*
-  %t52 = getelementptr %events_WheelEventData, %events_WheelEventData* %t51, i32 0, i32 3
-  store volatile i64 %t49, i64* %t52
-  %t53 = load i64, i64* @__g_events__callbacks
-  %t54 = load i64, i64* %callback_id
-  %t55 = call i64 @__map_get(i64 %t53, i64 %t54)
-  %t56 = trunc i64 %t55 to i32
-  %t57 = inttoptr i32 %t56 to [2 x i64]*
-  %t58 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 0
-  %t59 = load i64, i64* %t58
-  %t60 = getelementptr [2 x i64], [2 x i64]* %t57, i64 0, i64 1
-  %t61 = load i64, i64* %t60
-  %t62 = load i64, i64* %data
-  %t63 = shl i64 14, 56
-  %t64 = or i64 %t63, %t62
-  %t65 = trunc i64 %t59 to i32
-  %t66 = inttoptr i32 %t65 to i64 (i64, i64)*
-  %t67 = call i64 %t66(i64 %t61, i64 %t64)
+  %t12 = load i64, i64* %data
+  %t13 = load i64, i64* %event_ptr
+  %t14 = getelementptr [7 x i8], [7 x i8]* @.str.108, i64 0, i64 0
+  %t15 = ptrtoint i8* %t14 to i32
+  %t16 = zext i32 %t15 to i64
+  %t17 = call i8* @__val_untag_ptr(i64 %t16)
+  %t18 = call i64 @js_event_get_float(i64 %t13, i8* %t17)
+  %t19 = trunc i64 %t12 to i32
+  %t20 = inttoptr i32 %t19 to %events_WheelEventData*
+  %t21 = getelementptr %events_WheelEventData, %events_WheelEventData* %t20, i32 0, i32 0
+  store volatile i64 %t18, i64* %t21
+  %t22 = load i64, i64* %data
+  %t23 = load i64, i64* %event_ptr
+  %t24 = getelementptr [7 x i8], [7 x i8]* @.str.109, i64 0, i64 0
+  %t25 = ptrtoint i8* %t24 to i32
+  %t26 = zext i32 %t25 to i64
+  %t27 = call i8* @__val_untag_ptr(i64 %t26)
+  %t28 = call i64 @js_event_get_float(i64 %t23, i8* %t27)
+  %t29 = trunc i64 %t22 to i32
+  %t30 = inttoptr i32 %t29 to %events_WheelEventData*
+  %t31 = getelementptr %events_WheelEventData, %events_WheelEventData* %t30, i32 0, i32 1
+  store volatile i64 %t28, i64* %t31
+  %t32 = load i64, i64* %data
+  %t33 = load i64, i64* %event_ptr
+  %t34 = getelementptr [7 x i8], [7 x i8]* @.str.110, i64 0, i64 0
+  %t35 = ptrtoint i8* %t34 to i32
+  %t36 = zext i32 %t35 to i64
+  %t37 = call i8* @__val_untag_ptr(i64 %t36)
+  %t38 = call i64 @js_event_get_float(i64 %t33, i8* %t37)
+  %t39 = trunc i64 %t32 to i32
+  %t40 = inttoptr i32 %t39 to %events_WheelEventData*
+  %t41 = getelementptr %events_WheelEventData, %events_WheelEventData* %t40, i32 0, i32 2
+  store volatile i64 %t38, i64* %t41
+  %t42 = load i64, i64* %data
+  %t43 = load i64, i64* %event_ptr
+  %t44 = getelementptr [10 x i8], [10 x i8]* @.str.111, i64 0, i64 0
+  %t45 = ptrtoint i8* %t44 to i32
+  %t46 = zext i32 %t45 to i64
+  %t47 = call i8* @__val_untag_ptr(i64 %t46)
+  %t48 = call i64 @js_event_get_float(i64 %t43, i8* %t47)
+  %t49 = trunc i64 %t42 to i32
+  %t50 = inttoptr i32 %t49 to %events_WheelEventData*
+  %t51 = getelementptr %events_WheelEventData, %events_WheelEventData* %t50, i32 0, i32 3
+  store volatile i64 %t48, i64* %t51
+  %t52 = load i64, i64* @__g_events__callbacks
+  %t53 = load i64, i64* %callback_id
+  %t54 = call i64 @__map_get(i64 %t52, i64 %t53)
+  %t55 = trunc i64 %t54 to i32
+  %t56 = inttoptr i32 %t55 to [2 x i64]*
+  %t57 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 0
+  %t58 = load i64, i64* %t57
+  %t59 = getelementptr [2 x i64], [2 x i64]* %t56, i64 0, i64 1
+  %t60 = load i64, i64* %t59
+  %t61 = load i64, i64* %data
+  %t62 = shl i64 14, 56
+  %t63 = or i64 %t62, %t61
+  %t64 = trunc i64 %t58 to i32
+  %t65 = inttoptr i32 %t64 to i64 (i64, i64)*
+  %t66 = call i64 %t65(i64 %t60, i64 %t63)
   call void @__gc_pop_roots(i64 1)
   ret i64 0
 }
@@ -6231,13 +6216,12 @@ entry:
   %t3 = ptrtoint i64* %builder to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = call i64 @reconcile_ConditionalSlot()
-  %t6 = load i64, i64* %parent
-  %t7 = load i64, i64* %condition
-  %t8 = load i64, i64* %builder
-  %t9 = call i64 @reconcile_ConditionalSlot__init(i64 %t5, i64 %t6, i64 %t7, i64 %t8)
+  %t5 = load i64, i64* %parent
+  %t6 = load i64, i64* %condition
+  %t7 = load i64, i64* %builder
+  %t8 = call i64 @reconcile_ConditionalSlot(i64 %t5, i64 %t6, i64 %t7)
   call void @__gc_pop_roots(i64 2)
-  ret i64 %t5
+  ret i64 %t8
 }
 
 define i64 @reconcile_MatchSlot__init(i64 %self.arg, i64 %parent_handle.arg, i64 %discriminator.arg, i64 %builders.arg) {
@@ -6501,13 +6485,12 @@ entry:
   %t3 = ptrtoint i64* %builders to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = call i64 @reconcile_MatchSlot()
-  %t6 = load i64, i64* %parent
-  %t7 = load i64, i64* %discriminator
-  %t8 = load i64, i64* %builders
-  %t9 = call i64 @reconcile_MatchSlot__init(i64 %t5, i64 %t6, i64 %t7, i64 %t8)
+  %t5 = load i64, i64* %parent
+  %t6 = load i64, i64* %discriminator
+  %t7 = load i64, i64* %builders
+  %t8 = call i64 @reconcile_MatchSlot(i64 %t5, i64 %t6, i64 %t7)
   call void @__gc_pop_roots(i64 2)
-  ret i64 %t5
+  ret i64 %t8
 }
 
 define i64 @reconcile_KeyedItem__init(i64 %self.arg, i64 %key.arg, i64 %comp.arg) {
@@ -6948,65 +6931,64 @@ else234:
   %t226 = load i64, i64* %comp
   %t227 = call i64 @reconcile_Component__mount(i64 %t226)
   %t228 = load i64, i64* %new_rendered
-  %t229 = call i64 @reconcile_KeyedItem()
-  %t230 = load i64, i64* %key
-  %t231 = load i64, i64* %comp
-  %t232 = call i64 @reconcile_KeyedItem__init(i64 %t229, i64 %t230, i64 %t231)
-  %t233 = call i64 @__list_push(i64 %t228, i64 %t229)
+  %t229 = load i64, i64* %key
+  %t230 = load i64, i64* %comp
+  %t231 = call i64 @reconcile_KeyedItem(i64 %t229, i64 %t230)
+  %t232 = call i64 @__list_push(i64 %t228, i64 %t231)
   br label %endif232
 endif232:
-  %t234 = load i64, i64* %i
-  %t235 = add i64 0, 1
-  %t236 = add i64 %t234, %t235
-  store i64 %t236, i64* %i
+  %t233 = load i64, i64* %i
+  %t234 = add i64 0, 1
+  %t235 = add i64 %t233, %t234
+  store i64 %t235, i64* %i
   br label %while.cond229
 while.end231:
-  %t237 = add i64 0, 0
-  store i64 %t237, i64* %i
+  %t236 = add i64 0, 0
+  store i64 %t236, i64* %i
   br label %while.cond235
 while.cond235:
-  %t238 = load i64, i64* %i
-  %t239 = load i64, i64* %new_rendered
-  %t240 = call i64 @__list_length(i64 %t239)
-  %t242 = icmp slt i64 %t238, %t240
-  %t241 = zext i1 %t242 to i64
-  %t243 = trunc i64 %t241 to i1
-  br i1 %t243, label %while.body236, label %while.end237
+  %t237 = load i64, i64* %i
+  %t238 = load i64, i64* %new_rendered
+  %t239 = call i64 @__list_length(i64 %t238)
+  %t241 = icmp slt i64 %t237, %t239
+  %t240 = zext i1 %t241 to i64
+  %t242 = trunc i64 %t240 to i1
+  br i1 %t242, label %while.body236, label %while.end237
 while.body236:
-  %t244 = load i64, i64* %self
-  %t245 = trunc i64 %t244 to i32
-  %t246 = inttoptr i32 %t245 to %reconcile_KeyedList*
-  %t247 = getelementptr %reconcile_KeyedList, %reconcile_KeyedList* %t246, i32 0, i32 0
-  %t248 = load volatile i64, i64* %t247
-  %t249 = load i64, i64* %new_rendered
-  %t250 = load i64, i64* %i
-  %t251 = call i64 @__val_untag_int(i64 %t250)
-  %t252 = icmp slt i64 %t251, 0
-  %t253 = call i64 @__list_length(i64 %t249)
-  %t254 = add i64 %t253, %t251
-  %t255 = select i1 %t252, i64 %t254, i64 %t251
-  %t256 = call i64 @__list_get(i64 %t249, i64 %t255)
-  %t257 = trunc i64 %t256 to i32
-  %t258 = inttoptr i32 %t257 to %reconcile_KeyedItem*
-  %t259 = getelementptr %reconcile_KeyedItem, %reconcile_KeyedItem* %t258, i32 0, i32 1
-  %t260 = load i64, i64* %t259
-  %t261 = trunc i64 %t260 to i32
-  %t262 = inttoptr i32 %t261 to %reconcile_Component*
-  %t263 = getelementptr %reconcile_Component, %reconcile_Component* %t262, i32 0, i32 0
-  %t264 = load i64, i64* %t263
-  call void @js_dom_append_child(i64 %t248, i64 %t264)
-  %t265 = load i64, i64* %i
-  %t266 = add i64 0, 1
-  %t267 = add i64 %t265, %t266
-  store i64 %t267, i64* %i
+  %t243 = load i64, i64* %self
+  %t244 = trunc i64 %t243 to i32
+  %t245 = inttoptr i32 %t244 to %reconcile_KeyedList*
+  %t246 = getelementptr %reconcile_KeyedList, %reconcile_KeyedList* %t245, i32 0, i32 0
+  %t247 = load volatile i64, i64* %t246
+  %t248 = load i64, i64* %new_rendered
+  %t249 = load i64, i64* %i
+  %t250 = call i64 @__val_untag_int(i64 %t249)
+  %t251 = icmp slt i64 %t250, 0
+  %t252 = call i64 @__list_length(i64 %t248)
+  %t253 = add i64 %t252, %t250
+  %t254 = select i1 %t251, i64 %t253, i64 %t250
+  %t255 = call i64 @__list_get(i64 %t248, i64 %t254)
+  %t256 = trunc i64 %t255 to i32
+  %t257 = inttoptr i32 %t256 to %reconcile_KeyedItem*
+  %t258 = getelementptr %reconcile_KeyedItem, %reconcile_KeyedItem* %t257, i32 0, i32 1
+  %t259 = load i64, i64* %t258
+  %t260 = trunc i64 %t259 to i32
+  %t261 = inttoptr i32 %t260 to %reconcile_Component*
+  %t262 = getelementptr %reconcile_Component, %reconcile_Component* %t261, i32 0, i32 0
+  %t263 = load i64, i64* %t262
+  call void @js_dom_append_child(i64 %t247, i64 %t263)
+  %t264 = load i64, i64* %i
+  %t265 = add i64 0, 1
+  %t266 = add i64 %t264, %t265
+  store i64 %t266, i64* %i
   br label %while.cond235
 while.end237:
-  %t268 = load i64, i64* %self
-  %t269 = load i64, i64* %new_rendered
-  %t270 = trunc i64 %t268 to i32
-  %t271 = inttoptr i32 %t270 to %reconcile_KeyedList*
-  %t272 = getelementptr %reconcile_KeyedList, %reconcile_KeyedList* %t271, i32 0, i32 4
-  store volatile i64 %t269, i64* %t272
+  %t267 = load i64, i64* %self
+  %t268 = load i64, i64* %new_rendered
+  %t269 = trunc i64 %t267 to i32
+  %t270 = inttoptr i32 %t269 to %reconcile_KeyedList*
+  %t271 = getelementptr %reconcile_KeyedList, %reconcile_KeyedList* %t270, i32 0, i32 4
+  store volatile i64 %t268, i64* %t271
   call void @__gc_pop_roots(i64 7)
   ret i64 0
 }
@@ -7115,14 +7097,13 @@ entry:
   %t5 = ptrtoint i64* %builder_fn to i32
   %t6 = zext i32 %t5 to i64
   call void @__gc_push_root(i64 %t6)
-  %t7 = call i64 @reconcile_KeyedList()
-  %t8 = load i64, i64* %parent
-  %t9 = load i64, i64* %items
-  %t10 = load i64, i64* %key_fn
-  %t11 = load i64, i64* %builder_fn
-  %t12 = call i64 @reconcile_KeyedList__init(i64 %t7, i64 %t8, i64 %t9, i64 %t10, i64 %t11)
+  %t7 = load i64, i64* %parent
+  %t8 = load i64, i64* %items
+  %t9 = load i64, i64* %key_fn
+  %t10 = load i64, i64* %builder_fn
+  %t11 = call i64 @reconcile_KeyedList(i64 %t7, i64 %t8, i64 %t9, i64 %t10)
   call void @__gc_pop_roots(i64 3)
-  ret i64 %t7
+  ret i64 %t11
 }
 
 define i64 @Ready(i64 %f0) {
@@ -7459,15 +7440,14 @@ entry:
   %t3 = ptrtoint i64* %r to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = call i64 @suspense_Resource()
-  %t6 = load i64, i64* %fetcher
-  %t7 = call i64 @suspense_Resource__init(i64 %t5, i64 %t6)
-  store i64 %t5, i64* %r
-  %t8 = load i64, i64* %r
-  %t9 = call i64 @suspense_Resource__load(i64 %t8)
-  %t10 = load i64, i64* %r
+  %t5 = load i64, i64* %fetcher
+  %t6 = call i64 @suspense_Resource(i64 %t5)
+  store i64 %t6, i64* %r
+  %t7 = load i64, i64* %r
+  %t8 = call i64 @suspense_Resource__load(i64 %t7)
+  %t9 = load i64, i64* %r
   call void @__gc_pop_roots(i64 2)
-  ret i64 %t10
+  ret i64 %t9
 }
 
 define i64 @suspense_lazy_resource(i64 %fetcher.arg) {
@@ -7477,11 +7457,10 @@ entry:
   %t1 = ptrtoint i64* %fetcher to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @suspense_Resource()
-  %t4 = load i64, i64* %fetcher
-  %t5 = call i64 @suspense_Resource__init(i64 %t3, i64 %t4)
+  %t3 = load i64, i64* %fetcher
+  %t4 = call i64 @suspense_Resource(i64 %t3)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t4
 }
 
 define i64 @suspense_SuspenseBoundary__init(i64 %self.arg, i64 %parent_handle.arg, i64 %resources.arg, i64 %content_builder.arg, i64 %fallback_builder.arg) {
@@ -8009,14 +7988,13 @@ entry:
   %t5 = ptrtoint i64* %fallback to i32
   %t6 = zext i32 %t5 to i64
   call void @__gc_push_root(i64 %t6)
-  %t7 = call i64 @suspense_SuspenseBoundary()
-  %t8 = load i64, i64* %parent
-  %t9 = load i64, i64* %resources
-  %t10 = load i64, i64* %content
-  %t11 = load i64, i64* %fallback
-  %t12 = call i64 @suspense_SuspenseBoundary__init(i64 %t7, i64 %t8, i64 %t9, i64 %t10, i64 %t11)
+  %t7 = load i64, i64* %parent
+  %t8 = load i64, i64* %resources
+  %t9 = load i64, i64* %content
+  %t10 = load i64, i64* %fallback
+  %t11 = call i64 @suspense_SuspenseBoundary(i64 %t7, i64 %t8, i64 %t9, i64 %t10)
   call void @__gc_pop_roots(i64 3)
-  ret i64 %t7
+  ret i64 %t11
 }
 
 define i64 @suspense_ErrorBoundary__init(i64 %self.arg, i64 %parent_handle.arg, i64 %content_builder.arg, i64 %error_builder.arg) {
@@ -8315,13 +8293,12 @@ entry:
   %t3 = ptrtoint i64* %fallback to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = call i64 @suspense_ErrorBoundary()
-  %t6 = load i64, i64* %parent
-  %t7 = load i64, i64* %content
-  %t8 = load i64, i64* %fallback
-  %t9 = call i64 @suspense_ErrorBoundary__init(i64 %t5, i64 %t6, i64 %t7, i64 %t8)
+  %t5 = load i64, i64* %parent
+  %t6 = load i64, i64* %content
+  %t7 = load i64, i64* %fallback
+  %t8 = call i64 @suspense_ErrorBoundary(i64 %t5, i64 %t6, i64 %t7)
   call void @__gc_pop_roots(i64 2)
-  ret i64 %t5
+  ret i64 %t8
 }
 
 define i64 @suspense_AsyncBoundary__init(i64 %self.arg, i64 %parent_handle.arg, i64 %resources.arg, i64 %content.arg, i64 %loading.arg, i64 %error.arg) {
@@ -8925,15 +8902,14 @@ entry:
   %t7 = ptrtoint i64* %error to i32
   %t8 = zext i32 %t7 to i64
   call void @__gc_push_root(i64 %t8)
-  %t9 = call i64 @suspense_AsyncBoundary()
-  %t10 = load i64, i64* %parent
-  %t11 = load i64, i64* %resources
-  %t12 = load i64, i64* %content
-  %t13 = load i64, i64* %loading
-  %t14 = load i64, i64* %error
-  %t15 = call i64 @suspense_AsyncBoundary__init(i64 %t9, i64 %t10, i64 %t11, i64 %t12, i64 %t13, i64 %t14)
+  %t9 = load i64, i64* %parent
+  %t10 = load i64, i64* %resources
+  %t11 = load i64, i64* %content
+  %t12 = load i64, i64* %loading
+  %t13 = load i64, i64* %error
+  %t14 = call i64 @suspense_AsyncBoundary(i64 %t9, i64 %t10, i64 %t11, i64 %t12, i64 %t13)
   call void @__gc_pop_roots(i64 4)
-  ret i64 %t9
+  ret i64 %t14
 }
 
 define i64 @context_Context__init(i64 %self.arg, i64 %name.arg, i64 %default_value.arg) {
@@ -8991,12 +8967,11 @@ entry:
   %t3 = ptrtoint i64* %default_value to i32
   %t4 = zext i32 %t3 to i64
   call void @__gc_push_root(i64 %t4)
-  %t5 = call i64 @context_Context()
-  %t6 = load i64, i64* %name
-  %t7 = load i64, i64* %default_value
-  %t8 = call i64 @context_Context__init(i64 %t5, i64 %t6, i64 %t7)
+  %t5 = load i64, i64* %name
+  %t6 = load i64, i64* %default_value
+  %t7 = call i64 @context_Context(i64 %t5, i64 %t6)
   call void @__gc_pop_roots(i64 2)
-  ret i64 %t5
+  ret i64 %t7
 }
 
 define i64 @context_ContextEntry__init(i64 %self.arg, i64 %value.arg) {
@@ -9092,11 +9067,10 @@ endif353:
   %t28 = inttoptr i32 %t27 to %context_Context*
   %t29 = getelementptr %context_Context, %context_Context* %t28, i32 0, i32 0
   %t30 = load volatile i64, i64* %t29
-  %t31 = call i64 @context_ContextEntry()
-  %t32 = load i64, i64* %value
-  %t33 = call i64 @signal_signal(i64 %t32)
-  %t34 = call i64 @context_ContextEntry__init(i64 %t31, i64 %t33)
-  %t35 = call i64 @__map_set(i64 %t25, i64 %t30, i64 %t31)
+  %t31 = load i64, i64* %value
+  %t32 = call i64 @signal_signal(i64 %t31)
+  %t33 = call i64 @context_ContextEntry(i64 %t32)
+  %t34 = call i64 @__map_set(i64 %t25, i64 %t30, i64 %t33)
   call void @__gc_pop_roots(i64 3)
   ret i64 0
 }
@@ -9149,10 +9123,9 @@ endif356:
   %t28 = inttoptr i32 %t27 to %context_Context*
   %t29 = getelementptr %context_Context, %context_Context* %t28, i32 0, i32 0
   %t30 = load volatile i64, i64* %t29
-  %t31 = call i64 @context_ContextEntry()
-  %t32 = load i64, i64* %sig
-  %t33 = call i64 @context_ContextEntry__init(i64 %t31, i64 %t32)
-  %t34 = call i64 @__map_set(i64 %t25, i64 %t30, i64 %t31)
+  %t31 = load i64, i64* %sig
+  %t32 = call i64 @context_ContextEntry(i64 %t31)
+  %t33 = call i64 @__map_set(i64 %t25, i64 %t30, i64 %t32)
   call void @__gc_pop_roots(i64 3)
   ret i64 0
 }
@@ -9385,7 +9358,6 @@ entry:
 define i64 @context_scoped() {
 entry:
   %t1 = call i64 @context_ContextScope()
-  %t2 = call i64 @context_ContextScope__init(i64 %t1)
   ret i64 %t1
 }
 
@@ -9639,53 +9611,50 @@ entry:
   %t2 = getelementptr [6 x i8], [6 x i8]* @.str.167, i64 0, i64 0
   %t3 = ptrtoint i8* %t2 to i32
   %t4 = zext i32 %t3 to i64
-  %t5 = call i64 @context_ThemeConfig()
-  %t6 = getelementptr [5 x i8], [5 x i8]* @.str.168, i64 0, i64 0
-  %t7 = ptrtoint i8* %t6 to i32
-  %t8 = zext i32 %t7 to i64
-  %t9 = call i64 @context_ThemeConfig__init(i64 %t5, i64 %t8)
-  %t10 = call i64 @context_create_context(i64 %t4, i64 %t5)
-  store i64 %t10, i64* @__g_context_ThemeContext
-  %t11 = getelementptr [5 x i8], [5 x i8]* @.str.169, i64 0, i64 0
-  %t12 = ptrtoint i8* %t11 to i32
-  %t13 = zext i32 %t12 to i64
-  %t14 = call i64 @context_AuthState()
-  %t15 = call i64 @context_AuthState__init(i64 %t14)
-  %t16 = call i64 @context_create_context(i64 %t13, i64 %t14)
-  store i64 %t16, i64* @__g_context_AuthContext
-  %t17 = getelementptr [12 x i8], [12 x i8]* @.str.170, i64 0, i64 0
-  %t18 = ptrtoint i8* %t17 to i32
-  %t19 = zext i32 %t18 to i64
-  %t20 = getelementptr [2 x i8], [2 x i8]* @.str.171, i64 0, i64 0
-  %t21 = ptrtoint i8* %t20 to i32
-  %t22 = zext i32 %t21 to i64
-  %t23 = call i64 @context_create_context(i64 %t19, i64 %t22)
-  store i64 %t23, i64* @__g_context_RouterContext
-  %t24 = getelementptr [7 x i8], [7 x i8]* @.str.172, i64 0, i64 0
-  %t25 = ptrtoint i8* %t24 to i32
-  %t26 = zext i32 %t25 to i64
-  %t27 = call i64 @context_LocaleConfig()
-  %t28 = getelementptr [3 x i8], [3 x i8]* @.str.173, i64 0, i64 0
-  %t29 = ptrtoint i8* %t28 to i32
-  %t30 = zext i32 %t29 to i64
-  %t31 = call i64 @context_LocaleConfig__init(i64 %t27, i64 %t30)
-  %t32 = call i64 @context_create_context(i64 %t26, i64 %t27)
-  store i64 %t32, i64* @__g_context_LocaleContext
-  %t33 = ptrtoint i64* @__g_context__context_stack to i32
-  %t34 = zext i32 %t33 to i64
-  call void @__gc_push_root(i64 %t34)
-  %t35 = ptrtoint i64* @__g_context_ThemeContext to i32
-  %t36 = zext i32 %t35 to i64
-  call void @__gc_push_root(i64 %t36)
-  %t37 = ptrtoint i64* @__g_context_AuthContext to i32
-  %t38 = zext i32 %t37 to i64
-  call void @__gc_push_root(i64 %t38)
-  %t39 = ptrtoint i64* @__g_context_RouterContext to i32
-  %t40 = zext i32 %t39 to i64
-  call void @__gc_push_root(i64 %t40)
-  %t41 = ptrtoint i64* @__g_context_LocaleContext to i32
-  %t42 = zext i32 %t41 to i64
-  call void @__gc_push_root(i64 %t42)
+  %t5 = getelementptr [5 x i8], [5 x i8]* @.str.168, i64 0, i64 0
+  %t6 = ptrtoint i8* %t5 to i32
+  %t7 = zext i32 %t6 to i64
+  %t8 = call i64 @context_ThemeConfig(i64 %t7)
+  %t9 = call i64 @context_create_context(i64 %t4, i64 %t8)
+  store i64 %t9, i64* @__g_context_ThemeContext
+  %t10 = getelementptr [5 x i8], [5 x i8]* @.str.169, i64 0, i64 0
+  %t11 = ptrtoint i8* %t10 to i32
+  %t12 = zext i32 %t11 to i64
+  %t13 = call i64 @context_AuthState()
+  %t14 = call i64 @context_create_context(i64 %t12, i64 %t13)
+  store i64 %t14, i64* @__g_context_AuthContext
+  %t15 = getelementptr [12 x i8], [12 x i8]* @.str.170, i64 0, i64 0
+  %t16 = ptrtoint i8* %t15 to i32
+  %t17 = zext i32 %t16 to i64
+  %t18 = getelementptr [2 x i8], [2 x i8]* @.str.171, i64 0, i64 0
+  %t19 = ptrtoint i8* %t18 to i32
+  %t20 = zext i32 %t19 to i64
+  %t21 = call i64 @context_create_context(i64 %t17, i64 %t20)
+  store i64 %t21, i64* @__g_context_RouterContext
+  %t22 = getelementptr [7 x i8], [7 x i8]* @.str.172, i64 0, i64 0
+  %t23 = ptrtoint i8* %t22 to i32
+  %t24 = zext i32 %t23 to i64
+  %t25 = getelementptr [3 x i8], [3 x i8]* @.str.173, i64 0, i64 0
+  %t26 = ptrtoint i8* %t25 to i32
+  %t27 = zext i32 %t26 to i64
+  %t28 = call i64 @context_LocaleConfig(i64 %t27)
+  %t29 = call i64 @context_create_context(i64 %t24, i64 %t28)
+  store i64 %t29, i64* @__g_context_LocaleContext
+  %t30 = ptrtoint i64* @__g_context__context_stack to i32
+  %t31 = zext i32 %t30 to i64
+  call void @__gc_push_root(i64 %t31)
+  %t32 = ptrtoint i64* @__g_context_ThemeContext to i32
+  %t33 = zext i32 %t32 to i64
+  call void @__gc_push_root(i64 %t33)
+  %t34 = ptrtoint i64* @__g_context_AuthContext to i32
+  %t35 = zext i32 %t34 to i64
+  call void @__gc_push_root(i64 %t35)
+  %t36 = ptrtoint i64* @__g_context_RouterContext to i32
+  %t37 = zext i32 %t36 to i64
+  call void @__gc_push_root(i64 %t37)
+  %t38 = ptrtoint i64* @__g_context_LocaleContext to i32
+  %t39 = zext i32 %t38 to i64
+  call void @__gc_push_root(i64 %t39)
   ret i64 0
 }
 
@@ -10477,11 +10446,10 @@ entry:
   %t7 = inttoptr i32 %t6 to %router_Router*
   %t8 = getelementptr %router_Router, %router_Router* %t7, i32 0, i32 2
   %t9 = load volatile i64, i64* %t8
-  %t10 = call i64 @router_RouteDef()
-  %t11 = load i64, i64* %pattern
-  %t12 = load i64, i64* %handler
-  %t13 = call i64 @router_RouteDef__init(i64 %t10, i64 %t11, i64 %t12)
-  %t14 = call i64 @__list_push(i64 %t9, i64 %t10)
+  %t10 = load i64, i64* %pattern
+  %t11 = load i64, i64* %handler
+  %t12 = call i64 @router_RouteDef(i64 %t10, i64 %t11)
+  %t13 = call i64 @__list_push(i64 %t9, i64 %t12)
   call void @__gc_pop_roots(i64 2)
   ret i64 0
 }
@@ -10604,29 +10572,27 @@ while.body435:
   %t46 = trunc i64 %t44 to i1
   br i1 %t46, label %then438, label %else439
 then438:
-  %t47 = call i64 @router_RouteParams()
-  %t48 = load i64, i64* %current_path
-  %t49 = load i64, i64* %params
-  %t50 = call i64 @__map_new()
-  %t51 = call i64 @router_RouteParams__init(i64 %t47, i64 %t48, i64 %t49, i64 %t50)
+  %t47 = load i64, i64* %current_path
+  %t48 = load i64, i64* %params
+  %t49 = call i64 @__map_new()
+  %t50 = call i64 @router_RouteParams(i64 %t47, i64 %t48, i64 %t49)
   call void @__gc_pop_roots(i64 3)
-  ret i64 %t47
+  ret i64 %t50
 else439:
   br label %endif437
 endif437:
-  %t52 = load i64, i64* %i
-  %t53 = add i64 0, 1
-  %t54 = add i64 %t52, %t53
-  store i64 %t54, i64* %i
+  %t51 = load i64, i64* %i
+  %t52 = add i64 0, 1
+  %t53 = add i64 %t51, %t52
+  store i64 %t53, i64* %i
   br label %while.cond434
 while.end436:
-  %t55 = call i64 @router_RouteParams()
-  %t56 = load i64, i64* %current_path
-  %t57 = call i64 @__map_new()
-  %t58 = call i64 @__map_new()
-  %t59 = call i64 @router_RouteParams__init(i64 %t55, i64 %t56, i64 %t57, i64 %t58)
+  %t54 = load i64, i64* %current_path
+  %t55 = call i64 @__map_new()
+  %t56 = call i64 @__map_new()
+  %t57 = call i64 @router_RouteParams(i64 %t54, i64 %t55, i64 %t56)
   call void @__gc_pop_roots(i64 3)
-  ret i64 %t55
+  ret i64 %t57
 }
 
 define i64 @router_Router__dispatch(i64 %self.arg) {
@@ -10710,23 +10676,22 @@ then444:
   %t55 = load i64, i64* %t54
   %t56 = getelementptr [2 x i64], [2 x i64]* %t53, i64 0, i64 1
   %t57 = load i64, i64* %t56
-  %t58 = call i64 @router_RouteParams()
-  %t59 = load i64, i64* %current_path
-  %t60 = load i64, i64* %params
-  %t61 = call i64 @__map_new()
-  %t62 = call i64 @router_RouteParams__init(i64 %t58, i64 %t59, i64 %t60, i64 %t61)
-  %t63 = trunc i64 %t55 to i32
-  %t64 = inttoptr i32 %t63 to i64 (i64, i64)*
-  %t65 = call i64 %t64(i64 %t57, i64 %t58)
+  %t58 = load i64, i64* %current_path
+  %t59 = load i64, i64* %params
+  %t60 = call i64 @__map_new()
+  %t61 = call i64 @router_RouteParams(i64 %t58, i64 %t59, i64 %t60)
+  %t62 = trunc i64 %t55 to i32
+  %t63 = inttoptr i32 %t62 to i64 (i64, i64)*
+  %t64 = call i64 %t63(i64 %t57, i64 %t61)
   call void @__gc_pop_roots(i64 3)
   ret i64 0
 else445:
   br label %endif443
 endif443:
-  %t66 = load i64, i64* %i
-  %t67 = add i64 0, 1
-  %t68 = add i64 %t66, %t67
-  store i64 %t68, i64* %i
+  %t65 = load i64, i64* %i
+  %t66 = add i64 0, 1
+  %t67 = add i64 %t65, %t66
+  store i64 %t67, i64* %i
   br label %while.cond440
 while.end442:
   call void @__gc_pop_roots(i64 3)
@@ -10807,12 +10772,11 @@ then447:
 else448:
   br label %endif446
 endif446:
-  %t15 = call i64 @router_Router()
-  %t16 = shl i64 0, 56
-  %t17 = load i64, i64* %initial
-  %t18 = call i64 @router_Router__init(i64 %t15, i64 %t16, i64 %t17)
+  %t15 = shl i64 0, 56
+  %t16 = load i64, i64* %initial
+  %t17 = call i64 @router_Router(i64 %t15, i64 %t16)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t15
+  ret i64 %t17
 }
 
 define i64 @router_history() {
@@ -10825,12 +10789,11 @@ entry:
   %t3 = call i8* @js_get_pathname()
   %t4 = call i64 @__val_tag_ptr(i8* %t3)
   store i64 %t4, i64* %initial
-  %t5 = call i64 @router_Router()
-  %t6 = shl i64 1, 56
-  %t7 = load i64, i64* %initial
-  %t8 = call i64 @router_Router__init(i64 %t5, i64 %t6, i64 %t7)
+  %t5 = shl i64 1, 56
+  %t6 = load i64, i64* %initial
+  %t7 = call i64 @router_Router(i64 %t5, i64 %t6)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t5
+  ret i64 %t7
 }
 
 define i64 @router_memory(i64 %initial.arg) {
@@ -10840,12 +10803,11 @@ entry:
   %t1 = ptrtoint i64* %initial to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @router_Router()
-  %t4 = shl i64 2, 56
-  %t5 = load i64, i64* %initial
-  %t6 = call i64 @router_Router__init(i64 %t3, i64 %t4, i64 %t5)
+  %t3 = shl i64 2, 56
+  %t4 = load i64, i64* %initial
+  %t5 = call i64 @router_Router(i64 %t3, i64 %t4)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t5
 }
 
 define i64 @style_styles(i64 %pairs.arg) {
@@ -11302,11 +11264,10 @@ entry:
   %t1 = ptrtoint i64* %declarations to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @style_ScopedStyles()
-  %t4 = load i64, i64* %declarations
-  %t5 = call i64 @style_ScopedStyles__init(i64 %t3, i64 %t4)
+  %t3 = load i64, i64* %declarations
+  %t4 = call i64 @style_ScopedStyles(i64 %t3)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t4
 }
 
 define i64 @style_css_vars(i64 %vars.arg) {
@@ -11703,11 +11664,10 @@ entry:
   %t1 = ptrtoint i64* %name to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @style_Keyframes()
-  %t4 = load i64, i64* %name
-  %t5 = call i64 @style_Keyframes__init(i64 %t3, i64 %t4)
+  %t3 = load i64, i64* %name
+  %t4 = call i64 @style_Keyframes(i64 %t3)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t4
 }
 
 define i64 @style_MediaQuery__init(i64 %self.arg, i64 %query.arg, i64 %initial.arg) {
@@ -11758,12 +11718,11 @@ entry:
   %t1 = ptrtoint i64* %query to i32
   %t2 = zext i32 %t1 to i64
   call void @__gc_push_root(i64 %t2)
-  %t3 = call i64 @style_MediaQuery()
-  %t4 = load i64, i64* %query
-  %t5 = add i64 0, 0
-  %t6 = call i64 @style_MediaQuery__init(i64 %t3, i64 %t4, i64 %t5)
+  %t3 = load i64, i64* %query
+  %t4 = add i64 0, 0
+  %t5 = call i64 @style_MediaQuery(i64 %t3, i64 %t4)
   call void @__gc_pop_roots(i64 1)
-  ret i64 %t3
+  ret i64 %t5
 }
 
 define i64 @__mod_init_style() {

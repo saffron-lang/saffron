@@ -14,7 +14,7 @@
 //!     {"Content-Type": "application/json"})
 //! ```
 
-import "@socket" as Socket
+import "@net" as Net
 import "@url" as URL
 import "@json" as JSON
 
@@ -243,18 +243,18 @@ fun _do_request(method: String, url: String, body: String, headers: Map<String, 
     var use_tls = (parsed.scheme == "https")
 
     // Connect (async — yields if would block)
-    var handle = _open_connection(host, port, use_tls)
+    var conn: Net.TcpConnection = _open_connection(host, port, use_tls)
 
     // Build and send the HTTP request
     var raw_request = _format_request(method, parsed, host, port, body, headers)
-    _send_all(handle, raw_request, use_tls)
+    conn.write(raw_request)
 
     // Read the full response (async — yields while waiting for data)
     var is_head = (method == "HEAD")
-    var raw_response = _recv_response(handle, use_tls, is_head)
+    var raw_response = _recv_response(conn, is_head)
 
     // Close connection
-    Socket.close(handle)
+    conn.close()
 
     // Parse response
     var response = _parse_response(raw_response, url)
@@ -291,47 +291,29 @@ fun _do_request(method: String, url: String, body: String, headers: Map<String, 
 // Connection
 // ---------------------------------------------------------------------------
 
-// Open a TCP or TLS connection. Returns a socket handle.
-fun _open_connection(host: String, port: Number, use_tls: Bool): Int {
-    var handle: Int = -1
+// Open a TCP or TLS connection. Returns a TcpConnection.
+fun _open_connection(host: String, port: Number, use_tls: Bool): Net.TcpConnection {
     if (use_tls) {
-        handle = Socket.connect_tls(host, port)
-    } else {
-        handle = Socket.connect(host, port)
+        return Net.connect_tls(host, port)
     }
-    if (handle < 0) {
-        throw "httpx: failed to connect to ${host}:${port}"
-    }
-    return handle
+    return Net.connect(host, port)
 }
 
-// ---------------------------------------------------------------------------
-// Send
-// ---------------------------------------------------------------------------
-
-// Write all request bytes to the socket (plain or TLS).
-fun _send_all(handle: Int, request_str: String, use_tls: Bool) {
-    if (use_tls) {
-        Socket.tls_write(handle, request_str)
-    } else {
-        Socket.write(handle, request_str)
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Receive
 // ---------------------------------------------------------------------------
 
-// Read the full HTTP response from the socket.
+// Read the full HTTP response from the connection.
 // Handles Content-Length, chunked transfer-encoding, and connection close.
-fun _recv_response(handle: Int, use_tls: Bool, head_only: Bool): String {
+fun _recv_response(conn: Net.TcpConnection, head_only: Bool): String {
     var buf = ""
     var header_end = -1
     var read_size = 4096
 
     // Phase 1: read until we have the full header block
     while (header_end < 0) {
-        var chunk = _recv_chunk(handle, read_size, use_tls)
+        var chunk = conn.read(read_size)
         if (chunk.length() == 0) {
             // Connection closed before headers complete
             break
@@ -369,13 +351,13 @@ fun _recv_response(handle: Int, use_tls: Bool, head_only: Bool): String {
 
     if (transfer_enc.to_lower().contains("chunked")) {
         // Chunked: read until we see the final "0\r\n\r\n" chunk
-        buf = _recv_until_chunked_end(handle, buf, body_start, use_tls)
+        buf = _recv_until_chunked_end(conn, buf, body_start)
     } else if (content_length != "") {
         // Content-Length: read exactly that many bytes of body
         var expected = content_length.to_number()
         var body_so_far = buf.length() - body_start
         while (body_so_far < expected) {
-            var chunk = _recv_chunk(handle, read_size, use_tls)
+            var chunk = conn.read(read_size)
             if (chunk.length() == 0) { break }
             buf = buf + chunk
             body_so_far = buf.length() - body_start
@@ -383,7 +365,7 @@ fun _recv_response(handle: Int, use_tls: Bool, head_only: Bool): String {
     } else {
         // No Content-Length, no chunked: read until connection close
         while (true) {
-            var chunk = _recv_chunk(handle, read_size, use_tls)
+            var chunk = conn.read(read_size)
             if (chunk.length() == 0) { break }
             buf = buf + chunk
         }
@@ -393,7 +375,7 @@ fun _recv_response(handle: Int, use_tls: Bool, head_only: Bool): String {
 }
 
 // Read until we have the complete chunked body (terminated by 0-length chunk).
-fun _recv_until_chunked_end(handle: Int, buf: String, body_start: Number, use_tls: Bool): String {
+fun _recv_until_chunked_end(conn: Net.TcpConnection, buf: String, body_start: Number): String {
     var read_size = 4096
     while (true) {
         var body_portion = buf.slice(body_start, buf.length())
@@ -405,19 +387,11 @@ fun _recv_until_chunked_end(handle: Int, buf: String, body_start: Number, use_tl
         if (body_portion.contains("\n0\n\n") or body_portion.starts_with("0\n\n")) {
             break
         }
-        var chunk = _recv_chunk(handle, read_size, use_tls)
+        var chunk = conn.read(read_size)
         if (chunk.length() == 0) { break }
         buf = buf + chunk
     }
     return buf
-}
-
-// Read a single chunk from the socket.
-fun _recv_chunk(handle: Int, max_bytes: Number, use_tls: Bool): String {
-    if (use_tls) {
-        return Socket.tls_read(handle, max_bytes)
-    }
-    return Socket.read(handle, max_bytes)
 }
 
 // Extract a header value from the raw header section (case-insensitive key match).

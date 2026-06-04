@@ -1,0 +1,235 @@
+//! Sorted map — keys maintained in sorted order via binary search.
+//! O(log n) lookup, O(n) insert/remove due to array shifting.
+
+// Character lookup table for lexicographic string comparison.
+// index_of returns the ordinal position, enabling correct < ordering.
+var _alphabet = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+
+/// Compare two strings lexicographically.
+/// Returns -1 if a < b, 0 if a == b, 1 if a > b.
+fun _str_cmp(a: String, b: String): Number {
+    if (a == b) { return 0 }
+    var len_a = a.length()
+    var len_b = b.length()
+    var min_len = len_a
+    if (len_b < min_len) { min_len = len_b }
+    var i = 0
+    while (i < min_len) {
+        var ca = _alphabet.index_of(a.char_at(i))
+        var cb = _alphabet.index_of(b.char_at(i))
+        if (ca < cb) { return 0 - 1 }
+        if (ca > cb) { return 1 }
+        i = i + 1
+    }
+    if (len_a < len_b) { return 0 - 1 }
+    if (len_a > len_b) { return 1 }
+    return 0
+}
+
+/// An ordered map that keeps keys in sorted (lexicographic) order.
+///
+/// ```saffron
+/// import "@sorted_map" as SortedMap
+///
+/// var sm = SortedMap.new()
+/// sm.set("banana", 2)
+/// sm.set("apple", 1)
+/// sm.keys()  // ["apple", "banana"]
+/// ```
+class SortedMap {
+    var _keys: List<String>
+    var _values: List<Any>
+
+    fun init() {
+        this._keys = []
+        this._values = []
+    }
+
+    /// Binary search for the insertion index of key.
+    /// Returns the index where key is or would be inserted.
+    fun _binary_search(key: String): Number {
+        var lo: Number = 0
+        var hi: Number = this._keys.length()
+        while (lo < hi) {
+            var mid: Number = ((lo + hi) / 2).floor()
+            if (_str_cmp(this._keys[mid], key) < 0) {
+                lo = mid + 1
+            } else {
+                hi = mid
+            }
+        }
+        return lo
+    }
+
+    /// Insert or update a key-value pair, maintaining sorted order.
+    fun set(key: String, value: Any): SortedMap {
+        var idx = this._binary_search(key)
+        if (idx < this._keys.length() and this._keys[idx] == key) {
+            // Key exists — update value in place
+            this._values[idx] = value
+        } else {
+            // Insert at idx — shift elements right
+            this._keys.push(nil)
+            this._values.push(nil)
+            var i = this._keys.length() - 1
+            while (i > idx) {
+                this._keys[i] = this._keys[i - 1]
+                this._values[i] = this._values[i - 1]
+                i = i - 1
+            }
+            this._keys[idx] = key
+            this._values[idx] = value
+        }
+        return this
+    }
+
+    /// Get the value for a key, or nil if not present.
+    fun get(key: String): Any {
+        var idx = this._binary_search(key)
+        if (idx < this._keys.length() and this._keys[idx] == key) {
+            return this._values[idx]
+        }
+        return nil
+    }
+
+    /// Check whether a key is present.
+    fun has(key: String): Bool {
+        var idx = this._binary_search(key)
+        return idx < this._keys.length() and this._keys[idx] == key
+    }
+
+    /// Remove a key and its value. No-op if key not present.
+    fun remove(key: String): SortedMap {
+        var idx = this._binary_search(key)
+        if (idx < this._keys.length() and this._keys[idx] == key) {
+            // Shift elements left
+            var i = idx
+            while (i < this._keys.length() - 1) {
+                this._keys[i] = this._keys[i + 1]
+                this._values[i] = this._values[i + 1]
+                i = i + 1
+            }
+            this._keys.pop()
+            this._values.pop()
+        }
+        return this
+    }
+
+    /// Return all keys in sorted order.
+    fun keys(): List<String> {
+        var result: List<String> = []
+        var i = 0
+        while (i < this._keys.length()) {
+            result.push(this._keys[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Return all values in key-sorted order.
+    fun values(): List<Any> {
+        var result: List<Any> = []
+        var i = 0
+        while (i < this._values.length()) {
+            result.push(this._values[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Return the number of entries.
+    fun length(): Number {
+        return this._keys.length()
+    }
+
+    /// Return true if the map is empty.
+    fun is_empty(): Bool {
+        return this._keys.length() == 0
+    }
+
+    /// Return [key, value] of the smallest key, or nil if empty.
+    fun first(): Any {
+        if (this._keys.length() == 0) { return nil }
+        return [this._keys[0], this._values[0]]
+    }
+
+    /// Return [key, value] of the largest key, or nil if empty.
+    fun last(): Any {
+        if (this._keys.length() == 0) { return nil }
+        var end = this._keys.length() - 1
+        return [this._keys[end], this._values[end]]
+    }
+
+    /// Return entries with keys in [from, to) as a list of [key, value] pairs.
+    fun range(from: String, to: String): List<Any> {
+        var result: List<Any> = []
+        var lo = this._binary_search(from)
+        var hi = this._binary_search(to)
+        var i = lo
+        while (i < hi) {
+            result.push([this._keys[i], this._values[i]])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Convert to a regular Map.
+    fun to_map(): Map<String, Any> {
+        var m: Map<String, Any> = {}
+        var i = 0
+        while (i < this._keys.length()) {
+            m.set(this._keys[i], this._values[i])
+            i = i + 1
+        }
+        return m
+    }
+
+    fun to_string(): String {
+        var sb = StringBuilder()
+        sb.append("SortedMap{")
+        var i = 0
+        while (i < this._keys.length()) {
+            if (i > 0) { sb.append(", ") }
+            sb.append("\"")
+            sb.append(this._keys[i])
+            sb.append("\": ")
+            var v = this._values[i]
+            if (v is String) {
+                sb.append("\"")
+                sb.append(v)
+                sb.append("\"")
+            } else if (v is Number) {
+                var n: Number = v
+                sb.append(n.to_string())
+            } else {
+                sb.append("<value>")
+            }
+            i = i + 1
+        }
+        sb.append("}")
+        return sb.to_string()
+    }
+}
+
+/// Create a new empty SortedMap.
+fun new(): SortedMap {
+    return SortedMap()
+}
+
+/// Create a SortedMap from an existing Map.
+///
+/// ```saffron
+/// import "@sorted_map" as SortedMap
+/// var sm = SortedMap.from({"b": 2, "a": 1})
+/// sm.keys()  // ["a", "b"]
+/// ```
+fun from(map: Map<String, Any>): SortedMap {
+    var sm = SortedMap()
+    var keys = map.keys()
+    var i = 0
+    while (i < keys.length()) {
+        sm.set(keys[i], map.get(keys[i]))
+        i = i + 1
+    }
+    return sm
+}
