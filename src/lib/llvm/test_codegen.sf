@@ -319,7 +319,7 @@ fun test_string_concat(): String {
     m.set_target_triple("arm64-apple-macosx15.0.0")
 
     // String constants
-    var idx0: Float = m.add_string_constant("hello ")
+    var idx0: Types.Value = m.add_string_constant("hello ")
 
     // Declare runtime functions
     m.add_declaration("strlen", Types.Type.I64, [Func.Param("", Types.Type.Ptr)])

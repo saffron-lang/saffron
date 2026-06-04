@@ -93,17 +93,20 @@ class Module {
         return g
     }
 
-    /// Add a string constant and return its index.
-    fun add_string_constant(value: String): Float {
-        var idx: Float = this.string_counter
-        this.string_constants.push(StringConst(idx, value))
-        this.string_counter = this.string_counter + 1
-        return idx
+    /// Add a string constant and return a Value referencing the global.
+    fun add_string_constant(value: String): Types.Value {
+        // Use list length as index (avoids broken float arithmetic in native compiler).
+        var idx_str: String = "${this.string_constants.length()}"
+        this.string_constants.push(StringConst(0, value))
+        return Types.Value.Global("@.str.${idx_str}", Types.Type.Ptr)
     }
 
     /// Get a Value reference to a string constant by index.
+    /// Note: prefer using the Value returned by add_string_constant() directly.
+    /// This method works correctly only when called from the CVM interpreter.
     fun string_ref(index: Float): Types.Value {
-        return Types.Value.Constant(Types.Const.StringLit("", index))
+        var idx_str: String = "${index}"
+        return Types.Value.Global("@.str.${idx_str}", Types.Type.Ptr)
     }
 
     /// Add a named type definition.
@@ -244,12 +247,16 @@ class Module {
     fun emit_string_constants(sb: StringBuilder) {
         if (this.string_constants.length() == 0) { return nil }
         var scs: List<StringConst> = this.string_constants
+        var emit_idx: List<String> = []
         for (sc in scs) {
             var escaped: String = escape_string(sc.value)
-            var len: Float = sc.value.length() + 1
-            var len_str: String = len.to_string().split(".")[0]
-            var idx_str: String = sc.index.to_string().split(".")[0]
+            // Workaround: native arithmetic on length() doesn't work due to NaN-boxing.
+            // Append a null-placeholder char to get length+1 via string concat.
+            var padded: String = sc.value + "X"
+            var len_str: String = "${padded.length()}"
+            var idx_str: String = "${emit_idx.length()}"
             sb.append("@.str.${idx_str} = private unnamed_addr constant [${len_str} x i8] c\"${escaped}\\00\"\n")
+            emit_idx.push("")
         }
         sb.append("\n")
     }
@@ -358,25 +365,13 @@ class Module {
 
 /// Escape a string for LLVM IR string constants.
 /// Converts special characters to \\xx hex escapes.
+/// Uses replace() chains since string indexing is not yet supported at runtime.
 fun escape_string(s: String): String {
-    var result: StringBuilder = StringBuilder()
-    var i: Float = 0
-    while (i < s.length()) {
-        var ch: String = s[i]
-        if (ch == "\n") {
-            result.append("\\0A")
-        } else if (ch == "\r") {
-            result.append("\\0D")
-        } else if (ch == "\t") {
-            result.append("\\09")
-        } else if (ch == "\"") {
-            result.append("\\22")
-        } else if (ch == "\\") {
-            result.append("\\5C")
-        } else {
-            result.append(ch)
-        }
-        i = i + 1
-    }
-    return result.to_string()
+    var result: String = s
+    result = result.replace("\\", "\\5C")
+    result = result.replace("\"", "\\22")
+    result = result.replace("\n", "\\0A")
+    result = result.replace("\r", "\\0D")
+    result = result.replace("\t", "\\09")
+    return result
 }
