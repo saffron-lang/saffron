@@ -1,0 +1,20 @@
+//! Bool — true/false value.
+//! Internally represented as an i64 (0 = false, nonzero = true).
+
+/// The Bool class — wraps a 1-bit truth value stored as i64.
+class Bool {
+    var _val: Int
+
+    /// Return "true" or "false".
+    fun to_string(): String {
+        if (this._val != 0) {
+            return "true"
+        }
+        return "false"
+    }
+
+    /// Return 1 for true, 0 for false.
+    fun to_int(): Int {
+        return this._val
+    }
+}

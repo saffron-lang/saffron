@@ -1,0 +1,87 @@
+//! List<T> — dynamic array.
+//! Wraps a pointer to a runtime list structure { count: i64, capacity: i64, data: i64* }.
+
+@extern("i64 __list_new()") fun _list_new(): Int
+@extern("i64 __list_push(i64, i64)") fun _list_push(list: Int, item: Int): Int
+@extern("i64 __list_pop(i64)") fun _list_pop(list: Int): Int
+@extern("i64 __list_get(i64, i64)") fun _list_get(list: Int, index: Int): Int
+@extern("i64 __list_set(i64, i64, i64)") fun _list_set(list: Int, index: Int, value: Int): Int
+@extern("i64 __list_length(i64)") fun _list_length(list: Int): Int
+@extern("i64 __list_remove(i64, i64)") fun _list_remove(list: Int, index: Int): Int
+@extern("i64 __list_slice(i64, i64, i64)") fun _list_slice(list: Int, start: Int, end: Int): Int
+@extern("i64 __list_contains(i64, i64)") fun _list_contains(list: Int, item: Int): Int
+@extern("i64 __list_join(i64, i64)") fun _list_join(list: Int, sep: Int): Int
+@extern("i64 __list_to_string(i64)") fun _list_to_string(list: Int): Int
+@extern("i64 rt_list_reverse(i64)") fun _list_reverse(list: Int): Int
+@extern("i64 rt_list_copy(i64)") fun _list_copy(list: Int): Int
+@extern("i64 rt_list_sort(i64)") fun _list_sort(list: Int): Int
+
+/// The List class — wraps a pointer to a dynamic array managed by the runtime.
+class List {
+    var _ptr: Int
+
+    /// Return the number of elements in this list.
+    fun length(): Int {
+        return _list_length(this._ptr)
+    }
+
+    /// Append an item to the end of this list.
+    fun push(item: Any) {
+        _list_push(this._ptr, item)
+    }
+
+    /// Remove and return the last element.
+    fun pop(): Any {
+        return _list_pop(this._ptr)
+    }
+
+    /// Return the element at the given index.
+    fun get(index: Int): Any {
+        return _list_get(this._ptr, index)
+    }
+
+    /// Set the element at the given index.
+    fun set(index: Int, value: Any) {
+        _list_set(this._ptr, index, value)
+    }
+
+    /// Remove and return the element at the given index.
+    fun remove(index: Int): Any {
+        return _list_remove(this._ptr, index)
+    }
+
+    /// Return true if this list contains the given item.
+    fun contains(item: Any): Bool {
+        return _list_contains(this._ptr, item)
+    }
+
+    /// Return a new list with elements in reverse order.
+    fun reverse(): List {
+        return _list_reverse(this._ptr)
+    }
+
+    /// Return a shallow copy of this list.
+    fun copy(): List {
+        return _list_copy(this._ptr)
+    }
+
+    /// Return a new sorted copy of this list.
+    fun sort(): List {
+        return _list_sort(this._ptr)
+    }
+
+    /// Return a sub-list from start (inclusive) to end (exclusive).
+    fun slice(start: Int, end: Int): List {
+        return _list_slice(this._ptr, start, end)
+    }
+
+    /// Join all elements into a string separated by sep.
+    fun join(sep: String): String {
+        return _list_join(this._ptr, sep)
+    }
+
+    /// Return a string representation of this list.
+    fun to_string(): String {
+        return _list_to_string(this._ptr)
+    }
+}

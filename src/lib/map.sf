@@ -1,0 +1,57 @@
+//! Map<K,V> — hash map.
+//! Wraps a pointer to a runtime hash map structure.
+
+@extern("i64 __map_new()") fun _map_new(): Int
+@extern("i64 __map_set(i64, i64, i64)") fun _map_set(map: Int, key: Int, value: Int): Int
+@extern("i64 __map_get(i64, i64)") fun _map_get(map: Int, key: Int): Int
+@extern("i64 __map_has(i64, i64)") fun _map_has(map: Int, key: Int): Int
+@extern("i64 __map_keys(i64)") fun _map_keys(map: Int): Int
+
+@intrinsic fun load64(addr: Int): Int
+
+/// The Map class — wraps a pointer to a runtime hash table.
+class Map {
+    var _ptr: Int
+
+    /// Return the number of key-value pairs in this map.
+    fun length(): Int {
+        return load64(this._ptr)
+    }
+
+    /// Return true if this map contains the given key.
+    fun has(key: String): Bool {
+        return _map_has(this._ptr, key)
+    }
+
+    /// Return the value associated with key, or nil if not found.
+    fun get(key: String): Any {
+        return _map_get(this._ptr, key)
+    }
+
+    /// Set the value for the given key.
+    fun set(key: String, value: Any) {
+        _map_set(this._ptr, key, value)
+    }
+
+    /// Return a list of all keys in this map.
+    fun keys(): List {
+        return _map_keys(this._ptr)
+    }
+
+    /// Return a list of all values in this map.
+    fun values(): List {
+        var ks: List = _map_keys(this._ptr)
+        var result: List = []
+        var i: Int = 0
+        while (i < ks.length()) {
+            result.push(_map_get(this._ptr, ks.get(i)))
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Return a string representation of this map.
+    fun to_string(): String {
+        return "[Map]"
+    }
+}
