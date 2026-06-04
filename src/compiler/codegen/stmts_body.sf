@@ -41,6 +41,26 @@
                     this.known_functions.push(emit_name)
                     this.func_ret_types.set(emit_name, this.str_to_type(ret_type))
                     this.intrinsic_funcs.push(emit_name)
+                } else if (doc.starts_with("@inline")) {
+                    // Mark function for alwaysinline attribute, then process normally
+                    var emit_name: String = this.current_prefix + name
+                    this.inline_funcs.push(emit_name)
+                    var params_str: String = this.params_to_string(params)
+                    var defaults: List<AST.Expr> = []
+                    var param_names: List<String> = []
+                    var pi: Float = 0
+                    while (pi < params.length()) {
+                        var p: AST.Param = params[pi]
+                        var dval: AST.Expr = match (p) { Param(n, t, d) => d }
+                        var pname: String = match (p) { Param(n, t, d) => n }
+                        defaults.push(dval)
+                        param_names.push(pname)
+                        pi = pi + 1
+                    }
+                    this.func_defaults.set(emit_name, defaults)
+                    this.func_param_count.set(emit_name, params.length())
+                    this.func_param_names.set(emit_name, param_names)
+                    this.gen_function(name, params_str, ret_type, body)
                 } else if (doc.starts_with("@extern:")) {
                     var c_sig: String = doc.slice(8, doc.length())
                     var emit_name: String = this.current_prefix + name
@@ -443,7 +463,14 @@
         var mparams: List<AST.Param> = this.get_fun_params(method)
         var mret: String = this.get_fun_ret(method)
         var mbody: List<AST.Stmt> = this.get_fun_body(method)
+        var mdoc: String = this.get_fun_doc(method)
         var full_name: String = class_name + "__" + mname
+        // Mark method for alwaysinline if annotated with @inline
+        if (mdoc.starts_with("@inline")) {
+            var inline_emit: String = this.current_prefix + full_name
+            this.inline_funcs.push(inline_emit)
+            this.inline_funcs.push(full_name)
+        }
         var mparams_str: String = this.params_to_string(mparams)
         var full_params: String = "self:Int"
         if (mparams_str.length() > 0) {

@@ -65,6 +65,7 @@ class Codegen {
     var module_init_names: List<String>
     var identity_mode: Bool
     var coroutine_funcs: List<String>
+    var inline_funcs: List<String>
     var is_coroutine: Bool
     var use_llvm_lib: Bool
     var emit_llvm_lib: Bool
@@ -127,6 +128,7 @@ class Codegen {
         this.module_init_names = []
         this.identity_mode = false
         this.coroutine_funcs = []
+        this.inline_funcs = []
         this.is_coroutine = false
         this.use_llvm_lib = true
         this.emit_llvm_lib = false
@@ -145,15 +147,7 @@ class Codegen {
         this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
         this.llvm_block_builder.init(this.llvm_func_builder, dummy_bb)
         this.llvm_values = {}
-        // String methods remain in builtin_methods (inconsistent naming convention)
-        this.builtin_methods.set("trim", "r1|rt_str_trim|String|1")
-        this.builtin_methods.set("to_upper", "r1|rt_str_to_upper|String|1")
-        this.builtin_methods.set("to_lower", "r1|rt_str_to_lower|String|1")
-        this.builtin_methods.set("index_of", "r2|rt_str_index_of|Int|1")
-        this.builtin_methods.set("repeat", "r2|rt_str_repeat|String|1")
-        this.builtin_methods.set("split", "p2|__str_split|ListStr|0")
-        this.builtin_methods.set("ends_with", "p2|__str_ends_with|Bool|0")
-        this.builtin_methods.set("replace", "p3|__str_replace|String|0")
+        // String methods are dispatched via class_methods (see methods_body.sf)
 
         // Register built-in type classes in class_methods so method resolution
         // finds them. These mirror the type class definitions in src/lib/*.sf.
