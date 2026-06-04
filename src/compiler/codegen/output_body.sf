@@ -1014,11 +1014,11 @@
         }
 
         // --- LLVM lib verification (when not emitting as primary) ---
-        // Validates that the structural representation serializes correctly.
-        if (this.use_llvm_lib and !this.identity_mode and !this.emit_llvm_lib) {
-            var llvm_ir_check: String = this.llvm_module.emit_ir()
-            IO.println("[llvm-lib] parallel IR length: " + llvm_ir_check.length().to_string())
-        }
+        // LLVM lib parallel validation (disabled — was causing pantry build to fail
+        // because stdout output made Process.run think there was an error)
+        // if (this.use_llvm_lib and !this.identity_mode and !this.emit_llvm_lib) {
+        //     var llvm_ir_check: String = this.llvm_module.emit_ir()
+        // }
 
         return out.to_string()
     }
