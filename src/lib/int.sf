@@ -1,0 +1,37 @@
+//! Int — 64-bit signed integer type.
+//! Wraps a raw i64 value and provides numeric methods.
+
+@extern("i64 __int_to_string(i64)") fun _int_to_string(val: Int): Int
+
+/// The Int class — wraps a raw 64-bit signed integer.
+class Int {
+    var _val: Int
+
+    /// Convert this integer to its string representation.
+    fun to_string(): String {
+        return _int_to_string(this._val)
+    }
+
+    /// Convert this integer to a floating-point value.
+    fun to_float(): Float {
+        return this._val
+    }
+
+    /// Return the absolute value of this integer.
+    fun abs(): Int {
+        if (this._val < 0) {
+            return 0 - this._val
+        }
+        return this._val
+    }
+
+    /// No-op for integers — returns self.
+    fun floor(): Int {
+        return this._val
+    }
+
+    /// No-op for integers — returns self.
+    fun ceil(): Int {
+        return this._val
+    }
+}
