@@ -565,7 +565,7 @@ class Codegen {
     }
 
     fun type_to_string(t: AST.Type): String {
-        return match (t) {
+        var result: String = match (t) {
             IntType => "Int"
             FloatType => "Float"
             BoolType => "Bool"
@@ -579,6 +579,9 @@ class Codegen {
             FuncType(p, r) => this.func_type_string(p, r)
             NullableType(inner) => this.type_to_string(inner) + "|Nil"
         }
+        // In identity mode, Float and Int are both i64 — treat Float as Int
+        if (this.identity_mode and result == "Float") { return "Int" }
+        return result
     }
 
     fun union_type_string(types: List<AST.Type>): String {
@@ -947,16 +950,17 @@ class Codegen {
     // Get the type string for a variable from typed_vars (the single source of truth).
     // Returns "" if the variable is not registered.
     fun get_var_type_str(name: String): String {
+        var result: String = ""
         if (this.typed_vars.has(name)) {
-            return this.type_to_string(this.typed_vars.get(name))
+            result = this.type_to_string(this.typed_vars.get(name))
+        } else if (this.global_var_types.has(name)) {
+            result = this.global_var_types.get(name)
+        } else if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + name)) {
+            result = this.global_var_types.get(this.current_prefix + name)
         }
-        if (this.global_var_types.has(name)) {
-            return this.global_var_types.get(name)
-        }
-        if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + name)) {
-            return this.global_var_types.get(this.current_prefix + name)
-        }
-        return ""
+        // In identity mode, Float and Int are both i64 — treat Float as Int
+        if (this.identity_mode and result == "Float") { return "Int" }
+        return result
     }
 
     // Resolve a type string to the class name registered in class_fields.
@@ -1795,7 +1799,7 @@ class Codegen {
         var rhs: String = this.gen_arg_value(right)
         if (right_type2 == "Any") { right_type2 = this.type_to_string(this.last_type) }
 
-        if (left_type2 == "Float" or right_type2 == "Float") {
+        if ((left_type2 == "Float" or right_type2 == "Float") and (op == "-" or op == "*" or op == "/" or op == "%")) {
             this.last_type = AST.Type.FloatType
             var ld: String = this.emit_untag_float(lhs)
             var rd: String = this.emit_untag_float(rhs)
@@ -1806,10 +1810,8 @@ class Codegen {
                 this.emit_indent(fd + " = fmul double " + ld + ", " + rd)
             } else if (op == "/") {
                 this.emit_indent(fd + " = fdiv double " + ld + ", " + rd)
-            } else if (op == "%") {
-                this.emit_indent(fd + " = frem double " + ld + ", " + rd)
             } else {
-                this.emit_indent(fd + " = fsub double " + ld + ", " + rd)
+                this.emit_indent(fd + " = frem double " + ld + ", " + rd)
             }
             return this.emit_tag_float(fd)
         }
@@ -8416,13 +8418,19 @@ class Codegen {
     if (ek == "variable") {
         var vname: String = this.get_variable_name(expr)
         if (vname.length() > 0 and this.typed_vars.has(vname)) {
-            return this.type_to_string(this.typed_vars.get(vname))
+            var vt: String = this.type_to_string(this.typed_vars.get(vname))
+            // In identity mode, Float and Int are both i64 — treat Float as Int
+            if (this.identity_mode and vt == "Float") { return "Int" }
+            return vt
         }
         return "Any"
     }
     if (ek == "string") return "String"
     if (ek == "int") return "Int"
-    if (ek == "float") return "Float"
+    if (ek == "float") {
+        if (this.identity_mode) { return "Int" }
+        return "Float"
+    }
     if (ek == "bool") return "Bool"
     if (ek == "nil") return "Nil"
     if (ek == "list_lit") {
@@ -10564,7 +10572,12 @@ class Codegen {
     var i: Float = 0
     while (i < parts.length()) {
         var fp: List<String> = parts[i].split(":")
-        if (fp[0] == field) return fp[1]
+        if (fp[0] == field) {
+            var ft: String = fp[1]
+            // In identity mode, Float and Int are both i64 — treat Float as Int
+            if (this.identity_mode and ft == "Float") { return "Int" }
+            return ft
+        }
         i = i + 1
     }
     return "Int"

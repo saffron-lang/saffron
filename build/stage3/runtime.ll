@@ -40,6 +40,7 @@ declare i64 @__nil_to_string()
 declare i64 @__float_to_string(i64)
 declare i64 @__string_eq(i64, i64)
 declare i64 @__string_ne(i64, i64)
+declare i64 @__string_intern(i64)
 declare i64 @__val_nil()
 declare double @strtod(i8*, i8*)
 declare double @llvm.floor.f64(double)
@@ -62,6 +63,7 @@ declare double @llvm.floor.f64(double)
 ; --- Runtime declarations ---
 %SB = type { i64, i64, i8* }
 
+@__debug_location = external global i8*
 declare i1 @__val_is_int(i64)
 declare i1 @__val_is_float(i64)
 declare i1 @__val_is_string(i64)
