@@ -543,6 +543,7 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
         out.append("declare i64 @__float_to_string(i64)\n")
         out.append("declare i64 @__string_eq(i64, i64)\n")
         out.append("declare i64 @__string_ne(i64, i64)\n")
+        out.append("declare i64 @__string_intern(i64)\n")
         if (!this.identity_mode) {
             out.append("; --- NaN-boxing value helpers ---\n")
             out.append("declare i64 @__val_tag_int(i64)\n")
