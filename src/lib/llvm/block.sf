@@ -359,6 +359,20 @@ class BlockBuilder {
         this.block.is_terminated = true
     }
 
+    /// Safe br_label for cross-module callers: uses set_terminator_text() method
+    /// instead of direct field writes to avoid gen2 nested field-write segfault.
+    fun br_label_set(label: String) {
+        if (this.block.is_terminated) { return nil }
+        this.block.set_terminator_text("  br label %" + label)
+    }
+
+    /// Safe cond_br_labels for cross-module callers: uses set_terminator_text().
+    fun cond_br_labels_set(cond: Types.Value, then_label: String, else_label: String) {
+        if (this.block.is_terminated) { return nil }
+        var text: String = "  br i1 " + Types.format_value(cond) + ", label %" + then_label + ", label %" + else_label
+        this.block.set_terminator_text(text)
+    }
+
     /// Safe ret for cross-module callers: uses set_terminator_text() method
     /// instead of direct field writes to avoid gen2 nested field-write segfault.
     fun ret_set(val: Types.Value) {
