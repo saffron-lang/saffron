@@ -118,6 +118,10 @@
             this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
             // Return closure pointer as i64
             var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
+            // LLVM lib parallel path: track lambda/closure result as opaque value
+            if (this.use_llvm_lib and !this.identity_mode) {
+                this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+            }
             return result
         }
 
@@ -180,6 +184,10 @@
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
         var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
+        // LLVM lib parallel path: track lambda/closure result as opaque value
+        if (this.use_llvm_lib and !this.identity_mode) {
+            this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+        }
         return result
     }
 
