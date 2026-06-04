@@ -3981,6 +3981,10 @@ class Codegen {
             this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
             // Return closure pointer as i64
             var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
+            // LLVM lib parallel path: track lambda/closure result as opaque value
+            if (this.use_llvm_lib and !this.identity_mode) {
+                this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+            }
             return result
         }
 
@@ -4043,6 +4047,10 @@ class Codegen {
         this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
         this.emit_indent("store i64 0, i64* " + env_slot)
         var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
+        // LLVM lib parallel path: track lambda/closure result as opaque value
+        if (this.use_llvm_lib and !this.identity_mode) {
+            this.llvm_values.set(result, LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+        }
         return result
     }
 
@@ -8928,6 +8936,22 @@ class Codegen {
     var local: String = this.fresh_local()
     if (this.use_llvm_lib) {
         this.emit_indent(this.lib_call(local, "i64", full_method, arg_strs.join(", ")))
+        // LLVM lib parallel path: track method call result as a call instruction
+        if (!this.identity_mode) {
+            var mc_arg_vals: List<LLVMTypes.Value> = []
+            var mc_ai: Float = 0
+            while (mc_ai < arg_strs.length()) {
+                var mc_part: String = arg_strs[mc_ai]
+                var mc_sp: Float = mc_part.index_of(" ")
+                if (mc_sp > 0) {
+                    var mc_reg: String = mc_part.slice(mc_sp + 1, mc_part.length())
+                    mc_arg_vals.push(LLVMTypes.Value.Instruction(mc_reg, LLVMTypes.Type.I64))
+                }
+                mc_ai = mc_ai + 1
+            }
+            var mc_result: LLVMTypes.Value = this.llvm_block_builder.call(full_method, LLVMTypes.Type.I64, mc_arg_vals)
+            this.llvm_values.set(local, mc_result)
+        }
     } else {
         this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")
     }
@@ -10461,6 +10485,13 @@ class Codegen {
     this.emit_indent(field_ptr + " = getelementptr %" + struct_name + ", %" + struct_name + "* " + obj_ptr + ", i32 0, i32 " + field_idx.floor().to_string())
     var result: String = this.fresh_local()
     this.emit_indent(result + " = load volatile i64, i64* " + field_ptr)
+    // LLVM lib parallel path: track field load result as opaque call (GEP+load)
+    if (this.use_llvm_lib and !this.identity_mode) {
+        var gf_arg_vals: List<LLVMTypes.Value> = []
+        gf_arg_vals.push(LLVMTypes.Value.Instruction(obj_val, LLVMTypes.Type.I64))
+        var gf_result: LLVMTypes.Value = this.llvm_block_builder.call("__field_load", LLVMTypes.Type.I64, gf_arg_vals)
+        this.llvm_values.set(result, gf_result)
+    }
     // Infer field type from class declaration
     this.last_type = this.str_to_type(this.get_field_type(class_name, field))
     return result
