@@ -60,10 +60,13 @@ class FunctionBuilder {
 
     fun init(name: String, ret_type: Types.Type, params: List<Param>) {
         this.func = FunctionDef(name, ret_type, params)
+        // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
+        this.func.init(name, ret_type, params)
         this.local_counter = 0
         this.block_counter = 0
         // Create entry block
         var entry: BasicBlock = BasicBlock("entry")
+        entry.init("entry")
         this.func.blocks.push(entry)
     }
 
@@ -95,6 +98,8 @@ class FunctionBuilder {
         this.block_counter = this.block_counter + 1
         var label: String = name
         var block: BasicBlock = BasicBlock(label)
+        // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
+        block.init(label)
         this.func.blocks.push(block)
         return block
     }

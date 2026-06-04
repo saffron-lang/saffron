@@ -131,10 +131,16 @@ class Codegen {
         this.class_type_ids = {}
         this.next_class_type_id = 10
         this.llvm_module = LLVMMod.Module("saffron_program")
+        // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
+        // Explicitly call init to set up internal lists/fields.
+        this.llvm_module.init("saffron_program")
         var dummy_params: List<LLVMFunc.Param> = []
         this.llvm_func_builder = LLVMFunc.FunctionBuilder("__dummy", LLVMTypes.Type.I64, dummy_params)
+        this.llvm_func_builder.init("__dummy", LLVMTypes.Type.I64, dummy_params)
         var dummy_bb: LLVMFunc.BasicBlock = LLVMFunc.BasicBlock("entry")
+        dummy_bb.init("entry")
         this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
+        this.llvm_block_builder.init(this.llvm_func_builder, dummy_bb)
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")

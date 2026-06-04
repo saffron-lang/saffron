@@ -114,6 +114,9 @@ class Module {
     /// Create a new function builder and register it with the module.
     fun add_function(name: String, ret_type: Types.Type, params: List<Func.Param>): Func.FunctionBuilder {
         var fb: Func.FunctionBuilder = Func.FunctionBuilder(name, ret_type, params)
+        // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
+        // Redundant when compiled by gen3+ but necessary for gen2-compiled binaries.
+        fb.init(name, ret_type, params)
         this.functions.push(fb.func)
         return fb
     }
