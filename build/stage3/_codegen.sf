@@ -1131,6 +1131,14 @@ class Codegen {
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
                 this.emit_indent(local + " = add i64 0, " + val_str)
+                // LLVM lib parallel path — builds BoolLit in the LLVM Module alongside string emission
+                if (this.use_llvm_lib and !this.identity_mode) {
+                    var bool_int: Float = 0
+                    if (v) { bool_int = 1 }
+                    var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
+                    var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(bool_int, 64))
+                    var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                }
                 local
             }
             StringLit(s) => {
@@ -1140,10 +1148,20 @@ class Codegen {
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.ptr_to_val(gep)
+                // LLVM lib parallel path — string literal ptrtoint
+                // Full path needs Module.add_global_string() + GEP + ptrtoint;
+                // deferred until the LLVM lib gains global string constant support
+                if (this.use_llvm_lib and !this.identity_mode) {
+                    // placeholder: string constants need Module.add_global_string()
+                }
                 local
             }
             NilLit => {
                 this.last_type = AST.Type.NilType
+                // LLVM lib parallel path — nil is constant 0
+                if (this.use_llvm_lib and !this.identity_mode) {
+                    // Nil represented as const 0 (no NaN-boxing yet in LLVM lib path)
+                }
                 "0"
             }
             Variable(name) => {
@@ -1734,6 +1752,9 @@ class Codegen {
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("add", local, lhs, rhs))
+                // LLVM lib parallel path: lhs/rhs are string register names — tracking
+                // Value objects alongside strings requires a register→Value map; defer to
+                // next iteration when we introduce llvm_value_map
             } else {
                 this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
             }
