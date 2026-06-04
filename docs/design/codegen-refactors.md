@@ -605,3 +605,48 @@ Recommended order to minimize risk and maximize immediate benefit:
 8. **#7** (AST node smuggling) — requires promotion cycle, do last
 
 Each refactor should be a single commit with its own bootstrap verification.
+
+---
+
+## 9. NaN-Boxing via LLVM Library Refactor
+
+**Priority:** HIGH (blocks println(Any), runtime type dispatch, full module-as-object)
+
+### Current State
+
+The codegen emits raw values everywhere:
+- IntLit(42) emits add i64 0, 42 (no tag)
+- BoolLit(true) emits add i64 0, 1 (no tag)  
+- StringLit("hi") emits ptrtoint i8* ... to i64 (no tag)
+- NilLit emits literal "0" (not the NaN-boxed nil constant)
+
+Tag/untag calls exist only at boundaries (IO printing, extern calls). The system assumes they are no-ops.
+
+### Target State
+
+All value creation goes through the NanBox helper in src/lib/llvm/nanbox.sf.
+The LLVM lib provides typed tag/untag operations via BlockBuilder + NanBox class.
+NaN-boxing becomes just a link-time choice: base.ll (identity) vs base_nanbox.ll (real).
+
+### Why This Is Part of the LLVM Lib Refactor
+
+When the codegen uses LLVM.BlockBuilder instead of string concatenation:
+1. Every emit_indent("add i64 0, " + val) becomes bb.add(...)
+2. NanBox wrapper fits naturally: nb.tag_int(bb.const_int(42))
+3. The same codegen produces both modes by choosing which base to link
+4. src/lib/llvm/nanbox.sf already has the NanBox class with tag_int, tag_ptr, untag_int, etc.
+
+### Migration Steps (done as part of LLVM lib codegen rewrite)
+
+1. Rewrite literal emission to use NanBox (tag_int, tag_ptr, tag_bool, nil_val)
+2. Rewrite arithmetic to untag/compute/retag
+3. Fix intrinsics (load64/store64 untag addresses)
+4. Compile runtime without identity-mode (or keep boundary via extern void*)
+5. Complete base_nanbox.ll (copy missing symbols from base.ll)
+6. Add --nanbox flag to tools/saffron driver
+
+### Dependencies
+
+- Requires LLVM lib codegen rewrite
+- Does NOT require gen2 promotion
+- Does NOT block anything else (identity-mode continues working)
