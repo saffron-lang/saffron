@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SAFFRONC="${SAFFRONC:-$SCRIPT_DIR/build/saffronc}"
 RUNTIME="${SAFFRON_RUNTIME:-$SCRIPT_DIR/build/stage3/runtime.ll}"
 RUNTIME_SRC="${SAFFRON_RUNTIME_SRC:-$SCRIPT_DIR/src/runtime/runtime.sf}"
-RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base.ll}"
+RUNTIME_BASE="${SAFFRON_RUNTIME_BASE:-$SCRIPT_DIR/src/runtime/base_nanbox.ll}"
 RUNTIME_GC="${SAFFRON_RUNTIME_GC:-$SCRIPT_DIR/src/runtime/gc.ll}"
 
 usage() {
