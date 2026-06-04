@@ -1,0 +1,124 @@
+//! String — the built-in string type.
+//! A String wraps a pointer to null-terminated UTF-8 bytes.
+//! All methods delegate to C standard library or runtime functions.
+
+@extern("i64 strlen(void*)") fun _strlen(ptr: Int): Int
+@extern("i64 strcmp(void*, void*)") fun _strcmp(a: Int, b: Int): Int
+@extern("void* strstr(void*, void*)") fun _strstr(haystack: Int, needle: Int): Int
+@extern("void* malloc(i64)") fun _malloc(size: Int): Int
+@extern("void* memcpy(void*, void*, i64)") fun _memcpy(dst: Int, src: Int, n: Int): Int
+@extern("void free(void*)") fun _free(ptr: Int)
+
+@intrinsic fun load8(addr: Int): Int
+@intrinsic fun store8(addr: Int, val: Int)
+
+@extern("i64 __str_split(i64, i64)") fun _split(str: Int, delim: Int): Int
+@extern("i64 __str_replace(i64, i64, i64)") fun _replace(str: Int, old: Int, new_: Int): Int
+@extern("i64 rt_str_trim(i64)") fun _trim(str: Int): Int
+@extern("i64 rt_str_to_upper(i64)") fun _to_upper(str: Int): Int
+@extern("i64 rt_str_to_lower(i64)") fun _to_lower(str: Int): Int
+@extern("i64 rt_str_index_of(i64, i64)") fun _index_of(str: Int, sub: Int): Int
+@extern("i64 rt_str_repeat(i64, i64)") fun _repeat(str: Int, count: Int): Int
+@extern("i64 __str_ends_with(i64, i64)") fun _ends_with(str: Int, suffix: Int): Int
+@extern("i64 __int_to_string(i64)") fun _int_to_string(val: Int): Int
+
+/// The String class — wraps a raw pointer to null-terminated bytes.
+class String {
+    var _ptr: Int
+
+    fun init(ptr: Int) {
+        this._ptr = ptr
+    }
+
+    /// Return the number of bytes in the string (excluding null terminator).
+    fun length(): Int {
+        return _strlen(this._ptr)
+    }
+
+    /// Return the character at the given byte index as a single-character string.
+    fun char_at(index: Int): String {
+        var ch: Int = load8(this._ptr + index)
+        var buf: Int = _malloc(2)
+        store8(buf, ch)
+        store8(buf + 1, 0)
+        return buf
+    }
+
+    /// Return true if this string contains the given substring.
+    fun contains(sub: String): Bool {
+        return _strstr(this._ptr, sub._ptr) != 0
+    }
+
+    /// Return true if this string starts with the given prefix.
+    fun starts_with(prefix: String): Bool {
+        var plen: Int = _strlen(prefix._ptr)
+        var i: Int = 0
+        while (i < plen) {
+            if (load8(this._ptr + i) != load8(prefix._ptr + i)) {
+                return false
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    /// Return true if this string ends with the given suffix.
+    fun ends_with(suffix: String): Bool {
+        return _ends_with(this._ptr, suffix._ptr) != 0
+    }
+
+    /// Return the index of the first occurrence of sub, or -1 if not found.
+    fun index_of(sub: String): Int {
+        return _index_of(this._ptr, sub._ptr)
+    }
+
+    /// Return a new string with leading/trailing whitespace removed.
+    fun trim(): String {
+        return _trim(this._ptr)
+    }
+
+    /// Return a new uppercase copy of this string.
+    fun to_upper(): String {
+        return _to_upper(this._ptr)
+    }
+
+    /// Return a new lowercase copy of this string.
+    fun to_lower(): String {
+        return _to_lower(this._ptr)
+    }
+
+    /// Return a substring from start (inclusive) to end (exclusive).
+    fun slice(start: Int, end: Int): String {
+        var len: Int = end - start
+        if (len <= 0) { return "" }
+        var buf: Int = _malloc(len + 1)
+        _memcpy(buf, this._ptr + start, len)
+        store8(buf + len, 0)
+        return buf
+    }
+
+    /// Split this string by a delimiter, returning a list of substrings.
+    fun split(delim: String): List<String> {
+        return _split(this._ptr, delim._ptr)
+    }
+
+    /// Replace all occurrences of old with new_.
+    fun replace(old: String, new_: String): String {
+        return _replace(this._ptr, old._ptr, new_._ptr)
+    }
+
+    /// Repeat this string count times.
+    fun repeat(count: Int): String {
+        return _repeat(this._ptr, count)
+    }
+
+    /// Convert a number to its string representation.
+    fun to_string(): String {
+        return this
+    }
+
+    /// Parse as a number. Returns 0 if not a valid number.
+    fun to_number(): Int {
+        return _int_to_string(this._ptr)
+    }
+}
