@@ -10216,7 +10216,13 @@ class Codegen {
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
-        class_name = this.current_class
+        // Try resolve_class_type to handle module-qualified types (e.g. "Func.BasicBlock")
+        var resolved: String = this.resolve_class_type(class_name)
+        if (resolved.length() > 0 and this.class_fields.has(resolved)) {
+            class_name = resolved
+        } else {
+            class_name = this.current_class
+        }
     }
     // Resolve to struct type name for GEP
     var struct_name: String = class_name
@@ -10281,7 +10287,13 @@ class Codegen {
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
-        class_name = this.current_class
+        // Try resolve_class_type to handle module-qualified types (e.g. "Func.BasicBlock")
+        var resolved: String = this.resolve_class_type(class_name)
+        if (resolved.length() > 0 and this.class_fields.has(resolved)) {
+            class_name = resolved
+        } else {
+            class_name = this.current_class
+        }
     }
     // Resolve to struct type name for GEP
     var struct_name: String = class_name
