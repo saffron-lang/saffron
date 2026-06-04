@@ -145,13 +145,7 @@ class Codegen {
         this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
         this.llvm_block_builder.init(this.llvm_func_builder, dummy_bb)
         this.llvm_values = {}
-        this.builtin_methods.set("push", "v2|__list_push|Nil|0")
-        this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
-        this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
-        this.builtin_methods.set("keys", "r1|__map_keys|ListStr|0")
-        this.builtin_methods.set("reverse", "r1|rt_list_reverse|List|1")
-        this.builtin_methods.set("copy", "r1|rt_list_copy|List|1")
-        this.builtin_methods.set("sort", "r1|rt_list_sort|List|1")
+        // String methods remain in builtin_methods (inconsistent naming convention)
         this.builtin_methods.set("trim", "r1|rt_str_trim|String|1")
         this.builtin_methods.set("to_upper", "r1|rt_str_to_upper|String|1")
         this.builtin_methods.set("to_lower", "r1|rt_str_to_lower|String|1")
@@ -160,7 +154,6 @@ class Codegen {
         this.builtin_methods.set("split", "p2|__str_split|ListStr|0")
         this.builtin_methods.set("ends_with", "p2|__str_ends_with|Bool|0")
         this.builtin_methods.set("replace", "p3|__str_replace|String|0")
-        this.builtin_methods.set("join", "m2|__list_join|String|0")
 
         // Register built-in type classes in class_methods so method resolution
         // finds them. These mirror the type class definitions in src/lib/*.sf.
