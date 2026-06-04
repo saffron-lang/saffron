@@ -27,6 +27,7 @@ class Manifest {
     var dependencies: Map<String, Any>
     var dev_dependencies: Map<String, Any>
     var scripts: Map<String, String>
+    var workspace_members: List<String>
     var raw: Map<String, Any>
 
     fun init() {
@@ -39,6 +40,7 @@ class Manifest {
         this.dependencies = {}
         this.dev_dependencies = {}
         this.scripts = {}
+        this.workspace_members = []
         this.raw = {}
     }
 }
@@ -155,6 +157,13 @@ fun load_from(path: String): Manifest {
     }
     if (config.has("scripts")) {
         manifest.scripts = config.table("scripts").to_map()
+    }
+
+    if (config.has("workspace")) {
+        var ws: TOML.TomlTable = config.table("workspace")
+        if (ws.has("members")) {
+            manifest.workspace_members = ws.list("members")
+        }
     }
 
     return manifest

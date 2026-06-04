@@ -10,13 +10,13 @@ fun run(parsed: Args.ParsedArgs) {
     var scripts: Map<String, String> = Run._collect_scripts(manifest)
 
     IO.println("Building " + manifest.name + "...")
-    var start: Number = Time.now()
+    var start: Float = Time.now()
 
     // If there's a build script defined, run it (with script expansion)
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
         Run._exec_command(cmd, scripts, 0)
-        var elapsed: Number = Time.now() - start
+        var elapsed: Float = Time.now() - start
         IO.println("✓ Built in " + elapsed.floor().to_string() + "s")
         return
     }

@@ -12,6 +12,7 @@
             this.func_ret_types.set(name, this.str_to_type(ret_type))
             this.func_prefix_map.set(name, emit_name)
         }
+        this.current_function_name = name
         if (this.register_only) { return }
         if (this.str_in_list(this.defined_funcs,emit_name)) {
             if (this.current_prefix.length() == 0 and !emit_name.contains("__lambda")) {
@@ -129,7 +130,7 @@
                     this.emit_indent("%" + this.sanitize_name(pp2[0]) + " = alloca i64")
                     this.emit_indent("store i64 %" + this.sanitize_name(pp2[0]) + ".arg, i64* %" + this.sanitize_name(pp2[0]))
                 }
-                if (pp2[1] == "Float") { this.typed_vars.set(pp2[0], AST.Type.IntType) } else { this.typed_vars.set(pp2[0], this.str_to_type(pp2[1])) }
+                this.typed_vars.set(pp2[0], this.str_to_type(pp2[1]))
                 pi3 = pi3 + 1
             }
             var var_names2: List<String> = []
@@ -307,7 +308,7 @@
             var parts: List<String> = param_list[i].split(":")
             var pname: String = parts[0]
             var ptype: String = parts[1]
-            if (ptype == "Float") { this.typed_vars.set(pname, AST.Type.IntType) } else { this.typed_vars.set(pname, this.str_to_type(ptype)) }
+            this.typed_vars.set(pname, this.str_to_type(ptype))
             if (ptype == "String") {
                 this.string_vars.push(pname)
             }

@@ -35,7 +35,7 @@
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
         if (s == "Int" or s == "Number") return AST.Type.IntType
-        if (s == "Float") return AST.Type.IntType
+        if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType

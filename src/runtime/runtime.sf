@@ -31,6 +31,7 @@
 @extern("i64 write(i32, void*, i64)") fun rt_write(fd: Int, buf: Int, len: Int): Int
 @extern("i64 read(i32, void*, i64)") fun rt_read(fd: Int, buf: Int, count: Int): Int
 @extern("void exit(i32)") fun rt_exit(code: Int)
+@extern("void __print_debug_location()") fun __print_debug_location()
 
 // --- GC Functions (defined in gc.ll, linked alongside) ---
 
@@ -433,6 +434,7 @@ fun __runtime_error(msg: Int) {
 
 fun __runtime_error_fatal(msg: Int) {
     __runtime_error(msg)
+    __print_debug_location()
     rt_exit(1)
 }
 

@@ -265,6 +265,15 @@
         if (this.func_ret_types.has(callee_name)) {
             return this.type_to_string(this.func_ret_types.get(callee_name))
         }
+        if (callee_name.contains(".")) {
+            var cp: List<String> = callee_name.split(".")
+            if (cp.length() >= 2 and this.module_prefixes.has(cp[0])) {
+                var resolved_name: String = this.module_prefixes.get(cp[0]) + cp[1]
+                if (this.func_ret_types.has(resolved_name)) {
+                    return this.type_to_string(this.func_ret_types.get(resolved_name))
+                }
+            }
+        }
     }
     if (ek == "is_check") return "Bool"
     if (ek == "binary") {
@@ -355,6 +364,9 @@
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
     var obj_name: String = this.get_variable_name(object)
+    var ig_dbg: String = obj_name
+    if (ig_dbg.length() == 0) { ig_dbg = "<expr>" }
+    this.emit_debug_location(ig_dbg + "[...]")
     // Block tuple indexing: must use ._0, ._1 etc.
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
@@ -667,6 +679,9 @@
 
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
     var obj_name: String = this.get_variable_name(object)
+    var dbg_ctx: String = obj_name
+    if (dbg_ctx.length() == 0) { dbg_ctx = "<expr>" }
+    this.emit_debug_location(dbg_ctx + "." + method + "()")
 
     // Self method calls: this.method(args)
     var obj_kind_early: String = this.classify_expr(object)
@@ -685,6 +700,35 @@
         if (__mp.length() > 0) {
             var __mp_func: String = __mp + method
             this.called_functions.push(__mp_func)
+
+            // Check if this is a class constructor: class_fields has the method name
+            // or the prefixed name, meaning it's a class not a plain function
+            var __mp_is_ctor: Bool = false
+            if (this.class_fields.has(method) or this.class_fields.has(__mp_func)) {
+                __mp_is_ctor = true
+            }
+
+            if (__mp_is_ctor) {
+                // Constructor: alloc instance, then call __init with args
+                var __mp_instance: String = this.fresh_local()
+                this.emit_indent(__mp_instance + " = call i64 @" + __mp_func + "()")
+                // Find and call __init
+                var __mp_init: String = __mp_func + "__init"
+                if (this.str_in_list(this.known_functions,__mp_init)) {
+                    var __mp_init_args: List<String> = []
+                    __mp_init_args.push("i64 " + __mp_instance)
+                    var __mpi: Float = 0
+                    while (__mpi < args.length()) {
+                        __mp_init_args.push("i64 " + this.gen_arg_value(args[__mpi]))
+                        __mpi = __mpi + 1
+                    }
+                    var __mp_discard: String = this.fresh_local()
+                    this.emit_indent(__mp_discard + " = call i64 @" + __mp_init + "(" + __mp_init_args.join(", ") + ")")
+                }
+                this.last_type = this.str_to_type(method)
+                return __mp_instance
+            }
+
             var __mp_args: List<String> = []
             var __mpi: Float = 0
             while (__mpi < args.length()) {
@@ -2119,6 +2163,9 @@
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
+    var gf_dbg: String = this.get_variable_name(object)
+    if (gf_dbg.length() == 0) { gf_dbg = "<expr>" }
+    this.emit_debug_location(gf_dbg + "." + field)
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
