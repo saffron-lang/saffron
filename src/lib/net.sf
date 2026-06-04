@@ -1,5 +1,6 @@
-//! High-level networking module.
-//! Wraps @socket, @server, and @dns with typed connection objects.
+//! Unified networking module — TCP client, server, TLS, and DNS.
+//! All I/O operations yield to the scheduler when they would block,
+//! allowing other tasks to run while waiting for data.
 //!
 //! ```saffron
 //! import "@net" as Net
@@ -27,11 +28,161 @@
 //!
 //! // DNS resolution
 //! var ips = Net.resolve("example.com")
+//!
+//! // Escape hatch: raw fd access for advanced use (select/poll/etc.)
+//! var fd: Number = conn.raw_fd()
 //! ```
 
-import "@socket" as Socket
-import "@server" as Server
 import "@dns" as DNS
+
+// =============================================================================
+// FFI declarations (private implementation details)
+// =============================================================================
+
+// --- TCP socket ---
+@extern("void sf_socket_init()") fun _socket_init()
+@extern("i64 sf_tcp_connect(i8*, i64)") fun _tcp_connect_raw(host: Int, port: Int): Int
+@extern("i64 sf_tcp_read(i64, i8*, i64)") fun _tcp_read_raw(fd: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tcp_write(i64, i8*, i64)") fun _tcp_write_raw(fd: Int, buf: Int, len: Int): Int
+@extern("void sf_tcp_close(i64)") fun _tcp_close_raw(fd: Int)
+
+// --- TLS ---
+@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Int, hostname: Int): Int
+@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
+@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Int)
+
+// --- Server ---
+@extern("i64 sf_tcp_bind(i8*, i64)") fun _tcp_bind_raw(host: Int, port: Int): Int
+@extern("i64 sf_tcp_listen(i64, i64)") fun _tcp_listen_raw(fd: Int, backlog: Int): Int
+@extern("i64 sf_tcp_accept(i64)") fun _tcp_accept_raw(fd: Int): Int
+
+// --- Memory ---
+@extern("void* malloc(i64)") fun _net_malloc(size: Int): Int
+@extern("void free(void*)") fun _net_free(ptr: Int)
+@extern("i64 strlen(void*)") fun _net_strlen(s: Int): Int
+
+@intrinsic fun __suspend(reason: Int, arg: Int)
+
+// =============================================================================
+// Internal: raw socket operations
+// =============================================================================
+
+// Connect to a TCP host:port. Returns fd or -1 on error.
+fun _raw_connect(host: String, port: Int): Int {
+    _socket_init()
+    return _tcp_connect_raw(host, port)
+}
+
+// Connect with TLS. Returns a packed handle (fd in low bits, tls handle in high bits).
+// Packed as: fd | (tls_handle << 32)
+fun _raw_connect_tls(host: String, port: Int): Int {
+    _socket_init()
+    var fd: Int = _tcp_connect_raw(host, port)
+    if (fd < 0) { return -1 }
+    var tls_handle: Int = _tls_connect_raw(fd, host)
+    if (tls_handle < 0) {
+        _tcp_close_raw(fd)
+        return -1
+    }
+    // Pack fd + tls_handle
+    return fd | (tls_handle << 32)
+}
+
+// Async read: yields to scheduler when socket would block.
+// Returns the data as a string, or empty string on EOF/error.
+fun _raw_read(fd: Int, max_bytes: Int): String {
+    var buf: Int = _net_malloc(max_bytes + 1)
+    var total: Int = 0
+    while (total < max_bytes) {
+        var n: Int = _tcp_read_raw(fd, buf + total, max_bytes - total)
+        if (n > 0) {
+            total = total + n
+            break
+        }
+        if (n == 0) { break }
+        if (n == -2) { break }
+        // n == -1: would block — suspend for read readiness
+        __suspend(2, fd)
+    }
+    // Null-terminate
+    @intrinsic fun store8(addr: Int, val: Int)
+    store8(buf + total, 0)
+    return buf
+}
+
+// Async write: yields to scheduler when socket would block.
+// Returns number of bytes written.
+fun _raw_write(fd: Int, data: String): Int {
+    var ptr: Int = data
+    var len: Int = _net_strlen(ptr)
+    var written: Int = 0
+    while (written < len) {
+        var n: Int = _tcp_write_raw(fd, ptr + written, len - written)
+        if (n > 0) {
+            written = written + n
+        } else if (n == -1) {
+            // Would block — suspend for write readiness
+            __suspend(4, fd)
+        } else {
+            // Error
+            break
+        }
+    }
+    return written
+}
+
+// Async TLS read
+fun _raw_tls_read(handle: Int, max_bytes: Int): String {
+    var fd: Int = handle & 0xFFFFFFFF
+    var tls: Int = handle >> 32
+    var buf: Int = _net_malloc(max_bytes + 1)
+    var total: Int = 0
+    while (total < max_bytes) {
+        var n: Int = _tls_read_raw(tls, buf + total, max_bytes - total)
+        if (n > 0) {
+            total = total + n
+            break
+        }
+        if (n == 0) { break }
+        if (n == -2) { break }
+        // Would block — suspend for read readiness on underlying fd
+        __suspend(2, fd)
+    }
+    @intrinsic fun store8(addr: Int, val: Int)
+    store8(buf + total, 0)
+    return buf
+}
+
+// Async TLS write
+fun _raw_tls_write(handle: Int, data: String): Int {
+    var fd: Int = handle & 0xFFFFFFFF
+    var tls: Int = handle >> 32
+    var ptr: Int = data
+    var len: Int = _net_strlen(ptr)
+    var written: Int = 0
+    while (written < len) {
+        var n: Int = _tls_write_raw(tls, ptr + written, len - written)
+        if (n > 0) {
+            written = written + n
+        } else if (n == -1) {
+            __suspend(4, fd)
+        } else {
+            break
+        }
+    }
+    return written
+}
+
+// Close a socket (plain or TLS)
+fun _raw_close(handle: Int) {
+    var fd: Int = handle & 0xFFFFFFFF
+    var tls: Int = handle >> 32
+    if (tls > 0) {
+        _tls_close_raw(tls)
+    }
+    _tcp_close_raw(fd)
+}
 
 // =============================================================================
 // TcpConnection
@@ -56,9 +207,9 @@ class TcpConnection {
     /// Returns the data as a string, or empty string on EOF/error.
     fun read(max_bytes: Int): String {
         if (this._is_tls) {
-            return Socket.tls_read(this._handle, max_bytes)
+            return _raw_tls_read(this._handle, max_bytes)
         }
-        return Socket.read(this._handle, max_bytes)
+        return _raw_read(this._handle, max_bytes)
     }
 
     /// Read all available data until EOF.
@@ -79,14 +230,14 @@ class TcpConnection {
     /// Returns the number of bytes written.
     fun write(data: String): Int {
         if (this._is_tls) {
-            return Socket.tls_write(this._handle, data)
+            return _raw_tls_write(this._handle, data)
         }
-        return Socket.write(this._handle, data)
+        return _raw_write(this._handle, data)
     }
 
     /// Close the connection and release the underlying file descriptor.
     fun close() {
-        Socket.close(this._handle)
+        _raw_close(this._handle)
     }
 
     /// Returns the remote address as "host:port" (or whatever was provided
@@ -99,6 +250,12 @@ class TcpConnection {
     fun is_tls(): Bool {
         return this._is_tls
     }
+
+    /// Escape hatch: returns the raw file descriptor (or packed TLS handle)
+    /// for advanced use cases like select/poll or passing to C FFI functions.
+    fun raw_fd(): Int {
+        return this._handle & 0xFFFFFFFF
+    }
 }
 
 // =============================================================================
@@ -106,14 +263,14 @@ class TcpConnection {
 // =============================================================================
 
 /// A TCP listener that accepts incoming connections.
-/// Wraps @server.Listener with higher-level TcpConnection objects.
+/// Binds to a host:port and yields to the scheduler while waiting for clients.
 class TcpListener {
-    var _listener: Server.Listener
+    var _fd: Int
     var _host: String
     var _port: Int
 
-    fun init(listener: Server.Listener, host: String, port: Int) {
-        this._listener = listener
+    fun init(fd: Int, host: String, port: Int) {
+        this._fd = fd
         this._host = host
         this._port = port
     }
@@ -122,24 +279,34 @@ class TcpListener {
     /// Blocks (yields to scheduler) until a client connects.
     /// Returns a TcpConnection wrapping the accepted socket.
     fun accept(): TcpConnection {
-        var fd: Int = this._listener.accept()
-        if (fd < 0) {
-            throw "net: accept failed"
+        while (true) {
+            var client: Int = _tcp_accept_raw(this._fd)
+            if (client >= 0) {
+                return TcpConnection(client, "unknown", false)
+            }
+            if (client == -1) {
+                __suspend(2, this._fd)
+            } else {
+                throw "net: accept failed"
+            }
         }
-        // The raw accept does not give us a remote address string directly,
-        // so we use a placeholder. A future version could extract the peer
-        // address from the accepted fd via getpeername().
-        return TcpConnection(fd, "unknown", false)
+        throw "net: accept failed"
     }
 
     /// Close the listener and stop accepting connections.
     fun close() {
-        this._listener.close()
+        _tcp_close_raw(this._fd)
     }
 
     /// Returns the bound address as "host:port".
     fun addr(): String {
         return "${this._host}:${this._port}"
+    }
+
+    /// Escape hatch: returns the raw listener file descriptor
+    /// for advanced use cases like select/poll or passing to C FFI functions.
+    fun raw_fd(): Int {
+        return this._fd
     }
 }
 
@@ -155,8 +322,17 @@ class TcpListener {
 /// var conn = listener.accept()
 /// ```
 fun listen(host: String, port: Int): TcpListener {
-    var listener: Server.Listener = Server.listen(host, port)
-    return TcpListener(listener, host, port)
+    _socket_init()
+    var fd: Int = _tcp_bind_raw(host, port)
+    if (fd < 0) {
+        throw "net: failed to bind to ${host}:${port}"
+    }
+    var result: Int = _tcp_listen_raw(fd, 128)
+    if (result < 0) {
+        _tcp_close_raw(fd)
+        throw "net: failed to listen on ${host}:${port}"
+    }
+    return TcpListener(fd, host, port)
 }
 
 /// Connect to a remote TCP host:port.
@@ -169,7 +345,7 @@ fun listen(host: String, port: Int): TcpListener {
 /// conn.close()
 /// ```
 fun connect(host: String, port: Int): TcpConnection {
-    var fd: Int = Socket.connect(host, port)
+    var fd: Int = _raw_connect(host, port)
     if (fd < 0) {
         throw "net: failed to connect to ${host}:${port}"
     }
@@ -186,7 +362,7 @@ fun connect(host: String, port: Int): TcpConnection {
 /// conn.close()
 /// ```
 fun connect_tls(host: String, port: Int): TcpConnection {
-    var handle: Int = Socket.connect_tls(host, port)
+    var handle: Int = _raw_connect_tls(host, port)
     if (handle < 0) {
         throw "net: failed to TLS connect to ${host}:${port}"
     }

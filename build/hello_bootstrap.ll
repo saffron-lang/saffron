@@ -3,11 +3,16 @@ target triple = "arm64-apple-macosx15.0.0"
 
 @.str.0 = private unnamed_addr constant [8 x i8] c"Saffron\00"
 @.str.1 = private unnamed_addr constant [6 x i8] c"0.1.0\00"
-@.str.2 = private unnamed_addr constant [12 x i8] c"Hello from \00"
-@.str.3 = private unnamed_addr constant [2 x i8] c" \00"
-@.str.4 = private unnamed_addr constant [2 x i8] c"!\00"
-@.str.5 = private unnamed_addr constant [27 x i8] c"Bootstrapped successfully.\00"
-@.str.6 = private unnamed_addr constant [50 x i8] c"The compiler compiled itself. We're self-hosting!\00"
+@.str.2 = private unnamed_addr constant [15 x i8] c": IO.println()\00"
+@.str.3 = private unnamed_addr constant [12 x i8] c"Hello from \00"
+@.str.4 = private unnamed_addr constant [19 x i8] c": name.to_string()\00"
+@.str.5 = private unnamed_addr constant [2 x i8] c" \00"
+@.str.6 = private unnamed_addr constant [22 x i8] c": version.to_string()\00"
+@.str.7 = private unnamed_addr constant [2 x i8] c"!\00"
+@.str.8 = private unnamed_addr constant [15 x i8] c": IO.println()\00"
+@.str.9 = private unnamed_addr constant [27 x i8] c"Bootstrapped successfully.\00"
+@.str.10 = private unnamed_addr constant [15 x i8] c": IO.println()\00"
+@.str.11 = private unnamed_addr constant [50 x i8] c"The compiler compiled itself. We're self-hosting!\00"
 
 declare i32 @puts(i8*)
 declare i32 @printf(i8*, ...)
@@ -123,6 +128,7 @@ declare i64 @__os_cwd()
 declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
+@__debug_location = external global i8*
 declare i1 @__val_is_int(i64)
 declare i1 @__val_is_float(i64)
 declare i1 @__val_is_string(i64)
@@ -189,65 +195,75 @@ entry:
   %t5 = getelementptr [6 x i8], [6 x i8]* @.str.1, i64 0, i64 0
   %t6 = ptrtoint i8* %t5 to i64
   store i64 %t6, i64* @__g_version
-  %t7 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
-  %t8 = ptrtoint i8* %t7 to i64
-  %t9 = load i64, i64* @__g_name
-  %t10 = inttoptr i64 %t8 to i8*
-  %t11 = inttoptr i64 %t9 to i8*
-  %t12 = call i64 @strlen(i8* %t10)
-  %t13 = call i64 @strlen(i8* %t11)
-  %t14 = add i64 %t12, %t13
-  %t15 = add i64 %t14, 1
-  %t16 = call i8* @malloc(i64 %t15)
-  call i8* @strcpy(i8* %t16, i8* %t10)
-  call i8* @strcat(i8* %t16, i8* %t11)
-  %t17 = ptrtoint i8* %t16 to i64
-  %t18 = call i64 @__string_intern(i64 %t17)
-  %t19 = getelementptr [2 x i8], [2 x i8]* @.str.3, i64 0, i64 0
-  %t20 = ptrtoint i8* %t19 to i64
-  %t21 = inttoptr i64 %t18 to i8*
-  %t22 = inttoptr i64 %t20 to i8*
-  %t23 = call i64 @strlen(i8* %t21)
-  %t24 = call i64 @strlen(i8* %t22)
-  %t25 = add i64 %t23, %t24
-  %t26 = add i64 %t25, 1
-  %t27 = call i8* @malloc(i64 %t26)
-  call i8* @strcpy(i8* %t27, i8* %t21)
-  call i8* @strcat(i8* %t27, i8* %t22)
-  %t28 = ptrtoint i8* %t27 to i64
-  %t29 = call i64 @__string_intern(i64 %t28)
-  %t30 = load i64, i64* @__g_version
-  %t31 = inttoptr i64 %t29 to i8*
-  %t32 = inttoptr i64 %t30 to i8*
-  %t33 = call i64 @strlen(i8* %t31)
-  %t34 = call i64 @strlen(i8* %t32)
-  %t35 = add i64 %t33, %t34
-  %t36 = add i64 %t35, 1
-  %t37 = call i8* @malloc(i64 %t36)
-  call i8* @strcpy(i8* %t37, i8* %t31)
-  call i8* @strcat(i8* %t37, i8* %t32)
-  %t38 = ptrtoint i8* %t37 to i64
-  %t39 = call i64 @__string_intern(i64 %t38)
-  %t40 = getelementptr [2 x i8], [2 x i8]* @.str.4, i64 0, i64 0
+  %t7 = getelementptr [15 x i8], [15 x i8]* @.str.2, i64 0, i64 0
+  store i8* %t7, i8** @__debug_location
+  %t8 = getelementptr [12 x i8], [12 x i8]* @.str.3, i64 0, i64 0
+  %t9 = ptrtoint i8* %t8 to i64
+  %t10 = getelementptr [19 x i8], [19 x i8]* @.str.4, i64 0, i64 0
+  store i8* %t10, i8** @__debug_location
+  %t11 = load i64, i64* @__g_name
+  %t12 = inttoptr i64 %t9 to i8*
+  %t13 = inttoptr i64 %t11 to i8*
+  %t14 = call i64 @strlen(i8* %t12)
+  %t15 = call i64 @strlen(i8* %t13)
+  %t16 = add i64 %t14, %t15
+  %t17 = add i64 %t16, 1
+  %t18 = call i8* @malloc(i64 %t17)
+  call i8* @strcpy(i8* %t18, i8* %t12)
+  call i8* @strcat(i8* %t18, i8* %t13)
+  %t19 = ptrtoint i8* %t18 to i64
+  %t20 = call i64 @__string_intern(i64 %t19)
+  %t21 = getelementptr [2 x i8], [2 x i8]* @.str.5, i64 0, i64 0
+  %t22 = ptrtoint i8* %t21 to i64
+  %t23 = inttoptr i64 %t20 to i8*
+  %t24 = inttoptr i64 %t22 to i8*
+  %t25 = call i64 @strlen(i8* %t23)
+  %t26 = call i64 @strlen(i8* %t24)
+  %t27 = add i64 %t25, %t26
+  %t28 = add i64 %t27, 1
+  %t29 = call i8* @malloc(i64 %t28)
+  call i8* @strcpy(i8* %t29, i8* %t23)
+  call i8* @strcat(i8* %t29, i8* %t24)
+  %t30 = ptrtoint i8* %t29 to i64
+  %t31 = call i64 @__string_intern(i64 %t30)
+  %t32 = getelementptr [22 x i8], [22 x i8]* @.str.6, i64 0, i64 0
+  store i8* %t32, i8** @__debug_location
+  %t33 = load i64, i64* @__g_version
+  %t34 = inttoptr i64 %t31 to i8*
+  %t35 = inttoptr i64 %t33 to i8*
+  %t36 = call i64 @strlen(i8* %t34)
+  %t37 = call i64 @strlen(i8* %t35)
+  %t38 = add i64 %t36, %t37
+  %t39 = add i64 %t38, 1
+  %t40 = call i8* @malloc(i64 %t39)
+  call i8* @strcpy(i8* %t40, i8* %t34)
+  call i8* @strcat(i8* %t40, i8* %t35)
   %t41 = ptrtoint i8* %t40 to i64
-  %t42 = inttoptr i64 %t39 to i8*
-  %t43 = inttoptr i64 %t41 to i8*
-  %t44 = call i64 @strlen(i8* %t42)
-  %t45 = call i64 @strlen(i8* %t43)
-  %t46 = add i64 %t44, %t45
-  %t47 = add i64 %t46, 1
-  %t48 = call i8* @malloc(i64 %t47)
-  call i8* @strcpy(i8* %t48, i8* %t42)
-  call i8* @strcat(i8* %t48, i8* %t43)
-  %t49 = ptrtoint i8* %t48 to i64
-  %t50 = call i64 @__string_intern(i64 %t49)
-  call void @__io_println_str(i64 %t50)
-  %t51 = getelementptr [27 x i8], [27 x i8]* @.str.5, i64 0, i64 0
+  %t42 = call i64 @__string_intern(i64 %t41)
+  %t43 = getelementptr [2 x i8], [2 x i8]* @.str.7, i64 0, i64 0
+  %t44 = ptrtoint i8* %t43 to i64
+  %t45 = inttoptr i64 %t42 to i8*
+  %t46 = inttoptr i64 %t44 to i8*
+  %t47 = call i64 @strlen(i8* %t45)
+  %t48 = call i64 @strlen(i8* %t46)
+  %t49 = add i64 %t47, %t48
+  %t50 = add i64 %t49, 1
+  %t51 = call i8* @malloc(i64 %t50)
+  call i8* @strcpy(i8* %t51, i8* %t45)
+  call i8* @strcat(i8* %t51, i8* %t46)
   %t52 = ptrtoint i8* %t51 to i64
-  call void @__io_println_str(i64 %t52)
-  %t53 = getelementptr [50 x i8], [50 x i8]* @.str.6, i64 0, i64 0
-  %t54 = ptrtoint i8* %t53 to i64
-  call void @__io_println_str(i64 %t54)
+  %t53 = call i64 @__string_intern(i64 %t52)
+  call void @__io_println_str(i64 %t53)
+  %t54 = getelementptr [15 x i8], [15 x i8]* @.str.8, i64 0, i64 0
+  store i8* %t54, i8** @__debug_location
+  %t55 = getelementptr [27 x i8], [27 x i8]* @.str.9, i64 0, i64 0
+  %t56 = ptrtoint i8* %t55 to i64
+  call void @__io_println_str(i64 %t56)
+  %t57 = getelementptr [15 x i8], [15 x i8]* @.str.10, i64 0, i64 0
+  store i8* %t57, i8** @__debug_location
+  %t58 = getelementptr [50 x i8], [50 x i8]* @.str.11, i64 0, i64 0
+  %t59 = ptrtoint i8* %t58 to i64
+  call void @__io_println_str(i64 %t59)
   ret i64 0
 }
 

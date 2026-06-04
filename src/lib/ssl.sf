@@ -119,11 +119,11 @@ class Context {
 ///
 /// ```saffron
 /// import "@ssl" as SSL
-/// import "@socket" as Socket
+/// import "@net" as Net
 ///
-/// var fd = Socket.connect("example.com", 443)
+/// var tcp = Net.connect("example.com", 443)
 /// var ctx = SSL.client_context()
-/// var conn = SSL.wrap_client(fd, "example.com", ctx)
+/// var conn = SSL.wrap_client(tcp.raw_fd(), "example.com", ctx)
 /// conn.write("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
 /// var response = conn.read(4096)
 /// conn.close()
@@ -373,11 +373,11 @@ fun client_context_default(): Context {
 ///
 /// ```saffron
 /// import "@ssl" as SSL
-/// import "@socket" as Socket
+/// import "@net" as Net
 ///
-/// var fd = Socket.connect("example.com", 443)
+/// var tcp = Net.connect("example.com", 443)
 /// var ctx = SSL.client_context_default()
-/// var conn = SSL.wrap_client(fd, "example.com", ctx)
+/// var conn = SSL.wrap_client(tcp.raw_fd(), "example.com", ctx)
 /// conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 /// var data = conn.read(4096)
 /// conn.close()
