@@ -21,17 +21,15 @@ fun _manifest_dir(): String {
     return path.slice(0, last_slash)
 }
 
-fun run(parsed: Args.ParsedArgs) {
-    var manifest = Config.load()
-    var dir: String = _manifest_dir()
+fun _install_in(manifest: Config.Manifest, dir: String) {
     var deps: Map<String, Any> = manifest.dependencies
 
     if (deps.length() == 0) {
-        IO.println("No dependencies to install.")
+        IO.println("  No dependencies for " + manifest.name + ".")
         return
     }
 
-    IO.println("Resolving dependencies for " + manifest.name + "...")
+    IO.println("  Resolving dependencies for " + manifest.name + "...")
 
     var resolved: List<Resolver.ResolvedDep> = Resolver.resolve_all(manifest.dependencies, dir)
 
@@ -112,7 +110,33 @@ fun run(parsed: Args.ParsedArgs) {
     var lock_path: String = dir + "/pantry.lock"
     Resolver.write_lockfile(resolved, lock_path)
 
+    IO.println("  Installed ${resolved.length()} packages to ${manifest.name}/.pantry/packages/")
+}
+
+fun run(parsed: Args.ParsedArgs) {
+    var manifest = Config.load()
+    var dir: String = _manifest_dir()
+
+    IO.println("Installing dependencies...")
+
+    // Install root project deps
+    _install_in(manifest, dir)
+
+    // Install workspace member deps
+    var members: List<String> = manifest.workspace_members
+    var m: Int = 0
+    while (m < members.length()) {
+        var member_dir: String = dir + "/" + members[m]
+        var member_toml: String = member_dir + "/pantry.toml"
+        if (OS.file_exists(member_toml)) {
+            var member_manifest: Config.Manifest = Config.load_from(member_toml)
+            _install_in(member_manifest, member_dir)
+        } else {
+            IO.println("  Warning: workspace member '${members[m]}' has no pantry.toml")
+        }
+        m = m + 1
+    }
+
     IO.println("")
-    IO.println("Installed ${resolved.length()} packages to .pantry/packages/")
-    IO.println("Written pantry.lock")
+    IO.println("Done.")
 }

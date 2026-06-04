@@ -118,6 +118,7 @@ declare i8* @getcwd(i8*, i64)
 declare i8* @getenv(i8*)
 declare i64 @write(i32, i8*, i64)
 declare i64 @read(i32, i8*, i64)
+declare void @__print_debug_location()
 declare i64 @__gc_alloc_safe(i64, i64)
 declare i64 @__val_untag_ptr(i64)
 
@@ -2111,6 +2112,7 @@ entry:
   store i64 %msg.arg, i64* %msg
   %t1 = load i64, i64* %msg
   %t2 = call i64 @__runtime_error(i64 %t1)
+  call void @__print_debug_location()
   %t3 = add i64 0, 1
   %t4 = trunc i64 %t3 to i32
   call void @exit(i32 %t4)

@@ -90,24 +90,6 @@ fun _exec_shell(cmd: String) {
         }
         step_num = step_num + 1
     }
-    return
-    // --- Legacy single-command path (unreachable, kept for reference) ---
-    IO.println("> ${cmd}")
-    var full_cmd: String = cmd
-    if (bin_path.length() > 0) {
-        full_cmd = "PATH=${bin_path}:$PATH " + cmd
-    }
-    var result: Process.ProcessResult = Process.run(full_cmd)
-    if (result.stdout.length() > 0) {
-        IO.print(result.stdout)
-    }
-    if (result.stderr.length() > 0) {
-        IO.print(result.stderr)
-    }
-    if (!(result.success)) {
-        IO.println("Command failed with exit code ${result.exit_code}")
-        OS.exit(result.exit_code)
-    }
 }
 
 /// Resolve a bin command by prefixing relative file paths with the package directory.

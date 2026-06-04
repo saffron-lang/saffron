@@ -11,6 +11,8 @@
             }
             di = di + 1
         }
+        // Debug location tracking
+        rt.append("@__debug_location = external global i8*\n")
         // Runtime type-check functions (NaN-boxing tag inspection, return i1)
         rt.append("declare i1 @__val_is_int(i64)\n")
         rt.append("declare i1 @__val_is_float(i64)\n")
@@ -119,6 +121,15 @@
             i = i + 1
         }
         return "Unknown"
+    }
+
+    fun emit_debug_location(context: String) {
+        var loc: String = this.current_function_name + ": " + context
+        var const_name: String = this.add_string_constant(loc)
+        var slen: Float = loc.length() + 1
+        var gep: String = this.fresh_local()
+        this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
+        this.emit_indent("store i8* " + gep + ", i8** @__debug_location")
     }
 
     fun resolve_callee(expr: AST.Expr): String {

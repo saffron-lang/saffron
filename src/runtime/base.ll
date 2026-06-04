@@ -8,6 +8,9 @@ target triple = "arm64-apple-macosx14.0.0"
 @__exception_value = weak global i64 0
 @__jmp_buf_stack = weak global [64 x i8] zeroinitializer
 
+; Debug location tracking (set by codegen before potentially-crashing operations)
+@__debug_location = global i8* null
+
 ; Async scheduler state
 @__yield_reason = global i64 0
 @__yield_arg = global i64 0
@@ -880,6 +883,34 @@ entry:
 ; __gc_init_shadow_stack: no-op without GC.
 define weak void @__gc_init_shadow_stack() {
 entry:
+  ret void
+}
+
+; Print debug location to stderr if set (called by runtime on error)
+@.debug.at = private unnamed_addr constant [6 x i8] c"  at \00"
+@.debug.nl = private unnamed_addr constant [2 x i8] c"\0A\00"
+
+declare i64 @strlen(i8*)
+declare i64 @write(i32, i8*, i64)
+
+define void @__print_debug_location() {
+entry:
+  %loc = load i8*, i8** @__debug_location
+  %is_null = icmp eq i8* %loc, null
+  br i1 %is_null, label %done, label %check_empty
+check_empty:
+  %first = load i8, i8* %loc
+  %is_empty = icmp eq i8 %first, 0
+  br i1 %is_empty, label %done, label %print
+print:
+  %at_ptr = getelementptr [6 x i8], [6 x i8]* @.debug.at, i64 0, i64 0
+  call i64 @write(i32 2, i8* %at_ptr, i64 5)
+  %len = call i64 @strlen(i8* %loc)
+  call i64 @write(i32 2, i8* %loc, i64 %len)
+  %nl_ptr = getelementptr [2 x i8], [2 x i8]* @.debug.nl, i64 0, i64 0
+  call i64 @write(i32 2, i8* %nl_ptr, i64 1)
+  br label %done
+done:
   ret void
 }
 

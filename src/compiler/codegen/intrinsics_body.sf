@@ -179,8 +179,7 @@
                 this.emit_indent(trunc_val + " = trunc i64 " + val + " to i32")
                 call_args.push("i32 " + trunc_val)
             } else if (norm == "double") {
-                var dbl: String = this.fresh_local()
-                this.emit_indent(dbl + " = bitcast i64 " + val + " to double")
+                var dbl: String = this.emit_untag_float(val)
                 call_args.push("double " + dbl)
             } else {
                 call_args.push("i64 " + val)
@@ -210,9 +209,8 @@
             return ext
         }
         if (llvm_ret == "double") {
-            var as_int: String = this.fresh_local()
-            this.emit_indent(as_int + " = bitcast double " + raw + " to i64")
-            this.last_type = AST.Type.IntType
+            var as_int: String = this.emit_tag_float(raw)
+            this.last_type = AST.Type.FloatType
             return as_int
         }
         this.last_type = AST.Type.IntType
