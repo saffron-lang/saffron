@@ -32,6 +32,7 @@
                     var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
                     var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(bool_int, 64))
                     var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                    this.llvm_values.set(local, llvm_result)
                 }
                 local
             }
@@ -98,6 +99,10 @@
                 }
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_load(local, "i64", var_ref))
+                    // LLVM lib parallel path: propagate stored Value for this variable
+                    if (!this.identity_mode and this.llvm_values.has(var_ref)) {
+                        this.llvm_values.set(local, this.llvm_values.get(var_ref))
+                    }
                 } else {
                     this.emit_indent(local + " = load i64, i64* " + var_ref)
                     this.verify_load(local, "i64", var_ref)
@@ -646,9 +651,13 @@
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("add", local, lhs, rhs))
-                // LLVM lib parallel path: lhs/rhs are string register names — tracking
-                // Value objects alongside strings requires a register→Value map; defer to
-                // next iteration when we introduce llvm_value_map
+                // LLVM lib parallel path: track Value for add
+                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs)
+                    var rhs_v: Any = this.llvm_values.get(rhs)
+                    var res_v: Any = this.llvm_block_builder.add(lhs_v, rhs_v)
+                    this.llvm_values.set(local, res_v)
+                }
             } else {
                 this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
             }
@@ -699,6 +708,13 @@
         if (op == "-") {
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("sub", local, lhs, rhs))
+                // LLVM lib parallel path: track Value for sub
+                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs)
+                    var rhs_v: Any = this.llvm_values.get(rhs)
+                    var res_v: Any = this.llvm_block_builder.sub(lhs_v, rhs_v)
+                    this.llvm_values.set(local, res_v)
+                }
             } else {
                 this.emit_indent(local + " = sub i64 " + lhs + ", " + rhs)
             }
@@ -706,6 +722,13 @@
         else if (op == "*") {
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("mul", local, lhs, rhs))
+                // LLVM lib parallel path: track Value for mul
+                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs)
+                    var rhs_v: Any = this.llvm_values.get(rhs)
+                    var res_v: Any = this.llvm_block_builder.mul(lhs_v, rhs_v)
+                    this.llvm_values.set(local, res_v)
+                }
             } else {
                 this.emit_indent(local + " = mul i64 " + lhs + ", " + rhs)
             }
@@ -713,6 +736,13 @@
         else if (op == "/") {
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("sdiv", local, lhs, rhs))
+                // LLVM lib parallel path: track Value for sdiv
+                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs)
+                    var rhs_v: Any = this.llvm_values.get(rhs)
+                    var res_v: Any = this.llvm_block_builder.sdiv(lhs_v, rhs_v)
+                    this.llvm_values.set(local, res_v)
+                }
             } else {
                 this.emit_indent(local + " = sdiv i64 " + lhs + ", " + rhs)
             }
@@ -720,6 +750,13 @@
         else if (op == "%") {
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_binary_op("srem", local, lhs, rhs))
+                // LLVM lib parallel path: track Value for srem
+                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs)
+                    var rhs_v: Any = this.llvm_values.get(rhs)
+                    var res_v: Any = this.llvm_block_builder.srem(lhs_v, rhs_v)
+                    this.llvm_values.set(local, res_v)
+                }
             } else {
                 this.emit_indent(local + " = srem i64 " + lhs + ", " + rhs)
             }
@@ -1069,6 +1106,10 @@
             }
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_load(local, "i64", var_ref))
+                // LLVM lib parallel path: propagate stored Value for this variable
+                if (!this.identity_mode and this.llvm_values.has(var_ref)) {
+                    this.llvm_values.set(local, this.llvm_values.get(var_ref))
+                }
             } else {
                 this.emit_indent(local + " = load i64, i64* " + var_ref)
                 this.verify_load(local, "i64", var_ref)
