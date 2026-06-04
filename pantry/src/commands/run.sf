@@ -54,8 +54,45 @@ fun _bin_path_prefix(): String {
 }
 
 fun _exec_shell(cmd: String) {
-    IO.println("> ${cmd}")
     var bin_path: String = _bin_path_prefix()
+
+    // Split on && and run each step with progress
+    var steps: List<String> = cmd.split(" && ")
+    var step_num: Int = 0
+    while (step_num < steps.length()) {
+        var step: String = steps[step_num].trim()
+        if (step.length() == 0) {
+            step_num = step_num + 1
+            continue
+        }
+
+        // Show step progress
+        if (steps.length() > 1) {
+            IO.println("  [" + (step_num + 1).to_string() + "/" + steps.length().to_string() + "] " + step)
+        } else {
+            IO.println("> " + step)
+        }
+
+        var full_cmd: String = step
+        if (bin_path.length() > 0) {
+            full_cmd = "PATH=${bin_path}:$PATH " + step
+        }
+        var result: Process.ProcessResult = Process.run(full_cmd)
+        if (result.stdout.length() > 0) {
+            IO.print(result.stdout)
+        }
+        if (result.stderr.length() > 0) {
+            IO.print(result.stderr)
+        }
+        if (!(result.success)) {
+            IO.println("  ✗ Step failed: " + step)
+            OS.exit(1)
+        }
+        step_num = step_num + 1
+    }
+    return
+    // --- Legacy single-command path (unreachable, kept for reference) ---
+    IO.println("> ${cmd}")
     var full_cmd: String = cmd
     if (bin_path.length() > 0) {
         full_cmd = "PATH=${bin_path}:$PATH " + cmd

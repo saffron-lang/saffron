@@ -1,6 +1,6 @@
 //! `pantry build` — compile the project.
 import "@args" as Args
-
+import "@time" as Time
 import "@os" as OS
 import "../config.sf" as Config
 import "./run.sf" as Run
@@ -9,10 +9,15 @@ fun run(parsed: Args.ParsedArgs) {
     var manifest: Config.Manifest = Config.load()
     var scripts: Map<String, String> = Run._collect_scripts(manifest)
 
+    IO.println("Building " + manifest.name + "...")
+    var start: Number = Time.now()
+
     // If there's a build script defined, run it (with script expansion)
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
         Run._exec_command(cmd, scripts, 0)
+        var elapsed: Number = Time.now() - start
+        IO.println("✓ Built in " + elapsed.floor().to_string() + "s")
         return
     }
 
