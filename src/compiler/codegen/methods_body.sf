@@ -1400,14 +1400,17 @@
             this.last_type = AST.Type.NilType
             return "0"
         }
-        // Map.set(key, value) -> __map_set
+        // Map.set(key, value) -> __map_set (untag key for runtime)
         var key_val: String = this.gen_arg_value(args[0])
+        var key_ptr_s: String = this.emit_untag_ptr(key_val)
+        var key_raw_s: String = this.fresh_local()
+        this.emit_indent(key_raw_s + " = ptrtoint i8* " + key_ptr_s + " to i64")
         var val: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
         if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_val + ", i64 " + val))
+            this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val))
         } else {
-            this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_val + ", i64 " + val + ")")
+            this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val + ")")
         }
         this.last_type = AST.Type.NilType
         return "0"
@@ -1422,11 +1425,15 @@
             IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
         }
         var key_val: String = this.gen_arg_value(args[0])
+        // Untag string key for runtime (expects raw pointer)
+        var key_ptr: String = this.emit_untag_ptr(key_val)
+        var key_raw: String = this.fresh_local()
+        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
         var raw: String = this.fresh_local()
         if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_val))
+            this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw))
         } else {
-            this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_val + ")")
+            this.emit_indent(raw + " = call i64 @__map_has(i64 " + obj + ", i64 " + key_raw + ")")
         }
         var local: String = this.emit_tag_bool(raw)
         this.last_type = AST.Type.BoolType
@@ -1442,11 +1449,14 @@
             IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
         }
         var key_val: String = this.gen_arg_value(args[0])
+        var key_ptr_g: String = this.emit_untag_ptr(key_val)
+        var key_raw_g: String = this.fresh_local()
+        this.emit_indent(key_raw_g + " = ptrtoint i8* " + key_ptr_g + " to i64")
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_val))
+            this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g))
         } else {
-            this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_val + ")")
+            this.emit_indent(local + " = call i64 @__map_get(i64 " + obj + ", i64 " + key_raw_g + ")")
         }
         // Infer value type from variable type annotation
         var obj_type_for_get: String = ""
