@@ -229,8 +229,10 @@ declare void @__io_println_str(i64)
 declare void @__io_println_int(i64)
 declare void @__io_println_bool(i64)
 declare void @__io_println_nil()
+declare void @__io_println_any(i64)
 declare void @__io_print_str(i64)
 declare void @__io_print_int(i64)
+declare i64 @__any_to_string(i64)
 declare i64 @__bool_to_string(i64)
 declare i64 @__nil_to_string()
 
@@ -238,7 +240,6 @@ declare i64 @__float_to_string(i64)
 declare i64 @__string_eq(i64, i64)
 declare i64 @__string_ne(i64, i64)
 declare i64 @__string_intern(i64)
-declare i64 @__val_nil()
 declare double @strtod(i8*, i8*)
 declare double @llvm.floor.f64(double)
 
@@ -304,6 +305,7 @@ declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
 @__debug_location = external global i8*
+declare i64 @__val_nil()
 declare i1 @__val_is_int(i64)
 declare i1 @__val_is_float(i64)
 declare i1 @__val_is_string(i64)
@@ -1926,9 +1928,9 @@ then190:
   store i64 %t47, i64* %depth
   %t48 = load i64, i64* %depth
   %t49 = add i64 0, 0
-  %t51 = icmp eq i64 %t48, %t49
-  %t50 = zext i1 %t51 to i64
-  %t52 = trunc i64 %t50 to i1
+  %t50 = icmp eq i64 %t48, %t49
+  %t51 = zext i1 %t50 to i64
+  %t52 = trunc i64 %t51 to i1
   br i1 %t52, label %then193, label %else194
 then193:
   %t53 = load i64, i64* %self

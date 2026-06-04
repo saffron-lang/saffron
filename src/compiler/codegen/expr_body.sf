@@ -55,13 +55,13 @@
             }
             NilLit => {
                 this.last_type = AST.Type.NilType
-                // LLVM lib parallel path — nil is constant 0
-                if (this.use_llvm_lib and !this.identity_mode) {
-                    // Nil represented as const 0 (no NaN-boxing yet in LLVM lib path)
+                if (this.identity_mode or !this.in_function) {
+                    "0"
+                } else {
+                    var local: String = this.fresh_local()
+                    this.emit_indent(local + " = call i64 @__val_nil()")
+                    local
                 }
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = call i64 @__val_nil()")
-                local
             }
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
