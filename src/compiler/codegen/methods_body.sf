@@ -364,9 +364,6 @@
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
     var obj_name: String = this.get_variable_name(object)
-    var ig_dbg: String = obj_name
-    if (ig_dbg.length() == 0) { ig_dbg = "<expr>" }
-    this.emit_debug_location(ig_dbg + "[...]")
     // Block tuple indexing: must use ._0, ._1 etc.
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
@@ -679,9 +676,6 @@
 
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
     var obj_name: String = this.get_variable_name(object)
-    var dbg_ctx: String = obj_name
-    if (dbg_ctx.length() == 0) { dbg_ctx = "<expr>" }
-    this.emit_debug_location(dbg_ctx + "." + method + "()")
 
     // Self method calls: this.method(args)
     var obj_kind_early: String = this.classify_expr(object)
@@ -2163,9 +2157,6 @@
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
-    var gf_dbg: String = this.get_variable_name(object)
-    if (gf_dbg.length() == 0) { gf_dbg = "<expr>" }
-    this.emit_debug_location(gf_dbg + "." + field)
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {

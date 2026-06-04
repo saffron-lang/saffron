@@ -43,11 +43,10 @@
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.ptr_to_val(gep)
-                // LLVM lib parallel path — string literal ptrtoint
-                // Full path needs Module.add_global_string() + GEP + ptrtoint;
-                // deferred until the LLVM lib gains global string constant support
+                // LLVM lib parallel path — string literal
                 if (this.use_llvm_lib and !this.identity_mode) {
-                    // placeholder: string constants need Module.add_global_string()
+                    var llvm_str_val: Any = this.llvm_module.add_string_constant(s)
+                    this.llvm_values.set(local, llvm_str_val)
                 }
                 local
             }
@@ -1909,6 +1908,22 @@
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(local, "i64", call_target, arg_strs.join(", ")))
+                // LLVM lib parallel path — direct call (known function)
+                if (!this.identity_mode) {
+                    var llvm_call_args: List<Any> = []
+                    var llvm_ci: Float = 0
+                    while (llvm_ci < arg_strs.length()) {
+                        var arg_reg: String = this.extract_arg_reg(arg_strs[llvm_ci])
+                        if (this.llvm_values.has(arg_reg)) {
+                            llvm_call_args.push(this.llvm_values.get(arg_reg))
+                        } else {
+                            llvm_call_args.push(LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+                        }
+                        llvm_ci = llvm_ci + 1
+                    }
+                    var llvm_call_result: Any = this.llvm_block_builder.call(call_target, LLVMTypes.Type.I64, llvm_call_args)
+                    this.llvm_values.set(local, llvm_call_result)
+                }
             } else {
                 this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", call_target, arg_strs.join(", "))
@@ -2139,6 +2154,22 @@
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(local, "i64", emit_callee, arg_strs.join(", ")))
+                // LLVM lib parallel path — direct call (fallback path)
+                if (!this.identity_mode) {
+                    var llvm_call_args2: List<Any> = []
+                    var llvm_ci2: Float = 0
+                    while (llvm_ci2 < arg_strs.length()) {
+                        var arg_reg2: String = this.extract_arg_reg(arg_strs[llvm_ci2])
+                        if (this.llvm_values.has(arg_reg2)) {
+                            llvm_call_args2.push(this.llvm_values.get(arg_reg2))
+                        } else {
+                            llvm_call_args2.push(LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+                        }
+                        llvm_ci2 = llvm_ci2 + 1
+                    }
+                    var llvm_call_result2: Any = this.llvm_block_builder.call(emit_callee, LLVMTypes.Type.I64, llvm_call_args2)
+                    this.llvm_values.set(local, llvm_call_result2)
+                }
             } else {
                 this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", emit_callee, arg_strs.join(", "))
