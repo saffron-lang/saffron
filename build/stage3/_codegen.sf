@@ -72,6 +72,7 @@ class Codegen {
     var llvm_module: LLVMMod.Module
     var llvm_func_builder: LLVMFunc.FunctionBuilder
     var llvm_block_builder: LLVMBlock.BlockBuilder
+    var llvm_values: Map<String, Any>
 
     fun init() {
         this.sb = StringBuilder()
@@ -140,6 +141,7 @@ class Codegen {
         dummy_bb.init("entry")
         this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
         this.llvm_block_builder.init(this.llvm_func_builder, dummy_bb)
+        this.llvm_values = {}
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
@@ -1116,6 +1118,7 @@ class Codegen {
                     var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
                     var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
                     var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                    this.llvm_values.set(local, llvm_result)
                 }
                 local
             }
