@@ -359,6 +359,21 @@ class BlockBuilder {
         this.block.is_terminated = true
     }
 
+    /// Safe ret for cross-module callers: uses set_terminator_text() method
+    /// instead of direct field writes to avoid gen2 nested field-write segfault.
+    fun ret_set(val: Types.Value) {
+        if (this.block.is_terminated) { return nil }
+        var ty_str: String = Types.format_type(Types.value_type(val))
+        var text: String = "  ret " + ty_str + " " + Types.format_value(val)
+        this.block.set_terminator_text(text)
+    }
+
+    /// Safe ret_void for cross-module callers.
+    fun ret_void_set() {
+        if (this.block.is_terminated) { return nil }
+        this.block.set_terminator_text("  ret void")
+    }
+
     fun ret_void() {
         if (this.block.is_terminated) { return nil }
         this.block.terminator_str = "  ret void"
