@@ -130,10 +130,16 @@ class Codegen {
         this.class_type_ids = {}
         this.next_class_type_id = 10
         this.llvm_module = LLVMMod.Module("saffron_program")
+        // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
+        // Explicitly call init to set up internal lists/fields.
+        this.llvm_module.init("saffron_program")
         var dummy_params: List<LLVMFunc.Param> = []
         this.llvm_func_builder = LLVMFunc.FunctionBuilder("__dummy", LLVMTypes.Type.I64, dummy_params)
+        this.llvm_func_builder.init("__dummy", LLVMTypes.Type.I64, dummy_params)
         var dummy_bb: LLVMFunc.BasicBlock = LLVMFunc.BasicBlock("entry")
+        dummy_bb.init("entry")
         this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, dummy_bb)
+        this.llvm_block_builder.init(this.llvm_func_builder, dummy_bb)
         this.builtin_methods.set("push", "v2|__list_push|Nil|0")
         this.builtin_methods.set("pop", "r1|__list_pop|Int|0")
         this.builtin_methods.set("remove", "r2|__list_remove|Int|0")
@@ -1105,12 +1111,12 @@ class Codegen {
                 this.last_type = AST.Type.IntType
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
-                // LLVM lib parallel path — disabled until gen_function wires up real builders
-                // if (!this.identity_mode) {
-                //     var llvm_zero = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
-                //     var llvm_val = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
-                //     var llvm_result = this.llvm_block_builder.add(llvm_zero, llvm_val)
-                // }
+                // LLVM lib parallel path — builds IntLit in the LLVM Module alongside string emission
+                if (this.use_llvm_lib and !this.identity_mode) {
+                    var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
+                    var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
+                    var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
+                }
                 local
             }
             FloatLit(v) => {
@@ -7264,30 +7270,26 @@ class Codegen {
 
         // --- LLVM lib: create FunctionBuilder in parallel ---
         // Build a parallel LLVM Module representation alongside string emission.
-        // Currently structural only: we create the FunctionBuilder + BlockBuilder so
-        // that gen_expr can record LLVM instructions in parallel with string emission.
-        // At the end of generate(), llvm_module.emit_ir() can be compared against
-        // the string output for validation.
-        //
-        // DISABLED: The gen3 binary is compiled by gen2 in identity mode, which
-        // breaks cross-module class method dispatch. Creating LLVMFunc.Param objects
-        // and calling this.llvm_module.add_function() segfaults at runtime because
-        // the LLVM lib classes were compiled as separate modules.
-        // Enable after gen2 promotion with working cross-module dispatch.
-        //
-        // if (this.use_llvm_lib and !this.identity_mode) {
-        //     var llvm_params: List<LLVMFunc.Param> = []
-        //     var lpi: Float = 0
-        //     while (lpi < param_list.length()) {
-        //         var lp_parts: List<String> = param_list[lpi].split(":")
-        //         var lp_name: String = "%" + this.sanitize_name(lp_parts[0]) + ".arg"
-        //         llvm_params.push(LLVMFunc.Param(lp_name, LLVMTypes.Type.I64))
-        //         lpi = lpi + 1
-        //     }
-        //     this.llvm_func_builder = this.llvm_module.add_function(emit_name, LLVMTypes.Type.I64, llvm_params)
-        //     var llvm_entry: LLVMFunc.BasicBlock = this.llvm_func_builder.entry_block()
-        //     this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_entry)
-        // }
+        // We create the FunctionBuilder + BlockBuilder so that gen_expr can record
+        // LLVM instructions in parallel with string emission.
+        // At the end of generate(), llvm_module.emit_ir() validates the structure.
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_params: List<LLVMFunc.Param> = []
+            var lpi: Float = 0
+            while (lpi < param_list.length()) {
+                var lp_parts: List<String> = param_list[lpi].split(":")
+                var lp_name: String = "%" + this.sanitize_name(lp_parts[0]) + ".arg"
+                var lp: LLVMFunc.Param = LLVMFunc.Param(lp_name, LLVMTypes.Type.I64)
+                // Workaround: gen2 doesn't emit init calls for cross-module constructors
+                lp.init(lp_name, LLVMTypes.Type.I64)
+                llvm_params.push(lp)
+                lpi = lpi + 1
+            }
+            this.llvm_func_builder = this.llvm_module.add_function(emit_name, LLVMTypes.Type.I64, llvm_params)
+            var llvm_entry: LLVMFunc.BasicBlock = this.llvm_func_builder.entry_block()
+            this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_entry)
+            this.llvm_block_builder.init(this.llvm_func_builder, llvm_entry)
+        }
 
         // Check if this function is a coroutine (direct or transitive)
         var is_coro: Bool = this.str_in_list(this.coroutine_funcs,emit_name)
@@ -7757,6 +7759,14 @@ class Codegen {
             this.emit("entry:")
             this.block_terminated = false
             this.reset_locals()
+            // LLVM lib: create FunctionBuilder for __saffron_entry
+            if (this.use_llvm_lib and !this.identity_mode) {
+                var llvm_entry_params: List<LLVMFunc.Param> = []
+                this.llvm_func_builder = this.llvm_module.add_function("__saffron_entry", LLVMTypes.Type.I64, llvm_entry_params)
+                var llvm_entry_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.entry_block()
+                this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_entry_bb)
+                this.llvm_block_builder.init(this.llvm_func_builder, llvm_entry_bb)
+            }
             if (entry_is_coro) {
                 this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
                 this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
@@ -8059,14 +8069,10 @@ class Codegen {
         // When not in identity mode, the LLVM lib builds a parallel Module. Calling
         // emit_ir() validates that the structural representation serializes correctly.
         // This does NOT affect the primary output — it runs alongside for validation.
-        //
-        // DISABLED: Cross-module class method dispatch is broken in identity-mode-
-        // compiled binaries. Enable after gen2 promotion.
-        //
-        // if (this.use_llvm_lib and !this.identity_mode) {
-        //     var llvm_ir_check: String = this.llvm_module.emit_ir()
-        //     IO.println("[llvm-lib] parallel IR length: " + llvm_ir_check.length().to_string())
-        // }
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_ir_check: String = this.llvm_module.emit_ir()
+            IO.println("[llvm-lib] parallel IR length: " + llvm_ir_check.length().to_string())
+        }
 
         return out.to_string()
     }
