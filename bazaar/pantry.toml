@@ -12,7 +12,7 @@ authors = ["henry232323"]
 
 [scripts]
 build = "pantry build --member frontend && saffron build src/main.sf -o build/bazaar"
-dev = "cd frontend && pantry build && cd .. && saffron run src/main.sf"
+dev = "saffron run dev.sf"
 frontend = "cd frontend && pantry build"
 migrate = "saffron run src/migrate.sf"
 start = "./build/bazaar"
