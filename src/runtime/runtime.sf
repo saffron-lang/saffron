@@ -981,6 +981,19 @@ fun __os_list_dir(path: Int): Int {
     return __io_walk_dir(path)
 }
 
+// Aliases for prefix convention (IO.list_dir -> __io_list_dir, etc.)
+fun __io_list_dir(path: Int): Int {
+    return __io_walk_dir(path)
+}
+
+fun __io_readln(): Int {
+    return __io_readline()
+}
+
+fun __io_read_line(): Int {
+    return __io_readline()
+}
+
 // =============================================================================
 // Runtime String Methods
 // =============================================================================

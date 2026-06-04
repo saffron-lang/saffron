@@ -1,0 +1,65 @@
+//! Compiler diagnostics — lightweight logging for saffronc.
+//! No external dependencies (no @time, no @os) so it links cleanly in bootstrap.
+
+var _verbosity: Float = 1
+var _internal_all: Bool = false
+var _internal_codegen: Bool = false
+var _internal_parser: Bool = false
+var _internal_checker: Bool = false
+var _internal_resolve: Bool = false
+var _internal_llvm: Bool = false
+
+fun set_verbosity(v: Float) {
+    _verbosity = v
+}
+
+fun enable_internal(category: String) {
+    if (category == "all") { _internal_all = true; _internal_codegen = true; _internal_parser = true; _internal_checker = true; _internal_resolve = true; _internal_llvm = true }
+    if (category == "codegen") { _internal_codegen = true }
+    if (category == "parser") { _internal_parser = true }
+    if (category == "checker") { _internal_checker = true }
+    if (category == "resolve") { _internal_resolve = true }
+    if (category == "llvm") { _internal_llvm = true }
+}
+
+fun error(phase: String, msg: String) {
+    IO.println("[error:" + phase + "] " + msg)
+}
+
+fun warn(phase: String, msg: String) {
+    if (_verbosity >= 1) {
+        IO.println("[warn:" + phase + "] " + msg)
+    }
+}
+
+fun info(msg: String) {
+    if (_verbosity >= 2) {
+        IO.println("[info] " + msg)
+    }
+}
+
+fun detail(msg: String) {
+    if (_verbosity >= 3) {
+        IO.println("[debug] " + msg)
+    }
+}
+
+fun codegen(msg: String) {
+    if (_internal_codegen) { IO.println("[codegen] " + msg) }
+}
+
+fun parser(msg: String) {
+    if (_internal_parser) { IO.println("[parser] " + msg) }
+}
+
+fun checker(msg: String) {
+    if (_internal_checker) { IO.println("[checker] " + msg) }
+}
+
+fun resolve(msg: String) {
+    if (_internal_resolve) { IO.println("[resolve] " + msg) }
+}
+
+fun llvm(msg: String) {
+    if (_internal_llvm) { IO.println("[llvm] " + msg) }
+}

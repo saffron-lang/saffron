@@ -962,18 +962,18 @@ done:
 ; =============================================================================
 
 ; Run a full mark-and-sweep collection
-define void @__gc_collect() {
+define i64 @__gc_collect() {
 entry:
   call void @__gc_mark()
   call void @__gc_sweep_impl()
   %c = load i64, i64* @__gc_collections
   %c_new = add i64 %c, 1
   store i64 %c_new, i64* @__gc_collections
-  ret void
+  ret i64 0
 }
 
 ; Enable automatic GC (also initializes nursery for generational collection)
-define void @__gc_enable() {
+define i64 @__gc_enable() {
 entry:
   store i64 1, i64* @__gc_enabled
   ; Set default threshold if not already set
@@ -988,21 +988,21 @@ set_default:
 init_ss:
   call void @__gc_init_shadow_stack()
   call void @__gc_nursery_init()
-  ret void
+  ret i64 0
 }
 
 ; Disable automatic GC
-define void @__gc_disable() {
+define i64 @__gc_disable() {
 entry:
   store i64 0, i64* @__gc_enabled
-  ret void
+  ret i64 0
 }
 
 ; Set the collection threshold
-define void @__gc_set_threshold(i64 %bytes) {
+define i64 @__gc_set_threshold(i64 %bytes) {
 entry:
   store i64 %bytes, i64* @__gc_threshold
-  ret void
+  ret i64 0
 }
 
 ; Statistics accessors
@@ -1037,7 +1037,7 @@ entry:
 }
 
 ; Print GC statistics (minimal: writes "GC: ok\n" to stderr)
-define void @__gc_debug_stats() {
+define i64 @__gc_debug_stats() {
 entry:
   %buf = alloca [7 x i8]
   %p = getelementptr [7 x i8], [7 x i8]* %buf, i64 0, i64 0
@@ -1055,8 +1055,9 @@ entry:
   %p6 = getelementptr i8, i8* %p, i64 6
   store i8 10, i8* %p6
   call i64 @write(i32 2, i8* %p, i64 7)
-  ret void
+  ret i64 0
 }
+
 
 ; =============================================================================
 ; GC-Aware Allocation Wrappers

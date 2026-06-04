@@ -866,7 +866,6 @@
             out.append("declare i64 @__val_tag_bool(i64)\n")
             out.append("declare i64 @__val_untag_bool(i64)\n")
         }
-        out.append("declare i64 @__val_nil()\n")
         out.append("declare double @strtod(i8*, i8*)\n")
         out.append("declare double @llvm.floor.f64(double)\n\n")
 

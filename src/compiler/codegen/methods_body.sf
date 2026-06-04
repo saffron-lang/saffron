@@ -690,7 +690,6 @@
     if (obj_name == "this" or this.classify_expr(object) == "this") {
         return this.current_class
     }
-    if (obj_name == "IO" or obj_name == "OS" or obj_name == "GC") { return obj_name }
     if (this.module_prefixes.has(obj_name)) { return obj_name }
     if (this.class_fields.has(obj_name)) { return obj_name }
     if (obj_name.length() > 0) {
@@ -720,6 +719,14 @@
         var __mp: String = this.module_prefixes.get(obj_name)
         if (__mp.length() > 0) {
             var __mp_func: String = __mp + method
+            // Method name remapping for GC functions that conflict with gc.ll globals.
+            // Use ends_with on __mp_func to avoid identity-mode pointer comparison issues.
+            if (__mp_func.starts_with("__gc_")) {
+                if (__mp_func.ends_with("_stats")) { __mp_func = "__gc_debug_stats" }
+                else if (__mp_func.ends_with("_alloc_count")) { __mp_func = "__gc_stat_alloc_count" }
+                else if (__mp_func.ends_with("_total_bytes")) { __mp_func = "__gc_stat_total_bytes" }
+                else if (__mp_func.ends_with("_threshold") and !__mp_func.ends_with("_set_threshold")) { __mp_func = "__gc_stat_threshold" }
+            }
             this.called_functions.push(__mp_func)
 
             // Check if this is a class constructor: class_fields has the method name
@@ -750,6 +757,38 @@
                 return __mp_instance
             }
 
+            // IO.println / IO.print: coerce argument to string at compile time
+            // so identity mode (no NaN-box tags) can safely puts the pointer.
+            // Use starts_with on __mp_func to avoid identity-mode pointer comparison issues.
+            if ((__mp_func.starts_with("__io_println") or __mp_func.starts_with("__io_print")) and args.length() > 0) {
+                var __io_pre_type: String = this.get_expr_type(args[0])
+                var __io_arg: String = this.gen_arg_value(args[0])
+                var __io_arg_type: String = this.type_to_string(this.last_type)
+                // Determine the best known type for the argument:
+                // 1. If pre_type is specific (not Any/Int), use it
+                // 2. If last_type after gen is specific, use it
+                // 3. If both are generic (Any/Int default), treat as String (safe pass-through)
+                if (__io_pre_type != "Any" and __io_pre_type != "Int") {
+                    __io_arg_type = __io_pre_type
+                } else if (__io_arg_type == "Int" and __io_pre_type == "Any") {
+                    // Type unknown — could be string or anything. Pass directly.
+                    __io_arg_type = "String"
+                }
+                // String/Any: pass directly (strings are already pointers)
+                if (__io_arg_type == "String" or __io_arg_type == "Any") {
+                    var __io_discard: String = this.fresh_local()
+                    this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_arg + ")")
+                    this.last_type = AST.Type.NilType
+                    return "0"
+                }
+                // For known non-string types (Int, Float, Bool), coerce to string
+                var __io_str: String = this.coerce_to_string(__io_arg, __io_arg_type)
+                var __io_discard: String = this.fresh_local()
+                this.emit_indent(__io_discard + " = call i64 @" + __mp_func + "(i64 " + __io_str + ")")
+                this.last_type = AST.Type.NilType
+                return "0"
+            }
+
             var __mp_args: List<String> = []
             var __mpi: Float = 0
             while (__mpi < args.length()) {
@@ -767,180 +806,12 @@
         }
     }
 
-    // Check for OS module calls
-    if (obj_name == "OS") {
-        if (method == "exit") {
-            var code: String = this.gen_arg_value(args[0])
-            var code32: String = this.fresh_local()
-            this.emit_indent(code32 + " = trunc i64 " + code + " to i32")
-            this.emit_indent("call void @exit(i32 " + code32 + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "file_exists" or method == "mkdir" or method == "list_dir") {
-            var io_func: String = "__io_" + method
-            if (method == "list_dir") { io_func = "__io_walk_dir" }
-            this.called_functions.push(io_func)
-            var io_args: List<String> = []
-            var ii: Float = 0
-            while (ii < args.length()) {
-                io_args.push("i64 " + this.gen_arg_value(args[ii]))
-                ii = ii + 1
-            }
-            var local: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(local, "i64", io_func, io_args.join(", ")))
-            } else {
-                this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
-            }
-            if (method == "file_exists") { this.last_type = AST.Type.BoolType }
-            else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
-            else if (method == "list_dir") { this.last_type = this.make_list_str_type() }
-            return local
-        }
-        var os_func: String = "__os_" + method
-        this.called_functions.push(os_func)
-        var os_args: List<String> = []
-        var oi: Float = 0
-        while (oi < args.length()) {
-            os_args.push("i64 " + this.gen_arg_value(args[oi]))
-            oi = oi + 1
-        }
-        var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", os_func, os_args.join(", ")))
-        } else {
-            this.emit_indent(local + " = call i64 @" + os_func + "(" + os_args.join(", ") + ")")
-        }
-        if (method == "args") { this.last_type = this.make_list_str_type() }
-        else { this.last_type = AST.Type.StringType }
-        return local
-    }
 
-    // Check for IO module calls
-    if (obj_name == "IO") {
-        if (method == "println") {
-            var pre_type: String = this.get_expr_type(args[0])
-            var arg: String = this.gen_arg_value(args[0])
-            var arg_type: String = this.type_to_string(this.last_type)
-            if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "print") {
-            var arg: String = this.gen_arg_value(args[0])
-            var arg_type: String = this.type_to_string(this.last_type)
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "read_file" or method == "file_exists" or method == "mkdir" or method == "walk_dir" or method == "list_dir" or method == "write_file" or method == "append_file" or method == "read_stdin" or method == "readline" or method == "readln" or method == "read_line" or method == "open") {
-            var io_func: String = "__io_" + method
-            if (method == "list_dir") { io_func = "__io_walk_dir" }
-            if (method == "readln" or method == "read_line") { io_func = "__io_readline" }
-            this.called_functions.push(io_func)
-            var io_args: List<String> = []
-            var ii: Float = 0
-            while (ii < args.length()) {
-                io_args.push("i64 " + this.gen_arg_value(args[ii]))
-                ii = ii + 1
-            }
-            var local: String = this.fresh_local()
-            if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_call(local, "i64", io_func, io_args.join(", ")))
-            } else {
-                this.emit_indent(local + " = call i64 @" + io_func + "(" + io_args.join(", ") + ")")
-            }
-            if (method == "file_exists") { this.last_type = AST.Type.BoolType }
-            else if (method == "mkdir") { this.last_type = AST.Type.NilType; return "0" }
-            else if (method == "write_file" or method == "append_file") { this.last_type = AST.Type.NilType; return "0" }
-            else if (method == "walk_dir" or method == "list_dir") { this.last_type = this.make_list_str_type() }
-            else { this.last_type = AST.Type.StringType }
-            return local
-        }
-        // Fallback: resolve any other IO.xxx method via module prefix (e.g. IO.open)
-        if (this.module_prefixes.has("IO")) {
-            var io_pfx: String = this.module_prefixes.get("IO") + method
-            if (this.str_in_list(this.known_functions, io_pfx)) {
-                var io_args2: List<String> = []
-                var io_i2: Float = 0
-                while (io_i2 < args.length()) {
-                    var io_v2: String = this.gen_arg_value(args[io_i2])
-                    io_args2.push("i64 " + io_v2)
-                    io_i2 = io_i2 + 1
-                }
-                this.called_functions.push(io_pfx)
-                var local: String = this.fresh_local()
-                if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_call(local, "i64", io_pfx, io_args2.join(", ")))
-                } else {
-                    this.emit_indent(local + " = call i64 @" + io_pfx + "(" + io_args2.join(", ") + ")")
-                }
-                if (this.func_ret_types.has(io_pfx)) {
-                    this.last_type = this.func_ret_types.get(io_pfx)
-                } else {
-                    this.last_type = AST.Type.IntType
-                }
-                return local
-            }
-        }
-    }
-
-    // Check for GC module calls
-    if (obj_name == "GC") {
-        if (method == "collect") {
-            this.emit_indent("call void @__gc_collect()")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "enable") {
-            this.emit_indent("call void @__gc_enable()")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "disable") {
-            this.emit_indent("call void @__gc_disable()")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "stats") {
-            this.emit_indent("call void @__gc_debug_stats()")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-        if (method == "alloc_count") {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__gc_stat_alloc_count()")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "total_bytes") {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__gc_stat_total_bytes()")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "threshold") {
-            var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__gc_stat_threshold()")
-            this.last_type = AST.Type.IntType
-            return local
-        }
-        if (method == "set_threshold") {
-            var arg: String = this.gen_arg_value(args[0])
-            this.emit_indent("call void @__gc_set_threshold(i64 " + arg + ")")
-            this.last_type = AST.Type.NilType
-            return "0"
-        }
-    }
 
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
     // (e.g. AST.type_to_string → would load %AST which is undefined as a value).
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and this.module_prefixes.has(obj_name)) {
+    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
         var prefixed_name: String = this.module_prefixes.get(obj_name) + method
         // Intrinsic check: if the target is an intrinsic, emit inline IR instead of a call
         if (this.str_in_list(this.intrinsic_funcs, prefixed_name)) {
@@ -1304,28 +1175,6 @@
     }
 
     // --- Builtin dispatch (only for non-class objects) ---
-    // Module aliases are not evaluable values — route to module dispatch
-    if (obj_name.length() > 0 and this.module_prefixes.has(obj_name)) {
-        var mp_prefix: String = this.module_prefixes.get(obj_name)
-        // Builtins with empty prefix use __module_ convention
-        if (mp_prefix.length() == 0) {
-            if (obj_name == "IO") { mp_prefix = "__io_" }
-            else if (obj_name == "OS") { mp_prefix = "__os_" }
-            else if (obj_name == "GC") { mp_prefix = "__gc_" }
-        }
-        var mp_func: String = mp_prefix + method
-        this.called_functions.push(mp_func)
-        var mp_args: List<String> = []
-        var mpi: Float = 0
-        while (mpi < args.length()) {
-            mp_args.push("i64 " + this.gen_arg_value(args[mpi]))
-            mpi = mpi + 1
-        }
-        var mp_local: String = this.fresh_local()
-        this.emit_indent(mp_local + " = call i64 @" + mp_func + "(" + mp_args.join(", ") + ")")
-        this.last_type = AST.Type.IntType
-        return mp_local
-    }
     var obj: String = this.gen_arg_value(object)
     var is_user_class: Bool = false
     if (obj_name.length() > 0) {
@@ -1829,7 +1678,7 @@
     // (enum check moved above builtin dispatch)
 
     // Check for imported module function calls (module alias or unknown name)
-    if (obj_name.length() > 0 and obj_name != "IO" and obj_name != "OS" and obj_name != "GC" and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
+    if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
         var prefixed_name: String = method
         if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method

@@ -4936,6 +4936,27 @@ entry:
   ret i64 %t2
 }
 
+define i64 @__io_list_dir(i64 %path.arg) {
+entry:
+  %path = alloca i64
+  store i64 %path.arg, i64* %path
+  %t1 = load i64, i64* %path
+  %t2 = call i64 @__io_walk_dir(i64 %t1)
+  ret i64 %t2
+}
+
+define i64 @__io_readln() {
+entry:
+  %t1 = call i64 @__io_readline()
+  ret i64 %t1
+}
+
+define i64 @__io_read_line() {
+entry:
+  %t1 = call i64 @__io_readline()
+  ret i64 %t1
+}
+
 define i64 @rt_str_trim(i64 %s.arg) {
 entry:
   %s = alloca i64
