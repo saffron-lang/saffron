@@ -161,6 +161,18 @@ class Codegen {
         this.builtin_methods.set("replace", "p3|__str_replace|String|0")
         this.builtin_methods.set("join", "m2|__list_join|String|0")
 
+        // Register built-in type classes in class_methods so method resolution
+        // finds them. These mirror the type class definitions in src/lib/*.sf.
+        // Methods listed here will be resolved via gen_namespace_call when the
+        // receiver's type is known — keeping inline emission for primitives while
+        // enabling proper dispatch for user-visible .to_string(), .abs(), etc.
+        this.class_methods.set("String", ["length", "char_at", "contains", "starts_with", "ends_with", "index_of", "trim", "to_upper", "to_lower", "slice", "split", "replace", "repeat", "to_string", "to_number"])
+        this.class_methods.set("List", ["length", "push", "pop", "get", "set", "remove", "contains", "reverse", "copy", "sort", "slice", "join", "to_string"])
+        this.class_methods.set("Map", ["length", "has", "get", "set", "keys", "values", "to_string"])
+        this.class_methods.set("Int", ["to_string", "to_float", "abs", "floor", "ceil"])
+        this.class_methods.set("Float", ["to_string", "floor", "ceil", "abs"])
+        this.class_methods.set("Bool", ["to_string"])
+
         // HTML element functions (provided by turmeric runtime library)
         this.known_functions.push("div")
         this.known_functions.push("span")
@@ -9572,6 +9584,9 @@ class Codegen {
 
     // If receiver type is unknown ("Any") but a user class defines this method,
     // skip builtin dispatch and fall through to class method resolution.
+    // Exclude built-in type classes (String/List/Map/Int/Float/Bool) — these
+    // are registered for documentation/future dispatch but shouldn't override
+    // the inline builtin_methods emission.
     if (!is_user_class and this.builtin_methods.has(method)) {
         var bd_obj_type: String = this.type_to_string(this.last_type)
         if (obj_name.length() > 0) {
@@ -9580,7 +9595,7 @@ class Codegen {
         }
         if (bd_obj_type == "Any") {
             var fcm_class: String = this.find_class_for_method(method)
-            if (fcm_class.length() > 0) {
+            if (fcm_class.length() > 0 and fcm_class != "String" and fcm_class != "List" and fcm_class != "Map" and fcm_class != "Int" and fcm_class != "Float" and fcm_class != "Bool") {
                 is_user_class = true
             }
         }
@@ -9994,9 +10009,12 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return local
         } else if (obj_type == "Any") {
-            // Unknown type: assume already a string (common in interpolation of untyped vars)
+            // Unknown type at compile time: dispatch via __any_to_string which
+            // does runtime NaN-box tag inspection to choose the right converter.
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__any_to_string(i64 " + obj + ")")
             this.last_type = AST.Type.StringType
-            return obj
+            return local
         } else {
             var raw: String = this.emit_untag_int(obj)
             var local: String = this.fresh_local()
@@ -10236,9 +10254,11 @@ class Codegen {
             class_name = cn_type_resolved
         }
     }
-    // Don't use find_class_for_method for builtin container methods —
-    // these should dispatch to runtime builtins (Map/List/String) not user classes
-    var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number"
+    // Don't use find_class_for_method for builtin container/primitive methods —
+    // these should dispatch to runtime builtins (Map/List/String/Int/Float) not user classes.
+    // Includes type-class methods (to_string, abs, floor, ceil, to_float) that are
+    // handled by inline codegen above for known primitive types.
+    var is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
     if (class_name.length() == 0 and this.current_class.length() > 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
     }
@@ -10327,9 +10347,15 @@ class Codegen {
         return obj
     }
     if (method == "to_string") {
-        if (obj_type == "String" or obj_type == "Any") {
+        if (obj_type == "String") {
             this.last_type = AST.Type.StringType
             return obj
+        }
+        if (obj_type == "Any") {
+            var ts_local: String = this.fresh_local()
+            this.emit_indent(ts_local + " = call i64 @__any_to_string(i64 " + obj + ")")
+            this.last_type = AST.Type.StringType
+            return ts_local
         }
         if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"

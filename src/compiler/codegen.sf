@@ -162,6 +162,18 @@ class Codegen {
         this.builtin_methods.set("replace", "p3|__str_replace|String|0")
         this.builtin_methods.set("join", "m2|__list_join|String|0")
 
+        // Register built-in type classes in class_methods so method resolution
+        // finds them. These mirror the type class definitions in src/lib/*.sf.
+        // Methods listed here will be resolved via gen_namespace_call when the
+        // receiver's type is known — keeping inline emission for primitives while
+        // enabling proper dispatch for user-visible .to_string(), .abs(), etc.
+        this.class_methods.set("String", ["length", "char_at", "contains", "starts_with", "ends_with", "index_of", "trim", "to_upper", "to_lower", "slice", "split", "replace", "repeat", "to_string", "to_number"])
+        this.class_methods.set("List", ["length", "push", "pop", "get", "set", "remove", "contains", "reverse", "copy", "sort", "slice", "join", "to_string"])
+        this.class_methods.set("Map", ["length", "has", "get", "set", "keys", "values", "to_string"])
+        this.class_methods.set("Int", ["to_string", "to_float", "abs", "floor", "ceil"])
+        this.class_methods.set("Float", ["to_string", "floor", "ceil", "abs"])
+        this.class_methods.set("Bool", ["to_string"])
+
         // HTML element functions (provided by turmeric runtime library)
         this.known_functions.push("div")
         this.known_functions.push("span")
