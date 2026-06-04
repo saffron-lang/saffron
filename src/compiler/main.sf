@@ -537,6 +537,7 @@ fun main(): Int {
     var target: String = "native"
     var identity_mode: Bool = false
     var use_llvm_lib: Bool = true
+    var emit_llvm_lib: Bool = false
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
@@ -551,6 +552,9 @@ fun main(): Int {
         }
         if (arg == "--no-llvm-lib") {
             use_llvm_lib = false
+        }
+        if (arg == "--emit-llvm-lib") {
+            emit_llvm_lib = true
         }
         if (arg == "--stdlib") {
             if (i + 1 < args.length()) {
@@ -788,9 +792,9 @@ fun main(): Int {
 
     var ir: String = ""
     if (all_import_stmts.length() > 0) {
-        ir = Codegen.generate_with_modules_flat_opts(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode)
+        ir = Codegen.generate_with_modules_flat_opts3(program, all_import_stmts, module_boundaries, prefixes_joined, resolved_aliases, target, named_imports, identity_mode, use_llvm_lib, emit_llvm_lib)
     } else {
-        ir = Codegen.generate_with_target_opts(program, target, identity_mode)
+        ir = Codegen.generate_with_target_opts3(program, target, identity_mode, use_llvm_lib, emit_llvm_lib)
     }
 
     if (Codegen.had_error()) {

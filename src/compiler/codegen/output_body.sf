@@ -1003,11 +1003,17 @@
             }
         }
 
-        // --- LLVM lib verification: emit_ir() to validate module builds correctly ---
-        // When not in identity mode, the LLVM lib builds a parallel Module. Calling
-        // emit_ir() validates that the structural representation serializes correctly.
-        // This does NOT affect the primary output — it runs alongside for validation.
-        if (this.use_llvm_lib and !this.identity_mode) {
+        // --- LLVM lib output ---
+        // When emit_llvm_lib is set, return the LLVM Module IR instead of string emission.
+        // This is activated by --emit-llvm-lib and produces structured IR from the
+        // parallel LLVM Module that was built alongside string emission.
+        if (this.emit_llvm_lib and this.use_llvm_lib and !this.identity_mode) {
+            return this.llvm_module.emit_ir()
+        }
+
+        // --- LLVM lib verification (when not emitting as primary) ---
+        // Validates that the structural representation serializes correctly.
+        if (this.use_llvm_lib and !this.identity_mode and !this.emit_llvm_lib) {
             var llvm_ir_check: String = this.llvm_module.emit_ir()
             IO.println("[llvm-lib] parallel IR length: " + llvm_ir_check.length().to_string())
         }
