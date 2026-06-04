@@ -566,21 +566,21 @@ entry:
 define i1 @__val_is_nil(i64 %v) {
 entry:
   ; nil = 0x7FFA000000000002
-  %result = icmp eq i64 %v, 9222246136947933186 ; 0x7FFA000000000002
+  %result = icmp eq i64 %v, 9221683186994511874 ; 0x7FFA000000000002
   ret i1 %result
 }
 
 define i1 @__val_is_true(i64 %v) {
 entry:
   ; true = 0x7FFA000000000001
-  %result = icmp eq i64 %v, 9222246136947933185 ; 0x7FFA000000000001
+  %result = icmp eq i64 %v, 9221683186994511873 ; 0x7FFA000000000001
   ret i1 %result
 }
 
 define i1 @__val_is_bool(i64 %v) {
 entry:
-  %is_t = icmp eq i64 %v, 9222246136947933185  ; true
-  %is_f = icmp eq i64 %v, 9222246136947933184  ; false (0x7FFA000000000000)
+  %is_t = icmp eq i64 %v, 9221683186994511873  ; true  (0x7FFA000000000001)
+  %is_f = icmp eq i64 %v, 9221683186994511872  ; false (0x7FFA000000000000)
   %result = or i1 %is_t, %is_f
   ret i1 %result
 }
@@ -638,9 +638,9 @@ no:
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
 ; TAG_INT_CONST  = 9221401712017801216  (0x7FF9000000000000)
 ; TAG_PTR_CONST  = 9221120237041090560  (0x7FF8000000000000)
-; VAL_TRUE       = 9222246136947933185  (0x7FFA000000000001)
-; VAL_FALSE      = 9222246136947933184  (0x7FFA000000000000)
-; VAL_NIL        = 9222246136947933186  (0x7FFA000000000002)
+; VAL_TRUE       = 9221683186994511873  (0x7FFA000000000001)
+; VAL_FALSE      = 9221683186994511872  (0x7FFA000000000000)
+; VAL_NIL        = 9221683186994511874  (0x7FFA000000000002)
 ; PAYLOAD_MASK   = 281474976710655      (0x0000FFFFFFFFFFFF)
 
 ; =============================================================================
