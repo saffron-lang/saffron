@@ -1,0 +1,178 @@
+//! Double-ended queue backed by two lists for amortized O(1) operations.
+
+/// Iterator for traversing a Deque from front to back.
+class DequeIter {
+    var _items: List<Any>
+    var _pos: Number
+
+    fun init(items: List<Any>) {
+        this._items = items
+        this._pos = 0
+    }
+
+    fun next?(): Bool {
+        return this._pos < this._items.length()
+    }
+
+    fun next(): Any {
+        var item = this._items[this._pos]
+        this._pos = this._pos + 1
+        return item
+    }
+}
+
+/// A double-ended queue supporting O(1) amortized push/pop on both ends.
+///
+/// ```saffron
+/// import "@deque" as Deque
+/// var dq = Deque.new()
+/// dq.push_back(1)
+/// dq.push_back(2)
+/// dq.push_front(0)
+/// dq.pop_front()   // 0
+/// dq.pop_back()    // 2
+/// ```
+class Deque {
+    var _front: List<Any>
+    var _back: List<Any>
+    var _len: Number
+
+    fun init() {
+        this._front = []
+        this._back = []
+        this._len = 0
+    }
+
+    /// Add an element to the front of the deque.
+    fun push_front(value: Any): Deque {
+        this._front.push(value)
+        this._len = this._len + 1
+        return this
+    }
+
+    /// Add an element to the back of the deque.
+    fun push_back(value: Any): Deque {
+        this._back.push(value)
+        this._len = this._len + 1
+        return this
+    }
+
+    /// Remove and return the front element. Returns nil if empty.
+    fun pop_front(): Any {
+        if (this._len == 0) { return nil }
+        if (this._front.length() == 0) {
+            this._rebalance_front()
+        }
+        var item = this._front.pop()
+        this._len = this._len - 1
+        return item
+    }
+
+    /// Remove and return the back element. Returns nil if empty.
+    fun pop_back(): Any {
+        if (this._len == 0) { return nil }
+        if (this._back.length() == 0) {
+            this._rebalance_back()
+        }
+        var item = this._back.pop()
+        this._len = this._len - 1
+        return item
+    }
+
+    /// Return the front element without removing it.
+    fun peek_front(): Any {
+        if (this._len == 0) { return nil }
+        if (this._front.length() > 0) {
+            return this._front[this._front.length() - 1]
+        }
+        return this._back[0]
+    }
+
+    /// Return the back element without removing it.
+    fun peek_back(): Any {
+        if (this._len == 0) { return nil }
+        if (this._back.length() > 0) {
+            return this._back[this._back.length() - 1]
+        }
+        return this._front[0]
+    }
+
+    /// Return the number of elements.
+    fun length(): Number {
+        return this._len
+    }
+
+    /// Return true if the deque is empty.
+    fun is_empty(): Bool {
+        return this._len == 0
+    }
+
+    /// Return a list snapshot in front-to-back order.
+    fun to_list(): List<Any> {
+        var result: List<Any> = []
+        var i = this._front.length() - 1
+        while (i >= 0) {
+            result.push(this._front[i])
+            i = i - 1
+        }
+        i = 0
+        while (i < this._back.length()) {
+            result.push(this._back[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Remove all elements.
+    fun clear(): Deque {
+        this._front = []
+        this._back = []
+        this._len = 0
+        return this
+    }
+
+    /// Return an iterator over elements from front to back.
+    fun iter(): DequeIter {
+        return DequeIter(this.to_list())
+    }
+
+    fun to_string(): String {
+        return "Deque(${this.to_list()})"
+    }
+
+    // Move elements from _back to _front (reversed) when _front is empty.
+    fun _rebalance_front() {
+        var i = this._back.length() - 1
+        while (i >= 0) {
+            this._front.push(this._back[i])
+            i = i - 1
+        }
+        this._back = []
+    }
+
+    // Move elements from _front to _back (reversed) when _back is empty.
+    fun _rebalance_back() {
+        var i = this._front.length() - 1
+        while (i >= 0) {
+            this._back.push(this._front[i])
+            i = i - 1
+        }
+        this._front = []
+    }
+}
+
+/// Create an empty Deque.
+fun new(): Deque {
+    return Deque()
+}
+
+/// Create a Deque from a list (front-to-back order).
+fun from(items: List<Any>): Deque {
+    var dq = Deque()
+    var i = 0
+    while (i < items.length()) {
+        dq.push_back(items[i])
+        i = i + 1
+    }
+    return dq
+}

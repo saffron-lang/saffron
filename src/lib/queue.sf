@@ -1,0 +1,131 @@
+//! FIFO queue backed by a list with head pointer for amortized O(1) dequeue.
+
+/// Iterator for traversing a Queue from front to back.
+class QueueIter {
+    var _items: List<Any>
+    var _pos: Number
+
+    fun init(items: List<Any>) {
+        this._items = items
+        this._pos = 0
+    }
+
+    fun next?(): Bool {
+        return this._pos < this._items.length()
+    }
+
+    fun next(): Any {
+        var item = this._items[this._pos]
+        this._pos = this._pos + 1
+        return item
+    }
+}
+
+/// A first-in, first-out queue.
+///
+/// ```saffron
+/// import "@queue" as Queue
+/// var q = Queue.new()
+/// q.enqueue("first")
+/// q.enqueue("second")
+/// q.dequeue()   // "first"
+/// q.peek()      // "second"
+/// ```
+class Queue {
+    var _data: List<Any>
+    var _head: Number
+
+    fun init() {
+        this._data = []
+        this._head = 0
+    }
+
+    /// Add an element to the back of the queue.
+    fun enqueue(value: Any): Queue {
+        this._data.push(value)
+        return this
+    }
+
+    /// Remove and return the front element. Returns nil if empty.
+    fun dequeue(): Any {
+        if (this.length() == 0) { return nil }
+        var item = this._data[this._head]
+        this._head = this._head + 1
+        // Compact when more than half the list is consumed
+        if (this._head > this._data.length() / 2) {
+            this._compact()
+        }
+        return item
+    }
+
+    /// Return the front element without removing it.
+    fun peek(): Any {
+        if (this.length() == 0) { return nil }
+        return this._data[this._head]
+    }
+
+    /// Return the number of elements in the queue.
+    fun length(): Number {
+        return this._data.length() - this._head
+    }
+
+    /// Return true if the queue is empty.
+    fun is_empty(): Bool {
+        return this.length() == 0
+    }
+
+    /// Return elements as a list in queue order (front to back).
+    fun to_list(): List<Any> {
+        var result: List<Any> = []
+        var i = this._head
+        while (i < this._data.length()) {
+            result.push(this._data[i])
+            i = i + 1
+        }
+        return result
+    }
+
+    /// Remove all elements from the queue.
+    fun clear(): Queue {
+        this._data = []
+        this._head = 0
+        return this
+    }
+
+    /// Return an iterator over elements from front to back.
+    fun iter(): QueueIter {
+        return QueueIter(this.to_list())
+    }
+
+    fun to_string(): String {
+        return "Queue(${this.to_list()})"
+    }
+
+    // Remove consumed prefix to free memory.
+    fun _compact() {
+        var new_data: List<Any> = []
+        var i = this._head
+        while (i < this._data.length()) {
+            new_data.push(this._data[i])
+            i = i + 1
+        }
+        this._data = new_data
+        this._head = 0
+    }
+}
+
+/// Create an empty Queue.
+fun new(): Queue {
+    return Queue()
+}
+
+/// Create a Queue from a list (first element is front).
+fun from(items: List<Any>): Queue {
+    var q = Queue()
+    var i = 0
+    while (i < items.length()) {
+        q.enqueue(items[i])
+        i = i + 1
+    }
+    return q
+}
