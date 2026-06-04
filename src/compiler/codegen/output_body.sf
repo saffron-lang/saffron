@@ -848,7 +848,6 @@
         out.append("declare void @__io_print_str(i64)\n")
         out.append("declare void @__io_print_int(i64)\n")
         out.append("declare i64 @__any_to_string(i64)\n")
-        out.append("declare i64 @__rt_tag_ptr(i64)\n")
         out.append("declare i64 @__bool_to_string(i64)\n")
         out.append("declare i64 @__nil_to_string()\n\n")
         out.append("declare i64 @__float_to_string(i64)\n")
