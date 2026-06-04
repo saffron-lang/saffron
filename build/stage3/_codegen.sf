@@ -66,6 +66,7 @@ class Codegen {
     var coroutine_funcs: List<String>
     var is_coroutine: Bool
     var use_llvm_lib: Bool
+    var emit_llvm_lib: Bool
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
@@ -127,6 +128,7 @@ class Codegen {
         this.coroutine_funcs = []
         this.is_coroutine = false
         this.use_llvm_lib = true
+        this.emit_llvm_lib = false
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
@@ -8300,11 +8302,17 @@ class Codegen {
             }
         }
 
-        // --- LLVM lib verification: emit_ir() to validate module builds correctly ---
-        // When not in identity mode, the LLVM lib builds a parallel Module. Calling
-        // emit_ir() validates that the structural representation serializes correctly.
-        // This does NOT affect the primary output — it runs alongside for validation.
-        if (this.use_llvm_lib and !this.identity_mode) {
+        // --- LLVM lib output ---
+        // When emit_llvm_lib is set, return the LLVM Module IR instead of string emission.
+        // This is activated by --emit-llvm-lib and produces structured IR from the
+        // parallel LLVM Module that was built alongside string emission.
+        if (this.emit_llvm_lib and this.use_llvm_lib and !this.identity_mode) {
+            return this.llvm_module.emit_ir()
+        }
+
+        // --- LLVM lib verification (when not emitting as primary) ---
+        // Validates that the structural representation serializes correctly.
+        if (this.use_llvm_lib and !this.identity_mode and !this.emit_llvm_lib) {
             var llvm_ir_check: String = this.llvm_module.emit_ir()
             IO.println("[llvm-lib] parallel IR length: " + llvm_ir_check.length().to_string())
         }
@@ -11654,20 +11662,37 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
 
 
 fun generate_with_target_opts2(program: List<AST.Stmt>, target: String, identity_mode: Bool, use_llvm_lib: Bool): String {
+    return generate_with_target_opts3(program, target, identity_mode, use_llvm_lib, false)
+}
+
+fun generate_with_target_opts3(program: List<AST.Stmt>, target: String, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool): String {
     var gen: Codegen = Codegen()
     gen.target = target
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib
+    gen.emit_llvm_lib = emit_llvm_lib
     var result: String = gen.generate(program)
     if (gen.has_errors) { __codegen_errors = true }
     return result
 }
 
 fun generate_with_modules_flat_opts2(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool): String {
+    return generate_with_modules_flat_opts3(program, all_stmts, boundaries, prefixes_joined, alias_map, target, named_imports, identity_mode, use_llvm_lib, false)
+}
+
+fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String, alias_map: Map<String, String>, target: String, named_imports: Map<String, String>, identity_mode: Bool, use_llvm_lib: Bool, emit_llvm_lib: Bool): String {
     var gen: Codegen = Codegen()
     gen.target = target
     gen.identity_mode = identity_mode
     gen.use_llvm_lib = use_llvm_lib
+    gen.emit_llvm_lib = emit_llvm_lib
+    // Reflect runtime functions (generated at end of compilation)
+    gen.known_functions.push("__reflect_get_fields")
+    gen.known_functions.push("__reflect_class_name")
+    gen.known_functions.push("__reflect_is_class")
+    gen.known_functions.push("__reflect_construct_from_map")
+    gen.known_functions.push("__reflect_number_to_string")
+    gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
     gen.module_prefixes.set("IO", "")
     gen.module_prefixes.set("Task", "")
