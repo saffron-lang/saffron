@@ -1,24 +1,121 @@
-//! Bazaar dev runner — builds frontend + starts server concurrently.
+//! Bazaar dev runner — builds frontend, starts API server with hot reload.
 //! Usage: saffron run dev.sf
+//!
+//! Watches frontend/src/ for changes, rebuilds WASM, triggers browser reload.
+//! API server runs concurrently on the same port (serves both API + static).
 
-import "@os" as OS
+import "@http/server" as Http
+import "@async" as Async
+import "@watch" as Watch
+import "@path" as Path
 import "@process" as Process
 
-// Build frontend first
-IO.println("[dev] Building frontend...")
-var build_result = Process.run("cd frontend && saffron build --target wasm32 src/main.sf -o ../static/app.wasm")
-if (build_result.success) {
-    IO.println("[dev] Frontend built → static/app.wasm")
-} else {
-    IO.println("[dev] Frontend build failed:")
-    IO.println(build_result.stderr)
+var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
+
+var _pending_reload: Bool = false
+
+fun build_frontend(): Bool {
+    IO.println("  [build] Compiling frontend...")
+    var result = Process.run("cd frontend && saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm")
+    if (result.success) {
+        IO.println("  [build] Done → static/app.wasm")
+        Process.run("cp frontend/public/* static/ 2>/dev/null")
+        return true
+    } else {
+        IO.println("  [build] FAILED:")
+        IO.println(result.stderr)
+        return false
+    }
 }
 
-// Copy public assets
-Process.run("cp frontend/public/* static/ 2>/dev/null")
+fun mime_for(file_path: String): String {
+    if (file_path.ends_with(".html")) { return "text/html; charset=utf-8" }
+    if (file_path.ends_with(".js")) { return "application/javascript" }
+    if (file_path.ends_with(".css")) { return "text/css" }
+    if (file_path.ends_with(".wasm")) { return "application/wasm" }
+    if (file_path.ends_with(".json")) { return "application/json" }
+    if (file_path.ends_with(".png")) { return "image/png" }
+    if (file_path.ends_with(".svg")) { return "image/svg+xml" }
+    if (file_path.ends_with(".ico")) { return "image/x-icon" }
+    return "application/octet-stream"
+}
 
-// Start server (blocks — this is the long-running process)
-IO.println("[dev] Starting server on :3000...")
-IO.println("[dev] Open http://localhost:3000")
+// --- Main ---
+
+// Initial build
+build_frontend()
+
+// File watcher — watches frontend source for changes
+var watcher = Watch.create()
+watcher.add("frontend/src/")
+watcher.add("frontend/public/")
+
+Task.spawn(fun () => {
+    while (true) {
+        if (watcher.poll(100)) {
+            IO.println("  [watch] File changed, rebuilding...")
+            build_frontend()
+            _pending_reload = true
+        }
+        Async.sleep(0.5)
+    }
+})
+
+// Server (handles both API routes + static frontend)
+var port: Int = 3000
+var app = Http.server(port)
+
+// Hot reload SSE endpoint
+app.get("/__reload") { req =>
+    req.stream { stream =>
+        stream.send("connected")
+        while (true) {
+            if (_pending_reload) {
+                stream.send("reload")
+                _pending_reload = false
+                return
+            }
+            Async.sleep(0.2)
+        }
+    }
+}
+
+// API routes (import from main server module)
+import "./src/routes.sf" as Routes
+import "./src/db.sf" as Db
+
+Db.init()
+Routes.register(app)
+
+// Static files with reload script injection (catch-all, after API routes)
+app.get("*") { req =>
+    var file_path: String = Path.join(["static", req.path])
+    if (req.path == "/" or req.path == "") {
+        file_path = "static/index.html"
+    }
+    if (!IO.file_exists(file_path)) {
+        file_path = "static/index.html"
+    }
+    if (!IO.file_exists(file_path)) {
+        Http.not_found()
+    } else {
+        var content: String = IO.read_file(file_path)
+        var mime: String = mime_for(file_path)
+        // Inject reload script into HTML
+        if (mime.starts_with("text/html")) {
+            content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
+        }
+        Http.file(content, mime)
+    }
+}
+
 IO.println("")
-OS.exec("saffron run src/main.sf")
+IO.println("  ╔═══════════════════════════════════╗")
+IO.println("  ║  Bazaar Dev Server                ║")
+IO.println("  ║  http://localhost:${port}             ║")
+IO.println("  ║  Watching: frontend/src/          ║")
+IO.println("  ║  Press Ctrl+C to stop             ║")
+IO.println("  ╚═══════════════════════════════════╝")
+IO.println("")
+
+app.serve()
