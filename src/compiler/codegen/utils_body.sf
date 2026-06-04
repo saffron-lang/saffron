@@ -1094,5 +1094,15 @@
         return lib_ir.slice(2, lib_ir.length())
     }
 
+    /// Extract the register name from an arg string like "i64 %1" -> "%1"
+    fun extract_arg_reg(arg_str: String): String {
+        // arg_str is e.g. "i64 %3" or "i64 0"
+        var space_idx: Float = arg_str.index_of(" ")
+        if (space_idx >= 0) {
+            return arg_str.slice(space_idx + 1, arg_str.length())
+        }
+        return arg_str
+    }
+
     // --- Statement codegen ---
 

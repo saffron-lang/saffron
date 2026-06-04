@@ -233,6 +233,9 @@
             if (this.gc_root_count > 0) {
                 this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
             }
+            // LLVM lib parallel path: explicit returns are handled by the implicit
+            // return path in gen_function (output_body.sf). Calling ret() from stmts_body
+            // triggers a gen2 codegen bug with enum field writes through nested dispatch.
             this.emit_terminator("ret i64 " + val)
         }
     }

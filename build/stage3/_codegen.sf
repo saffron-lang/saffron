@@ -1152,11 +1152,10 @@ class Codegen {
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
                 var local: String = this.ptr_to_val(gep)
-                // LLVM lib parallel path — string literal ptrtoint
-                // Full path needs Module.add_global_string() + GEP + ptrtoint;
-                // deferred until the LLVM lib gains global string constant support
+                // LLVM lib parallel path — string literal
                 if (this.use_llvm_lib and !this.identity_mode) {
-                    // placeholder: string constants need Module.add_global_string()
+                    var llvm_str_val: Any = this.llvm_module.add_string_constant(s)
+                    this.llvm_values.set(local, llvm_str_val)
                 }
                 local
             }
@@ -3018,6 +3017,22 @@ class Codegen {
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(local, "i64", call_target, arg_strs.join(", ")))
+                // LLVM lib parallel path — direct call (known function)
+                if (!this.identity_mode) {
+                    var llvm_call_args: List<Any> = []
+                    var llvm_ci: Float = 0
+                    while (llvm_ci < arg_strs.length()) {
+                        var arg_reg: String = this.extract_arg_reg(arg_strs[llvm_ci])
+                        if (this.llvm_values.has(arg_reg)) {
+                            llvm_call_args.push(this.llvm_values.get(arg_reg))
+                        } else {
+                            llvm_call_args.push(LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+                        }
+                        llvm_ci = llvm_ci + 1
+                    }
+                    var llvm_call_result: Any = this.llvm_block_builder.call(call_target, LLVMTypes.Type.I64, llvm_call_args)
+                    this.llvm_values.set(local, llvm_call_result)
+                }
             } else {
                 this.emit_indent(local + " = call i64 @" + call_target + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", call_target, arg_strs.join(", "))
@@ -3248,6 +3263,22 @@ class Codegen {
             var local: String = this.fresh_local()
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_call(local, "i64", emit_callee, arg_strs.join(", ")))
+                // LLVM lib parallel path — direct call (fallback path)
+                if (!this.identity_mode) {
+                    var llvm_call_args2: List<Any> = []
+                    var llvm_ci2: Float = 0
+                    while (llvm_ci2 < arg_strs.length()) {
+                        var arg_reg2: String = this.extract_arg_reg(arg_strs[llvm_ci2])
+                        if (this.llvm_values.has(arg_reg2)) {
+                            llvm_call_args2.push(this.llvm_values.get(arg_reg2))
+                        } else {
+                            llvm_call_args2.push(LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64)))
+                        }
+                        llvm_ci2 = llvm_ci2 + 1
+                    }
+                    var llvm_call_result2: Any = this.llvm_block_builder.call(emit_callee, LLVMTypes.Type.I64, llvm_call_args2)
+                    this.llvm_values.set(local, llvm_call_result2)
+                }
             } else {
                 this.emit_indent(local + " = call i64 @" + emit_callee + "(" + arg_strs.join(", ") + ")")
                 this.verify_call(local, "i64", emit_callee, arg_strs.join(", "))
@@ -4844,6 +4875,9 @@ class Codegen {
             if (this.gc_root_count > 0) {
                 this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
             }
+            // LLVM lib parallel path: explicit returns are handled by the implicit
+            // return path in gen_function (output_body.sf). Calling ret() from stmts_body
+            // triggers a gen2 codegen bug with enum field writes through nested dispatch.
             this.emit_terminator("ret i64 " + val)
         }
     }
@@ -7126,6 +7160,16 @@ class Codegen {
         return lib_ir.slice(2, lib_ir.length())
     }
 
+    /// Extract the register name from an arg string like "i64 %1" -> "%1"
+    fun extract_arg_reg(arg_str: String): String {
+        // arg_str is e.g. "i64 %3" or "i64 0"
+        var space_idx: Float = arg_str.index_of(" ")
+        if (space_idx >= 0) {
+            return arg_str.slice(space_idx + 1, arg_str.length())
+        }
+        return arg_str
+    }
+
     // --- Statement codegen ---
 
     // @codegen-split: output
@@ -8515,9 +8559,6 @@ class Codegen {
 
     fun gen_index_get(object: AST.Expr, index: AST.Expr): String {
     var obj_name: String = this.get_variable_name(object)
-    var ig_dbg: String = obj_name
-    if (ig_dbg.length() == 0) { ig_dbg = "<expr>" }
-    this.emit_debug_location(ig_dbg + "[...]")
     // Block tuple indexing: must use ._0, ._1 etc.
     if (obj_name.length() > 0 and this.typed_vars.has(obj_name)) {
         var ig_ttype: String = this.type_to_string(this.typed_vars.get(obj_name))
@@ -8830,9 +8871,6 @@ class Codegen {
 
     fun gen_method_call(object: AST.Expr, method: String, args: List<AST.Expr>): String {
     var obj_name: String = this.get_variable_name(object)
-    var dbg_ctx: String = obj_name
-    if (dbg_ctx.length() == 0) { dbg_ctx = "<expr>" }
-    this.emit_debug_location(dbg_ctx + "." + method + "()")
 
     // Self method calls: this.method(args)
     var obj_kind_early: String = this.classify_expr(object)
@@ -10314,9 +10352,6 @@ class Codegen {
     }
 
     fun gen_get_field(object: AST.Expr, field: String): String {
-    var gf_dbg: String = this.get_variable_name(object)
-    if (gf_dbg.length() == 0) { gf_dbg = "<expr>" }
-    this.emit_debug_location(gf_dbg + "." + field)
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {

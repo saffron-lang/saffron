@@ -1,9 +1,9 @@
 //! Sorted set — unique elements maintained in sorted order via binary search.
 //! O(log n) lookup, O(n) insert/remove due to array shifting.
-//! Elements must support < and == operators (Numbers, Strings).
+//! Uses native < and == operators for comparison (works with Numbers and Strings).
 
 /// An ordered set of unique elements kept in sorted order.
-/// Elements are compared using the < operator directly.
+/// Uses the < operator for ordering.
 ///
 /// ```saffron
 /// import "@sorted_set" as SortedSet
@@ -170,7 +170,6 @@ fun from(items: List<Any>): SortedSet {
 /// Return a new SortedSet containing all elements from both sets.
 fun union(a: SortedSet, b: SortedSet): SortedSet {
     var result = SortedSet()
-    // Merge-style linear scan over two sorted lists
     var ai = 0
     var bi = 0
     var a_items = a.to_list()
