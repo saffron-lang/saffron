@@ -171,8 +171,8 @@ declare i32 @snprintf(i8*, i64, i8*, ...)
 
 ; --- Tag/Untag Helpers ---
 ; ACTIVE NaN-boxing implementations.
-; TAG_INT  = 0x7FF9000000000000 = 9221120237041090560
-; TAG_PTR  = 0x7FF8000000000000 = 9218868437227405312
+; TAG_INT  = 0x7FF9000000000000 = 9221401712017801216
+; TAG_PTR  = 0x7FF8000000000000 = 9221120237041090560
 ; VAL_TRUE  = 0x7FFA000000000001 = 9222246136947933185
 ; VAL_FALSE = 0x7FFA000000000000 = 9222246136947933184
 ; VAL_NIL   = 0x7FFA000000000002 = 9222246136947933186
@@ -181,7 +181,7 @@ declare i32 @snprintf(i8*, i64, i8*, ...)
 define i64 @__val_tag_int(i64 %n) {
 entry:
   %masked = and i64 %n, 281474976710655
-  %tagged = or i64 %masked, 9221120237041090560
+  %tagged = or i64 %masked, 9221401712017801216
   ret i64 %tagged
 }
 
@@ -197,7 +197,7 @@ define i64 @__val_tag_ptr(i8* %ptr) {
 entry:
   %int_ptr = ptrtoint i8* %ptr to i64
   %masked = and i64 %int_ptr, 281474976710655
-  %tagged = or i64 %masked, 9218868437227405312
+  %tagged = or i64 %masked, 9221120237041090560
   ret i64 %tagged
 }
 
@@ -346,8 +346,8 @@ no:
 
 
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
-; TAG_INT_CONST  = 9221120237041090560  (0x7FF9000000000000)
-; TAG_PTR_CONST  = 9218868437227405312  (0x7FF8000000000000)
+; TAG_INT_CONST  = 9221401712017801216  (0x7FF9000000000000)
+; TAG_PTR_CONST  = 9221120237041090560  (0x7FF8000000000000)
 ; VAL_TRUE       = 9222246136947933185  (0x7FFA000000000001)
 ; VAL_FALSE      = 9222246136947933184  (0x7FFA000000000000)
 ; VAL_NIL        = 9222246136947933186  (0x7FFA000000000002)
@@ -904,6 +904,78 @@ entry:
 ; __gc_init_shadow_stack: no-op without GC.
 define weak void @__gc_init_shadow_stack() {
 entry:
+  ret void
+}
+
+; =============================================================================
+; __any_to_string — Runtime type dispatch for NaN-boxed values
+; =============================================================================
+; Takes a NaN-boxed i64, determines its type at runtime, and returns a raw
+; char* (as i64) pointing to the string representation.
+
+declare i64 @__int_to_string(i64)
+
+define i64 @__any_to_string(i64 %val) {
+entry:
+  ; Check nil first
+  %is_nil = call i1 @__val_is_nil(i64 %val)
+  br i1 %is_nil, label %ret_nil, label %check_bool
+
+check_bool:
+  %is_true = call i1 @__val_is_true(i64 %val)
+  br i1 %is_true, label %ret_true, label %check_false
+
+check_false:
+  ; Check false (0x7FFA000000000000)
+  %is_false = icmp eq i64 %val, 9222246136947933184
+  br i1 %is_false, label %ret_false, label %check_int
+
+check_int:
+  %is_int = call i1 @__val_is_int(i64 %val)
+  br i1 %is_int, label %do_int, label %check_ptr
+
+do_int:
+  %raw_int = call i64 @__val_untag_int(i64 %val)
+  %int_str = call i64 @__int_to_string(i64 %raw_int)
+  ret i64 %int_str
+
+check_ptr:
+  %is_ptr = call i1 @__val_is_ptr(i64 %val)
+  br i1 %is_ptr, label %do_ptr, label %do_float
+
+do_ptr:
+  ; Untag the pointer — caller (puts) expects a raw i8*
+  %raw_ptr = call i8* @__val_untag_ptr(i64 %val)
+  %ptr_as_i64 = ptrtoint i8* %raw_ptr to i64
+  ret i64 %ptr_as_i64
+
+do_float:
+  ; Must be a float (not NaN-tagged)
+  %float_str = call i64 @__float_to_string(i64 %val)
+  ret i64 %float_str
+
+ret_nil:
+  %nil_str = getelementptr [4 x i8], [4 x i8]* @.str.nil_nl, i64 0, i64 0
+  %nil_ptr = ptrtoint i8* %nil_str to i64
+  ret i64 %nil_ptr
+
+ret_true:
+  %true_str = getelementptr [5 x i8], [5 x i8]* @.str.true_nl, i64 0, i64 0
+  %true_ptr = ptrtoint i8* %true_str to i64
+  ret i64 %true_ptr
+
+ret_false:
+  %false_str = getelementptr [6 x i8], [6 x i8]* @.str.false_nl, i64 0, i64 0
+  %false_ptr = ptrtoint i8* %false_str to i64
+  ret i64 %false_ptr
+}
+
+; __io_println_any — Print any NaN-boxed value followed by a newline.
+define void @__io_println_any(i64 %val) {
+entry:
+  %str = call i64 @__any_to_string(i64 %val)
+  %ptr = inttoptr i64 %str to i8*
+  call i32 @puts(i8* %ptr)
   ret void
 }
 

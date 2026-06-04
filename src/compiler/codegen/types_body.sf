@@ -320,6 +320,15 @@
             var result: String = this.emit_tag_ptr(gep)
             return result
         }
+        // Any type: runtime dispatch via __any_to_string
+        if (val_type == "Any") {
+            var result: String = this.fresh_local()
+            this.emit_indent(result + " = call i64 @__any_to_string(i64 " + val + ")")
+            // __any_to_string returns a raw pointer; tag it for use as a Saffron string
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + result + ")")
+            return tagged
+        }
         // Fallback: return "[unknown]" string constant
         var const_name: String = this.add_string_constant("[unknown]")
         var gep: String = this.fresh_local()
