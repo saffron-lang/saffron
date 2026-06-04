@@ -353,11 +353,15 @@ class Module {
             }
         }
 
-        // Emit terminator
+        // Emit terminator (prefer pre-formatted string to avoid enum field read issues)
         if (block.is_terminated) {
-            var term_str: String = Instructions.format_terminator(block.terminator)
-            if (term_str.length() > 0) {
-                sb.append("${term_str}\n")
+            if (block.terminator_str.length() > 0) {
+                sb.append(block.terminator_str + "\n")
+            } else {
+                var term_str: String = Instructions.format_terminator(block.terminator)
+                if (term_str.length() > 0) {
+                    sb.append("${term_str}\n")
+                }
             }
         }
     }

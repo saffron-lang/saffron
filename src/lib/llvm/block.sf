@@ -312,28 +312,31 @@ class BlockBuilder {
     }
 
     // ==================== Terminators ====================
+    // These store a pre-formatted string in block.terminator_str to avoid
+    // writing to block.terminator (an enum field), which triggers a gen2
+    // segfault on enum field writes through cross-module nested dispatch.
 
     fun br(target: Func.BasicBlock) {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.Br(target.label)
+        this.block.terminator_str = "  br label %" + target.label
         this.block.is_terminated = true
     }
 
     fun br_label(label: String) {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.Br(label)
+        this.block.terminator_str = "  br label %" + label
         this.block.is_terminated = true
     }
 
     fun cond_br(cond: Types.Value, then_bb: Func.BasicBlock, else_bb: Func.BasicBlock) {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.CondBr(cond, then_bb.label, else_bb.label)
+        this.block.terminator_str = "  br i1 " + Types.format_value(cond) + ", label %" + then_bb.label + ", label %" + else_bb.label
         this.block.is_terminated = true
     }
 
     fun cond_br_labels(cond: Types.Value, then_label: String, else_label: String) {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.CondBr(cond, then_label, else_label)
+        this.block.terminator_str = "  br i1 " + Types.format_value(cond) + ", label %" + then_label + ", label %" + else_label
         this.block.is_terminated = true
     }
 
@@ -351,19 +354,20 @@ class BlockBuilder {
 
     fun ret(val: Types.Value) {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.Ret(val)
+        var ty_str: String = Types.format_type(Types.value_type(val))
+        this.block.terminator_str = "  ret " + ty_str + " " + Types.format_value(val)
         this.block.is_terminated = true
     }
 
     fun ret_void() {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.RetVoid
+        this.block.terminator_str = "  ret void"
         this.block.is_terminated = true
     }
 
     fun unreachable() {
         if (this.block.is_terminated) { return nil }
-        this.block.terminator = Instructions.Terminator.Unreachable
+        this.block.terminator_str = "  unreachable"
         this.block.is_terminated = true
     }
 }

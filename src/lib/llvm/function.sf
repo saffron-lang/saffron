@@ -19,12 +19,14 @@ class BasicBlock {
     var label: String
     var instructions: List<Instructions.Instruction>
     var terminator: Instructions.Terminator
+    var terminator_str: String
     var is_terminated: Bool
 
     fun init(label: String) {
         this.label = label
         this.instructions = []
         this.terminator = Instructions.Terminator.None
+        this.terminator_str = ""
         this.is_terminated = false
     }
 }
