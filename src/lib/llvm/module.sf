@@ -222,86 +222,81 @@ class Module {
 
     fun emit_type_definitions(sb: StringBuilder) {
         if (this.type_defs.length() == 0) { return nil }
-        var i: Float = 0
-        while (i < this.type_defs.length()) {
-            var td: TypeDef = this.type_defs[i]
-            var field_parts: List<String> = []
-            var j: Float = 0
-            while (j < td.fields.length()) {
-                field_parts.push(Types.format_type(td.fields[j]))
-                j = j + 1
-            }
-            sb.append("%${td.name} = type { ${field_parts.join(", ")} }\n")
-            i = i + 1
+        var tds: List<TypeDef> = this.type_defs
+        for (td in tds) {
+            this.emit_type_def(sb, td)
         }
         sb.append("\n")
     }
 
+    fun emit_type_def(sb: StringBuilder, td: TypeDef) {
+        var field_parts: List<String> = []
+        var fields: List<Types.Type> = td.fields
+        for (field in fields) {
+            field_parts.push(Types.format_type(field))
+        }
+        sb.append("%${td.name} = type { ${field_parts.join(", ")} }\n")
+    }
+
     fun emit_string_constants(sb: StringBuilder) {
         if (this.string_constants.length() == 0) { return nil }
-        var i: Float = 0
-        while (i < this.string_constants.length()) {
-            var sc: StringConst = this.string_constants[i]
+        var scs: List<StringConst> = this.string_constants
+        for (sc in scs) {
             var escaped: String = escape_string(sc.value)
             var len: Float = sc.value.length() + 1
             var len_str: String = len.to_string().split(".")[0]
             var idx_str: String = sc.index.to_string().split(".")[0]
             sb.append("@.str.${idx_str} = private unnamed_addr constant [${len_str} x i8] c\"${escaped}\\00\"\n")
-            i = i + 1
         }
         sb.append("\n")
     }
 
     fun emit_globals(sb: StringBuilder) {
         if (this.globals.length() == 0) { return nil }
-        var i: Float = 0
-        while (i < this.globals.length()) {
-            var g: GlobalDef = this.globals[i]
+        var gs: List<GlobalDef> = this.globals
+        for (g in gs) {
             var linkage_str: String = Types.format_linkage(g.linkage)
             var kind: String = "global"
             if (g.is_constant) { kind = "constant" }
             var ty_str: String = Types.format_type(g.ty)
             var init_str: String = Types.format_const(g.initializer)
             sb.append("${g.name} = ${linkage_str}${kind} ${ty_str} ${init_str}\n")
-            i = i + 1
         }
         sb.append("\n")
     }
 
     fun emit_declarations(sb: StringBuilder) {
         var has_decl: Bool = false
-        var i: Float = 0
-        while (i < this.functions.length()) {
-            var func: Func.FunctionDef = this.functions[i]
+        var fns: List<Func.FunctionDef> = this.functions
+        for (func in fns) {
             if (func.is_declaration) {
                 has_decl = true
-                var param_parts: List<String> = []
-                var j: Float = 0
-                while (j < func.params.length()) {
-                    var p: Func.Param = func.params[j]
-                    param_parts.push(Types.format_type(p.ty))
-                    j = j + 1
-                }
-                if (func.is_variadic) {
-                    param_parts.push("...")
-                }
-                var ret_str: String = Types.format_type(func.ret_type)
-                sb.append("declare ${ret_str} @${func.name}(${param_parts.join(", ")})\n")
+                this.emit_declaration(sb, func)
             }
-            i = i + 1
         }
         if (has_decl) { sb.append("\n") }
     }
 
+    fun emit_declaration(sb: StringBuilder, func: Func.FunctionDef) {
+        var param_parts: List<String> = []
+        var ps: List<Func.Param> = func.params
+        for (p in ps) {
+            param_parts.push(Types.format_type(p.ty))
+        }
+        if (func.is_variadic) {
+            param_parts.push("...")
+        }
+        var ret_str: String = Types.format_type(func.ret_type)
+        sb.append("declare ${ret_str} @${func.name}(${param_parts.join(", ")})\n")
+    }
+
     fun emit_function_defs(sb: StringBuilder) {
-        var i: Float = 0
-        while (i < this.functions.length()) {
-            var func: Func.FunctionDef = this.functions[i]
+        var fns: List<Func.FunctionDef> = this.functions
+        for (func in fns) {
             if (!func.is_declaration) {
                 this.emit_function(sb, func)
                 sb.append("\n")
             }
-            i = i + 1
         }
     }
 
@@ -311,11 +306,9 @@ class Module {
 
         // Build parameter list
         var param_parts: List<String> = []
-        var j: Float = 0
-        while (j < func.params.length()) {
-            var p: Func.Param = func.params[j]
+        var ps: List<Func.Param> = func.params
+        for (p in ps) {
             param_parts.push("${Types.format_type(p.ty)} ${p.name}")
-            j = j + 1
         }
         if (func.is_variadic) {
             param_parts.push("...")
@@ -330,34 +323,33 @@ class Module {
         sb.append("define ${linkage_str}${ret_str} @${func.name}(${param_parts.join(", ")})${attr_str} {\n")
 
         // Emit each basic block
-        var k: Float = 0
-        while (k < func.blocks.length()) {
-            var block: Func.BasicBlock = func.blocks[k]
-            sb.append("${block.label}:\n")
-
-            // Emit instructions
-            var m: Float = 0
-            while (m < block.instructions.length()) {
-                var inst: Instructions.Instruction = block.instructions[m]
-                var inst_str: String = Instructions.format_instruction(inst, false)
-                if (inst_str.length() > 0) {
-                    sb.append("${inst_str}\n")
-                }
-                m = m + 1
-            }
-
-            // Emit terminator
-            if (block.is_terminated) {
-                var term_str: String = Instructions.format_terminator(block.terminator)
-                if (term_str.length() > 0) {
-                    sb.append("${term_str}\n")
-                }
-            }
-
-            k = k + 1
+        var blocks: List<Func.BasicBlock> = func.blocks
+        for (block in blocks) {
+            this.emit_block(sb, block)
         }
 
         sb.append("}\n")
+    }
+
+    fun emit_block(sb: StringBuilder, block: Func.BasicBlock) {
+        sb.append("${block.label}:\n")
+
+        // Emit instructions
+        var insts: List<Instructions.Instruction> = block.instructions
+        for (inst in insts) {
+            var inst_str: String = Instructions.format_instruction(inst, false)
+            if (inst_str.length() > 0) {
+                sb.append("${inst_str}\n")
+            }
+        }
+
+        // Emit terminator
+        if (block.is_terminated) {
+            var term_str: String = Instructions.format_terminator(block.terminator)
+            if (term_str.length() > 0) {
+                sb.append("${term_str}\n")
+            }
+        }
     }
 }
 
