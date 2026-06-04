@@ -603,15 +603,15 @@ entry:
 
 define i1 @__val_is_bool(i64 %v) {
 entry:
-  %is_t = icmp eq i64 %v, 9222246136947933185
-  %is_f = icmp eq i64 %v, 9222246136947933184
+  %is_t = icmp eq i64 %v, 9221683186994511873
+  %is_f = icmp eq i64 %v, 9221683186994511872
   %result = or i1 %is_t, %is_f
   ret i1 %result
 }
 
 define i1 @__val_is_nil(i64 %v) {
 entry:
-  %result = icmp eq i64 %v, 9222246136947933186
+  %result = icmp eq i64 %v, 9221683186994511874
   ret i1 %result
 }
 

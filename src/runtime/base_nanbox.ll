@@ -95,20 +95,53 @@ entry:
   ret void
 }
 
-; __io_println — Universal println: calls __io_println_any, returns i64 for uniform dispatch.
+; __io_println — Universal println: detects NaN-boxed values vs raw string ptrs.
+; If the value has a NaN-box tag (upper 16 bits in 0x7FF8..0x7FFA), dispatch via
+; __io_println_any. Otherwise treat as a raw char* and puts directly.
 define i64 @__io_println(i64 %val) {
 entry:
+  %upper = lshr i64 %val, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %t1 = or i1 %is_ptr, %is_int
+  %is_tagged = or i1 %t1, %is_spec
+  br i1 %is_tagged, label %tagged, label %raw_str
+
+tagged:
   call void @__io_println_any(i64 %val)
+  ret i64 0
+
+raw_str:
+  ; Value is a raw char* from __int_to_string / __bool_to_string / etc.
+  %ptr = inttoptr i64 %val to i8*
+  call i32 @puts(i8* %ptr)
   ret i64 0
 }
 
-; __io_print — Universal print: calls __any_to_string then printf.
+; __io_print — Universal print: detects NaN-boxed values vs raw string ptrs.
 define i64 @__io_print(i64 %val) {
 entry:
+  %upper = lshr i64 %val, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %t1 = or i1 %is_ptr, %is_int
+  %is_tagged = or i1 %t1, %is_spec
+  br i1 %is_tagged, label %tagged, label %raw_str
+
+tagged:
   %str = call i64 @__any_to_string(i64 %val)
-  %ptr = inttoptr i64 %str to i8*
-  %fmt = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
-  call i32 (i8*, ...) @printf(i8* %fmt, i8* %ptr)
+  %str_ptr = inttoptr i64 %str to i8*
+  %fmt1 = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
+  call i32 (i8*, ...) @printf(i8* %fmt1, i8* %str_ptr)
+  ret i64 0
+
+raw_str:
+  ; Value is a raw char* from coerce_to_string
+  %ptr = inttoptr i64 %val to i8*
+  %fmt2 = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
+  call i32 (i8*, ...) @printf(i8* %fmt2, i8* %ptr)
   ret i64 0
 }
 
@@ -199,9 +232,9 @@ declare i32 @snprintf(i8*, i64, i8*, ...)
 ; ACTIVE NaN-boxing implementations.
 ; TAG_INT  = 0x7FF9000000000000 = 9221401712017801216
 ; TAG_PTR  = 0x7FF8000000000000 = 9221120237041090560
-; VAL_TRUE  = 0x7FFA000000000001 = 9222246136947933185
-; VAL_FALSE = 0x7FFA000000000000 = 9222246136947933184
-; VAL_NIL   = 0x7FFA000000000002 = 9222246136947933186
+; VAL_TRUE  = 0x7FFA000000000001 = 9221683186994511873
+; VAL_FALSE = 0x7FFA000000000000 = 9221683186994511872
+; VAL_NIL   = 0x7FFA000000000002 = 9221683186994511874
 ; PAYLOAD_MASK = 0x0000FFFFFFFFFFFF = 281474976710655
 
 define i64 @__val_tag_int(i64 %n) {
@@ -249,20 +282,20 @@ entry:
 define i64 @__val_tag_bool(i64 %b) {
 entry:
   %is_true = icmp ne i64 %b, 0
-  %result = select i1 %is_true, i64 9222246136947933185, i64 9222246136947933184
+  %result = select i1 %is_true, i64 9221683186994511873, i64 9221683186994511872
   ret i64 %result
 }
 
 define i64 @__val_untag_bool(i64 %v) {
 entry:
-  %is_true = icmp eq i64 %v, 9222246136947933185
+  %is_true = icmp eq i64 %v, 9221683186994511873
   %result = zext i1 %is_true to i64
   ret i64 %result
 }
 
 define i64 @__val_nil() {
 entry:
-  ret i64 9222246136947933186
+  ret i64 9221683186994511874
 }
 
 ; --- Type Checking ---
@@ -301,21 +334,21 @@ entry:
 define i1 @__val_is_nil(i64 %v) {
 entry:
   ; nil = 0x7FFA000000000002
-  %result = icmp eq i64 %v, 9222246136947933186 ; 0x7FFA000000000002
+  %result = icmp eq i64 %v, 9221683186994511874 ; 0x7FFA000000000002
   ret i1 %result
 }
 
 define i1 @__val_is_true(i64 %v) {
 entry:
   ; true = 0x7FFA000000000001
-  %result = icmp eq i64 %v, 9222246136947933185 ; 0x7FFA000000000001
+  %result = icmp eq i64 %v, 9221683186994511873 ; 0x7FFA000000000001
   ret i1 %result
 }
 
 define i1 @__val_is_bool(i64 %v) {
 entry:
-  %is_t = icmp eq i64 %v, 9222246136947933185  ; true
-  %is_f = icmp eq i64 %v, 9222246136947933184  ; false (0x7FFA000000000000)
+  %is_t = icmp eq i64 %v, 9221683186994511873  ; true  (0x7FFA000000000001)
+  %is_f = icmp eq i64 %v, 9221683186994511872  ; false (0x7FFA000000000000)
   %result = or i1 %is_t, %is_f
   ret i1 %result
 }
@@ -374,9 +407,9 @@ no:
 ; --- NaN-Boxing Constants (for codegen to emit directly) ---
 ; TAG_INT_CONST  = 9221401712017801216  (0x7FF9000000000000)
 ; TAG_PTR_CONST  = 9221120237041090560  (0x7FF8000000000000)
-; VAL_TRUE       = 9222246136947933185  (0x7FFA000000000001)
-; VAL_FALSE      = 9222246136947933184  (0x7FFA000000000000)
-; VAL_NIL        = 9222246136947933186  (0x7FFA000000000002)
+; VAL_TRUE       = 9221683186994511873  (0x7FFA000000000001)
+; VAL_FALSE      = 9221683186994511872  (0x7FFA000000000000)
+; VAL_NIL        = 9221683186994511874  (0x7FFA000000000002)
 ; PAYLOAD_MASK   = 281474976710655      (0x0000FFFFFFFFFFFF)
 
 ; =============================================================================
@@ -959,7 +992,7 @@ check_bool:
 
 check_false:
   ; Check false (0x7FFA000000000000)
-  %is_false = icmp eq i64 %val, 9222246136947933184
+  %is_false = icmp eq i64 %val, 9221683186994511872
   br i1 %is_false, label %ret_false, label %check_int
 
 check_int:

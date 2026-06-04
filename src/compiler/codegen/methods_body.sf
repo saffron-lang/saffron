@@ -1622,8 +1622,16 @@
         } else if (obj_type == "Any") {
             // Unknown type at compile time: dispatch via __any_to_string which
             // does runtime NaN-box tag inspection to choose the right converter.
+            var raw: String = this.fresh_local()
+            this.emit_indent(raw + " = call i64 @__any_to_string(i64 " + obj + ")")
+            if (this.identity_mode) {
+                // Identity mode: raw pointer IS the value
+                this.last_type = AST.Type.StringType
+                return raw
+            }
+            // NaN-box mode: tag the raw char* as a Saffron string ptr
             var local: String = this.fresh_local()
-            this.emit_indent(local + " = call i64 @__any_to_string(i64 " + obj + ")")
+            this.emit_indent(local + " = call i64 @__rt_tag_ptr(i64 " + raw + ")")
             this.last_type = AST.Type.StringType
             return local
         } else {
