@@ -1117,15 +1117,16 @@ class Codegen {
         return match (expr) {
             IntLit(v) => {
                 this.last_type = AST.Type.IntType
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = add i64 0, " + v.floor().to_string())
+                var raw: String = this.fresh_local()
+                this.emit_indent(raw + " = add i64 0, " + v.floor().to_string())
                 // LLVM lib parallel path — builds IntLit in the LLVM Module alongside string emission
                 if (this.use_llvm_lib and !this.identity_mode) {
                     var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
                     var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(v.floor(), 64))
                     var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
-                    this.llvm_values.set(local, llvm_result)
+                    this.llvm_values.set(raw, llvm_result)
                 }
+                var local: String = this.emit_tag_int(raw)
                 local
             }
             FloatLit(v) => {
@@ -1136,10 +1137,10 @@ class Codegen {
             }
             BoolLit(v) => {
                 this.last_type = AST.Type.BoolType
-                var local: String = this.fresh_local()
+                var raw: String = this.fresh_local()
                 var val_str: String = "0"
                 if (v) { val_str = "1" }
-                this.emit_indent(local + " = add i64 0, " + val_str)
+                this.emit_indent(raw + " = add i64 0, " + val_str)
                 // LLVM lib parallel path — builds BoolLit in the LLVM Module alongside string emission
                 if (this.use_llvm_lib and !this.identity_mode) {
                     var bool_int: Float = 0
@@ -1147,8 +1148,9 @@ class Codegen {
                     var llvm_zero: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
                     var llvm_val: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(bool_int, 64))
                     var llvm_result: LLVMTypes.Value = this.llvm_block_builder.add(llvm_zero, llvm_val)
-                    this.llvm_values.set(local, llvm_result)
+                    this.llvm_values.set(raw, llvm_result)
                 }
+                var local: String = this.emit_tag_bool(raw)
                 local
             }
             StringLit(s) => {
@@ -1157,7 +1159,7 @@ class Codegen {
                 var gep: String = this.fresh_local()
                 var len: Float = s.length() + 1
                 this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-                var local: String = this.ptr_to_val(gep)
+                var local: String = this.emit_tag_ptr(gep)
                 // LLVM lib parallel path — string literal ptrtoint
                 // Full path needs Module.add_global_string() + GEP + ptrtoint;
                 // deferred until the LLVM lib gains global string constant support
@@ -1172,7 +1174,9 @@ class Codegen {
                 if (this.use_llvm_lib and !this.identity_mode) {
                     // Nil represented as const 0 (no NaN-boxing yet in LLVM lib path)
                 }
-                "0"
+                var local: String = this.fresh_local()
+                this.emit_indent(local + " = call i64 @__val_nil()")
+                local
             }
             Variable(name) => {
                 if (this.typed_vars.has(name)) {
@@ -1700,22 +1704,23 @@ class Codegen {
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
             if (left_type == "String" or right_type == "String") {
-                var local: String = this.fresh_local()
+                var raw_bool: String = this.fresh_local()
                 if (op == "==") {
-                    this.emit_indent(local + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                    this.emit_indent(raw_bool + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
                 } else {
-                    this.emit_indent(local + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                    this.emit_indent(raw_bool + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
                 }
                 this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
                 return local
             }
 
-            // Integer comparison
-            var local: String = this.fresh_local()
+            // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
             else { this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs) }
-            this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+            var raw_bool: String = this.fresh_local()
+            this.emit_indent(raw_bool + " = zext i1 " + cmp_local + " to i64")
             // LLVM lib parallel path: track Value for == / != integer comparison
             if (this.use_llvm_lib and !this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
                 var lhs_v: Any = this.llvm_values.get(lhs)
@@ -1724,9 +1729,10 @@ class Codegen {
                 if (op == "==") { cmp_v = this.llvm_block_builder.icmp_eq(lhs_v, rhs_v) }
                 else { cmp_v = this.llvm_block_builder.icmp_ne(lhs_v, rhs_v) }
                 var zext_v: Any = this.llvm_block_builder.zext(cmp_v, LLVMTypes.Type.I64)
-                this.llvm_values.set(local, zext_v)
+                this.llvm_values.set(raw_bool, zext_v)
             }
             this.last_type = AST.Type.BoolType
+            var local: String = this.emit_tag_bool(raw_bool)
             return local
         }
 
@@ -1742,8 +1748,8 @@ class Codegen {
             if (left_type == "String" or right_type == "String") {
                 // String concatenation
                 this.last_type = AST.Type.StringType
-                var lptr: String = this.val_to_ptr(lhs)
-                var rptr: String = this.val_to_ptr(rhs)
+                var lptr: String = this.emit_untag_ptr(lhs)
+                var rptr: String = this.emit_untag_ptr(rhs)
                 var llen: String = this.fresh_local()
                 this.emit_indent(llen + " = call i64 @strlen(i8* " + lptr + ")")
                 var rlen: String = this.fresh_local()
@@ -1759,12 +1765,16 @@ class Codegen {
                 var raw_result: String = this.ptr_to_val(buf)
                 var result: String = this.fresh_local()
                 this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
+                // Tag the interned pointer for NaN-boxing
+                var intern_ptr: String = this.fresh_local()
+                this.emit_indent(intern_ptr + " = inttoptr i64 " + result + " to i8*")
+                var tagged_result: String = this.emit_tag_ptr(intern_ptr)
                 // LLVM lib parallel path: track string concatenation result
                 if (!this.identity_mode) {
                     var sc_res: LLVMTypes.Value = this.llvm_block_builder.call("__string_concat", LLVMTypes.Type.I64, [])
-                    this.llvm_values.set(result, sc_res)
+                    this.llvm_values.set(tagged_result, sc_res)
                 }
-                return result
+                return tagged_result
             }
 
             if (left_type == "Float" or right_type == "Float") {
@@ -1778,19 +1788,22 @@ class Codegen {
 
             // Integer addition
             this.last_type = AST.Type.IntType
-            var local: String = this.fresh_local()
+            var lhs_raw: String = this.emit_untag_int(lhs)
+            var rhs_raw: String = this.emit_untag_int(rhs)
+            var add_result: String = this.fresh_local()
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("add", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("add", add_result, lhs_raw, rhs_raw))
                 // LLVM lib parallel path: track Value for add
-                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                    var lhs_v: Any = this.llvm_values.get(lhs)
-                    var rhs_v: Any = this.llvm_values.get(rhs)
+                if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                    var rhs_v: Any = this.llvm_values.get(rhs_raw)
                     var res_v: Any = this.llvm_block_builder.add(lhs_v, rhs_v)
-                    this.llvm_values.set(local, res_v)
+                    this.llvm_values.set(add_result, res_v)
                 }
             } else {
-                this.emit_indent(local + " = add i64 " + lhs + ", " + rhs)
+                this.emit_indent(add_result + " = add i64 " + lhs_raw + ", " + rhs_raw)
             }
+            var local: String = this.emit_tag_int(add_result)
             return local
         }
 
@@ -1818,10 +1831,14 @@ class Codegen {
             return this.emit_tag_float(fd)
         }
 
+        // Untag integer operands for arithmetic/comparison
+        var lhs_raw: String = this.emit_untag_int(lhs)
+        var rhs_raw: String = this.emit_untag_int(rhs)
+
         // Guard against division/modulo by zero
         if (op == "/" or op == "%") {
             var is_zero: String = this.fresh_local()
-            this.emit_indent(is_zero + " = icmp eq i64 " + rhs + ", 0")
+            this.emit_indent(is_zero + " = icmp eq i64 " + rhs_raw + ", 0")
             var lbl_err: String = this.fresh_label("div_err")
             var lbl_ok: String = this.fresh_label("div_ok")
             this.emit_terminator("br i1 " + is_zero + ", label %" + lbl_err + ", label %" + lbl_ok)
@@ -1830,104 +1847,111 @@ class Codegen {
             this.emit_terminator("unreachable")
             this.start_block(lbl_ok)
         }
-        var local: String = this.fresh_local()
+        var op_result: String = this.fresh_local()
         this.last_type = AST.Type.IntType
 
         if (op == "-") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("sub", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("sub", op_result, lhs_raw, rhs_raw))
                 // LLVM lib parallel path: track Value for sub
-                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                    var lhs_v: Any = this.llvm_values.get(lhs)
-                    var rhs_v: Any = this.llvm_values.get(rhs)
+                if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                    var rhs_v: Any = this.llvm_values.get(rhs_raw)
                     var res_v: Any = this.llvm_block_builder.sub(lhs_v, rhs_v)
-                    this.llvm_values.set(local, res_v)
+                    this.llvm_values.set(op_result, res_v)
                 }
             } else {
-                this.emit_indent(local + " = sub i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = sub i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "*") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("mul", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("mul", op_result, lhs_raw, rhs_raw))
                 // LLVM lib parallel path: track Value for mul
-                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                    var lhs_v: Any = this.llvm_values.get(lhs)
-                    var rhs_v: Any = this.llvm_values.get(rhs)
+                if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                    var rhs_v: Any = this.llvm_values.get(rhs_raw)
                     var res_v: Any = this.llvm_block_builder.mul(lhs_v, rhs_v)
-                    this.llvm_values.set(local, res_v)
+                    this.llvm_values.set(op_result, res_v)
                 }
             } else {
-                this.emit_indent(local + " = mul i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = mul i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "/") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("sdiv", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("sdiv", op_result, lhs_raw, rhs_raw))
                 // LLVM lib parallel path: track Value for sdiv
-                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                    var lhs_v: Any = this.llvm_values.get(lhs)
-                    var rhs_v: Any = this.llvm_values.get(rhs)
+                if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                    var rhs_v: Any = this.llvm_values.get(rhs_raw)
                     var res_v: Any = this.llvm_block_builder.sdiv(lhs_v, rhs_v)
-                    this.llvm_values.set(local, res_v)
+                    this.llvm_values.set(op_result, res_v)
                 }
             } else {
-                this.emit_indent(local + " = sdiv i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = sdiv i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "%") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("srem", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("srem", op_result, lhs_raw, rhs_raw))
                 // LLVM lib parallel path: track Value for srem
-                if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                    var lhs_v: Any = this.llvm_values.get(lhs)
-                    var rhs_v: Any = this.llvm_values.get(rhs)
+                if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                    var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                    var rhs_v: Any = this.llvm_values.get(rhs_raw)
                     var res_v: Any = this.llvm_block_builder.srem(lhs_v, rhs_v)
-                    this.llvm_values.set(local, res_v)
+                    this.llvm_values.set(op_result, res_v)
                 }
             } else {
-                this.emit_indent(local + " = srem i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = srem i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "&") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("and", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("and", op_result, lhs_raw, rhs_raw))
             } else {
-                this.emit_indent(local + " = and i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = and i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "|") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("or", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("or", op_result, lhs_raw, rhs_raw))
             } else {
-                this.emit_indent(local + " = or i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = or i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "^") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("xor", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("xor", op_result, lhs_raw, rhs_raw))
             } else {
-                this.emit_indent(local + " = xor i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = xor i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "<<") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("shl", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("shl", op_result, lhs_raw, rhs_raw))
             } else {
-                this.emit_indent(local + " = shl i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = shl i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == ">>") {
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_binary_op("ashr", local, lhs, rhs))
+                this.emit_indent(this.lib_binary_op("ashr", op_result, lhs_raw, rhs_raw))
             } else {
-                this.emit_indent(local + " = ashr i64 " + lhs + ", " + rhs)
+                this.emit_indent(op_result + " = ashr i64 " + lhs_raw + ", " + rhs_raw)
             }
         }
         else if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
             this.last_type = AST.Type.BoolType
             var cmp_local: String = this.fresh_local()
-            if (left_type2 == "Float" or right_type2 == "Float") {
+            if ((left_type2 == "String" or right_type2 == "String") and (op == "<" or op == "<=" or op == ">" or op == ">=")) {
+                var strcmp_result: String = this.fresh_local()
+                this.emit_indent(strcmp_result + " = call i64 @__safe_strcmp(i64 " + lhs + ", i64 " + rhs + ")")
+                if (op == "<") { this.emit_indent(cmp_local + " = icmp slt i64 " + strcmp_result + ", 0") }
+                else if (op == "<=") { this.emit_indent(cmp_local + " = icmp sle i64 " + strcmp_result + ", 0") }
+                else if (op == ">") { this.emit_indent(cmp_local + " = icmp sgt i64 " + strcmp_result + ", 0") }
+                else { this.emit_indent(cmp_local + " = icmp sge i64 " + strcmp_result + ", 0") }
+            } else if (left_type2 == "Float" or right_type2 == "Float") {
                 var cld: String = this.emit_untag_float(lhs)
                 var crd: String = this.emit_untag_float(rhs)
                 if (op == "==") { this.emit_indent(cmp_local + " = fcmp oeq double " + cld + ", " + crd) }
@@ -1938,101 +1962,108 @@ class Codegen {
                 else if (op == ">=") { this.emit_indent(cmp_local + " = fcmp oge double " + cld + ", " + crd) }
             } else if (op == "==") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("eq", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("eq", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_eq value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_eq(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp eq i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             else if (op == "!=") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("ne", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("ne", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_ne value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_ne(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp ne i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp ne i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             else if (op == "<") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("slt", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("slt", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_slt value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_slt(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp slt i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp slt i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             else if (op == "<=") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("sle", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("sle", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_sle value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_sle(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp sle i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp sle i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             else if (op == ">") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("sgt", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("sgt", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_sgt value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_sgt(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp sgt i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             else if (op == ">=") {
                 if (this.use_llvm_lib) {
-                    this.emit_indent(this.lib_icmp_op("sge", cmp_local, lhs, rhs))
+                    this.emit_indent(this.lib_icmp_op("sge", cmp_local, lhs_raw, rhs_raw))
                     // LLVM lib parallel path: track icmp_sge value
-                    if (!this.identity_mode and this.llvm_values.has(lhs) and this.llvm_values.has(rhs)) {
-                        var lhs_v: Any = this.llvm_values.get(lhs)
-                        var rhs_v: Any = this.llvm_values.get(rhs)
+                    if (!this.identity_mode and this.llvm_values.has(lhs_raw) and this.llvm_values.has(rhs_raw)) {
+                        var lhs_v: Any = this.llvm_values.get(lhs_raw)
+                        var rhs_v: Any = this.llvm_values.get(rhs_raw)
                         var cmp_v: Any = this.llvm_block_builder.icmp_sge(lhs_v, rhs_v)
                         this.llvm_values.set(cmp_local, cmp_v)
                     }
                 } else {
-                    this.emit_indent(cmp_local + " = icmp sge i64 " + lhs + ", " + rhs)
+                    this.emit_indent(cmp_local + " = icmp sge i64 " + lhs_raw + ", " + rhs_raw)
                 }
             }
             if (this.use_llvm_lib) {
-                this.emit_indent(this.lib_zext_op(local, cmp_local))
+                this.emit_indent(this.lib_zext_op(op_result, cmp_local))
                 // LLVM lib parallel path: track zext value
                 if (!this.identity_mode and this.llvm_values.has(cmp_local)) {
                     var cmp_v: Any = this.llvm_values.get(cmp_local)
                     var ext_v: Any = this.llvm_block_builder.zext(cmp_v, LLVMTypes.Type.I64)
-                    this.llvm_values.set(local, ext_v)
+                    this.llvm_values.set(op_result, ext_v)
                 }
             } else {
-                this.emit_indent(local + " = zext i1 " + cmp_local + " to i64")
+                this.emit_indent(op_result + " = zext i1 " + cmp_local + " to i64")
             }
         }
 
+        // Tag the result: int for arithmetic/bitwise, bool for comparisons
+        var local: String = op_result
+        if (op == "==" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=") {
+            local = this.emit_tag_bool(op_result)
+        } else {
+            local = this.emit_tag_int(op_result)
+        }
         return local
     }
 
@@ -2043,7 +2074,7 @@ class Codegen {
         var gep: String = this.fresh_local()
         var len: Float = combined.length() + 1
         this.emit_indent(gep + " = getelementptr [" + len.to_string() + " x i8], [" + len.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-        var local: String = this.ptr_to_val(gep)
+        var local: String = this.emit_tag_ptr(gep)
         return local
     }
 
@@ -2419,7 +2450,7 @@ class Codegen {
             var gep: String = this.fresh_local()
             var slen: Float = str_val.length() + 1
             this.emit_indent(gep + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.ptr_to_val(gep)
+            var local: String = this.emit_tag_ptr(gep)
             return local
         }
         return this.gen_expr(expr)
@@ -2435,9 +2466,9 @@ class Codegen {
             this.emit_indent(ptr + " = getelementptr [" + slen.to_string() + " x i8], [" + slen.to_string() + " x i8]* " + const_name + ", i64 0, i64 0")
             return ptr
         }
-        // Variable or expression: gen_expr gives i64, convert to i8*
+        // Variable or expression: gen_expr gives i64 (possibly tagged), convert to i8*
         var val: String = this.gen_arg_value(expr)
-        var ptr: String = this.val_to_ptr(val)
+        var ptr: String = this.emit_untag_ptr(val)
         return ptr
     }
 
@@ -2593,7 +2624,9 @@ class Codegen {
             var str_val: String = this.coerce_to_string(arg, arg_type)
             this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
             this.last_type = AST.Type.NilType
-            return "0"
+            var nil_val: String = this.fresh_local()
+            this.emit_indent(nil_val + " = call i64 @__val_nil()")
+            return nil_val
         }
         if (callee_name == "IO.print") {
             var arg: String = this.gen_arg_value(args[0])
@@ -2601,7 +2634,9 @@ class Codegen {
             var str_val: String = this.coerce_to_string(arg, arg_type)
             this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
             this.last_type = AST.Type.NilType
-            return local
+            var nil_val: String = this.fresh_local()
+            this.emit_indent(nil_val + " = call i64 @__val_nil()")
+            return nil_val
         }
 
         // Task.spawn(fn) — call the coroutine function to get a handle, enqueue it
