@@ -9237,7 +9237,7 @@ class Codegen {
                 return __tagged
             }
             // Bool-returning functions: tag raw 0/1 as bool
-            if (__mp_func == "__io_file_exists") {
+            if (__mp_func == "__io_file_exists" or __mp_func == "__os_file_exists") {
                 var __tagged: String = this.emit_tag_bool(__mp_local)
                 this.last_type = AST.Type.BoolType
                 return __tagged
