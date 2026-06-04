@@ -1,0 +1,24 @@
+//! Bazaar dev runner — builds frontend + starts server concurrently.
+//! Usage: saffron run dev.sf
+
+import "@os" as OS
+import "@process" as Process
+
+// Build frontend first
+IO.println("[dev] Building frontend...")
+var build_result = Process.run("cd frontend && saffron build --target wasm32 src/main.sf -o ../static/app.wasm")
+if (build_result.success) {
+    IO.println("[dev] Frontend built → static/app.wasm")
+} else {
+    IO.println("[dev] Frontend build failed:")
+    IO.println(build_result.stderr)
+}
+
+// Copy public assets
+Process.run("cp frontend/public/* static/ 2>/dev/null")
+
+// Start server (blocks — this is the long-running process)
+IO.println("[dev] Starting server on :3000...")
+IO.println("[dev] Open http://localhost:3000")
+IO.println("")
+OS.exec("saffron run src/main.sf")
