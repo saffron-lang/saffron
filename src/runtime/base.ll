@@ -36,6 +36,7 @@ declare i64 @__sched_has_stored_result(i64)
 
 declare i32 @puts(i8*)
 declare i32 @printf(i8*, ...)
+declare void @exit(i32)
 
 @.fmt.ld_nl = private unnamed_addr constant [5 x i8] c"%ld\0A\00"
 @.fmt.ld = private unnamed_addr constant [4 x i8] c"%ld\00"
@@ -92,6 +93,32 @@ entry:
   %fmt = getelementptr [4 x i8], [4 x i8]* @.fmt.ld, i64 0, i64 0
   call i32 (i8*, ...) @printf(i8* %fmt, i64 %n)
   ret void
+}
+
+; __io_println — Identity mode: treat value as string pointer, call puts.
+; The compiler coerces to string at compile time via coerce_to_string.
+define i64 @__io_println(i64 %val) {
+entry:
+  %ptr = inttoptr i64 %val to i8*
+  call i32 @puts(i8* %ptr)
+  ret i64 0
+}
+
+; __io_print — Identity mode: treat value as string pointer, printf.
+define i64 @__io_print(i64 %val) {
+entry:
+  %ptr = inttoptr i64 %val to i8*
+  %fmt = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
+  call i32 (i8*, ...) @printf(i8* %fmt, i8* %ptr)
+  ret i64 0
+}
+
+; __os_exit — Exit process with given code (truncated to i32).
+define i64 @__os_exit(i64 %code) {
+entry:
+  %code32 = trunc i64 %code to i32
+  call void @exit(i32 %code32)
+  ret i64 0
 }
 
 ; --- to_string helpers for compile-time polymorphism ---
@@ -659,26 +686,32 @@ fail:
 }
 
 ; __gc_enable / __gc_disable: no-ops when GC is not linked.
-define weak void @__gc_enable() {
+define weak i64 @__gc_enable() {
 entry:
-  ret void
+  ret i64 0
 }
 
-define weak void @__gc_disable() {
+define weak i64 @__gc_disable() {
 entry:
-  ret void
+  ret i64 0
 }
 
 ; __gc_collect: no-op when GC is not linked.
-define weak void @__gc_collect() {
+define weak i64 @__gc_collect() {
 entry:
-  ret void
+  ret i64 0
 }
 
 ; __gc_set_threshold: no-op.
-define weak void @__gc_set_threshold(i64 %bytes) {
+define weak i64 @__gc_set_threshold(i64 %bytes) {
 entry:
-  ret void
+  ret i64 0
+}
+
+; __gc_debug_stats: no-op when GC is not linked.
+define weak i64 @__gc_debug_stats() {
+entry:
+  ret i64 0
 }
 
 ; __gc_push_root / __gc_pop_roots: no-ops without GC.

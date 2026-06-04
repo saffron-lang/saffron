@@ -13,6 +13,8 @@
         }
         // Debug location tracking
         rt.append("@__debug_location = external global i8*\n")
+        // NaN-boxing value constructors
+        rt.append("declare i64 @__val_nil()\n")
         // Runtime type-check functions (NaN-boxing tag inspection, return i1)
         rt.append("declare i1 @__val_is_int(i64)\n")
         rt.append("declare i1 @__val_is_float(i64)\n")

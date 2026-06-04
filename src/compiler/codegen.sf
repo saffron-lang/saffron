@@ -507,8 +507,11 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     // Each module's functions get prefixed via current_prefix during gen_stmt
     var gen: Codegen = Codegen()
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("IO", "__io_")
+    gen.module_prefixes.set("OS", "__os_")
+    gen.module_prefixes.set("GC", "__gc_")
+    // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
+    // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "")
 
     // Register runtime functions first
@@ -938,8 +941,11 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__reflect_number_to_string")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("IO", "__io_")
+    gen.module_prefixes.set("OS", "__os_")
+    gen.module_prefixes.set("GC", "__gc_")
+    // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
+    // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
     gen.register_only = false
@@ -1484,8 +1490,11 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__reflect_number_to_string")
     gen.known_functions.push("__gc_get_type_tag")
     gen.module_prefixes = alias_map
-    gen.module_prefixes.set("IO", "")
-    gen.module_prefixes.set("Task", "")
+    gen.module_prefixes.set("IO", "__io_")
+    gen.module_prefixes.set("OS", "__os_")
+    gen.module_prefixes.set("GC", "__gc_")
+    // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
+    // and is NOT a real module prefix — don't register it here.
     gen.module_prefixes.set("Reflect", "")
     gen.named_imports = named_imports
     gen.register_only = false
