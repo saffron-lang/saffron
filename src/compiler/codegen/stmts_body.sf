@@ -233,18 +233,15 @@
             if (this.gc_root_count > 0) {
                 this.emit_indent("call void @__gc_pop_roots(i64 " + this.gc_root_count.floor().to_string() + ")")
             }
-            // LLVM lib parallel path: ret via block builder
-            // NOTE: bb.ret() writes to block.terminator (an enum field).
-            // gen2 segfaults on enum field writes through nested dispatch.
-            // Enable after gen2 promotion that fixes this specific case:
-            // if (!this.identity_mode and this.use_llvm_lib) {
-            //     if (this.llvm_values.has(val)) {
-            //         this.llvm_block_builder.ret(this.llvm_values.get(val))
-            //     } else {
-            //         var nil_v = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
-            //         this.llvm_block_builder.ret(nil_v)
-            //     }
-            // }
+            // LLVM lib parallel path: emit ret
+            if (!this.identity_mode and this.use_llvm_lib) {
+                if (this.llvm_values.has(val)) {
+                    this.llvm_block_builder.ret(this.llvm_values.get(val))
+                } else {
+                    var nil_v: LLVMTypes.Value = LLVMTypes.Value.Constant(LLVMTypes.Const.Int(0, 64))
+                    this.llvm_block_builder.ret(nil_v)
+                }
+            }
             this.emit_terminator("ret i64 " + val)
         }
     }
@@ -927,11 +924,11 @@
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_trunc(local, val, "i64", "i1"))
-            // LLVM lib parallel path: track trunc to i1
-            if (!this.identity_mode and this.llvm_values.has(val)) {
-                var trunc_v: Any = this.llvm_block_builder.trunc(this.llvm_values.get(val), LLVMTypes.Type.I1)
-                this.llvm_values.set(local, trunc_v)
-            }
+            // LLVM lib parallel path: trunc — disabled (crashes gen3)
+            // if (!this.identity_mode and this.llvm_values.has(val)) {
+            //     var trunc_v: Any = this.llvm_block_builder.trunc(this.llvm_values.get(val), LLVMTypes.Type.I1)
+            //     this.llvm_values.set(local, trunc_v)
+            // }
         } else {
             this.emit_indent(local + " = trunc i64 " + val + " to i1")
             this.verify_trunc(local, val, "i64", "i1")
@@ -953,21 +950,41 @@
 
             if (this.use_llvm_lib) {
                 this.emit_terminator(this.lib_cond_br(cond_val, then_label, else_label))
+                // LLVM lib parallel path: conditional branch
+                if (!this.identity_mode and this.llvm_values.has(cond_val)) {
+                    this.llvm_block_builder.cond_br_labels(this.llvm_values.get(cond_val), then_label, else_label)
+                }
             } else {
                 this.emit_terminator("br i1 " + cond_val + ", label %" + then_label + ", label %" + else_label)
                 this.verify_cond_br(cond_val, then_label, else_label)
             }
 
             this.start_block(then_label)
+            // LLVM lib parallel path: switch to then block
+            if (this.use_llvm_lib and !this.identity_mode) {
+                var llvm_then_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(then_label)
+                this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_then_bb)
+                this.llvm_block_builder.init(this.llvm_func_builder, llvm_then_bb)
+            }
             this.gen_stmts(current_then)
             if (this.use_llvm_lib) {
                 this.emit_terminator(this.lib_br(end_label))
+                // LLVM lib parallel path: unconditional branch to end
+                if (!this.identity_mode) {
+                    this.llvm_block_builder.br_label(end_label)
+                }
             } else {
                 this.emit_terminator("br label %" + end_label)
                 this.verify_br(end_label)
             }
 
             this.start_block(else_label)
+            // LLVM lib parallel path: switch to else block
+            if (this.use_llvm_lib and !this.identity_mode) {
+                var llvm_else_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(else_label)
+                this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_else_bb)
+                this.llvm_block_builder.init(this.llvm_func_builder, llvm_else_bb)
+            }
 
             // Check if else is a single If (else-if chain)
             var is_elseif: Bool = false
@@ -988,11 +1005,21 @@
                     this.gen_stmts(current_else)
                 }
                 this.emit_terminator("br label %" + end_label)
+                // LLVM lib parallel path: branch to end from else
+                if (this.use_llvm_lib and !this.identity_mode) {
+                    this.llvm_block_builder.br_label(end_label)
+                }
                 break
             }
         }
 
         this.start_block(end_label)
+        // LLVM lib parallel path: switch to end block
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_end_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(end_label)
+            this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_end_bb)
+            this.llvm_block_builder.init(this.llvm_func_builder, llvm_end_bb)
+        }
     }
 
         fun classify_stmt(stmt: AST.Stmt): String {
@@ -1209,31 +1236,50 @@
         this.loop_break_label = end_label
         this.loop_continue_label = cond_label
 
-        // LLVM lib parallel path for branching (br_label, cond_br_labels, new_block)
-        // is deferred: these write to block.terminator (enum field), which triggers
-        // gen2 segfault. Enable after gen2 promotion fixes enum field writes.
-        // Then: create blocks, call cond_br_labels/br_label, switch llvm_block_builder.
-
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
+            // LLVM lib parallel path: branch to cond block
+            if (!this.identity_mode) {
+                this.llvm_block_builder.br_label(cond_label)
+            }
         } else {
             this.emit_terminator("br label %" + cond_label)
             this.verify_br(cond_label)
         }
 
         this.start_block(cond_label)
+        // LLVM lib parallel path: switch to cond block
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_cond_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(cond_label)
+            this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_cond_bb)
+            this.llvm_block_builder.init(this.llvm_func_builder, llvm_cond_bb)
+        }
         var cond_val: String = this.to_i1(this.gen_arg_value(cond))
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_cond_br(cond_val, body_label, end_label))
+            // LLVM lib parallel path: conditional branch
+            if (!this.identity_mode and this.llvm_values.has(cond_val)) {
+                this.llvm_block_builder.cond_br_labels(this.llvm_values.get(cond_val), body_label, end_label)
+            }
         } else {
             this.emit_terminator("br i1 " + cond_val + ", label %" + body_label + ", label %" + end_label)
             this.verify_cond_br(cond_val, body_label, end_label)
         }
 
         this.start_block(body_label)
+        // LLVM lib parallel path: switch to body block
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_body_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(body_label)
+            this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_body_bb)
+            this.llvm_block_builder.init(this.llvm_func_builder, llvm_body_bb)
+        }
         this.gen_stmts(body)
         if (this.use_llvm_lib) {
             this.emit_terminator(this.lib_br(cond_label))
+            // LLVM lib parallel path: branch back to cond
+            if (!this.identity_mode) {
+                this.llvm_block_builder.br_label(cond_label)
+            }
         } else {
             this.emit_terminator("br label %" + cond_label)
             this.verify_br(cond_label)
@@ -1244,6 +1290,12 @@
         this.loop_continue_label = saved_continue
 
         this.start_block(end_label)
+        // LLVM lib parallel path: switch to end block
+        if (this.use_llvm_lib and !this.identity_mode) {
+            var llvm_end_bb: LLVMFunc.BasicBlock = this.llvm_func_builder.new_block(end_label)
+            this.llvm_block_builder = LLVMBlock.BlockBuilder(this.llvm_func_builder, llvm_end_bb)
+            this.llvm_block_builder.init(this.llvm_func_builder, llvm_end_bb)
+        }
     }
 
     fun emit_reflect_helpers() {
