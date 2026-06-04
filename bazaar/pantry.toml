@@ -11,7 +11,7 @@ authors = ["henry232323"]
 [dependencies]
 
 [scripts]
-build = "pantry build --member frontend && saffron build src/main.sf -o build/bazaar"
+build = "cd frontend && pantry build && cd .. && saffron build src/main.sf -o build/bazaar"
 dev = "saffron run dev.sf"
 frontend = "cd frontend && pantry build"
 migrate = "saffron run src/migrate.sf"
