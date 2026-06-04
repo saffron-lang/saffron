@@ -601,7 +601,9 @@
                 this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-                var result: String = this.ptr_to_val(buf)
+                var raw_result: String = this.ptr_to_val(buf)
+                var result: String = this.fresh_local()
+                this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
                 return result
             }
 
@@ -1171,8 +1173,10 @@
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-        // Return as i64
-        var result: String = this.ptr_to_val(buf)
+        // Intern the result for O(1) equality
+        var raw_result: String = this.ptr_to_val(buf)
+        var result: String = this.fresh_local()
+        this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
         return result
     }
 

@@ -340,8 +340,10 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
                 this.emit_indent(buf + " = call i8* @malloc(i64 " + total1 + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
+                var raw_result: String = this.fresh_local()
+                this.emit_indent(raw_result + " = ptrtoint i8* " + buf + " to i64")
                 var result: String = this.fresh_local()
-                this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+                this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
                 return result
             }
 
@@ -734,9 +736,11 @@ extend fun Codegen.gen_runtime_string_concat(left: AST.Expr, right: AST.Expr): S
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
-        // Return as i64
+        // Intern the result for O(1) equality
+        var raw_result: String = this.fresh_local()
+        this.emit_indent(raw_result + " = ptrtoint i8* " + buf + " to i64")
         var result: String = this.fresh_local()
-        this.emit_indent(result + " = ptrtoint i8* " + buf + " to i64")
+        this.emit_indent(result + " = call i64 @__string_intern(i64 " + raw_result + ")")
         return result
     }
 

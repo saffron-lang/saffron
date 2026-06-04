@@ -170,6 +170,238 @@ entry:
   ret i64 %ne
 }
 
+; =============================================================================
+; String Interning — Phase 2: Intern Table for Dynamic Strings
+; =============================================================================
+;
+; Hash table mapping string content → canonical pointer.
+; After interning, all strings with equal content share the same pointer,
+; making __string_eq O(1) via the fast-path pointer check.
+;
+; Table layout:
+;   @__intern_buckets: pointer to array of bucket head pointers (linked list)
+;   @__intern_bucket_count: number of buckets (initially 1024)
+;   @__intern_size: number of interned entries
+;
+; Each bucket entry (node): { i64 str_ptr, i64 next_node_ptr }
+;   - str_ptr: the canonical interned string pointer
+;   - next_node_ptr: pointer to next node in bucket chain (0 = end)
+;
+; Hash: FNV-1a 64-bit on string bytes
+
+@__intern_buckets = global i8* null
+@__intern_bucket_count = global i64 1024
+@__intern_size = global i64 0
+
+; __intern_init: lazily initialize the intern table
+define internal void @__intern_init() {
+entry:
+  %buckets = load i8*, i8** @__intern_buckets
+  %is_null = icmp eq i8* %buckets, null
+  br i1 %is_null, label %do_init, label %done
+
+do_init:
+  ; Allocate 1024 buckets * 8 bytes each = 8192 bytes, zeroed
+  %mem = call i8* @calloc(i64 1024, i64 8)
+  store i8* %mem, i8** @__intern_buckets
+  br label %done
+
+done:
+  ret void
+}
+
+; __string_hash: FNV-1a 64-bit hash of a null-terminated string
+; Returns hash as i64.
+define i64 @__string_hash(i64 %str_ptr) {
+entry:
+  %ptr = inttoptr i64 %str_ptr to i8*
+  ; FNV offset basis: 14695981039346656037
+  br label %loop
+
+loop:
+  %hash = phi i64 [ -3750763034362895579, %entry ], [ %new_hash, %next ]
+  %p = phi i8* [ %ptr, %entry ], [ %p_next, %next ]
+  %byte = load i8, i8* %p
+  %is_zero = icmp eq i8 %byte, 0
+  br i1 %is_zero, label %done, label %next
+
+next:
+  %byte_ext = zext i8 %byte to i64
+  %xored = xor i64 %hash, %byte_ext
+  ; FNV prime: 1099511628211
+  %new_hash = mul i64 %xored, 1099511628211
+  %p_next = getelementptr i8, i8* %p, i64 1
+  br label %loop
+
+done:
+  %final = phi i64 [ %hash, %loop ]
+  ret i64 %final
+}
+
+; __string_intern: Intern a string pointer.
+;   If a string with the same content already exists in the table, return
+;   the existing pointer (and free the duplicate).
+;   Otherwise, add this pointer to the table and return it.
+define i64 @__string_intern(i64 %str) {
+entry:
+  ; Null check
+  %is_null = icmp eq i64 %str, 0
+  br i1 %is_null, label %ret_input, label %do_intern
+
+do_intern:
+  ; Ensure table is initialized
+  call void @__intern_init()
+
+  ; Hash the string
+  %hash = call i64 @__string_hash(i64 %str)
+
+  ; Compute bucket index: hash & (bucket_count - 1)
+  %bucket_count = load i64, i64* @__intern_bucket_count
+  %mask = sub i64 %bucket_count, 1
+  %idx = and i64 %hash, %mask
+
+  ; Get bucket array base
+  %buckets_raw = load i8*, i8** @__intern_buckets
+  %buckets = bitcast i8* %buckets_raw to i64*
+
+  ; Get head of this bucket's chain
+  %bucket_slot = getelementptr i64, i64* %buckets, i64 %idx
+  %head = load i64, i64* %bucket_slot
+  br label %search
+
+search:
+  ; Walk the linked list looking for a match
+  %node = phi i64 [ %head, %do_intern ], [ %next_node, %continue_search ]
+  %node_is_null = icmp eq i64 %node, 0
+  br i1 %node_is_null, label %not_found, label %check_node
+
+check_node:
+  ; Node layout: { i64 str_ptr, i64 next }
+  %node_ptr = inttoptr i64 %node to i64*
+  %existing_str = load i64, i64* %node_ptr
+  ; Quick check: same pointer means same string
+  %same_ptr = icmp eq i64 %existing_str, %str
+  br i1 %same_ptr, label %found, label %cmp_content
+
+cmp_content:
+  ; Compare content via strcmp
+  %str_p = inttoptr i64 %str to i8*
+  %existing_p = inttoptr i64 %existing_str to i8*
+  %cmp = call i32 @strcmp(i8* %str_p, i8* %existing_p)
+  %is_eq = icmp eq i32 %cmp, 0
+  br i1 %is_eq, label %found_free, label %continue_search
+
+continue_search:
+  ; Move to next node
+  %next_addr = add i64 %node, 8
+  %next_ptr = inttoptr i64 %next_addr to i64*
+  %next_node = load i64, i64* %next_ptr
+  br label %search
+
+found_free:
+  ; Found an existing string with the same content.
+  ; Free the new duplicate and return the canonical one.
+  %dup_ptr = inttoptr i64 %str to i8*
+  call void @free(i8* %dup_ptr)
+  br label %found
+
+found:
+  %canonical = phi i64 [ %str, %check_node ], [ %existing_str, %found_free ]
+  ret i64 %canonical
+
+not_found:
+  ; Not in table — add it. Allocate a node (16 bytes: str_ptr + next)
+  %new_node_raw = call i8* @malloc(i64 16)
+  %new_node = ptrtoint i8* %new_node_raw to i64
+  %new_node_str = inttoptr i64 %new_node to i64*
+  store i64 %str, i64* %new_node_str
+  ; Point new node's next to the old head
+  %new_node_next_addr = add i64 %new_node, 8
+  %new_node_next = inttoptr i64 %new_node_next_addr to i64*
+  store i64 %head, i64* %new_node_next
+  ; Update bucket head
+  store i64 %new_node, i64* %bucket_slot
+  ; Increment size
+  %old_size = load i64, i64* @__intern_size
+  %new_size = add i64 %old_size, 1
+  store i64 %new_size, i64* @__intern_size
+  ; Check load factor: if size > bucket_count * 3/4, rehash
+  %threshold = mul i64 %bucket_count, 3
+  %threshold4 = udiv i64 %threshold, 4
+  %need_rehash = icmp ugt i64 %new_size, %threshold4
+  br i1 %need_rehash, label %do_rehash, label %ret_input
+
+do_rehash:
+  call void @__intern_rehash()
+  br label %ret_input
+
+ret_input:
+  ret i64 %str
+}
+
+; __intern_rehash: Double the bucket count and redistribute entries.
+define internal void @__intern_rehash() {
+entry:
+  %old_count = load i64, i64* @__intern_bucket_count
+  %new_count = shl i64 %old_count, 1
+  store i64 %new_count, i64* @__intern_bucket_count
+
+  ; Allocate new bucket array (zeroed)
+  %new_buckets_raw = call i8* @calloc(i64 %new_count, i64 8)
+  %new_buckets = bitcast i8* %new_buckets_raw to i64*
+
+  ; Walk old buckets and re-insert each node
+  %old_buckets_raw = load i8*, i8** @__intern_buckets
+  %old_buckets = bitcast i8* %old_buckets_raw to i64*
+  %new_mask = sub i64 %new_count, 1
+  br label %bucket_loop
+
+bucket_loop:
+  %i = phi i64 [ 0, %entry ], [ %i_next, %bucket_done ]
+  %done = icmp uge i64 %i, %old_count
+  br i1 %done, label %finish, label %process_bucket
+
+process_bucket:
+  %slot = getelementptr i64, i64* %old_buckets, i64 %i
+  %chain = load i64, i64* %slot
+  br label %node_loop
+
+node_loop:
+  %node = phi i64 [ %chain, %process_bucket ], [ %saved_next, %reinsert ]
+  %node_null = icmp eq i64 %node, 0
+  br i1 %node_null, label %bucket_done, label %reinsert
+
+reinsert:
+  ; Read node fields
+  %n_ptr = inttoptr i64 %node to i64*
+  %n_str = load i64, i64* %n_ptr
+  %n_next_addr = add i64 %node, 8
+  %n_next_ptr = inttoptr i64 %n_next_addr to i64*
+  %saved_next = load i64, i64* %n_next_ptr
+
+  ; Compute new bucket index
+  %h = call i64 @__string_hash(i64 %n_str)
+  %new_idx = and i64 %h, %new_mask
+  %new_slot = getelementptr i64, i64* %new_buckets, i64 %new_idx
+  %old_head = load i64, i64* %new_slot
+
+  ; Insert node at head of new chain
+  store i64 %old_head, i64* %n_next_ptr
+  store i64 %node, i64* %new_slot
+  br label %node_loop
+
+bucket_done:
+  %i_next = add i64 %i, 1
+  br label %bucket_loop
+
+finish:
+  ; Free old bucket array, install new one
+  call void @free(i8* %old_buckets_raw)
+  %new_buckets_i8 = bitcast i64* %new_buckets to i8*
+  store i8* %new_buckets_i8, i8** @__intern_buckets
+  ret void
+}
+
 @.fmt.float = private unnamed_addr constant [3 x i8] c"%g\00"
 
 define i64 @__float_to_string(i64 %v) {
