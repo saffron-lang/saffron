@@ -1,0 +1,111 @@
+import "@test" as T
+
+// === Basic generic function ===
+fun identity<T>(value: T): T {
+    return value
+}
+
+var s: String = identity("hello")
+T.assert_eq(s, "hello", "identity<String>")
+
+var n: Float = identity(42)
+T.assert_eq(n, 42, "identity<Float>")
+
+var bool_val: Bool = identity(true)
+T.assert_eq(bool_val, true, "identity<Bool>")
+
+// === Generic with multiple type params ===
+fun pair<A, B>(first: A, second: B): List<Any> {
+    return [first, second]
+}
+
+var p = pair("name", 42)
+T.assert_eq(p[0], "name", "pair first element")
+T.assert_eq(p[1], 42, "pair second element")
+
+// === Generic returning transformed value ===
+fun echo<T>(value: T): T {
+    return value
+}
+
+T.assert_eq(echo("abc"), "abc", "echo<String>")
+T.assert_eq(echo(99), 99, "echo<Float>")
+T.assert_eq(echo(false), false, "echo<Bool>")
+
+// === Generic with constrained type param ===
+fun add_one<T: Numeric>(value: T): T {
+    return value + 1
+}
+
+var added: Float = add_one(41)
+T.assert_eq(added, 42, "constrained generic add_one")
+
+// === Multiple type parameters in complex use ===
+fun swap<A, B>(first: A, second: B): List<Any> {
+    return [second, first]
+}
+
+var sw = swap(1, "two")
+T.assert_eq(sw[0], "two", "swap first is second arg")
+T.assert_eq(sw[1], 1, "swap second is first arg")
+
+// === Generic function operating on lists ===
+fun first_of<T>(items: List<T>): T {
+    return items[0]
+}
+
+var first_str: String = first_of(["alpha", "beta", "gamma"])
+T.assert_eq(first_str, "alpha", "first_of<String>")
+
+var first_num: Float = first_of([10, 20, 30])
+T.assert_eq(first_num, 10, "first_of<Float>")
+
+// === Generic function with conditional logic ===
+fun pick<T>(condition: Bool, a: T, b: T): T {
+    if (condition) {
+        return a
+    }
+    return b
+}
+
+T.assert_eq(pick(true, "yes", "no"), "yes", "pick true")
+T.assert_eq(pick(false, "yes", "no"), "no", "pick false")
+T.assert_eq(pick(true, 1, 2), 1, "pick number true")
+T.assert_eq(pick(false, 1, 2), 2, "pick number false")
+
+// === Generic method on a class ===
+class Box {
+    var items: List<Any>
+    fun init() {
+        this.items = []
+    }
+    fun put<T>(item: T) {
+        this.items.push(item)
+    }
+    fun get_at<T>(idx: Float): T {
+        return this.items[idx]
+    }
+}
+
+var box = Box()
+box.put("hello")
+box.put(42)
+T.assert_eq(box.get_at(0), "hello", "generic method put/get string")
+T.assert_eq(box.get_at(1), 42, "generic method put/get number")
+
+// === Nested generic calls ===
+fun wrap<T>(value: T): List<Any> {
+    return [value]
+}
+
+var wrapped = wrap(identity("nested"))
+T.assert_eq(wrapped[0], "nested", "nested generic calls")
+
+// === Generic with multiple constraints (syntax parsing) ===
+fun process<T: Comparable + Serializable>(value: T): T {
+    return value
+}
+
+T.assert_eq(process(42), 42, "multiple constraints syntax")
+
+T.summary()

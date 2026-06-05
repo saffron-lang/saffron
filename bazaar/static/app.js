@@ -14,6 +14,8 @@ function readCString(ptr) {
     return decoder.decode(b.slice(p, e));
 }
 
+const _eventStack = [];
+
 const imports = { env: new Proxy({
     js_log_str: (ptr) => console.log(readCString(ptr)),
     js_log_int: (n) => console.log(Number(n)),
@@ -71,28 +73,34 @@ const imports = { env: new Proxy({
     js_dom_add_event: (handle, eventPtr, callbackId) => {
         const el = getHandle(handle);
         if (!el) return;
-        el.addEventListener(readCString(eventPtr), () => {
-            if (instance.exports.__dispatch_event) {
-                instance.exports.__dispatch_event(callbackId);
-            }
+        const name = readCString(eventPtr);
+        el.addEventListener(name, (e) => {
+            _eventStack.push(e);
+            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
+            if (dispatch) dispatch(callbackId, 0n);
+            _eventStack.pop();
         });
     },
     js_dom_add_event_listener: (handle, eventPtr, callbackId) => {
         const el = getHandle(handle);
         if (!el) return;
-        el.addEventListener(readCString(eventPtr), () => {
-            if (instance.exports.__dispatch_event) {
-                instance.exports.__dispatch_event(callbackId);
-            }
+        const name = readCString(eventPtr);
+        el.addEventListener(name, (e) => {
+            _eventStack.push(e);
+            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
+            if (dispatch) dispatch(callbackId, 0n);
+            _eventStack.pop();
         });
     },
     js_dom_add_typed_event_listener: (handle, eventPtr, callbackId) => {
         const el = getHandle(handle);
         if (!el) return;
-        el.addEventListener(readCString(eventPtr), () => {
-            if (instance.exports.__dispatch_event) {
-                instance.exports.__dispatch_event(callbackId);
-            }
+        const name = readCString(eventPtr);
+        el.addEventListener(name, (e) => {
+            _eventStack.push(e);
+            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
+            if (dispatch) dispatch(callbackId, 0n);
+            _eventStack.pop();
         });
     },
     js_dom_set_property: (handle, propPtr, valuePtr) => {
@@ -106,8 +114,8 @@ const imports = { env: new Proxy({
     js_event_get_float: () => 0n,
     js_event_get_string: () => 0n,
     js_event_get_bool: () => 0n,
-    js_event_prevent_default: () => {},
-    js_event_stop_propagation: () => {},
+    js_event_prevent_default: () => { const e = _eventStack[_eventStack.length - 1]; if (e) e.preventDefault(); },
+    js_event_stop_propagation: () => { const e = _eventStack[_eventStack.length - 1]; if (e) e.stopPropagation(); },
     memcpy: (dst, src, len) => {
         const b = new Uint8Array(instance.exports.memory.buffer);
         b.copyWithin(Number(dst), Number(src), Number(src) + Number(len));
@@ -118,6 +126,28 @@ const imports = { env: new Proxy({
     js_get_hash: () => writeCString(location.hash.replace(/^#\/?/, '') || '/'),
     js_push_state: (ptr) => history.pushState(null, '', readCString(ptr)),
     js_get_pathname: () => writeCString(location.pathname),
+    js_fetch_json: (urlPtr, callbackId) => {
+        const url = readCString(urlPtr);
+        fetch(url).then(r => r.text()).then(text => {
+            const ptr = writeCString(text);
+            instance.exports.__on_fetch_complete(callbackId, ptr);
+        }).catch(() => {
+            const ptr = writeCString('{"error":"fetch failed"}');
+            instance.exports.__on_fetch_complete(callbackId, ptr);
+        });
+    },
+    js_fetch_post: (urlPtr, bodyPtr, callbackId) => {
+        const url = readCString(urlPtr);
+        const body = readCString(bodyPtr);
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+            .then(r => r.text()).then(text => {
+                const ptr = writeCString(text);
+                instance.exports.__on_fetch_complete(callbackId, ptr);
+            }).catch(() => {
+                const ptr = writeCString('{"error":"fetch failed"}');
+                instance.exports.__on_fetch_complete(callbackId, ptr);
+            });
+    },
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
 

@@ -55,6 +55,45 @@ fun next_sub_id(): Float {
 }
 
 // =============================================================================
+// Batch — defer notifications until outermost batch completes
+// =============================================================================
+
+var _batch_depth: Float = 0
+var _batch_queue: List<() => Nil> = []
+var _batch_signals: List<Any> = []
+
+fun _schedule_notify(sig: Any, notify_fn: () => Nil) {
+    if (_batch_depth > 0) {
+        _batch_queue.push(notify_fn)
+        _batch_signals.push(sig)
+    } else {
+        notify_fn()
+    }
+}
+
+fun _flush_batch() {
+    while (_batch_queue.length() > 0) {
+        var queue: List<() => Nil> = _batch_queue
+        _batch_queue = []
+        _batch_signals = []
+        var i: Float = 0
+        while (i < queue.length()) {
+            queue[i]()
+            i = i + 1
+        }
+    }
+}
+
+fun batch(fn: () => Nil) {
+    _batch_depth = _batch_depth + 1
+    fn()
+    _batch_depth = _batch_depth - 1
+    if (_batch_depth == 0) {
+        _flush_batch()
+    }
+}
+
+// =============================================================================
 // Subscription
 // =============================================================================
 
@@ -90,7 +129,7 @@ class Signal<T> {
 
     fun set(next: T) {
         this.value = next
-        this.notify()
+        _schedule_notify(this, fun () => this.notify())
     }
 
     fun update(fn: (T) => T) {
@@ -157,7 +196,7 @@ class Computed<T> {
         while (i < deps.length()) {
             deps[i].subscribe(fun () => {
                 this.value = this.compute()
-                this.notify()
+                _schedule_notify(this, fun () => this.notify())
             })
             i = i + 1
         }
@@ -229,29 +268,6 @@ fun effect(fn: () => Nil): EffectHandle {
         i = i + 1
     }
     return EffectHandle(sub_ids, deps)
-}
-
-// =============================================================================
-// Batch — defer notifications
-// =============================================================================
-
-var _batch_depth: Float = 0
-var _batch_pending: List<() => Nil> = []
-
-fun batch(fn: () => Nil) {
-    _batch_depth = _batch_depth + 1
-    fn()
-    _batch_depth = _batch_depth - 1
-    if (_batch_depth == 0) {
-        var pending: List<() => Nil> = _batch_pending
-        _batch_pending = []
-        var i: Float = 0
-        while (i < pending.length()) {
-            var cb: () => Nil = pending[i]
-            cb()
-            i = i + 1
-        }
-    }
 }
 
 // =============================================================================

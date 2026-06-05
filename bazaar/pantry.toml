@@ -9,6 +9,7 @@ entry = "src/main.sf"
 authors = ["henry232323"]
 
 [dependencies]
+parsley = { path = "../parsley" }
 
 [scripts]
 build = "cd frontend && pantry build && cd .. && saffron build src/main.sf -o build/bazaar"

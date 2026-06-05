@@ -20,6 +20,7 @@ class TypeEnv {
     var scopes: List<Scope>
     var funcs: Map<String, AST.Type>
     var func_params: Map<String, String>
+    var func_type_params: Map<String, String>
     var enum_variants: Map<String, String>
     var enum_fields: Map<String, String>
     var class_fields: Map<String, String>
@@ -30,6 +31,7 @@ class TypeEnv {
         this.scopes.push(Scope())
         this.funcs = {}
         this.func_params = {}
+        this.func_type_params = {}
         this.enum_variants = {}
         this.enum_fields = {}
         this.class_fields = {}
@@ -122,6 +124,17 @@ class TypeEnv {
     fun get_func_params(name: String): String {
         if (this.func_params.has(name)) {
             return this.func_params.get(name)
+        }
+        return ""
+    }
+
+    fun define_func_type_params(name: String, type_params_str: String) {
+        this.func_type_params.set(name, type_params_str)
+    }
+
+    fun get_func_type_params(name: String): String {
+        if (this.func_type_params.has(name)) {
+            return this.func_type_params.get(name)
         }
         return ""
     }
@@ -616,6 +629,8 @@ class NullChecker {
             FunDecl(name, params, ret_type, body, doc) => {
                 this.env.define_func_str(name, this.type_node_to_string(ret_type))
                 this.env.define_func_params(name, this.params_list_to_string(params))
+                // Extract generic type params from docstring: @generic:T,U:Constraint\n
+                this.extract_and_register_generics(name, doc)
                 // Detect receiver-typed parameters: Fun[Type](...):Ret
                 var rpi: Float = 0
                 while (rpi < params.length()) {
@@ -734,6 +749,8 @@ class NullChecker {
                 if (this.current_class.length() > 0) {
                     this.env.define_func_str(this.current_class + "__" + name, ret_type_str)
                     this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
+                    // Register generic type params for class methods
+                    this.extract_and_register_generics(this.current_class + "__" + name, doc)
                     // Track method names for conformance checking
                     var existing: String = ""
                     if (this.class_method_names.has(this.current_class)) {
@@ -1411,6 +1428,10 @@ class NullChecker {
         }
         // Look up declared return type
         if (name.length() > 0) {
+            // Check generic constraints if this is a generic function
+            if (this.is_generic_func(name)) {
+                this.check_generic_constraints(name, args)
+            }
             var ret: String = this.env.get_func_ret(name)
             if (ret != "Any") {
                 // If return type contains a type parameter, try to resolve it
@@ -1565,8 +1586,26 @@ class NullChecker {
         // Methods are registered as "ClassName__method" or just "method"
         if (obj_type != "Any") {
             var full_name: String = obj_type + "__" + method
+            // Check generic constraints for class methods
+            if (this.is_generic_func(full_name)) {
+                this.check_generic_constraints(full_name, args)
+            }
             var ret: String = this.env.get_func_ret(full_name)
-            if (ret != "Any") return ret
+            if (ret != "Any") {
+                // Resolve type params for generic method return types
+                if (this.is_type_param(ret)) {
+                    var params_str: String = this.env.get_func_params(full_name)
+                    var resolved: String = this.resolve_type_params(ret, params_str, args)
+                    if (resolved != ret) return resolved
+                } else if (ret.contains("<")) {
+                    var params_str: String = this.env.get_func_params(full_name)
+                    if (params_str.length() > 0) {
+                        var resolved: String = this.resolve_generic_return(ret, params_str, args)
+                        if (resolved != ret) return resolved
+                    }
+                }
+                return ret
+            }
         }
         var ret: String = this.env.get_func_ret(method)
         if (ret != "Any") return ret
@@ -2010,6 +2049,138 @@ class NullChecker {
             i = i + 1
         }
         return result
+    }
+
+    // --- Generic type parameter support ---
+
+    fun extract_and_register_generics(func_name: String, doc: String) {
+        // Extract @generic:T,U:Constraint+Other from docstring prefix
+        if (!doc.starts_with("@generic:")) return nil
+        var newline_pos: Float = doc.index_of("\n")
+        var generic_str: String = ""
+        if (newline_pos >= 0) {
+            generic_str = doc.slice(9, newline_pos)
+        } else {
+            generic_str = doc.slice(9, doc.length())
+        }
+        if (generic_str.length() > 0) {
+            this.env.define_func_type_params(func_name, generic_str)
+        }
+    }
+
+    fun parse_type_param_names(type_params_str: String): List<String> {
+        // "T,U:Constraint,V:A+B" → ["T", "U", "V"]
+        var names: List<String> = []
+        if (type_params_str.length() == 0) return names
+        var parts: List<String> = type_params_str.split(",")
+        var i: Float = 0
+        while (i < parts.length()) {
+            var part: String = parts[i]
+            var colon_pos: Float = part.index_of(":")
+            if (colon_pos >= 0) {
+                names.push(part.slice(0, colon_pos))
+            } else {
+                names.push(part)
+            }
+            i = i + 1
+        }
+        return names
+    }
+
+    fun get_type_param_constraints(type_params_str: String, param_name: String): List<String> {
+        // For "T,U:Serializable+Comparable" and param "U" → ["Serializable", "Comparable"]
+        var constraints: List<String> = []
+        if (type_params_str.length() == 0) return constraints
+        var parts: List<String> = type_params_str.split(",")
+        var i: Float = 0
+        while (i < parts.length()) {
+            var part: String = parts[i]
+            var colon_pos: Float = part.index_of(":")
+            if (colon_pos >= 0) {
+                var name: String = part.slice(0, colon_pos)
+                if (name == param_name) {
+                    var constraint_str: String = part.slice(colon_pos + 1, part.length())
+                    constraints = constraint_str.split("+")
+                    return constraints
+                }
+            }
+            i = i + 1
+        }
+        return constraints
+    }
+
+    fun check_generic_constraints(func_name: String, args: List<AST.Expr>) {
+        // Look up type params for this function
+        var type_params_str: String = this.env.get_func_type_params(func_name)
+        if (type_params_str.length() == 0) return nil
+        var params_str: String = this.env.get_func_params(func_name)
+        if (params_str.length() == 0) return nil
+        // Get type param names
+        var tp_names: List<String> = this.parse_type_param_names(type_params_str)
+        // For each type param, try to resolve it from the args, then check constraints
+        var ti: Float = 0
+        while (ti < tp_names.length()) {
+            var tp_name: String = tp_names[ti]
+            var constraints: List<String> = this.get_type_param_constraints(type_params_str, tp_name)
+            if (constraints.length() > 0) {
+                // Resolve what type the type param binds to
+                var resolved: String = this.resolve_type_params(tp_name, params_str, args)
+                if (resolved != tp_name and resolved != "Any") {
+                    // Check each constraint
+                    var ci: Float = 0
+                    while (ci < constraints.length()) {
+                        var constraint: String = constraints[ci]
+                        if (!this.type_satisfies_constraint(resolved, constraint)) {
+                            this.warn("generic constraint violation: " + resolved + " does not satisfy " + constraint + " (required by " + func_name + "<" + tp_name + ">)")
+                        }
+                        ci = ci + 1
+                    }
+                }
+            }
+            ti = ti + 1
+        }
+    }
+
+    fun type_satisfies_constraint(typ: String, constraint: String): Bool {
+        // Check if a type satisfies a constraint (interface name)
+        // 1. Check if the type has the constraint as a parent (interface conformance)
+        if (this.class_parents.has(typ)) {
+            var parent: String = this.class_parents.get(typ)
+            if (parent == constraint) return true
+            // Check comma-separated parent list
+            if (parent.contains(",")) {
+                var parents: List<String> = parent.split(",")
+                if (parents.contains(constraint)) return true
+            }
+        }
+        // 2. Check if the constraint's methods are all present on the type
+        if (this.class_method_names.has(constraint)) {
+            var required_methods_str: String = this.class_method_names.get(constraint)
+            var required_methods: List<String> = required_methods_str.split(",")
+            var has_all: Bool = true
+            var mi: Float = 0
+            while (mi < required_methods.length()) {
+                var method: String = required_methods[mi]
+                if (method != "init" and method.length() > 0) {
+                    // Check if the type has this method
+                    var full_name: String = typ + "__" + method
+                    var ret: String = this.env.get_func_ret(full_name)
+                    if (ret == "Any") {
+                        has_all = false
+                    }
+                }
+                mi = mi + 1
+            }
+            if (has_all) return true
+        }
+        // 3. Built-in type structural checks for common interfaces
+        // String has length(), so it satisfies HasLength-like interfaces structurally
+        return false
+    }
+
+    fun is_generic_func(name: String): Bool {
+        var tp: String = this.env.get_func_type_params(name)
+        return tp.length() > 0
     }
 
     // --- Report ---

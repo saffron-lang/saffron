@@ -18,6 +18,8 @@ class Query<T> {
     var isLoading: Signal.Signal<Bool>
     var error: Signal.Signal<String>
     var _stale_time: Float
+    var _cancelled: Bool
+    var _fetch_id: Float
 
     fun init(url: String, stale_time: Float) {
         this.url = url
@@ -25,6 +27,8 @@ class Query<T> {
         this.isLoading = Signal.signal(false)
         this.error = Signal.signal("")
         this._stale_time = stale_time
+        this._cancelled = false
+        this._fetch_id = 0
         this._fetch()
     }
 
@@ -36,17 +40,22 @@ class Query<T> {
         }
 
         this.isLoading.set(true)
+        this._fetch_id = this._fetch_id + 1
+        var expected_id: Float = this._fetch_id
         var self = this
         Fetch.get(self.url, fun (response: String) => {
-            var parsed: T = JSON.parse_as<T>(response)
-            if (parsed != nil) {
-                self.data.set(parsed)
-                self.error.set("")
-                Cache.store.set(self.url, parsed, self._stale_time)
-            } else {
-                self.error.set("Failed to parse response")
-            }
-            self.isLoading.set(false)
+            if (self._cancelled or self._fetch_id != expected_id) { return }
+            Signal.batch(fun () => {
+                var parsed: T = JSON.parse_as<T>(response)
+                if (parsed != nil) {
+                    self.data.set(parsed)
+                    self.error.set("")
+                    Cache.store.set(self.url, parsed, self._stale_time)
+                } else {
+                    self.error.set("Failed to parse response")
+                }
+                self.isLoading.set(false)
+            })
         })
     }
 
@@ -57,6 +66,11 @@ class Query<T> {
 
     fun invalidate() {
         Cache.store.invalidate(this.url)
+    }
+
+    fun cancel() {
+        this._cancelled = true
+        this.isLoading.set(false)
     }
 }
 
