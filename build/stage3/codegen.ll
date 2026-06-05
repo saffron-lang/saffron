@@ -3458,7 +3458,7 @@ target triple = "arm64-apple-macosx15.0.0"
 @.str.3454 = private unnamed_addr constant [7 x i8] c"wasm32\00"
 @.str.3455 = private unnamed_addr constant [20 x i8] c"define linkonce_odr\00"
 @.str.3456 = private unnamed_addr constant [1 x i8] c"\00"
-@.str.3457 = private unnamed_addr constant [36 x i8] c" noinline optnone presplitcoroutine\00"
+@.str.3457 = private unnamed_addr constant [19 x i8] c" presplitcoroutine\00"
 @.str.3458 = private unnamed_addr constant [1 x i8] c"\00"
 @.str.3459 = private unnamed_addr constant [14 x i8] c" alwaysinline\00"
 @.str.3460 = private unnamed_addr constant [4 x i8] c"ptr\00"
@@ -100978,7 +100978,7 @@ endif4976:
   %t1659 = trunc i64 %t1658 to i1
   br i1 %t1659, label %then4989, label %else4990
 then4989:
-  %t1660 = getelementptr [36 x i8], [36 x i8]* @.str.3457, i64 0, i64 0
+  %t1660 = getelementptr [19 x i8], [19 x i8]* @.str.3457, i64 0, i64 0
   %t1661 = ptrtoint i8* %t1660 to i64
   store i64 %t1661, i64* %coro_attr
   br label %endif4988
