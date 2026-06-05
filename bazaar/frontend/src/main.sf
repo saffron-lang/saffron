@@ -1,34 +1,11 @@
 //! Bazaar Frontend — Package registry SPA
-//! Built with Turmeric, styled with bespoke CSS (OKLCH tokens)
+//! Built with Turmeric + Basil (auto-caching queries)
 
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
 import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, mount } from "turmeric/prelude"
-import "@json" as JSON
-
-// =============================================================================
-// FFI — fetch from same-origin API
-// =============================================================================
-
-@extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Float)
-
-var _fetch_next_id: Float = 0
-var _fetch_callbacks: Map<Float, (String) => Nil> = {}
-
-fun fetch_json(url: String, callback: (String) => Nil) {
-    _fetch_next_id = _fetch_next_id + 1
-    var id: Float = _fetch_next_id
-    _fetch_callbacks.set(id, callback)
-    _fetch_json(url, id)
-}
-
-fun __on_fetch_complete(id: Float, json_str: String) {
-    if (_fetch_callbacks.has(id)) {
-        _fetch_callbacks.get(id)(json_str)
-        _fetch_callbacks.set(id, nil)
-    }
-}
+import "./api.sf" as Api
 
 // =============================================================================
 // State
@@ -36,45 +13,29 @@ fun __on_fetch_complete(id: Float, json_str: String) {
 
 var router = Router.hash()
 var search_query = signal("")
-var search_results = signal([])
-var is_loading = signal(false)
-var detail_name = signal("")
-var detail_versions = signal([])
-var detail_description = signal("")
-var detail_latest = signal("")
-var featured_packages = signal([])
+
+// Basil queries — auto-caching, signal-based
+var packages_query = Api.getPackages()
+var search_q = signal("")
+var detail_name_sig = signal("")
+
+// Derived queries (re-created when params change)
+var search_results_query = signal(nil)
+var detail_query = signal(nil)
 
 // =============================================================================
-// API
+// Actions
 // =============================================================================
-
-fun load_featured() {
-    is_loading.set(true)
-    fetch_json("/api/v1/packages", fun (json_str: String) => {
-        var data = JSON.parse(json_str)
-        if (data != nil and data.has("packages")) {
-            featured_packages.set(data.get("packages"))
-        }
-        is_loading.set(false)
-    })
-}
 
 fun do_search() {
     var q: String = search_query.get()
     if (q.length() == 0) {
-        load_featured()
+        packages_query.refetch()
         router.go("/")
         return
     }
-    is_loading.set(true)
     router.go("/search?q=" + q)
-    fetch_json("/api/v1/search?q=" + q, fun (json_str: String) => {
-        var data = JSON.parse(json_str)
-        if (data != nil and data.has("packages")) {
-            search_results.set(data.get("packages"))
-        }
-        is_loading.set(false)
-    })
+    search_results_query.set(Api.searchPackages(q))
 }
 
 fun search_category(cat: String) {
@@ -83,33 +44,15 @@ fun search_category(cat: String) {
 }
 
 fun load_package_detail(name: String) {
-    detail_name.set(name)
+    detail_name_sig.set(name)
+    detail_query.set(Api.getPackage(name))
     router.go("/packages/" + name)
-    is_loading.set(true)
-    fetch_json("/api/v1/packages/" + name, fun (json_str: String) => {
-        var data = JSON.parse(json_str)
-        if (data != nil) {
-            detail_name.set(data.get("name"))
-            var versions = data.get("versions")
-            detail_versions.set(versions)
-            if (versions.length() > 0) {
-                var latest = versions[versions.length() - 1]
-                detail_latest.set(latest.get("vers"))
-                if (latest.has("description")) {
-                    detail_description.set(latest.get("description"))
-                } else {
-                    detail_description.set("")
-                }
-            }
-        }
-        is_loading.set(false)
-    })
 }
 
 fun navigate_home() {
     router.go("/")
     search_query.set("")
-    load_featured()
+    packages_query.refetch()
 }
 
 // =============================================================================
@@ -120,7 +63,7 @@ fun NavBar() {
     <nav cls="nav">
         {Router.Link(router, "/", cls="nav-brand") { text("Bazaar") }}
         {Router.Link(router, "/search?q=", cls="nav-link") { text("Browse") }}
-        <a cls="nav-link" href="https://saffron-lang.org/docs">Docs</a>
+        <a cls="nav-link">Docs</a>
         <div cls="nav-r">
             <a cls="btn-g">Sign in</a>
             <a cls="btn-a">Publish</a>
@@ -132,7 +75,7 @@ fun NavBarWithSearch() {
     <nav cls="nav">
         {Router.Link(router, "/", cls="nav-brand") { text("Bazaar") }}
         {Router.Link(router, "/search?q=", cls="nav-link on") { text("Browse") }}
-        <a cls="nav-link" href="https://saffron-lang.org/docs">Docs</a>
+        <a cls="nav-link">Docs</a>
         <form cls="nav-search" on_submit={fun (e: Event) => do_search()}>
             <input type="text" placeholder="Search packages..." on_input={fun (e: Event) => search_query.set(e.target_value)} />
             <button cls="nav-search-btn" type="submit">→</button>
@@ -148,7 +91,7 @@ fun Footer() {
     <footer cls="footer">
         {Router.Link(router, "/", cls="footer-brand") { text("Bazaar") }}
         <div cls="footer-links">
-            <a cls="footer-link" href="https://saffron-lang.org/docs">Docs</a>
+            <a cls="footer-link">Docs</a>
             <a cls="footer-link">Status</a>
             <a cls="footer-link" href="https://github.com/henry232323/saffron">GitHub</a>
             <a cls="footer-link">Terms</a>
@@ -157,8 +100,8 @@ fun Footer() {
     </footer>
 }
 
-fun LoadingIndicator() {
-    if (is_loading.get()) {
+fun LoadingIndicator(query: Any) {
+    if (query != nil and query.isLoading.get()) {
         <div cls="loading">
             <div cls="spinner"></div>
             <span>Loading...</span>
@@ -174,7 +117,6 @@ fun PackageCard(pkg: Map<String, String>) {
     var name: String = pkg.get("name")
     var version: String = ""
     if (pkg.has("latest")) { version = pkg.get("latest") }
-    if (pkg.has("vers")) { version = pkg.get("vers") }
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
@@ -184,7 +126,9 @@ fun PackageCard(pkg: Map<String, String>) {
             <div>
                 <div cls="pkg-name">{name}</div>
                 <div cls="pkg-meta">
-                    <span cls="ver">v{version}</span>
+                    {if (version.length() > 0) {
+                        <span cls="ver">v{version}</span>
+                    }}
                 </div>
             </div>
         </div>
@@ -204,7 +148,6 @@ fun PackageRow(pkg: Map<String, String>) {
     var name: String = pkg.get("name")
     var version: String = ""
     if (pkg.has("latest")) { version = pkg.get("latest") }
-    if (pkg.has("vers")) { version = pkg.get("vers") }
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
@@ -214,7 +157,9 @@ fun PackageRow(pkg: Map<String, String>) {
             <div cls="pkg-row-info">
                 <div cls="pkg-row-title">
                     <span cls="pkg-row-name">{name}</span>
-                    <span cls="ver">{version}</span>
+                    {if (version.length() > 0) {
+                        <span cls="ver">{version}</span>
+                    }}
                 </div>
                 if (description.length() > 0) {
                     <p cls="pkg-row-desc">{description}</p>
@@ -257,7 +202,7 @@ fun HomePage() {
             </div>
         </section>
 
-        {LoadingIndicator()}
+        {LoadingIndicator(packages_query)}
 
         <div cls="section wrap">
             <div cls="section-hd">
@@ -265,14 +210,17 @@ fun HomePage() {
                 {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
             </div>
             <div cls="pkg-grid">
-                {var pkgs = featured_packages.get()
-                var i: Float = 0
-                while (i < pkgs.length()) {
-                    PackageCard(pkgs[i])
-                    i = i + 1
-                }
-                if (pkgs.length() == 0 and !is_loading.get()) {
-                    <div cls="empty-state">No packages published yet. Be the first!</div>
+                {var data = packages_query.data.get()
+                if (data != nil and data.has("packages")) {
+                    var pkgs = data.get("packages")
+                    var i: Float = 0
+                    while (i < pkgs.length()) {
+                        PackageCard(pkgs[i])
+                        i = i + 1
+                    }
+                    if (pkgs.length() == 0 and !packages_query.isLoading.get()) {
+                        <div cls="empty-state">No packages published yet. Be the first!</div>
+                    }
                 }}
             </div>
         </div>
@@ -286,6 +234,8 @@ fun HomePage() {
 // =============================================================================
 
 fun SearchResultsPage() {
+    var query = search_results_query.get()
+
     <div>
         {NavBarWithSearch()}
 
@@ -293,26 +243,33 @@ fun SearchResultsPage() {
             <div cls="tab on">All</div>
             <div cls="tab-r">
                 <span cls="result-ct">
-                    {search_results.get().length().to_string()} results
+                    {if (query != nil and query.data.get() != nil) {
+                        text(query.data.get().get("total").to_string() + " results")
+                    }}
                 </span>
             </div>
         </div>
 
-        {LoadingIndicator()}
+        {LoadingIndicator(query)}
 
         <div cls="layout">
             <main cls="results">
                 <p cls="result-hd">
                     Results for "<strong>{search_query.get()}</strong>"
                 </p>
-                {var pkgs = search_results.get()
-                var i: Float = 0
-                while (i < pkgs.length()) {
-                    PackageRow(pkgs[i])
-                    i = i + 1
-                }
-                if (pkgs.length() == 0 and !is_loading.get()) {
-                    <div cls="empty-state">No packages found matching your query.</div>
+                {if (query != nil) {
+                    var data = query.data.get()
+                    if (data != nil and data.has("packages")) {
+                        var pkgs = data.get("packages")
+                        var i: Float = 0
+                        while (i < pkgs.length()) {
+                            PackageRow(pkgs[i])
+                            i = i + 1
+                        }
+                        if (pkgs.length() == 0 and !query.isLoading.get()) {
+                            <div cls="empty-state">No packages found matching your query.</div>
+                        }
+                    }
                 }}
             </main>
         </div>
@@ -326,94 +283,118 @@ fun SearchResultsPage() {
 // =============================================================================
 
 fun PackageDetailPage() {
-    var name: String = detail_name.get()
-    var latest: String = detail_latest.get()
-    var description: String = detail_description.get()
-    var versions = detail_versions.get()
+    var query = detail_query.get()
+    var name: String = detail_name_sig.get()
 
     <div>
         {NavBarWithSearch()}
 
-        <div cls="pkg-header">
-            <div cls="pkg-header-inner">
-                <div cls="pkg-header-top">
-                    <div cls="pkg-header-ico">{name.char_at(0)}</div>
-                    <div>
-                        <div cls="pkg-header-title-row">
-                            <h1 cls="pkg-header-title">{name}</h1>
-                            <span cls="ver">{latest}</span>
-                        </div>
-                        {if (description.length() > 0) {
-                            <p cls="pkg-header-desc">{description}</p>
-                        }}
-                        <div cls="pkg-header-stats">
-                            <span cls="pkg-hstat">License: <strong>MIT</strong></span>
-                            <span cls="pkg-hstat-sep">·</span>
-                            <span cls="pkg-hstat"><strong>{versions.length().to_string()}</strong> versions</span>
-                        </div>
-                        <div cls="pkg-install">
-                            <code><b>pantry</b> add {name}</code>
-                            <button cls="pkg-copy">COPY</button>
+        {if (query != nil and query.data.get() != nil) {
+            var data = query.data.get()
+            var latest: String = ""
+            var description: String = ""
+            var versions = []
+            if (data.has("description")) { description = data.get("description") }
+            if (data.has("versions")) {
+                versions = data.get("versions")
+                if (versions.length() > 0) {
+                    latest = versions[versions.length() - 1].get("vers")
+                }
+            }
+
+            <div cls="pkg-header">
+                <div cls="pkg-header-inner">
+                    <div cls="pkg-header-top">
+                        <div cls="pkg-header-ico">{name.char_at(0)}</div>
+                        <div>
+                            <div cls="pkg-header-title-row">
+                                <h1 cls="pkg-header-title">{name}</h1>
+                                <span cls="ver">{latest}</span>
+                            </div>
+                            if (description.length() > 0) {
+                                <p cls="pkg-header-desc">{description}</p>
+                            }
+                            <div cls="pkg-header-stats">
+                                <span cls="pkg-hstat">License: <strong>{data.get("license")}</strong></span>
+                                <span cls="pkg-hstat-sep">·</span>
+                                <span cls="pkg-hstat"><strong>{versions.length().to_string()}</strong> versions</span>
+                                <span cls="pkg-hstat-sep">·</span>
+                                <span cls="pkg-hstat"><strong>{data.get("total_downloads")}</strong> downloads</span>
+                            </div>
+                            <div cls="pkg-install">
+                                <code><b>pantry</b> add {name}</code>
+                                <button cls="pkg-copy">COPY</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div cls="pkg-tabs">
-                    <div cls="pkg-tab on">Readme</div>
-                    <div cls="pkg-tab">Versions</div>
-                    <div cls="pkg-tab">Dependencies</div>
+                    <div cls="pkg-tabs">
+                        <div cls="pkg-tab on">Readme</div>
+                        <div cls="pkg-tab">Versions</div>
+                        <div cls="pkg-tab">Dependencies</div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        {LoadingIndicator()}
+            <div cls="detail-layout">
+                <article cls="readme">
+                    <h2>Installation</h2>
+                    <pre><code>pantry add {name}</code></pre>
+                    if (description.length() > 0) {
+                        <div>
+                            <h2>About</h2>
+                            <p>{description}</p>
+                        </div>
+                    }
+                </article>
 
-        <div cls="detail-layout">
-            <article cls="readme">
-                <h2>Installation</h2>
-                <pre><code>pantry add {name}</code></pre>
-                {if (description.length() > 0) {
-                    <div>
-                        <h2>About</h2>
-                        <p>{description}</p>
-                    </div>
-                }}
-            </article>
-
-            <aside cls="meta-sidebar">
-                <div cls="meta-card">
-                    <span cls="meta-title">About</span>
-                    <div cls="meta-row">
-                        <span cls="meta-key">Version</span>
-                        <span cls="meta-val mono">{latest}</span>
-                    </div>
-                    <div cls="meta-row">
-                        <span cls="meta-key">License</span>
-                        <span cls="meta-val">MIT</span>
-                    </div>
-                    <div cls="meta-row">
-                        <span cls="meta-key">Versions</span>
-                        <span cls="meta-val">{versions.length().to_string()}</span>
-                    </div>
-                </div>
-
-                {if (versions.length() > 0) {
+                <aside cls="meta-sidebar">
                     <div cls="meta-card">
-                        <span cls="meta-title">Version history</span>
-                        {var i: Float = versions.length() - 1
-                        while (i >= 0 and i > versions.length() - 6) {
-                            var v = versions[i]
-                            <div cls="ver-row">
-                                <span cls="ver-row-num">{v.get("vers")}</span>
-                                {if (i == versions.length() - 1) {
-                                    <span cls="ver-row-cur">CURRENT</span>
-                                }}
+                        <span cls="meta-title">About</span>
+                        <div cls="meta-row">
+                            <span cls="meta-key">Version</span>
+                            <span cls="meta-val mono">{latest}</span>
+                        </div>
+                        <div cls="meta-row">
+                            <span cls="meta-key">License</span>
+                            <span cls="meta-val">{data.get("license")}</span>
+                        </div>
+                        <div cls="meta-row">
+                            <span cls="meta-key">Downloads</span>
+                            <span cls="meta-val">{data.get("total_downloads")}</span>
+                        </div>
+                        <div cls="meta-row">
+                            <span cls="meta-key">Versions</span>
+                            <span cls="meta-val">{versions.length().to_string()}</span>
+                        </div>
+                        {if (data.has("repository") and data.get("repository").length() > 0) {
+                            <div cls="meta-row">
+                                <span cls="meta-key">Repository</span>
+                                <span cls="meta-val">{data.get("repository")}</span>
                             </div>
-                            i = i - 1
                         }}
                     </div>
-                }}
-            </aside>
-        </div>
+
+                    if (versions.length() > 0) {
+                        <div cls="meta-card">
+                            <span cls="meta-title">Version history</span>
+                            {var i: Float = versions.length() - 1
+                            while (i >= 0 and i > versions.length() - 6) {
+                                var v = versions[i]
+                                <div cls="ver-row">
+                                    <span cls="ver-row-num">{v.get("vers")}</span>
+                                    {if (i == versions.length() - 1) {
+                                        <span cls="ver-row-cur">CURRENT</span>
+                                    }}
+                                </div>
+                                i = i - 1
+                            }}
+                        </div>
+                    }
+                </aside>
+            </div>
+        } else {
+            LoadingIndicator(query)
+        }}
 
         {Footer()}
     </div>
@@ -432,12 +413,14 @@ router.route("/search", fun (p: Router.RouteParams) => {
     var q: String = p.query_get("q")
     if (q.length() > 0) {
         search_query.set(q)
-        do_search()
+        search_results_query.set(Api.searchPackages(q))
     }
     SearchResultsPage()
 })
 router.route("/packages/:name", fun (p: Router.RouteParams) => {
-    load_package_detail(p.get("name"))
+    var name: String = p.get("name")
+    detail_name_sig.set(name)
+    detail_query.set(Api.getPackage(name))
     PackageDetailPage()
 })
 
@@ -445,5 +428,4 @@ router.route("/packages/:name", fun (p: Router.RouteParams) => {
 // Entry
 // =============================================================================
 
-load_featured()
 mount("#app", fun () => App())

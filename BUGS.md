@@ -59,6 +59,32 @@ from the type checker then trigger `runtimeError()` which corrupts VM state duri
 `type` is tokenized as `TOKEN_TYPE` for type alias declarations. Code that uses `type` as a parameter name (e.g. `fun define(name: String, type: String)`) gets a parse error. Consider making it a contextual keyword (only reserved at statement start).
 
 
+### 22. Cross-module global variable access emits undefined LLVM local
+
+**Reproduction:**
+```saffron
+// cache.sf
+var store: CacheStore = CacheStore()
+
+// query.sf
+import "./cache.sf" as Cache
+Cache.store.get(key)  // <-- generates %Cache instead of @__g_basil_src_cache_store
+```
+
+**Expected:** `Cache.store` loads from the LLVM global `@__g_<prefix>store`.
+**Actual:** Codegen emits `load i64, i64* %Cache` — `%Cache` is undefined.
+
+**Root cause:** In `codegen/expr_body.sf` MemberAccess handler (~line 208), module-prefixed
+access only checks if the resolved name is a known function. If it's a module-level `var`
+(global), the check falls through and tries to load from a nonexistent local variable.
+
+**Fix:** After the known_functions check, add a `module_globals.has(mp_resolved)` check
+that emits `load i64, i64* @__g_<prefix><field>` for module-level variables.
+
+**Impact:** Blocks any library that uses module-level globals accessed cross-module
+(e.g. basil's `Cache.store` singleton). Workaround: inline the global or avoid module-qualified access.
+
+
 ## Fixed
 
 - ~~#1: Functions in imported modules can't call each other~~ — Fixed: ObjFunction now stores owning module, OP_GET_GLOBAL uses correct module context.

@@ -922,6 +922,23 @@ class Parser {
         return AST.Type.ClassType(s)
     }
 
+    fun type_ast_to_string(t: AST.Type): String {
+        return match (t) {
+            IntType => "Int"
+            FloatType => "Float"
+            BoolType => "Bool"
+            StringType => "String"
+            NilType => "Nil"
+            AnyType => "Any"
+            ClassType(n) => n
+            EnumType(n) => n
+            GenericType(base, args) => base
+            UnionType(types) => "Union"
+            FuncType(p, r) => "Fun"
+            NullableType(inner) => "Nullable"
+        }
+    }
+
     fun split_type_args(s: String): List<String> {
         var args: List<String> = []
         var current: String = ""
@@ -1461,19 +1478,71 @@ class Parser {
     fun parse_fun_decl_with_doc(docstring: String): AST.Stmt {
         this.advance() // consume fun
         var name: String = this.expect_ident()
-        // Skip generic type parameters: fun foo<T>(...) or fun bar<K, V>(...)
+        // Parse generic type parameters: fun foo<T>(...) or fun bar<K, V: Constraint>(...)
+        // Encodes as "@generic:T,U:Constraint+Other\n" prefix in docstring
         if (this.match_kind_check("<")) {
             this.advance()
+            var generic_str: String = ""
             var depth: Float = 1
             while (depth > 0 and !this.match_kind_check("eof")) {
                 if (this.match_kind_check("<")) {
                     depth = depth + 1
+                    this.advance()
                 } else if (this.match_kind_check(">")) {
                     depth = depth - 1
+                    if (depth > 0) {
+                        generic_str = generic_str + ">"
+                    }
+                    this.advance()
                 } else if (this.match_kind_check(">>")) {
                     depth = depth - 2
+                    if (depth > 0) {
+                        generic_str = generic_str + ">>"
+                    }
+                    this.advance()
+                } else if (this.match_kind_check(",")) {
+                    if (depth == 1) {
+                        generic_str = generic_str + ","
+                    }
+                    this.advance()
+                } else if (this.match_kind_check(":")) {
+                    generic_str = generic_str + ":"
+                    this.advance()
+                } else if (this.match_kind_check("+")) {
+                    generic_str = generic_str + "+"
+                    this.advance()
+                } else if (this.match_kind_check("ident")) {
+                    var part: String = this.expect_ident()
+                    generic_str = generic_str + part
+                } else {
+                    this.advance()
                 }
-                this.advance()
+            }
+            if (generic_str.length() > 0) {
+                docstring = "@generic:" + generic_str + "\n" + docstring
+            }
+        }
+        // Extract type param names from generic_str for erasure
+        var type_param_names: List<String> = []
+        if (docstring.starts_with("@generic:")) {
+            var nl_pos: Float = docstring.index_of("\n")
+            var gstr: String = ""
+            if (nl_pos >= 0) {
+                gstr = docstring.slice(9, nl_pos)
+            } else {
+                gstr = docstring.slice(9, docstring.length())
+            }
+            var gparts: List<String> = gstr.split(",")
+            var gi: Float = 0
+            while (gi < gparts.length()) {
+                var gp: String = gparts[gi]
+                var gc_pos: Float = gp.index_of(":")
+                if (gc_pos >= 0) {
+                    type_param_names.push(gp.slice(0, gc_pos))
+                } else {
+                    type_param_names.push(gp)
+                }
+                gi = gi + 1
             }
         }
         this.consume("(")
@@ -1492,6 +1561,27 @@ class Parser {
         var ret_type: String = "Nil"
         if (this.match_kind(":")) {
             ret_type = this.parse_type()
+        }
+        // Erase type params in parameter types and return type for codegen
+        // (generics are erased at compile time — all values are i64 NaN-boxed)
+        if (type_param_names.length() > 0) {
+            var epi: Float = 0
+            while (epi < params.length()) {
+                var ep: AST.Param = params[epi]
+                var ep_name: String = match (ep) { Param(n, t, d) => n }
+                var ep_type: AST.Type = match (ep) { Param(n, t, d) => t }
+                var ep_default: AST.Expr = match (ep) { Param(n, t, d) => d }
+                var ep_type_str: String = this.type_ast_to_string(ep_type)
+                if (type_param_names.contains(ep_type_str)) {
+                    params[epi] = AST.Param.Param(ep_name, AST.Type.AnyType, ep_default)
+                }
+                epi = epi + 1
+            }
+            // Also erase type params in return type
+            if (type_param_names.contains(ret_type)) {
+                // Keep the type param name in ret_type for checker resolution
+                // but the codegen will treat it correctly since params are erased
+            }
         }
         var body: List<AST.Stmt> = []
         if (this.match_kind("=")) {

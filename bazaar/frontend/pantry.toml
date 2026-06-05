@@ -6,6 +6,7 @@ target = "wasm32"
 
 [dependencies]
 turmeric = { path = "../../turmeric" }
+basil = { path = "../../basil" }
 
 [scripts]
 build = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm"

@@ -11,34 +11,34 @@ parsley = { path = "../parsley" }
 ```
 
 ```saffron
-import "parsley/router" as P
-import "parsley/response" as Res
-import "parsley/request" as Req
+import "parsley/router" as Parsley
+import "parsley/response" as Response
+import "parsley/request" as Request
 import "@http/server" as Http
 ```
 
 ## Defining Routes
 
 ```saffron
-var api = P.router("/api/v1")
+var api = Parsley.router("/api/v1")
 
 api.get("/packages", fun (req: Http.Request): Http.Response => {
     var packages = Db.list_packages()
-    Res.json(packages)
+    Response.json(packages)
 })
 
 api.get("/packages/:name", fun (req: Http.Request): Http.Response => {
-    var name = Req.param(req, "name")
+    var name = Request.param(req, "name")
     var pkg = Db.get_package(name)
-    if (pkg == nil) { return Res.not_found("package not found") }
-    Res.json(pkg)
+    if (pkg == nil) { return Response.not_found("package not found") }
+    Response.json(pkg)
 })
 
 api.post("/packages/publish", fun (req: Http.Request): Http.Response => {
-    var body = Req.parse_body(req)
-    if (body == nil) { return Res.bad_request("invalid JSON") }
+    var body = Request.parse_body(req)
+    if (body == nil) { return Response.bad_request("invalid JSON") }
     // ...
-    Res.created(result)
+    Response.created(result)
 })
 ```
 
@@ -56,24 +56,24 @@ app.serve()
 
 | Function | Status | Description |
 |----------|--------|-------------|
-| `Res.json(data)` | 200 | JSON response from any serializable value |
-| `Res.created(data)` | 201 | Created with JSON body |
-| `Res.not_found(msg)` | 404 | Error JSON: `{"error": msg}` |
-| `Res.bad_request(msg)` | 400 | Validation error |
+| `Response.json(data)` | 200 | JSON response from any serializable value |
+| `Response.created(data)` | 201 | Created with JSON body |
+| `Response.not_found(msg)` | 404 | Error JSON: `{"error": msg}` |
+| `Response.bad_request(msg)` | 400 | Validation error |
 | `Res.unauthorized(msg)` | 401 | Auth required |
 
 ## Request Helpers
 
 ```saffron
 // Path parameters
-var name = Req.param(req, "name")       // from /packages/:name
+var name = Request.param(req, "name")       // from /packages/:name
 
 // Query string
-var params = Req.query_params(req)      // Map<String, String>
+var params = Request.query_params(req)      // Map<String, String>
 var q = params.get("q")
 
 // JSON body
-var body = Req.parse_body(req)          // Map<String, Any> or nil
+var body = Request.parse_body(req)          // Map<String, Any> or nil
 ```
 
 ## API Spec Generation
@@ -145,30 +145,30 @@ pub_ep.description = "Publish a new package version"
 ## Full Example
 
 ```saffron
-import "parsley/router" as P
-import "parsley/response" as Res
-import "parsley/request" as Req
+import "parsley/router" as Parsley
+import "parsley/response" as Response
+import "parsley/request" as Request
 import "parsley/spec" as Spec
 import "@http/server" as Http
 
-var api = P.router("/api/v1")
+var api = Parsley.router("/api/v1")
 
 api.get("/users", fun (req: Http.Request): Http.Response => {
-    Res.json(Db.list_users())
+    Response.json(Db.list_users())
 })
 
 api.get("/users/:id", fun (req: Http.Request): Http.Response => {
-    var id = Req.param(req, "id")
+    var id = Request.param(req, "id")
     var user = Db.get_user(id)
-    if (user == nil) { return Res.not_found("user not found") }
-    Res.json(user)
+    if (user == nil) { return Response.not_found("user not found") }
+    Response.json(user)
 })
 
 api.post("/users", fun (req: Http.Request): Http.Response => {
-    var body = Req.parse_body(req)
-    if (body == nil) { return Res.bad_request("invalid body") }
+    var body = Request.parse_body(req)
+    if (body == nil) { return Response.bad_request("invalid body") }
     var user = Db.create_user(body.get("name"), body.get("email"))
-    Res.created(user)
+    Response.created(user)
 })
 
 // Serve

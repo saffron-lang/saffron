@@ -19,6 +19,8 @@ class Mutation<TRequest, TResponse> {
     var error: Signal.Signal<String>
     var _on_success: (TResponse) => Nil
     var _invalidates: List<String>
+    var _cancelled: Bool
+    var _mutation_id: Float
 
     fun init(url: String, method: String) {
         this.url = url
@@ -28,30 +30,37 @@ class Mutation<TRequest, TResponse> {
         this.error = Signal.signal("")
         this._on_success = nil
         this._invalidates = []
+        this._cancelled = false
+        this._mutation_id = 0
     }
 
     fun mutate(body: TRequest) {
         this.isLoading.set(true)
         this.error.set("")
+        this._mutation_id = this._mutation_id + 1
+        var expected_id: Float = this._mutation_id
         var self = this
         var body_json: String = JSON.to_string(body)
         Fetch.post(self.url, body_json, fun (response: String) => {
-            var parsed: TResponse = JSON.parse_as<TResponse>(response)
-            if (parsed != nil) {
-                self.data.set(parsed)
-                self.error.set("")
-                var i: Float = 0
-                while (i < self._invalidates.length()) {
-                    Cache.store.invalidate_matching(self._invalidates[i])
-                    i = i + 1
+            if (self._cancelled or self._mutation_id != expected_id) { return }
+            Signal.batch(fun () => {
+                var parsed: TResponse = JSON.parse_as<TResponse>(response)
+                if (parsed != nil) {
+                    self.data.set(parsed)
+                    self.error.set("")
+                    var i: Float = 0
+                    while (i < self._invalidates.length()) {
+                        Cache.store.invalidate_matching(self._invalidates[i])
+                        i = i + 1
+                    }
+                    if (self._on_success != nil) {
+                        self._on_success(parsed)
+                    }
+                } else {
+                    self.error.set("Request failed")
                 }
-                if (self._on_success != nil) {
-                    self._on_success(parsed)
-                }
-            } else {
-                self.error.set("Request failed")
-            }
-            self.isLoading.set(false)
+                self.isLoading.set(false)
+            })
         })
     }
 
@@ -63,6 +72,11 @@ class Mutation<TRequest, TResponse> {
     fun on_success(handler: (TResponse) => Nil): Mutation<TRequest, TResponse> {
         this._on_success = handler
         return this
+    }
+
+    fun cancel() {
+        this._cancelled = true
+        this.isLoading.set(false)
     }
 
     fun reset() {

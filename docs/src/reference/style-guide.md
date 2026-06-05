@@ -31,6 +31,22 @@ import "@test" as T
 import "@math" as M
 ```
 
+Prefer named imports when importing utility functions you'll call directly:
+
+```saffron
+// Good — named imports for utilities
+import { json, not_found, bad_request } from "parsley/response"
+import { param, query_params } from "parsley/request"
+
+// Good — module alias for namespaces with many symbols
+import "@http/server" as Http
+import "turmeric/router" as Router
+
+// Bad — single-letter alias
+import "parsley/router" as P
+import "basil/query" as Q
+```
+
 ## Indentation and braces
 
 Use 4 spaces. Opening brace on the same line:

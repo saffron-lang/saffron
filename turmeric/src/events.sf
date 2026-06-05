@@ -218,7 +218,7 @@ fun __dispatch_click(callback_id: Float, event_ptr: Float) {
     data.shift_key = _js_get_bool(event_ptr, "shiftKey")
     data.meta_key = _js_get_bool(event_ptr, "metaKey")
 
-    _callbacks.get(callback_id)(Event.Click(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Click(data)))
 }
 
 fun __dispatch_keydown(callback_id: Float, event_ptr: Float) {
@@ -235,7 +235,7 @@ fun __dispatch_keydown(callback_id: Float, event_ptr: Float) {
     data.shift_key = _js_get_bool(event_ptr, "shiftKey")
     data.meta_key = _js_get_bool(event_ptr, "metaKey")
 
-    _callbacks.get(callback_id)(Event.KeyDown(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.KeyDown(data)))
 }
 
 fun __dispatch_keyup(callback_id: Float, event_ptr: Float) {
@@ -245,7 +245,7 @@ fun __dispatch_keyup(callback_id: Float, event_ptr: Float) {
     data.key = _js_get_string(event_ptr, "key")
     data.code = _js_get_string(event_ptr, "code")
 
-    _callbacks.get(callback_id)(Event.KeyUp(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.KeyUp(data)))
 }
 
 fun __dispatch_input(callback_id: Float, event_ptr: Float) {
@@ -256,7 +256,7 @@ fun __dispatch_input(callback_id: Float, event_ptr: Float) {
     data.input_type = _js_get_string(event_ptr, "inputType")
     data.data = _js_get_string(event_ptr, "data")
 
-    _callbacks.get(callback_id)(Event.Input(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Input(data)))
 }
 
 fun __dispatch_change(callback_id: Float, event_ptr: Float) {
@@ -265,27 +265,27 @@ fun __dispatch_change(callback_id: Float, event_ptr: Float) {
     var data: InputEventData = InputEventData()
     data.value = _js_get_string(event_ptr, "target.value")
 
-    _callbacks.get(callback_id)(Event.Change(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Change(data)))
 }
 
 fun __dispatch_submit(callback_id: Float, event_ptr: Float) {
     if (!_callbacks.has(callback_id)) { return }
-    _js_prevent_default(event_ptr)  // Always prevent default on submit
+    _js_prevent_default(event_ptr)
 
     var data: SubmitEventData = SubmitEventData()
-    _callbacks.get(callback_id)(Event.Submit(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Submit(data)))
 }
 
 fun __dispatch_focus(callback_id: Float, event_ptr: Float) {
     if (!_callbacks.has(callback_id)) { return }
     var data: FocusEventData = FocusEventData()
-    _callbacks.get(callback_id)(Event.Focus(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Focus(data)))
 }
 
 fun __dispatch_blur(callback_id: Float, event_ptr: Float) {
     if (!_callbacks.has(callback_id)) { return }
     var data: FocusEventData = FocusEventData()
-    _callbacks.get(callback_id)(Event.Blur(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Blur(data)))
 }
 
 fun __dispatch_wheel(callback_id: Float, event_ptr: Float) {
@@ -297,12 +297,12 @@ fun __dispatch_wheel(callback_id: Float, event_ptr: Float) {
     data.delta_z = _js_get_float(event_ptr, "deltaZ")
     data.delta_mode = _js_get_float(event_ptr, "deltaMode")
 
-    _callbacks.get(callback_id)(Event.Wheel(data))
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Wheel(data)))
 }
 
 fun __dispatch_scroll(callback_id: Float, event_ptr: Float) {
     if (!_callbacks.has(callback_id)) { return }
-    _callbacks.get(callback_id)(Event.Scroll)
+    Sig.batch(fun () => _callbacks.get(callback_id)(Event.Scroll))
 }
 
 // =============================================================================
