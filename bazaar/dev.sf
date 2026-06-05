@@ -24,7 +24,7 @@ fun build_frontend(): Bool {
         return false
     }
     Process.run("cp frontend/public/* static/ 2>/dev/null")
-    Process.run("cp frontend/.pantry/packages/turmeric/runtime/turmeric.js static/ 2>/dev/null")
+    Process.run("cp frontend/.pantry/packages/turmeric/runtime/app_template.js static/app.js 2>/dev/null")
     IO.println("  [frontend] ✓ static/app.wasm")
     return true
 }
