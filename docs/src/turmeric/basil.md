@@ -1,6 +1,6 @@
 # Basil
 
-Basil is an auto-caching query client for Turmeric frontend apps. It provides signal-based data fetching with automatic caching, stale-time management, and cache invalidation — similar to RTK Query or TanStack Query.
+Basil is a typed, auto-caching query client for Turmeric frontend apps. It provides signal-based data fetching with automatic caching, stale-time management, and cache invalidation — similar to RTK Query or TanStack Query, but with compile-time type safety via generics.
 
 ## Setup
 
@@ -12,16 +12,21 @@ basil = { path = "../basil" }
 ```
 
 ```saffron
-import "basil/query" as Q
-import "basil/mutation" as M
+import "basil/query" as Query
+import "basil/mutation" as Mutation
 ```
 
 ## Queries (GET requests)
 
-A query fetches data from a URL, caches it, and exposes reactive signals:
+A query fetches data from a URL, caches it, and exposes reactive signals. The type parameter `T` flows through to the `data` signal:
 
 ```saffron
-var packages = Q.query("/api/v1/packages")
+class PackageList {
+    var packages: List<Package>
+    var total: Float
+}
+
+var packages = Query.query<PackageList>("/api/v1/packages")
 
 // In a component:
 fun PackageList() {
@@ -34,9 +39,14 @@ fun PackageList() {
         <div>Error: {error}</div>
     }
 
-    var data = packages.data.get()
+    var data: PackageList = packages.data.get()
     if (data != nil) {
-        // render packages...
+        // data is PackageList — no casting needed
+        var i: Float = 0
+        while (i < data.packages.length()) {
+            PackageCard(data.packages[i])
+            i = i + 1
+        }
     }
 }
 ```
@@ -45,7 +55,7 @@ fun PackageList() {
 
 | Signal | Type | Description |
 |--------|------|-------------|
-| `query.data` | `Signal<Any>` | Parsed JSON response (nil until first success) |
+| `query.data` | `Signal<T?>` | Parsed, typed response (nil until first success) |
 | `query.isLoading` | `Signal<Bool>` | True while fetch is in flight |
 | `query.error` | `Signal<String>` | Error message (empty on success) |
 
@@ -60,29 +70,37 @@ fun PackageList() {
 
 ```saffron
 // Data stays fresh for 60 seconds (default is 30s)
-var packages = Q.query_with("/api/v1/packages", 60.0)
+var packages = Query.query_with<PackageList>("/api/v1/packages", 60.0)
 ```
 
 ## Mutations (POST/PUT/DELETE)
 
-Mutations are for operations that modify server state:
+Mutations are for operations that modify server state. They take two type parameters: `TRequest` (the body type) and `TResponse` (the response type):
 
 ```saffron
-var publish = M.mutation("/api/v1/packages/publish")
+class PublishRequest {
+    var name: String
+    var version: String
+    var tarball: String
+}
 
-// Trigger the mutation with a JSON body
-publish.mutate(JSON.to_string({
-    "name": "my-package",
-    "vers": "1.0.0",
-    "tarball": encoded_data
-}))
+class PublishResponse {
+    var ok: Bool
+    var package_name: String
+    var published_version: String
+}
+
+var publish = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/packages/publish")
+
+// Trigger the mutation with a typed body — serialized automatically
+publish.mutate(PublishRequest("my-package", "1.0.0", encoded_data))
 ```
 
 ### Mutation signals
 
 | Signal | Type | Description |
 |--------|------|-------------|
-| `mutation.data` | `Signal<Any>` | Response data from last successful mutation |
+| `mutation.data` | `Signal<TResponse?>` | Typed response from last successful mutation |
 | `mutation.isLoading` | `Signal<Bool>` | True while request is in flight |
 | `mutation.error` | `Signal<String>` | Error message (empty on success) |
 
@@ -91,7 +109,7 @@ publish.mutate(JSON.to_string({
 Invalidate related queries after a successful mutation:
 
 ```saffron
-var publish = M.mutation("/api/v1/packages/publish")
+var publish = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/packages/publish")
     .invalidates(["/api/v1/packages"])
 
 // After publish succeeds, any query starting with "/api/v1/packages"
@@ -100,13 +118,30 @@ var publish = M.mutation("/api/v1/packages/publish")
 
 ### Success callback
 
+The callback receives the typed response:
+
 ```saffron
-var publish = M.mutation("/api/v1/packages/publish")
+var publish = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/packages/publish")
     .invalidates(["/api/v1/packages"])
-    .on_success(fun (data: Any) => {
-        IO.println("Published: " + data.get("package"))
-        router.go("/packages/" + data.get("package"))
+    .on_success(fun (data: PublishResponse) => {
+        IO.println("Published: " + data.package_name)
+        router.go("/packages/" + data.package_name)
     })
+```
+
+### Explicit HTTP method
+
+```saffron
+class YankRequest {
+    var package_name: String
+    var version: String
+}
+
+class YankResponse {
+    var ok: Bool
+}
+
+var yank = Mutation.mutation_method<YankRequest, YankResponse>("/api/v1/yank", "DELETE")
 ```
 
 ### Reset
@@ -123,22 +158,22 @@ Instead of writing query URLs manually, use the Parsley generator to create a ty
 saffron run parsley/tools/gen_client.sf api_spec.json frontend/src/api.sf
 ```
 
-The generated client provides named functions per endpoint:
+The generated client provides named functions per endpoint with full type safety:
 
 ```saffron
 // Generated: frontend/src/api.sf
-import "basil" as B
+import "basil" as Basil
 
-fun getPackages(): B.Query {
-    return B.query("/api/v1/packages")
+fun getPackages(): Basil.Query<PackageList> {
+    return Basil.query<PackageList>("/api/v1/packages")
 }
 
-fun getPackage(name: String): B.Query {
-    return B.query("/api/v1/packages/${name}")
+fun getPackage(name: String): Basil.Query<PackageDetail> {
+    return Basil.query<PackageDetail>("/api/v1/packages/${name}")
 }
 
-fun createPackagesPublish(): B.Mutation {
-    return B.mutation("/api/v1/packages/publish")
+fun createPackagesPublish(): Basil.Mutation<PublishRequest, PublishResponse> {
+    return Basil.mutation<PublishRequest, PublishResponse>("/api/v1/packages/publish")
 }
 ```
 
@@ -154,12 +189,11 @@ fun HomePage() {
         <div cls="loading">Loading...</div>
     }
 
-    var data = packages.data.get()
+    var data: PackageList = packages.data.get()
     if (data != nil) {
-        var pkgs = data.get("packages")
         var i: Float = 0
-        while (i < pkgs.length()) {
-            PackageCard(pkgs[i])
+        while (i < data.packages.length()) {
+            PackageCard(data.packages[i])
             i = i + 1
         }
     }
@@ -174,30 +208,31 @@ fun HomePage() {
 - `invalidate()` marks an entry as stale without removing it
 - `invalidate_matching(prefix)` invalidates all entries whose URL starts with the prefix
 - Mutations never cache their responses
+- The cache layer uses `Any` internally (type erasure at the storage boundary); type safety is enforced at the `Query<T>` / `Mutation<TReq, TRes>` API surface
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│  Component                          │
-│  var pkgs = Q.query("/packages")    │
-│  pkgs.data.get() → Signal read     │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────────┐
+│  Component                                  │
+│  var pkgs = Query.query<PkgList>("/packages")   │
+│  pkgs.data.get() → Signal<PkgList?> read    │
+└──────────────┬──────────────────────────────┘
                │
                ▼
-┌─────────────────────────────────────┐
-│  Cache Store                        │
-│  key="/packages" → CacheEntry       │
-│  { data, timestamp, stale_time }    │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────────┐
+│  Cache Store (Any-typed internally)         │
+│  key="/packages" → CacheEntry               │
+│  { data: Any, timestamp, stale_time }       │
+└──────────────┬──────────────────────────────┘
                │ cache miss or stale
                ▼
-┌─────────────────────────────────────┐
-│  Fetch (wasm FFI)                   │
-│  js_fetch_json(url, callback_id)    │
-│  → browser fetch() → JSON parse    │
-│  → update signal + cache           │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  Fetch (wasm FFI)                           │
+│  js_fetch_json(url, callback_id)            │
+│  → browser fetch() → JSON.parse_as<T>()    │
+│  → update Signal<T> + cache                 │
+└─────────────────────────────────────────────┘
 ```
 
 ## FFI Requirements

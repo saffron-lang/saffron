@@ -1,40 +1,49 @@
-import "@test" as T
-import "../src/mutation.sf" as M
+import "@test" as Test
+import "../src/mutation.sf" as Mutation
 
-T.assert(true, "basil mutation module loads")
+Test.assert(true, "basil mutation module loads")
 
-// Test mutation creation
-var mut = M.mutation("/api/v1/packages/publish")
-T.assert_eq(mut.url, "/api/v1/packages/publish", "mutation has correct url")
-T.assert_eq(mut.method, "POST", "default method is POST")
-T.assert_eq(mut.isLoading.get(), false, "initial isLoading is false")
-T.assert(mut.data.get() == nil, "initial data is nil")
-T.assert_eq(mut.error.get(), "", "initial error is empty")
+class PublishRequest {
+    var name: String
+    var version: String
+}
 
-// Test mutation with explicit method
-var del = M.mutation_method("/api/v1/packages/foo/yank", "DELETE")
-T.assert_eq(del.method, "DELETE", "explicit method set")
+class PublishResponse {
+    var ok: Bool
+    var package_name: String
+}
 
-// Test invalidates chaining
-var pub = M.mutation("/api/v1/publish")
+// Test typed mutation creation
+var publish = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/publish")
+Test.assert_eq(publish.url, "/api/v1/publish", "mutation has correct url")
+Test.assert_eq(publish.method, "POST", "default method is POST")
+Test.assert_eq(publish.isLoading.get(), false, "initial isLoading is false")
+Test.assert(publish.data.get() == nil, "initial data is nil")
+Test.assert_eq(publish.error.get(), "", "initial error is empty")
+
+// Test with explicit method
+var yank = Mutation.mutation_method<String, String>("/api/v1/yank", "DELETE")
+Test.assert_eq(yank.method, "DELETE", "explicit method set")
+
+// Test invalidates chaining (returns same typed mutation)
+var pub2 = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/publish")
     .invalidates(["/api/v1/packages", "/api/v1/search"])
-T.assert_eq(pub._invalidates.length(), 2, "invalidates list set")
-T.assert_eq(pub._invalidates[0], "/api/v1/packages", "first invalidation prefix")
-T.assert_eq(pub._invalidates[1], "/api/v1/search", "second invalidation prefix")
+Test.assert_eq(pub2._invalidates.length(), 2, "invalidates list set")
+Test.assert_eq(pub2._invalidates[0], "/api/v1/packages", "first prefix")
+Test.assert_eq(pub2._invalidates[1], "/api/v1/search", "second prefix")
 
 // Test on_success chaining
 var success_called: Bool = false
-var pub2 = M.mutation("/api/v1/publish")
-    .on_success(fun (data: Any) => { success_called = true })
-T.assert(pub2._on_success != nil, "on_success handler set")
+var pub3 = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/publish")
+    .on_success(fun (data: PublishResponse) => { success_called = true })
+Test.assert(pub3._on_success != nil, "on_success handler set")
 
 // Test reset
-mut.isLoading.set(true)
-mut.error.set("something went wrong")
-mut.data.set("stale")
-mut.reset()
-T.assert_eq(mut.isLoading.get(), false, "reset clears isLoading")
-T.assert_eq(mut.error.get(), "", "reset clears error")
-T.assert(mut.data.get() == nil, "reset clears data")
+publish.isLoading.set(true)
+publish.error.set("something went wrong")
+publish.reset()
+Test.assert_eq(publish.isLoading.get(), false, "reset clears isLoading")
+Test.assert_eq(publish.error.get(), "", "reset clears error")
+Test.assert(publish.data.get() == nil, "reset clears data")
 
-T.summary()
+Test.summary()

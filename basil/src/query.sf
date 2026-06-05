@@ -1,35 +1,35 @@
-//! Query — cached, signal-based data fetching for Turmeric apps.
+//! Query — typed, cached, signal-based data fetching.
 //!
 //! Usage:
-//!   var packages = Q.query("/api/v1/packages")
-//!   // In component:
-//!   if (packages.isLoading.get()) { ... }
-//!   var data = packages.data.get()
+//!   import "basil/query" as Query
+//!   var packages = Query.query<PackageList>("/api/v1/packages")
+//!   packages.data.get()       // Signal<PackageList?>
+//!   packages.isLoading.get()  // Signal<Bool>
+//!   packages.refetch()
 
-import "turmeric/signal" as Sig
+import "turmeric/signal" as Signal
 import "@json" as JSON
 import "./cache.sf" as Cache
 import "./fetch.sf" as Fetch
 
-class Query {
+class Query<T> {
     var url: String
-    var data: Sig.Signal<Any>
-    var isLoading: Sig.Signal<Bool>
-    var error: Sig.Signal<String>
+    var data: Signal.Signal<T>
+    var isLoading: Signal.Signal<Bool>
+    var error: Signal.Signal<String>
     var _stale_time: Float
 
     fun init(url: String, stale_time: Float) {
         this.url = url
-        this.data = Sig.signal(nil)
-        this.isLoading = Sig.signal(false)
-        this.error = Sig.signal("")
+        this.data = Signal.signal(nil)
+        this.isLoading = Signal.signal(false)
+        this.error = Signal.signal("")
         this._stale_time = stale_time
         this._fetch()
     }
 
     fun _fetch() {
-        // Check cache first
-        var cached: Cache.CacheEntry = Cache.store.get(this.url)
+        var cached = Cache.store.get(this.url)
         if (cached != nil and !cached.is_stale) {
             this.data.set(cached.data)
             return
@@ -37,8 +37,8 @@ class Query {
 
         this.isLoading.set(true)
         var self = this
-        Fetch.get(this.url, fun (response: String) => {
-            var parsed = JSON.parse(response)
+        Fetch.get(self.url, fun (response: String) => {
+            var parsed: T = JSON.parse_as<T>(response)
             if (parsed != nil) {
                 self.data.set(parsed)
                 self.error.set("")
@@ -60,15 +60,14 @@ class Query {
     }
 }
 
-/// Default stale time in seconds
 var DEFAULT_STALE_TIME: Float = 30.0
 
-/// Create a cached query for a GET endpoint
-fun query(url: String): Query {
-    return Query(url, DEFAULT_STALE_TIME)
+/// Create a typed cached query.
+fun query<T>(url: String): Query<T> {
+    return Query<T>(url, DEFAULT_STALE_TIME)
 }
 
-/// Create a cached query with custom stale time
-fun query_with(url: String, stale_time: Float): Query {
-    return Query(url, stale_time)
+/// Create a typed cached query with custom stale time.
+fun query_with<T>(url: String, stale_time: Float): Query<T> {
+    return Query<T>(url, stale_time)
 }
