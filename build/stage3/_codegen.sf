@@ -7597,19 +7597,6 @@ class Codegen {
                 if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
-                } else {
-                    // Check if any coroutine name is a suffix of this callee
-                    // (handles module-prefixed calls like stdlib_async_sleep matching "sleep")
-                    var cfi: Float = 0
-                    while (cfi < this.coroutine_funcs.length()) {
-                        var cf: String = this.coroutine_funcs[cfi]
-                        if (bc.ends_with(cf) or bc.ends_with("_" + cf)) {
-                            is_coro = true
-                            cfi = this.coroutine_funcs.length()
-                            bci = body_calls.length()
-                        }
-                        cfi = cfi + 1
-                    }
                 }
                 bci = bci + 1
             }
@@ -10422,27 +10409,8 @@ class Codegen {
             is_coro_callee = this.str_in_list(this.coroutine_funcs, method)
         }
         // Definitive check: if the function is already defined and is in coroutine_funcs
-        if (!is_coro_callee and this.coroutine_funcs.length() > 0) {
-            var cfi: Float = 0
-            while (cfi < this.coroutine_funcs.length()) {
-                var cf: String = this.coroutine_funcs[cfi]
-                if (cf == prefixed_name or cf == method or prefixed_name.ends_with("_" + cf)) {
-                    is_coro_callee = true
-                    cfi = this.coroutine_funcs.length()
-                }
-                cfi = cfi + 1
-            }
-        }
         if (!is_coro_callee) {
-            var cfi: Float = 0
-            while (cfi < this.coroutine_funcs.length()) {
-                var cf: String = this.coroutine_funcs[cfi]
-                if (prefixed_name.ends_with("_" + cf) or prefixed_name == cf) {
-                    is_coro_callee = true
-                    cfi = this.coroutine_funcs.length()
-                }
-                cfi = cfi + 1
-            }
+            is_coro_callee = this.str_in_list(this.coroutine_funcs, prefixed_name) or this.str_in_list(this.coroutine_funcs, method)
         }
         if (this.is_coroutine and is_coro_callee) {
             var b_hdl: String = this.fresh_local()

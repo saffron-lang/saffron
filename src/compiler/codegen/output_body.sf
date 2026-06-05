@@ -242,19 +242,6 @@
                 if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
-                } else {
-                    // Check if any coroutine name is a suffix of this callee
-                    // (handles module-prefixed calls like stdlib_async_sleep matching "sleep")
-                    var cfi: Float = 0
-                    while (cfi < this.coroutine_funcs.length()) {
-                        var cf: String = this.coroutine_funcs[cfi]
-                        if (bc.ends_with(cf) or bc.ends_with("_" + cf)) {
-                            is_coro = true
-                            cfi = this.coroutine_funcs.length()
-                            bci = body_calls.length()
-                        }
-                        cfi = cfi + 1
-                    }
                 }
                 bci = bci + 1
             }
