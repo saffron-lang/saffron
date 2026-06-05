@@ -838,22 +838,26 @@ extend fun Codegen.gen_call(callee: AST.Expr, args: List<AST.Expr>): String {
         }
 
         if (callee_name == "IO.println") {
-            var pre_type: String = this.get_expr_type(args[0])
             var arg: String = this.gen_arg_value(args[0])
             var arg_type: String = this.type_to_string(this.last_type)
-            if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
+            if (this.identity_mode and arg_type == "String") {
+                this.emit_indent("call void @__io_println_str(i64 " + arg + ")")
+            } else {
+                this.emit_indent("call void @__io_println_any(i64 " + arg + ")")
+            }
             this.last_type = AST.Type.NilType
             return "0"
         }
         if (callee_name == "IO.print") {
             var arg: String = this.gen_arg_value(args[0])
             var arg_type: String = this.type_to_string(this.last_type)
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
+            if (this.identity_mode and arg_type == "String") {
+                this.emit_indent("call void @__io_print_str(i64 " + arg + ")")
+            } else {
+                this.emit_indent("call void @__io_print_any(i64 " + arg + ")")
+            }
             this.last_type = AST.Type.NilType
-            return local
+            return "0"
         }
 
         // Check if it's a known direct function or an indirect call through a variable
