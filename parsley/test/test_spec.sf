@@ -1,0 +1,42 @@
+import "@test" as T
+import "../src/spec.sf" as Spec
+import "@json" as JSON
+
+T.assert(true, "parsley spec module loads")
+
+// Build a mock spec
+var endpoints: List<Map<String, String>> = []
+
+var ep1: Map<String, String> = {}
+ep1.set("method", "GET")
+ep1.set("path", "/api/v1/packages")
+ep1.set("response_type", "ListResponse")
+ep1.set("body_type", "")
+ep1.set("auth", "false")
+ep1.set("description", "List packages")
+endpoints.push(ep1)
+
+var ep2: Map<String, String> = {}
+ep2.set("method", "POST")
+ep2.set("path", "/api/v1/packages/publish")
+ep2.set("response_type", "PublishResponse")
+ep2.set("body_type", "PublishRequest")
+ep2.set("auth", "true")
+ep2.set("description", "Publish a package")
+endpoints.push(ep2)
+
+// Test JSON output
+var json_str: String = Spec.to_json(endpoints)
+T.assert(json_str.length() > 0, "to_json produces output")
+T.assert(json_str.contains("GET"), "JSON contains method")
+T.assert(json_str.contains("/api/v1/packages"), "JSON contains path")
+
+// Test manifest output
+var manifest: String = Spec.to_manifest(endpoints)
+T.assert(manifest.contains("[[endpoint]]"), "manifest has endpoint headers")
+T.assert(manifest.contains("method = \"GET\""), "manifest has method")
+T.assert(manifest.contains("path = \"/api/v1/packages\""), "manifest has path")
+T.assert(manifest.contains("auth = true"), "manifest has auth flag")
+T.assert(manifest.contains("description = \"Publish a package\""), "manifest has description")
+
+T.summary()

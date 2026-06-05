@@ -1,0 +1,28 @@
+import "@test" as T
+import "../src/router.sf" as P
+
+T.assert(true, "parsley router module loads")
+
+// Test router creation
+var api = P.router("/api/v1")
+T.assert_eq(api.prefix, "/api/v1", "router has correct prefix")
+T.assert_eq(api.endpoints.length(), 0, "new router has no endpoints")
+
+// Test endpoint registration (count)
+api.get("/packages", fun (req: Any): Any => nil)
+T.assert_eq(api.endpoints.length(), 1, "get adds endpoint")
+
+api.post("/packages/publish", fun (req: Any): Any => nil)
+T.assert_eq(api.endpoints.length(), 2, "post adds endpoint")
+
+api.put("/packages/:name", fun (req: Any): Any => nil)
+T.assert_eq(api.endpoints.length(), 3, "put adds endpoint")
+
+api.delete("/packages/:name/:version", fun (req: Any): Any => nil)
+T.assert_eq(api.endpoints.length(), 4, "delete adds endpoint")
+
+// Test spec generation (count)
+var spec = api.spec()
+T.assert_eq(spec.length(), 4, "spec has all endpoints")
+
+T.summary()

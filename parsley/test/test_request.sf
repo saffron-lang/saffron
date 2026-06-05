@@ -1,0 +1,20 @@
+import "@test" as T
+import "../src/request.sf" as Req
+
+T.assert(true, "parsley request module loads")
+
+// Test query string parsing
+var params = Req.query_params_from_string("q=hello&page=2&limit=10")
+T.assert_eq(params.get("q"), "hello", "parses q param")
+T.assert_eq(params.get("page"), "2", "parses page param")
+T.assert_eq(params.get("limit"), "10", "parses limit param")
+
+// Empty query
+var empty = Req.query_params_from_string("")
+T.assert_eq(empty.keys().length(), 0, "empty query returns empty map")
+
+// Single param
+var single = Req.query_params_from_string("name=saffron")
+T.assert_eq(single.get("name"), "saffron", "single param works")
+
+T.summary()
