@@ -2025,27 +2025,8 @@
             is_coro_callee = this.str_in_list(this.coroutine_funcs, method)
         }
         // Definitive check: if the function is already defined and is in coroutine_funcs
-        if (!is_coro_callee and this.coroutine_funcs.length() > 0) {
-            var cfi: Float = 0
-            while (cfi < this.coroutine_funcs.length()) {
-                var cf: String = this.coroutine_funcs[cfi]
-                if (cf == prefixed_name or cf == method or prefixed_name.ends_with("_" + cf)) {
-                    is_coro_callee = true
-                    cfi = this.coroutine_funcs.length()
-                }
-                cfi = cfi + 1
-            }
-        }
         if (!is_coro_callee) {
-            var cfi: Float = 0
-            while (cfi < this.coroutine_funcs.length()) {
-                var cf: String = this.coroutine_funcs[cfi]
-                if (prefixed_name.ends_with("_" + cf) or prefixed_name == cf) {
-                    is_coro_callee = true
-                    cfi = this.coroutine_funcs.length()
-                }
-                cfi = cfi + 1
-            }
+            is_coro_callee = this.str_in_list(this.coroutine_funcs, prefixed_name) or this.str_in_list(this.coroutine_funcs, method)
         }
         if (this.is_coroutine and is_coro_callee) {
             var b_hdl: String = this.fresh_local()
