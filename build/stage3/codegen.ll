@@ -89760,6 +89760,7 @@ entry:
   %rhs_raw = alloca i64
   %rhs = alloca i64
   %phi_result = alloca i64
+  %raw = alloca i64
   %result = alloca i64
   store i64 %self.arg, i64* %self
   store i64 %left.arg, i64* %left
@@ -90143,9 +90144,9 @@ endif4226:
   %t320 = call i64 @Codegen__emit_indent(i64 %t205, i64 %t319)
   %t321 = load i64, i64* %self
   %t322 = call i64 @Codegen__fresh_local(i64 %t321)
-  store i64 %t322, i64* %result
+  store i64 %t322, i64* %raw
   %t323 = load i64, i64* %self
-  %t324 = load i64, i64* %result
+  %t324 = load i64, i64* %raw
   %t325 = getelementptr [12 x i8], [12 x i8]* @.str.3216, i64 0, i64 0
   %t326 = ptrtoint i8* %t325 to i64
   %t327 = inttoptr i64 %t324 to i8*
@@ -90192,16 +90193,20 @@ endif4226:
   %t362 = ptrtoint i8* %t361 to i64
   %t363 = call i64 @Codegen__emit_indent(i64 %t323, i64 %t362)
   %t364 = load i64, i64* %self
-  %t365 = call i8* @malloc(i64 8)
-  %t366 = bitcast i8* %t365 to [1 x i64]*
-  %t367 = getelementptr [1 x i64], [1 x i64]* %t366, i64 0, i64 0
-  store i64 2, i64* %t367
-  %t368 = ptrtoint [1 x i64]* %t366 to i64
-  %t369 = inttoptr i64 %t364 to %Codegen*
-  %t370 = getelementptr %Codegen, %Codegen* %t369, i32 0, i32 20
-  store volatile i64 %t368, i64* %t370
-  %t371 = load i64, i64* %result
-  ret i64 %t371
+  %t365 = load i64, i64* %raw
+  %t366 = call i64 @Codegen__emit_tag_bool(i64 %t364, i64 %t365)
+  store i64 %t366, i64* %result
+  %t367 = load i64, i64* %self
+  %t368 = call i8* @malloc(i64 8)
+  %t369 = bitcast i8* %t368 to [1 x i64]*
+  %t370 = getelementptr [1 x i64], [1 x i64]* %t369, i64 0, i64 0
+  store i64 2, i64* %t370
+  %t371 = ptrtoint [1 x i64]* %t369 to i64
+  %t372 = inttoptr i64 %t367 to %Codegen*
+  %t373 = getelementptr %Codegen, %Codegen* %t372, i32 0, i32 20
+  store volatile i64 %t371, i64* %t373
+  %t374 = load i64, i64* %result
+  ret i64 %t374
 }
 
 define i64 @Codegen__collect_vars(i64 %self.arg, i64 %stmts.arg, i64 %names.arg, i64 %types.arg) {

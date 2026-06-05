@@ -706,86 +706,6 @@ class Codegen {
         }
     }
 
-    fun coerce_to_string(val: String, val_type: String): String {
-        if (val_type == "String") {
-            return val
-        }
-        if (val_type == "Int") {
-            var raw: String = this.emit_untag_int(val)
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__int_to_string(i64 " + raw + ")")
-            return result
-        }
-        if (val_type == "Float") {
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__float_to_string(i64 " + val + ")")
-            return result
-        }
-        if (val_type == "Bool") {
-            var raw: String = this.emit_untag_bool(val)
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__bool_to_string(i64 " + raw + ")")
-            return result
-        }
-        if (val_type == "Nil") {
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__nil_to_string()")
-            return result
-        }
-        // Enum with generated to_string
-        if (this.enum_defs.has(val_type)) {
-            var ts_method: String = val_type + "__to_string"
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
-            return result
-        }
-        // Class with to_string method
-        var ts_class: String = this.resolve_class_type(val_type)
-        if (ts_class.length() > 0) {
-            var ts_method: String = ts_class + "__to_string"
-            if (this.func_prefix_map.has(ts_method)) {
-                ts_method = this.func_prefix_map.get(ts_method)
-            } else if (this.str_in_list(this.known_functions,this.current_prefix + ts_method)) {
-                ts_method = this.current_prefix + ts_method
-            }
-            if (this.str_in_list(this.known_functions,ts_method)) {
-                var result: String = this.fresh_local()
-                this.emit_indent(result + " = call i64 @" + ts_method + "(i64 " + val + ")")
-                return result
-            }
-        }
-        // List type: call __list_to_string runtime function
-        if (val_type.starts_with("List")) {
-            this.called_functions.push("__list_to_string")
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__list_to_string(i64 " + val + ")")
-            return result
-        }
-        // Map type: return "[Map]" string constant
-        if (val_type.starts_with("Map")) {
-            var const_name: String = this.add_string_constant("[Map]")
-            var gep: String = this.fresh_local()
-            this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var result: String = this.emit_tag_ptr(gep)
-            return result
-        }
-        // Any type: runtime dispatch via __any_to_string
-        if (val_type == "Any") {
-            var result: String = this.fresh_local()
-            this.emit_indent(result + " = call i64 @__any_to_string(i64 " + val + ")")
-            // __any_to_string returns a raw pointer; tag it for use as a Saffron string
-            var tagged: String = this.fresh_local()
-            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + result + ")")
-            return tagged
-        }
-        // Fallback: return "[unknown]" string constant
-        var const_name: String = this.add_string_constant("[unknown]")
-        var gep: String = this.fresh_local()
-        this.emit_indent(gep + " = getelementptr [10 x i8], [10 x i8]* " + const_name + ", i64 0, i64 0")
-        var result: String = this.emit_tag_ptr(gep)
-        return result
-    }
-
     fun is_string_type(t: AST.Type): Bool {
         return match (t) {
             StringType => true
@@ -6469,8 +6389,10 @@ class Codegen {
         var phi_result: String = this.fresh_local()
         this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
         // Extend back to i64 for uniform value type
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = zext i1 " + phi_result + " to i64")
+        // Tag as bool so the value is a proper NaN-boxed bool when stored
+        var result: String = this.emit_tag_bool(raw)
         this.last_type = AST.Type.BoolType
         return result
     }

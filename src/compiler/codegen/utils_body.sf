@@ -168,8 +168,10 @@
         var phi_result: String = this.fresh_local()
         this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
         // Extend back to i64 for uniform value type
-        var result: String = this.fresh_local()
-        this.emit_indent(result + " = zext i1 " + phi_result + " to i64")
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = zext i1 " + phi_result + " to i64")
+        // Tag as bool so the value is a proper NaN-boxed bool when stored
+        var result: String = this.emit_tag_bool(raw)
         this.last_type = AST.Type.BoolType
         return result
     }
