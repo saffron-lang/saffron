@@ -219,7 +219,7 @@ fun __sb_to_string(sb: Int): Int {
 // Map: { count@0, capacity@8, keys*@16, values*@24 } — 32 bytes
 // =============================================================================
 
-@extern("i64 __val_untag_ptr(i64)") fun __rt_untag_ptr(val: Int): Int
+@extern("void* __val_untag_ptr(i64)") fun __rt_untag_ptr(val: Int): Int
 @extern("i64 __val_untag_int(i64)") fun __rt_untag_int(val: Int): Int
 
 fun __safe_strcmp(a: Int, b: Int): Int {
