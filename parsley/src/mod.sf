@@ -1,0 +1,15 @@
+//! Parsley — Typed API framework for Saffron
+//!
+//! Usage:
+//!   import "parsley" as P
+//!
+//!   var api = P.router("/api/v1")
+//!   api.get("/packages", list_packages)
+//!   api.get("/packages/:name", get_package)
+//!   api.post("/packages/publish", publish_package).auth(true)
+//!   api.mount(app)
+
+import "./router.sf" as Router
+import "./response.sf" as Response
+import "./request.sf" as Request
+import "./spec.sf" as Spec

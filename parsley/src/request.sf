@@ -1,0 +1,34 @@
+//! Request parsing helpers for Parsley.
+
+import "@http/server" as Http
+import "@json" as JSON
+
+/// Parse JSON body from request. Returns nil on parse failure.
+fun parse_body(req: Http.Request): Map<String, Any> {
+    return JSON.parse(req.body)
+}
+
+/// Get a path parameter (shorthand)
+fun param(req: Http.Request, name: String): String {
+    return req.param(name)
+}
+
+/// Parse query string into a map
+fun query_params(req: Http.Request): Map<String, String> {
+    var result: Map<String, String> = {}
+    var qs: String = req.query
+    if (qs.length() == 0) { return result }
+    var parts: List<String> = qs.split("&")
+    var i: Float = 0
+    while (i < parts.length()) {
+        var pair: String = parts[i]
+        var eq: Float = pair.index_of("=")
+        if (eq > 0) {
+            var key: String = pair.slice(0, eq)
+            var value: String = pair.slice(eq + 1, pair.length())
+            result.set(key, value)
+        }
+        i = i + 1
+    }
+    return result
+}

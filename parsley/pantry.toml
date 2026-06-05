@@ -1,0 +1,8 @@
+[package]
+name = "parsley"
+version = "0.1.0"
+description = "Typed API framework for Saffron"
+type = "library"
+entry = "src/mod.sf"
+
+[dependencies]

@@ -1,0 +1,35 @@
+//! Typed response builders for Parsley endpoints.
+
+import "@http/server" as Http
+import "@json" as JSON
+
+/// Return JSON response from a serializable value
+fun json(data: Any): Http.Response {
+    return Http.json(JSON.to_string(data))
+}
+
+/// Return 404 with standard error body
+fun not_found(message: String): Http.Response {
+    var body: Map<String, String> = {}
+    body.set("error", message)
+    return Http.json(JSON.to_string(body)).status_code(404)
+}
+
+/// Return 400 with validation error
+fun bad_request(message: String): Http.Response {
+    var body: Map<String, String> = {}
+    body.set("error", message)
+    return Http.json(JSON.to_string(body)).status_code(400)
+}
+
+/// Return 401 unauthorized
+fun unauthorized(message: String): Http.Response {
+    var body: Map<String, String> = {}
+    body.set("error", message)
+    return Http.json(JSON.to_string(body)).status_code(401)
+}
+
+/// Return 201 created with data
+fun created(data: Any): Http.Response {
+    return Http.json(JSON.to_string(data)).status_code(201)
+}

@@ -1,0 +1,37 @@
+//! API spec generation — serialize endpoint metadata to JSON for client generation.
+
+import "@json" as JSON
+
+/// Serialize a router's spec to JSON string (used by gen_client tool)
+fun to_json(endpoints: List<Map<String, String>>): String {
+    return JSON.to_string(endpoints)
+}
+
+/// Serialize a router's spec to a TOML-style format for readability
+fun to_manifest(endpoints: List<Map<String, String>>): String {
+    var sb = StringBuilder()
+    sb.append("# Auto-generated API spec\n")
+    sb.append("# Source: parsley router\n\n")
+    var i: Float = 0
+    while (i < endpoints.length()) {
+        var ep: Map<String, String> = endpoints[i]
+        sb.append("[[endpoint]]\n")
+        sb.append("method = \"" + ep.get("method") + "\"\n")
+        sb.append("path = \"" + ep.get("path") + "\"\n")
+        if (ep.has("response_type") and ep.get("response_type").length() > 0) {
+            sb.append("response = \"" + ep.get("response_type") + "\"\n")
+        }
+        if (ep.has("body_type") and ep.get("body_type").length() > 0) {
+            sb.append("body = \"" + ep.get("body_type") + "\"\n")
+        }
+        if (ep.get("auth") == "true") {
+            sb.append("auth = true\n")
+        }
+        if (ep.has("description") and ep.get("description").length() > 0) {
+            sb.append("description = \"" + ep.get("description") + "\"\n")
+        }
+        sb.append("\n")
+        i = i + 1
+    }
+    return sb.to_string()
+}

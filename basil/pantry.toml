@@ -1,0 +1,10 @@
+[package]
+name = "basil"
+version = "0.1.0"
+description = "Auto-caching query client for Turmeric frontends"
+type = "library"
+entry = "src/mod.sf"
+target = "wasm32"
+
+[dependencies]
+turmeric = { path = "../turmeric" }
