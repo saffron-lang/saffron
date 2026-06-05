@@ -7617,7 +7617,7 @@ class Codegen {
             }
         }
         var coro_attr: String = ""
-        if (is_coro) { coro_attr = " noinline optnone presplitcoroutine" }
+        if (is_coro) { coro_attr = " presplitcoroutine" }
         var inline_attr: String = ""
         if (!is_coro and this.str_in_list(this.inline_funcs, emit_name)) {
             inline_attr = " alwaysinline"
