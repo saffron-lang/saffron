@@ -7,6 +7,15 @@ import "./db.sf" as Db
 import "./storage.sf" as Storage
 import "./auth.sf" as Auth
 
+fun register(app: Http.App) {
+    app.get("/api/v1/packages", fun (req: Http.Request): Http.Response => list_packages(req))
+    app.get("/api/v1/packages/:name", fun (req: Http.Request): Http.Response => get_package(req))
+    app.get("/api/v1/packages/:name/download/:version", fun (req: Http.Request): Http.Response => download_package(req))
+    app.post("/api/v1/packages/publish", fun (req: Http.Request): Http.Response => publish_package(req))
+    app.post("/api/v1/packages/:name/yank/:version", fun (req: Http.Request): Http.Response => yank_package(req))
+    app.get("/api/v1/search", fun (req: Http.Request): Http.Response => search_packages(req))
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/packages — list all packages
 // ---------------------------------------------------------------------------
