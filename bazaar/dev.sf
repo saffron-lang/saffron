@@ -1,24 +1,26 @@
-//! Bazaar dev runner — builds frontend, starts API server with hot reload.
-//! Usage: saffron run dev.sf
-//!
-//! Watches frontend/src/ for changes, rebuilds WASM, triggers browser reload.
-//! API server runs concurrently on the same port (serves both API + static).
+//! Bazaar dev runner — builds frontend, starts static file server.
+//! Usage: pantry run dev
 
-import "@http/server" as Http
-import "@async" as Async
-import "@watch" as Watch
-import "@path" as Path
 import "@process" as Process
 
-var RELOAD_SCRIPT: String = "\n<script>\n(function() {\n    var es = new EventSource('/__reload');\n    es.onmessage = function(e) { if (e.data === 'reload') window.location.reload(); };\n    es.onerror = function() { setTimeout(function() { window.location.reload(); }, 1000); };\n})();\n</script>\n"
+@extern("void sf_socket_init()") fun _socket_init()
+@extern("i64 sf_tcp_bind(i8*, i64)") fun _tcp_bind(host: String, port: Int): Int
+@extern("i64 sf_tcp_listen(i64, i64)") fun _tcp_listen(fd: Int, backlog: Int): Int
+@extern("i64 sf_tcp_accept(i64)") fun _tcp_accept(listener_fd: Int): Int
+@extern("i64 sf_tcp_poll(i64, i64, i64)") fun _tcp_poll(fd: Int, events: Int, timeout_ms: Int): Int
+@extern("i64 sf_tcp_read(i64, i8*, i64)") fun _tcp_read(fd: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tcp_write(i64, i8*, i64)") fun _tcp_write(fd: Int, buf: Int, len: Int): Int
+@extern("void sf_tcp_close(i64)") fun _tcp_close(fd: Int)
+@extern("void* malloc(i64)") fun _malloc(size: Int): Int
+@extern("void free(void*)") fun _free(ptr: Int)
 
-var _pending_reload: Bool = false
+var port: Int = 3000
 
 fun build_frontend(): Bool {
     IO.println("  [build] Compiling frontend...")
     var result = Process.run("cd frontend && saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm")
     if (result.success) {
-        IO.println("  [build] Done → static/app.wasm")
+        IO.println("  [build] ✓ static/app.wasm")
         Process.run("cp frontend/public/* static/ 2>/dev/null")
         return true
     } else {
@@ -28,98 +30,88 @@ fun build_frontend(): Bool {
     }
 }
 
-fun mime_for(file_path: String): String {
-    if (file_path.ends_with(".html")) { return "text/html; charset=utf-8" }
-    if (file_path.ends_with(".js")) { return "application/javascript" }
-    if (file_path.ends_with(".css")) { return "text/css" }
-    if (file_path.ends_with(".wasm")) { return "application/wasm" }
-    if (file_path.ends_with(".json")) { return "application/json" }
-    if (file_path.ends_with(".png")) { return "image/png" }
-    if (file_path.ends_with(".svg")) { return "image/svg+xml" }
-    if (file_path.ends_with(".ico")) { return "image/x-icon" }
+fun mime_for(path: String): String {
+    if (path.ends_with(".html")) { return "text/html; charset=utf-8" }
+    if (path.ends_with(".js")) { return "application/javascript" }
+    if (path.ends_with(".css")) { return "text/css" }
+    if (path.ends_with(".wasm")) { return "application/wasm" }
+    if (path.ends_with(".json")) { return "application/json" }
+    if (path.ends_with(".png")) { return "image/png" }
+    if (path.ends_with(".svg")) { return "image/svg+xml" }
     return "application/octet-stream"
 }
 
-// --- Main ---
+fun read_request(fd: Int): String {
+    var buf: Int = _malloc(8192)
+    var n: Int = _tcp_read(fd, buf, 8191)
+    if (n <= 0) { _free(buf); return "" }
+    return buf
+}
 
-// Initial build
+fun send_response(fd: Int, status: String, mime: String, body: String) {
+    var headers: String = "HTTP/1.1 " + status + "\r\nContent-Type: " + mime + "\r\nContent-Length: " + body.length().to_string() + "\r\nConnection: close\r\n\r\n"
+    var full: String = headers + body
+    _tcp_write(fd, full, full.length())
+}
+
+fun handle_request(fd: Int) {
+    var raw: String = read_request(fd)
+    if (raw.length() == 0) { _tcp_close(fd); return }
+
+    var lines: List<String> = raw.split("\r\n")
+    if (lines.length() == 0) { _tcp_close(fd); return }
+    var parts: List<String> = lines[0].split(" ")
+    if (parts.length() < 2) { _tcp_close(fd); return }
+    var req_path: String = parts[1]
+
+    // Strip query string
+    var qidx: Int = req_path.index_of("?")
+    if (qidx >= 0) { req_path = req_path.slice(0, qidx) }
+
+    // Resolve file
+    var file_path: String = "static" + req_path
+    if (req_path == "/" or req_path == "") {
+        file_path = "static/index.html"
+    }
+    if (!IO.file_exists(file_path) or file_path.ends_with("/")) {
+        file_path = "static/index.html"
+    }
+    if (!IO.file_exists(file_path)) {
+        send_response(fd, "404 Not Found", "text/plain", "Not Found")
+        _tcp_close(fd)
+        return
+    }
+
+    var content: String = IO.read_file(file_path)
+    var mime: String = mime_for(file_path)
+    send_response(fd, "200 OK", mime, content)
+    _tcp_close(fd)
+}
+
+// --- Main ---
 build_frontend()
 
-// File watcher — watches frontend source for changes
-var watcher = Watch.create()
-watcher.add("frontend/src/")
-watcher.add("frontend/public/")
-
-Task.spawn(fun () => {
-    while (true) {
-        if (watcher.poll(100)) {
-            IO.println("  [watch] File changed, rebuilding...")
-            build_frontend()
-            _pending_reload = true
-        }
-        Async.sleep(0.5)
-    }
-})
-
-// Server (handles both API routes + static frontend)
-var port: Int = 3000
-var app = Http.server(port)
-
-// Hot reload SSE endpoint
-app.get("/__reload") { req =>
-    req.stream { stream =>
-        stream.send("connected")
-        while (true) {
-            if (_pending_reload) {
-                stream.send("reload")
-                _pending_reload = false
-                return
-            }
-            Async.sleep(0.2)
-        }
-    }
+_socket_init()
+var listen_fd: Int = _tcp_bind("0.0.0.0", port)
+if (listen_fd < 0) {
+    IO.println("Error: failed to bind to port " + port.to_string())
+    return
 }
-
-// API routes (import from main server module)
-import "./src/routes.sf" as Routes
-import "./src/db.sf" as Db
-
-Db.init()
-Routes.register(app)
-
-// Static files with reload script injection (catch-all, after API routes)
-app.get("*") { req =>
-    var file_path: String = Path.join(["static", req.path])
-    if (req.path == "/" or req.path == "") {
-        file_path = "static/index.html"
-    }
-    if (!IO.file_exists(file_path)) {
-        file_path = "static/index.html"
-    }
-    if (!IO.file_exists(file_path)) {
-        Http.not_found()
-    } else {
-        var content: String = IO.read_file(file_path)
-        var mime: String = mime_for(file_path)
-        // Inject reload script into HTML
-        if (mime.starts_with("text/html")) {
-            content = content.replace("</body>", RELOAD_SCRIPT + "</body>")
-        }
-        Http.file(content, mime)
-    }
-}
+_tcp_listen(listen_fd, 128)
 
 IO.println("")
-IO.println("  ╔═══════════════════════════════════╗")
-IO.println("  ║  Bazaar Dev Server                ║")
-IO.println("  ║  http://localhost:${port}             ║")
-IO.println("  ║  Watching: frontend/src/          ║")
-IO.println("  ║  Press Ctrl+C to stop             ║")
-IO.println("  ╚═══════════════════════════════════╝")
+IO.println("  Bazaar Dev Server")
+IO.println("  http://localhost:" + port.to_string())
+IO.println("  Press Ctrl+C to stop")
 IO.println("")
 
-try {
-    app.serve()
-} catch (e) {
-    IO.println("Server error: " + e)
+while (true) {
+    // Poll for incoming connection (1 = POLLIN, 1000ms timeout)
+    _tcp_poll(listen_fd, 1, 1000)
+    var client_fd: Int = _tcp_accept(listen_fd)
+    if (client_fd >= 0) {
+        // Poll for readable data on client
+        _tcp_poll(client_fd, 1, 5000)
+        handle_request(client_fd)
+    }
 }
