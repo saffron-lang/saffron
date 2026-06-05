@@ -687,7 +687,36 @@
                 }
                 i = i + 1
             }
-            var entry_is_coro: Bool = this.coroutine_funcs.length() > 0
+            // Only make entry a coroutine if the top-level statements actually
+            // call a coroutine function or contain yield. Merely importing a module
+            // that defines coroutines (e.g. @async) should NOT force the entry to be
+            // a coroutine — that causes scheduler_run() to hang when there's nothing
+            // to schedule.
+            var entry_is_coro: Bool = false
+            var entry_stmts: List<AST.Stmt> = []
+            var es_i: Float = 0
+            while (es_i < program.length()) {
+                if (!this.is_decl(program[es_i])) {
+                    entry_stmts.push(program[es_i])
+                }
+                es_i = es_i + 1
+            }
+            if (this.stmts_have_yield(entry_stmts)) {
+                entry_is_coro = true
+            }
+            if (!entry_is_coro) {
+                var entry_calls: List<String> = []
+                this.collect_calls_from_stmts(entry_stmts, entry_calls)
+                var ec_i: Float = 0
+                while (ec_i < entry_calls.length()) {
+                    var ec: String = entry_calls[ec_i]
+                    if (this.str_in_list(this.coroutine_funcs, ec) or this.str_in_list(this.coroutine_funcs, this.current_prefix + ec)) {
+                        entry_is_coro = true
+                        ec_i = entry_calls.length()
+                    }
+                    ec_i = ec_i + 1
+                }
+            }
             this.emit("")
             if (entry_is_coro) {
                 this.is_coroutine = true
