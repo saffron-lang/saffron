@@ -34,4 +34,38 @@ class Int {
     fun ceil(): Int {
         return this._val
     }
+
+    // --- Operator methods (Phase E preparation) ---
+
+    /// Addition operator.
+    @inline
+    fun add(other: Int): Int { return this._val + other._val }
+
+    /// Subtraction operator.
+    @inline
+    fun sub(other: Int): Int { return this._val - other._val }
+
+    /// Multiplication operator.
+    @inline
+    fun mul(other: Int): Int { return this._val * other._val }
+
+    /// Division operator.
+    @inline
+    fun div(other: Int): Int { return this._val / other._val }
+
+    /// Modulo operator.
+    @inline
+    fun mod(other: Int): Int { return this._val % other._val }
+
+    /// Less-than operator.
+    @inline
+    fun lt(other: Int): Bool { return this._val < other._val }
+
+    /// Greater-than operator.
+    @inline
+    fun gt(other: Int): Bool { return this._val > other._val }
+
+    /// Equality operator.
+    @inline
+    fun eq(other: Int): Bool { return this._val == other._val }
 }

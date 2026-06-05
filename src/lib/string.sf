@@ -121,4 +121,14 @@ class String {
     fun to_number(): Int {
         return _int_to_string(this._ptr)
     }
+
+    // --- Operator methods (Phase E preparation) ---
+
+    /// Concatenation operator.
+    @inline
+    fun add(other: String): String { return this._ptr + other._ptr }
+
+    /// Equality operator.
+    @inline
+    fun eq(other: String): Bool { return this._ptr == other._ptr }
 }

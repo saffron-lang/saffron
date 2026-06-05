@@ -17,4 +17,10 @@ class Bool {
     fun to_int(): Int {
         return this._val
     }
+
+    // --- Operator methods (Phase E preparation) ---
+
+    /// Equality operator.
+    @inline
+    fun eq(other: Bool): Bool { return this._val == other._val }
 }
