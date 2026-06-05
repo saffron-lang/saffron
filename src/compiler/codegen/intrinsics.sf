@@ -125,22 +125,28 @@ extend fun Codegen.gen_extern_call(name: String, args: List<AST.Expr>): String {
             var norm: String = this.normalize_c_type(ptype)
             if (norm == "i8*") {
                 var ptr: String = this.fresh_local()
-                this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8*")
+                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
                 call_args.push("i8* " + ptr)
             } else if (norm == "i8**") {
                 var ptr: String = this.fresh_local()
                 this.emit_indent(ptr + " = inttoptr i64 " + val + " to i8**")
                 call_args.push("i8** " + ptr)
             } else if (norm == "i32") {
+                var untagged: String = this.fresh_local()
+                this.emit_indent(untagged + " = call i64 @__val_untag_int(i64 " + val + ")")
                 var trunc_val: String = this.fresh_local()
-                this.emit_indent(trunc_val + " = trunc i64 " + val + " to i32")
+                this.emit_indent(trunc_val + " = trunc i64 " + untagged + " to i32")
                 call_args.push("i32 " + trunc_val)
             } else if (norm == "double") {
                 var dbl: String = this.fresh_local()
                 this.emit_indent(dbl + " = bitcast i64 " + val + " to double")
                 call_args.push("double " + dbl)
             } else {
-                call_args.push("i64 " + val)
+                var ptr: String = this.fresh_local()
+                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
+                var as_i64: String = this.fresh_local()
+                this.emit_indent(as_i64 + " = ptrtoint i8* " + ptr + " to i64")
+                call_args.push("i64 " + as_i64)
             }
             i = i + 1
         }
