@@ -235,3 +235,27 @@ fun history(): Router {
 fun memory(initial: String): Router {
     return Router(Mode.Memory, initial)
 }
+
+// =============================================================================
+// Link — SPA navigation component
+// =============================================================================
+// Renders <a href="..."> with click interception for client-side navigation.
+// Supports middle-click/ctrl+click for new-tab (falls through to browser).
+//
+// Usage:
+//   Link(router, "/about", cls="nav-link") { text("About") }
+
+// Link renders an <a> with proper href for accessibility/SEO and intercepts
+// clicks for SPA navigation. Use from app code like:
+//   import { Link } from "turmeric/router"
+//   Link(router, "/about", cls="nav-link") { text("About") }
+//
+// The href is set for accessibility (right-click → open in new tab works).
+// Left clicks are intercepted for client-side navigation via router.go().
+fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String = "", block: () => Nil = nil) {
+    var href: String = to
+    if (r._mode == Mode.Hash) {
+        href = "#" + to
+    }
+    a(cls=cls, id=id, style=style, href=href, on_click=fun (e: Any) => r.go(to), block=block)
+}
