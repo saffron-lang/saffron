@@ -1,15 +1,20 @@
 //! Parsley — Typed API framework for Saffron
 //!
-//! Usage:
-//!   import "parsley" as P
+//! Provides compile-time type safety for HTTP API routes.
+//! The response type of each handler is captured and used for:
+//! - Automatic JSON serialization in mount()
+//! - Client code generation via gen_client
+//! - Compile-time validation that handlers return correct types
 //!
-//!   var api = P.router("/api/v1")
-//!   api.get("/packages", list_packages)
-//!   api.get("/packages/:name", get_package)
-//!   api.post("/packages/publish", publish_package).auth(true)
+//! Usage:
+//!   import "parsley" as Parsley
+//!
+//!   var api = Parsley.router("/api/v1")
+//!   api.get("/users", list_users)        // infers Endpoint<ListUsersResponse>
+//!   api.post<CreateUserReq, User>("/users", create_user)
 //!   api.mount(app)
 
-import "./router.sf" as Router
-import "./response.sf" as Response
-import "./request.sf" as Request
-import "./spec.sf" as Spec
+import { router, ApiRouter, Endpoint } from "./router.sf"
+import { ok, created, not_found, bad_request, unauthorized, conflict, ApiResponse, ApiError } from "./response.sf"
+import { body, param, query_params, query_params_from_string } from "./request.sf"
+import { to_json, to_manifest } from "./spec.sf"

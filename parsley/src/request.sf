@@ -1,19 +1,21 @@
-//! Request parsing helpers for Parsley.
+//! Typed request parsing for Parsley.
 
 import "@http/server" as Http
 import "@json" as JSON
 
-/// Parse JSON body from request. Returns nil on parse failure.
-fun parse_body(req: Http.Request): Map<String, Any> {
-    return JSON.parse(req.body)
+/// Parse a JSON request body into a typed structure.
+/// Uses Reflect.construct to build the class instance from parsed JSON.
+fun body<T>(req: Http.Request): T {
+    var parsed = JSON.parse(req.body)
+    return Reflect.construct(T, parsed)
 }
 
-/// Get a path parameter (shorthand)
+/// Get a path parameter.
 fun param(req: Http.Request, name: String): String {
     return req.param(name)
 }
 
-/// Parse a raw query string into a map (testable without Http.Request)
+/// Parse query string from raw string.
 fun query_params_from_string(qs: String): Map<String, String> {
     var result: Map<String, String> = {}
     if (qs.length() == 0) { return result }
@@ -32,7 +34,7 @@ fun query_params_from_string(qs: String): Map<String, String> {
     return result
 }
 
-/// Parse query string from a request
+/// Parse query string from a request.
 fun query_params(req: Http.Request): Map<String, String> {
     return query_params_from_string(req.query)
 }

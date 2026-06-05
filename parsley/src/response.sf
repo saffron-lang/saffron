@@ -1,35 +1,56 @@
-//! Typed response builders for Parsley endpoints.
+//! Typed response types for Parsley.
 
 import "@http/server" as Http
 import "@json" as JSON
 
-/// Return JSON response from a serializable value
-fun json(data: Any): Http.Response {
-    return Http.json(JSON.to_string(data))
+/// Successful JSON response wrapping any serializable type.
+class ApiResponse<T> {
+    var data: T
+    var status: Int
+
+    fun init(data: T, status: Int) {
+        this.data = data
+        this.status = status
+    }
 }
 
-/// Return 404 with standard error body
-fun not_found(message: String): Http.Response {
-    var body: Map<String, String> = {}
-    body.set("error", message)
-    return Http.json(JSON.to_string(body)).status_code(404)
+/// Error response body.
+class ApiError {
+    var error: String
+    var status: Int
+
+    fun init(message: String, status: Int) {
+        this.error = message
+        this.status = status
+    }
 }
 
-/// Return 400 with validation error
-fun bad_request(message: String): Http.Response {
-    var body: Map<String, String> = {}
-    body.set("error", message)
-    return Http.json(JSON.to_string(body)).status_code(400)
+/// Wrap a value in a success response.
+fun ok<T>(data: T): ApiResponse<T> {
+    return ApiResponse<T>(data, 200)
 }
 
-/// Return 401 unauthorized
-fun unauthorized(message: String): Http.Response {
-    var body: Map<String, String> = {}
-    body.set("error", message)
-    return Http.json(JSON.to_string(body)).status_code(401)
+/// 201 Created.
+fun created<T>(data: T): ApiResponse<T> {
+    return ApiResponse<T>(data, 201)
 }
 
-/// Return 201 created with data
-fun created(data: Any): Http.Response {
-    return Http.json(JSON.to_string(data)).status_code(201)
+/// 404 Not Found error.
+fun not_found(message: String): ApiError {
+    return ApiError(message, 404)
+}
+
+/// 400 Bad Request error.
+fun bad_request(message: String): ApiError {
+    return ApiError(message, 400)
+}
+
+/// 401 Unauthorized error.
+fun unauthorized(message: String): ApiError {
+    return ApiError(message, 401)
+}
+
+/// 409 Conflict error.
+fun conflict(message: String): ApiError {
+    return ApiError(message, 409)
 }
