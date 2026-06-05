@@ -1,0 +1,40 @@
+import "@test" as T
+import "../src/cache.sf" as Cache
+
+T.assert(true, "basil cache module loads")
+
+// Test cache store creation
+var store = Cache.CacheStore()
+T.assert(store.entries.keys().length() == 0, "new store is empty")
+
+// Test set and get
+store.set("/api/packages", "data1", 30.0)
+var entry = store.get("/api/packages")
+T.assert(entry != nil, "get returns entry after set")
+T.assert_eq(entry.data, "data1", "entry has correct data")
+T.assert_eq(entry.is_stale, false, "new entry is not stale")
+
+// Test cache miss
+var miss = store.get("/api/nonexistent")
+T.assert(miss == nil, "get returns nil for missing key")
+
+// Test invalidate
+store.invalidate("/api/packages")
+var stale_entry = store.get("/api/packages")
+T.assert(stale_entry != nil, "invalidated entry still exists")
+T.assert_eq(stale_entry.is_stale, true, "invalidated entry is stale")
+
+// Test invalidate_matching
+store.set("/api/users/1", "user1", 30.0)
+store.set("/api/users/2", "user2", 30.0)
+store.set("/api/posts", "posts", 30.0)
+store.invalidate_matching("/api/users")
+T.assert_eq(store.get("/api/users/1").is_stale, true, "matching prefix invalidated")
+T.assert_eq(store.get("/api/users/2").is_stale, true, "matching prefix invalidated 2")
+T.assert_eq(store.get("/api/posts").is_stale, false, "non-matching prefix not invalidated")
+
+// Test remove
+store.remove("/api/posts")
+T.assert(store.get("/api/posts") == nil, "removed entry returns nil")
+
+T.summary()

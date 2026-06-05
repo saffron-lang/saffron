@@ -13,10 +13,9 @@ fun param(req: Http.Request, name: String): String {
     return req.param(name)
 }
 
-/// Parse query string into a map
-fun query_params(req: Http.Request): Map<String, String> {
+/// Parse a raw query string into a map (testable without Http.Request)
+fun query_params_from_string(qs: String): Map<String, String> {
     var result: Map<String, String> = {}
-    var qs: String = req.query
     if (qs.length() == 0) { return result }
     var parts: List<String> = qs.split("&")
     var i: Float = 0
@@ -31,4 +30,9 @@ fun query_params(req: Http.Request): Map<String, String> {
         i = i + 1
     }
     return result
+}
+
+/// Parse query string from a request
+fun query_params(req: Http.Request): Map<String, String> {
+    return query_params_from_string(req.query)
 }
