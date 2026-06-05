@@ -1,0 +1,84 @@
+//! Mutation — for POST/PUT/DELETE requests that modify server state.
+//!
+//! Usage:
+//!   var publish = Basil.mutation("/api/v1/packages/publish", "POST")
+//!   publish.mutate(JSON.to_string(body))
+
+import "turmeric/signal" as Sig
+import "@json" as JSON
+import "./cache.sf" as Cache
+import "./fetch.sf" as Fetch
+
+class Mutation {
+    var url: String
+    var method: String
+    var data: Sig.Signal<Any>
+    var isLoading: Sig.Signal<Bool>
+    var error: Sig.Signal<String>
+    var _on_success: (Any) => Nil
+    var _invalidates: List<String>
+
+    fun init(url: String, method: String) {
+        this.url = url
+        this.method = method
+        this.data = Sig.signal(nil)
+        this.isLoading = Sig.signal(false)
+        this.error = Sig.signal("")
+        this._on_success = nil
+        this._invalidates = []
+    }
+
+    fun mutate(body: String) {
+        this.isLoading.set(true)
+        this.error.set("")
+        var self = this
+        Fetch.post(this.url, body, fun (response: String) => {
+            var parsed = JSON.parse(response)
+            if (parsed != nil) {
+                self.data.set(parsed)
+                self.error.set("")
+                // Invalidate related queries
+                var i: Float = 0
+                while (i < self._invalidates.length()) {
+                    Cache.store.invalidate_matching(self._invalidates[i])
+                    i = i + 1
+                }
+                // Call success handler
+                if (self._on_success != nil) {
+                    self._on_success(parsed)
+                }
+            } else {
+                self.error.set("Request failed")
+            }
+            self.isLoading.set(false)
+        })
+    }
+
+    /// Set cache keys to invalidate on success
+    fun invalidates(prefixes: List<String>): Mutation {
+        this._invalidates = prefixes
+        return this
+    }
+
+    /// Set success callback
+    fun on_success(handler: (Any) => Nil): Mutation {
+        this._on_success = handler
+        return this
+    }
+
+    fun reset() {
+        this.data.set(nil)
+        this.error.set("")
+        this.isLoading.set(false)
+    }
+}
+
+/// Create a mutation for a POST endpoint
+fun mutation(url: String): Mutation {
+    return Mutation(url, "POST")
+}
+
+/// Create a mutation with explicit method
+fun mutation_method(url: String, method: String): Mutation {
+    return Mutation(url, method)
+}

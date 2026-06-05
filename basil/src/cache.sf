@@ -1,0 +1,60 @@
+//! Cache store — holds query results with TTL-based invalidation.
+
+class CacheEntry {
+    var data: Any
+    var timestamp: Float
+    var stale_time: Float
+    var is_stale: Bool
+
+    fun init(data: Any, stale_time: Float) {
+        this.data = data
+        this.timestamp = 0
+        this.stale_time = stale_time
+        this.is_stale = false
+    }
+}
+
+class CacheStore {
+    var entries: Map<String, CacheEntry>
+
+    fun init() {
+        this.entries = {}
+    }
+
+    fun get(key: String): CacheEntry {
+        if (this.entries.has(key)) {
+            return this.entries.get(key)
+        }
+        return nil
+    }
+
+    fun set(key: String, data: Any, stale_time: Float) {
+        this.entries.set(key, CacheEntry(data, stale_time))
+    }
+
+    fun invalidate(key: String) {
+        if (this.entries.has(key)) {
+            this.entries.get(key).is_stale = true
+        }
+    }
+
+    fun invalidate_matching(prefix: String) {
+        var keys: List<String> = this.entries.keys()
+        var i: Float = 0
+        while (i < keys.length()) {
+            if (keys[i].starts_with(prefix)) {
+                this.entries.get(keys[i]).is_stale = true
+            }
+            i = i + 1
+        }
+    }
+
+    fun remove(key: String) {
+        if (this.entries.has(key)) {
+            this.entries.set(key, nil)
+        }
+    }
+}
+
+/// Global cache instance
+var store: CacheStore = CacheStore()

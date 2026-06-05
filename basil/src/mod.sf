@@ -1,0 +1,18 @@
+//! Basil — Auto-caching query client for Turmeric frontends
+//!
+//! Usage:
+//!   import "basil" as B
+//!
+//!   var packages = B.query("/api/v1/packages")
+//!   packages.data.get()       // Signal<Any> — the parsed JSON response
+//!   packages.isLoading.get()  // Signal<Bool>
+//!   packages.refetch()        // force re-fetch
+//!
+//!   var publish = B.mutation("/api/v1/packages/publish")
+//!   publish.mutate(body_json)
+//!   publish.invalidates(["/api/v1/packages"])
+
+import "./query.sf" as Query
+import "./mutation.sf" as Mutation
+import "./cache.sf" as Cache
+import "./fetch.sf" as Fetch
