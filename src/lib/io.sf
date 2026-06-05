@@ -251,6 +251,17 @@ fun read_file(path: String): String {
     return __io_read_file(path)
 }
 
+/// Get the size of a file in bytes. Returns 0 if the file doesn't exist.
+fun file_size(path: String): Int {
+    return __io_file_size(path)
+}
+
+/// Read a file as raw binary into a pre-allocated buffer.
+/// Returns the number of bytes read.
+fun read_binary(path: String, buf: Int, max_size: Int): Int {
+    return __io_read_binary(path, buf, max_size)
+}
+
 /// Write content to a file, creating or overwriting it.
 fun write_file(path: String, content: String) {
     __io_write_file(path, content)
