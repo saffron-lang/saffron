@@ -7,12 +7,14 @@ class Parser {
     var tokens: List<Lexer.Token>
     var pos: Float
     var had_error: Bool
+    var error_count: Float
     var source: String
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
         this.pos = 0
         this.had_error = false
+        this.error_count = 0
         this.source = ""
     }
 
@@ -87,6 +89,18 @@ class Parser {
     }
 
     fun parse_error(message: String) {
+        this.error_count = this.error_count + 1
+        if (this.error_count > 20) {
+            if (this.error_count == 21) {
+                IO.println("Too many errors (20+), stopping.")
+            }
+            this.had_error = true
+            // Skip to EOF to abort parsing
+            while (!this.match_kind_check("eof")) {
+                this.advance()
+            }
+            return
+        }
         IO.println("[line " + this.current_line() + ", col " + this.current_col() + "] Error: " + message)
         if (this.source.length() > 0) {
             var line_num: Float = this.current_line_num()
@@ -2200,8 +2214,24 @@ class Parser {
     fun parse_html_attrs(): List<AST.Expr> {
         var args: List<AST.Expr> = []
         // Parse name=value pairs until > or />
-        while (this.match_kind_check("ident")) {
-            var attr_name: String = this.expect_ident()
+        // Accept identifiers and keywords that are valid HTML attribute names (class, for, etc.)
+        while (this.match_kind_check("ident") or this.match_kind_check("class") or this.match_kind_check("for") or this.match_kind_check("in") or this.match_kind_check("is")) {
+            var attr_name: String = ""
+            if (this.match_kind_check("class")) {
+                attr_name = "cls"
+                this.advance()
+            } else if (this.match_kind_check("for")) {
+                attr_name = "html_for"
+                this.advance()
+            } else if (this.match_kind_check("in")) {
+                attr_name = "in"
+                this.advance()
+            } else if (this.match_kind_check("is")) {
+                attr_name = "is"
+                this.advance()
+            } else {
+                attr_name = this.expect_ident()
+            }
 
             if (this.match_kind("=")) {
                 // name=value
@@ -2483,10 +2513,12 @@ class Parser {
 
 
 
+var _had_error: Bool = false
+
 fun parse(tokens: List<Lexer.Token>): List<AST.Stmt> {
     var p: Parser = Parser(tokens)
     var result: List<AST.Stmt> = p.parse_program()
-    
+    _had_error = p.had_error
     return result
 }
 
@@ -2494,10 +2526,10 @@ fun parse_with_source(tokens: List<Lexer.Token>, source: String): List<AST.Stmt>
     var p: Parser = Parser(tokens)
     p.source = source
     var result: List<AST.Stmt> = p.parse_program()
-    
+    _had_error = p.had_error
     return result
 }
 
 fun had_error(): Bool {
-    return false
+    return _had_error
 }

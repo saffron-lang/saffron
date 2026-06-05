@@ -117,30 +117,30 @@ fun PackageCard(pkg: Map<String, String>) {
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
-    <div class="bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer" on_click={fun (e: Event) => load_package_detail(name)}>
-        <div class="flex items-center justify-between mb-2">
-            <h2 class="text-lg font-bold text-white">{name}</h2>
-            <span class="text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded">v{version}</span>
+    <div cls="bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer" on_click={fun (e: Event) => load_package_detail(name)}>
+        <div cls="flex items-center justify-between mb-2">
+            <h2 cls="text-lg font-bold text-white">{name}</h2>
+            <span cls="text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded">v{version}</span>
         </div>
         {if (description.length() > 0) {
-            <p class="text-sm text-gray-400 mb-3">{description}</p>
+            <p cls="text-sm text-gray-400 mb-3">{description}</p>
         }}
-        <div class="font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700">
+        <div cls="font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700">
             <code>pantry add {name}</code>
         </div>
     </div>
 }
 
 fun SearchBar() {
-    <form class="w-full max-w-2xl mx-auto mb-8" on_submit={fun (e: Event) => do_search()}>
-        <div class="flex gap-2">
+    <form cls="w-full max-w-2xl mx-auto mb-8" on_submit={fun (e: Event) => do_search()}>
+        <div cls="flex gap-2">
             <input
-                class="flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all"
+                cls="flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all"
                 type="text"
                 placeholder="Search packages..."
                 on_input={fun (e: Event) => search_query.set(e.target_value)}
             />
-            <button class="px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors" type="submit">
+            <button cls="px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors" type="submit">
                 Search
             </button>
         </div>
@@ -148,31 +148,31 @@ fun SearchBar() {
 }
 
 fun NavBar() {
-    <nav class="sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800">
-        <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-            <a class="text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
+    <nav cls="sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800">
+        <div cls="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+            <a cls="text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
                 Bazaar
             </a>
-            <div class="flex items-center gap-5">
-                <a class="text-sm text-gray-400 hover:text-white transition-colors" href="https://saffron-lang.org/docs">Docs</a>
-                <a class="text-sm text-gray-400 hover:text-white transition-colors" href="https://github.com/henry232323/saffron">GitHub</a>
-                <a class="text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Publish</a>
-                <a class="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">Login</a>
+            <div cls="flex items-center gap-5">
+                <a cls="text-sm text-gray-400 hover:text-white transition-colors" href="https://saffron-lang.org/docs">Docs</a>
+                <a cls="text-sm text-gray-400 hover:text-white transition-colors" href="https://github.com/henry232323/saffron">GitHub</a>
+                <a cls="text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Publish</a>
+                <a cls="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">Login</a>
             </div>
         </div>
     </nav>
 }
 
 fun HomePage() {
-    <div class="min-h-screen">
-        <header class="text-center py-16">
-            <h1 class="text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3">Bazaar</h1>
-            <p class="text-lg text-gray-400">The Saffron package registry</p>
+    <div cls="min-h-screen">
+        <header cls="text-center py-16">
+            <h1 cls="text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3">Bazaar</h1>
+            <p cls="text-lg text-gray-400">The Saffron package registry</p>
         </header>
         {SearchBar()}
-        <section class="max-w-4xl mx-auto px-6">
-            <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-4">All Packages</h3>
-            <div class="grid gap-4">
+        <section cls="max-w-4xl mx-auto px-6">
+            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-4">All Packages</h3>
+            <div cls="grid gap-4">
                 {var pkgs = featured_packages.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
@@ -180,7 +180,7 @@ fun HomePage() {
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    <p class="text-center text-gray-500 py-12">No packages published yet. Be the first!</p>
+                    <p cls="text-center text-gray-500 py-12">No packages published yet. Be the first!</p>
                 }}
             </div>
         </section>
@@ -188,13 +188,13 @@ fun HomePage() {
 }
 
 fun SearchResultsPage() {
-    <div class="min-h-screen max-w-4xl mx-auto px-6 py-8">
+    <div cls="min-h-screen max-w-4xl mx-auto px-6 py-8">
         {SearchBar()}
         <section>
-            <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-4">
+            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-4">
                 Search results for "{search_query.get()}"
             </h3>
-            <div class="grid gap-4">
+            <div cls="grid gap-4">
                 {var pkgs = search_results.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
@@ -202,7 +202,7 @@ fun SearchResultsPage() {
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    <p class="text-center text-gray-500 py-12">No packages found matching your query.</p>
+                    <p cls="text-center text-gray-500 py-12">No packages found matching your query.</p>
                 }}
             </div>
         </section>
@@ -215,40 +215,40 @@ fun PackageDetailPage() {
     var description: String = detail_description.get()
     var versions = detail_versions.get()
 
-    <div class="min-h-screen max-w-4xl mx-auto px-6 py-8">
-        <a class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
+    <div cls="min-h-screen max-w-4xl mx-auto px-6 py-8">
+        <a cls="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
             ← Back to packages
         </a>
 
-        <div class="flex items-center gap-4 mb-4">
-            <h1 class="text-3xl font-bold text-white">{name}</h1>
-            <span class="text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded">v{latest}</span>
+        <div cls="flex items-center gap-4 mb-4">
+            <h1 cls="text-3xl font-bold text-white">{name}</h1>
+            <span cls="text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded">v{latest}</span>
         </div>
 
         {if (description.length() > 0) {
-            <p class="text-gray-400 text-lg mb-6">{description}</p>
+            <p cls="text-gray-400 text-lg mb-6">{description}</p>
         }}
 
-        <div class="mb-8">
-            <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-2">Install</h3>
-            <div class="bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200">
+        <div cls="mb-8">
+            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-2">Install</h3>
+            <div cls="bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200">
                 <code>pantry add {name}</code>
             </div>
         </div>
 
         {if (versions.length() > 0) {
             <section>
-                <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">
+                <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-3">
                     Versions ({versions.length().to_string()})
                 </h3>
-                <div class="space-y-2">
+                <div cls="space-y-2">
                     {var i: Float = versions.length() - 1
                     while (i >= 0) {
                         var v = versions[i]
-                        <div class="flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50">
-                            <span class="font-mono text-sm text-white">{v.get("vers")}</span>
+                        <div cls="flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50">
+                            <span cls="font-mono text-sm text-white">{v.get("vers")}</span>
                             {if (v.has("yanked") and v.get("yanked") == "true") {
-                                <span class="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded">yanked</span>
+                                <span cls="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded">yanked</span>
                             }}
                         </div>
                         i = i - 1
@@ -261,9 +261,9 @@ fun PackageDetailPage() {
 
 fun LoadingIndicator() {
     if (is_loading.get()) {
-        <div class="flex items-center justify-center py-12 gap-3">
-            <div class="w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin"></div>
-            <span class="text-gray-400 text-sm">Loading...</span>
+        <div cls="flex items-center justify-center py-12 gap-3">
+            <div cls="w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin"></div>
+            <span cls="text-gray-400 text-sm">Loading...</span>
         </div>
     }
 }
@@ -273,15 +273,15 @@ fun LoadingIndicator() {
 // =============================================================================
 
 fun App() {
-    <div id="bazaar-app" class="min-h-screen flex flex-col">
+    <div id="bazaar-app" cls="min-h-screen flex flex-col">
         {NavBar()}
-        <div class="flex-1">
+        <div cls="flex-1">
             {LoadingIndicator()}
             {router.render()}
         </div>
-        <footer class="border-t border-gray-800 py-6 text-center">
-            <p class="text-sm text-gray-500">Bazaar — the Saffron package registry</p>
-            <p class="text-xs text-gray-600 mt-1">Built with Saffron + Turmeric</p>
+        <footer cls="border-t border-gray-800 py-6 text-center">
+            <p cls="text-sm text-gray-500">Bazaar — the Saffron package registry</p>
+            <p cls="text-xs text-gray-600 mt-1">Built with Saffron + Turmeric</p>
         </footer>
     </div>
 }
