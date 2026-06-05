@@ -1,49 +1,50 @@
-//! Mutation — for POST/PUT/DELETE requests that modify server state.
+//! Mutation — typed POST/PUT/DELETE with cache invalidation.
 //!
 //! Usage:
-//!   var publish = Basil.mutation("/api/v1/packages/publish", "POST")
-//!   publish.mutate(JSON.to_string(body))
+//!   import "basil/mutation" as Mutation
+//!   var publish = Mutation.mutation<PublishRequest, PublishResponse>("/api/v1/publish")
+//!   publish.mutate(PublishRequest("pkg", "1.0", data))
+//!   publish.data.get()  // Signal<PublishResponse?>
 
-import "turmeric/signal" as Sig
+import "turmeric/signal" as Signal
 import "@json" as JSON
 import "./cache.sf" as Cache
 import "./fetch.sf" as Fetch
 
-class Mutation {
+class Mutation<TRequest, TResponse> {
     var url: String
     var method: String
-    var data: Sig.Signal<Any>
-    var isLoading: Sig.Signal<Bool>
-    var error: Sig.Signal<String>
-    var _on_success: (Any) => Nil
+    var data: Signal.Signal<TResponse>
+    var isLoading: Signal.Signal<Bool>
+    var error: Signal.Signal<String>
+    var _on_success: (TResponse) => Nil
     var _invalidates: List<String>
 
     fun init(url: String, method: String) {
         this.url = url
         this.method = method
-        this.data = Sig.signal(nil)
-        this.isLoading = Sig.signal(false)
-        this.error = Sig.signal("")
+        this.data = Signal.signal(nil)
+        this.isLoading = Signal.signal(false)
+        this.error = Signal.signal("")
         this._on_success = nil
         this._invalidates = []
     }
 
-    fun mutate(body: String) {
+    fun mutate(body: TRequest) {
         this.isLoading.set(true)
         this.error.set("")
         var self = this
-        Fetch.post(this.url, body, fun (response: String) => {
-            var parsed = JSON.parse(response)
+        var body_json: String = JSON.to_string(body)
+        Fetch.post(self.url, body_json, fun (response: String) => {
+            var parsed: TResponse = JSON.parse_as<TResponse>(response)
             if (parsed != nil) {
                 self.data.set(parsed)
                 self.error.set("")
-                // Invalidate related queries
                 var i: Float = 0
                 while (i < self._invalidates.length()) {
                     Cache.store.invalidate_matching(self._invalidates[i])
                     i = i + 1
                 }
-                // Call success handler
                 if (self._on_success != nil) {
                     self._on_success(parsed)
                 }
@@ -54,14 +55,12 @@ class Mutation {
         })
     }
 
-    /// Set cache keys to invalidate on success
-    fun invalidates(prefixes: List<String>): Mutation {
+    fun invalidates(prefixes: List<String>): Mutation<TRequest, TResponse> {
         this._invalidates = prefixes
         return this
     }
 
-    /// Set success callback
-    fun on_success(handler: (Any) => Nil): Mutation {
+    fun on_success(handler: (TResponse) => Nil): Mutation<TRequest, TResponse> {
         this._on_success = handler
         return this
     }
@@ -73,12 +72,12 @@ class Mutation {
     }
 }
 
-/// Create a mutation for a POST endpoint
-fun mutation(url: String): Mutation {
-    return Mutation(url, "POST")
+/// Create a typed mutation (defaults to POST).
+fun mutation<TRequest, TResponse>(url: String): Mutation<TRequest, TResponse> {
+    return Mutation<TRequest, TResponse>(url, "POST")
 }
 
-/// Create a mutation with explicit method
-fun mutation_method(url: String, method: String): Mutation {
-    return Mutation(url, method)
+/// Create a typed mutation with explicit HTTP method.
+fun mutation_method<TRequest, TResponse>(url: String, method: String): Mutation<TRequest, TResponse> {
+    return Mutation<TRequest, TResponse>(url, method)
 }

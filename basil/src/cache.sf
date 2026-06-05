@@ -56,5 +56,4 @@ class CacheStore {
     }
 }
 
-/// Global cache instance
 var store: CacheStore = CacheStore()

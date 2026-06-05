@@ -1,18 +1,22 @@
-//! Basil — Auto-caching query client for Turmeric frontends
+//! Basil — Typed auto-caching query client for Turmeric frontends
+//!
+//! Provides compile-time type safety for API data fetching:
+//!   - Query<T> for GET requests with caching + signals
+//!   - Mutation<TReq, TRes> for POST/PUT/DELETE with invalidation
 //!
 //! Usage:
-//!   import "basil" as B
+//!   import "basil" as Basil
 //!
-//!   var packages = B.query("/api/v1/packages")
-//!   packages.data.get()       // Signal<Any> — the parsed JSON response
+//!   var packages = Basil.query<PackageList>("/api/v1/packages")
+//!   packages.data.get()       // Signal<PackageList?>
 //!   packages.isLoading.get()  // Signal<Bool>
-//!   packages.refetch()        // force re-fetch
+//!   packages.refetch()
 //!
-//!   var publish = B.mutation("/api/v1/packages/publish")
-//!   publish.mutate(body_json)
-//!   publish.invalidates(["/api/v1/packages"])
+//!   var publish = Basil.mutation<PublishReq, PublishRes>("/api/v1/publish")
+//!       .invalidates(["/api/v1/packages"])
+//!   publish.mutate(body)
 
-import "./query.sf" as Query
-import "./mutation.sf" as Mutation
-import "./cache.sf" as Cache
-import "./fetch.sf" as Fetch
+import { query, query_with, Query } from "./query.sf"
+import { mutation, mutation_method, Mutation } from "./mutation.sf"
+import { CacheStore, CacheEntry, store } from "./cache.sf"
+import { get, post, __on_fetch_complete } from "./fetch.sf"

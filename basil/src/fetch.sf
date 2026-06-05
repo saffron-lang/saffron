@@ -6,7 +6,6 @@
 var _next_id: Float = 0
 var _callbacks: Map<Float, (String) => Nil> = {}
 
-/// Fetch JSON from a URL. Calls callback with response body string.
 fun get(url: String, callback: (String) => Nil) {
     _next_id = _next_id + 1
     var id: Float = _next_id
@@ -14,7 +13,6 @@ fun get(url: String, callback: (String) => Nil) {
     _fetch_json(url, id)
 }
 
-/// POST JSON to a URL. Calls callback with response body string.
 fun post(url: String, body: String, callback: (String) => Nil) {
     _next_id = _next_id + 1
     var id: Float = _next_id
@@ -22,7 +20,6 @@ fun post(url: String, body: String, callback: (String) => Nil) {
     _fetch_post(url, body, id)
 }
 
-/// Called from JS when a fetch completes
 fun __on_fetch_complete(id: Float, response: String) {
     if (_callbacks.has(id)) {
         _callbacks.get(id)(response)
