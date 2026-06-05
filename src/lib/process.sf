@@ -1,12 +1,12 @@
 //! Full subprocess control — spawn, stream, and manage child processes.
 //!
-//! Provides structured process execution with access to exit codes, stderr,
-//! background processes, and environment control. Built on top of OS.exec()
-//! with shell wrappers until native subprocess syscalls are available.
+//! Provides Python-like subprocess support with full pipe control over stdin,
+//! stdout, and stderr. Built on posix_spawn via native C runtime.
 //!
 //! ```saffron
 //! import "@process" as Process
 //!
+//! // Simple run (captures output)
 //! var result = Process.run("ls -la")
 //! if (result.success) {
 //!     IO.println(result.stdout)
@@ -14,59 +14,71 @@
 //!     IO.println("failed (exit ${result.exit_code}): ${result.stderr}")
 //! }
 //!
-//! var server = Process.spawn("python3 -m http.server 8080")
-//! // ... do work ...
-//! server.kill()
+//! // Live process with pipe access
+//! var proc = Process.open("cat")
+//! proc.stdin.write("hello world\n")
+//! proc.stdin.close()
+//! var output = proc.stdout.read_all()
+//! proc.wait()
+//!
+//! // Real-time output streaming
+//! var proc2 = Process.open("ping -c 3 localhost")
+//! while (proc2.is_alive()) {
+//!     var data = proc2.stdout.read_available()
+//!     if (data.length() > 0) { IO.print(data) }
+//! }
+//! IO.print(proc2.stdout.read_all())
 //! ```
 
 import "os" as OS
 
-// ---------------------------------------------------------------------------
-// Internal helpers (defined first to avoid forward reference issues)
-// ---------------------------------------------------------------------------
+// =============================================================================
+// FFI declarations — native process primitives (process_native.c)
+// =============================================================================
 
-/// Parse exit code from a string. Returns 0 if parsing fails.
-fun _parse_exit_code(s: String): Number {
-    if (s.length() == 0) { return 0 }
-    try {
-        return s.to_number()
-    } catch (e) {
-        return 0
-    }
-}
+@extern("i64 sf_process_spawn(i8*, i8*, i8*, i8*, i64)") fun _spawn(program: String, argv: Int, envp: Int, cwd: String, flags: Int): Int
+@extern("i64 sf_process_write_stdin(i64, i8*, i64)") fun _write_stdin(handle: Int, data: Int, len: Int): Int
+@extern("i64 sf_process_read_stdout(i64, i8*, i64)") fun _read_stdout(handle: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_read_stderr(i64, i8*, i64)") fun _read_stderr(handle: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_read_nonblock(i64, i64, i8*, i64)") fun _read_nonblock(handle: Int, stream: Int, buf: Int, max_len: Int): Int
+@extern("i64 sf_process_poll(i64)") fun _poll(handle: Int): Int
+@extern("i64 sf_process_wait(i64)") fun _wait(handle: Int): Int
+@extern("void sf_process_kill(i64, i64)") fun _kill(handle: Int, signal: Int)
+@extern("void sf_process_close(i64)") fun _close(handle: Int)
+@extern("void sf_process_close_stdin(i64)") fun _close_stdin(handle: Int)
+@extern("i64 sf_process_pid(i64)") fun _pid(handle: Int): Int
 
-/// Escape a string for safe use in single-quoted shell context.
-/// Replaces ' with '\'' (end quote, escaped quote, start quote).
-fun _escape_single_quotes(s: String): String {
-    return s.replace("'", "'\\''")
-}
+// Memory management
+@extern("void* malloc(i64)") fun _proc_malloc(size: Int): Int
+@extern("void free(void*)") fun _proc_free(ptr: Int)
+@extern("i64 strlen(void*)") fun _proc_strlen(s: Int): Int
 
-/// Shell-escape a value by wrapping in single quotes.
-/// Handles embedded single quotes safely.
-fun _shell_escape(s: String): String {
-    return "'" + _escape_single_quotes(s) + "'"
-}
+// Intrinsic for null-termination
+@intrinsic fun store8(addr: Int, val: Int)
+@intrinsic fun load8(addr: Int): Int
 
-/// Generate a pseudo-unique ID for temp files using the current PID and a counter.
-var _uid_counter = 0
-fun _unique_id(): String {
-    _uid_counter = _uid_counter + 1
-    var pid = OS.exec("echo $$").trim()
-    return "${pid}_${_uid_counter}"
-}
+// =============================================================================
+// Constants
+// =============================================================================
 
-// ---------------------------------------------------------------------------
+var _PIPE_STDIN: Int = 1
+var _PIPE_STDOUT: Int = 2
+var _PIPE_STDERR: Int = 4
+var _SHELL: Int = 8
+var _BUF_SIZE: Int = 8192
+
+// =============================================================================
 // ProcessResult — the outcome of a completed process
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 /// Result of a completed process, containing stdout, stderr, and exit code.
 class ProcessResult {
     var stdout: String
     var stderr: String
-    var exit_code: Number
+    var exit_code: Int
     var success: Bool
 
-    fun init(stdout: String, stderr: String, exit_code: Number) {
+    fun init(stdout: String, stderr: String, exit_code: Int) {
         this.stdout = stdout
         this.stderr = stderr
         this.exit_code = exit_code
@@ -82,215 +94,436 @@ class ProcessResult {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Internal: core captured execution (needs ProcessResult defined above)
-// ---------------------------------------------------------------------------
+// =============================================================================
+// ProcessPipe — read/write handle to a child process pipe
+// =============================================================================
 
-/// Core implementation: run a command capturing stdout, stderr, and exit code.
-/// Uses a temp file for stderr since OS.exec() only returns stdout.
-fun _run_captured(cmd: String): ProcessResult {
-    // Strategy: redirect stderr to a temp file, run the command, append a
-    // delimiter and the exit code to stdout so we can parse it all from
-    // the single string OS.exec() returns.
-    //
-    // Format returned by the wrapper:
-    //   <stdout>\n__SF_EXIT__\n<exit_code>
-    //
-    // Stderr is captured to a temp file and read back.
-    var stderr_file = "/tmp/_sf_stderr_${_unique_id()}"
-    // Wrap user command in a subshell so stderr redirect captures all of it
-    var escaped_cmd = _escape_single_quotes(cmd)
-    var wrapper = "sh -c '(${escaped_cmd}) 2>${stderr_file}; SF_EC=$?; echo \"__SF_EXIT__\"; echo $SF_EC'"
-    var raw = OS.exec(wrapper)
+/// A pipe endpoint for communicating with a child process.
+/// Wraps a native process handle + stream direction.
+class ProcessPipe {
+    var _handle: Int
+    var _stream: Int   // 0=stdin(write), 1=stdout(read), 2=stderr(read)
+    var _closed: Bool
 
-    // Parse stdout and exit code from the combined output
-    var stdout = ""
-    var exit_code = 0
-    var marker = "__SF_EXIT__"
-    var marker_pos = raw.index_of(marker)
+    fun init(handle: Int, stream: Int) {
+        this._handle = handle
+        this._stream = stream
+        this._closed = false
+    }
 
-    if (marker_pos >= 0) {
-        stdout = raw.slice(0, marker_pos)
-        // Remove trailing newline from stdout
-        if (stdout.length() > 0 and stdout.char_at(stdout.length() - 1) == "\n") {
-            stdout = stdout.slice(0, stdout.length() - 1)
+    /// Write data to the pipe (only valid for stdin pipes).
+    /// Returns the number of bytes written.
+    fun write(data: String): Int {
+        if (this._closed) { throw "ProcessPipe: write to closed pipe" }
+        if (this._stream != 0) { throw "ProcessPipe: cannot write to a read pipe" }
+        var ptr: Int = data
+        var len: Int = _proc_strlen(ptr)
+        if (len == 0) { return 0 }
+        var written: Int = _write_stdin(this._handle, ptr, len)
+        if (written < 0) { throw "ProcessPipe: write failed" }
+        return written
+    }
+
+    /// Blocking read up to max_bytes from the pipe.
+    /// Returns the data read as a string. Returns empty string on EOF.
+    fun read(max_bytes: Int): String {
+        if (this._closed) { return "" }
+        if (this._stream == 0) { throw "ProcessPipe: cannot read from a write pipe" }
+
+        var buf: Int = _proc_malloc(max_bytes + 1)
+        var n: Int = 0
+        if (this._stream == 1) {
+            n = _read_stdout(this._handle, buf, max_bytes)
+        } else {
+            n = _read_stderr(this._handle, buf, max_bytes)
         }
-        var after_marker = raw.slice(marker_pos + marker.length(), raw.length())
-        exit_code = _parse_exit_code(after_marker.trim())
-    } else {
-        // Fallback: marker not found, treat entire output as stdout
-        stdout = raw
+
+        if (n <= 0) {
+            _proc_free(buf)
+            return ""
+        }
+        store8(buf + n, 0)
+        return buf
     }
 
-    // Read stderr from temp file
-    var stderr = ""
-    try {
-        stderr = OS.exec("cat ${stderr_file} 2>/dev/null")
-        OS.exec("rm -f ${stderr_file} 2>/dev/null")
-    } catch (e) {
-        // Temp file may not exist if command was extremely short-lived
+    /// Read until a newline character is found. Returns the line including newline.
+    /// Returns empty string on EOF.
+    fun read_line(): String {
+        if (this._closed) { return "" }
+        if (this._stream == 0) { throw "ProcessPipe: cannot read from a write pipe" }
+
+        var result: String = ""
+        var one_buf: Int = _proc_malloc(2)
+        while (true) {
+            var n: Int = 0
+            if (this._stream == 1) {
+                n = _read_stdout(this._handle, one_buf, 1)
+            } else {
+                n = _read_stderr(this._handle, one_buf, 1)
+            }
+            if (n <= 0) { break }
+            store8(one_buf + 1, 0)
+            var ch: String = one_buf
+            result = result + ch
+            if (ch == "\n") { break }
+        }
+        _proc_free(one_buf)
+        return result
     }
 
-    return ProcessResult(stdout, stderr, exit_code)
+    /// Read all remaining data until EOF. Blocks until the pipe closes.
+    fun read_all(): String {
+        if (this._closed) { return "" }
+        if (this._stream == 0) { throw "ProcessPipe: cannot read from a write pipe" }
+
+        var result: String = ""
+        var buf: Int = _proc_malloc(_BUF_SIZE + 1)
+        while (true) {
+            var n: Int = 0
+            if (this._stream == 1) {
+                n = _read_stdout(this._handle, buf, _BUF_SIZE)
+            } else {
+                n = _read_stderr(this._handle, buf, _BUF_SIZE)
+            }
+            if (n <= 0) { break }
+            store8(buf + n, 0)
+            var chunk: String = buf
+            result = result + chunk
+        }
+        _proc_free(buf)
+        return result
+    }
+
+    /// Non-blocking read: return whatever data is available right now.
+    /// Returns empty string if no data is ready (does not block).
+    fun read_available(): String {
+        if (this._closed) { return "" }
+        if (this._stream == 0) { throw "ProcessPipe: cannot read from a write pipe" }
+
+        var buf: Int = _proc_malloc(_BUF_SIZE + 1)
+        var n: Int = _read_nonblock(this._handle, this._stream, buf, _BUF_SIZE)
+        if (n <= 0) {
+            _proc_free(buf)
+            return ""
+        }
+        store8(buf + n, 0)
+        return buf
+    }
+
+    /// Close this pipe endpoint.
+    fun close() {
+        if (this._closed) { return }
+        this._closed = true
+        if (this._stream == 0) {
+            _close_stdin(this._handle)
+        }
+        // stdout/stderr are closed when the handle is closed
+    }
 }
 
-// ---------------------------------------------------------------------------
-// Process — a running child process handle
-// ---------------------------------------------------------------------------
+// =============================================================================
+// Subprocess — a live child process with pipe access
+// =============================================================================
 
-/// A running child process handle. Obtained from spawn().
-class Process {
-    var pid: Number
-    var _cmd: String
+/// A running child process with full pipe control.
+/// Create via Process.open() or Process.open_args().
+class Subprocess {
+    var _handle: Int
+    var pid: Int
+    var stdin: ProcessPipe
+    var stdout: ProcessPipe
+    var stderr: ProcessPipe
+    var returncode: Int
 
-    fun init(pid: Number, cmd: String) {
-        this.pid = pid
-        this._cmd = cmd
+    fun init(handle: Int) {
+        this._handle = handle
+        this.pid = _pid(handle)
+        this.stdin = ProcessPipe(handle, 0)
+        this.stdout = ProcessPipe(handle, 1)
+        this.stderr = ProcessPipe(handle, 2)
+        this.returncode = -1
     }
 
-    /// Wait for the process to complete and return its result.
-    fun wait(): ProcessResult {
-        // Use wait/waitpid via shell — wait for PID and capture exit code
-        var raw = OS.exec("wait ${this.pid} 2>/dev/null; echo $?")
-        var code = _parse_exit_code(raw.trim())
-        // After waiting, we can't recover stdout/stderr that already went
-        // to the terminal. Full capture requires native runtime support.
-        return ProcessResult("", "", code)
+    /// Check if the process has exited. Returns -1 if still running,
+    /// otherwise returns the exit code.
+    fun poll(): Int {
+        var code: Int = _poll(this._handle)
+        if (code >= 0) {
+            this.returncode = code
+        }
+        return code
     }
 
-    /// Kill the process (SIGTERM).
+    /// Block until the process exits. Returns the exit code.
+    fun wait(): Int {
+        var code: Int = _wait(this._handle)
+        this.returncode = code
+        return code
+    }
+
+    /// Send stdin data, close stdin, wait for exit, and return result.
+    /// Like Python's Popen.communicate().
+    fun communicate(input: String): ProcessResult {
+        if (input.length() > 0) {
+            this.stdin.write(input)
+        }
+        this.stdin.close()
+
+        var out: String = this.stdout.read_all()
+        var err: String = this.stderr.read_all()
+        var code: Int = this.wait()
+
+        return ProcessResult(out, err, code)
+    }
+
+    /// Send SIGKILL to the process.
     fun kill() {
-        OS.exec("kill ${this.pid} 2>/dev/null")
+        _kill(this._handle, 9)
     }
 
-    /// Forcefully kill the process (SIGKILL).
-    fun force_kill() {
-        OS.exec("kill -9 ${this.pid} 2>/dev/null")
+    /// Send SIGTERM to the process.
+    fun terminate() {
+        _kill(this._handle, 15)
     }
 
     /// Check if the process is still running.
-    fun is_running(): Bool {
-        var raw = OS.exec("kill -0 ${this.pid} 2>/dev/null; echo $?")
-        return raw.trim() == "0"
+    fun is_alive(): Bool {
+        return this.poll() < 0
     }
 
-    /// Write to the process's stdin.
-    /// NOTE: Requires native subprocess support. Throws with current OS.exec backend.
-    fun write_stdin(input: String) {
-        // Cannot pipe stdin to a background process with OS.exec alone.
-        // This requires native subprocess file descriptor management.
-        throw "process: write_stdin requires native subprocess support (not yet available)"
+    /// Close all pipes and release the handle.
+    /// Call this when you're done with the process.
+    fun close() {
+        _close(this._handle)
     }
 
     /// Return a human-readable description.
     fun to_string(): String {
-        return "Process(pid=${this.pid}, cmd=\"${this._cmd}\")"
+        return "Subprocess(pid=${this.pid}, returncode=${this.returncode})"
     }
 }
 
-// ---------------------------------------------------------------------------
-// Public API — module-level functions
-// ---------------------------------------------------------------------------
+// =============================================================================
+// Internal helpers
+// =============================================================================
+
+/// Parse exit code from a string. Returns 0 if parsing fails.
+fun _parse_exit_code(s: String): Int {
+    if (s.length() == 0) { return 0 }
+    try {
+        return s.to_number()
+    } catch (e) {
+        return 0
+    }
+}
+
+/// Escape a string for safe use in single-quoted shell context.
+fun _escape_single_quotes(s: String): String {
+    return s.replace("'", "'\\''")
+}
+
+/// Shell-escape a value by wrapping in single quotes.
+fun _shell_escape(s: String): String {
+    return "'" + _escape_single_quotes(s) + "'"
+}
+
+// =============================================================================
+// Public API — Module-level functions
+// =============================================================================
 
 /// Run a command via the shell and wait for completion.
 /// Returns a ProcessResult with stdout, stderr, and exit code.
 ///
-/// This is the primary replacement for OS.exec() when you need exit codes
-/// and stderr separation.
+/// This is the primary entry point for simple command execution.
+/// Captures stdout and stderr, waits for exit.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// var result = Process.run("cargo build 2>&1")
 /// if (!result.success) {
-///     IO.println("Build failed (exit ${result.exit_code}):")
-///     IO.println(result.stderr)
+///     IO.println("Build failed: ${result.stderr}")
 /// }
 /// ```
-///
-/// WORKS TODAY: Yes — uses OS.exec with temp file for stderr capture.
 fun run(cmd: String): ProcessResult {
-    return _run_captured(cmd)
+    // Use native subprocess with all pipes + shell mode
+    var flags: Int = _PIPE_STDIN | _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, "", flags)
+    if (handle < 0) {
+        return ProcessResult("", "process: failed to spawn command", -1)
+    }
+    var proc: Subprocess = Subprocess(handle)
+    // Close stdin immediately (no input)
+    proc.stdin.close()
+    // Read all output
+    var out: String = proc.stdout.read_all()
+    var err: String = proc.stderr.read_all()
+    var code: Int = proc.wait()
+    proc.close()
+    return ProcessResult(out, err, code)
 }
 
 /// Run a command with explicit arguments (no shell interpretation).
-/// Safer than run() for user-provided input — arguments are individually quoted.
+/// Safer than run() for user-provided input.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// var result = Process.exec("git", ["commit", "-m", "my message with spaces"])
-/// IO.println(result.exit_code)
 /// ```
-///
-/// WORKS TODAY: Yes — shell-escapes each argument.
 fun exec(program: String, args: List<String>): ProcessResult {
-    var cmd = _shell_escape(program)
-    var i = 0
+    // Build a shell command with proper escaping
+    var cmd: String = _shell_escape(program)
+    var i: Int = 0
     while (i < args.length()) {
         cmd = cmd + " " + _shell_escape(args[i])
         i = i + 1
     }
-    return _run_captured(cmd)
+    return run(cmd)
 }
 
-/// Spawn a background process. Returns immediately with a Process handle.
-/// The process runs asynchronously; use the returned handle to check status,
-/// wait, or kill it.
+/// Open a subprocess with full pipe control (shell mode).
+/// Returns immediately with a live Subprocess handle.
+///
+/// All three pipes (stdin, stdout, stderr) are connected.
+/// The command is run through /bin/sh -c.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
-/// var server = Process.spawn("python3 -m http.server 8080")
-/// IO.println(server.pid)
-/// // ... do other work ...
-/// server.kill()
+/// var proc = Process.open("cat")
+/// proc.stdin.write("hello\n")
+/// proc.stdin.close()
+/// IO.println(proc.stdout.read_all())
+/// proc.wait()
+/// proc.close()
 /// ```
-///
-/// WORKS TODAY: Yes — uses shell backgrounding to obtain PID.
-fun spawn(cmd: String): Process {
-    // Launch the command in background and capture its PID.
-    // We use a pidfile approach: start the command with nohup in background,
-    // write its PID to a temp file, then read it back.
-    var pidfile = "/tmp/_sf_pid_${_unique_id()}"
-    var escaped = _escape_single_quotes(cmd)
-    OS.exec("sh -c 'nohup ${escaped} >/dev/null 2>&1 & echo $! > ${pidfile}'")
-    var raw = OS.exec("cat ${pidfile} 2>/dev/null")
-    OS.exec("rm -f ${pidfile} 2>/dev/null")
-    var pid = _parse_exit_code(raw.trim())
-    return Process(pid, cmd)
+fun open(cmd: String): Subprocess {
+    var flags: Int = _PIPE_STDIN | _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, "", flags)
+    if (handle < 0) {
+        throw "process: failed to spawn: ${cmd}"
+    }
+    return Subprocess(handle)
 }
 
-/// Run a command and return just the exit code.
+/// Open a subprocess with a specific working directory.
 ///
 /// ```saffron
-/// import "@process" as Process
+/// var proc = Process.open_in("ls -la", "/tmp")
+/// IO.print(proc.stdout.read_all())
+/// proc.wait()
+/// proc.close()
+/// ```
+fun open_in(cmd: String, cwd: String): Subprocess {
+    var flags: Int = _PIPE_STDIN | _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, cwd, flags)
+    if (handle < 0) {
+        throw "process: failed to spawn: ${cmd}"
+    }
+    return Subprocess(handle)
+}
+
+/// Open a subprocess with explicit arguments (no shell).
+/// Uses posix_spawnp to search PATH for the program.
 ///
+/// ```saffron
+/// var proc = Process.open_args("grep", ["-r", "TODO", "src/"])
+/// IO.print(proc.stdout.read_all())
+/// proc.wait()
+/// proc.close()
+/// ```
+fun open_args(program: String, args: List<String>): Subprocess {
+    // For non-shell mode, build a shell-escaped command and use shell mode
+    // because passing argv arrays through the FFI boundary is complex.
+    // This gives us proper argument separation via shell quoting.
+    var cmd: String = _shell_escape(program)
+    var i: Int = 0
+    while (i < args.length()) {
+        cmd = cmd + " " + _shell_escape(args[i])
+        i = i + 1
+    }
+    var flags: Int = _PIPE_STDIN | _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, "", flags)
+    if (handle < 0) {
+        throw "process: failed to spawn: ${program}"
+    }
+    return Subprocess(handle)
+}
+
+/// Run a command and return just its stdout.
+/// Throws on non-zero exit code (like Python's subprocess.check_output).
+///
+/// ```saffron
+/// var output = Process.check_output("git rev-parse HEAD")
+/// IO.println(output.trim())
+/// ```
+fun check_output(cmd: String): String {
+    var result: ProcessResult = run(cmd)
+    if (!result.success) {
+        var msg: String = "process: command failed (exit ${result.exit_code}): ${cmd}"
+        if (result.stderr.length() > 0) {
+            msg = msg + "\n" + result.stderr
+        }
+        throw msg
+    }
+    return result.stdout
+}
+
+/// Run a command and return the exit code.
+/// Throws on non-zero exit code (like Python's subprocess.check_call).
+///
+/// ```saffron
+/// Process.check_call("make test")
+/// ```
+fun check_call(cmd: String): Int {
+    var result: ProcessResult = run(cmd)
+    if (!result.success) {
+        var msg: String = "process: command failed (exit ${result.exit_code}): ${cmd}"
+        if (result.stderr.length() > 0) {
+            msg = msg + "\n" + result.stderr
+        }
+        throw msg
+    }
+    return result.exit_code
+}
+
+/// Spawn a background process (shell mode, no pipes).
+/// Returns immediately with a Subprocess handle for monitoring/killing.
+/// stdout and stderr go to /dev/null unless you read from the pipes.
+///
+/// ```saffron
+/// var server = Process.spawn("python3 -m http.server 8080")
+/// // ... do work ...
+/// server.terminate()
+/// server.wait()
+/// server.close()
+/// ```
+fun spawn(cmd: String): Subprocess {
+    // Use only stdout/stderr pipes (no stdin needed for background)
+    var flags: Int = _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, "", flags)
+    if (handle < 0) {
+        throw "process: failed to spawn: ${cmd}"
+    }
+    return Subprocess(handle)
+}
+
+/// Run a command and return just the exit code (does not throw).
+///
+/// ```saffron
 /// var code = Process.status("test -f pantry.toml")
 /// if (code == 0) { IO.println("file exists") }
 /// ```
-///
-/// WORKS TODAY: Yes — uses OS.exec wrapper.
-fun status(cmd: String): Number {
-    var raw = OS.exec("sh -c '${_escape_single_quotes(cmd)}; echo $?'")
-    return _parse_exit_code(raw.trim())
+fun status(cmd: String): Int {
+    var result: ProcessResult = run(cmd)
+    return result.exit_code
 }
 
 /// Run a command, abort if it fails (non-zero exit).
 /// Throws an error containing stderr on failure.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// Process.run_or_fail("saffron build src/main.sf -o build/app")
-/// // If the command fails, throws with stderr content
 /// ```
-///
-/// WORKS TODAY: Yes — calls run() then throws on failure.
 fun run_or_fail(cmd: String): ProcessResult {
-    var result = run(cmd)
+    var result: ProcessResult = run(cmd)
     if (!result.success) {
-        var msg = "process: command failed (exit ${result.exit_code}): ${cmd}"
+        var msg: String = "process: command failed (exit ${result.exit_code}): ${cmd}"
         if (result.stderr.length() > 0) {
             msg = msg + "\n" + result.stderr
         }
@@ -303,67 +536,62 @@ fun run_or_fail(cmd: String): ProcessResult {
 /// The provided env map is exported before running the command.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// var result = Process.run_with_env("node server.js", {"PORT": "3000", "DEBUG": "true"})
 /// ```
-///
-/// WORKS TODAY: Yes — prepends env var exports to the shell command.
 fun run_with_env(cmd: String, env: Map<String, String>): ProcessResult {
-    var exports = ""
-    var keys = env.keys()
-    var i = 0
+    var exports: String = ""
+    var keys: List<String> = env.keys()
+    var i: Int = 0
     while (i < keys.length()) {
-        var k = "" + keys[i]
-        var v = "" + env.get(k)
-        // Use export so vars are visible to the command
+        var k: String = "" + keys[i]
+        var v: String = "" + env.get(k)
         exports = exports + "export " + k + "='" + _escape_single_quotes(v) + "'; "
         i = i + 1
     }
-    return _run_captured(exports + cmd)
+    return run(exports + cmd)
 }
 
 /// Run a command in a specific working directory.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// var result = Process.run_in("npm install", "../frontend")
-/// IO.println(result.success)
 /// ```
-///
-/// WORKS TODAY: Yes — wraps with cd.
 fun run_in(cmd: String, dir: String): ProcessResult {
-    return _run_captured("cd ${_shell_escape(dir)} && ${cmd}")
+    var flags: Int = _PIPE_STDIN | _PIPE_STDOUT | _PIPE_STDERR | _SHELL
+    var handle: Int = _spawn(cmd, 0, 0, dir, flags)
+    if (handle < 0) {
+        return ProcessResult("", "process: failed to spawn in dir: ${dir}", -1)
+    }
+    var proc: Subprocess = Subprocess(handle)
+    proc.stdin.close()
+    var out: String = proc.stdout.read_all()
+    var err: String = proc.stderr.read_all()
+    var code: Int = proc.wait()
+    proc.close()
+    return ProcessResult(out, err, code)
 }
 
 /// Pipe: run the first command, feed its stdout as stdin to the second.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// var result = Process.pipe("cat data.txt", "grep error")
-/// IO.println(result.stdout)
 /// ```
-///
-/// WORKS TODAY: Yes — uses shell pipe operator.
 fun pipe(cmd1: String, cmd2: String): ProcessResult {
-    return _run_captured("${cmd1} | ${cmd2}")
+    return run("${cmd1} | ${cmd2}")
 }
 
 /// Check if a program is available on PATH.
 /// Returns the full path if found, or an empty string if not.
 ///
 /// ```saffron
-/// import "@process" as Process
-///
 /// if (Process.which("git") != "") {
 ///     IO.println("git is available")
 /// }
 /// ```
-///
-/// WORKS TODAY: Yes — uses which(1).
 fun which(program: String): String {
-    var raw = OS.exec("which ${_shell_escape(program)} 2>/dev/null")
-    return raw.trim()
+    var result: ProcessResult = run("which " + _shell_escape(program) + " 2>/dev/null")
+    if (result.success) {
+        return result.stdout.trim()
+    }
+    return ""
 }

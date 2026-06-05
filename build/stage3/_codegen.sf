@@ -11224,6 +11224,79 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         pr_pi = pr_pi + 1
     }
 
+    // Pre-scan: register func_defaults and func_param_names for ALL functions
+    // from all modules BEFORE any IR generation. This ensures named argument
+    // default filling works regardless of module compilation order.
+    var df_mi: Float = 0
+    while (df_mi < module_stmts.length()) {
+        var df_stmts: List<AST.Stmt> = module_stmts[df_mi]
+        var df_prefix: String = module_prefixes_list[df_mi]
+        var df_si: Float = 0
+        while (df_si < df_stmts.length()) {
+            var df_kind: String = gen.classify_stmt(df_stmts[df_si])
+            if (df_kind == "fun") {
+                var df_name: String = gen.get_fun_name(df_stmts[df_si])
+                var df_doc: String = gen.get_fun_doc(df_stmts[df_si])
+                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
+                    var df_emit: String = df_prefix + df_name
+                    var df_params: List<AST.Param> = gen.get_fun_params(df_stmts[df_si])
+                    var df_defaults: List<AST.Expr> = []
+                    var df_pnames: List<String> = []
+                    var df_pi: Float = 0
+                    while (df_pi < df_params.length()) {
+                        var df_p: AST.Param = df_params[df_pi]
+                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
+                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
+                        df_defaults.push(df_dval)
+                        df_pnames.push(df_pn)
+                        df_pi = df_pi + 1
+                    }
+                    gen.func_defaults.set(df_emit, df_defaults)
+                    gen.func_param_count.set(df_emit, df_params.length())
+                    gen.func_param_names.set(df_emit, df_pnames)
+                }
+            } else if (df_kind == "class") {
+                var df_cname: String = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                var df_methods: List<AST.Stmt> = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
+                    _ => []
+                }
+                var df_mi2: Float = 0
+                while (df_mi2 < df_methods.length()) {
+                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
+                    if (df_mname.length() > 0) {
+                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
+                        var df_mdefs: List<AST.Expr> = []
+                        var df_mpnames: List<String> = []
+                        df_mpnames.push("self")
+                        df_mdefs.push(AST.Expr.NilLit)
+                        var df_mpi: Float = 0
+                        while (df_mpi < df_mparams.length()) {
+                            var df_mp: AST.Param = df_mparams[df_mpi]
+                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
+                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
+                            df_mdefs.push(df_mdval)
+                            df_mpnames.push(df_mpn)
+                            df_mpi = df_mpi + 1
+                        }
+                        var df_full: String = df_cname + "__" + df_mname
+                        var df_pfull: String = df_prefix + df_full
+                        gen.func_defaults.set(df_pfull, df_mdefs)
+                        gen.func_param_count.set(df_pfull, df_mpnames.length())
+                        gen.func_param_names.set(df_pfull, df_mpnames)
+                        gen.func_defaults.set(df_full, df_mdefs)
+                        gen.func_param_count.set(df_full, df_mpnames.length())
+                        gen.func_param_names.set(df_full, df_mpnames)
+                    }
+                    df_mi2 = df_mi2 + 1
+                }
+            }
+            df_si = df_si + 1
+        }
+        df_mi = df_mi + 1
+    }
+
     // Compile each module's declarations with its prefix (in dependency order)
     var module_init_names: List<String> = []
     gen.register_only = false
@@ -11758,6 +11831,139 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         pr_pi = pr_pi + 1
     }
 
+    // Pre-scan: register func_defaults and func_param_names for ALL functions
+    // from all modules BEFORE any IR generation. This ensures named argument
+    // default filling works regardless of module compilation order.
+    mi = 0
+    while (mi < prefixes.length()) {
+        var df_prefix: String = prefixes[mi]
+        var df_start: Float = boundaries[mi]
+        var df_end: Float = boundaries[mi + 1]
+        var df_si: Float = df_start
+        while (df_si < df_end) {
+            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
+            if (df_kind == "fun") {
+                var df_name: String = gen.get_fun_name(all_stmts[df_si])
+                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
+                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
+                    var df_emit: String = df_prefix + df_name
+                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
+                    var df_defaults: List<AST.Expr> = []
+                    var df_pnames: List<String> = []
+                    var df_pi: Float = 0
+                    while (df_pi < df_params.length()) {
+                        var df_p: AST.Param = df_params[df_pi]
+                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
+                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
+                        df_defaults.push(df_dval)
+                        df_pnames.push(df_pn)
+                        df_pi = df_pi + 1
+                    }
+                    gen.func_defaults.set(df_emit, df_defaults)
+                    gen.func_param_count.set(df_emit, df_params.length())
+                    gen.func_param_names.set(df_emit, df_pnames)
+                }
+            } else if (df_kind == "class") {
+                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
+                    _ => []
+                }
+                var df_mi2: Float = 0
+                while (df_mi2 < df_methods.length()) {
+                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
+                    if (df_mname.length() > 0) {
+                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
+                        var df_mdefs: List<AST.Expr> = []
+                        var df_mpnames: List<String> = []
+                        df_mpnames.push("self")
+                        df_mdefs.push(AST.Expr.NilLit)
+                        var df_mpi: Float = 0
+                        while (df_mpi < df_mparams.length()) {
+                            var df_mp: AST.Param = df_mparams[df_mpi]
+                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
+                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
+                            df_mdefs.push(df_mdval)
+                            df_mpnames.push(df_mpn)
+                            df_mpi = df_mpi + 1
+                        }
+                        var df_full: String = df_cname + "__" + df_mname
+                        var df_pfull: String = df_prefix + df_full
+                        gen.func_defaults.set(df_pfull, df_mdefs)
+                        gen.func_param_count.set(df_pfull, df_mpnames.length())
+                        gen.func_param_names.set(df_pfull, df_mpnames)
+                        gen.func_defaults.set(df_full, df_mdefs)
+                        gen.func_param_count.set(df_full, df_mpnames.length())
+                        gen.func_param_names.set(df_full, df_mpnames)
+                    }
+                    df_mi2 = df_mi2 + 1
+                }
+            }
+            df_si = df_si + 1
+        }
+        mi = mi + 1
+    }
+    // Also pre-scan main program's function defaults
+    var df_pi2: Float = 0
+    while (df_pi2 < program.length()) {
+        var df_pk: String = gen.classify_stmt(program[df_pi2])
+        if (df_pk == "fun") {
+            var df_name2: String = gen.get_fun_name(program[df_pi2])
+            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
+            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
+                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
+                var df_defaults2: List<AST.Expr> = []
+                var df_pnames2: List<String> = []
+                var df_pi3: Float = 0
+                while (df_pi3 < df_params2.length()) {
+                    var df_p2: AST.Param = df_params2[df_pi3]
+                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
+                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
+                    df_defaults2.push(df_dval2)
+                    df_pnames2.push(df_pn2)
+                    df_pi3 = df_pi3 + 1
+                }
+                gen.func_defaults.set(df_name2, df_defaults2)
+                gen.func_param_count.set(df_name2, df_params2.length())
+                gen.func_param_names.set(df_name2, df_pnames2)
+            }
+        } else if (df_pk == "class") {
+            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var df_mi3: Float = 0
+            while (df_mi3 < df_methods2.length()) {
+                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
+                if (df_mname2.length() > 0) {
+                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
+                    var df_mdefs2: List<AST.Expr> = []
+                    var df_mpnames2: List<String> = []
+                    df_mpnames2.push("self")
+                    df_mdefs2.push(AST.Expr.NilLit)
+                    var df_mpi2: Float = 0
+                    while (df_mpi2 < df_mparams2.length()) {
+                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
+                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
+                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
+                        df_mdefs2.push(df_mdval2)
+                        df_mpnames2.push(df_mpn2)
+                        df_mpi2 = df_mpi2 + 1
+                    }
+                    var df_full2: String = df_cname2 + "__" + df_mname2
+                    gen.func_defaults.set(df_full2, df_mdefs2)
+                    gen.func_param_count.set(df_full2, df_mpnames2.length())
+                    gen.func_param_names.set(df_full2, df_mpnames2)
+                }
+                df_mi3 = df_mi3 + 1
+            }
+        }
+        df_pi2 = df_pi2 + 1
+    }
+
     // Compile each module's declarations
     var module_init_names: List<String> = []
     mi = 0
@@ -12288,6 +12494,139 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
             gen.enum_defs.set(pr_ename2, pr_vnames2)
         }
         pr_pi = pr_pi + 1
+    }
+
+    // Pre-scan: register func_defaults and func_param_names for ALL functions
+    // from all modules BEFORE any IR generation. This ensures named argument
+    // default filling works regardless of module compilation order.
+    mi = 0
+    while (mi < prefixes.length()) {
+        var df_prefix: String = prefixes[mi]
+        var df_start: Float = boundaries[mi]
+        var df_end: Float = boundaries[mi + 1]
+        var df_si: Float = df_start
+        while (df_si < df_end) {
+            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
+            if (df_kind == "fun") {
+                var df_name: String = gen.get_fun_name(all_stmts[df_si])
+                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
+                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
+                    var df_emit: String = df_prefix + df_name
+                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
+                    var df_defaults: List<AST.Expr> = []
+                    var df_pnames: List<String> = []
+                    var df_pi: Float = 0
+                    while (df_pi < df_params.length()) {
+                        var df_p: AST.Param = df_params[df_pi]
+                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
+                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
+                        df_defaults.push(df_dval)
+                        df_pnames.push(df_pn)
+                        df_pi = df_pi + 1
+                    }
+                    gen.func_defaults.set(df_emit, df_defaults)
+                    gen.func_param_count.set(df_emit, df_params.length())
+                    gen.func_param_names.set(df_emit, df_pnames)
+                }
+            } else if (df_kind == "class") {
+                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
+                    _ => ""
+                }
+                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
+                    _ => []
+                }
+                var df_mi2: Float = 0
+                while (df_mi2 < df_methods.length()) {
+                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
+                    if (df_mname.length() > 0) {
+                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
+                        var df_mdefs: List<AST.Expr> = []
+                        var df_mpnames: List<String> = []
+                        df_mpnames.push("self")
+                        df_mdefs.push(AST.Expr.NilLit)
+                        var df_mpi: Float = 0
+                        while (df_mpi < df_mparams.length()) {
+                            var df_mp: AST.Param = df_mparams[df_mpi]
+                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
+                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
+                            df_mdefs.push(df_mdval)
+                            df_mpnames.push(df_mpn)
+                            df_mpi = df_mpi + 1
+                        }
+                        var df_full: String = df_cname + "__" + df_mname
+                        var df_pfull: String = df_prefix + df_full
+                        gen.func_defaults.set(df_pfull, df_mdefs)
+                        gen.func_param_count.set(df_pfull, df_mpnames.length())
+                        gen.func_param_names.set(df_pfull, df_mpnames)
+                        gen.func_defaults.set(df_full, df_mdefs)
+                        gen.func_param_count.set(df_full, df_mpnames.length())
+                        gen.func_param_names.set(df_full, df_mpnames)
+                    }
+                    df_mi2 = df_mi2 + 1
+                }
+            }
+            df_si = df_si + 1
+        }
+        mi = mi + 1
+    }
+    // Also pre-scan main program's function defaults
+    var df_pi2: Float = 0
+    while (df_pi2 < program.length()) {
+        var df_pk: String = gen.classify_stmt(program[df_pi2])
+        if (df_pk == "fun") {
+            var df_name2: String = gen.get_fun_name(program[df_pi2])
+            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
+            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
+                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
+                var df_defaults2: List<AST.Expr> = []
+                var df_pnames2: List<String> = []
+                var df_pi3: Float = 0
+                while (df_pi3 < df_params2.length()) {
+                    var df_p2: AST.Param = df_params2[df_pi3]
+                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
+                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
+                    df_defaults2.push(df_dval2)
+                    df_pnames2.push(df_pn2)
+                    df_pi3 = df_pi3 + 1
+                }
+                gen.func_defaults.set(df_name2, df_defaults2)
+                gen.func_param_count.set(df_name2, df_params2.length())
+                gen.func_param_names.set(df_name2, df_pnames2)
+            }
+        } else if (df_pk == "class") {
+            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
+                _ => ""
+            }
+            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
+                _ => []
+            }
+            var df_mi3: Float = 0
+            while (df_mi3 < df_methods2.length()) {
+                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
+                if (df_mname2.length() > 0) {
+                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
+                    var df_mdefs2: List<AST.Expr> = []
+                    var df_mpnames2: List<String> = []
+                    df_mpnames2.push("self")
+                    df_mdefs2.push(AST.Expr.NilLit)
+                    var df_mpi2: Float = 0
+                    while (df_mpi2 < df_mparams2.length()) {
+                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
+                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
+                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
+                        df_mdefs2.push(df_mdval2)
+                        df_mpnames2.push(df_mpn2)
+                        df_mpi2 = df_mpi2 + 1
+                    }
+                    var df_full2: String = df_cname2 + "__" + df_mname2
+                    gen.func_defaults.set(df_full2, df_mdefs2)
+                    gen.func_param_count.set(df_full2, df_mpnames2.length())
+                    gen.func_param_names.set(df_full2, df_mpnames2)
+                }
+                df_mi3 = df_mi3 + 1
+            }
+        }
+        df_pi2 = df_pi2 + 1
     }
 
     // Compile each module's declarations

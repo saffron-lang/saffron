@@ -246,6 +246,7 @@ build_project() {
         local ASYNC_NATIVE="$SCRIPT_DIR/src/runtime/async_native.c"
         local SOCKET_NATIVE="$SCRIPT_DIR/src/runtime/socket_native.c"
         local WATCH_NATIVE="$SCRIPT_DIR/src/runtime/watch_native.c"
+        local PROCESS_NATIVE="$SCRIPT_DIR/src/runtime/process_native.c"
         # Find OpenSSL (Homebrew on macOS, system elsewhere)
         local SSL_FLAGS=""
         if command -v brew &>/dev/null; then
@@ -255,7 +256,7 @@ build_project() {
                 SSL_FLAGS="-I${SSL_PREFIX}/include -L${SSL_PREFIX}/lib"
             fi
         fi
-        clang "$OPT" -w -Wl,-stack_size,0x10000000 $SSL_FLAGS -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" "$ASYNC_NATIVE" "$SOCKET_NATIVE" "$WATCH_NATIVE" -lssl -lcrypto || {
+        clang "$OPT" -w -Wl,-stack_size,0x10000000 $SSL_FLAGS -o "$output" "$ll_path" "$RUNTIME" "$RUNTIME_GC" "$RUNTIME_BASE" "$ASYNC_NATIVE" "$SOCKET_NATIVE" "$WATCH_NATIVE" "$PROCESS_NATIVE" -lssl -lcrypto || {
             echo "saffron: linking failed" >&2
             exit 1
         }
