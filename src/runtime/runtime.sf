@@ -970,6 +970,14 @@ fun __os_env(name: Int): Int {
     return rt_strdup(val)
 }
 
+@extern("i32 system(i8*)") fun __rt_system(cmd: Int): Int
+
+fun __os_system(cmd: Int): Int {
+    var rc: Int = __rt_untag_ptr(cmd)
+    if (rc == 0) { return -1 }
+    return __rt_system(rc)
+}
+
 fun __os_exec(cmd: Int): Int {
     var rc: Int = __rt_untag_ptr(cmd)
     if (rc == 0) {

@@ -11,6 +11,7 @@
 @extern("void __io_mkdir(i64)") fun _mkdir(path: Int)
 @extern("i64 __io_walk_dir(void*)") fun _walk_dir(path: Int): Int
 @extern("void exit(i32)") fun _exit(code: Int)
+@extern("i64 __os_system(void*)") fun _system(cmd: String): Int
 
 /// Return the command-line arguments as a list of strings.
 fun args(): List<String> {
@@ -20,6 +21,12 @@ fun args(): List<String> {
 /// Execute a shell command and return its stdout as a string.
 fun exec(cmd: String): String {
     return _exec(cmd)
+}
+
+/// Run a command with stdout/stderr passed through to the terminal.
+/// Returns the exit code.
+fun system(cmd: String): Int {
+    return _system(cmd)
 }
 
 /// Return the current working directory.
