@@ -4,7 +4,7 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
-import { div, span, p, a, h1, h2, h3, nav, header, footer, section, form, input, button, code, text } from "turmeric/prelude"
+import { div, span, p, a, h1, h2, h3, nav, header, footer, section, form, input, button, code, text, mount } from "turmeric/prelude"
 import "@json" as JSON
 
 // =============================================================================
@@ -304,4 +304,4 @@ router.route("/packages/:name", fun (p: Router.RouteParams) => {
 // =============================================================================
 
 load_featured()
-App()
+mount("#app", fun () => App())
