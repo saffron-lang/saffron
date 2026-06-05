@@ -257,5 +257,5 @@ fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String
     } else if (r._mode == Mode.Memory) {
         href = "javascript:void(0)"
     }
-    a(cls=cls, id=id, style=style, href=href, on_click=fun (e: Event) => r.go(to), block=block)
+    a(cls=cls, id=id, style=style, href=href, block=block)
 }

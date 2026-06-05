@@ -47,9 +47,9 @@ fun get_package(name: String): Map<String, String> {
     return row.to_map()
 }
 
-/// List all packages (name, description, total_downloads).
+/// List all packages (name, description, total_downloads, latest version).
 fun list_packages(): List<Map<String, String>> {
-    var rows = _db.query_all("SELECT name, description, total_downloads FROM packages ORDER BY name", [])
+    var rows = _db.query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p ORDER BY p.total_downloads DESC", [])
     var results: List<Map<String, String>> = []
     var i = 0
     while (i < rows.length()) {
@@ -176,11 +176,14 @@ fun is_owner(package_name: String, user_id: String): Bool {
 // Search
 // ---------------------------------------------------------------------------
 
-/// Search packages by name or description substring.
-/// Returns up to `limit` results.
+/// Search packages using FTS5 full-text search.
+/// Returns up to `limit` results ranked by relevance.
 fun search(query: String, limit: String): List<Map<String, String>> {
-    var pattern = "%" + query + "%"
-    var rows = _db.query_all("SELECT name, description, total_downloads FROM packages WHERE name LIKE ? OR description LIKE ? ORDER BY total_downloads DESC LIMIT ?", [pattern, pattern, limit])
+    if (query.length() == 0) {
+        return list_packages()
+    }
+    var fts_query = query + "*"
+    var rows = _db.query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages_fts fts JOIN packages p ON p.rowid = fts.rowid WHERE packages_fts MATCH ? ORDER BY rank LIMIT ?", [fts_query, limit])
     var results: List<Map<String, String>> = []
     var i = 0
     while (i < rows.length()) {
@@ -188,4 +191,25 @@ fun search(query: String, limit: String): List<Map<String, String>> {
         i = i + 1
     }
     return results
+}
+
+/// List packages with pagination.
+fun list_packages_paginated(offset: String, limit: String): List<Map<String, String>> {
+    var rows = _db.query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p ORDER BY p.total_downloads DESC LIMIT ? OFFSET ?", [limit, offset])
+    var results: List<Map<String, String>> = []
+    var i = 0
+    while (i < rows.length()) {
+        results.push(rows[i].to_map())
+        i = i + 1
+    }
+    return results
+}
+
+/// Get total number of packages.
+fun count_packages(): Float {
+    var row = _db.query_one("SELECT count(*) as cnt FROM packages", [])
+    if (row == nil) {
+        return 0
+    }
+    return row.get_int("cnt")
 }
