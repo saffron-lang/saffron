@@ -1,21 +1,44 @@
 # Router
 
-Turmeric includes a client-side router for single-page applications. It maps URL paths to components using pattern matching.
+Turmeric includes a client-side router for single-page applications. It maps URL paths to components using pattern matching with three routing modes.
 
-## Basic Usage
+## Setup
 
 ```saffron
-import "turmeric" as T
 import "turmeric/router" as Router
+import { Link } from "turmeric/router"
 
-fun App(): Node {
-    return Router.create([
-        Route("/", HomePage),
-        Route("/about", AboutPage),
-        Route("/users/:id", UserPage),
-        Route("*", NotFoundPage),
-    ])
+var router = Router.hash()   // hash-based: /#/path
+// or: Router.history()      // clean URLs: /path (needs server fallback)
+// or: Router.memory("/")    // in-memory (testing/embedded)
+```
+
+## Defining Routes
+
+```saffron
+router.route("/", fun (p: Router.RouteParams) => HomePage())
+router.route("/about", fun (p: Router.RouteParams) => AboutPage())
+router.route("/users/:id", fun (p: Router.RouteParams) => {
+    UserPage(p.get("id"))
+})
+```
+
+## Rendering
+
+Call `router.render()` inside your app layout where the routed content should appear:
+
+```saffron
+fun App() {
+    <div cls="app">
+        {NavBar()}
+        <main>
+            {router.render()}
+        </main>
+        {Footer()}
+    </div>
 }
+
+mount("#app", fun () => App())
 ```
 
 ## Route Patterns
@@ -24,148 +47,112 @@ fun App(): Node {
 |---------|---------|--------|
 | `/` | Exact root | — |
 | `/about` | Exact path | — |
-| `/users/:id` | Dynamic segment | `{id: "42"}` |
-| `/posts/:id/comments/:cid` | Multiple params | `{id: "5", cid: "3"}` |
-| `/files/*path` | Catch-all (rest) | `{path: "docs/intro.md"}` |
-| `*` | Wildcard (404) | — |
+| `/users/:id` | Dynamic segment | `p.get("id")` → `"42"` |
+| `/posts/:id/comments/:cid` | Multiple params | `p.get("id")`, `p.get("cid")` |
 
-## Defining Routes
+## Navigation Links
+
+`Link` renders a real `<a href="...">` with SPA click interception. Right-click and ctrl+click open in new tab as expected.
 
 ```saffron
-enum Route {
-    Route(path: String, component: (RouteParams) => Node)
-}
+import { Link } from "turmeric/router"
 
+fun NavBar() {
+    <nav>
+        Link(router, "/", cls="nav-link") {
+            text("Home")
+        }
+        Link(router, "/about", cls="nav-link") {
+            text("About")
+        }
+        Link(router, "/users/42", cls="nav-link") {
+            text("User 42")
+        }
+    </nav>
+}
+```
+
+The `href` format adapts to the router mode:
+- **Hash**: `href="#/about"` — works without server config
+- **History**: `href="/about"` — clean URLs, needs server to serve index.html for all paths
+- **Memory**: `href="javascript:void(0)"` — no real navigation
+
+### Link Parameters
+
+```saffron
+Link(router, to, cls="", id="", style="", block=nil)
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `router` | `Router` | The router instance |
+| `to` | `String` | Target path (e.g., `"/about"`) |
+| `cls` | `String` | CSS classes |
+| `id` | `String` | Element ID |
+| `style` | `String` | Inline style |
+| `block` | `() => Nil` | Children (text, nested elements) |
+
+## Programmatic Navigation
+
+```saffron
+router.go("/users/42")
+router.go("/search?q=hello")
+```
+
+## Route Parameters
+
+Route handlers receive `RouteParams`:
+
+```saffron
 class RouteParams {
+    var path: String
     var params: Map<String, String>
     var query: Map<String, String>
-    var path: String
 
-    fun get(name: String): String {
-        return this.params.get(name)
-    }
+    fun get(name: String): String  // shorthand for params.get(name)
 }
 ```
 
-## Route Components
-
-Route components receive a `RouteParams` argument:
-
 ```saffron
-fun UserPage(route: RouteParams): Node {
-    var user_id = route.get("id")
-    var user = resource(fun () => fetch_user(user_id))
-
-    return div {
-        match (user.get()) {
-            Loading => p { text("Loading...") }
-            is Ready(u) => div {
-                h1 { text(u.name) }
-                p { text(u.email) }
-            }
-            is Error(msg) => p { text("Error: ${msg}") }
-        }
-    }
-}
-```
-
-## Navigation
-
-### Links
-
-```saffron
-fun NavBar(): Node {
-    return nav {
-        Router.link("/", [class_("nav-link")]) { text("Home") }
-        Router.link("/about", [class_("nav-link")]) { text("About") }
-        Router.link("/users/42", []) { text("User 42") }
-    }
-}
-```
-
-`Router.link` renders an `<a>` tag that navigates without a full page reload.
-
-### Programmatic Navigation
-
-```saffron
-Router.navigate("/users/42")
-Router.navigate("/search?q=hello")
-Router.back()
-Router.forward()
-```
-
-## Active Route Signal
-
-The current route is a signal — components can react to route changes:
-
-```saffron
-var current = Router.current_route()
-
-effect(fun () => {
-    IO.println("Navigated to: ${current.get().path}")
+router.route("/users/:id", fun (p: Router.RouteParams) => {
+    var user_id: String = p.get("id")
+    <div>
+        <h1>User {user_id}</h1>
+    </div>
 })
 ```
 
-## Nested Routes
+## Current Route Signal
+
+The router's current path is a signal — use it for reactive UI (e.g., active nav styling):
 
 ```saffron
-fun DashboardLayout(): Node {
-    return div([class_("dashboard")]) {
-        Sidebar()
-        div([class_("content")]) {
-            Router.outlet()  // renders the matched child route
-        }
-    }
-}
+var current_path = router.current_signal()
 
-var routes = [
-    Route("/dashboard", DashboardLayout, [
-        Route("/dashboard/overview", OverviewPage),
-        Route("/dashboard/settings", SettingsPage),
-        Route("/dashboard/users/:id", UserDetailPage),
-    ]),
-]
+// React to route changes
+effect(fun () => {
+    IO.println("Now at: " + current_path.get())
+})
 ```
 
-## Guards
+## Routing Modes
 
-Protect routes with guard functions that run before navigation:
+### Hash (`Router.hash()`)
 
-```saffron
-fun require_auth(route: RouteParams): Bool {
-    return auth_state.get().is_logged_in
-}
+Uses `location.hash` (`/#/path`). No server configuration needed — works with any static file server.
 
-var routes = [
-    Route("/public", PublicPage),
-    Route("/admin", AdminPage).guard(require_auth),
-]
-```
+### History (`Router.history()`)
 
-If a guard returns `false`, navigation is cancelled and the current route stays.
+Uses `history.pushState` for clean URLs (`/path`). Requires the server to serve `index.html` for all paths (SPA fallback).
 
-## Query Parameters
+### Memory (`Router.memory("/")`)
 
-Access query parameters from the route:
-
-```saffron
-// URL: /search?q=hello&page=2
-fun SearchPage(route: RouteParams): Node {
-    var query = route.query.get("q")       // "hello"
-    var page = route.query.get("page")     // "2"
-
-    return div {
-        h1 { text("Results for: ${query}") }
-    }
-}
-```
+Routes exist only in memory. Useful for testing or embedding a routed app inside another app.
 
 ## Implementation Notes
 
-The router uses the browser's History API (`pushState`/`popstate`) under the hood. In WASM, this means:
-
-1. `Router.navigate()` calls a JS-imported function to push state
-2. `popstate` events from the browser call back into WASM to update the route signal
-3. Components that read `current_route()` automatically re-render via the signal system
-
-No framework magic — just signals and JS interop.
+The router uses browser APIs via Saffron's FFI:
+- Hash mode: reads/writes `location.hash`, listens to `hashchange`
+- History mode: calls `history.pushState`, listens to `popstate`
+- Route matching uses path segment comparison with `:param` extraction
+- `render()` uses turmeric's `render_into` to clear and rebuild the outlet on navigation
