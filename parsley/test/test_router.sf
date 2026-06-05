@@ -1,5 +1,6 @@
 import "@test" as T
 import "../src/router.sf" as P
+import "@http/server" as Http
 
 T.assert(true, "parsley router module loads")
 
@@ -8,21 +9,50 @@ var api = P.router("/api/v1")
 T.assert_eq(api.prefix, "/api/v1", "router has correct prefix")
 T.assert_eq(api.endpoints.length(), 0, "new router has no endpoints")
 
-// Test endpoint registration (count)
-api.get("/packages", fun (req: Any): Any => nil)
+// Test GET endpoint registration
+api.get("/packages", fun (req: Http.Request): Http.Response => Http.text("ok"))
 T.assert_eq(api.endpoints.length(), 1, "get adds endpoint")
+T.assert_eq(api.endpoints[0].method, "GET", "get endpoint method")
+T.assert_eq(api.endpoints[0].path, "/api/v1/packages", "path includes prefix")
 
-api.post("/packages/publish", fun (req: Any): Any => nil)
+// Test POST
+api.post("/packages/publish", fun (req: Http.Request): Http.Response => Http.text("ok"))
 T.assert_eq(api.endpoints.length(), 2, "post adds endpoint")
+T.assert_eq(api.endpoints[1].method, "POST", "post endpoint method")
+T.assert_eq(api.endpoints[1].path, "/api/v1/packages/publish", "post path includes prefix")
 
-api.put("/packages/:name", fun (req: Any): Any => nil)
+// Test PUT
+api.put("/packages/:name", fun (req: Http.Request): Http.Response => Http.text("ok"))
 T.assert_eq(api.endpoints.length(), 3, "put adds endpoint")
+T.assert_eq(api.endpoints[2].method, "PUT", "put endpoint method")
 
-api.delete("/packages/:name/:version", fun (req: Any): Any => nil)
+// Test DELETE
+api.delete("/packages/:name/:version", fun (req: Http.Request): Http.Response => Http.text("ok"))
 T.assert_eq(api.endpoints.length(), 4, "delete adds endpoint")
+T.assert_eq(api.endpoints[3].method, "DELETE", "delete endpoint method")
 
-// Test spec generation (count)
+// Test endpoint metadata
+var ep = api.endpoints[0]
+ep.response_type = "ListPackagesResponse"
+ep.description = "List all packages"
+ep.auth_required = true
+T.assert_eq(ep.response_type, "ListPackagesResponse", "response_type set")
+T.assert_eq(ep.description, "List all packages", "description set")
+T.assert_eq(ep.auth_required, true, "auth_required set")
+
+// Test spec generation
 var spec = api.spec()
 T.assert_eq(spec.length(), 4, "spec has all endpoints")
+T.assert_eq(spec[0].get("method"), "GET", "spec[0] method")
+T.assert_eq(spec[0].get("path"), "/api/v1/packages", "spec[0] path")
+T.assert_eq(spec[0].get("auth"), "true", "spec[0] auth from metadata")
+T.assert_eq(spec[1].get("method"), "POST", "spec[1] method")
+T.assert_eq(spec[2].get("method"), "PUT", "spec[2] method")
+T.assert_eq(spec[3].get("method"), "DELETE", "spec[3] method")
+
+// Test multiple routers with different prefixes
+var v2 = P.router("/api/v2")
+v2.get("/health", fun (req: Http.Request): Http.Response => Http.text("ok"))
+T.assert_eq(v2.endpoints[0].path, "/api/v2/health", "v2 router uses own prefix")
 
 T.summary()

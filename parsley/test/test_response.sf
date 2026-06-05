@@ -1,0 +1,41 @@
+import "@test" as T
+import "../src/response.sf" as Res
+import "@http/server" as Http
+import "@json" as JSON
+
+T.assert(true, "parsley response module loads")
+
+// Test json response
+var data: Map<String, String> = {}
+data.set("name", "saffron")
+data.set("version", "1.0.0")
+var resp = Res.json(data)
+T.assert_eq(resp.status, 200, "json response has 200 status")
+T.assert(resp.body.contains("saffron"), "json body contains data")
+T.assert(resp.body.contains("1.0.0"), "json body contains version")
+
+// Test not_found
+var nf = Res.not_found("package not found")
+T.assert_eq(nf.status, 404, "not_found has 404 status")
+T.assert(nf.body.contains("package not found"), "not_found body has message")
+T.assert(nf.body.contains("error"), "not_found body has error key")
+
+// Test bad_request
+var br = Res.bad_request("invalid JSON")
+T.assert_eq(br.status, 400, "bad_request has 400 status")
+T.assert(br.body.contains("invalid JSON"), "bad_request body has message")
+
+// Test unauthorized
+var ua = Res.unauthorized("token expired")
+T.assert_eq(ua.status, 401, "unauthorized has 401 status")
+T.assert(ua.body.contains("token expired"), "unauthorized body has message")
+
+// Test created
+var new_pkg: Map<String, String> = {}
+new_pkg.set("id", "42")
+new_pkg.set("name", "new-package")
+var cr = Res.created(new_pkg)
+T.assert_eq(cr.status, 201, "created has 201 status")
+T.assert(cr.body.contains("new-package"), "created body has data")
+
+T.summary()

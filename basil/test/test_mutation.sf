@@ -1,0 +1,40 @@
+import "@test" as T
+import "../src/mutation.sf" as M
+
+T.assert(true, "basil mutation module loads")
+
+// Test mutation creation
+var mut = M.mutation("/api/v1/packages/publish")
+T.assert_eq(mut.url, "/api/v1/packages/publish", "mutation has correct url")
+T.assert_eq(mut.method, "POST", "default method is POST")
+T.assert_eq(mut.isLoading.get(), false, "initial isLoading is false")
+T.assert(mut.data.get() == nil, "initial data is nil")
+T.assert_eq(mut.error.get(), "", "initial error is empty")
+
+// Test mutation with explicit method
+var del = M.mutation_method("/api/v1/packages/foo/yank", "DELETE")
+T.assert_eq(del.method, "DELETE", "explicit method set")
+
+// Test invalidates chaining
+var pub = M.mutation("/api/v1/publish")
+    .invalidates(["/api/v1/packages", "/api/v1/search"])
+T.assert_eq(pub._invalidates.length(), 2, "invalidates list set")
+T.assert_eq(pub._invalidates[0], "/api/v1/packages", "first invalidation prefix")
+T.assert_eq(pub._invalidates[1], "/api/v1/search", "second invalidation prefix")
+
+// Test on_success chaining
+var success_called: Bool = false
+var pub2 = M.mutation("/api/v1/publish")
+    .on_success(fun (data: Any) => { success_called = true })
+T.assert(pub2._on_success != nil, "on_success handler set")
+
+// Test reset
+mut.isLoading.set(true)
+mut.error.set("something went wrong")
+mut.data.set("stale")
+mut.reset()
+T.assert_eq(mut.isLoading.get(), false, "reset clears isLoading")
+T.assert_eq(mut.error.get(), "", "reset clears error")
+T.assert(mut.data.get() == nil, "reset clears data")
+
+T.summary()
