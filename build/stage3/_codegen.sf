@@ -9612,6 +9612,15 @@ class Codegen {
             is_user_class = true
         }
     }
+    // Fallback: if type resolution failed but a user class defines this method,
+    // treat as user class dispatch. Skip known builtin methods (length, push, etc.)
+    // to avoid hijacking built-in container dispatch.
+    if (!is_user_class and args.length() == 0) {
+        var __uc_fcm: String = this.find_class_for_method(method)
+        if (__uc_fcm.length() > 0 and __uc_fcm != "String" and __uc_fcm != "List" and __uc_fcm != "Map" and __uc_fcm != "Int" and __uc_fcm != "Float" and __uc_fcm != "Bool") {
+            is_user_class = true
+        }
+    }
 
     // --- List method dispatch (type-aware, replaces builtin_methods for List) ---
     if (!is_user_class) {
@@ -10374,7 +10383,8 @@ class Codegen {
     // (enum check moved above builtin dispatch)
 
     // Check for imported module function calls (module alias or unknown name)
-    if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name)))) {
+    // Also skip global variables (they should dispatch via class method resolution below)
+    if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
         var prefixed_name: String = method
         if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
