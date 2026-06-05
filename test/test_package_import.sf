@@ -1,0 +1,22 @@
+// Test: unified package namespaces
+// When import "pkg" as Alias, all re-exported names from the entry file
+// are accessible as Alias.name, resolving to the correct sub-module function.
+
+import "testpkg" as Pkg
+import { multiply } from "testpkg"
+
+// Aliased access: Pkg.add → math_add
+var sum = Pkg.add(3, 4)
+IO.println(sum)
+
+// Aliased access: Pkg.hello → greet_hello
+var msg = Pkg.hello("World")
+IO.println(msg)
+
+// Named import: multiply → math_multiply
+var product = multiply(5, 6)
+IO.println(product)
+
+// Function returning class: Pkg.make_circle → shapes_make_circle
+var c = Pkg.make_circle(7)
+IO.println(c.radius)
