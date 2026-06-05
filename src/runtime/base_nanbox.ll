@@ -33,6 +33,7 @@ declare i64 @__sched_has_stored_result(i64)
 
 declare i32 @puts(i8*)
 declare i32 @printf(i8*, ...)
+declare i32 @fflush(i8*)
 declare void @exit(i32)
 
 @.fmt.ld_nl = private unnamed_addr constant [5 x i8] c"%ld\0A\00"
@@ -46,6 +47,7 @@ define void @__io_println_str(i64 %s) {
 entry:
   %ptr = call i8* @__val_untag_ptr(i64 %s)
   call i32 @puts(i8* %ptr)
+  call i32 @fflush(i8* null)
   ret void
 }
 
@@ -54,6 +56,7 @@ entry:
   %fmt = getelementptr [5 x i8], [5 x i8]* @.fmt.ld_nl, i64 0, i64 0
   %raw = call i64 @__val_untag_int(i64 %n)
   call i32 (i8*, ...) @printf(i8* %fmt, i64 %raw)
+  call i32 @fflush(i8* null)
   ret void
 }
 
@@ -65,10 +68,12 @@ entry:
 yes:
   %t = getelementptr [5 x i8], [5 x i8]* @.str.true_nl, i64 0, i64 0
   call i32 @puts(i8* %t)
+  call i32 @fflush(i8* null)
   ret void
 no:
   %f = getelementptr [6 x i8], [6 x i8]* @.str.false_nl, i64 0, i64 0
   call i32 @puts(i8* %f)
+  call i32 @fflush(i8* null)
   ret void
 }
 
@@ -76,6 +81,7 @@ define void @__io_println_nil() {
 entry:
   %s = getelementptr [4 x i8], [4 x i8]* @.str.nil_nl, i64 0, i64 0
   call i32 @puts(i8* %s)
+  call i32 @fflush(i8* null)
   ret void
 }
 
