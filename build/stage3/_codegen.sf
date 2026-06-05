@@ -4718,24 +4718,57 @@ class Codegen {
         } else {
             this.emit_indent(raw + " = call " + llvm_ret + " @" + c_name + "(" + call_args.join(", ") + ")")
         }
+        // Look up the Saffron return type annotation for proper boxing
+        var saffron_ret_str: String = "Int"
+        if (this.func_ret_types.has(name)) {
+            saffron_ret_str = this.type_to_string(this.func_ret_types.get(name))
+        }
         if (llvm_ret == "i8*") {
             var as_int: String = this.emit_tag_ptr(raw)
-            this.last_type = AST.Type.IntType
+            this.last_type = AST.Type.StringType
             return as_int
         }
         if (llvm_ret == "i32") {
             var ext: String = this.fresh_local()
             this.emit_indent(ext + " = sext i32 " + raw + " to i64")
+            if (saffron_ret_str == "Any") {
+                this.last_type = AST.Type.IntType
+                return ext
+            }
+            if (saffron_ret_str == "Bool") {
+                var tagged: String = this.emit_tag_bool(ext)
+                this.last_type = AST.Type.BoolType
+                return tagged
+            }
+            var tagged: String = this.emit_tag_int(ext)
             this.last_type = AST.Type.IntType
-            return ext
+            return tagged
         }
         if (llvm_ret == "double") {
             var as_int: String = this.emit_tag_float(raw)
             this.last_type = AST.Type.FloatType
             return as_int
         }
+        // Default i64 return: box based on Saffron type annotation
+        if (saffron_ret_str == "Any") {
+            this.last_type = AST.Type.IntType
+            return raw
+        }
+        if (saffron_ret_str == "String") {
+            var ptr: String = this.fresh_local()
+            this.emit_indent(ptr + " = inttoptr i64 " + raw + " to i8*")
+            var tagged: String = this.emit_tag_ptr(ptr)
+            this.last_type = AST.Type.StringType
+            return tagged
+        }
+        if (saffron_ret_str == "Bool") {
+            var tagged: String = this.emit_tag_bool(raw)
+            this.last_type = AST.Type.BoolType
+            return tagged
+        }
+        var tagged: String = this.emit_tag_int(raw)
         this.last_type = AST.Type.IntType
-        return raw
+        return tagged
     }
 
     fun extern_param_types(parsed: List<String>): String {
