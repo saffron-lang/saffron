@@ -118,4 +118,8 @@ IO.println("  ║  Press Ctrl+C to stop             ║")
 IO.println("  ╚═══════════════════════════════════╝")
 IO.println("")
 
-app.serve()
+try {
+    app.serve()
+} catch (e) {
+    IO.println("Server error: " + e)
+}

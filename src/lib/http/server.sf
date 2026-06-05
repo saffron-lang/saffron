@@ -368,12 +368,14 @@ class App {
     }
 
     fun serve() {
-        var listener: Net.TcpListener = Net.listen(this.host, this.port)
+        var bind_host: String = this.host
+        var bind_port: Int = this.port
+        var listener: Net.TcpListener = Net.listen(bind_host, bind_port)
         var proto: String = "http"
         if (this._tls_ctx != nil) {
             proto = "https"
         }
-        IO.println("Listening on " + proto + "://" + this.host + ":" + this.port.to_string())
+        IO.println("Listening on " + proto + "://" + bind_host + ":" + bind_port.to_string())
         while (true) {
             var conn: Net.TcpConnection = listener.accept()
             var app = this
