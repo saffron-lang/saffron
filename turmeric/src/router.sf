@@ -18,6 +18,7 @@
 //   router.back()
 
 import "./signal.sf" as Sig
+import { Event } from "./events.sf"
 
 // =============================================================================
 // Route Params — passed to route handlers
@@ -239,23 +240,22 @@ fun memory(initial: String): Router {
 // =============================================================================
 // Link — SPA navigation component
 // =============================================================================
-// Renders <a href="..."> with click interception for client-side navigation.
-// Supports middle-click/ctrl+click for new-tab (falls through to browser).
+// Renders <a href="..."> with proper href and click interception.
+// href format matches the router mode:
+//   Hash:    href="#/about"     (works without server config)
+//   History: href="/about"      (clean URLs, needs server fallback)
+//   Memory:  href="javascript:void(0)"  (no real navigation)
 //
 // Usage:
-//   Link(router, "/about", cls="nav-link") { text("About") }
-
-// Link renders an <a> with proper href for accessibility/SEO and intercepts
-// clicks for SPA navigation. Use from app code like:
 //   import { Link } from "turmeric/router"
 //   Link(router, "/about", cls="nav-link") { text("About") }
-//
-// The href is set for accessibility (right-click → open in new tab works).
-// Left clicks are intercepted for client-side navigation via router.go().
+
 fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String = "", block: () => Nil = nil) {
     var href: String = to
     if (r._mode == Mode.Hash) {
         href = "#" + to
+    } else if (r._mode == Mode.Memory) {
+        href = "javascript:void(0)"
     }
-    a(cls=cls, id=id, style=style, href=href, on_click=fun (e: Any) => r.go(to), block=block)
+    a(cls=cls, id=id, style=style, href=href, on_click=fun (e: Event) => r.go(to), block=block)
 }
