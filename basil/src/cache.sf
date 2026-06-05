@@ -40,7 +40,7 @@ class CacheStore {
 
     fun invalidate_matching(prefix: String) {
         var keys: List<String> = this.entries.keys()
-        var i: Float = 0
+        var i: Int = 0
         while (i < keys.length()) {
             if (keys[i].starts_with(prefix)) {
                 this.entries.get(keys[i]).is_stale = true
