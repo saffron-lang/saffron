@@ -511,7 +511,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
-    gen.module_prefixes.set("Reflect", "")
+    gen.module_prefixes.set("Reflect", "stdlib_reflect_")
 
     // Register runtime functions first
     gen.known_functions.push("StringBuilder")
@@ -945,7 +945,7 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
-    gen.module_prefixes.set("Reflect", "")
+    gen.module_prefixes.set("Reflect", "stdlib_reflect_")
     gen.named_imports = named_imports
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
@@ -1494,7 +1494,7 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.module_prefixes.set("GC", "__gc_")
     // Task is handled by dedicated dispatch (Task.spawn, task.await, etc.)
     // and is NOT a real module prefix — don't register it here.
-    gen.module_prefixes.set("Reflect", "")
+    gen.module_prefixes.set("Reflect", "stdlib_reflect_")
     gen.named_imports = named_imports
     gen.register_only = false
     var prefixes: List<String> = prefixes_joined.split("|")
