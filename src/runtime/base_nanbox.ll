@@ -95,53 +95,21 @@ entry:
   ret void
 }
 
-; __io_println — Universal println: detects NaN-boxed values vs raw string ptrs.
-; If the value has a NaN-box tag (upper 16 bits in 0x7FF8..0x7FFA), dispatch via
-; __io_println_any. Otherwise treat as a raw char* and puts directly.
+; __io_println — Universal println: delegates to __io_println_any which handles
+; all NaN-boxed types (int, bool, nil, ptr/string, float) via tag dispatch.
 define i64 @__io_println(i64 %val) {
 entry:
-  %upper = lshr i64 %val, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  %is_int = icmp eq i64 %upper, 32761
-  %is_spec = icmp eq i64 %upper, 32762
-  %t1 = or i1 %is_ptr, %is_int
-  %is_tagged = or i1 %t1, %is_spec
-  br i1 %is_tagged, label %tagged, label %raw_str
-
-tagged:
   call void @__io_println_any(i64 %val)
-  ret i64 0
-
-raw_str:
-  ; Value is a raw char* from __int_to_string / __bool_to_string / etc.
-  %ptr = inttoptr i64 %val to i8*
-  call i32 @puts(i8* %ptr)
   ret i64 0
 }
 
-; __io_print — Universal print: detects NaN-boxed values vs raw string ptrs.
+; __io_print — Universal print (no newline): converts via __any_to_string then printf.
 define i64 @__io_print(i64 %val) {
 entry:
-  %upper = lshr i64 %val, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  %is_int = icmp eq i64 %upper, 32761
-  %is_spec = icmp eq i64 %upper, 32762
-  %t1 = or i1 %is_ptr, %is_int
-  %is_tagged = or i1 %t1, %is_spec
-  br i1 %is_tagged, label %tagged, label %raw_str
-
-tagged:
   %str = call i64 @__any_to_string(i64 %val)
   %str_ptr = inttoptr i64 %str to i8*
-  %fmt1 = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
-  call i32 (i8*, ...) @printf(i8* %fmt1, i8* %str_ptr)
-  ret i64 0
-
-raw_str:
-  ; Value is a raw char* from coerce_to_string
-  %ptr = inttoptr i64 %val to i8*
-  %fmt2 = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
-  call i32 (i8*, ...) @printf(i8* %fmt2, i8* %ptr)
+  %fmt = getelementptr [3 x i8], [3 x i8]* @.str.pct_s, i64 0, i64 0
+  call i32 (i8*, ...) @printf(i8* %fmt, i8* %str_ptr)
   ret i64 0
 }
 
