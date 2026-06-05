@@ -9,6 +9,7 @@ class Parser {
     var had_error: Bool
     var error_count: Float
     var source: String
+    var html_depth: Float
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -16,6 +17,7 @@ class Parser {
         this.had_error = false
         this.error_count = 0
         this.source = ""
+        this.html_depth = 0
     }
 
     fun current(): Lexer.Token {
@@ -525,6 +527,10 @@ class Parser {
                 return AST.Expr.Yield(yval)
             }
             return AST.Expr.Yield(AST.Expr.NilLit)
+        }
+        // HTML fragment: <>children</>
+        if (this.match_kind_check("<") and this.peek_is(">")) {
+            return this.parse_html_fragment()
         }
         // HTML element expression: <tag attrs...>children</tag>
         if (this.match_kind_check("<") and this.peek_is_html_start()) {
@@ -1079,8 +1085,29 @@ class Parser {
     }
 
     fun is_comparison_op(): Bool {
-        return this.match_kind_check("<") or this.match_kind_check("<=") or
+        if (this.html_depth > 0) { return false }
+        if (this.match_kind_check("<")) {
+            if (this.peek_is(">") or this.peek_is("/")) { return false }
+            if (this.peek_is("ident") and this.is_html_open_at(this.pos + 1)) { return false }
+            return true
+        }
+        return this.match_kind_check("<=") or
                this.match_kind_check(">") or this.match_kind_check(">=")
+    }
+
+    fun is_html_open_at(ident_pos: Float): Bool {
+        // Check if ident at ident_pos is the start of an HTML element (not a comparison RHS).
+        // HTML: <tag>, <tag/>, <tag attr=...>, <Tag> (component)
+        // Comparison: <expr.method(), <expr), <expr + ...
+        if (ident_pos + 1 >= this.tokens.length()) { return false }
+        var next_tok: Lexer.Token = this.tokens[ident_pos + 1]
+        var next_kind: Lexer.TokenKind = match (next_tok) { Token(k, l, c) => k }
+        var next_str: String = this.kind_name(next_kind)
+        // After a tag name: >, />, or attribute name (ident), or = (shorthand)
+        if (next_str == ">" or next_str == "/" or next_str == "ident" or next_str == "=") { return true }
+        // Keywords that are valid attribute names (cls, for, in, is)
+        if (next_str == "class" or next_str == "for" or next_str == "in" or next_str == "is") { return true }
+        return false
     }
 
     fun is_shift_op(): Bool {
@@ -2178,6 +2205,14 @@ class Parser {
         return false
     }
 
+    fun parse_html_fragment(): AST.Expr {
+        // <> already checked but not consumed. Consume < and >
+        this.advance()
+        this.advance()
+        var children: List<AST.Stmt> = this.parse_html_children("")
+        return AST.Expr.BlockExpr(children, AST.Expr.NilLit)
+    }
+
     fun parse_html_element(): AST.Expr {
         // < already checked but not consumed. Consume it.
         this.advance()
@@ -2263,9 +2298,12 @@ class Parser {
         // anonymous lambdas (fun () => ...) as declarations.
         if (this.match_kind_check("{")) {
             this.advance()
+            var saved_depth: Float = this.html_depth
+            this.html_depth = 0
             // Check for empty map: {}
             if (this.match_kind_check("}")) {
                 this.advance()
+                this.html_depth = saved_depth
                 return AST.Expr.MapLit
             }
             // Check for Kotlin-style lambda: {x => body} or {x, y => body}
@@ -2297,6 +2335,7 @@ class Parser {
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
+                    this.html_depth = saved_depth
                     return AST.Expr.Lambda(lparams, "Any", lbody)
                 } else if (this.match_kind(",")) {
                     // Multi-param Kotlin lambda: {x, y => body}
@@ -2324,6 +2363,7 @@ class Parser {
                             lbody[lbody.length() - 1] = AST.Stmt.Return(kexpr)
                         }
                     }
+                    this.html_depth = saved_depth
                     return AST.Expr.Lambda(lparams, "Any", lbody)
                 } else {
                     // Not a Kotlin lambda — restore position
@@ -2347,11 +2387,13 @@ class Parser {
                     map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
                 }
                 this.consume("}")
+                this.html_depth = saved_depth
                 return AST.Expr.BlockExpr(map_stmts, AST.Expr.Variable("__map"))
             }
             // General expression (lambda, arithmetic, etc.)
             var expr: AST.Expr = this.parse_expr()
             this.consume("}")
+            this.html_depth = saved_depth
             return expr
         }
         // Bare value (identifier, number, etc.) — use parse_call to avoid
@@ -2361,29 +2403,43 @@ class Parser {
 
     fun parse_html_children(parent_tag: String): List<AST.Stmt> {
         var stmts: List<AST.Stmt> = []
+        this.html_depth = this.html_depth + 1
 
         while (!this.match_kind_check("eof")) {
-            // Check for closing tag: </tag>
+            // Check for closing tag: </tag> or fragment close </>
             if (this.match_kind_check("<") and this.peek_is("/")) {
-                // Consume </ tag >
                 this.advance()
                 this.advance()
-                this.expect_ident()
+                if (!this.match_kind_check(">")) {
+                    this.expect_ident()
+                }
                 this.consume(">")
+                this.html_depth = this.html_depth - 1
                 return stmts
             }
 
-            // Nested HTML element
-            if (this.match_kind_check("<") and this.peek_is_html_start()) {
+            // Nested fragment: <>...</>
+            if (this.match_kind_check("<") and this.peek_is(">")) {
+                var child: AST.Expr = this.parse_html_fragment()
+                stmts.push(AST.Stmt.ExprStmt(child))
+            }
+            // Nested HTML element: <ident ...> (any identifier — no tag list needed at depth>0)
+            else if (this.match_kind_check("<") and this.peek_is("ident")) {
                 var child: AST.Expr = this.parse_html_element()
                 stmts.push(AST.Stmt.ExprStmt(child))
             }
-            // Expression: {code}
+            // Code block: {stmts...}
             else if (this.match_kind_check("{")) {
                 this.advance()
-                var expr: AST.Expr = this.parse_expr()
+                var saved_depth: Float = this.html_depth
+                this.html_depth = 0
+                while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
+                    while (this.match_kind(";")) {}
+                    if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
+                    stmts.push(this.parse_stmt())
+                }
                 this.consume("}")
-                stmts.push(AST.Stmt.ExprStmt(expr))
+                this.html_depth = saved_depth
             }
             // Text content — accumulate until < or { or EOF
             else if (this.match_kind_check("string")) {
@@ -2393,8 +2449,7 @@ class Parser {
                 stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(text)])))
             }
             else {
-                // Text as identifier tokens (HTML text content between tags)
-                // Accumulate tokens as text until we see < or { or EOF
+                // Text tokens (identifiers, numbers, symbols) until < or { or EOF
                 var text_parts: List<String> = []
                 while (!this.match_kind_check("<") and !this.match_kind_check("{") and !this.match_kind_check("eof")) {
                     var kind: Lexer.TokenKind = this.current_kind()
@@ -2409,6 +2464,8 @@ class Parser {
                 if (text_parts.length() > 0) {
                     var full_text: String = text_parts.join(" ")
                     stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(full_text)])))
+                } else {
+                    this.advance()
                 }
             }
         }
