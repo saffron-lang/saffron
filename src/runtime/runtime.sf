@@ -146,9 +146,9 @@ fun __list_pop(list: Int): Int {
 }
 
 fun __list_remove(list: Int, index: Int): Int {
-    if (list == 0) { return 0 }
+    if (list == 0) { return __rt_nil() }
     var count: Int = load64(list)
-    if (index < 0 or index >= count) { return 0 }
+    if (index < 0 or index >= count) { return __rt_nil() }
     var data: Int = load64(list + 16)
     var removed: Int = load64(data + index * 8)
     var i: Int = index
@@ -221,6 +221,12 @@ fun __sb_to_string(sb: Int): Int {
 
 @extern("void* __val_untag_ptr(i64)") fun __rt_untag_ptr(val: Int): Int
 @extern("i64 __val_untag_int(i64)") fun __rt_untag_int(val: Int): Int
+
+// NaN-boxed nil sentinel (0x7FFA000000000002 = 9221683186994511874).
+// Cannot use `nil` keyword here: identity-mode compiles nil to raw 0.
+fun __rt_nil(): Int {
+    return 9221683186994511874
+}
 
 fun __safe_strcmp(a: Int, b: Int): Int {
     var ra: Int = __rt_untag_ptr(a)
@@ -299,7 +305,7 @@ fun __map_set(map: Int, key: Int, value: Int) {
 }
 
 fun __map_get(map: Int, key: Int): Int {
-    if (map == 0) { return 0 }
+    if (map == 0) { return __rt_nil() }
     var count: Int = load64(map)
     var keys: Int = load64(map + 16)
     var vals: Int = load64(map + 24)
@@ -311,7 +317,7 @@ fun __map_get(map: Int, key: Int): Int {
         }
         i = i + 1
     }
-    return 0
+    return __rt_nil()
 }
 
 fun __map_has(map: Int, key: Int): Int {
