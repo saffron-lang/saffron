@@ -662,9 +662,9 @@ entry:
 
 define double @__val_untag_float(i64 %v) {
 entry:
-  ; Check if value has int tag (top 16 bits == 0x7FF8)
+  ; Check if value has int tag (top 16 bits == 0x7FF9)
   %tag_bits = lshr i64 %v, 48
-  %is_int = icmp eq i64 %tag_bits, 32760
+  %is_int = icmp eq i64 %tag_bits, 32761
   br i1 %is_int, label %convert_int, label %as_float
 convert_int:
   ; Extract int payload (sign-extend from 48 bits) and convert to double
