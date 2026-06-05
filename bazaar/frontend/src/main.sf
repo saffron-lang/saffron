@@ -4,6 +4,8 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
+import { div, span, p, a, h1, h2, h3, nav, header, footer, section, form, input, button, code, text } from "turmeric/prelude"
+import "@json" as JSON
 
 // =============================================================================
 // FFI — fetch from same-origin API
@@ -61,7 +63,7 @@ fun do_search() {
     var q: String = search_query.get()
     if (q.length() == 0) {
         load_featured()
-        current_page.set("home")
+        router.go("/")
         return
     }
     is_loading.set(true)

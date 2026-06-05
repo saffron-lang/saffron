@@ -472,7 +472,8 @@ class App {
         while (i < this.routes.length()) {
             var route: Route = this.routes[i]
             if ((route.method == req.method or route.method == "*") and (route.path == req.path or route.path == "*")) {
-                return route.handler(req)
+                var h: Fun = route.handler
+                return h(req)
             }
             i = i + 1
         }
@@ -489,7 +490,8 @@ class App {
                         req.params.set(keys[k], matched.get(keys[k]))
                         k = k + 1
                     }
-                    return route.handler(req)
+                    var h: Fun = route.handler
+                    return h(req)
                 }
             }
             i = i + 1

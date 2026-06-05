@@ -1,4 +1,5 @@
 //! JSON parser and serializer — pure Saffron implementation.
+import "@reflect" as Reflect
 
 /// Parse a JSON string into native Saffron values (maps, lists, strings, numbers, bools, nil).
 ///
