@@ -249,6 +249,18 @@ entry:
 
 define double @__val_untag_float(i64 %v) {
 entry:
+  ; Check if value has int tag (top 16 bits == 0x7FF8)
+  %tag_bits = lshr i64 %v, 48
+  %is_int = icmp eq i64 %tag_bits, 32760
+  br i1 %is_int, label %convert_int, label %as_float
+convert_int:
+  ; Extract int payload (sign-extend from 48 bits) and convert to double
+  %payload = and i64 %v, 281474976710655
+  %shift_left = shl i64 %payload, 16
+  %sign_ext = ashr i64 %shift_left, 16
+  %from_int = sitofp i64 %sign_ext to double
+  ret double %from_int
+as_float:
   %f = bitcast i64 %v to double
   ret double %f
 }
