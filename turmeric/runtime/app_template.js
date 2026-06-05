@@ -118,6 +118,28 @@ const imports = { env: new Proxy({
     js_get_hash: () => writeCString(location.hash.replace(/^#\/?/, '') || '/'),
     js_push_state: (ptr) => history.pushState(null, '', readCString(ptr)),
     js_get_pathname: () => writeCString(location.pathname),
+    js_fetch_json: (urlPtr, callbackId) => {
+        const url = readCString(urlPtr);
+        fetch(url).then(r => r.text()).then(text => {
+            const ptr = writeCString(text);
+            instance.exports.__on_fetch_complete(callbackId, ptr);
+        }).catch(() => {
+            const ptr = writeCString('{"error":"fetch failed"}');
+            instance.exports.__on_fetch_complete(callbackId, ptr);
+        });
+    },
+    js_fetch_post: (urlPtr, bodyPtr, callbackId) => {
+        const url = readCString(urlPtr);
+        const body = readCString(bodyPtr);
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+            .then(r => r.text()).then(text => {
+                const ptr = writeCString(text);
+                instance.exports.__on_fetch_complete(callbackId, ptr);
+            }).catch(() => {
+                const ptr = writeCString('{"error":"fetch failed"}');
+                instance.exports.__on_fetch_complete(callbackId, ptr);
+            });
+    },
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
 
