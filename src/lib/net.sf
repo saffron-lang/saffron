@@ -33,7 +33,7 @@
 //! var fd: Number = conn.raw_fd()
 //! ```
 
-import "@dns" as DNS
+// import "@dns" as DNS  // disabled: dns coroutine codegen crashes runtime
 
 // =============================================================================
 // FFI declarations (private implementation details)
@@ -377,22 +377,10 @@ fun connect_tls(host: String, port: Int): TcpConnection {
 /// // ips = ["93.184.216.34"]
 /// ```
 fun resolve(hostname: String): List<String> {
-    var ip: String = DNS.resolve(hostname)
-    if (ip == "") {
-        return []
-    }
-    return [ip]
+    // TODO: re-enable when coroutine await codegen is fixed
+    return []
 }
 
-/// Resolve a hostname using a specific nameserver.
-///
-/// ```saffron
-/// var ips = Net.resolve_with("example.com", "1.1.1.1")
-/// ```
 fun resolve_with(hostname: String, nameserver: String): List<String> {
-    var ip: String = DNS.resolve_with(hostname, nameserver)
-    if (ip == "") {
-        return []
-    }
-    return [ip]
+    return []
 }
