@@ -96,7 +96,6 @@ entry:
 }
 
 ; __io_println — Identity mode: treat value as string pointer, call puts.
-; The compiler coerces to string at compile time via coerce_to_string.
 define i64 @__io_println(i64 %val) {
 entry:
   %ptr = inttoptr i64 %val to i8*

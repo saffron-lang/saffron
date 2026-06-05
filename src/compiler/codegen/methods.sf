@@ -543,20 +543,26 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
     // Check for IO module calls
     if (obj_name == "IO") {
         if (method == "println") {
-            var pre_type: String = this.get_expr_type(args[0])
             var arg: String = this.gen_arg_value(args[0])
             var arg_type: String = this.type_to_string(this.last_type)
-            if (arg_type == "Int" and pre_type != "Any") { arg_type = pre_type }
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_println_str(i64 " + str_val + ")")
+            if (this.identity_mode and arg_type == "String") {
+                this.emit_indent("call void @__io_println_str(i64 " + arg + ")")
+            } else {
+                this.emit_indent("call void @__io_println_any(i64 " + arg + ")")
+            }
             this.set_last_type(AST.Type.NilType)
             return "0"
         }
         if (method == "print") {
             var arg: String = this.gen_arg_value(args[0])
             var arg_type: String = this.type_to_string(this.last_type)
-            var str_val: String = this.coerce_to_string(arg, arg_type)
-            this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
+            if (this.identity_mode and arg_type == "String") {
+                this.emit_indent("call void @__io_print_str(i64 " + arg + ")")
+            } else {
+                var str_val: String = this.fresh_local()
+                this.emit_indent(str_val + " = call i64 @__any_to_string(i64 " + arg + ")")
+                this.emit_indent("call void @__io_print_str(i64 " + str_val + ")")
+            }
             this.set_last_type(AST.Type.NilType)
             return "0"
         }
