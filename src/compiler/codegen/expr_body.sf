@@ -2011,17 +2011,23 @@
                             var def_val: String = this.gen_arg_value(def_expr)
                             arg_strs.push("i64 " + def_val)
                         } else {
-                            arg_strs.push("i64 0")
+                            var __nil_fill: String = this.fresh_local()
+                            this.emit_indent(__nil_fill + " = call i64 @__val_nil()")
+                            arg_strs.push("i64 " + __nil_fill)
                         }
                     } else {
-                        arg_strs.push("i64 0")
+                        var __nil_fill: String = this.fresh_local()
+                        this.emit_indent(__nil_fill + " = call i64 @__val_nil()")
+                        arg_strs.push("i64 " + __nil_fill)
                     }
                     i = i + 1
                 }
             } else if (this.func_param_names.has(resolved_callee)) {
                 var param_count: Float = this.func_param_names.get(resolved_callee).length()
                 while (arg_strs.length() < param_count) {
-                    arg_strs.push("i64 0")
+                    var __nil_fill: String = this.fresh_local()
+                    this.emit_indent(__nil_fill + " = call i64 @__val_nil()")
+                    arg_strs.push("i64 " + __nil_fill)
                 }
             }
             var local: String = this.fresh_local()
@@ -2241,17 +2247,23 @@
                             var def_val2b: String = this.gen_arg_value(def_expr2)
                             arg_strs.push("i64 " + def_val2b)
                         } else {
-                            arg_strs.push("i64 0")
+                            var __nil_fill2: String = this.fresh_local()
+                            this.emit_indent(__nil_fill2 + " = call i64 @__val_nil()")
+                            arg_strs.push("i64 " + __nil_fill2)
                         }
                     } else {
-                        arg_strs.push("i64 0")
+                        var __nil_fill2: String = this.fresh_local()
+                        this.emit_indent(__nil_fill2 + " = call i64 @__val_nil()")
+                        arg_strs.push("i64 " + __nil_fill2)
                     }
                     i = i + 1
                 }
             } else if (this.func_param_names.has(emit_callee)) {
                 var param_count2: Float = this.func_param_names.get(emit_callee).length()
                 while (arg_strs.length() < param_count2) {
-                    arg_strs.push("i64 0")
+                    var __nil_fill2: String = this.fresh_local()
+                    this.emit_indent(__nil_fill2 + " = call i64 @__val_nil()")
+                    arg_strs.push("i64 " + __nil_fill2)
                 }
             }
             var local: String = this.fresh_local()

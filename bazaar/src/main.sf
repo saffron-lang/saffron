@@ -34,9 +34,11 @@ fun main() {
     app.get("/api/v1/packages", Routes.list_packages)
     app.get("/api/v1/packages/:name", Routes.get_package)
     app.get("/api/v1/packages/:name/:version/download", Routes.download_package)
-    app.put("/api/v1/packages/new", Routes.publish_package)
-    app.delete("/api/v1/packages/:name/:version/yank", Routes.yank_package)
+    app.post("/api/v1/packages/publish", Routes.publish_package)
+    app.post("/api/v1/packages/:name/yank/:version", Routes.yank_package)
     app.get("/api/v1/search", Routes.search_packages)
+    app.post("/api/v1/auth/register", Routes.register_user)
+    app.post("/api/v1/auth/revoke", Routes.revoke_user_token)
 
     // Start serving
     IO.println("Bazaar registry server v0.1.0")

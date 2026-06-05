@@ -810,11 +810,185 @@
                 return "0"
             }
 
+            // Named arg reordering + trailing closure + default filling
+            var __mp_reordered: List<AST.Expr> = args
+            var __mp_has_named: Bool = false
+            var __mp_tc_applied: Bool = false
+            // Trailing closure: last arg is lambda and fewer args than params
+            if (this.func_param_names.has(__mp_func) and args.length() > 0) {
+                var __mp_pnames: List<String> = this.func_param_names.get(__mp_func)
+                var __mp_tc_last: AST.Expr = args[args.length() - 1]
+                if (this.classify_expr(__mp_tc_last) == "lambda" and args.length() < __mp_pnames.length()) {
+                    var __mp_tc_args: List<AST.Expr> = []
+                    var __mp_tci: Float = 0
+                    while (__mp_tci < args.length() - 1) {
+                        __mp_tc_args.push(args[__mp_tci])
+                        __mp_tci = __mp_tci + 1
+                    }
+                    var __mp_tc_has_named: Bool = false
+                    var __mp_tcni: Float = 0
+                    while (__mp_tcni < __mp_tc_args.length()) {
+                        if (this.classify_expr(__mp_tc_args[__mp_tcni]) == "assign") {
+                            __mp_tc_has_named = true
+                        }
+                        __mp_tcni = __mp_tcni + 1
+                    }
+                    var __mp_tc_new: List<AST.Expr> = []
+                    if (__mp_tc_has_named) {
+                        var __mp_pos_idx: Float = 0
+                        var __mp_pi: Float = 0
+                        while (__mp_pi < __mp_pnames.length() - 1) {
+                            var __mp_pn: String = __mp_pnames[__mp_pi]
+                            var __mp_found: Bool = false
+                            var __mp_si: Float = 0
+                            while (__mp_si < __mp_tc_args.length()) {
+                                if (this.classify_expr(__mp_tc_args[__mp_si]) == "assign") {
+                                    var __mp_an: String = match (__mp_tc_args[__mp_si]) { Assign(n, v) => n
+                                        _ => ""
+                                    }
+                                    if (__mp_an == __mp_pn) {
+                                        var __mp_av: AST.Expr = match (__mp_tc_args[__mp_si]) { Assign(n, v) => v
+                                            _ => AST.Expr.NilLit
+                                        }
+                                        __mp_tc_new.push(__mp_av)
+                                        __mp_found = true
+                                    }
+                                }
+                                __mp_si = __mp_si + 1
+                            }
+                            if (!__mp_found) {
+                                var __mp_used_pos: Bool = false
+                                while (__mp_pos_idx < __mp_tc_args.length() and !__mp_used_pos) {
+                                    if (this.classify_expr(__mp_tc_args[__mp_pos_idx]) != "assign") {
+                                        __mp_tc_new.push(__mp_tc_args[__mp_pos_idx])
+                                        __mp_pos_idx = __mp_pos_idx + 1
+                                        __mp_used_pos = true
+                                    } else {
+                                        __mp_pos_idx = __mp_pos_idx + 1
+                                    }
+                                }
+                                if (!__mp_used_pos) {
+                                    __mp_tc_new.push(AST.Expr.NilLit)
+                                }
+                            }
+                            __mp_pi = __mp_pi + 1
+                        }
+                    } else {
+                        __mp_tci = 0
+                        while (__mp_tci < __mp_tc_args.length()) {
+                            __mp_tc_new.push(__mp_tc_args[__mp_tci])
+                            __mp_tci = __mp_tci + 1
+                        }
+                        while (__mp_tc_new.length() < __mp_pnames.length() - 1) {
+                            __mp_tc_new.push(AST.Expr.NilLit)
+                        }
+                    }
+                    __mp_tc_new.push(__mp_tc_last)
+                    __mp_reordered = __mp_tc_new
+                    __mp_has_named = true
+                    __mp_tc_applied = true
+                }
+            }
+            // Check for named args (non-trailing-closure case)
+            var __mp_nai: Float = 0
+            while (__mp_nai < args.length()) {
+                if (this.classify_expr(args[__mp_nai]) == "assign") {
+                    __mp_has_named = true
+                }
+                __mp_nai = __mp_nai + 1
+            }
+            if (__mp_has_named and this.func_param_names.has(__mp_func) and !__mp_tc_applied) {
+                var __mp_pnames2: List<String> = this.func_param_names.get(__mp_func)
+                var __mp_new_args: List<AST.Expr> = []
+                var __mp_pos_idx2: Float = 0
+                var __mp_pi2: Float = 0
+                while (__mp_pi2 < __mp_pnames2.length()) {
+                    var __mp_pn2: String = __mp_pnames2[__mp_pi2]
+                    var __mp_found2: Bool = false
+                    var __mp_si2: Float = 0
+                    while (__mp_si2 < args.length()) {
+                        if (this.classify_expr(args[__mp_si2]) == "assign") {
+                            var __mp_an2: String = match (args[__mp_si2]) { Assign(n, v) => n
+                                _ => ""
+                            }
+                            if (__mp_an2 == __mp_pn2) {
+                                var __mp_av2: AST.Expr = match (args[__mp_si2]) { Assign(n, v) => v
+                                    _ => AST.Expr.NilLit
+                                }
+                                __mp_new_args.push(__mp_av2)
+                                __mp_found2 = true
+                            }
+                        }
+                        __mp_si2 = __mp_si2 + 1
+                    }
+                    if (!__mp_found2) {
+                        var __mp_used_pos2: Bool = false
+                        while (__mp_pos_idx2 < args.length() and !__mp_used_pos2) {
+                            if (this.classify_expr(args[__mp_pos_idx2]) != "assign") {
+                                __mp_new_args.push(args[__mp_pos_idx2])
+                                __mp_pos_idx2 = __mp_pos_idx2 + 1
+                                __mp_used_pos2 = true
+                            } else {
+                                __mp_pos_idx2 = __mp_pos_idx2 + 1
+                            }
+                        }
+                        if (!__mp_used_pos2) {
+                            __mp_new_args.push(AST.Expr.NilLit)
+                        }
+                    }
+                    __mp_pi2 = __mp_pi2 + 1
+                }
+                __mp_reordered = __mp_new_args
+            }
             var __mp_args: List<String> = []
             var __mpi: Float = 0
-            while (__mpi < args.length()) {
-                __mp_args.push("i64 " + this.gen_arg_value(args[__mpi]))
+            while (__mpi < __mp_reordered.length()) {
+                var __mp_used_def: Bool = false
+                if (__mp_has_named and this.classify_expr(__mp_reordered[__mpi]) == "nil" and this.func_defaults.has(__mp_func)) {
+                    var __mp_defs: List<AST.Expr> = this.func_defaults.get(__mp_func)
+                    if (__mpi < __mp_defs.length() and this.classify_expr(__mp_defs[__mpi]) != "nil") {
+                        var __mp_def_val: String = this.gen_arg_value(__mp_defs[__mpi])
+                        __mp_args.push("i64 " + __mp_def_val)
+                        __mp_used_def = true
+                    }
+                }
+                if (!__mp_used_def) {
+                    __mp_args.push("i64 " + this.gen_arg_value(__mp_reordered[__mpi]))
+                }
                 __mpi = __mpi + 1
+            }
+            // Fill missing args with defaults
+            if (this.func_defaults.has(__mp_func)) {
+                var __mp_defaults: List<AST.Expr> = this.func_defaults.get(__mp_func)
+                var __mp_param_count: Float = __mp_defaults.length()
+                if (this.func_param_names.has(__mp_func)) {
+                    var __mp_pc2: Float = this.func_param_names.get(__mp_func).length()
+                    if (__mp_pc2 > __mp_param_count) { __mp_param_count = __mp_pc2 }
+                }
+                while (__mpi < __mp_param_count) {
+                    if (__mpi < __mp_defaults.length()) {
+                        var __mp_de: AST.Expr = __mp_defaults[__mpi]
+                        if (this.classify_expr(__mp_de) != "nil") {
+                            __mp_args.push("i64 " + this.gen_arg_value(__mp_de))
+                        } else {
+                            var __mp_nil_val: String = this.fresh_local()
+                            this.emit_indent(__mp_nil_val + " = call i64 @__val_nil()")
+                            __mp_args.push("i64 " + __mp_nil_val)
+                        }
+                    } else {
+                        var __mp_nil_val: String = this.fresh_local()
+                        this.emit_indent(__mp_nil_val + " = call i64 @__val_nil()")
+                        __mp_args.push("i64 " + __mp_nil_val)
+                    }
+                    __mpi = __mpi + 1
+                }
+            } else if (this.func_param_names.has(__mp_func)) {
+                var __mp_param_count: Float = this.func_param_names.get(__mp_func).length()
+                while (__mp_args.length() < __mp_param_count) {
+                    var __mp_nil_val: String = this.fresh_local()
+                    this.emit_indent(__mp_nil_val + " = call i64 @__val_nil()")
+                    __mp_args.push("i64 " + __mp_nil_val)
+                }
             }
             var __mp_local: String = this.fresh_local()
             this.emit_indent(__mp_local + " = call i64 @" + __mp_func + "(" + __mp_args.join(", ") + ")")

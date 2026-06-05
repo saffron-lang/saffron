@@ -1,10 +1,10 @@
 //! Bazaar Frontend — Package registry SPA
-//! Built with Turmeric + Tailwind CSS (inline HTML syntax)
+//! Built with Turmeric, styled with bespoke CSS (OKLCH tokens)
 
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
-import { div, span, p, a, h1, h2, h3, nav, header, footer, section, form, input, button, code, text, mount } from "turmeric/prelude"
+import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, mount } from "turmeric/prelude"
 import "@json" as JSON
 
 // =============================================================================
@@ -77,6 +77,11 @@ fun do_search() {
     })
 }
 
+fun search_category(cat: String) {
+    search_query.set(cat)
+    do_search()
+}
+
 fun load_package_detail(name: String) {
     detail_name.set(name)
     router.go("/packages/" + name)
@@ -108,7 +113,61 @@ fun navigate_home() {
 }
 
 // =============================================================================
-// Components
+// Components — Shared
+// =============================================================================
+
+fun NavBar() {
+    <nav cls="nav">
+        {Router.Link(router, "/", cls="nav-brand") { text("Bazaar") }}
+        {Router.Link(router, "/search?q=", cls="nav-link") { text("Browse") }}
+        <a cls="nav-link" href="https://saffron-lang.org/docs">Docs</a>
+        <div cls="nav-r">
+            <a cls="btn-g">Sign in</a>
+            <a cls="btn-a">Publish</a>
+        </div>
+    </nav>
+}
+
+fun NavBarWithSearch() {
+    <nav cls="nav">
+        {Router.Link(router, "/", cls="nav-brand") { text("Bazaar") }}
+        {Router.Link(router, "/search?q=", cls="nav-link on") { text("Browse") }}
+        <a cls="nav-link" href="https://saffron-lang.org/docs">Docs</a>
+        <form cls="nav-search" on_submit={fun (e: Event) => do_search()}>
+            <input type="text" placeholder="Search packages..." on_input={fun (e: Event) => search_query.set(e.target_value)} />
+            <button cls="nav-search-btn" type="submit">→</button>
+        </form>
+        <div cls="nav-r">
+            <a cls="btn-g">Sign in</a>
+            <a cls="btn-a">Publish</a>
+        </div>
+    </nav>
+}
+
+fun Footer() {
+    <footer cls="footer">
+        {Router.Link(router, "/", cls="footer-brand") { text("Bazaar") }}
+        <div cls="footer-links">
+            <a cls="footer-link" href="https://saffron-lang.org/docs">Docs</a>
+            <a cls="footer-link">Status</a>
+            <a cls="footer-link" href="https://github.com/henry232323/saffron">GitHub</a>
+            <a cls="footer-link">Terms</a>
+        </div>
+        <span cls="footer-t">© 2026 Bazaar Registry</span>
+    </footer>
+}
+
+fun LoadingIndicator() {
+    if (is_loading.get()) {
+        <div cls="loading">
+            <div cls="spinner"></div>
+            <span>Loading...</span>
+        </div>
+    }
+}
+
+// =============================================================================
+// Components — Package Cards
 // =============================================================================
 
 fun PackageCard(pkg: Map<String, String>) {
@@ -119,62 +178,93 @@ fun PackageCard(pkg: Map<String, String>) {
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
 
-    <div cls="bg-navy-800 border border-gray-700 rounded-lg p-5 hover:border-saffron-400 hover:-translate-y-0.5 transition-all cursor-pointer" on_click={fun (e: Event) => load_package_detail(name)}>
-        <div cls="flex items-center justify-between mb-2">
-            <h2 cls="text-lg font-bold text-white">{name}</h2>
-            <span cls="text-xs font-mono bg-gray-700 text-saffron-400 px-2 py-0.5 rounded">v{version}</span>
-        </div>
-        {if (description.length() > 0) {
-            <p cls="text-sm text-gray-400 mb-3">{description}</p>
-        }}
-        <div cls="font-mono text-xs bg-navy-950 text-gray-300 px-3 py-2 rounded border border-gray-700">
-            <code>pantry add {name}</code>
-        </div>
-    </div>
-}
-
-fun SearchBar() {
-    <form cls="w-full max-w-2xl mx-auto mb-8" on_submit={fun (e: Event) => do_search()}>
-        <div cls="flex gap-2">
-            <input
-                cls="flex-1 px-4 py-3 bg-navy-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-saffron-400 focus:ring-1 focus:ring-saffron-400 transition-all"
-                type="text"
-                placeholder="Search packages..."
-                on_input={fun (e: Event) => search_query.set(e.target_value)}
-            />
-            <button cls="px-6 py-3 bg-saffron-500 hover:bg-saffron-400 text-navy-900 font-bold rounded-lg transition-colors" type="submit">
-                Search
-            </button>
-        </div>
-    </form>
-}
-
-fun NavBar() {
-    <nav cls="sticky top-0 z-50 bg-navy-900/80 backdrop-blur border-b border-gray-800">
-        <div cls="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-            <a cls="text-xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
-                Bazaar
-            </a>
-            <div cls="flex items-center gap-5">
-                <a cls="text-sm text-gray-400 hover:text-white transition-colors" href="https://saffron-lang.org/docs">Docs</a>
-                <a cls="text-sm text-gray-400 hover:text-white transition-colors" href="https://github.com/henry232323/saffron">GitHub</a>
-                <a cls="text-sm font-medium bg-saffron-500/10 text-saffron-400 hover:bg-saffron-500/20 px-3 py-1.5 rounded-md transition-colors cursor-pointer">Publish</a>
-                <a cls="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">Login</a>
+    {Router.Link(router, "/packages/" + name, cls="pkg-card") {
+        <div cls="pkg-card-top">
+            <div cls="pkg-ico">{name.char_at(0)}</div>
+            <div>
+                <div cls="pkg-name">{name}</div>
+                <div cls="pkg-meta">
+                    <span cls="ver">v{version}</span>
+                </div>
             </div>
         </div>
-    </nav>
+        if (description.length() > 0) {
+            <p cls="pkg-desc">{description}</p>
+        }
+        <div cls="pkg-footer">
+            <div cls="pkg-tags">
+                <span cls="tag">saffron</span>
+            </div>
+            <code cls="pkg-cmd">pantry add {name}</code>
+        </div>
+    }}
 }
 
+fun PackageRow(pkg: Map<String, String>) {
+    var name: String = pkg.get("name")
+    var version: String = ""
+    if (pkg.has("latest")) { version = pkg.get("latest") }
+    if (pkg.has("vers")) { version = pkg.get("vers") }
+    var description: String = ""
+    if (pkg.has("description")) { description = pkg.get("description") }
+
+    {Router.Link(router, "/packages/" + name, cls="pkg-row") {
+        <div cls="pkg-row-top">
+            <div cls="pkg-ico">{name.char_at(0)}</div>
+            <div cls="pkg-row-info">
+                <div cls="pkg-row-title">
+                    <span cls="pkg-row-name">{name}</span>
+                    <span cls="ver">{version}</span>
+                </div>
+                if (description.length() > 0) {
+                    <p cls="pkg-row-desc">{description}</p>
+                }
+                <div cls="pkg-row-footer">
+                    <div cls="pkg-row-tags">
+                        <span cls="tag">saffron</span>
+                    </div>
+                    <code cls="pkg-row-cmd">pantry add {name}</code>
+                </div>
+            </div>
+        </div>
+    }}
+}
+
+// =============================================================================
+// Pages — Landing
+// =============================================================================
+
 fun HomePage() {
-    <div cls="min-h-screen">
-        <header cls="text-center py-16">
-            <h1 cls="text-5xl font-extrabold bg-gradient-to-r from-saffron-400 to-orange-500 bg-clip-text text-transparent mb-3">Bazaar</h1>
-            <p cls="text-lg text-gray-400">The Saffron package registry</p>
-        </header>
-        {SearchBar()}
-        <section cls="max-w-4xl mx-auto px-6">
-            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-4">All Packages</h3>
-            <div cls="grid gap-4">
+    <div>
+        {NavBar()}
+
+        <section cls="hero">
+            <div cls="hero-inner">
+                <span cls="kicker">OPEN PACKAGE REGISTRY</span>
+                <h1 cls="hero-h">Find the right package. Build something lasting.</h1>
+                <p cls="hero-sub">Browse packages from the Saffron community. Open source, forever free.</p>
+                <form cls="hero-form" on_submit={fun (e: Event) => do_search()}>
+                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." on_input={fun (e: Event) => search_query.set(e.target_value)} />
+                    <button cls="hero-btn" type="submit">Search</button>
+                </form>
+                <div cls="hero-pills">
+                    <span cls="pill" on_click={fun (e: Event) => search_category("ui")}>UI components</span>
+                    <span cls="pill" on_click={fun (e: Event) => search_category("cli")}>CLI tools</span>
+                    <span cls="pill" on_click={fun (e: Event) => search_category("auth")}>Authentication</span>
+                    <span cls="pill" on_click={fun (e: Event) => search_category("data")}>Data parsing</span>
+                    <span cls="pill" on_click={fun (e: Event) => search_category("test")}>Testing</span>
+                </div>
+            </div>
+        </section>
+
+        {LoadingIndicator()}
+
+        <div cls="section wrap">
+            <div cls="section-hd">
+                <h2 cls="section-title">All packages</h2>
+                {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
+            </div>
+            <div cls="pkg-grid">
                 {var pkgs = featured_packages.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
@@ -182,34 +272,58 @@ fun HomePage() {
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    <p cls="text-center text-gray-500 py-12">No packages published yet. Be the first!</p>
+                    <div cls="empty-state">No packages published yet. Be the first!</div>
                 }}
             </div>
-        </section>
+        </div>
+
+        {Footer()}
     </div>
 }
 
+// =============================================================================
+// Pages — Search Results
+// =============================================================================
+
 fun SearchResultsPage() {
-    <div cls="min-h-screen max-w-4xl mx-auto px-6 py-8">
-        {SearchBar()}
-        <section>
-            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-4">
-                Search results for "{search_query.get()}"
-            </h3>
-            <div cls="grid gap-4">
+    <div>
+        {NavBarWithSearch()}
+
+        <div cls="tab-strip">
+            <div cls="tab on">All</div>
+            <div cls="tab-r">
+                <span cls="result-ct">
+                    {search_results.get().length().to_string()} results
+                </span>
+            </div>
+        </div>
+
+        {LoadingIndicator()}
+
+        <div cls="layout">
+            <main cls="results">
+                <p cls="result-hd">
+                    Results for "<strong>{search_query.get()}</strong>"
+                </p>
                 {var pkgs = search_results.get()
                 var i: Float = 0
                 while (i < pkgs.length()) {
-                    PackageCard(pkgs[i])
+                    PackageRow(pkgs[i])
                     i = i + 1
                 }
                 if (pkgs.length() == 0 and !is_loading.get()) {
-                    <p cls="text-center text-gray-500 py-12">No packages found matching your query.</p>
+                    <div cls="empty-state">No packages found matching your query.</div>
                 }}
-            </div>
-        </section>
+            </main>
+        </div>
+
+        {Footer()}
     </div>
 }
+
+// =============================================================================
+// Pages — Package Detail
+// =============================================================================
 
 fun PackageDetailPage() {
     var name: String = detail_name.get()
@@ -217,83 +331,111 @@ fun PackageDetailPage() {
     var description: String = detail_description.get()
     var versions = detail_versions.get()
 
-    <div cls="min-h-screen max-w-4xl mx-auto px-6 py-8">
-        <a cls="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-saffron-400 transition-colors mb-6 cursor-pointer" on_click={fun (e: Event) => navigate_home()}>
-            ← Back to packages
-        </a>
+    <div>
+        {NavBarWithSearch()}
 
-        <div cls="flex items-center gap-4 mb-4">
-            <h1 cls="text-3xl font-bold text-white">{name}</h1>
-            <span cls="text-sm font-mono bg-gray-700 text-saffron-400 px-3 py-1 rounded">v{latest}</span>
-        </div>
-
-        {if (description.length() > 0) {
-            <p cls="text-gray-400 text-lg mb-6">{description}</p>
-        }}
-
-        <div cls="mb-8">
-            <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-2">Install</h3>
-            <div cls="bg-navy-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-gray-200">
-                <code>pantry add {name}</code>
+        <div cls="pkg-header">
+            <div cls="pkg-header-inner">
+                <div cls="pkg-header-top">
+                    <div cls="pkg-header-ico">{name.char_at(0)}</div>
+                    <div>
+                        <div cls="pkg-header-title-row">
+                            <h1 cls="pkg-header-title">{name}</h1>
+                            <span cls="ver">{latest}</span>
+                        </div>
+                        {if (description.length() > 0) {
+                            <p cls="pkg-header-desc">{description}</p>
+                        }}
+                        <div cls="pkg-header-stats">
+                            <span cls="pkg-hstat">License: <strong>MIT</strong></span>
+                            <span cls="pkg-hstat-sep">·</span>
+                            <span cls="pkg-hstat"><strong>{versions.length().to_string()}</strong> versions</span>
+                        </div>
+                        <div cls="pkg-install">
+                            <code><b>pantry</b> add {name}</code>
+                            <button cls="pkg-copy">COPY</button>
+                        </div>
+                    </div>
+                </div>
+                <div cls="pkg-tabs">
+                    <div cls="pkg-tab on">Readme</div>
+                    <div cls="pkg-tab">Versions</div>
+                    <div cls="pkg-tab">Dependencies</div>
+                </div>
             </div>
         </div>
 
-        {if (versions.length() > 0) {
-            <section>
-                <h3 cls="text-sm uppercase tracking-wider text-gray-500 mb-3">
-                    Versions ({versions.length().to_string()})
-                </h3>
-                <div cls="space-y-2">
-                    {var i: Float = versions.length() - 1
-                    while (i >= 0) {
-                        var v = versions[i]
-                        <div cls="flex items-center justify-between py-2 px-4 bg-navy-800 rounded border border-gray-700/50">
-                            <span cls="font-mono text-sm text-white">{v.get("vers")}</span>
-                            {if (v.has("yanked") and v.get("yanked") == "true") {
-                                <span cls="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded">yanked</span>
-                            }}
-                        </div>
-                        i = i - 1
-                    }}
+        {LoadingIndicator()}
+
+        <div cls="detail-layout">
+            <article cls="readme">
+                <h2>Installation</h2>
+                <pre><code>pantry add {name}</code></pre>
+                {if (description.length() > 0) {
+                    <div>
+                        <h2>About</h2>
+                        <p>{description}</p>
+                    </div>
+                }}
+            </article>
+
+            <aside cls="meta-sidebar">
+                <div cls="meta-card">
+                    <span cls="meta-title">About</span>
+                    <div cls="meta-row">
+                        <span cls="meta-key">Version</span>
+                        <span cls="meta-val mono">{latest}</span>
+                    </div>
+                    <div cls="meta-row">
+                        <span cls="meta-key">License</span>
+                        <span cls="meta-val">MIT</span>
+                    </div>
+                    <div cls="meta-row">
+                        <span cls="meta-key">Versions</span>
+                        <span cls="meta-val">{versions.length().to_string()}</span>
+                    </div>
                 </div>
-            </section>
-        }}
+
+                {if (versions.length() > 0) {
+                    <div cls="meta-card">
+                        <span cls="meta-title">Version history</span>
+                        {var i: Float = versions.length() - 1
+                        while (i >= 0 and i > versions.length() - 6) {
+                            var v = versions[i]
+                            <div cls="ver-row">
+                                <span cls="ver-row-num">{v.get("vers")}</span>
+                                {if (i == versions.length() - 1) {
+                                    <span cls="ver-row-cur">CURRENT</span>
+                                }}
+                            </div>
+                            i = i - 1
+                        }}
+                    </div>
+                }}
+            </aside>
+        </div>
+
+        {Footer()}
     </div>
 }
 
-fun LoadingIndicator() {
-    if (is_loading.get()) {
-        <div cls="flex items-center justify-center py-12 gap-3">
-            <div cls="w-5 h-5 border-2 border-saffron-400 border-t-transparent rounded-full animate-spin"></div>
-            <span cls="text-gray-400 text-sm">Loading...</span>
-        </div>
-    }
-}
-
 // =============================================================================
-// App
+// App + Routes
 // =============================================================================
 
 fun App() {
-    <div id="bazaar-app" cls="min-h-screen flex flex-col">
-        {NavBar()}
-        <div cls="flex-1">
-            {LoadingIndicator()}
-            {router.render()}
-        </div>
-        <footer cls="border-t border-gray-800 py-6 text-center">
-            <p cls="text-sm text-gray-500">Bazaar — the Saffron package registry</p>
-            <p cls="text-xs text-gray-600 mt-1">Built with Saffron + Turmeric</p>
-        </footer>
-    </div>
+    router.render()
 }
 
-// =============================================================================
-// Routes
-// =============================================================================
-
 router.route("/", fun (p: Router.RouteParams) => HomePage())
-router.route("/search", fun (p: Router.RouteParams) => SearchResultsPage())
+router.route("/search", fun (p: Router.RouteParams) => {
+    var q: String = p.query_get("q")
+    if (q.length() > 0) {
+        search_query.set(q)
+        do_search()
+    }
+    SearchResultsPage()
+})
 router.route("/packages/:name", fun (p: Router.RouteParams) => {
     load_package_detail(p.get("name"))
     PackageDetailPage()

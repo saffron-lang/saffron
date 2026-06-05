@@ -14,6 +14,8 @@ fun register(app: Http.App) {
     app.post("/api/v1/packages/publish", fun (req: Http.Request): Http.Response => publish_package(req))
     app.post("/api/v1/packages/:name/yank/:version", fun (req: Http.Request): Http.Response => yank_package(req))
     app.get("/api/v1/search", fun (req: Http.Request): Http.Response => search_packages(req))
+    app.post("/api/v1/auth/register", fun (req: Http.Request): Http.Response => register_user(req))
+    app.post("/api/v1/auth/revoke", fun (req: Http.Request): Http.Response => revoke_user_token(req))
 }
 
 // ---------------------------------------------------------------------------
@@ -21,20 +23,29 @@ fun register(app: Http.App) {
 // ---------------------------------------------------------------------------
 
 fun list_packages(req: Http.Request): Http.Response {
-    var packages = Db.list_packages()
-    var results = []
+    var query = req.query
+    var offset = "0"
+    var limit = "20"
+
+    // Parse pagination params from query string
+    var parts = query.split("&")
     var i = 0
-    while (i < packages.length()) {
-        var pkg = packages[i]
-        var info = {}
-        info.set("name", pkg.get("name"))
-        info.set("description", pkg.get("description"))
-        info.set("total_downloads", pkg.get("total_downloads"))
-        results.push(info)
+    while (i < parts.length()) {
+        if (parts[i].starts_with("offset=")) {
+            offset = parts[i].slice(7, parts[i].length())
+        }
+        if (parts[i].starts_with("limit=")) {
+            limit = parts[i].slice(6, parts[i].length())
+        }
         i = i + 1
     }
+
+    var packages = Db.list_packages_paginated(offset, limit)
+    var total = Db.count_packages()
+
     var result = {}
-    result.set("packages", results)
+    result.set("packages", packages)
+    result.set("total", total)
     return Http.json(JSON.to_string(result))
 }
 
@@ -207,6 +218,12 @@ fun yank_package(req: Http.Request): Http.Response {
         return Http.json(JSON.to_string({"error": "version not found"})).status_code(404)
     }
 
+    // Check ownership
+    var user_id = Db.ensure_user(username)
+    if (!Db.is_owner(name, user_id)) {
+        return Http.json(JSON.to_string({"error": "not an owner of this package"})).status_code(403)
+    }
+
     // Mark as yanked
     Db.yank_version(name, version)
 
@@ -224,19 +241,71 @@ fun yank_package(req: Http.Request): Http.Response {
 
 fun search_packages(req: Http.Request): Http.Response {
     var query = req.query
-    // Parse q= from query string
     var q = ""
+    var limit = "20"
     var parts = query.split("&")
     var i = 0
     while (i < parts.length()) {
         if (parts[i].starts_with("q=")) {
             q = parts[i].slice(2, parts[i].length())
         }
+        if (parts[i].starts_with("limit=")) {
+            limit = parts[i].slice(6, parts[i].length())
+        }
         i = i + 1
     }
 
-    var results = Db.search(q, "20")
+    var results = Db.search(q, limit)
     var response = {}
     response.set("packages", results)
+    response.set("total", results.length())
     return Http.json(JSON.to_string(response))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/auth/register — register a user and get a token
+// ---------------------------------------------------------------------------
+
+fun register_user(req: Http.Request): Http.Response {
+    var body = JSON.parse(req.body)
+    if (body == nil) {
+        return Http.json(JSON.to_string({"error": "invalid request body"})).status_code(400)
+    }
+
+    var username = body.get("username")
+    if (username == nil or username.length() == 0) {
+        return Http.json(JSON.to_string({"error": "username is required"})).status_code(400)
+    }
+
+    // Create user and generate token
+    var token = Auth.create_token(username)
+
+    var result = {}
+    result.set("ok", true)
+    result.set("username", username)
+    result.set("token", token)
+    return Http.json(JSON.to_string(result))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/auth/revoke — revoke the current token
+// ---------------------------------------------------------------------------
+
+fun revoke_user_token(req: Http.Request): Http.Response {
+    var auth_header = req.header("Authorization")
+    if (auth_header.length() == 0) {
+        return Http.json(JSON.to_string({"error": "missing authorization"})).status_code(401)
+    }
+    var token = auth_header.replace("Bearer ", "")
+    var username = Auth.validate_token(token)
+    if (username == "") {
+        return Http.json(JSON.to_string({"error": "unauthorized"})).status_code(401)
+    }
+
+    Auth.revoke_token(token)
+
+    var result = {}
+    result.set("ok", true)
+    result.set("revoked", true)
+    return Http.json(JSON.to_string(result))
 }
