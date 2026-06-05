@@ -279,24 +279,26 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
 
 define i64 @__string_eq(i64 %a, i64 %b) {
 entry:
-  ; Fast path: same pointer = same string
+  ; Fast path: same tagged value = same string
   %same = icmp eq i64 %a, %b
   br i1 %same, label %equal, label %slow
 
 slow:
-  ; Null checks: if either is 0, they're not equal (already checked pointer eq)
-  %a_null = icmp eq i64 %a, 0
+  ; Untag both pointers
+  %a_raw = call i8* @__val_untag_ptr(i64 %a)
+  %b_raw = call i8* @__val_untag_ptr(i64 %b)
+
+  ; Null checks: if either is null, they're not equal
+  %a_null = icmp eq i8* %a_raw, null
   br i1 %a_null, label %not_equal, label %check_b
 
 check_b:
-  %b_null = icmp eq i64 %b, 0
+  %b_null = icmp eq i8* %b_raw, null
   br i1 %b_null, label %not_equal, label %do_strcmp
 
 do_strcmp:
   ; Fall back to byte-by-byte comparison
-  %a_ptr = inttoptr i64 %a to i8*
-  %b_ptr = inttoptr i64 %b to i8*
-  %cmp = call i32 @strcmp(i8* %a_ptr, i8* %b_ptr)
+  %cmp = call i32 @strcmp(i8* %a_raw, i8* %b_raw)
   %is_eq = icmp eq i32 %cmp, 0
   br i1 %is_eq, label %equal, label %not_equal
 
@@ -318,20 +320,22 @@ entry:
 
 define void @__io_println_str(i64 %s) {
 entry:
-  %ptr = inttoptr i64 %s to i8*
+  %ptr = call i8* @__val_untag_ptr(i64 %s)
   call void @js_log_str(i8* %ptr)
   ret void
 }
 
 define void @__io_println_int(i64 %n) {
 entry:
-  call void @js_log_int(i64 %n)
+  %raw = call i64 @__val_untag_int(i64 %n)
+  call void @js_log_int(i64 %raw)
   ret void
 }
 
 define void @__io_println_bool(i64 %b) {
 entry:
-  call void @js_log_bool(i64 %b)
+  %raw = call i64 @__val_untag_bool(i64 %b)
+  call void @js_log_bool(i64 %raw)
   ret void
 }
 
@@ -343,14 +347,15 @@ entry:
 
 define void @__io_print_str(i64 %s) {
 entry:
-  %ptr = inttoptr i64 %s to i8*
+  %ptr = call i8* @__val_untag_ptr(i64 %s)
   call void @js_log_str(i8* %ptr)
   ret void
 }
 
 define void @__io_print_int(i64 %n) {
 entry:
-  call void @js_log_int(i64 %n)
+  %raw = call i64 @__val_untag_int(i64 %n)
+  call void @js_log_int(i64 %raw)
   ret void
 }
 
@@ -596,28 +601,56 @@ entry:
 }
 
 ; =============================================================================
-; NaN-Boxing Value Helpers (identity mode -- matches base.ll)
+; NaN-Boxing Value Helpers
 ; =============================================================================
+;
+; Encoding (matches base_nanbox.ll):
+;   Valid double (not NaN)         -> Float (stored directly, zero cost)
+;   0x7FF8_xxxx_xxxx_xxxx         -> Heap pointer (48-bit address in payload)
+;   0x7FF9_xxxx_xxxx_xxxx         -> Integer (48-bit signed in payload)
+;   0x7FFA_0000_0000_0001         -> true
+;   0x7FFA_0000_0000_0000         -> false
+;   0x7FFA_0000_0000_0002         -> nil
+;
+; Constants:
+;   TAG_PTR      = 0x7FF8000000000000 = 9221120237041090560
+;   TAG_INT      = 0x7FF9000000000000 = 9221401712017801216
+;   TAG_SPEC     = 0x7FFA000000000000 = 9221683186994511872
+;   PAYLOAD_MASK = 0x0000FFFFFFFFFFFF = 281474976710655
+;   VAL_TRUE     = 0x7FFA000000000001 = 9221683186994511873
+;   VAL_FALSE    = 0x7FFA000000000000 = 9221683186994511872
+;   VAL_NIL      = 0x7FFA000000000002 = 9221683186994511874
 
 define i64 @__val_tag_int(i64 %n) {
 entry:
-  ret i64 %n
+  %masked = and i64 %n, 281474976710655
+  %tagged = or i64 %masked, 9221401712017801216
+  ret i64 %tagged
 }
 
 define i64 @__val_untag_int(i64 %v) {
 entry:
-  ret i64 %v
+  %payload = and i64 %v, 281474976710655
+  %shift_left = shl i64 %payload, 16
+  %sign_ext = ashr i64 %shift_left, 16
+  ret i64 %sign_ext
 }
 
 define i64 @__val_tag_ptr(i8* %ptr) {
 entry:
-  %r = ptrtoint i8* %ptr to i64
-  ret i64 %r
+  ; wasm32 pointers are 32-bit; ptrtoint zero-extends to i64
+  %int_ptr = ptrtoint i8* %ptr to i64
+  %masked = and i64 %int_ptr, 281474976710655
+  %tagged = or i64 %masked, 9221120237041090560
+  ret i64 %tagged
 }
 
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
-  %ptr = inttoptr i64 %v to i8*
+  ; Mask off the tag bits to get the raw pointer value
+  %ptr_int = and i64 %v, 281474976710655
+  ; On wasm32, inttoptr truncates i64 to i32 pointer
+  %ptr = inttoptr i64 %ptr_int to i8*
   ret i8* %ptr
 }
 
@@ -635,74 +668,125 @@ entry:
 
 define i64 @__val_tag_bool(i64 %b) {
 entry:
-  ret i64 %b
+  %is_true = icmp ne i64 %b, 0
+  %result = select i1 %is_true, i64 9221683186994511873, i64 9221683186994511872
+  ret i64 %result
 }
 
 define i64 @__val_untag_bool(i64 %v) {
 entry:
-  ret i64 %v
+  %is_true = icmp eq i64 %v, 9221683186994511873
+  %result = zext i1 %is_true to i64
+  ret i64 %result
 }
 
 define i64 @__val_nil() {
 entry:
-  ret i64 0
+  ret i64 9221683186994511874
 }
 
 ; --- Type Checking ---
 
 define i1 @__val_is_float(i64 %v) {
 entry:
+  ; A value is a float if it's NOT in our NaN-tagged range
+  ; Check that the upper 16 bits are NOT 0x7FF8, 0x7FF9, or 0x7FFA
   %upper = lshr i64 %v, 48
-  %is_ptr = icmp eq i64 %upper, 32760
-  %is_int = icmp eq i64 %upper, 32761
-  %is_spec = icmp eq i64 %upper, 32762
-  %tagged1 = or i1 %is_ptr, %is_int
-  %tagged = or i1 %tagged1, %is_spec
-  %is_float = xor i1 %tagged, true
-  ret i1 %is_float
+  %is_ptr = icmp eq i64 %upper, 32760         ; 0x7FF8
+  %is_int = icmp eq i64 %upper, 32761         ; 0x7FF9
+  %is_spec = icmp eq i64 %upper, 32762        ; 0x7FFA
+  %not_ptr = xor i1 %is_ptr, true
+  %not_int = xor i1 %is_int, true
+  %not_spec = xor i1 %is_spec, true
+  %a = and i1 %not_ptr, %not_int
+  %result = and i1 %a, %not_spec
+  ret i1 %result
 }
 
 define i1 @__val_is_int(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
-  %r = icmp eq i64 %upper, 32761
-  ret i1 %r
+  %result = icmp eq i64 %upper, 32761         ; 0x7FF9
+  ret i1 %result
 }
 
 define i1 @__val_is_ptr(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
-  %r = icmp eq i64 %upper, 32760
-  ret i1 %r
-}
-
-define i1 @__val_is_bool(i64 %v) {
-entry:
-  %is_t = icmp eq i64 %v, 9221683186994511873
-  %is_f = icmp eq i64 %v, 9221683186994511872
-  %result = or i1 %is_t, %is_f
+  %result = icmp eq i64 %upper, 32760         ; 0x7FF8
   ret i1 %result
 }
 
 define i1 @__val_is_nil(i64 %v) {
 entry:
+  ; nil = 0x7FFA000000000002
   %result = icmp eq i64 %v, 9221683186994511874
+  ret i1 %result
+}
+
+define i1 @__val_is_true(i64 %v) {
+entry:
+  ; true = 0x7FFA000000000001
+  %result = icmp eq i64 %v, 9221683186994511873
+  ret i1 %result
+}
+
+define i1 @__val_is_bool(i64 %v) {
+entry:
+  %is_t = icmp eq i64 %v, 9221683186994511873  ; true  (0x7FFA000000000001)
+  %is_f = icmp eq i64 %v, 9221683186994511872  ; false (0x7FFA000000000000)
+  %result = or i1 %is_t, %is_f
   ret i1 %result
 }
 
 define i1 @__val_is_string(i64 %v) {
 entry:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %no
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 1               ; TYPE_STRING
+  ret i1 %result
+no:
   ret i1 false
 }
 
 define i1 @__val_is_list(i64 %v) {
 entry:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %no
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 2               ; TYPE_LIST
+  ret i1 %result
+no:
   ret i1 false
 }
 
 define i1 @__val_is_map(i64 %v) {
 entry:
+  %upper = lshr i64 %v, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %check, label %no
+check:
+  %tid = call i64 @__val_type_id(i64 %v)
+  %result = icmp eq i64 %tid, 3               ; TYPE_MAP
+  ret i1 %result
+no:
   ret i1 false
+}
+
+; --- Heap Object Type ID ---
+
+define i64 @__val_type_id(i64 %v) {
+entry:
+  ; For a heap pointer, read the type ID from the first field of the object
+  %ptr_int = and i64 %v, 281474976710655      ; mask off tag
+  %ptr = inttoptr i64 %ptr_int to i64*
+  %type_id = load i64, i64* %ptr
+  ret i64 %type_id
 }
 
 ; =============================================================================
@@ -715,7 +799,8 @@ entry:
 
 define i64 @__bool_to_string(i64 %b) {
 entry:
-  %is_true = icmp ne i64 %b, 0
+  %raw = call i64 @__val_untag_bool(i64 %b)
+  %is_true = icmp ne i64 %raw, 0
   br i1 %is_true, label %yes, label %no
 yes:
   %t = getelementptr [5 x i8], [5 x i8]* @.str.true, i64 0, i64 0
@@ -995,6 +1080,92 @@ entry:
 
 define i64 @__gc_stat_threshold() {
 entry:
+  ret i64 0
+}
+
+; =============================================================================
+; __any_to_string -- Runtime type dispatch for NaN-boxed values
+; =============================================================================
+; Takes a NaN-boxed i64, determines its type at runtime, and returns a raw
+; char* (as i64) pointing to the string representation.
+
+define i64 @__any_to_string(i64 %val) {
+entry:
+  ; Check nil first
+  %is_nil = call i1 @__val_is_nil(i64 %val)
+  br i1 %is_nil, label %ret_nil, label %check_bool
+
+check_bool:
+  %is_true = call i1 @__val_is_true(i64 %val)
+  br i1 %is_true, label %ret_true, label %check_false
+
+check_false:
+  ; Check false (0x7FFA000000000000)
+  %is_false = icmp eq i64 %val, 9221683186994511872
+  br i1 %is_false, label %ret_false, label %check_int
+
+check_int:
+  %is_int = call i1 @__val_is_int(i64 %val)
+  br i1 %is_int, label %do_int, label %check_ptr
+
+do_int:
+  %raw_int = call i64 @__val_untag_int(i64 %val)
+  %int_str = call i64 @__int_to_string(i64 %raw_int)
+  ret i64 %int_str
+
+check_ptr:
+  %is_ptr = call i1 @__val_is_ptr(i64 %val)
+  br i1 %is_ptr, label %do_ptr, label %do_float
+
+do_ptr:
+  ; Untag the pointer -- caller expects a raw i8*
+  %raw_ptr = call i8* @__val_untag_ptr(i64 %val)
+  %ptr_as_i64 = ptrtoint i8* %raw_ptr to i64
+  ret i64 %ptr_as_i64
+
+do_float:
+  ; Must be a float (not NaN-tagged)
+  %float_str = call i64 @__float_to_string(i64 %val)
+  ret i64 %float_str
+
+ret_nil:
+  %nil_str = getelementptr [4 x i8], [4 x i8]* @.str.nil, i64 0, i64 0
+  %nil_ptr = ptrtoint i8* %nil_str to i64
+  ret i64 %nil_ptr
+
+ret_true:
+  %true_str = getelementptr [5 x i8], [5 x i8]* @.str.true, i64 0, i64 0
+  %true_ptr = ptrtoint i8* %true_str to i64
+  ret i64 %true_ptr
+
+ret_false:
+  %false_str = getelementptr [6 x i8], [6 x i8]* @.str.false, i64 0, i64 0
+  %false_ptr = ptrtoint i8* %false_str to i64
+  ret i64 %false_ptr
+}
+
+; __io_println_any -- Print any NaN-boxed value followed by a newline.
+define void @__io_println_any(i64 %val) {
+entry:
+  %str = call i64 @__any_to_string(i64 %val)
+  %ptr = inttoptr i64 %str to i8*
+  call void @js_log_str(i8* %ptr)
+  ret void
+}
+
+; __io_println -- Universal println: delegates to __io_println_any
+define i64 @__io_println(i64 %val) {
+entry:
+  call void @__io_println_any(i64 %val)
+  ret i64 0
+}
+
+; __io_print -- Universal print (no newline): converts via __any_to_string
+define i64 @__io_print(i64 %val) {
+entry:
+  %str = call i64 @__any_to_string(i64 %val)
+  %ptr = inttoptr i64 %str to i8*
+  call void @js_log_str(i8* %ptr)
   ret i64 0
 }
 
