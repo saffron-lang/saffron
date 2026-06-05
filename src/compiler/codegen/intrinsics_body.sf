@@ -175,14 +175,21 @@
                 var ptr: String = this.val_to_typed_ptr(val, "i8**")
                 call_args.push("i8** " + ptr)
             } else if (norm == "i32") {
+                var untagged: String = this.emit_untag_int(val)
                 var trunc_val: String = this.fresh_local()
-                this.emit_indent(trunc_val + " = trunc i64 " + val + " to i32")
+                this.emit_indent(trunc_val + " = trunc i64 " + untagged + " to i32")
                 call_args.push("i32 " + trunc_val)
             } else if (norm == "double") {
                 var dbl: String = this.emit_untag_float(val)
                 call_args.push("double " + dbl)
             } else {
-                call_args.push("i64 " + val)
+                // Use ptr-style untag (mask only, no sign extend) — safe for
+                // both small ints and pointer-as-int values in i64 params
+                var ptr: String = this.fresh_local()
+                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
+                var as_i64: String = this.fresh_local()
+                this.emit_indent(as_i64 + " = ptrtoint i8* " + ptr + " to i64")
+                call_args.push("i64 " + as_i64)
             }
             i = i + 1
         }
