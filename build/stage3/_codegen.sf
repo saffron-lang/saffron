@@ -1247,6 +1247,13 @@ class Codegen {
                         this.current_class = saved_class
                         return result
                     }
+                    // Package namespace: check named_imports for "Alias.field" first
+                    if (this.named_imports.has(obj_name + "." + field)) {
+                        var pe_ref: String = this.named_imports.get(obj_name + "." + field)
+                        if (this.str_in_list(this.known_functions, pe_ref)) {
+                            return this.gen_func_ref(pe_ref)
+                        }
+                    }
                     // Module-prefixed function reference: e.g. Routes.list_packages used as value
                     if (this.module_prefixes.has(obj_name)) {
                         var mp_resolved: String = this.module_prefixes.get(obj_name) + field
@@ -1645,6 +1652,24 @@ class Codegen {
                 } else {
                     this.emit_indent(raw_bool + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
                 }
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
+            }
+
+            // Nil comparison: use __val_is_nil in NaN-boxing mode
+            if (!this.identity_mode and (left_type == "Nil" or right_type == "Nil")) {
+                var check_val: String = lhs
+                if (left_type == "Nil") { check_val = rhs }
+                var is_nil_raw: String = this.fresh_local()
+                this.emit_indent(is_nil_raw + " = call i1 @__val_is_nil(i64 " + check_val + ")")
+                var nil_bool: String = is_nil_raw
+                if (op == "!=") {
+                    nil_bool = this.fresh_local()
+                    this.emit_indent(nil_bool + " = xor i1 " + is_nil_raw + ", true")
+                }
+                var raw_bool: String = this.fresh_local()
+                this.emit_indent(raw_bool + " = zext i1 " + nil_bool + " to i64")
                 this.last_type = AST.Type.BoolType
                 var local: String = this.emit_tag_bool(raw_bool)
                 return local
@@ -2312,6 +2337,13 @@ class Codegen {
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
                 return this.gen_enum_construct(mn, m_field, [])
             }
+            // Package namespace: check named_imports for "Alias.field" first
+            if (mn.length() > 0 and this.named_imports.has(mn + "." + m_field)) {
+                var pe_ref2: String = this.named_imports.get(mn + "." + m_field)
+                if (this.str_in_list(this.known_functions, pe_ref2)) {
+                    return this.gen_func_ref(pe_ref2)
+                }
+            }
             // Module-prefixed function reference: e.g. Routes.list_packages used as value
             if (mn.length() > 0 and this.module_prefixes.has(mn)) {
                 var mp_resolved: String = this.module_prefixes.get(mn) + m_field
@@ -2637,11 +2669,16 @@ class Codegen {
         // Resolve module-qualified names (e.g. "Async.gather" → "stdlib_async_gather")
         // before intrinsic/extern/coroutine checks
         if (resolved_callee.contains(".")) {
-            var dot_parts: List<String> = resolved_callee.split(".")
-            if (dot_parts.length() >= 2 and this.module_prefixes.has(dot_parts[0])) {
-                resolved_callee = this.module_prefixes.get(dot_parts[0]) + dot_parts[1]
-            } else if (this.func_prefix_map.has(resolved_callee)) {
-                resolved_callee = this.func_prefix_map.get(resolved_callee)
+            // Package namespace: check named_imports for dotted key first
+            if (this.named_imports.has(resolved_callee)) {
+                resolved_callee = this.named_imports.get(resolved_callee)
+            } else {
+                var dot_parts: List<String> = resolved_callee.split(".")
+                if (dot_parts.length() >= 2 and this.module_prefixes.has(dot_parts[0])) {
+                    resolved_callee = this.module_prefixes.get(dot_parts[0]) + dot_parts[1]
+                } else if (this.func_prefix_map.has(resolved_callee)) {
+                    resolved_callee = this.func_prefix_map.get(resolved_callee)
+                }
             }
         }
         if (this.str_in_list(this.intrinsic_funcs,resolved_callee)) {
@@ -8054,7 +8091,36 @@ class Codegen {
                 }
                 i = i + 1
             }
-            var entry_is_coro: Bool = this.coroutine_funcs.length() > 0
+            // Only make entry a coroutine if the top-level statements actually
+            // call a coroutine function or contain yield. Merely importing a module
+            // that defines coroutines (e.g. @async) should NOT force the entry to be
+            // a coroutine — that causes scheduler_run() to hang when there's nothing
+            // to schedule.
+            var entry_is_coro: Bool = false
+            var entry_stmts: List<AST.Stmt> = []
+            var es_i: Float = 0
+            while (es_i < program.length()) {
+                if (!this.is_decl(program[es_i])) {
+                    entry_stmts.push(program[es_i])
+                }
+                es_i = es_i + 1
+            }
+            if (this.stmts_have_yield(entry_stmts)) {
+                entry_is_coro = true
+            }
+            if (!entry_is_coro) {
+                var entry_calls: List<String> = []
+                this.collect_calls_from_stmts(entry_stmts, entry_calls)
+                var ec_i: Float = 0
+                while (ec_i < entry_calls.length()) {
+                    var ec: String = entry_calls[ec_i]
+                    if (this.str_in_list(this.coroutine_funcs, ec) or this.str_in_list(this.coroutine_funcs, this.current_prefix + ec)) {
+                        entry_is_coro = true
+                        ec_i = entry_calls.length()
+                    }
+                    ec_i = ec_i + 1
+                }
+            }
             this.emit("")
             if (entry_is_coro) {
                 this.is_coroutine = true
@@ -9149,6 +9215,50 @@ class Codegen {
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
+    // Package namespace dispatch: check named_imports for "Alias.method" pattern.
+    // This handles package re-exports where Parsley.router → router_router.
+    if (obj_name.length() > 0 and this.named_imports.has(obj_name + "." + method)) {
+        var __pe_target: String = this.named_imports.get(obj_name + "." + method)
+        this.called_functions.push(__pe_target)
+        this.called_function_arity.set(__pe_target, args.length())
+
+        // Check if this is a class constructor
+        var __pe_is_ctor: Bool = false
+        if (this.class_fields.has(method) or this.class_fields.has(__pe_target)) {
+            __pe_is_ctor = true
+        }
+
+        if (__pe_is_ctor) {
+            var __pe_instance: String = this.fresh_local()
+            this.emit_indent(__pe_instance + " = call i64 @" + __pe_target + "()")
+            var __pe_init: String = __pe_target + "__init"
+            if (this.str_in_list(this.known_functions, __pe_init)) {
+                var __pe_init_args: List<String> = []
+                __pe_init_args.push("i64 " + __pe_instance)
+                var __pei: Float = 0
+                while (__pei < args.length()) {
+                    __pe_init_args.push("i64 " + this.gen_arg_value(args[__pei]))
+                    __pei = __pei + 1
+                }
+                var __pe_discard: String = this.fresh_local()
+                this.emit_indent(__pe_discard + " = call i64 @" + __pe_init + "(" + __pe_init_args.join(", ") + ")")
+            }
+            this.last_type = this.str_to_type(method)
+            return __pe_instance
+        }
+
+        // Regular function call
+        var __pe_args: List<String> = []
+        var __peai: Float = 0
+        while (__peai < args.length()) {
+            __pe_args.push("i64 " + this.gen_arg_value(args[__peai]))
+            __peai = __peai + 1
+        }
+        var __pe_result: String = this.fresh_local()
+        this.emit_indent(__pe_result + " = call i64 @" + __pe_target + "(" + __pe_args.join(", ") + ")")
+        return __pe_result
+    }
+
     // Universal module dispatch: route through module prefix when the module
     // was properly imported (has a real prefix like "stdlib_os_").
     // Builtins with empty prefix (IO/OS/GC registered as "") fall through
@@ -9413,6 +9523,45 @@ class Codegen {
     }
 
 
+
+    // Package namespace dispatch (fallback path): same as the early check above,
+    // handles cases that reach here after failing earlier conditions.
+    if (obj_name.length() > 0 and this.named_imports.has(obj_name + "." + method)) {
+        var __pe2_target: String = this.named_imports.get(obj_name + "." + method)
+        this.called_functions.push(__pe2_target)
+        this.called_function_arity.set(__pe2_target, args.length())
+        var __pe2_is_ctor: Bool = false
+        if (this.class_fields.has(method) or this.class_fields.has(__pe2_target)) {
+            __pe2_is_ctor = true
+        }
+        if (__pe2_is_ctor) {
+            var __pe2_inst: String = this.fresh_local()
+            this.emit_indent(__pe2_inst + " = call i64 @" + __pe2_target + "()")
+            var __pe2_init: String = __pe2_target + "__init"
+            if (this.str_in_list(this.known_functions, __pe2_init)) {
+                var __pe2_iargs: List<String> = []
+                __pe2_iargs.push("i64 " + __pe2_inst)
+                var __pe2i: Float = 0
+                while (__pe2i < args.length()) {
+                    __pe2_iargs.push("i64 " + this.gen_arg_value(args[__pe2i]))
+                    __pe2i = __pe2i + 1
+                }
+                var __pe2_d: String = this.fresh_local()
+                this.emit_indent(__pe2_d + " = call i64 @" + __pe2_init + "(" + __pe2_iargs.join(", ") + ")")
+            }
+            this.last_type = this.str_to_type(method)
+            return __pe2_inst
+        }
+        var __pe2_args: List<String> = []
+        var __pe2ai: Float = 0
+        while (__pe2ai < args.length()) {
+            __pe2_args.push("i64 " + this.gen_arg_value(args[__pe2ai]))
+            __pe2ai = __pe2ai + 1
+        }
+        var __pe2_r: String = this.fresh_local()
+        this.emit_indent(__pe2_r + " = call i64 @" + __pe2_target + "(" + __pe2_args.join(", ") + ")")
+        return __pe2_r
+    }
 
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
@@ -10572,7 +10721,10 @@ class Codegen {
     // Also skip global variables (they should dispatch via class method resolution below)
     if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
         var prefixed_name: String = method
-        if (this.module_prefixes.has(obj_name)) {
+        // Package namespace: check named_imports for "Alias.method" first
+        if (this.named_imports.has(obj_name + "." + method)) {
+            prefixed_name = this.named_imports.get(obj_name + "." + method)
+        } else if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
         } else if (this.func_prefix_map.has(method)) {
             prefixed_name = this.func_prefix_map.get(method)

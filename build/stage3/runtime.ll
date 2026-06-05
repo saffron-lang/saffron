@@ -646,7 +646,7 @@ entry:
   %t5 = trunc i64 %t4 to i1
   br i1 %t5, label %then50, label %else51
 then50:
-  %t6 = add i64 0, 0
+  %t6 = call i64 @__rt_nil()
   ret i64 %t6
 else51:
   br label %endif49
@@ -676,7 +676,7 @@ end55:
   %t22 = trunc i64 %t21 to i1
   br i1 %t22, label %then56, label %else57
 then56:
-  %t23 = add i64 0, 0
+  %t23 = call i64 @__rt_nil()
   ret i64 %t23
 else57:
   br label %endif52
@@ -993,6 +993,12 @@ entry:
   %t4 = inttoptr i64 %t3 to i64*
   %t5 = load i64, i64* %t4
   ret i64 %t5
+}
+
+define i64 @__rt_nil() {
+entry:
+  %t1 = add i64 0, 9221683186994511874
+  ret i64 %t1
 }
 
 define i64 @__safe_strcmp(i64 %a.arg, i64 %b.arg) {
@@ -1517,7 +1523,7 @@ entry:
   %t5 = trunc i64 %t4 to i1
   br i1 %t5, label %then137, label %else138
 then137:
-  %t6 = add i64 0, 0
+  %t6 = call i64 @__rt_nil()
   ret i64 %t6
 else138:
   br label %endif136
@@ -1583,7 +1589,7 @@ endif142:
   store i64 %t49, i64* %i
   br label %while.cond139
 while.end141:
-  %t50 = add i64 0, 0
+  %t50 = call i64 @__rt_nil()
   ret i64 %t50
 }
 
