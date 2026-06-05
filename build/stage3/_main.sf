@@ -538,6 +538,7 @@ fun main(): Int {
     var identity_mode: Bool = false
     var use_llvm_lib: Bool = true
     var emit_llvm_lib: Bool = false
+    var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
@@ -565,7 +566,7 @@ fun main(): Int {
         if (arg == "--lib-path") {
             if (i + 1 < args.length()) {
                 i = i + 1
-                _lib_paths.push(args[i])
+                lib_path_args.push(args[i])
             }
         }
         if (arg == "--target") {
@@ -576,6 +577,7 @@ fun main(): Int {
         }
         i = i + 1
     }
+    _lib_paths = lib_path_args
 
     // Find the last .sf arg (input) and anything after it (output)
     var last_sf_idx: Float = -1
@@ -701,8 +703,9 @@ fun main(): Int {
                     var dep_src: String = IO.read_file(pkg_prelude)
                     var dep_tokens: List = Lexer.lex(dep_src)
                     var dep_program: List = Parser.parse_with_source(dep_tokens, dep_src)
+                    var dep_prefix: String = pkg_name + "_prelude_"
                     module_stmts.push(dep_program)
-                    module_prefixes_list.push("")
+                    module_prefixes_list.push(dep_prefix)
                     visited.set(pkg_prelude, true)
                 }
             }

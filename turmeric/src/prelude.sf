@@ -12,6 +12,7 @@
 @extern("void js_dom_set_attr(i64, void*, void*)") fun _tc_set_attr(handle: Float, name: String, value: String)
 @extern("void js_dom_add_event(i64, void*, i64)") fun _tc_add_event_raw(handle: Float, event: String, callback_id: Float)
 @extern("void js_dom_set_inner_html(i64, void*)") fun _tc_set_html(handle: Float, html: String)
+@extern("i64 js_dom_query_selector(void*)") fun _tc_query(selector: String): Float
 
 // --- Event callback registry ---
 // Callbacks have varying signatures: () => Nil, (Event) => Nil, etc.
@@ -1531,7 +1532,6 @@ fun wbr(cls: String = "", id: String = "", style: String = "",
 // =============================================================================
 
 fun mount(selector: String, app: () => Nil) {
-    @extern("i64 js_dom_query_selector(void*)") fun _tc_query(sel: String): Float
     _tc_root = _tc_query(selector)
     app()
 }
