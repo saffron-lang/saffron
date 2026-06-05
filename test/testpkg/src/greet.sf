@@ -1,0 +1,7 @@
+fun hello(name: String): String {
+    return "Hello, " + name + "!"
+}
+
+fun goodbye(name: String): String {
+    return "Goodbye, " + name + "!"
+}

@@ -450,6 +450,99 @@ fun is_builtin_module(imp_path: String): Bool {
     return false
 }
 
+fun _is_package_entry(imp_path: String, stdlib_dir: String): Bool {
+    // Check if a bare import resolves to a package entry via pantry.toml
+    if (imp_path.starts_with("./") or imp_path.starts_with("../") or imp_path.starts_with("@")) {
+        return false
+    }
+    if (imp_path.contains("/")) { return false }
+    var i: Float = 0
+    while (i < _lib_paths.length()) {
+        var lib_dir: String = _lib_paths[i]
+        var pkg_manifest: String = lib_dir + "/" + imp_path + "/pantry.toml"
+        if (OS.file_exists(pkg_manifest)) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+fun _build_package_exports(alias: String, entry_path: String, imp_path: String, stdlib_dir: String, path_to_prefix: Map<String, String>): Map<String, String> {
+    // Read the package entry file and extract its named imports.
+    // For each re-exported name, compute the actual sub-module prefix.
+    // Returns a map: "Alias.name" → "sub_module_prefix_name"
+    var exports: Map<String, String> = {}
+    var entry_source: String = IO.read_file(entry_path)
+    var entry_dir: String = dir_of(entry_path)
+
+    // Extract named imports from entry file: import { X, Y } from "./sub.sf"
+    var entry_named: Map<String, List<String>> = extract_named_imports(entry_source)
+    var en_paths: List<String> = entry_named.keys()
+    var eni: Float = 0
+    while (eni < en_paths.length()) {
+        var sub_imp_path: String = en_paths[eni]
+        var sub_full_path: String = resolve_import_path(entry_path, sub_imp_path, stdlib_dir)
+        // Compute the prefix for this sub-module
+        var sub_prefix: String = ""
+        if (path_to_prefix.has(sub_full_path)) {
+            sub_prefix = path_to_prefix.get(sub_full_path)
+        } else {
+            sub_prefix = path_based_prefix(sub_imp_path, sub_full_path, stdlib_dir)
+            path_to_prefix.set(sub_full_path, sub_prefix)
+        }
+        // Map each re-exported name
+        var names: List<String> = entry_named.get(sub_imp_path)
+        var ni: Float = 0
+        while (ni < names.length()) {
+            var name: String = names[ni]
+            // "Alias.name" → "sub_prefix + name"
+            exports.set(alias + "." + name, sub_prefix + name)
+            // Also map bare name for "import { name } from pkg"
+            exports.set(name, sub_prefix + name)
+            ni = ni + 1
+        }
+        eni = eni + 1
+    }
+
+    // Also check aliased imports in the entry: import "./router.sf" as Router
+    // The convention is that all top-level functions/classes in those modules
+    // are re-exported. We scan each sub-module for its exports.
+    var entry_aliases: Map<String, String> = extract_import_aliases(entry_source)
+    var ea_keys: List<String> = entry_aliases.keys()
+    var eai: Float = 0
+    while (eai < ea_keys.length()) {
+        var ea_alias: String = ea_keys[eai]
+        var ea_path: String = entry_aliases.get(ea_alias)
+        if (!is_builtin_module(ea_path)) {
+            var ea_full: String = resolve_import_path(entry_path, ea_path, stdlib_dir)
+            var ea_prefix: String = ""
+            if (path_to_prefix.has(ea_full)) {
+                ea_prefix = path_to_prefix.get(ea_full)
+            } else {
+                ea_prefix = path_based_prefix(ea_path, ea_full, stdlib_dir)
+                path_to_prefix.set(ea_full, ea_prefix)
+            }
+            // Read the sub-module to find its top-level declarations
+            if (OS.file_exists(ea_full)) {
+                var sub_source: String = IO.read_file(ea_full)
+                var sub_tokens: List = Lexer.lex(sub_source)
+                var sub_program: List = Parser.parse_with_source(sub_tokens, sub_source)
+                var spi: Float = 0
+                while (spi < sub_program.length()) {
+                    var sp_name: String = get_stmt_name(sub_program[spi])
+                    if (sp_name.length() > 0 and !is_import_stmt(sub_program[spi])) {
+                        exports.set(alias + "." + sp_name, ea_prefix + sp_name)
+                        exports.set(sp_name, ea_prefix + sp_name)
+                    }
+                    spi = spi + 1
+                }
+            }
+        }
+        eai = eai + 1
+    }
+
+    return exports
+}
+
 fun collect_modules(file_path: String, stdlib_dir: String, visited: Map<String, Bool>, module_stmts: List<List<AST.Stmt>>, module_prefixes_list: List<String>, all_aliases: Map<String, String>, path_to_prefix: Map<String, String>) {
     if (visited.has(file_path)) { return }
     visited.set(file_path, true)
@@ -651,6 +744,28 @@ fun main(): Int {
         ak = ak + 1
     }
 
+    // Build package exports for package imports (import "pkg" as Alias).
+    // When the entry file re-exports names from sub-modules, we need to map
+    // "Alias.name" to the actual sub-module's prefixed function name.
+    var package_exports: Map<String, String> = {}
+    ak = 0
+    while (ak < alias_keys.length()) {
+        var pkg_alias: String = alias_keys[ak]
+        var pkg_imp_path: String = alias_map.get(pkg_alias)
+        if (!is_builtin_module(pkg_imp_path) and _is_package_entry(pkg_imp_path, stdlib_dir)) {
+            var pkg_full_path: String = resolve_import_path(input_path, pkg_imp_path, stdlib_dir)
+            var pkg_exp: Map<String, String> = _build_package_exports(pkg_alias, pkg_full_path, pkg_imp_path, stdlib_dir, path_to_prefix)
+            var pkg_exp_keys: List<String> = pkg_exp.keys()
+            var pei: Float = 0
+            while (pei < pkg_exp_keys.length()) {
+                var pe_key: String = pkg_exp_keys[pei]
+                package_exports.set(pe_key, pkg_exp.get(pe_key))
+                pei = pei + 1
+            }
+        }
+        ak = ak + 1
+    }
+
     // Register named import module paths so they get correct prefixes
     var named_imports_raw_early: Map<String, List<String>> = extract_named_imports(source)
     var ni_paths_early: List<String> = named_imports_raw_early.keys()
@@ -664,6 +779,30 @@ fun main(): Int {
             }
         }
         npe = npe + 1
+    }
+
+    // Also resolve named imports from packages: import { router } from "parsley"
+    // needs to map "router" → actual sub-module prefix (not the entry file's prefix).
+    var ni_pkg_paths: List<String> = named_imports_raw_early.keys()
+    var nppi: Float = 0
+    while (nppi < ni_pkg_paths.length()) {
+        var npkg_path: String = ni_pkg_paths[nppi]
+        if (!is_builtin_module(npkg_path) and _is_package_entry(npkg_path, stdlib_dir)) {
+            var npkg_full: String = resolve_import_path(input_path, npkg_path, stdlib_dir)
+            // Use a dummy alias to get bare-name exports
+            var npkg_exp: Map<String, String> = _build_package_exports("__dummy", npkg_full, npkg_path, stdlib_dir, path_to_prefix)
+            var npkg_names: List<String> = named_imports_raw_early.get(npkg_path)
+            var npni: Float = 0
+            while (npni < npkg_names.length()) {
+                var npn: String = npkg_names[npni]
+                // Check if package_exports has a mapping for this bare name
+                if (npkg_exp.has(npn)) {
+                    package_exports.set(npn, npkg_exp.get(npn))
+                }
+                npni = npni + 1
+            }
+        }
+        nppi = nppi + 1
     }
 
     // Auto-import prelude (interfaces available in all programs)
@@ -773,10 +912,27 @@ fun main(): Int {
         var nni: Float = 0
         while (nni < ni_names.length()) {
             var ni_name: String = ni_names[nni]
-            named_imports.set(ni_name, ni_prefix + ni_name)
+            // Package exports override: if the bare name has a package-resolved target, use it
+            if (package_exports.has(ni_name)) {
+                named_imports.set(ni_name, package_exports.get(ni_name))
+            } else {
+                named_imports.set(ni_name, ni_prefix + ni_name)
+            }
             nni = nni + 1
         }
         npi = npi + 1
+    }
+
+    // Merge package exports (dotted keys like "Parsley.router") into named_imports
+    // so the codegen can resolve module-qualified calls via the same map.
+    var pe_keys: List<String> = package_exports.keys()
+    var peki: Float = 0
+    while (peki < pe_keys.length()) {
+        var pe_key: String = pe_keys[peki]
+        if (!named_imports.has(pe_key)) {
+            named_imports.set(pe_key, package_exports.get(pe_key))
+        }
+        peki = peki + 1
     }
 
     // Run type checker (blocking by default)

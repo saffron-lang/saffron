@@ -1658,21 +1658,26 @@ class Codegen {
             }
 
             // Nil comparison: use __val_is_nil in NaN-boxing mode
-            if (!this.identity_mode and (left_type == "Nil" or right_type == "Nil")) {
-                var check_val: String = lhs
-                if (left_type == "Nil") { check_val = rhs }
-                var is_nil_raw: String = this.fresh_local()
-                this.emit_indent(is_nil_raw + " = call i1 @__val_is_nil(i64 " + check_val + ")")
-                var nil_bool: String = is_nil_raw
-                if (op == "!=") {
-                    nil_bool = this.fresh_local()
-                    this.emit_indent(nil_bool + " = xor i1 " + is_nil_raw + ", true")
+            if (!this.identity_mode) {
+                var is_nil_cmp: Bool = false
+                if (left_type == "Nil") { is_nil_cmp = true }
+                if (right_type == "Nil") { is_nil_cmp = true }
+                if (is_nil_cmp) {
+                    var check_val: String = lhs
+                    if (left_type == "Nil") { check_val = rhs }
+                    var is_nil_raw: String = this.fresh_local()
+                    this.emit_indent(is_nil_raw + " = call i1 @__val_is_nil(i64 " + check_val + ")")
+                    var nil_bool: String = is_nil_raw
+                    if (op == "!=") {
+                        nil_bool = this.fresh_local()
+                        this.emit_indent(nil_bool + " = xor i1 " + is_nil_raw + ", true")
+                    }
+                    var raw_bool: String = this.fresh_local()
+                    this.emit_indent(raw_bool + " = zext i1 " + nil_bool + " to i64")
+                    this.last_type = AST.Type.BoolType
+                    var local: String = this.emit_tag_bool(raw_bool)
+                    return local
                 }
-                var raw_bool: String = this.fresh_local()
-                this.emit_indent(raw_bool + " = zext i1 " + nil_bool + " to i64")
-                this.last_type = AST.Type.BoolType
-                var local: String = this.emit_tag_bool(raw_bool)
-                return local
             }
 
             // Integer comparison (tagged values compare equal correctly)
@@ -9256,6 +9261,10 @@ class Codegen {
         }
         var __pe_result: String = this.fresh_local()
         this.emit_indent(__pe_result + " = call i64 @" + __pe_target + "(" + __pe_args.join(", ") + ")")
+        // Set return type from func_ret_types if available
+        if (this.func_ret_types.has(__pe_target)) {
+            this.last_type = this.func_ret_types.get(__pe_target)
+        }
         return __pe_result
     }
 
@@ -9560,6 +9569,9 @@ class Codegen {
         }
         var __pe2_r: String = this.fresh_local()
         this.emit_indent(__pe2_r + " = call i64 @" + __pe2_target + "(" + __pe2_args.join(", ") + ")")
+        if (this.func_ret_types.has(__pe2_target)) {
+            this.last_type = this.func_ret_types.get(__pe2_target)
+        }
         return __pe2_r
     }
 

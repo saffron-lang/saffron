@@ -1,0 +1,11 @@
+class Circle {
+    var radius: Int
+
+    fun init(radius: Int) {
+        this.radius = radius
+    }
+}
+
+fun make_circle(r: Int): Circle {
+    return Circle(r)
+}

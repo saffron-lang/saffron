@@ -753,6 +753,54 @@
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
+    // Package namespace dispatch: check named_imports for "Alias.method" pattern.
+    // This handles package re-exports where Parsley.router → router_router.
+    if (obj_name.length() > 0 and this.named_imports.has(obj_name + "." + method)) {
+        var __pe_target: String = this.named_imports.get(obj_name + "." + method)
+        this.called_functions.push(__pe_target)
+        this.called_function_arity.set(__pe_target, args.length())
+
+        // Check if this is a class constructor
+        var __pe_is_ctor: Bool = false
+        if (this.class_fields.has(method) or this.class_fields.has(__pe_target)) {
+            __pe_is_ctor = true
+        }
+
+        if (__pe_is_ctor) {
+            var __pe_instance: String = this.fresh_local()
+            this.emit_indent(__pe_instance + " = call i64 @" + __pe_target + "()")
+            var __pe_init: String = __pe_target + "__init"
+            if (this.str_in_list(this.known_functions, __pe_init)) {
+                var __pe_init_args: List<String> = []
+                __pe_init_args.push("i64 " + __pe_instance)
+                var __pei: Float = 0
+                while (__pei < args.length()) {
+                    __pe_init_args.push("i64 " + this.gen_arg_value(args[__pei]))
+                    __pei = __pei + 1
+                }
+                var __pe_discard: String = this.fresh_local()
+                this.emit_indent(__pe_discard + " = call i64 @" + __pe_init + "(" + __pe_init_args.join(", ") + ")")
+            }
+            this.last_type = this.str_to_type(method)
+            return __pe_instance
+        }
+
+        // Regular function call
+        var __pe_args: List<String> = []
+        var __peai: Float = 0
+        while (__peai < args.length()) {
+            __pe_args.push("i64 " + this.gen_arg_value(args[__peai]))
+            __peai = __peai + 1
+        }
+        var __pe_result: String = this.fresh_local()
+        this.emit_indent(__pe_result + " = call i64 @" + __pe_target + "(" + __pe_args.join(", ") + ")")
+        // Set return type from func_ret_types if available
+        if (this.func_ret_types.has(__pe_target)) {
+            this.last_type = this.func_ret_types.get(__pe_target)
+        }
+        return __pe_result
+    }
+
     // Universal module dispatch: route through module prefix when the module
     // was properly imported (has a real prefix like "stdlib_os_").
     // Builtins with empty prefix (IO/OS/GC registered as "") fall through
@@ -1017,6 +1065,48 @@
     }
 
 
+
+    // Package namespace dispatch (fallback path): same as the early check above,
+    // handles cases that reach here after failing earlier conditions.
+    if (obj_name.length() > 0 and this.named_imports.has(obj_name + "." + method)) {
+        var __pe2_target: String = this.named_imports.get(obj_name + "." + method)
+        this.called_functions.push(__pe2_target)
+        this.called_function_arity.set(__pe2_target, args.length())
+        var __pe2_is_ctor: Bool = false
+        if (this.class_fields.has(method) or this.class_fields.has(__pe2_target)) {
+            __pe2_is_ctor = true
+        }
+        if (__pe2_is_ctor) {
+            var __pe2_inst: String = this.fresh_local()
+            this.emit_indent(__pe2_inst + " = call i64 @" + __pe2_target + "()")
+            var __pe2_init: String = __pe2_target + "__init"
+            if (this.str_in_list(this.known_functions, __pe2_init)) {
+                var __pe2_iargs: List<String> = []
+                __pe2_iargs.push("i64 " + __pe2_inst)
+                var __pe2i: Float = 0
+                while (__pe2i < args.length()) {
+                    __pe2_iargs.push("i64 " + this.gen_arg_value(args[__pe2i]))
+                    __pe2i = __pe2i + 1
+                }
+                var __pe2_d: String = this.fresh_local()
+                this.emit_indent(__pe2_d + " = call i64 @" + __pe2_init + "(" + __pe2_iargs.join(", ") + ")")
+            }
+            this.last_type = this.str_to_type(method)
+            return __pe2_inst
+        }
+        var __pe2_args: List<String> = []
+        var __pe2ai: Float = 0
+        while (__pe2ai < args.length()) {
+            __pe2_args.push("i64 " + this.gen_arg_value(args[__pe2ai]))
+            __pe2ai = __pe2ai + 1
+        }
+        var __pe2_r: String = this.fresh_local()
+        this.emit_indent(__pe2_r + " = call i64 @" + __pe2_target + "(" + __pe2_args.join(", ") + ")")
+        if (this.func_ret_types.has(__pe2_target)) {
+            this.last_type = this.func_ret_types.get(__pe2_target)
+        }
+        return __pe2_r
+    }
 
     // Check for module-qualified function calls BEFORE loading the object.
     // This avoids emitting a spurious `load i64, i64* %ModuleName` for module aliases
@@ -2176,7 +2266,10 @@
     // Also skip global variables (they should dispatch via class method resolution below)
     if (obj_name.length() > 0 and (this.module_prefixes.has(obj_name) or (obj_name != "super" and !this.class_fields.has(obj_name) and !this.typed_vars.has(obj_name) and !this.global_var_types.has(obj_name) and !this.module_globals.has(obj_name) and !this.module_globals.has(this.current_prefix + obj_name)))) {
         var prefixed_name: String = method
-        if (this.module_prefixes.has(obj_name)) {
+        // Package namespace: check named_imports for "Alias.method" first
+        if (this.named_imports.has(obj_name + "." + method)) {
+            prefixed_name = this.named_imports.get(obj_name + "." + method)
+        } else if (this.module_prefixes.has(obj_name)) {
             prefixed_name = this.module_prefixes.get(obj_name) + method
         } else if (this.func_prefix_map.has(method)) {
             prefixed_name = this.func_prefix_map.get(method)
