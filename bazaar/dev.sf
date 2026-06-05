@@ -17,17 +17,16 @@ import "@process" as Process
 var port: Int = 3000
 
 fun build_frontend(): Bool {
-    IO.println("  [build] Compiling frontend...")
     var result = Process.run("cd frontend && saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm")
-    if (result.success) {
-        IO.println("  [build] ✓ static/app.wasm")
-        Process.run("cp frontend/public/* static/ 2>/dev/null")
-        return true
-    } else {
-        IO.println("  [build] FAILED:")
+    if (!result.success) {
+        IO.println("  [frontend] FAILED")
         IO.println(result.stderr)
         return false
     }
+    Process.run("cp frontend/public/* static/ 2>/dev/null")
+    Process.run("cp frontend/.pantry/packages/turmeric/runtime/turmeric.js static/ 2>/dev/null")
+    IO.println("  [frontend] ✓ static/app.wasm")
+    return true
 }
 
 fun mime_for(path: String): String {
@@ -52,6 +51,20 @@ fun send_response(fd: Int, status: String, mime: String, body: String) {
     var headers: String = "HTTP/1.1 " + status + "\r\nContent-Type: " + mime + "\r\nContent-Length: " + body.length().to_string() + "\r\nConnection: close\r\n\r\n"
     var full: String = headers + body
     _tcp_write(fd, full, full.length())
+}
+
+fun send_file(fd: Int, mime: String, path: String) {
+    var size: Int = IO.file_size(path)
+    if (size <= 0) {
+        send_response(fd, "404 Not Found", "text/plain", "Not Found")
+        return
+    }
+    var buf: Int = _malloc(size)
+    IO.read_binary(path, buf, size)
+    var headers: String = "HTTP/1.1 200 OK\r\nContent-Type: " + mime + "\r\nContent-Length: " + size.to_string() + "\r\nConnection: close\r\n\r\n"
+    _tcp_write(fd, headers, headers.length())
+    _tcp_write(fd, buf, size)
+    _free(buf)
 }
 
 fun handle_request(fd: Int) {
@@ -82,9 +95,8 @@ fun handle_request(fd: Int) {
         return
     }
 
-    var content: String = IO.read_file(file_path)
     var mime: String = mime_for(file_path)
-    send_response(fd, "200 OK", mime, content)
+    send_file(fd, mime, file_path)
     _tcp_close(fd)
 }
 
@@ -94,15 +106,11 @@ build_frontend()
 _socket_init()
 var listen_fd: Int = _tcp_bind("0.0.0.0", port)
 if (listen_fd < 0) {
-    IO.println("Error: failed to bind to port " + port.to_string())
+    IO.println("  [server] failed to bind to port " + port.to_string())
     return
 }
 _tcp_listen(listen_fd, 128)
-
-IO.println("")
-IO.println("  Bazaar Dev Server")
-IO.println("  http://localhost:" + port.to_string())
-IO.println("  Press Ctrl+C to stop")
+IO.println("  [server] http://localhost:" + port.to_string())
 IO.println("")
 
 while (true) {

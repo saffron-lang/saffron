@@ -769,6 +769,39 @@ fun __io_read_file(path: Int): Int {
     return buf
 }
 
+fun __io_file_size(path: Int): Int {
+    var rp: Int = __rt_untag_ptr(path)
+    if (rp == 0) { return 0 }
+    var mode: Int = rt_malloc(3)
+    store8(mode, 114)
+    store8(mode + 1, 98)
+    store8(mode + 2, 0)
+    var fp: Int = rt_fopen(rp, mode)
+    rt_free(mode)
+    if (fp == 0) { return 0 }
+    rt_fseek(fp, 0, 2)
+    var size: Int = rt_ftell(fp)
+    rt_fclose(fp)
+    return size
+}
+
+fun __io_read_binary(path: Int, buf: Int, max_size: Int): Int {
+    var rp: Int = __rt_untag_ptr(path)
+    var rb: Int = __rt_untag_ptr(buf)
+    if (rp == 0) { return 0 }
+    if (rb == 0) { return 0 }
+    var mode: Int = rt_malloc(3)
+    store8(mode, 114)
+    store8(mode + 1, 98)
+    store8(mode + 2, 0)
+    var fp: Int = rt_fopen(rp, mode)
+    rt_free(mode)
+    if (fp == 0) { return 0 }
+    var n: Int = rt_fread(rb, 1, max_size, fp)
+    rt_fclose(fp)
+    return n
+}
+
 fun __io_write_file(path: Int, content: Int) {
     var rp: Int = __rt_untag_ptr(path)
     var rc: Int = __rt_untag_ptr(content)
