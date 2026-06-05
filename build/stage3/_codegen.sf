@@ -1247,6 +1247,13 @@ class Codegen {
                         this.current_class = saved_class
                         return result
                     }
+                    // Module-prefixed function reference: e.g. Routes.list_packages used as value
+                    if (this.module_prefixes.has(obj_name)) {
+                        var mp_resolved: String = this.module_prefixes.get(obj_name) + field
+                        if (this.str_in_list(this.known_functions, mp_resolved)) {
+                            return this.gen_func_ref(mp_resolved)
+                        }
+                    }
                 }
                 // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)
                 var ma_obj_val: String = this.gen_arg_value(object)
@@ -2304,6 +2311,13 @@ class Codegen {
             }
             if (mn.length() > 0 and this.enum_variant_tags.has(mn + "." + m_field)) {
                 return this.gen_enum_construct(mn, m_field, [])
+            }
+            // Module-prefixed function reference: e.g. Routes.list_packages used as value
+            if (mn.length() > 0 and this.module_prefixes.has(mn)) {
+                var mp_resolved: String = this.module_prefixes.get(mn) + m_field
+                if (this.str_in_list(this.known_functions, mp_resolved)) {
+                    return this.gen_func_ref(mp_resolved)
+                }
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
@@ -7858,6 +7872,16 @@ class Codegen {
         this.known_functions.push("__runtime_error_fatal")
         this.known_functions.push("__null_pointer_error")
         this.known_functions.push("__division_error")
+        // NaN-boxing helpers (declared in runtime_declares, defined in base*.ll)
+        this.known_functions.push("__val_tag_int")
+        this.known_functions.push("__val_untag_int")
+        this.known_functions.push("__val_tag_ptr")
+        this.known_functions.push("__val_untag_ptr")
+        this.known_functions.push("__val_tag_float")
+        this.known_functions.push("__val_untag_float")
+        this.known_functions.push("__val_tag_bool")
+        this.known_functions.push("__val_untag_bool")
+        this.known_functions.push("__rt_tag_ptr")
         // GC runtime functions
         this.known_functions.push("__gc_enable")
         this.known_functions.push("__gc_disable")
