@@ -763,7 +763,10 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
 
     // If receiver type is unknown ("Any") but a user class defines this method,
     // skip builtin dispatch and fall through to class method resolution.
-    if (!is_user_class and this.builtin_methods.has(method)) {
+    // Do NOT override for builtin container/primitive methods (keys, values, has, etc.)
+    // even when a user class defines the same method name.
+    var __uc_is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
+    if (!is_user_class and !__uc_is_builtin_method and this.builtin_methods.has(method)) {
         var bd_obj_type: String = this.type_to_string(this.last_type)
         if (obj_name.length() > 0) {
             var bd_ot: String = this.get_var_type_str(obj_name)
@@ -771,7 +774,7 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
         if (bd_obj_type == "Any") {
             var fcm_class: String = this.find_class_for_method(method)
-            if (fcm_class.length() > 0) {
+            if (fcm_class.length() > 0 and fcm_class != "String" and fcm_class != "List" and fcm_class != "Map" and fcm_class != "Int" and fcm_class != "Float" and fcm_class != "Bool") {
                 is_user_class = true
             }
         }

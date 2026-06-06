@@ -1495,7 +1495,8 @@
     // Fallback: if type resolution failed but a user class defines this method,
     // treat as user class dispatch. Skip known builtin methods (length, push, etc.)
     // to avoid hijacking built-in container dispatch.
-    if (!is_user_class and args.length() == 0) {
+    var __uc_is_builtin_method: Bool = method == "keys" or method == "values" or method == "has" or method == "get" or method == "set" or method == "length" or method == "push" or method == "pop" or method == "contains" or method == "split" or method == "join" or method == "slice" or method == "reverse" or method == "sort" or method == "copy" or method == "trim" or method == "replace" or method == "index_of" or method == "starts_with" or method == "ends_with" or method == "to_upper" or method == "to_lower" or method == "repeat" or method == "char_at" or method == "to_number" or method == "to_string" or method == "to_float" or method == "abs" or method == "floor" or method == "ceil"
+    if (!is_user_class and !__uc_is_builtin_method and args.length() == 0) {
         var __uc_fcm: String = this.find_class_for_method(method)
         if (__uc_fcm.length() > 0 and __uc_fcm != "String" and __uc_fcm != "List" and __uc_fcm != "Map" and __uc_fcm != "Int" and __uc_fcm != "Float" and __uc_fcm != "Bool") {
             is_user_class = true
