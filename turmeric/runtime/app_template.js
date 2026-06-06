@@ -185,6 +185,7 @@ const imports = { env: new Proxy({
                 if (fn) fn(callbackId, ptr);
             });
     },
+    __string_intern: (ptr) => ptr,
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
 
