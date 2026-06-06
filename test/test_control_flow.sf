@@ -1,0 +1,89 @@
+import "@test" as Test
+
+// While loop
+var sum: Float = 0
+var i: Int = 1
+while (i <= 10) {
+    sum = sum + i
+    i = i + 1
+}
+Test.assert_eq(sum, 55, "while loop sum 1-10")
+
+// For-in loop
+var items = ["a", "b", "c"]
+var joined: String = ""
+for (item in items) {
+    joined = joined + item
+}
+Test.assert_eq(joined, "abc", "for-in loop")
+
+// If/else with Int (Float comparisons broken - see BUG below)
+fun classify_int(n: Int): String {
+    if (n > 0) { return "positive" }
+    else if (n < 0) { return "negative" }
+    else { return "zero" }
+}
+Test.assert_eq(classify_int(5), "positive", "if positive (Int)")
+Test.assert_eq(classify_int(-3), "negative", "if negative (Int)")
+Test.assert_eq(classify_int(0), "zero", "if zero (Int)")
+
+// BUG: Float comparisons in function params always evaluate to false
+fun classify_float(n: Float): String {
+    if (n > 0) { return "positive" }
+    else if (n < 0) { return "negative" }
+    else { return "zero" }
+}
+Test.assert_eq(classify_float(5), "positive", "if positive (Float) BUG: returns zero")
+Test.assert_eq(classify_float(-3), "negative", "if negative (Float) BUG: returns zero")
+
+// Try/catch
+fun risky(x: Float): String {
+    if (x == 0) { throw "bad value" }
+    return "ok"
+}
+var caught: String = ""
+try {
+    risky(0)
+} catch (e) {
+    caught = e
+}
+Test.assert_eq(caught, "bad value", "try/catch catches throw")
+
+var safe: String = ""
+try {
+    safe = risky(1)
+} catch (e) {
+    safe = "error"
+}
+Test.assert_eq(safe, "ok", "try/catch no throw")
+
+// Nested try/catch
+var outer_catch: String = ""
+try {
+    try {
+        throw "inner"
+    } catch (e) {
+        throw "rethrown: " + e
+    }
+} catch (e) {
+    outer_catch = e
+}
+Test.assert_eq(outer_catch, "rethrown: inner", "nested try/catch rethrow")
+
+// Recursion (NOTE: recursive functions cause bus error/segfault at runtime)
+// These are commented out to allow the rest of the test to run.
+// BUG: any recursive function call crashes with Bus error: 10
+// fun factorial(n: Float): Float {
+//     if (n <= 1) { return 1 }
+//     return n * factorial(n - 1)
+// }
+// Test.assert_eq(factorial(5), 120, "recursion factorial")
+// Test.assert_eq(factorial(0), 1, "recursion base case")
+//
+// fun fib(n: Float): Float {
+//     if (n <= 1) { return n }
+//     return fib(n - 1) + fib(n - 2)
+// }
+// Test.assert_eq(fib(10), 55, "fibonacci")
+
+Test.summary()

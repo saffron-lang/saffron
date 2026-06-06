@@ -1,0 +1,35 @@
+import "@test" as Test
+import "@json" as JSON
+
+// Parse basic types
+var obj = JSON.parse("{\"name\": \"saffron\", \"version\": 1}")
+Test.assert(obj != nil, "parse object")
+Test.assert_eq(obj.get("name"), "saffron", "parse string field")
+
+// Parse arrays
+var arr = JSON.parse("[1, 2, 3]")
+Test.assert(arr != nil, "parse array")
+Test.assert_eq(arr.length(), 3, "array length")
+
+// Parse nested
+var nested = JSON.parse("{\"data\": {\"items\": [1, 2]}}")
+Test.assert(nested != nil, "parse nested")
+
+// Parse booleans and null
+var mixed = JSON.parse("{\"flag\": true, \"empty\": null}")
+Test.assert(mixed != nil, "parse mixed types")
+
+// Serialize
+var map: Map<String, Any> = {}
+map.set("key", "value")
+map.set("num", 42)
+var serialized = JSON.to_string(map)
+Test.assert(serialized.contains("key"), "serialize has key")
+Test.assert(serialized.contains("value"), "serialize has value")
+
+// Round-trip
+var original = "{\"x\":1,\"y\":2}"
+var parsed = JSON.parse(original)
+Test.assert(parsed != nil, "round-trip parse")
+
+Test.summary()

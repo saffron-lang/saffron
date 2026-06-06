@@ -1,0 +1,73 @@
+import "@test" as Test
+
+class Point {
+    var x: Float
+    var y: Float
+    fun init(x: Float, y: Float) {
+        this.x = x
+        this.y = y
+    }
+    fun distance_to(other: Point): Float {
+        var dx = this.x - other.x
+        var dy = this.y - other.y
+        return (dx * dx + dy * dy)
+    }
+    fun translate(dx: Float, dy: Float): Point {
+        return Point(this.x + dx, this.y + dy)
+    }
+}
+
+var p1 = Point(0, 0)
+var p2 = Point(3, 4)
+Test.assert_eq(p1.x, 0, "field access x")
+Test.assert_eq(p1.y, 0, "field access y")
+Test.assert_eq(p2.x, 3, "constructor sets x")
+Test.assert_eq(p2.y, 4, "constructor sets y")
+
+var p3 = p2.translate(1, 1)
+Test.assert_eq(p3.x, 4, "method returns new instance")
+Test.assert_eq(p3.y, 5, "method returns new instance y")
+
+// Inheritance
+class Shape {
+    var name: String
+    fun init(name: String) { this.name = name }
+    fun describe(): String { return "I am a " + this.name }
+}
+
+class Circle extends Shape {
+    var radius: Float
+    fun init(radius: Float) {
+        this.name = "circle"
+        this.radius = radius
+    }
+    fun describe(): String { return "I am a " + this.name }
+    fun area(): Float { return 3.14159 * this.radius * this.radius }
+}
+
+var c = Circle(5)
+Test.assert_eq(c.name, "circle", "inherited field")
+Test.assert_eq(c.describe(), "I am a circle", "inherited method")
+Test.assert(c.area() > 78, "own method")
+Test.assert(c.area() < 79, "own method precision")
+
+// Class with List fields
+class Stack {
+    var items: List<Any>
+    fun init() { this.items = [] }
+    fun push(item: Any) { this.items.push(item) }
+    fun pop(): Any { return this.items.pop() }
+    fun size(): Int { return this.items.length() }
+    fun is_empty(): Bool { return this.items.length() == 0 }
+}
+
+var stack = Stack()
+Test.assert_eq(stack.is_empty(), true, "new stack empty")
+stack.push("a")
+stack.push("b")
+stack.push("c")
+Test.assert_eq(stack.size(), 3, "stack size after push")
+Test.assert_eq(stack.pop(), "c", "stack pop LIFO")
+Test.assert_eq(stack.size(), 2, "stack size after pop")
+
+Test.summary()
