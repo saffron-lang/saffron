@@ -50,8 +50,8 @@ api.post("/packages/publish", publish)     // Endpoint<PublishResponse>
 
 Test.assert_eq(api.endpoints.length(), 3, "three endpoints registered")
 Test.assert_eq(api.endpoints[0].method, "GET", "first is GET")
-Test.assert_eq(api.endpoints[0].path, "/api/v1/packages", "path with prefix")
-Test.assert_eq(api.endpoints[1].path, "/api/v1/packages/:name", "param path")
+Test.assert(api.endpoints[0].path == "/api/v1/packages", "path with prefix")
+Test.assert(api.endpoints[1].path == "/api/v1/packages/:name", "param path")
 Test.assert_eq(api.endpoints[2].method, "POST", "third is POST")
 
 // Chained metadata
