@@ -1,5 +1,7 @@
-//! Bazaar dev runner — builds frontend, starts static file server.
-//! Usage: pantry run dev
+//! Bazaar dev runner — builds frontend + backend, runs both in parallel.
+//! Frontend: static file server on port 3000
+//! Backend: API server subprocess on port 3001
+//! API requests (/api/*) are proxied to the backend.
 
 import "@process" as Process
 
@@ -14,7 +16,12 @@ import "@process" as Process
 @extern("void* malloc(i64)") fun _malloc(size: Int): Int
 @extern("void free(void*)") fun _free(ptr: Int)
 
-var port: Int = 3000
+var FRONTEND_PORT: Int = 3000
+var BACKEND_PORT: Int = 3001
+
+// =============================================================================
+// Build
+// =============================================================================
 
 fun build_frontend(): Bool {
     var result = Process.run("cd frontend && saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm")
@@ -28,6 +35,21 @@ fun build_frontend(): Bool {
     IO.println("  [frontend] ✓ static/app.wasm")
     return true
 }
+
+fun build_backend(): Bool {
+    var result = Process.run("saffron build --lib-path .pantry/packages src/main.sf -o build/bazaar")
+    if (!result.success) {
+        IO.println("  [backend]  FAILED")
+        IO.println(result.stderr)
+        return false
+    }
+    IO.println("  [backend]  ✓ build/bazaar")
+    return true
+}
+
+// =============================================================================
+// Static file serving
+// =============================================================================
 
 fun mime_for(path: String): String {
     if (path.ends_with(".html")) { return "text/html; charset=utf-8" }
@@ -67,6 +89,42 @@ fun send_file(fd: Int, mime: String, path: String) {
     _free(buf)
 }
 
+fun proxy_to_backend(fd: Int, raw: String) {
+    // Forward the raw HTTP request to the backend via curl
+    var lines: List<String> = raw.split("\r\n")
+    var parts: List<String> = lines[0].split(" ")
+    var method: String = parts[0]
+    var path: String = parts[1]
+
+    var curl_cmd: String = "curl -s -X " + method + " http://localhost:" + BACKEND_PORT.to_string() + path
+    // For POST/PUT, include body
+    if (method == "POST" or method == "PUT") {
+        // Extract body (after double CRLF)
+        var body_start: Int = raw.index_of("\r\n\r\n")
+        if (body_start >= 0) {
+            var body: String = raw.slice(body_start + 4, raw.length())
+            if (body.length() > 0) {
+                curl_cmd = curl_cmd + " -H 'Content-Type: application/json' -d '" + body + "'"
+            }
+        }
+    }
+    // Extract auth header if present
+    var i: Int = 0
+    while (i < lines.length()) {
+        if (lines[i].starts_with("Authorization:")) {
+            curl_cmd = curl_cmd + " -H '" + lines[i] + "'"
+        }
+        i = i + 1
+    }
+
+    var result = Process.run(curl_cmd)
+    if (result.success and result.stdout.length() > 0) {
+        send_response(fd, "200 OK", "application/json", result.stdout)
+    } else {
+        send_response(fd, "502 Bad Gateway", "application/json", "{\"error\":\"backend unavailable\"}")
+    }
+}
+
 fun handle_request(fd: Int) {
     var raw: String = read_request(fd)
     if (raw.length() == 0) { _tcp_close(fd); return }
@@ -77,11 +135,18 @@ fun handle_request(fd: Int) {
     if (parts.length() < 2) { _tcp_close(fd); return }
     var req_path: String = parts[1]
 
-    // Strip query string
+    // Proxy API requests to backend
+    if (req_path.starts_with("/api/")) {
+        proxy_to_backend(fd, raw)
+        _tcp_close(fd)
+        return
+    }
+
+    // Strip query string for static file lookup
     var qidx: Int = req_path.index_of("?")
     if (qidx >= 0) { req_path = req_path.slice(0, qidx) }
 
-    // Resolve file
+    // Serve static files
     var file_path: String = "static" + req_path
     if (req_path == "/" or req_path == "") {
         file_path = "static/index.html"
@@ -100,25 +165,34 @@ fun handle_request(fd: Int) {
     _tcp_close(fd)
 }
 
-// --- Main ---
-build_frontend()
+// =============================================================================
+// Main
+// =============================================================================
 
+// Build both
+build_frontend()
+build_backend()
+
+// Start backend API server as subprocess
+var backend_proc = Process.spawn("./build/bazaar")
+IO.println("  [backend]  http://localhost:" + BACKEND_PORT.to_string() + " (API)")
+
+// Start frontend static server
 _socket_init()
-var listen_fd: Int = _tcp_bind("0.0.0.0", port)
+var listen_fd: Int = _tcp_bind("0.0.0.0", FRONTEND_PORT)
 if (listen_fd < 0) {
-    IO.println("  [server] failed to bind to port " + port.to_string())
+    IO.println("  [server]   failed to bind to port " + FRONTEND_PORT.to_string())
+    backend_proc.kill()
     return
 }
 _tcp_listen(listen_fd, 128)
-IO.println("  [server] http://localhost:" + port.to_string())
+IO.println("  [server]   http://localhost:" + FRONTEND_PORT.to_string() + " (app)")
 IO.println("")
 
 while (true) {
-    // Poll for incoming connection (1 = POLLIN, 1000ms timeout)
     _tcp_poll(listen_fd, 1, 1000)
     var client_fd: Int = _tcp_accept(listen_fd)
     if (client_fd >= 0) {
-        // Poll for readable data on client
         _tcp_poll(client_fd, 1, 5000)
         handle_request(client_fd)
     }
