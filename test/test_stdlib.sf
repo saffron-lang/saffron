@@ -1,0 +1,83 @@
+import "@test" as Test
+
+// String operations
+Test.assert_eq("hello".length(), 5, "string length")
+Test.assert_eq("hello world".split(" ").length(), 2, "string split")
+Test.assert_eq("  hi  ".trim(), "hi", "string trim")
+Test.assert_eq("hello".contains("ell"), true, "string contains")
+Test.assert_eq("hello".starts_with("he"), true, "starts_with")
+Test.assert_eq("hello".ends_with("lo"), true, "ends_with")
+Test.assert_eq("hello".replace("l", "L"), "heLLo", "replace")
+Test.assert_eq("hello".slice(1, 3), "el", "slice")
+Test.assert_eq("hello".index_of("lo"), 3, "index_of")
+Test.assert_eq("abc".to_upper(), "ABC", "to_upper")
+Test.assert_eq("ABC".to_lower(), "abc", "to_lower")
+Test.assert_eq("ha".repeat(3), "hahaha", "repeat")
+Test.assert_eq("hello".char_at(0), "h", "char_at")
+
+// Number operations
+Test.assert_eq((5).to_string(), "5", "int to_string")
+Test.assert_eq((-3).abs(), 3, "abs")
+Test.assert_eq((3.7).floor(), 3, "floor")
+Test.assert_eq((3.2).ceil(), 4, "ceil")
+Test.assert_eq((3.5).round(), 4, "round")
+
+// List operations
+var list = [1, 2, 3]
+Test.assert_eq(list.length(), 3, "list length")
+list.push(4)
+Test.assert_eq(list.length(), 4, "list push")
+Test.assert_eq(list[0], 1, "list index 0")
+Test.assert_eq(list[3], 4, "list index 3")
+Test.assert_eq(list[-1], 4, "list negative index")
+var popped = list.pop()
+Test.assert_eq(popped, 4, "list pop returns last")
+Test.assert_eq(list.length(), 3, "list pop reduces length")
+
+// List operations continued
+var nums = [3, 1, 4, 1, 5]
+nums.sort()
+Test.assert_eq(nums[0], 1, "sort smallest first")
+Test.assert_eq(nums[4], 5, "sort largest last")
+
+var copied = [1, 2, 3].copy()
+copied.push(4)
+Test.assert_eq(copied.length(), 4, "copy is independent")
+
+// Map operations
+var map: Map<String, String> = {}
+map.set("name", "saffron")
+map.set("version", "1.0")
+Test.assert_eq(map.get("name"), "saffron", "map get")
+Test.assert_eq(map.has("name"), true, "map has existing")
+Test.assert_eq(map.has("missing"), false, "map has missing")
+Test.assert_eq(map.keys().length(), 2, "map keys")
+Test.assert_eq(map.values().length(), 2, "map values")
+
+// Map nil behavior
+var result = map.get("nonexistent")
+Test.assert(result == nil, "map get missing returns nil")
+
+// String interpolation
+var name = "world"
+Test.assert_eq("hello ${name}!", "hello world!", "string interpolation")
+Test.assert_eq("${1 + 2}", "3", "interpolation with expr")
+
+// Boolean operations
+Test.assert_eq(true.to_string(), "true", "bool to_string true")
+Test.assert_eq(false.to_string(), "false", "bool to_string false")
+Test.assert_eq(!true, false, "bool not")
+Test.assert_eq(true and false, false, "bool and")
+Test.assert_eq(true or false, true, "bool or")
+
+// Nil checks
+var x: Any = nil
+Test.assert(x == nil, "nil equality")
+Test.assert(x != "something", "nil inequality")
+
+// Type checks
+Test.assert(42 is Number, "int is Number")
+Test.assert("hi" is String, "string is String")
+Test.assert(true is Bool, "bool is Bool")
+
+Test.summary()

@@ -1,0 +1,60 @@
+import "@test" as Test
+
+// Basic lambda
+var double = fun (x: Float): Float => x * 2
+Test.assert_eq(double(5), 10, "basic lambda")
+
+// Closure captures
+var base = 10
+var adder = fun (x: Float): Float => x + base
+Test.assert_eq(adder(5), 15, "closure captures local")
+
+// Closure over loop variable
+var fns: List<() => Float> = []
+var i: Int = 0
+while (i < 3) {
+    var captured = i
+    fns.push(fun (): Float => captured)
+    i = i + 1
+}
+Test.assert_eq(fns[0](), 0, "closure in loop 0")
+Test.assert_eq(fns[1](), 1, "closure in loop 1")
+Test.assert_eq(fns[2](), 2, "closure in loop 2")
+
+// Higher-order functions
+fun apply(f: (Float) => Float, x: Float): Float {
+    return f(x)
+}
+Test.assert_eq(apply(fun (n: Float): Float => n * n, 4), 16, "higher order")
+Test.assert_eq(apply(double, 7), 14, "pass named fn as arg")
+
+// Returned closures (factory)
+fun make_counter(): () => Float {
+    var count: Float = 0
+    return fun (): Float => {
+        count = count + 1
+        return count
+    }
+}
+var counter = make_counter()
+Test.assert_eq(counter(), 1, "counter first call")
+Test.assert_eq(counter(), 2, "counter second call")
+Test.assert_eq(counter(), 3, "counter third call")
+
+// Nested closures
+var outer = 100
+var nested = fun (): Float => {
+    var inner = 50
+    var deep = fun (): Float => outer + inner
+    return deep()
+}
+Test.assert_eq(nested(), 150, "nested closure access")
+
+// Callback pattern
+fun with_value(val: Float, callback: (Float) => Float): Float {
+    return callback(val)
+}
+var result = with_value(42, fun (x: Float): Float => x + 8)
+Test.assert_eq(result, 50, "callback pattern")
+
+Test.summary()

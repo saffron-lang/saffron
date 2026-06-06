@@ -1,0 +1,57 @@
+import "@test" as Test
+
+// Basic enum matching (no data extraction) - WORKS
+enum Color { Red, Green, Blue }
+
+var c = Color.Red
+var name = match (c) {
+    Red => "red"
+    Green => "green"
+    Blue => "blue"
+}
+Test.assert_eq(name, "red", "basic enum match")
+
+var c2 = Color.Blue
+var name2 = match (c2) {
+    Red => "red"
+    Green => "green"
+    Blue => "blue"
+}
+Test.assert_eq(name2, "blue", "enum match Blue")
+
+var c3 = Color.Green
+var name3 = match (c3) {
+    Red => "red"
+    Green => "green"
+    Blue => "blue"
+}
+Test.assert_eq(name3, "green", "enum match Green")
+
+// Enum None matching (without data extraction) - WORKS
+enum Option {
+    Some(value: Float),
+    None
+}
+
+var y = Option.None
+var val2 = match (y) {
+    Some(v) => v
+    None => -1
+}
+Test.assert_eq(val2, -1, "enum None match")
+
+// BUG: Enum data extraction is broken. All of the following fail:
+// - Numeric extraction returns garbage (NaN-boxed pointer)
+// - String extraction returns garbage (NaN-boxed pointer)
+// - With 2 enums, extraction returns the wrong enum's match value
+// - With 3+ enums using extraction, runtime segfaults
+//
+// Leaving one test to document the bug without crashing:
+var x = Option.Some(42)
+var val = match (x) {
+    Some(v) => v
+    None => 0
+}
+Test.assert_eq(val, 42, "enum numeric data extraction (BUG: returns garbage)")
+
+Test.summary()
