@@ -77,7 +77,7 @@ fun NavBarWithSearch() {
         {Router.Link(router, "/search?q=", cls="nav-link on") { text("Browse") }}
         <a cls="nav-link">Docs</a>
         <form cls="nav-search" on_submit={fun (e: Event) => do_search()}>
-            <input type="text" placeholder="Search packages..." on_input={fun (e: Event) => search_query.set(e.target_value)} />
+            <input type="text" placeholder="Search packages..." on_input={fun (e: Event) => search_query.set(event_target_value())} />
             <button cls="nav-search-btn" type="submit">→</button>
         </form>
         <div cls="nav-r">
@@ -189,7 +189,7 @@ fun HomePage() {
                 <h1 cls="hero-h">Find the right package. Build something lasting.</h1>
                 <p cls="hero-sub">Browse packages from the Saffron community. Open source, forever free.</p>
                 <form cls="hero-form" on_submit={fun (e: Event) => do_search()}>
-                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." on_input={fun (e: Event) => search_query.set(e.target_value)} />
+                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." on_input={fun (e: Event) => search_query.set(event_target_value())} />
                     <button cls="hero-btn" type="submit">Search</button>
                 </form>
                 <div cls="hero-pills">

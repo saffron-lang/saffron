@@ -77,8 +77,9 @@ const imports = { env: new Proxy({
         el.addEventListener(name, (e) => {
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
-            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
-            if (dispatch) dispatch(callbackId, 0n);
+            // Prelude path: always use generic __dispatch_event (1 arg).
+            // Handlers registered here use event_target_value() FFI for input data.
+            if (_genericDispatch) _genericDispatch(callbackId);
             _eventStack.pop();
         });
     },
@@ -88,8 +89,9 @@ const imports = { env: new Proxy({
         const name = readCString(eventPtr);
         el.addEventListener(name, (e) => {
             _eventStack.push(e);
-            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
-            if (dispatch) dispatch(callbackId, 0n);
+            const typed = _findExport(`__dispatch_${name}`);
+            if (typed) { typed(callbackId, 0n); }
+            else if (_genericDispatch) { _genericDispatch(callbackId); }
             _eventStack.pop();
         });
     },
@@ -99,8 +101,9 @@ const imports = { env: new Proxy({
         const name = readCString(eventPtr);
         el.addEventListener(name, (e) => {
             _eventStack.push(e);
-            const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
-            if (dispatch) dispatch(callbackId, 0n);
+            const typed = _findExport(`__dispatch_${name}`);
+            if (typed) { typed(callbackId, 0n); }
+            else if (_genericDispatch) { _genericDispatch(callbackId); }
             _eventStack.pop();
         });
     },
@@ -112,9 +115,38 @@ const imports = { env: new Proxy({
         const el = getHandle(handle);
         if (el) el[readCString(propPtr)] = !!Number(value);
     },
-    js_event_get_float: () => 0n,
-    js_event_get_string: () => 0n,
-    js_event_get_bool: () => 0n,
+    js_event_get_float: (eventPtr, fieldPtr) => {
+        const e = _eventStack[_eventStack.length - 1];
+        if (!e) return 0n;
+        const field = readCString(fieldPtr);
+        const parts = field.split('.');
+        let val = e;
+        for (const p of parts) { val = val?.[p]; }
+        // Return NaN-boxed float: raw double bits as i64
+        const buf = new ArrayBuffer(8);
+        new Float64Array(buf)[0] = Number(val) || 0;
+        return new BigInt64Array(buf)[0];
+    },
+    js_event_get_string: (eventPtr, fieldPtr) => {
+        const e = _eventStack[_eventStack.length - 1];
+        if (!e) return 0n;
+        const field = readCString(fieldPtr);
+        const parts = field.split('.');
+        let val = e;
+        for (const p of parts) { val = val?.[p]; }
+        const ptr = writeCString(String(val ?? ''));
+        // Return raw pointer as i64 (codegen does inttoptr + tag_ptr on it)
+        return BigInt(ptr) & 0xFFFFFFFFn;
+    },
+    js_event_get_bool: (eventPtr, fieldPtr) => {
+        const e = _eventStack[_eventStack.length - 1];
+        if (!e) return 0n;
+        const field = readCString(fieldPtr);
+        const parts = field.split('.');
+        let val = e;
+        for (const p of parts) { val = val?.[p]; }
+        return val ? 1n : 0n;
+    },
     js_event_prevent_default: () => { const e = _eventStack[_eventStack.length - 1]; if (e) e.preventDefault(); },
     js_event_stop_propagation: () => { const e = _eventStack[_eventStack.length - 1]; if (e) e.stopPropagation(); },
     memcpy: (dst, src, len) => {
@@ -131,10 +163,12 @@ const imports = { env: new Proxy({
         const url = readCString(urlPtr);
         fetch(url).then(r => r.text()).then(text => {
             const ptr = writeCString(text);
-            instance.exports.__on_fetch_complete(callbackId, ptr);
+            const fn = _findExport('__on_fetch_complete');
+            if (fn) fn(callbackId, ptr);
         }).catch(() => {
             const ptr = writeCString('{"error":"fetch failed"}');
-            instance.exports.__on_fetch_complete(callbackId, ptr);
+            const fn = _findExport('__on_fetch_complete');
+            if (fn) fn(callbackId, ptr);
         });
     },
     js_fetch_post: (urlPtr, bodyPtr, callbackId) => {
@@ -143,10 +177,12 @@ const imports = { env: new Proxy({
         fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
             .then(r => r.text()).then(text => {
                 const ptr = writeCString(text);
-                instance.exports.__on_fetch_complete(callbackId, ptr);
+                const fn = _findExport('__on_fetch_complete');
+                if (fn) fn(callbackId, ptr);
             }).catch(() => {
                 const ptr = writeCString('{"error":"fetch failed"}');
-                instance.exports.__on_fetch_complete(callbackId, ptr);
+                const fn = _findExport('__on_fetch_complete');
+                if (fn) fn(callbackId, ptr);
             });
     },
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
@@ -166,12 +202,31 @@ const response = await fetch('./app.wasm');
 const wasmBytes = await response.arrayBuffer();
 const result = await WebAssembly.instantiate(wasmBytes, imports);
 instance = result.instance;
+
+// Resolve exported WASM functions that may have module-prefixed symbol names.
+// The compiler prefixes functions with their module path (e.g., turmeric_events___dispatch_submit).
+// _findExport looks up by bare name first, then searches for a suffixed match.
+const _exportCache = {};
+function _findExport(name) {
+    if (_exportCache[name] !== undefined) return _exportCache[name];
+    let fn = instance.exports[name] || null;
+    if (!fn) {
+        for (const key of Object.keys(instance.exports)) {
+            if (key === name || key.endsWith('_' + name)) { fn = instance.exports[key]; break; }
+        }
+    }
+    _exportCache[name] = fn;
+    return fn;
+}
+
+const _genericDispatch = _findExport('__dispatch_event');
+function _getDispatch(eventName) {
+    return _findExport(`__dispatch_${eventName}`) || _genericDispatch;
+}
+
 instance.exports._start();
 
 // Browser navigation → WASM callback
-window.addEventListener('hashchange', () => {
-    if (instance.exports.__on_navigate) instance.exports.__on_navigate();
-});
-window.addEventListener('popstate', () => {
-    if (instance.exports.__on_navigate) instance.exports.__on_navigate();
-});
+const _onNavigate = _findExport('__on_navigate');
+window.addEventListener('hashchange', () => { if (_onNavigate) _onNavigate(); });
+window.addEventListener('popstate', () => { if (_onNavigate) _onNavigate(); });

@@ -78,10 +78,14 @@ var DEFAULT_STALE_TIME: Float = 30.0
 
 /// Create a typed cached query.
 fun query(url: String): Query {
-    return Query(url, DEFAULT_STALE_TIME)
+    var q: Query = Query(url, DEFAULT_STALE_TIME)
+    q._fetch()
+    return q
 }
 
 /// Create a typed cached query with custom stale time.
 fun query_with(url: String, stale_time: Float): Query {
-    return Query(url, stale_time)
+    var q: Query = Query(url, stale_time)
+    q._fetch()
+    return q
 }

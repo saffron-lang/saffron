@@ -6,7 +6,14 @@
 // Then run: tools/build_prelude.sh (concatenates infra + generated elements)
 
 // --- DOM FFI (provided by wasm_base.ll) ---
+@extern("i64 js_event_get_string(i64, void*)") fun _tc_event_get_string(event_ptr: Float, field: String): String
 @extern("i64 js_dom_create_element(void*)") fun _tc_create(tag: String): Float
+
+// --- Event value accessor: reads from the current JS event on the _eventStack ---
+// Used by prelude on_input/on_change handlers where the full typed Event is unavailable.
+fun event_target_value(): String {
+    return _tc_event_get_string(0, "target.value")
+}
 @extern("void js_dom_set_text(i64, void*)") fun _tc_set_text(handle: Float, text: String)
 @extern("void js_dom_append_child(i64, i64)") fun _tc_append(parent: Float, child: Float)
 @extern("void js_dom_set_attr(i64, void*, void*)") fun _tc_set_attr(handle: Float, name: String, value: String)
@@ -347,7 +354,7 @@ fun button(cls: String = "", id: String = "", style: String = "",
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", fun () => on_submit(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -486,7 +493,7 @@ fun details(cls: String = "", id: String = "", style: String = "",
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (open) { _tc_set_attr(el, "open", "true") }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_toggle != nil) { _tc_add_event(el, "toggle", on_toggle) }
+    if (on_toggle != nil) { _tc_add_event(el, "toggle", fun () => on_toggle(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -623,8 +630,8 @@ fun form(cls: String = "", id: String = "", style: String = "",
     if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
     if (target.length() > 0) { _tc_set_attr(el, "target", target) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
-    if (on_reset != nil) { _tc_add_event(el, "reset", on_reset) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", fun () => on_submit(nil)) }
+    if (on_reset != nil) { _tc_add_event(el, "reset", fun () => on_reset(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1503,9 +1510,9 @@ fun video(cls: String = "", id: String = "", style: String = "",
     if (poster.length() > 0) { _tc_set_attr(el, "poster", poster) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
     if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
-    if (on_play != nil) { _tc_add_event(el, "play", on_play) }
-    if (on_pause != nil) { _tc_add_event(el, "pause", on_pause) }
-    if (on_ended != nil) { _tc_add_event(el, "ended", on_ended) }
+    if (on_play != nil) { _tc_add_event(el, "play", fun () => on_play(nil)) }
+    if (on_pause != nil) { _tc_add_event(el, "pause", fun () => on_pause(nil)) }
+    if (on_ended != nil) { _tc_add_event(el, "ended", fun () => on_ended(nil)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
