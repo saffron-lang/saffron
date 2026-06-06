@@ -12,7 +12,7 @@ authors = ["henry232323"]
 parsley = { path = "../parsley" }
 
 [scripts]
-build = "cd frontend && pantry build && cd .. && saffron build --lib-path .pantry/packages src/main.sf -o build/bazaar"
+build = "cd frontend && pantry build && cd .. && saffron build src/main.sf -o build/bazaar"
 dev = "saffron run dev.sf"
 frontend = "cd frontend && pantry build"
 migrate = "saffron run src/migrate.sf"
