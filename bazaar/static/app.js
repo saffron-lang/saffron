@@ -75,6 +75,7 @@ const imports = { env: new Proxy({
         if (!el) return;
         const name = readCString(eventPtr);
         el.addEventListener(name, (e) => {
+            if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             const dispatch = instance.exports[`__dispatch_${name}`] || instance.exports.__dispatch_event;
             if (dispatch) dispatch(callbackId, 0n);
