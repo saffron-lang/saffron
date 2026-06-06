@@ -4,11 +4,11 @@ import "@http/server" as Http
 import "@json" as JSON
 
 /// Successful JSON response wrapping any serializable type.
-class ApiResponse<T> {
-    var data: T
+class ApiResponse {
+    var data: Any
     var status: Int
 
-    fun init(data: T, status: Int) {
+    fun init(data: Any, status: Int) {
         this.data = data
         this.status = status
     }
@@ -26,13 +26,13 @@ class ApiError {
 }
 
 /// Wrap a value in a success response.
-fun ok<T>(data: T): ApiResponse<T> {
-    return ApiResponse<T>(data, 200)
+fun ok(data: Any): ApiResponse {
+    return ApiResponse(data, 200)
 }
 
 /// 201 Created.
-fun created<T>(data: T): ApiResponse<T> {
-    return ApiResponse<T>(data, 201)
+fun created(data: Any): ApiResponse {
+    return ApiResponse(data, 201)
 }
 
 /// 404 Not Found error.

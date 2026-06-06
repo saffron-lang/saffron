@@ -4,7 +4,7 @@ import "@http/server" as Http
 import "@json" as JSON
 
 /// A typed endpoint that knows its response type at compile time.
-class Endpoint<TResponse> {
+class Endpoint {
     var method: String
     var path: String
     var handler: (Http.Request) => TResponse
@@ -19,12 +19,12 @@ class Endpoint<TResponse> {
         this.description = ""
     }
 
-    fun auth(required: Bool): Endpoint<TResponse> {
+    fun auth(required: Bool): Endpoint {
         this.auth_required = required
         return this
     }
 
-    fun describe(desc: String): Endpoint<TResponse> {
+    fun describe(desc: String): Endpoint {
         this.description = desc
         return this
     }
@@ -41,31 +41,48 @@ class ApiRouter {
     }
 
     /// Register a GET endpoint with typed response.
-    fun get<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
+    fun get<T>(path: String, handler: (Http.Request) => T): Endpoint {
         var ep = Endpoint("GET", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a POST endpoint with typed request body and response.
-    fun post<TBody, TResponse>(path: String, handler: (Http.Request) => TResponse): Endpoint<TResponse> {
+    fun post<TBody, TResponse>(path: String, handler: (Http.Request) => TResponse): Endpoint {
         var ep = Endpoint("POST", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a PUT endpoint.
-    fun put<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
+    fun put<T>(path: String, handler: (Http.Request) => T): Endpoint {
         var ep = Endpoint("PUT", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a DELETE endpoint.
-    fun delete<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
+    fun delete<T>(path: String, handler: (Http.Request) => T): Endpoint {
         var ep = Endpoint("DELETE", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
+    }
+
+    /// Generate API spec as a list of endpoint descriptors (for client generation)
+    fun spec(): List<Map<String, String>> {
+        var result: List<Map<String, String>> = []
+        var i: Int = 0
+        while (i < this.endpoints.length()) {
+            var ep = this.endpoints[i]
+            var entry: Map<String, String> = {}
+            entry.set("method", ep.method)
+            entry.set("path", ep.path)
+            entry.set("auth", ep.auth_required.to_string())
+            entry.set("description", ep.description)
+            result.push(entry)
+            i = i + 1
+        }
+        return result
     }
 
     /// Mount all routes to an Http.App

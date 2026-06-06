@@ -3,11 +3,14 @@
 import "@http/server" as Http
 import "@json" as JSON
 
-/// Parse a JSON request body into a typed structure.
-/// Uses Reflect.construct to build the class instance from parsed JSON.
-fun body<T>(req: Http.Request): T {
-    var parsed = JSON.parse(req.body)
-    return Reflect.construct(T, parsed)
+/// Parse a JSON request body. Returns the parsed Map.
+fun parse_body(req: Http.Request): Any {
+    return JSON.parse(req.body)
+}
+
+/// Alias for parse_body.
+fun body(req: Http.Request): Any {
+    return parse_body(req)
 }
 
 /// Get a path parameter.

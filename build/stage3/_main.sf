@@ -670,6 +670,18 @@ fun main(): Int {
         }
         i = i + 1
     }
+    // Also read SAFFRON_LIB_PATH env var (colon-separated, like PATH)
+    var env_lib_path: String = OS.env("SAFFRON_LIB_PATH")
+    if (env_lib_path.length() > 0) {
+        var env_parts: List<String> = env_lib_path.split(":")
+        var epi: Float = 0
+        while (epi < env_parts.length()) {
+            if (env_parts[epi].length() > 0) {
+                lib_path_args.push(env_parts[epi])
+            }
+            epi = epi + 1
+        }
+    }
     _lib_paths = lib_path_args
 
     // Find the last .sf arg (input) and anything after it (output)
@@ -921,6 +933,47 @@ fun main(): Int {
             nni = nni + 1
         }
         npi = npi + 1
+    }
+
+    // Also collect named imports from sub-modules so cross-module bare
+    // references (e.g. api.sf importing { mutation } from "basil/mutation") resolve.
+    var visited_keys: List<String> = visited.keys()
+    var vki: Float = 0
+    while (vki < visited_keys.length()) {
+        var vk_path: String = visited_keys[vki]
+        if (OS.file_exists(vk_path)) {
+            var vk_src: String = IO.read_file(vk_path)
+            var vk_ni_raw: Map<String, List<String>> = extract_named_imports(vk_src)
+            var vk_ni_paths: List<String> = vk_ni_raw.keys()
+            var vk_npi: Float = 0
+            while (vk_npi < vk_ni_paths.length()) {
+                var vk_ni_path: String = vk_ni_paths[vk_npi]
+                if (!is_builtin_module(vk_ni_path)) {
+                    var vk_ni_full: String = resolve_import_path(vk_path, vk_ni_path, stdlib_dir)
+                    var vk_ni_prefix: String = ""
+                    if (path_to_prefix.has(vk_ni_full)) {
+                        vk_ni_prefix = path_to_prefix.get(vk_ni_full)
+                    } else {
+                        vk_ni_prefix = path_based_prefix(vk_ni_path, vk_ni_full, stdlib_dir)
+                    }
+                    var vk_names: List<String> = vk_ni_raw.get(vk_ni_path)
+                    var vk_nni: Float = 0
+                    while (vk_nni < vk_names.length()) {
+                        var vk_name: String = vk_names[vk_nni]
+                        if (!named_imports.has(vk_name)) {
+                            if (package_exports.has(vk_name)) {
+                                named_imports.set(vk_name, package_exports.get(vk_name))
+                            } else {
+                                named_imports.set(vk_name, vk_ni_prefix + vk_name)
+                            }
+                        }
+                        vk_nni = vk_nni + 1
+                    }
+                }
+                vk_npi = vk_npi + 1
+            }
+        }
+        vki = vki + 1
     }
 
     // Merge package exports (dotted keys like "Parsley.router") into named_imports

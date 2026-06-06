@@ -58,11 +58,15 @@ fun _exec_shell(cmd: String) {
 
     IO.println("> " + cmd)
 
-    var full_cmd: String = cmd
+    var env_prefix: String = ""
     if (bin_path.length() > 0) {
-        full_cmd = "PATH=${bin_path}:$PATH " + cmd
+        env_prefix = "PATH=${bin_path}:$PATH "
     }
-    OS.system(full_cmd)
+    // Set SAFFRON_LIB_PATH so saffron finds installed packages
+    if (OS.file_exists(".pantry/packages")) {
+        env_prefix = env_prefix + "SAFFRON_LIB_PATH=.pantry/packages "
+    }
+    OS.system(env_prefix + cmd)
 }
 
 /// Resolve a bin command by prefixing relative file paths with the package directory.
