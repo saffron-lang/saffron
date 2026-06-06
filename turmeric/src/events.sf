@@ -202,6 +202,7 @@ fun unregister_handler(id: Float) {
 @extern("void js_event_prevent_default(i64)") fun _js_prevent_default(event_ptr: Float)
 @extern("void js_event_stop_propagation(i64)") fun _js_stop_propagation(event_ptr: Float)
 
+
 fun __dispatch_click(callback_id: Float, event_ptr: Float) {
     if (!_callbacks.has(callback_id)) { return }
     if (_prevent_defaults.has(callback_id)) { _js_prevent_default(event_ptr) }
