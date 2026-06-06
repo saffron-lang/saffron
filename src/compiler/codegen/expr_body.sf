@@ -1226,6 +1226,10 @@
             }
             if (this.typed_vars.has(vname)) {
                 this.last_type = this.typed_vars.get(vname)
+            } else if (this.global_var_types.has(vname)) {
+                this.last_type = this.str_to_type(this.global_var_types.get(vname))
+            } else if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + vname)) {
+                this.last_type = this.str_to_type(this.global_var_types.get(this.current_prefix + vname))
             } else {
                 this.last_type = AST.Type.IntType
             }

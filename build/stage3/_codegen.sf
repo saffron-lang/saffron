@@ -2269,6 +2269,10 @@ class Codegen {
             }
             if (this.typed_vars.has(vname)) {
                 this.last_type = this.typed_vars.get(vname)
+            } else if (this.global_var_types.has(vname)) {
+                this.last_type = this.str_to_type(this.global_var_types.get(vname))
+            } else if (this.current_prefix.length() > 0 and this.global_var_types.has(this.current_prefix + vname)) {
+                this.last_type = this.str_to_type(this.global_var_types.get(this.current_prefix + vname))
             } else {
                 this.last_type = AST.Type.IntType
             }
@@ -10927,6 +10931,21 @@ class Codegen {
     }
     if (class_name.length() == 0 and !is_builtin_method) {
         class_name = this.find_class_for_method(method)
+    }
+    // Fallback: if class_name is still empty, try find_class_for_method even for
+    // builtin method names. User classes (e.g. Signal) can have .set()/.get()
+    // with different arities than Map/List builtins.
+    if (class_name.length() == 0 and is_builtin_method) {
+        // Builtin .set() requires 2 args (Map.set(k,v) or List.set(i,v)).
+        // Builtin .get() requires 1 arg (Map.get(k)).
+        // If arity doesn't match builtins, it must be a user class method.
+        var builtin_arity_mismatch: Bool = false
+        if (method == "set" and args.length() != 2) { builtin_arity_mismatch = true }
+        if (method == "get" and args.length() != 1) { builtin_arity_mismatch = true }
+        // Also fallback for module globals whose type is unknown
+        if (builtin_arity_mismatch or (obj_name.length() > 0 and (this.module_globals.has(obj_name) or this.module_globals.has(this.current_prefix + obj_name)))) {
+            class_name = this.find_class_for_method(method)
+        }
     }
     if (class_name.length() > 0) {
         // Error check: verify method actually exists on the class

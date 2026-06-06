@@ -81,13 +81,10 @@ test('search updates URL hash', async ({ page }) => {
     await page.waitForTimeout(1500);
 
     // Hash router should update to #/search?q=test-pkg
-    // Currently: event dispatch works but do_search() body doesn't fully execute
-    // (captured module-level function calls from event callbacks have a codegen gap)
     const url = page.url();
     expect(url).toContain('#');
-    // TODO: once event→function capture is fixed, assert:
-    // expect(url).toContain('search');
-    // expect(url).toContain('q=test-pkg');
+    expect(url).toContain('search');
+    expect(url).toContain('q=test-pkg');
 });
 
 test('search triggers route change', async ({ page }) => {
@@ -100,9 +97,8 @@ test('search triggers route change', async ({ page }) => {
     await page.waitForTimeout(1500);
 
     // do_search() executes: navigates to search route via hash router
-    // This proves the on_submit handler dispatches correctly
     const url = page.url();
     expect(url).toContain('#');
-    // The hash should include a route path (either /search or /)
-    expect(url).toMatch(/#\//);
+    expect(url).toContain('search');
+    expect(url).toContain('q=hello');
 });
