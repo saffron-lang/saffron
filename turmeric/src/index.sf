@@ -1,11 +1,32 @@
 // Turmeric — Reactive Web Framework for Saffron
-// Barrel file: re-exports all public API
+// Barrel file: re-exports all public API via named imports
 
-import "./signal.sf" as Signal
-import "./element.sf" as Element
-import "./events.sf" as Events
-import "./reconcile.sf" as Reconcile
-import "./suspense.sf" as Suspense
-import "./context.sf" as Context
-import "./router.sf" as Router
-import "./style.sf" as Style
+// =============================================================================
+// Signals — reactive primitives
+// =============================================================================
+
+import { signal, computed, effect, batch, untrack, Signal, Computed, EffectHandle, Subscription } from "./signal.sf"
+
+// =============================================================================
+// Router — client-side SPA routing
+// =============================================================================
+
+import { hash, history, memory, Link, Router, RouteParams, RouteDef, Mode, split_path, parse_query, match_pattern } from "./router.sf"
+
+// =============================================================================
+// Events — typed DOM event system
+// =============================================================================
+
+import { Event, MouseEventData, KeyboardEventData, InputEventData, FocusEventData, SubmitEventData, DragEventData, TouchPoint, TouchEventData, WheelEventData, register_handler, register_handler_with_options, unregister_handler, on, on_prevent, off, on_click, on_dblclick, on_mousedown, on_mouseup, on_mousemove, on_mouseenter, on_mouseleave, on_keydown, on_keyup, on_input, on_change, on_focus, on_blur, on_submit, on_wheel, on_scroll, bind_value, bind_checked } from "./events.sf"
+
+// =============================================================================
+// Style — CSS utilities
+// =============================================================================
+
+import { styles, cx, scoped_styles, ScopedStyles, css_vars, keyframes, Keyframes, media_query, MediaQuery } from "./style.sf"
+
+// =============================================================================
+// Context — dependency injection
+// =============================================================================
+
+import { create_context, Context, provide, provide_signal, use_context, use_context_signal, scoped, ContextScope, ContextEntry, ThemeConfig, ThemeContext, AuthState, AuthContext, LocaleConfig, LocaleContext, RouterContext } from "./context.sf"
