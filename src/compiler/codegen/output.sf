@@ -66,11 +66,13 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             var saved_terminated2: Bool = this.block_terminated
             var saved_counter2: Float = this.local_counter
             var saved_typed_vars2: Map<String, AST.Type> = this.typed_vars
+            var saved_gc_root_count2: Float = this.gc_root_count
 
             this.sb = StringBuilder()
             this.in_function = true
             this.typed_vars = {}
             this.string_vars = []
+            this.gc_root_count = 0
             this.reset_locals()
             var ret_llvm2: String = this.llvm_type(ret_type)
             var all_params: List<String> = []
@@ -124,6 +126,7 @@ extend fun Codegen.gen_function(name: String, params: String, ret_type: String, 
             this.block_terminated = saved_terminated2
             this.local_counter = saved_counter2
             this.typed_vars = saved_typed_vars2
+            this.gc_root_count = saved_gc_root_count2
             this.globals.push(nested_ir)
             return
         }
