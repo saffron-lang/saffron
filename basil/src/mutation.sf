@@ -8,8 +8,8 @@
 
 import "turmeric/signal" as Signal
 import "@json" as JSON
-import "./cache.sf" as Cache
-import "./fetch.sf" as Fetch
+import { store } from "./cache.sf"
+import { post } from "./fetch.sf"
 
 class Mutation<TRequest, TResponse> {
     var url: String
@@ -41,7 +41,7 @@ class Mutation<TRequest, TResponse> {
         var expected_id: Float = this._mutation_id
         var self = this
         var body_json: String = JSON.to_string(body)
-        Fetch.post(self.url, body_json, fun (response: String) => {
+        post(self.url, body_json, fun (response: String) => {
             if (self._cancelled or self._mutation_id != expected_id) { return }
             Signal.batch(fun () => {
                 var parsed = JSON.parse(response)
@@ -50,7 +50,7 @@ class Mutation<TRequest, TResponse> {
                     self.error.set("")
                     var i: Float = 0
                     while (i < self._invalidates.length()) {
-                        Cache.store.invalidate_matching(self._invalidates[i])
+                        store.invalidate_matching(self._invalidates[i])
                         i = i + 1
                     }
                     if (self._on_success != nil) {

@@ -2362,6 +2362,13 @@ class Codegen {
                 if (this.str_in_list(this.known_functions, mp_resolved)) {
                     return this.gen_func_ref(mp_resolved)
                 }
+                // Module-prefixed global variable: e.g. Cache.store
+                if (this.module_globals.has(mp_resolved)) {
+                    var mg_local: String = this.fresh_local()
+                    var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
+                    this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                    return mg_local
+                }
             }
             // Module-qualified zero-arg enum: AST.Expr.This → try Expr.This
             if (mn.length() == 0) {
@@ -10684,8 +10691,10 @@ class Codegen {
             var raw: String = this.emit_untag_int(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + raw + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         }
     }
     if (!is_user_class and method == "floor") {
@@ -11004,8 +11013,10 @@ class Codegen {
         if (obj_type == "Any") {
             var ts_local: String = this.fresh_local()
             this.emit_indent(ts_local + " = call i64 @__any_to_string(i64 " + obj + ")")
+            var ts_tagged: String = this.fresh_local()
+            this.emit_indent(ts_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
             this.last_type = AST.Type.StringType
-            return ts_local
+            return ts_tagged
         }
         if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"
@@ -11017,8 +11028,10 @@ class Codegen {
         var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
         this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + ts_raw + ")")
+        var ts_tagged: String = this.fresh_local()
+        this.emit_indent(ts_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
         this.last_type = AST.Type.StringType
-        return ts_local
+        return ts_tagged
     }
     // Error: method not found on a known user-defined class type
     // Skip for builtin types (String, List, Map, etc.) which have runtime methods

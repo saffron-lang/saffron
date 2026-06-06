@@ -1030,15 +1030,21 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
             this.set_last_type(AST.Type.StringType)
             return local
         } else if (obj_type == "Any") {
-            // Unknown type: assume already a string (common in interpolation of untyped vars)
+            // Unknown type: dispatch via __any_to_string with runtime tag inspection
+            var any_raw: String = this.fresh_local()
+            this.emit_indent(any_raw + " = call i64 @__any_to_string(i64 " + obj + ")")
+            var any_tagged: String = this.fresh_local()
+            this.emit_indent(any_tagged + " = call i64 @__rt_tag_ptr(i64 " + any_raw + ")")
             this.set_last_type(AST.Type.StringType)
-            return obj
+            return any_tagged
         } else {
             var raw: String = this.emit_untag_int(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + raw + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.set_last_type(AST.Type.StringType)
-            return local
+            return tagged
         }
     }
     if (!is_user_class and method == "floor") {
@@ -1148,9 +1154,17 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         return obj
     }
     if (method == "to_string") {
-        if (obj_type == "String" or obj_type == "Any") {
+        if (obj_type == "String") {
             this.set_last_type(AST.Type.StringType)
             return obj
+        }
+        if (obj_type == "Any") {
+            var ts_any: String = this.fresh_local()
+            this.emit_indent(ts_any + " = call i64 @__any_to_string(i64 " + obj + ")")
+            var ts_any_tagged: String = this.fresh_local()
+            this.emit_indent(ts_any_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_any + ")")
+            this.set_last_type(AST.Type.StringType)
+            return ts_any_tagged
         }
         if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"
@@ -1162,8 +1176,10 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
         this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + ts_raw + ")")
+        var ts_tagged: String = this.fresh_local()
+        this.emit_indent(ts_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
         this.set_last_type(AST.Type.StringType)
-        return ts_local
+        return ts_tagged
     }
     this.set_last_type(AST.Type.IntType)
     return "0"

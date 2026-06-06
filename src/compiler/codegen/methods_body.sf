@@ -2209,8 +2209,10 @@
             var raw: String = this.emit_untag_int(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__int_to_string(i64 " + raw + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         }
     }
     if (!is_user_class and method == "floor") {
@@ -2529,8 +2531,10 @@
         if (obj_type == "Any") {
             var ts_local: String = this.fresh_local()
             this.emit_indent(ts_local + " = call i64 @__any_to_string(i64 " + obj + ")")
+            var ts_tagged: String = this.fresh_local()
+            this.emit_indent(ts_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
             this.last_type = AST.Type.StringType
-            return ts_local
+            return ts_tagged
         }
         if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"
@@ -2542,8 +2546,10 @@
         var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
         this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + ts_raw + ")")
+        var ts_tagged: String = this.fresh_local()
+        this.emit_indent(ts_tagged + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
         this.last_type = AST.Type.StringType
-        return ts_local
+        return ts_tagged
     }
     // Error: method not found on a known user-defined class type
     // Skip for builtin types (String, List, Map, etc.) which have runtime methods

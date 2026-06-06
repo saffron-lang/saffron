@@ -9,8 +9,8 @@
 
 import "turmeric/signal" as Signal
 import "@json" as JSON
-import "./cache.sf" as Cache
-import "./fetch.sf" as Fetch
+import { store } from "./cache.sf"
+import { get } from "./fetch.sf"
 
 class Query<T> {
     var url: String
@@ -33,7 +33,7 @@ class Query<T> {
     }
 
     fun _fetch() {
-        var cached = Cache.store.get(this.url)
+        var cached = store.get(this.url)
         if (cached != nil and !cached.is_stale) {
             this.data.set(cached.data)
             return
@@ -43,14 +43,14 @@ class Query<T> {
         this._fetch_id = this._fetch_id + 1
         var expected_id: Float = this._fetch_id
         var self = this
-        Fetch.get(self.url, fun (response: String) => {
+        get(self.url, fun (response: String) => {
             if (self._cancelled or self._fetch_id != expected_id) { return }
             Signal.batch(fun () => {
                 var parsed = JSON.parse(response)
                 if (parsed != nil) {
                     self.data.set(parsed)
                     self.error.set("")
-                    Cache.store.set(self.url, parsed, self._stale_time)
+                    store.set(self.url, parsed, self._stale_time)
                 } else {
                     self.error.set("Failed to parse response")
                 }
@@ -60,12 +60,12 @@ class Query<T> {
     }
 
     fun refetch() {
-        Cache.store.invalidate(this.url)
+        store.invalidate(this.url)
         this._fetch()
     }
 
     fun invalidate() {
-        Cache.store.invalidate(this.url)
+        store.invalidate(this.url)
     }
 
     fun cancel() {
