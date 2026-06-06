@@ -59,7 +59,7 @@ fun next_sub_id(): Float {
 // =============================================================================
 
 var _batch_depth: Float = 0
-var _batch_queue: List<() => Nil> = []
+var _batch_queue: List<Any> = []
 var _batch_signals: List<Any> = []
 
 fun _schedule_notify(sig: Any, notify_fn: () => Nil) {
@@ -73,12 +73,13 @@ fun _schedule_notify(sig: Any, notify_fn: () => Nil) {
 
 fun _flush_batch() {
     while (_batch_queue.length() > 0) {
-        var queue: List<() => Nil> = _batch_queue
+        var queue: List<Any> = _batch_queue
         _batch_queue = []
         _batch_signals = []
         var i: Float = 0
         while (i < queue.length()) {
-            queue[i]()
+            var fn: () => Nil = queue[i]
+            fn()
             i = i + 1
         }
     }

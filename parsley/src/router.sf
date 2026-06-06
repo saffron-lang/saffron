@@ -42,28 +42,28 @@ class ApiRouter {
 
     /// Register a GET endpoint with typed response.
     fun get<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
-        var ep = Endpoint<T>("GET", this.prefix + path, handler)
+        var ep = Endpoint("GET", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a POST endpoint with typed request body and response.
     fun post<TBody, TResponse>(path: String, handler: (Http.Request) => TResponse): Endpoint<TResponse> {
-        var ep = Endpoint<TResponse>("POST", this.prefix + path, handler)
+        var ep = Endpoint("POST", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a PUT endpoint.
     fun put<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
-        var ep = Endpoint<T>("PUT", this.prefix + path, handler)
+        var ep = Endpoint("PUT", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }
 
     /// Register a DELETE endpoint.
     fun delete<T>(path: String, handler: (Http.Request) => T): Endpoint<T> {
-        var ep = Endpoint<T>("DELETE", this.prefix + path, handler)
+        var ep = Endpoint("DELETE", this.prefix + path, handler)
         this.endpoints.push(ep)
         return ep
     }

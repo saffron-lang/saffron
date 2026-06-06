@@ -217,6 +217,13 @@
                         if (this.str_in_list(this.known_functions, mp_resolved)) {
                             return this.gen_func_ref(mp_resolved)
                         }
+                        // Module-prefixed global variable: e.g. Cache.store
+                        if (this.module_globals.has(mp_resolved)) {
+                            var mg_local: String = this.fresh_local()
+                            var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
+                            this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                            return mg_local
+                        }
                     }
                 }
                 // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)

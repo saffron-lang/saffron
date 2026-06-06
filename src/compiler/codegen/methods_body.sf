@@ -2539,8 +2539,9 @@
             this.last_type = AST.Type.StringType
             return ts_local
         }
+        var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
-        this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + obj + ")")
+        this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + ts_raw + ")")
         this.last_type = AST.Type.StringType
         return ts_local
     }
