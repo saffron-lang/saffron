@@ -46,7 +46,7 @@ class Query<T> {
         Fetch.get(self.url, fun (response: String) => {
             if (self._cancelled or self._fetch_id != expected_id) { return }
             Signal.batch(fun () => {
-                var parsed: T = JSON.parse_as<T>(response)
+                var parsed = JSON.parse(response)
                 if (parsed != nil) {
                     self.data.set(parsed)
                     self.error.set("")
@@ -77,11 +77,11 @@ class Query<T> {
 var DEFAULT_STALE_TIME: Float = 30.0
 
 /// Create a typed cached query.
-fun query<T>(url: String): Query<T> {
-    return Query<T>(url, DEFAULT_STALE_TIME)
+fun query(url: String): Query {
+    return Query(url, DEFAULT_STALE_TIME)
 }
 
 /// Create a typed cached query with custom stale time.
-fun query_with<T>(url: String, stale_time: Float): Query<T> {
-    return Query<T>(url, stale_time)
+fun query_with(url: String, stale_time: Float): Query {
+    return Query(url, stale_time)
 }

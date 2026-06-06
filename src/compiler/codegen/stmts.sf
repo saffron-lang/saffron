@@ -604,8 +604,9 @@ extend fun Codegen.emit_enum_to_string(name: String, variants: List<AST.Variant>
                         field_str = this.fresh_local()
                         this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + field_val + ")")
                     } else {
+                        var field_raw: String = this.emit_untag_int(field_val)
                         field_str = this.fresh_local()
-                        this.emit_indent(field_str + " = call i64 @__int_to_string(i64 " + field_val + ")")
+                        this.emit_indent(field_str + " = call i64 @__int_to_string(i64 " + field_raw + ")")
                     }
 
                     this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + field_str + ")")

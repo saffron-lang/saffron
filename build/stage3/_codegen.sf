@@ -1260,6 +1260,13 @@ class Codegen {
                         if (this.str_in_list(this.known_functions, mp_resolved)) {
                             return this.gen_func_ref(mp_resolved)
                         }
+                        // Module-prefixed global variable: e.g. Cache.store
+                        if (this.module_globals.has(mp_resolved)) {
+                            var mg_local: String = this.fresh_local()
+                            var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
+                            this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                            return mg_local
+                        }
                     }
                 }
                 // Fallback: evaluate object, check last_type for class (handles chained expr like list[i].field)
@@ -5530,8 +5537,9 @@ class Codegen {
                         field_str = this.fresh_local()
                         this.emit_indent(field_str + " = call i64 @__bool_to_string(i64 " + field_val + ")")
                     } else {
+                        var field_raw: String = this.emit_untag_int(field_val)
                         field_str = this.fresh_local()
-                        this.emit_indent(field_str + " = call i64 @__int_to_string(i64 " + field_val + ")")
+                        this.emit_indent(field_str + " = call i64 @__int_to_string(i64 " + field_raw + ")")
                     }
 
                     this.emit_indent("call i64 @__sb_append(i64 " + sb + ", i64 " + field_str + ")")
@@ -11006,8 +11014,9 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return ts_local
         }
+        var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
-        this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + obj + ")")
+        this.emit_indent(ts_local + " = call i64 @__int_to_string(i64 " + ts_raw + ")")
         this.last_type = AST.Type.StringType
         return ts_local
     }

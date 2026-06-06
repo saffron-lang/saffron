@@ -44,7 +44,7 @@ class Mutation<TRequest, TResponse> {
         Fetch.post(self.url, body_json, fun (response: String) => {
             if (self._cancelled or self._mutation_id != expected_id) { return }
             Signal.batch(fun () => {
-                var parsed: TResponse = JSON.parse_as<TResponse>(response)
+                var parsed = JSON.parse(response)
                 if (parsed != nil) {
                     self.data.set(parsed)
                     self.error.set("")
@@ -87,11 +87,11 @@ class Mutation<TRequest, TResponse> {
 }
 
 /// Create a typed mutation (defaults to POST).
-fun mutation<TRequest, TResponse>(url: String): Mutation<TRequest, TResponse> {
-    return Mutation<TRequest, TResponse>(url, "POST")
+fun mutation(url: String): Mutation {
+    return Mutation(url, "POST")
 }
 
 /// Create a typed mutation with explicit HTTP method.
-fun mutation_method<TRequest, TResponse>(url: String, method: String): Mutation<TRequest, TResponse> {
-    return Mutation<TRequest, TResponse>(url, method)
+fun mutation_method(url: String, method: String): Mutation {
+    return Mutation(url, method)
 }
