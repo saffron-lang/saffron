@@ -13,6 +13,7 @@ import "./api.sf" as Api
 
 var router = Router.hash()
 var search_query = signal("")
+var search_suggestions = signal([])
 
 // Auth state — persists across page navigations
 var auth_token_global = signal("")
@@ -40,6 +41,27 @@ fun do_search() {
     }
     router.go("/search?q=" + q)
     search_results_query.set(Api.searchPackages(q))
+}
+
+fun update_suggestions(q: String) {
+    if (q.length() < 2) {
+        search_suggestions.set([])
+        return
+    }
+    var data = packages_query.data.get()
+    if (data != nil and data.has("packages")) {
+        var pkgs = data.get("packages")
+        var matches = []
+        var i: Float = 0
+        while (i < pkgs.length()) {
+            var pkg_name: String = pkgs[i].get("name")
+            if (pkg_name.contains(q)) {
+                matches.push(pkg_name)
+            }
+            i = i + 1
+        }
+        search_suggestions.set(matches)
+    }
 }
 
 fun search_category(cat: String) {
@@ -85,10 +107,23 @@ fun NavBarWithSearch() {
         {Router.Link(router, "/", cls="nav-brand") { text("Bazaar") }}
         {Router.Link(router, "/search?q=", cls="nav-link on") { text("Browse") }}
         <a cls="nav-link">Docs</a>
-        <form cls="nav-search" on_submit={fun (e: Event) => do_search()}>
-            <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => search_query.set(event_target_value())} />
-            <button cls="nav-search-btn" type="submit">→</button>
-        </form>
+        <div cls="search-wrapper">
+            <form cls="nav-search" on_submit={fun (e: Event) => { search_suggestions.set([]); do_search() }}>
+                <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => { search_query.set(event_target_value()); update_suggestions(event_target_value()) }} on_blur={fun (e: Event) => search_suggestions.set([])} />
+                <button cls="nav-search-btn" type="submit">→</button>
+            </form>
+            {if (search_suggestions.get().length() > 0) {
+                <div cls="autocomplete">
+                    {var items = search_suggestions.get()
+                    var i: Float = 0
+                    while (i < items.length()) {
+                        var suggestion: String = items[i]
+                        {Router.Link(router, "/packages/" + suggestion, cls="autocomplete-item") { text(suggestion) }}
+                        i = i + 1
+                    }}
+                </div>
+            }}
+        </div>
         <div cls="nav-r">
             {if (auth_token_global.get().length() > 0) {
                 {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
@@ -146,9 +181,9 @@ fun PackageCard(pkg: Map<String, String>) {
                 </div>
             </div>
         </div>
-        if (description.length() > 0) {
+        {if (description.length() > 0) {
             <p cls="pkg-desc">{description}</p>
-        }
+        }}
         <div cls="pkg-footer">
             <div cls="pkg-tags">
                 <span cls="tag">saffron</span>
@@ -177,9 +212,9 @@ fun PackageRow(pkg: Map<String, String>) {
                         <span cls="ver">{version}</span>
                     }}
                 </div>
-                if (description.length() > 0) {
+                {if (description.length() > 0) {
                     <p cls="pkg-row-desc">{description}</p>
-                }
+                }}
                 <div cls="pkg-row-footer">
                     <div cls="pkg-row-tags">
                         <span cls="tag">saffron</span>
@@ -208,10 +243,23 @@ fun HomePage() {
                 <span cls="kicker">OPEN PACKAGE REGISTRY</span>
                 <h1 cls="hero-h">Find the right package. Build something lasting.</h1>
                 <p cls="hero-sub">Browse packages from the Saffron community. Open source, forever free.</p>
-                <form cls="hero-form" on_submit={fun (e: Event) => do_search()}>
-                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." value={search_query.get()} on_input={fun (e: Event) => search_query.set(event_target_value())} />
-                    <button cls="hero-btn" type="submit">Search</button>
-                </form>
+                <div cls="search-wrapper hero-search-wrapper">
+                    <form cls="hero-form" on_submit={fun (e: Event) => { search_suggestions.set([]); do_search() }}>
+                        <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." value={search_query.get()} on_input={fun (e: Event) => { search_query.set(event_target_value()); update_suggestions(event_target_value()) }} on_blur={fun (e: Event) => search_suggestions.set([])} />
+                        <button cls="hero-btn" type="submit">Search</button>
+                    </form>
+                    {if (search_suggestions.get().length() > 0) {
+                        <div cls="autocomplete">
+                            {var items = search_suggestions.get()
+                            var i: Float = 0
+                            while (i < items.length()) {
+                                var suggestion: String = items[i]
+                                {Router.Link(router, "/packages/" + suggestion, cls="autocomplete-item") { text(suggestion) }}
+                                i = i + 1
+                            }}
+                        </div>
+                    }}
+                </div>
                 <div cls="hero-pills">
                     <span cls="pill" on_click={fun (e: Event) => search_category("ui")}>UI components</span>
                     <span cls="pill" on_click={fun (e: Event) => search_category("cli")}>CLI tools</span>
@@ -404,9 +452,9 @@ fun PackageDetailPage() {
                                 <h1 cls="pkg-header-title">{name}</h1>
                                 <span cls="ver">{latest}</span>
                             </div>
-                            if (description.length() > 0) {
+                            {if (description.length() > 0) {
                                 <p cls="pkg-header-desc">{description}</p>
-                            }
+                            }}
                             <div cls="pkg-header-stats">
                                 <span cls="pkg-hstat">License: <strong>{data.get("license")}</strong></span>
                                 <span cls="pkg-hstat-sep">·</span>
@@ -432,12 +480,12 @@ fun PackageDetailPage() {
                 <article cls="readme">
                     <h2>Installation</h2>
                     <pre><code>pantry add {name}</code></pre>
-                    if (description.length() > 0) {
+                    {if (description.length() > 0) {
                         <div>
                             <h2>About</h2>
                             <p>{description}</p>
                         </div>
-                    }
+                    }}
                 </article>
 
                 <aside cls="meta-sidebar">
@@ -467,7 +515,7 @@ fun PackageDetailPage() {
                         }}
                     </div>
 
-                    if (versions.length() > 0) {
+                    {if (versions.length() > 0) {
                         <div cls="meta-card">
                             <span cls="meta-title">Version history</span>
                             {var i: Float = versions.length() - 1
@@ -482,7 +530,7 @@ fun PackageDetailPage() {
                                 i = i - 1
                             }}
                         </div>
-                    }
+                    }}
                 </aside>
             </div>
         } else {
