@@ -23,7 +23,7 @@
             this.collect_calls_from_stmts(body, lambda_calls)
             var lci: Float = 0
             while (lci < lambda_calls.length()) {
-                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci])) {
+                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci]) or this.coro_method_match(lambda_calls[lci])) {
                     this.coroutine_funcs.push(lambda_name)
                     lci = lambda_calls.length()
                 }
@@ -211,9 +211,7 @@
 
         // Check if this closure is a coroutine
         var is_coro: Bool = this.str_in_list(this.coroutine_funcs,name)
-        if (is_coro) {
-            this.is_coroutine = true
-        }
+        this.is_coroutine = is_coro
 
         var param_list: List<String> = []
         if (params.length() > 0) {

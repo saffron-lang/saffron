@@ -696,6 +696,82 @@
         }
     }
     this.called_functions.push(full_method)
+
+    // Coroutine-aware method call: if this function is a coroutine and the
+    // callee is also a coroutine, emit the await pattern instead of plain call.
+    if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
+        var mc_hdl: String = this.fresh_local()
+        this.emit_indent(mc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        var mc_hdl_i64: String = this.fresh_local()
+        this.emit_indent(mc_hdl_i64 + " = ptrtoint ptr " + mc_hdl + " to i64")
+        var mc_await_loop: String = this.fresh_label("await.loop")
+        var mc_await_yield: String = this.fresh_label("await.yield")
+        var mc_await_cleanup: String = this.fresh_label("await.cleanup")
+        var mc_await_done: String = this.fresh_label("await.done")
+        var mc_await_check: String = this.fresh_label("await.check")
+        this.emit_terminator("br label %" + mc_await_check)
+        this.start_block(mc_await_check)
+        var mc_done: String = this.fresh_local()
+        this.emit_indent(mc_done + " = call i64 @__sched_coro_done(i64 " + mc_hdl_i64 + ")")
+        var mc_done_cmp: String = this.fresh_local()
+        this.emit_indent(mc_done_cmp + " = icmp eq i64 " + mc_done + ", 1")
+        this.emit_terminator("br i1 " + mc_done_cmp + ", label %" + mc_await_done + ", label %" + mc_await_yield)
+        this.start_block(mc_await_yield)
+        var mc_save: String = this.fresh_local()
+        this.emit_indent(mc_save + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+        var mc_susp: String = this.fresh_local()
+        this.emit_indent(mc_susp + " = call i8 @llvm.coro.suspend(token " + mc_save + ", i1 false)")
+        this.emit_terminator("switch i8 " + mc_susp + ", label %__coro_suspend [i8 0, label %" + mc_await_loop + " i8 1, label %" + mc_await_cleanup + "]")
+        this.start_block(mc_await_cleanup)
+        this.emit_terminator("br label %__coro_cleanup")
+        this.start_block(mc_await_loop)
+        this.emit_indent("call void @__sched_coro_resume(i64 " + mc_hdl_i64 + ")")
+        this.emit_terminator("br label %" + mc_await_check)
+        this.start_block(mc_await_done)
+        var mc_result: String = this.fresh_local()
+        this.emit_indent(mc_result + " = load i64, i64* @__task_result")
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return mc_result
+    }
+
+    // Sync-calls-coro for method calls: non-coroutine calling a coroutine method
+    if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
+        var sc_hdl: String = this.fresh_local()
+        this.emit_indent(sc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        var sc_i64: String = this.fresh_local()
+        this.emit_indent(sc_i64 + " = ptrtoint ptr " + sc_hdl + " to i64")
+        var sc_check: String = this.fresh_label("sync.check")
+        var sc_loop: String = this.fresh_label("sync.loop")
+        var sc_done: String = this.fresh_label("sync.done")
+        this.emit_terminator("br label %" + sc_check)
+        this.start_block(sc_check)
+        var sc_d: String = this.fresh_local()
+        this.emit_indent(sc_d + " = call i64 @__sched_coro_done(i64 " + sc_i64 + ")")
+        var sc_cmp: String = this.fresh_local()
+        this.emit_indent(sc_cmp + " = icmp eq i64 " + sc_d + ", 1")
+        this.emit_terminator("br i1 " + sc_cmp + ", label %" + sc_done + ", label %" + sc_loop)
+        this.start_block(sc_loop)
+        this.emit_indent("call void @__sched_coro_resume(i64 " + sc_i64 + ")")
+        this.emit_terminator("br label %" + sc_check)
+        this.start_block(sc_done)
+        var sc_result: String = this.fresh_local()
+        this.emit_indent(sc_result + " = load i64, i64* @__task_result")
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return sc_result
+    }
+
     var local: String = this.fresh_local()
     if (this.use_llvm_lib) {
         this.emit_indent(this.lib_call(local, "i64", full_method, arg_strs.join(", ")))
@@ -712,8 +788,8 @@
                 }
                 mc_ai = mc_ai + 1
             }
-            var mc_result: LLVMTypes.Value = this.llvm_block_builder.call(full_method, LLVMTypes.Type.I64, mc_arg_vals)
-            this.llvm_values.set(local, mc_result)
+            var mc_result2: LLVMTypes.Value = this.llvm_block_builder.call(full_method, LLVMTypes.Type.I64, mc_arg_vals)
+            this.llvm_values.set(local, mc_result2)
         }
     } else {
         this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")

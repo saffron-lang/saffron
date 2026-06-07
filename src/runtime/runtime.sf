@@ -38,6 +38,7 @@
 @extern("i64 __gc_alloc(i64, i64)") fun __gc_alloc(size: Int, type_tag: Int): Int
 @extern("i64 __gc_realloc(i64, i64, i64)") fun __gc_realloc(old_ptr: Int, new_size: Int, type_tag: Int): Int
 @extern("i64 __gc_alloc_safe(i64, i64)") fun __gc_alloc_safe(size: Int, type_tag: Int): Int
+@extern("i64 __val_untag_int(i64)") fun __rt_untag_int(v: Int): Int
 
 // --- Intrinsics ---
 
@@ -100,12 +101,12 @@ fun __split_push(list: Int, value: Int) {
 fun __list_get(list: Int, index: Int): Int {
     if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
-    var actual_idx: Int = index
-    if (index < 0) {
-        actual_idx = count + index
+    var actual_idx: Int = __rt_untag_int(index)
+    if (actual_idx < 0) {
+        actual_idx = count + actual_idx
     }
     if (actual_idx < 0 or actual_idx >= count) {
-        __index_error(index, count)
+        __index_error(actual_idx, count)
         return 0
     }
     var data: Int = load64(list + 16)
@@ -115,12 +116,12 @@ fun __list_get(list: Int, index: Int): Int {
 fun __list_set(list: Int, index: Int, value: Int) {
     if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
-    var actual_idx: Int = index
-    if (index < 0) {
-        actual_idx = count + index
+    var actual_idx: Int = __rt_untag_int(index)
+    if (actual_idx < 0) {
+        actual_idx = count + actual_idx
     }
     if (actual_idx < 0 or actual_idx >= count) {
-        __index_error(index, count)
+        __index_error(actual_idx, count)
         return
     }
     var data: Int = load64(list + 16)
@@ -148,10 +149,11 @@ fun __list_pop(list: Int): Int {
 fun __list_remove(list: Int, index: Int): Int {
     if (list == 0) { return __rt_nil() }
     var count: Int = load64(list)
-    if (index < 0 or index >= count) { return __rt_nil() }
+    var idx: Int = __rt_untag_int(index)
+    if (idx < 0 or idx >= count) { return __rt_nil() }
     var data: Int = load64(list + 16)
-    var removed: Int = load64(data + index * 8)
-    var i: Int = index
+    var removed: Int = load64(data + idx * 8)
+    var i: Int = idx
     while (i < count - 1) {
         store64(data + i * 8, load64(data + (i + 1) * 8))
         i = i + 1
@@ -164,8 +166,8 @@ fun __list_slice(list: Int, start: Int, end: Int): Int {
     var result: Int = __list_new()
     if (list == 0) { return result }
     var len: Int = __list_length(list)
-    var s: Int = start
-    var e: Int = end
+    var s: Int = __rt_untag_int(start)
+    var e: Int = __rt_untag_int(end)
     if (s < 0) { s = 0 }
     if (e > len) { e = len }
     while (s < e) {
