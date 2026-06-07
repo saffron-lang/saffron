@@ -2574,22 +2574,17 @@
         var key: String = enum_name + "." + variant
         var tag: Float = this.enum_variant_tags.get(key)
 
-        // Check if this enum uses simple encoding (max 1 field) or array encoding
+        // Check if this enum uses simple encoding (no fields) or array encoding
         var max_fields: Float = this.get_max_fields(enum_name)
 
-        if (max_fields <= 1) {
-            // Simple encoding: (tag << 56) | value
+        if (max_fields == 0) {
+            // Simple encoding for enums with no data fields at all: tag << 56
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 this.last_type = AST.Type.EnumType(enum_name); return local
             }
-            var val: String = this.gen_arg_value(args[0])
-            var tag_shifted: String = this.fresh_local()
-            this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
-            var combined: String = this.fresh_local()
-            this.emit_indent(combined + " = or i64 " + tag_shifted + ", " + val)
-            this.last_type = AST.Type.EnumType(enum_name); return combined
+            // Shouldn't happen (max_fields==0 but args>0), fall through to array encoding
         }
 
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]

@@ -40,18 +40,12 @@ var val2 = match (y) {
 }
 Test.assert_eq(val2, -1, "enum None match")
 
-// BUG: Enum data extraction is broken in NaN-box mode.
-// The simple encoding (tag << 56 | value) corrupts NaN-boxed values because
-// the OR operation overwrites the NaN-box tag bits in the upper 8 bits.
-// Fix requires either: untagging before enum storage, or using array encoding
-// for all enums in NaN-box mode.
-//
-// Leaving one test to document the bug without crashing:
+// Enum data extraction: uses heap-allocated array encoding [tag, value]
 var x = Option.Some(42)
 var val = match (x) {
     Some(v) => v
     None => 0
 }
-Test.assert_eq(val, 42, "enum numeric data extraction (BUG: returns garbage)")
+Test.assert_eq(val, 42, "enum with data")
 
 Test.summary()
