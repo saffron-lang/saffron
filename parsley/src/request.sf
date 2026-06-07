@@ -3,9 +3,15 @@
 import "@http/server" as Http
 import "@json" as JSON
 
-/// Parse a JSON request body. Returns the parsed Map.
+/// Parse a JSON request body. Returns the parsed Map, or nil if body is empty/invalid.
 fun parse_body(req: Http.Request): Any {
-    return JSON.parse(req.body)
+    if (req.body == nil) { return nil }
+    if (req.body.length() == 0) { return nil }
+    try {
+        return JSON.parse(req.body)
+    } catch (e) {
+        return nil
+    }
 }
 
 /// Alias for parse_body.
@@ -13,9 +19,11 @@ fun body(req: Http.Request): Any {
     return parse_body(req)
 }
 
-/// Get a path parameter.
+/// Get a path parameter. Returns "" if not found.
 fun param(req: Http.Request, name: String): String {
-    return req.param(name)
+    if (req.params == nil) { return "" }
+    if (!req.params.has(name)) { return "" }
+    return req.params.get(name)
 }
 
 /// Parse query string from raw string.
@@ -39,5 +47,6 @@ fun query_params_from_string(qs: String): Map<String, String> {
 
 /// Parse query string from a request.
 fun query_params(req: Http.Request): Map<String, String> {
+    if (req.query == nil) { return {} }
     return query_params_from_string(req.query)
 }

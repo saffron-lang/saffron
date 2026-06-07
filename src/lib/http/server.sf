@@ -415,19 +415,46 @@ class App {
         }
 
         var req: Request = _parse_request(raw)
+
+        // If Content-Length indicates more body data than we received, read more
+        var cl_str: String = req.header("Content-Length")
+        if (cl_str.length() > 0) {
+            var content_length: Int = cl_str.to_number()
+            var body_len: Int = req.body.length()
+            if (body_len < content_length) {
+                // Need to read more body data from the connection
+                var remaining: Int = content_length - body_len
+                var extra: String = ""
+                if (tls_conn != nil) {
+                    extra = tls_conn.read(remaining)
+                } else {
+                    extra = conn.read(remaining)
+                }
+                if (extra.length() > 0) {
+                    req.body = req.body + extra
+                }
+            }
+        }
+
         req._conn = conn
         req._tls_conn = tls_conn
 
         // Run before-middlewares in order
-        var resp: Response = this._run_middlewares(req)
-        if (resp == nil) {
-            // No middleware short-circuited, proceed to route matching
-            resp = this._route(req)
-        }
+        var resp: Response = nil
+        try {
+            resp = this._run_middlewares(req)
+            if (resp == nil) {
+                // No middleware short-circuited, proceed to route matching
+                resp = this._route(req)
+            }
 
-        // Run after-middlewares on the response (skip for streams)
-        if (!resp._is_stream) {
-            resp = this._run_after_middlewares(req, resp)
+            // Run after-middlewares on the response (skip for streams)
+            if (!resp._is_stream) {
+                resp = this._run_after_middlewares(req, resp)
+            }
+        } catch (e) {
+            resp = Response(500, "{\"error\":\"internal server error\"}")
+            resp = resp.header("Content-Type", "application/json")
         }
 
         if (resp._is_stream) {
