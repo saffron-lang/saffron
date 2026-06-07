@@ -104,6 +104,9 @@ test('search triggers route change', async ({ page }) => {
 });
 
 test('search navigation renders search results page', async ({ page }) => {
+    const logs = [];
+    page.on('console', msg => logs.push(msg.text()));
+
     await page.goto('/');
     await page.waitForTimeout(1000);
 
@@ -112,8 +115,17 @@ test('search navigation renders search results page', async ({ page }) => {
     await input.press('Enter');
     await page.waitForTimeout(2000);
 
+    // Debug: print console logs and innerHTML
+    const innerHTML = await page.locator('#app').innerHTML();
+    console.log('Console logs:', logs.slice(0, 20));
+    console.log('innerHTML length:', innerHTML.length);
+    console.log('innerHTML preview:', innerHTML.slice(0, 300));
+
     // Router should re-render: search results page replaces home page
     const text = await page.locator('#app').textContent();
-    expect(text).toContain('Search results');
+    // SearchResultsPage shows "Results for" header with the query term
+    expect(text).toContain('Results for');
     expect(text).toContain('mypackage');
+    // Home page hero should no longer be visible
+    expect(text).not.toContain('Find the right package');
 });

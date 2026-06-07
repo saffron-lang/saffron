@@ -1703,6 +1703,24 @@ class Codegen {
                 return local
             }
 
+            // Float equality: untag both sides as float and compare at double level.
+            // Raw icmp eq fails when one value is int-tagged (0x7FF9...) and the
+            // other is float-tagged (after arithmetic), even if semantically equal.
+            if (left_type == "Float" or right_type == "Float") {
+                var lf: String = this.fresh_local()
+                this.emit_indent(lf + " = call double @__val_untag_float(i64 " + lhs + ")")
+                var rf: String = this.fresh_local()
+                this.emit_indent(rf + " = call double @__val_untag_float(i64 " + rhs + ")")
+                var cmp_local: String = this.fresh_local()
+                if (op == "==") { this.emit_indent(cmp_local + " = fcmp oeq double " + lf + ", " + rf) }
+                else { this.emit_indent(cmp_local + " = fcmp une double " + lf + ", " + rf) }
+                var raw_bool: String = this.fresh_local()
+                this.emit_indent(raw_bool + " = zext i1 " + cmp_local + " to i64")
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
@@ -10212,6 +10230,7 @@ class Codegen {
             }
             if (method == "index_of") {
                 this.called_functions.push("rt_str_index_of")
+                this.called_function_arity.set("rt_str_index_of", 2)
                 var __si_arg: String = this.gen_arg_value(args[0])
                 var __si_local: String = this.fresh_local()
                 if (this.use_llvm_lib) {
@@ -10225,6 +10244,7 @@ class Codegen {
             }
             if (method == "repeat") {
                 this.called_functions.push("rt_str_repeat")
+                this.called_function_arity.set("rt_str_repeat", 2)
                 var __sr_arg: String = this.gen_arg_value(args[0])
                 var __sr_local: String = this.fresh_local()
                 if (this.use_llvm_lib) {
@@ -11307,6 +11327,16 @@ class Codegen {
     }
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
+    // Check for module global write: ModuleAlias._field = value
+    var sf_obj_name: String = this.get_variable_name(object)
+    if (sf_obj_name.length() > 0 and this.module_prefixes.has(sf_obj_name)) {
+        var sf_mp_resolved: String = this.module_prefixes.get(sf_obj_name) + field
+        if (this.module_globals.has(sf_mp_resolved)) {
+            var sf_val: String = this.gen_arg_value(value)
+            this.emit_indent("store i64 " + sf_val + ", i64* @__g_" + this.sanitize_name(sf_mp_resolved))
+            return sf_val
+        }
+    }
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
