@@ -6219,9 +6219,15 @@ class Codegen {
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
+        var untagged: String = this.fresh_local()
+        this.emit_indent(untagged + " = call i64 @__val_untag_int(i64 %val)")
         var ns_result: String = this.fresh_local()
-        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 %val)")
-        this.emit_terminator("ret i64 " + ns_result)
+        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 " + untagged + ")")
+        var ns_ptr: String = this.fresh_local()
+        this.emit_indent(ns_ptr + " = inttoptr i64 " + ns_result + " to i8*")
+        var ns_tagged: String = this.fresh_local()
+        this.emit_indent(ns_tagged + " = call i64 @__val_tag_ptr(i8* " + ns_ptr + ")")
+        this.emit_terminator("ret i64 " + ns_tagged)
         this.emit("}")
         this.block_terminated = false
 
@@ -6262,7 +6268,7 @@ class Codegen {
                 var fname_len: Float = fname.length() + 1
                 var fname_gep: String = this.fresh_local()
                 this.emit_indent(fname_gep + " = getelementptr [" + fname_len.to_string() + " x i8], [" + fname_len.to_string() + " x i8]* " + fname_const + ", i64 0, i64 0")
-                var fname_i64: String = this.ptr_to_val(fname_gep)
+                var fname_i64: String = this.emit_tag_ptr(fname_gep)
                 var inst_ptr: String = this.fresh_local()
                 this.emit_indent(inst_ptr + " = inttoptr i64 %val to %" + cname2 + "*")
                 var field_ptr: String = this.fresh_local()
@@ -7025,8 +7031,9 @@ class Codegen {
                     var ci: Float = 0
                     while (ci < calls.length()) {
                         var callee: String = calls[ci]
-                        // Check both bare name and prefixed name
-                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee) or this.coro_method_match(callee)) {
+                        // Check both bare name and prefixed name (no coro_method_match —
+                        // bare suffix matching causes false positives across unrelated classes)
+                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee)) {
                             this.coroutine_funcs.push(fn_name)
                             changed = true
                             ci = calls.length()
@@ -7745,7 +7752,7 @@ class Codegen {
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc) or this.coro_method_match(bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 }

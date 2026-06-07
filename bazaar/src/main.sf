@@ -3,10 +3,9 @@
 
 import "@http/server" as Http
 import "@os" as OS
-import { router } from "parsley/router"
-import { to_json } from "parsley/spec"
+import "@json" as JSON
+import { router, ApiRouter } from "parsley/router"
 import "./routes.sf" as Routes
-import "./index.sf" as Index
 import "./db.sf" as Db
 
 fun main() {
@@ -17,14 +16,13 @@ fun main() {
     }
 
     Db.init()
-    Index.init_index()
 
     var app = Http.server(port)
 
     // Middleware
     app.use(Http.cors())
     app.use(Http.logger())
-    app.use(Http.static_files("/", "static"))
+    // app.use(Http.static_files("/", "static"))  // disabled: causes blocking on API routes
     app.after(Http.cors_headers())
 
     // Build API router with parsley
@@ -32,12 +30,7 @@ fun main() {
     Routes.register(api)
     api.mount(app)
 
-    // Export spec for frontend client generation
-    var spec_json = to_json(api.spec())
-    IO.write_file("static/api_spec.json", spec_json)
-
     IO.println("Bazaar registry server v0.1.0")
-    IO.println("API spec exported to static/api_spec.json")
     app.serve()
 }
 

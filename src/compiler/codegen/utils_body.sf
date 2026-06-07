@@ -682,8 +682,9 @@
                     var ci: Float = 0
                     while (ci < calls.length()) {
                         var callee: String = calls[ci]
-                        // Check both bare name and prefixed name
-                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee) or this.coro_method_match(callee)) {
+                        // Check both bare name and prefixed name (no coro_method_match —
+                        // bare suffix matching causes false positives across unrelated classes)
+                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee)) {
                             this.coroutine_funcs.push(fn_name)
                             changed = true
                             ci = calls.length()

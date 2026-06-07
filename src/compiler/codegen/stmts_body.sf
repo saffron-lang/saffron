@@ -1388,9 +1388,15 @@
         this.emit("entry:")
         this.block_terminated = false
         this.reset_locals()
+        var untagged: String = this.fresh_local()
+        this.emit_indent(untagged + " = call i64 @__val_untag_int(i64 %val)")
         var ns_result: String = this.fresh_local()
-        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 %val)")
-        this.emit_terminator("ret i64 " + ns_result)
+        this.emit_indent(ns_result + " = call i64 @__int_to_string(i64 " + untagged + ")")
+        var ns_ptr: String = this.fresh_local()
+        this.emit_indent(ns_ptr + " = inttoptr i64 " + ns_result + " to i8*")
+        var ns_tagged: String = this.fresh_local()
+        this.emit_indent(ns_tagged + " = call i64 @__val_tag_ptr(i8* " + ns_ptr + ")")
+        this.emit_terminator("ret i64 " + ns_tagged)
         this.emit("}")
         this.block_terminated = false
 
@@ -1431,7 +1437,7 @@
                 var fname_len: Float = fname.length() + 1
                 var fname_gep: String = this.fresh_local()
                 this.emit_indent(fname_gep + " = getelementptr [" + fname_len.to_string() + " x i8], [" + fname_len.to_string() + " x i8]* " + fname_const + ", i64 0, i64 0")
-                var fname_i64: String = this.ptr_to_val(fname_gep)
+                var fname_i64: String = this.emit_tag_ptr(fname_gep)
                 var inst_ptr: String = this.fresh_local()
                 this.emit_indent(inst_ptr + " = inttoptr i64 %val to %" + cname2 + "*")
                 var field_ptr: String = this.fresh_local()
