@@ -8194,6 +8194,7 @@ class Codegen {
             this.emit("entry:")
             this.block_terminated = false
             this.reset_locals()
+            this.in_function = true
             // LLVM lib: create FunctionBuilder for __saffron_entry
             if (this.use_llvm_lib and !this.identity_mode) {
                 var llvm_entry_params: List<LLVMFunc.Param> = []
@@ -8274,6 +8275,7 @@ class Codegen {
             }
             this.emit("}")
             this.block_terminated = false
+            this.in_function = false
         }
 
         // Build final output with proper ordering
@@ -10571,9 +10573,19 @@ class Codegen {
     if (!is_user_class and method == "length") {
         if (obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'length' on untyped value (type inference failed)")
+            // Use runtime dispatch (__any_length) for unknown types
+            this.called_functions.push("__any_length")
+            var raw: String = this.fresh_local()
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(raw, "i64", "__any_length", "i64 " + obj))
+            } else {
+                this.emit_indent(raw + " = call i64 @__any_length(i64 " + obj + ")")
+            }
+            var local: String = this.emit_tag_int(raw)
+            this.last_type = AST.Type.IntType
+            return local
         }
-        if (obj_type == "String" or obj_type == "Any") {
-            // For Any type, default to strlen (common case: untyped vars hold strings)
+        if (obj_type == "String") {
             var str_ptr: String = this.emit_untag_ptr(obj)
             var raw: String = this.fresh_local()
             this.emit_indent(raw + " = call i64 @strlen(i8* " + str_ptr + ")")

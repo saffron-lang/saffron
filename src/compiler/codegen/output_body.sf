@@ -730,6 +730,7 @@
             this.emit("entry:")
             this.block_terminated = false
             this.reset_locals()
+            this.in_function = true
             // LLVM lib: create FunctionBuilder for __saffron_entry
             if (this.use_llvm_lib and !this.identity_mode) {
                 var llvm_entry_params: List<LLVMFunc.Param> = []
@@ -810,6 +811,7 @@
             }
             this.emit("}")
             this.block_terminated = false
+            this.in_function = false
         }
 
         // Build final output with proper ordering

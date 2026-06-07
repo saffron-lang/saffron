@@ -343,11 +343,20 @@ entry:
 
 define i64 @__val_type_id(i64 %v) {
 entry:
-  ; For a heap pointer, read the type ID from the first field of the object
+  ; For a heap pointer, check if it has a GC header (magic sentinel at ptr - 8)
   %ptr_int = and i64 %v, 281474976710655      ; mask off tag
-  %ptr = inttoptr i64 %ptr_int to i64*
-  %type_id = load i64, i64* %ptr
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %is_string
+read_tag:
+  ; GC-managed object: read type tag from header
+  %type_id = call i64 @__gc_get_type_tag(i64 %ptr_int)
   ret i64 %type_id
+is_string:
+  ; Plain malloc'd buffer (no GC header) = string (type 1)
+  ret i64 1
 }
 
 define i1 @__val_is_string(i64 %v) {
@@ -365,26 +374,66 @@ no:
 
 define i1 @__val_is_list(i64 %v) {
 entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
   %upper = lshr i64 %v, 48
   %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
+  br i1 %is_ptr, label %check, label %check_raw
 check:
   %tid = call i64 @__val_type_id(i64 %v)
   %result = icmp eq i64 %tid, 2               ; TYPE_LIST
   ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_list = icmp eq i64 %gc_tag, 2
+  ret i1 %gc_is_list
 no:
   ret i1 false
 }
 
 define i1 @__val_is_map(i64 %v) {
 entry:
+  ; Check for nil/zero
+  %is_zero = icmp eq i64 %v, 0
+  br i1 %is_zero, label %no, label %check_tagged
+check_tagged:
   %upper = lshr i64 %v, 48
   %is_ptr = icmp eq i64 %upper, 32760
-  br i1 %is_ptr, label %check, label %no
+  br i1 %is_ptr, label %check, label %check_raw
 check:
   %tid = call i64 @__val_type_id(i64 %v)
   %result = icmp eq i64 %tid, 3               ; TYPE_MAP
   ret i1 %result
+check_raw:
+  ; Could be a raw (untagged) GC pointer — check magic sentinel at ptr - 8
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan_tagged = or i1 %is_int, %is_spec
+  br i1 %is_nan_tagged, label %no, label %try_gc
+try_gc:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_gc_tag, label %no
+read_gc_tag:
+  %gc_tag = call i64 @__gc_get_type_tag(i64 %v)
+  %gc_is_map = icmp eq i64 %gc_tag, 3
+  ret i1 %gc_is_map
 no:
   ret i1 false
 }
@@ -1115,6 +1164,86 @@ ret_false:
   %false_str = getelementptr [6 x i8], [6 x i8]* @.str.false_nl, i64 0, i64 0
   %false_ptr = ptrtoint i8* %false_str to i64
   ret i64 %false_ptr
+}
+
+; __any_length — Runtime-dispatched length for Any-typed values.
+; Returns raw i64 length (not NaN-boxed). Caller must tag result.
+declare i64 @__gc_get_type_tag(i64)
+declare i64 @__list_length(i64)
+define i64 @__any_length(i64 %val) {
+entry:
+  ; Check for zero/nil
+  %is_zero = icmp eq i64 %val, 0
+  br i1 %is_zero, label %ret_zero, label %check_tagged
+check_tagged:
+  ; Check if pointer-tagged (upper 16 bits == 0x7FF8)
+  %upper = lshr i64 %val, 48
+  %is_ptr = icmp eq i64 %upper, 32760
+  br i1 %is_ptr, label %tagged_ptr, label %check_raw
+tagged_ptr:
+  ; NaN-box tagged pointer: unmask
+  %raw_ptr = and i64 %val, 281474976710655
+  br label %check_gc
+check_raw:
+  ; Not NaN-tagged: could be raw GC pointer or int/bool/etc
+  %is_int = icmp eq i64 %upper, 32761
+  %is_spec = icmp eq i64 %upper, 32762
+  %is_nan = or i1 %is_int, %is_spec
+  br i1 %is_nan, label %ret_zero, label %use_raw
+use_raw:
+  ; Treat as raw pointer
+  br label %check_gc_raw
+check_gc_raw:
+  ; Check magic sentinel at val - 8 for raw pointers
+  %magic_addr2 = sub i64 %val, 8
+  %magic_ptr2 = inttoptr i64 %magic_addr2 to i64*
+  %magic2 = load i64, i64* %magic_ptr2
+  %has_gc2 = icmp eq i64 %magic2, 6557403441622859503
+  br i1 %has_gc2, label %gc_object_raw, label %do_string_raw
+gc_object_raw:
+  %tag2 = call i64 @__gc_get_type_tag(i64 %val)
+  %is_list2 = icmp eq i64 %tag2, 2
+  br i1 %is_list2, label %do_list_raw, label %do_map_raw
+do_list_raw:
+  %list_len2 = call i64 @__list_length(i64 %val)
+  ret i64 %list_len2
+do_map_raw:
+  %map_ptr2 = inttoptr i64 %val to i64*
+  %map_count2 = load i64, i64* %map_ptr2
+  ret i64 %map_count2
+do_string_raw:
+  %str_ptr2 = inttoptr i64 %val to i8*
+  %str_len2 = call i64 @strlen(i8* %str_ptr2)
+  ret i64 %str_len2
+check_gc:
+  ; Check magic sentinel at raw_ptr - 8
+  %magic_addr = sub i64 %raw_ptr, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %gc_object, label %do_string
+gc_object:
+  ; GC-managed object: check type tag
+  %tag = call i64 @__gc_get_type_tag(i64 %raw_ptr)
+  %is_list = icmp eq i64 %tag, 2
+  br i1 %is_list, label %do_list, label %do_map_or_other
+do_list:
+  %list_len = call i64 @__list_length(i64 %raw_ptr)
+  ret i64 %list_len
+do_map_or_other:
+  ; Map (type 3): count is first field
+  %is_map = icmp eq i64 %tag, 3
+  br i1 %is_map, label %do_map, label %do_string
+do_map:
+  %map_ptr = inttoptr i64 %raw_ptr to i64*
+  %map_count = load i64, i64* %map_ptr
+  ret i64 %map_count
+do_string:
+  %str_ptr = inttoptr i64 %raw_ptr to i8*
+  %str_len = call i64 @strlen(i8* %str_ptr)
+  ret i64 %str_len
+ret_zero:
+  ret i64 0
 }
 
 ; __io_println_any — Print any NaN-boxed value followed by a newline.
