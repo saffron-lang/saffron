@@ -187,6 +187,7 @@ class RouteDef {
 }
 
 var _router_container: Float = 0
+var _navigating: Bool = false
 
 class Router {
     var mode: Mode
@@ -206,11 +207,19 @@ class Router {
     }
 
     fun go(url: String) {
+        _navigating = true
         _js_set_hash(url)
-        if (_router_container > 0) {
-            _rt_set_html(_router_container, "")
-            this.dispatch(url)
+        // Strip query string: dispatch only the path portion
+        var dispatch_url: String = url
+        var qidx: Float = url.index_of("?")
+        if (qidx > 0) {
+            dispatch_url = url.slice(0, qidx)
         }
+        _rt_set_html(_router_container, "")
+        _tc_push(_router_container)
+        this.dispatch(dispatch_url)
+        _tc_pop()
+        _navigating = false
     }
 
     fun current(): String {
@@ -246,11 +255,13 @@ class Router {
     }
 
     fun dispatch(current_path: String) {
-        // Extract query string
+        // Split path from query string by scanning for '?'
+        var path_part: String = current_path
         var query_part: String = ""
         var qi: Float = 0
         while (qi < current_path.length()) {
             if (current_path.char_at(qi) == "?") {
+                path_part = current_path.slice(0, qi)
                 query_part = current_path.slice(qi + 1, current_path.length())
                 qi = current_path.length()
             }
@@ -258,13 +269,12 @@ class Router {
         }
         var query: Map<String, String> = parse_query(query_part)
 
-        // match_pattern uses split_path which strips query automatically
         var i: Float = 0
         while (i < this.routes.length()) {
             var r: RouteDef = this.routes[i]
-            var params: Map<String, String> = match_pattern(r.pattern, current_path)
+            var params: Map<String, String> = match_pattern(r.pattern, path_part)
             if (params != nil) {
-                r.handler(RouteParams(current_path, params, query))
+                r.handler(RouteParams(path_part, params, query))
                 return
             }
             i = i + 1
@@ -283,6 +293,7 @@ class Router {
 
 
     fun _on_external_change() {
+        if (_navigating) { return }
         var hash: String = _js_get_hash()
         // Normalize: ensure path starts with /
         if (!hash.starts_with("/")) {
