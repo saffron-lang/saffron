@@ -34,8 +34,8 @@ declare i32 @pclose(i8*)
 declare i8* @popen(i8*, i8*)
 declare i8* @fgets(i8*, i32, i8*)
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
-declare i32 @setjmp(i8*)
-declare void @longjmp(i8*, i32)
+declare i32 @setjmp(i8*) returns_twice
+declare void @longjmp(i8*, i32) noreturn
 declare void @__io_println_str(i64)
 declare void @__io_println_int(i64)
 declare void @__io_println_bool(i64)
@@ -197,7 +197,7 @@ entry:
   store i64 %t6, i64* @__g_version
   %t7 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
   %t8 = call i64 @__val_tag_ptr(i8* %t7)
-  %t9 = load i64, i64* @__g_name
+  %t9 = load i64, i64* %name
   %t10 = call i8* @__val_untag_ptr(i64 %t8)
   %t11 = call i8* @__val_untag_ptr(i64 %t9)
   %t12 = call i64 @strlen(i8* %t10)
@@ -226,7 +226,7 @@ entry:
   %t31 = call i64 @__string_intern(i64 %t30)
   %t32 = inttoptr i64 %t31 to i8*
   %t33 = call i64 @__val_tag_ptr(i8* %t32)
-  %t34 = load i64, i64* @__g_version
+  %t34 = load i64, i64* %version
   %t35 = call i8* @__val_untag_ptr(i64 %t33)
   %t36 = call i8* @__val_untag_ptr(i64 %t34)
   %t37 = call i64 @strlen(i8* %t35)

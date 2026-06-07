@@ -80,7 +80,14 @@ fun init() {
     }
 
     _db_path = db_path
-    _db = DB.open(db_path)
+    try {
+        _db = DB.open(db_path)
+    } catch (e) {
+        IO.println("[db] warning: DB.open failed (" + e.to_string() + "), retrying...")
+        // Retry without _ensure_sqlite3 (skip the which check that may fail
+        // due to nursery GC invalidating the trimmed path string)
+        _db = DB.Database(db_path)
+    }
     IO.println("[db] initialized: ${db_path}")
 }
 

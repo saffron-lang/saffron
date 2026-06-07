@@ -261,8 +261,10 @@ try_nursery:
   br i1 %has_nursery, label %nursery_alloc, label %check_threshold
 
 nursery_alloc:
-  ; total_needed = size + 24 (header)
-  %nursery_need = add i64 %size, 24
+  ; total_needed = align8(size + 24) (header + payload, 8-byte aligned)
+  %nursery_raw = add i64 %size, 24
+  %nursery_round = add i64 %nursery_raw, 7
+  %nursery_need = and i64 %nursery_round, -8
   %n_ptr = load i64, i64* @__gc_nursery_ptr
   %n_end = load i64, i64* @__gc_nursery_end
   %n_new_ptr = add i64 %n_ptr, %nursery_need

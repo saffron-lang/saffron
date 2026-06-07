@@ -893,9 +893,23 @@ extend fun Codegen.is_if_stmt(stmt: AST.Stmt): Bool {
 extend fun Codegen.gen_throw(value: AST.Expr) {
         var val: String = this.gen_arg_value(value)
         this.emit_indent("store i64 " + val + ", i64* @__exception_value")
-        // Load the current jmp_buf pointer and longjmp to it
+        // Load the current jmp_buf pointer and check for null (uncaught exception)
         var jmp_ptr: String = this.fresh_local()
         this.emit_indent(jmp_ptr + " = load i8*, i8** @__jmp_buf_current")
+        var is_null: String = this.fresh_local()
+        this.emit_indent(is_null + " = icmp eq i8* " + jmp_ptr + ", null")
+        var uncaught_label: String = this.fresh_label("uncaught")
+        var do_throw_label: String = this.fresh_label("do_throw")
+        this.emit_terminator("br i1 " + is_null + ", label %" + uncaught_label + ", label %" + do_throw_label)
+        // Uncaught exception: convert to string, print fatal error, and exit
+        this.start_block(uncaught_label)
+        var msg_str: String = this.fresh_local()
+        this.emit_indent(msg_str + " = call i64 @__any_to_string(i64 " + val + ")")
+        this.emit_indent("call i64 @__runtime_error_fatal(i64 " + msg_str + ")")
+        this.emit_indent("call void @exit(i32 1)")
+        this.emit_terminator("unreachable")
+        // Normal throw: longjmp to handler
+        this.start_block(do_throw_label)
         this.emit_indent("call void @longjmp(i8* " + jmp_ptr + ", i32 1)")
         this.emit_terminator("unreachable")
     }
