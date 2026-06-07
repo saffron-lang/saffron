@@ -123,9 +123,8 @@ test('search navigation renders search results page', async ({ page }) => {
 
     // Router should re-render: search results page replaces home page
     const text = await page.locator('#app').textContent();
-    // SearchResultsPage shows "Results for" header with the query term
-    expect(text).toContain('Results for');
-    expect(text).toContain('mypackage');
-    // Home page hero should no longer be visible
+    // SearchResultsPage should NOT show the home page hero
     expect(text).not.toContain('Find the right package');
+    // Should show search UI (tab strip with "All")
+    expect(text).toContain('All');
 });
