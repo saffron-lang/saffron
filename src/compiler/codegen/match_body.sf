@@ -81,19 +81,12 @@
 
         // If enum not found, just generate the first arm's body as default
         if (enum_name == "Unknown") {
-            // Unknown enum — extract bindings from subject
+            // Unknown enum — extract bindings from subject using array encoding
             var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
                 _ => []
             }
-            if (first_bindings.length() == 1) {
-                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF, retag
-                var bname: String = first_bindings[0]
-                var raw: String = this.fresh_local()
-                this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-                var extracted: String = this.emit_tag_int(raw)
-                this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-            } else if (first_bindings.length() > 1) {
-                // Multi-field variant: inttoptr → GEP for each binding
+            if (first_bindings.length() >= 1) {
+                // Array encoding: inttoptr → GEP for each binding
                 var num_slots: Float = first_bindings.length() + 1
                 var total_str: String = num_slots.floor().to_string()
                 var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
@@ -129,13 +122,13 @@
 
         // Extract tag based on encoding
         var tag_val: String = this.fresh_local()
-        if (max_fields <= 1) {
-            // Single-field or no-field: (tag << 56) | value encoding
+        if (max_fields == 0) {
+            // No-data enum: tag << 56 encoding
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
             this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
         } else {
-            // Multi-field: ptrtoint encoding, tag at array[0]
+            // Enum with data: heap-allocated array encoding, tag at array[0]
             var arr_ptr: String = this.val_to_typed_ptr(subj, "i64*")
             var tag_i64: String = this.fresh_local()
             this.emit_indent(tag_i64 + " = load i64, i64* " + arr_ptr)
@@ -231,25 +224,17 @@
 
     fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
         var bind_count: Float = bindings.length()
-        if (max_fields <= 1) {
-            // Simple encoding: extract raw value with AND mask, then retag as int
-            var bname: String = bindings[0]
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-            var extracted: String = this.emit_tag_int(raw)
-            this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-        } else {
-            // Array encoding: inttoptr and GEP to extract fields
-            var total: Float = bind_count + 1
-            var total_str: String = total.floor().to_string()
-            var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
-            // Extract each field individually to avoid VM loop variable bug
-            if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
-            if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
-            if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
-            if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
-            if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
-        }
+        // Always use array encoding: inttoptr and GEP to extract fields
+        // (max_fields >= 1 means heap-allocated [tag, field0, field1, ...])
+        var total: Float = bind_count + 1
+        var total_str: String = total.floor().to_string()
+        var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
+        // Extract each field individually to avoid VM loop variable bug
+        if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
+        if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
+        if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
+        if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
+        if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
     }
 
     fun extract_one_field(bname: String, arr_ptr: String, total_str: String, idx: Float) {
