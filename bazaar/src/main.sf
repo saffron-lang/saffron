@@ -4,7 +4,6 @@
 import "@http/server" as Http
 import "@os" as OS
 import "@json" as JSON
-import { router, ApiRouter } from "parsley/router"
 import "./routes.sf" as Routes
 import "./db.sf" as Db
 
@@ -23,13 +22,10 @@ fun main() {
         // Middleware
         app.use(Http.cors())
         app.use(Http.logger())
-        // app.use(Http.static_files("/", "static"))  // disabled: causes blocking on API routes
         app.after(Http.cors_headers())
 
-        // Build API router with parsley
-        var api = router("/api/v1")
-        Routes.register(api)
-        api.mount(app)
+        // Register API routes directly on the app
+        Routes.register(app, "/api/v1")
 
         IO.println("Bazaar registry server v0.1.0")
         app.serve()

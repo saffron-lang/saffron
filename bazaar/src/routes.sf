@@ -1,18 +1,17 @@
 //! API route handlers for the Bazaar registry.
-//! Uses Parsley typed router — handlers return typed response objects,
-//! errors are thrown as ApiError (caught by the router middleware).
+//! Routes are registered directly on Http.App (bypasses parsley mount()
+//! due to a cross-package closure capture bug in the native compiler).
 
 import "@http/server" as Http
 import "@crypto" as Crypto
-import { ApiRouter } from "parsley/router"
-import { ApiError, not_found, unauthorized, bad_request, conflict } from "parsley/response"
+import "@json" as JSON
 import { param, query_params, parse_body } from "parsley/request"
 import "./db.sf" as Db
 import "./storage.sf" as Storage
 import "./auth.sf" as Auth
 
 // ---------------------------------------------------------------------------
-// Response types — typed structures that Parsley serializes to JSON
+// Response types — typed structures serialized to JSON
 // ---------------------------------------------------------------------------
 
 class PackageSummary {
@@ -132,36 +131,87 @@ class RevokeResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Route registration — typed endpoints via Parsley ApiRouter
+// Route registration — direct app.get/post with local JSON wrapping
+// (Workaround: parsley mount() creates closures in a different package which
+// triggers a cross-package upvalue capture bug in the native compiler.)
 // ---------------------------------------------------------------------------
 
-fun register(api: ApiRouter) {
-    api.get("/packages", fun (req: Http.Request): ListPackagesResponse => list_packages(req))
-        .describe("List all packages with pagination")
+fun register(app: Http.App, prefix: String) {
+    _mount_list_packages(app, prefix + "/packages")
+    _mount_get_package(app, prefix + "/packages/:name")
+    _mount_download_package(app, prefix + "/packages/:name/:version/download")
+    _mount_search(app, prefix + "/search")
+    _mount_publish(app, prefix + "/packages/publish")
+    _mount_yank(app, prefix + "/packages/:name/yank/:version")
+    _mount_register(app, prefix + "/auth/register")
+    _mount_revoke(app, prefix + "/auth/revoke")
+}
 
-    api.get("/packages/:name", fun (req: Http.Request): PackageDetail => get_package(req))
-        .describe("Get package details and version history")
+// ---------------------------------------------------------------------------
+// Mount helpers — each creates ONE closure per route (avoids loop capture)
+// ---------------------------------------------------------------------------
 
-    api.get("/packages/:name/:version/download", fun (req: Http.Request): Http.Response => download_package(req))
-        .describe("Download package tarball")
+fun _mount_list_packages(app: Http.App, path: String) {
+    app.get(path, fun (req: Http.Request): Http.Response => {
+        return _json_response(list_packages(req))
+    })
+}
 
-    api.post("/packages/publish", fun (req: Http.Request): PublishResponse => publish_package(req))
-        .auth(true)
-        .describe("Publish a new package version")
+fun _mount_get_package(app: Http.App, path: String) {
+    app.get(path, fun (req: Http.Request): Http.Response => {
+        return _handle_get_package(req)
+    })
+}
 
-    api.post("/packages/:name/yank/:version", fun (req: Http.Request): YankResponse => yank_package(req))
-        .auth(true)
-        .describe("Yank a package version")
+fun _mount_download_package(app: Http.App, path: String) {
+    app.get(path, fun (req: Http.Request): Http.Response => {
+        return _handle_download(req)
+    })
+}
 
-    api.get("/search", fun (req: Http.Request): SearchResponse => search_packages(req))
-        .describe("Search packages by query")
+fun _mount_search(app: Http.App, path: String) {
+    app.get(path, fun (req: Http.Request): Http.Response => {
+        return _json_response(search_packages(req))
+    })
+}
 
-    api.post("/auth/register", fun (req: Http.Request): AuthResponse => register_user(req))
-        .describe("Register a new user and get API token")
+fun _mount_publish(app: Http.App, path: String) {
+    app.post(path, fun (req: Http.Request): Http.Response => {
+        return _handle_publish(req)
+    })
+}
 
-    api.post("/auth/revoke", fun (req: Http.Request): RevokeResponse => revoke_user_token(req))
-        .auth(true)
-        .describe("Revoke the current API token")
+fun _mount_yank(app: Http.App, path: String) {
+    app.post(path, fun (req: Http.Request): Http.Response => {
+        return _handle_yank(req)
+    })
+}
+
+fun _mount_register(app: Http.App, path: String) {
+    app.post(path, fun (req: Http.Request): Http.Response => {
+        return _handle_register(req)
+    })
+}
+
+fun _mount_revoke(app: Http.App, path: String) {
+    app.post(path, fun (req: Http.Request): Http.Response => {
+        return _handle_revoke(req)
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Response helpers
+// ---------------------------------------------------------------------------
+
+fun _json_response(data: Any): Http.Response {
+    return Http.Response(200, JSON.to_string(data))
+        .header("Content-Type", "application/json")
+}
+
+fun _error_json(status: Int, message: String): Http.Response {
+    var body = "{\"error\":" + JSON.escape_string(message) + "}"
+    return Http.Response(status, body)
+        .header("Content-Type", "application/json")
 }
 
 // ---------------------------------------------------------------------------
@@ -185,11 +235,14 @@ fun list_packages(req: Http.Request): ListPackagesResponse {
 // GET /api/v1/packages/:name — package info with version list
 // ---------------------------------------------------------------------------
 
-fun get_package(req: Http.Request): PackageDetail {
+fun _handle_get_package(req: Http.Request): Http.Response {
     var name = param(req, "name")
+    if (name == nil or name == "") {
+        return _error_json(400, "missing package name")
+    }
     var pkg = Db.get_package(name)
     if (pkg == nil) {
-        throw not_found("package not found")
+        return _error_json(404, "package not found")
     }
 
     var versions = Db.get_versions(name)
@@ -208,7 +261,7 @@ fun get_package(req: Http.Request): PackageDetail {
         i = i + 1
     }
 
-    return PackageDetail(
+    var detail = PackageDetail(
         name,
         pkg.get("description"),
         pkg.get("repository"),
@@ -216,19 +269,25 @@ fun get_package(req: Http.Request): PackageDetail {
         pkg.get("total_downloads"),
         version_list
     )
+    return _json_response(detail)
 }
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/packages/:name/:version/download — serve tarball
-// (Returns raw Http.Response for binary content — not JSON-serialized)
 // ---------------------------------------------------------------------------
 
-fun download_package(req: Http.Request): Http.Response {
+fun _handle_download(req: Http.Request): Http.Response {
     var name = param(req, "name")
     var version = param(req, "version")
+    if (name == nil or name == "") {
+        return _error_json(400, "missing package name")
+    }
+    if (version == nil or version == "") {
+        return _error_json(400, "missing version")
+    }
 
     if (!Storage.exists(name, version)) {
-        throw not_found("version not found")
+        return _error_json(404, "version not found")
     }
 
     Db.record_download(name, version)
@@ -242,25 +301,32 @@ fun download_package(req: Http.Request): Http.Response {
 // POST /api/v1/packages/publish — publish a new package version
 // ---------------------------------------------------------------------------
 
-fun publish_package(req: Http.Request): PublishResponse {
-    var username = require_auth(req)
+fun _handle_publish(req: Http.Request): Http.Response {
+    var auth_result = _check_auth(req)
+    if (auth_result == "") {
+        return _error_json(401, "missing or invalid authorization")
+    }
+    var username = auth_result
 
     var body = parse_body(req)
     if (body == nil) {
-        throw bad_request("invalid request body")
+        return _error_json(400, "invalid or empty request body")
     }
 
-    var name = body.get("name")
-    var version = body.get("vers")
-    var tarball_data = body.get("tarball")
+    var name = ""
+    var version = ""
+    var tarball_data = ""
+    if (body.has("name")) { name = body.get("name") }
+    if (body.has("vers")) { version = body.get("vers") }
+    if (body.has("tarball")) { tarball_data = body.get("tarball") }
 
-    if (name == nil or version == nil or tarball_data == nil) {
-        throw bad_request("missing required fields: name, vers, tarball")
+    if (name == "" or version == "" or tarball_data == "") {
+        return _error_json(400, "missing required fields: name, vers, tarball")
     }
 
     var existing = Db.get_version(name, version)
     if (existing != nil) {
-        throw conflict("version ${version} already exists")
+        return _error_json(409, "version ${version} already exists")
     }
 
     Storage.store(name, version, tarball_data)
@@ -286,37 +352,47 @@ fun publish_package(req: Http.Request): PublishResponse {
 
     Db.publish_version(name, version, cksum, username)
 
-    return PublishResponse(true, name, version)
+    return _json_response(PublishResponse(true, name, version))
 }
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/packages/:name/yank/:version — mark version as yanked
 // ---------------------------------------------------------------------------
 
-fun yank_package(req: Http.Request): YankResponse {
-    var username = require_auth(req)
+fun _handle_yank(req: Http.Request): Http.Response {
+    var auth_result = _check_auth(req)
+    if (auth_result == "") {
+        return _error_json(401, "missing or invalid authorization")
+    }
+    var username = auth_result
 
     var name = param(req, "name")
     var version = param(req, "version")
+    if (name == nil or name == "") {
+        return _error_json(400, "missing package name")
+    }
+    if (version == nil or version == "") {
+        return _error_json(400, "missing version")
+    }
 
     var pkg = Db.get_package(name)
     if (pkg == nil) {
-        throw not_found("package not found")
+        return _error_json(404, "package not found")
     }
 
     var ver = Db.get_version(name, version)
     if (ver == nil) {
-        throw not_found("version not found")
+        return _error_json(404, "version not found")
     }
 
     var user_id = Db.ensure_user(username)
     if (!Db.is_owner(name, user_id)) {
-        throw ApiError("not an owner of this package", 403)
+        return _error_json(403, "not an owner of this package")
     }
 
     Db.yank_version(name, version)
 
-    return YankResponse(true, name, version, true)
+    return _json_response(YankResponse(true, name, version, true))
 }
 
 // ---------------------------------------------------------------------------
@@ -338,48 +414,57 @@ fun search_packages(req: Http.Request): SearchResponse {
 // POST /api/v1/auth/register — register a user and get a token
 // ---------------------------------------------------------------------------
 
-fun register_user(req: Http.Request): AuthResponse {
+fun _handle_register(req: Http.Request): Http.Response {
     var body = parse_body(req)
     if (body == nil) {
-        throw bad_request("invalid request body")
+        return _error_json(400, "invalid or empty request body")
     }
 
-    var username = body.get("username")
-    if (username == nil or username.length() == 0) {
-        throw bad_request("username is required")
+    var username = ""
+    if (body.has("username")) { username = body.get("username") }
+    if (username == "" or username == nil) {
+        return _error_json(400, "username is required")
     }
 
     var token = Auth.create_token(username)
 
-    return AuthResponse(true, username, token)
+    return _json_response(AuthResponse(true, username, token))
 }
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/auth/revoke — revoke the current token
 // ---------------------------------------------------------------------------
 
-fun revoke_user_token(req: Http.Request): RevokeResponse {
-    var username = require_auth(req)
-    var token = req.header("Authorization").replace("Bearer ", "")
+fun _handle_revoke(req: Http.Request): Http.Response {
+    var auth_result = _check_auth(req)
+    if (auth_result == "") {
+        return _error_json(401, "missing or invalid authorization")
+    }
+    var auth_header = req.header("Authorization")
+    var token = ""
+    if (auth_header != nil and auth_header.length() > 0) {
+        token = auth_header.replace("Bearer ", "")
+    }
     Auth.revoke_token(token)
 
-    return RevokeResponse(true, true)
+    return _json_response(RevokeResponse(true, true))
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Extract and validate auth token, throwing unauthorized on failure.
-fun require_auth(req: Http.Request): String {
+/// Check auth and return username, or "" if invalid.
+/// Uses return values instead of throw to avoid cross-module exception bugs.
+fun _check_auth(req: Http.Request): String {
     var auth_header = req.header("Authorization")
-    if (auth_header.length() == 0) {
-        throw unauthorized("missing authorization")
+    if (auth_header == nil or auth_header.length() == 0) {
+        return ""
     }
     var token = auth_header.replace("Bearer ", "")
     var username = Auth.validate_token(token)
-    if (username == "") {
-        throw unauthorized("invalid token")
+    if (username == nil or username == "") {
+        return ""
     }
     return username
 }

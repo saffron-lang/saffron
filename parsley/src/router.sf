@@ -90,47 +90,84 @@ class ApiRouter {
         var i: Float = 0
         while (i < this.endpoints.length()) {
             var ep = this.endpoints[i]
-            var h = ep.handler
             if (ep.method == "GET") {
-                app.get(ep.path, fun (req: Http.Request): Http.Response => {
-                    try {
-                        var result = h(req)
-                        return Http.json(JSON.to_string(result))
-                    } catch (e) {
-                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
-                    }
-                })
+                _mount_get(app, ep)
             } else if (ep.method == "POST") {
-                app.post(ep.path, fun (req: Http.Request): Http.Response => {
-                    try {
-                        var result = h(req)
-                        return Http.json(JSON.to_string(result))
-                    } catch (e) {
-                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
-                    }
-                })
+                _mount_post(app, ep)
             } else if (ep.method == "PUT") {
-                app.put(ep.path, fun (req: Http.Request): Http.Response => {
-                    try {
-                        var result = h(req)
-                        return Http.json(JSON.to_string(result))
-                    } catch (e) {
-                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
-                    }
-                })
+                _mount_put(app, ep)
             } else if (ep.method == "DELETE") {
-                app.delete(ep.path, fun (req: Http.Request): Http.Response => {
-                    try {
-                        var result = h(req)
-                        return Http.json(JSON.to_string(result))
-                    } catch (e) {
-                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
-                    }
-                })
+                _mount_delete(app, ep)
             }
             i = i + 1
         }
     }
+}
+
+/// Mount a single GET endpoint — takes handler as direct function parameter.
+fun _mount_get(app: Http.App, ep: Endpoint) {
+    _register_get(app, ep.path, ep.handler)
+}
+
+fun _register_get(app: Http.App, path: String, handler: Fun) {
+    app.get(path, fun (req: Http.Request): Http.Response => {
+        try {
+            var result = handler(req)
+            return Http.json(JSON.to_string(result))
+        } catch (e) {
+            return _error_response(e)
+        }
+    })
+}
+
+/// Mount a single POST endpoint.
+fun _mount_post(app: Http.App, ep: Endpoint) {
+    app.post(ep.path, fun (req: Http.Request): Http.Response => {
+        try {
+            var result = ep.handler(req)
+            return Http.json(JSON.to_string(result))
+        } catch (e) {
+            return _error_response(e)
+        }
+    })
+}
+
+/// Mount a single PUT endpoint.
+fun _mount_put(app: Http.App, ep: Endpoint) {
+    app.put(ep.path, fun (req: Http.Request): Http.Response => {
+        try {
+            var result = ep.handler(req)
+            return Http.json(JSON.to_string(result))
+        } catch (e) {
+            return _error_response(e)
+        }
+    })
+}
+
+/// Mount a single DELETE endpoint.
+fun _mount_delete(app: Http.App, ep: Endpoint) {
+    app.delete(ep.path, fun (req: Http.Request): Http.Response => {
+        try {
+            var result = ep.handler(req)
+            return Http.json(JSON.to_string(result))
+        } catch (e) {
+            return _error_response(e)
+        }
+    })
+}
+
+/// Convert a caught exception to an HTTP error response.
+/// NOTE: Due to a cross-package closure capture bug in the native compiler,
+/// mount() does not work reliably for multi-route apps. Use direct registration
+/// from the same module as the route handlers instead (see bazaar/src/routes.sf).
+fun _error_response(e: Any): Http.Response {
+    // Handle string errors directly
+    if (e is String) {
+        var body = "{\"error\":" + JSON.escape_string(e) + "}"
+        return Http.Response(500, body).header("Content-Type", "application/json")
+    }
+    // Fallback for non-string errors
+    return Http.Response(500, "{\"error\":\"internal server error\"}").header("Content-Type", "application/json")
 }
 
 /// Create a new typed API router.
