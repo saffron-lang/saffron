@@ -128,3 +128,15 @@ test('search navigation renders search results page', async ({ page }) => {
     // Should show search UI (tab strip with "All")
     expect(text).toContain('All');
 });
+
+test('package detail page renders from direct URL', async ({ page }) => {
+    await page.goto('/#/packages/test-pkg');
+    await page.waitForTimeout(2000);
+
+    // Should show package detail layout (not home page)
+    const text = await page.locator('#app').textContent();
+    expect(text).not.toContain('Find the right package');
+    // Should show the package name and install command
+    expect(text).toContain('test-pkg');
+    expect(text).toContain('pantry add test-pkg');
+});

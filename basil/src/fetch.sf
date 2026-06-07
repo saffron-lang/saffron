@@ -2,6 +2,7 @@
 
 @extern("void js_fetch_json(void*, i64)") fun _fetch_json(url: String, callback_id: Float)
 @extern("void js_fetch_post(void*, void*, i64)") fun _fetch_post(url: String, body: String, callback_id: Float)
+@extern("void js_fetch_post_auth(void*, void*, void*, i64)") fun _fetch_post_auth(url: String, body: String, token: String, callback_id: Float)
 
 var _next_id: Float = 0
 var _callbacks: Map<Float, (String) => Nil> = {}
@@ -18,6 +19,13 @@ fun post(url: String, body: String, callback: (String) => Nil) {
     var id: Float = _next_id
     _callbacks.set(id, callback)
     _fetch_post(url, body, id)
+}
+
+fun post_auth(url: String, body: String, token: String, callback: (String) => Nil) {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _callbacks.set(id, callback)
+    _fetch_post_auth(url, body, token, id)
 }
 
 fun __on_fetch_complete(id: Float, response: String) {
