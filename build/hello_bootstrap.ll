@@ -50,6 +50,8 @@ declare i64 @__nil_to_string()
 declare i64 @__float_to_string(i64)
 declare i64 @__string_eq(i64, i64)
 declare i64 @__string_ne(i64, i64)
+declare i64 @__any_eq(i64, i64)
+declare i64 @__any_ne(i64, i64)
 declare i64 @__string_intern(i64)
 ; --- NaN-boxing value helpers ---
 declare i64 @__val_tag_int(i64)

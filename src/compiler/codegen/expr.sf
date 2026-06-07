@@ -302,6 +302,19 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
                 return local
             }
 
+            // Any-typed equality: use __any_eq/__any_ne for deep comparison
+            // (handles strings with different pointers but same content)
+            if (left_type == "Any" or right_type == "Any") {
+                var local: String = this.fresh_local()
+                if (op == "==") {
+                    this.emit_indent(local + " = call i64 @__any_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(local + " = call i64 @__any_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
+                this.last_type = AST.Type.BoolType
+                return local
+            }
+
             // Integer comparison
             var local: String = this.fresh_local()
             var cmp_local: String = this.fresh_local()

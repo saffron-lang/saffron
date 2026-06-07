@@ -644,6 +644,20 @@
                 }
             }
 
+            // Any-typed equality: use __any_eq/__any_ne for deep comparison
+            // (handles strings with different pointers but same content)
+            if (left_type == "Any" or right_type == "Any") {
+                var raw_bool: String = this.fresh_local()
+                if (op == "==") {
+                    this.emit_indent(raw_bool + " = call i64 @__any_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(raw_bool + " = call i64 @__any_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
@@ -1453,10 +1467,20 @@
     }
 
     fun gen_unary(op: String, right: AST.Expr): String {
+        var right_type: String = this.get_expr_type(right)
         var rhs: String = this.gen_arg_value(right)
 
         if (op == "-") {
-            // NaN-boxed negation: untag → negate → retag
+            if (right_type == "Float") {
+                // Float negation: untag as double, fsub from 0.0, retag
+                var raw_f: String = this.emit_untag_float(rhs)
+                var negated: String = this.fresh_local()
+                this.emit_indent(negated + " = fsub double 0.0, " + raw_f)
+                var local: String = this.emit_tag_float(negated)
+                this.last_type = AST.Type.FloatType
+                return local
+            }
+            // NaN-boxed integer negation: untag → negate → retag
             var raw: String = this.emit_untag_int(rhs)
             var negated: String = this.fresh_local()
             this.emit_indent(negated + " = sub i64 0, " + raw)
