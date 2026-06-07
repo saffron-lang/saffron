@@ -19,6 +19,7 @@
 
 import "./signal.sf" as Sig
 import { Event } from "./events.sf"
+import { _tc_push, _tc_pop } from "./prelude.sf"
 
 // =============================================================================
 // Route Params — passed to route handlers
@@ -303,7 +304,9 @@ class Router {
         this.path.value = hash
         if (_router_container > 0) {
             _rt_set_html(_router_container, "")
+            _tc_push(_router_container)
             this.dispatch(hash)
+            _tc_pop()
         }
     }
 }

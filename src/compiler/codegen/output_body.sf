@@ -937,10 +937,12 @@
         var ext_keys: List<String> = this.extern_sigs.keys()
         var ei: Float = 0
         var out_so_far: String = out.to_string()
+        var extern_c_names: List<String> = []
         while (ei < ext_keys.length()) {
             var decl: String = this.emit_extern_declare(this.extern_sigs.get(ext_keys[ei]))
             var parsed_ext: List<String> = this.parse_extern_sig(this.extern_sigs.get(ext_keys[ei]))
             var c_fn_name: String = parsed_ext[0]
+            extern_c_names.push(c_fn_name)
             if (!out_so_far.contains("@" + c_fn_name + "(")) {
                 out.append(decl + "\n")
             }
@@ -962,7 +964,7 @@
         var ci: Float = 0
         while (ci < this.called_functions.length()) {
             var cfname: String = this.called_functions[ci]
-            if (!this.str_in_list(this.known_functions,cfname) and !this.str_in_list(declared,cfname) and !this.str_in_list(this.defined_funcs,cfname)) {
+            if (!this.str_in_list(this.known_functions,cfname) and !this.str_in_list(declared,cfname) and !this.str_in_list(this.defined_funcs,cfname) and !this.str_in_list(extern_c_names,cfname)) {
                 var arity: Float = 1
                 if (this.called_function_arity.has(cfname)) {
                     arity = this.called_function_arity.get(cfname)
