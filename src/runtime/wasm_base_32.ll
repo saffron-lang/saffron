@@ -630,10 +630,43 @@ entry:
 
 define i64 @__val_untag_int(i64 %v) {
 entry:
+  ; Check if value is NaN-boxed (top 16 bits in 0x7FF8..0x7FFF)
+  %tag_bits = lshr i64 %v, 48
+  %ge_min = icmp uge i64 %tag_bits, 32760
+  %le_max = icmp ule i64 %tag_bits, 32767
+  %is_tagged = and i1 %ge_min, %le_max
+  br i1 %is_tagged, label %extract_int, label %check_raw
+check_raw:
+  ; Not NaN-boxed. Could be:
+  ; 1) A raw small integer passed directly (0, 1, 2, ...) from codegen
+  ; 2) A float-tagged double from arithmetic (e.g., 1.0 = 0x3FF0000000000000)
+  ; Distinguish: raw ints are small (< 2^31), float bits for numbers >= 1.0 are >= 0x3FF0...
+  ; Any value fitting in 32 bits is a raw integer (wasm32 addresses/indices fit in 32 bits)
+  %high_bits = lshr i64 %v, 32
+  %is_small = icmp eq i64 %high_bits, 0
+  br i1 %is_small, label %raw_int, label %from_float
+raw_int:
+  ; Value fits in 32 bits — it's a raw integer, return as-is
+  ret i64 %v
+extract_int:
+  ; NaN-boxed value: extract lower 48-bit payload as signed integer
   %payload = and i64 %v, 281474976710655
   %shift_left = shl i64 %payload, 16
   %sign_ext = ashr i64 %shift_left, 16
   ret i64 %sign_ext
+from_float:
+  ; Value has bits in upper 32 — it's a float from arithmetic. Convert to int.
+  ; Guard against NaN/Inf (exponent field all 1s)
+  %exp_bits = lshr i64 %v, 52
+  %exp_masked = and i64 %exp_bits, 2047
+  %is_special = icmp eq i64 %exp_masked, 2047
+  br i1 %is_special, label %ret_zero, label %safe_convert
+safe_convert:
+  %f = bitcast i64 %v to double
+  %as_int = fptosi double %f to i64
+  ret i64 %as_int
+ret_zero:
+  ret i64 0
 }
 
 define i64 @__val_tag_ptr(i8* %ptr) {
