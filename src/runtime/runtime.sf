@@ -101,7 +101,7 @@ fun __split_push(list: Int, value: Int) {
 fun __list_get(list: Int, index: Int): Int {
     if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
-    var actual_idx: Int = __rt_untag_int(index)
+    var actual_idx: Int = index
     if (actual_idx < 0) {
         actual_idx = count + actual_idx
     }
@@ -116,7 +116,7 @@ fun __list_get(list: Int, index: Int): Int {
 fun __list_set(list: Int, index: Int, value: Int) {
     if (list == 0) { __null_pointer_error() }
     var count: Int = load64(list)
-    var actual_idx: Int = __rt_untag_int(index)
+    var actual_idx: Int = index
     if (actual_idx < 0) {
         actual_idx = count + actual_idx
     }
@@ -149,7 +149,7 @@ fun __list_pop(list: Int): Int {
 fun __list_remove(list: Int, index: Int): Int {
     if (list == 0) { return __rt_nil() }
     var count: Int = load64(list)
-    var idx: Int = __rt_untag_int(index)
+    var idx: Int = index
     if (idx < 0 or idx >= count) { return __rt_nil() }
     var data: Int = load64(list + 16)
     var removed: Int = load64(data + idx * 8)
@@ -166,8 +166,8 @@ fun __list_slice(list: Int, start: Int, end: Int): Int {
     var result: Int = __list_new()
     if (list == 0) { return result }
     var len: Int = __list_length(list)
-    var s: Int = __rt_untag_int(start)
-    var e: Int = __rt_untag_int(end)
+    var s: Int = start
+    var e: Int = end
     if (s < 0) { s = 0 }
     if (e > len) { e = len }
     while (s < e) {

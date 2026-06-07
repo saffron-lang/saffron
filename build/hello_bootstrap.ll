@@ -182,8 +182,6 @@ declare i64 @__sched_has_stored_result(i64)
 
 define i64 @__saffron_entry() {
 entry:
-  %name = alloca i64
-  %version = alloca i64
   call void @__gc_enable()
   %t1 = ptrtoint i64* @__g_name to i64
   call void @__gc_push_root(i64 %t1)
@@ -197,7 +195,7 @@ entry:
   store i64 %t6, i64* @__g_version
   %t7 = getelementptr [12 x i8], [12 x i8]* @.str.2, i64 0, i64 0
   %t8 = call i64 @__val_tag_ptr(i8* %t7)
-  %t9 = load i64, i64* %name
+  %t9 = load i64, i64* @__g_name
   %t10 = call i8* @__val_untag_ptr(i64 %t8)
   %t11 = call i8* @__val_untag_ptr(i64 %t9)
   %t12 = call i64 @strlen(i8* %t10)
@@ -226,7 +224,7 @@ entry:
   %t31 = call i64 @__string_intern(i64 %t30)
   %t32 = inttoptr i64 %t31 to i8*
   %t33 = call i64 @__val_tag_ptr(i8* %t32)
-  %t34 = load i64, i64* %version
+  %t34 = load i64, i64* @__g_version
   %t35 = call i8* @__val_untag_ptr(i64 %t33)
   %t36 = call i8* @__val_untag_ptr(i64 %t34)
   %t37 = call i64 @strlen(i8* %t35)

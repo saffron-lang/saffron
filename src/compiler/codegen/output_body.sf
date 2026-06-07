@@ -747,7 +747,9 @@
             }
             var vi: Float = 0
             while (vi < top_vars.length()) {
-                this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
+                if (!this.module_globals.has(this.current_prefix + top_vars[vi]) and !this.module_globals.has(top_vars[vi])) {
+                    this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
+                }
                 vi = vi + 1
             }
             if (!this.identity_mode) {
