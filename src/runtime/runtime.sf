@@ -348,6 +348,19 @@ fun __map_keys(map: Int): Int {
     return list
 }
 
+fun __map_values(map: Int): Int {
+    if (map == 0) { return __list_new() }
+    var count: Int = load64(map)
+    var vp: Int = load64(map + 24)
+    var list: Int = __list_new()
+    var i: Int = 0
+    while (i < count) {
+        __list_push(list, load64(vp + i * 8))
+        i = i + 1
+    }
+    return list
+}
+
 // =============================================================================
 // String Utilities
 // =============================================================================
@@ -1206,21 +1219,20 @@ fun rt_list_copy(list: Int): Int {
 
 fun rt_list_sort(list: Int): Int {
     if (list == 0) { return __list_new() }
-    var copy: Int = rt_list_copy(list)
-    var len: Int = __list_length(copy)
+    var len: Int = __list_length(list)
     var outer: Int = 0
     while (outer < len - 1) {
         var inner: Int = 0
         while (inner < len - 1 - outer) {
-            var a: Int = __list_get(copy, inner)
-            var b: Int = __list_get(copy, inner + 1)
+            var a: Int = __list_get(list, inner)
+            var b: Int = __list_get(list, inner + 1)
             if (a > b) {
-                __list_set(copy, inner, b)
-                __list_set(copy, inner + 1, a)
+                __list_set(list, inner, b)
+                __list_set(list, inner + 1, a)
             }
             inner = inner + 1
         }
         outer = outer + 1
     }
-    return copy
+    return list
 }

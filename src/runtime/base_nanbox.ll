@@ -472,7 +472,47 @@ check_tags:
   %a_is_ptr = icmp eq i64 %a_upper, 32760
   %b_is_ptr = icmp eq i64 %b_upper, 32760
   %both_ptr = and i1 %a_is_ptr, %b_is_ptr
-  br i1 %both_ptr, label %ptr_compare, label %not_equal
+  br i1 %both_ptr, label %ptr_compare, label %check_numeric
+
+check_numeric:
+  ; Check if both values are numeric (Int or Float) — compare as doubles
+  ; Int tag = 0x7FF9 (upper 16 bits = 32761)
+  ; Float = anything NOT tagged as ptr/int/spec (i.e., a valid IEEE 754 double)
+  %a_is_int = icmp eq i64 %a_upper, 32761
+  %a_is_spec = icmp eq i64 %a_upper, 32762
+  %a_is_tagged = or i1 %a_is_ptr, %a_is_int
+  %a_is_tagged2 = or i1 %a_is_tagged, %a_is_spec
+  %a_is_float = xor i1 %a_is_tagged2, true
+  %a_is_num = or i1 %a_is_int, %a_is_float
+
+  %b_is_int = icmp eq i64 %b_upper, 32761
+  %b_is_spec = icmp eq i64 %b_upper, 32762
+  %b_is_tagged = or i1 %b_is_ptr, %b_is_int
+  %b_is_tagged2 = or i1 %b_is_tagged, %b_is_spec
+  %b_is_float = xor i1 %b_is_tagged2, true
+  %b_is_num = or i1 %b_is_int, %b_is_float
+
+  %both_num = and i1 %a_is_num, %b_is_num
+  br i1 %both_num, label %numeric_compare, label %check_bool
+
+check_bool:
+  ; Check if both are bool-tagged (upper 16 bits == 0x7FFA)
+  %a_is_bool = icmp eq i64 %a_upper, 32762
+  %b_is_bool = icmp eq i64 %b_upper, 32762
+  %both_bool = and i1 %a_is_bool, %b_is_bool
+  br i1 %both_bool, label %bool_compare, label %not_equal
+
+bool_compare:
+  ; Bool values: compare the full i64 directly (true/false have unique bit patterns)
+  %bool_eq = icmp eq i64 %a, %b
+  br i1 %bool_eq, label %equal, label %not_equal
+
+numeric_compare:
+  ; Convert both to double and compare
+  %a_dbl = call double @__val_untag_float(i64 %a)
+  %b_dbl = call double @__val_untag_float(i64 %b)
+  %num_eq = fcmp oeq double %a_dbl, %b_dbl
+  br i1 %num_eq, label %equal, label %not_equal
 
 ptr_compare:
   ; Both are pointer-tagged — do strcmp (works for strings; for non-string

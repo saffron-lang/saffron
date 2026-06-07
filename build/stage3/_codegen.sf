@@ -1652,19 +1652,9 @@ class Codegen {
             var rhs: String = this.gen_arg_value(right)
             if (right_type == "Any") { right_type = this.type_to_string(this.last_type) }
 
-            if (left_type == "String" or right_type == "String") {
-                var raw_bool: String = this.fresh_local()
-                if (op == "==") {
-                    this.emit_indent(raw_bool + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
-                } else {
-                    this.emit_indent(raw_bool + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
-                }
-                this.last_type = AST.Type.BoolType
-                var local: String = this.emit_tag_bool(raw_bool)
-                return local
-            }
-
             // Nil comparison: use __val_is_nil in NaN-boxing mode
+            // Must come before string comparison to handle cases like:
+            // map.get("missing") == nil where get returns "String" type but actual value is nil
             if (!this.identity_mode) {
                 var is_nil_cmp: Bool = false
                 if (left_type == "Nil") { is_nil_cmp = true }
@@ -1685,6 +1675,18 @@ class Codegen {
                     var local: String = this.emit_tag_bool(raw_bool)
                     return local
                 }
+            }
+
+            if (left_type == "String" or right_type == "String") {
+                var raw_bool: String = this.fresh_local()
+                if (op == "==") {
+                    this.emit_indent(raw_bool + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(raw_bool + " = call i64 @__string_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
             }
 
             // Any-typed equality: use __any_eq/__any_ne for deep comparison
@@ -10157,6 +10159,17 @@ class Codegen {
             this.last_type = this.make_list_str_type()
             return __mk_local
         }
+        if (__map_type_match and method == "values") {
+            this.called_functions.push("__map_values")
+            var __mv_local: String = this.fresh_local()
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(__mv_local, "i64", "__map_values", "i64 " + obj))
+            } else {
+                this.emit_indent(__mv_local + " = call i64 @__map_values(i64 " + obj + ")")
+            }
+            this.last_type = this.make_list_str_type()
+            return __mv_local
+        }
     }
 
     // --- String method dispatch (type-aware, replaces builtin_methods for String) ---
@@ -10762,6 +10775,58 @@ class Codegen {
             this.emit_indent(floored + " = call double @llvm.floor.f64(double " + dbl + ")")
             var as_int: String = this.fresh_local()
             this.emit_indent(as_int + " = fptosi double " + floored + " to i64")
+            var local: String = this.emit_tag_int(as_int)
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        this.last_type = AST.Type.IntType
+        return obj
+    }
+    if (!is_user_class and method == "ceil") {
+        if (obj_type == "Float") {
+            var dbl: String = this.emit_untag_float(obj)
+            var ceiled: String = this.fresh_local()
+            this.emit_indent(ceiled + " = call double @llvm.ceil.f64(double " + dbl + ")")
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = fptosi double " + ceiled + " to i64")
+            var local: String = this.emit_tag_int(as_int)
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        this.last_type = AST.Type.IntType
+        return obj
+    }
+    if (!is_user_class and method == "abs") {
+        if (obj_type == "Float") {
+            var dbl: String = this.emit_untag_float(obj)
+            var abs_val: String = this.fresh_local()
+            this.emit_indent(abs_val + " = call double @llvm.fabs.f64(double " + dbl + ")")
+            var local: String = this.emit_tag_float(abs_val)
+            this.last_type = AST.Type.FloatType
+            return local
+        }
+        if (obj_type == "Int") {
+            var raw: String = this.emit_untag_int(obj)
+            var neg: String = this.fresh_local()
+            this.emit_indent(neg + " = sub i64 0, " + raw)
+            var is_neg: String = this.fresh_local()
+            this.emit_indent(is_neg + " = icmp slt i64 " + raw + ", 0")
+            var abs_val: String = this.fresh_local()
+            this.emit_indent(abs_val + " = select i1 " + is_neg + ", i64 " + neg + ", i64 " + raw)
+            var local: String = this.emit_tag_int(abs_val)
+            this.last_type = AST.Type.IntType
+            return local
+        }
+        this.last_type = AST.Type.IntType
+        return obj
+    }
+    if (!is_user_class and method == "round") {
+        if (obj_type == "Float") {
+            var dbl: String = this.emit_untag_float(obj)
+            var rounded: String = this.fresh_local()
+            this.emit_indent(rounded + " = call double @llvm.round.f64(double " + dbl + ")")
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = fptosi double " + rounded + " to i64")
             var local: String = this.emit_tag_int(as_int)
             this.last_type = AST.Type.IntType
             return local
