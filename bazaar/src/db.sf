@@ -132,14 +132,14 @@ fun create_package(name: String, description: String, repository: String, licens
     var esc_d = description.replace("'", "''")
     var esc_r = repository.replace("'", "''")
     var esc_l = license.replace("'", "''")
-    _exec("INSERT INTO packages (name, description, repository, license) VALUES (''" + esc_n + "'', ''" + esc_d + "'', ''" + esc_r + "'', ''" + esc_l + "'')")
+    _exec("INSERT INTO packages (name, description, repository, license) VALUES ('" +esc_n + "', '" + esc_d + "', '" + esc_r + "', '" + esc_l + "')")
 }
 
 /// Update package description.
 fun update_package_description(name: String, description: String) {
     var esc_d = description.replace("'", "''")
     var esc_n = name.replace("'", "''")
-    _exec("UPDATE packages SET description = '" +esc_d + "'' WHERE name = '" +esc_n + "'")
+    _exec("UPDATE packages SET description = '" +esc_d + "' WHERE name = '" +esc_n + "'")
 }
 
 // ---------------------------------------------------------------------------
@@ -149,14 +149,14 @@ fun update_package_description(name: String, description: String) {
 /// Get all versions for a package.
 fun get_versions(package_name: String): List<Map<String, String>> {
     var esc_name = package_name.replace("'", "''")
-    return _query_all("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = '" +esc_name + "'' ORDER BY id")
+    return _query_all("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = '" +esc_name + "' ORDER BY id")
 }
 
 /// Get a specific version of a package.
 fun get_version(package_name: String, version: String): Map<String, String> {
     var esc_name = package_name.replace("'", "''")
     var esc_ver = version.replace("'", "''")
-    return _query_one("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = '" +esc_name + "'' AND version = '" +esc_ver + "'")
+    return _query_one("SELECT version, checksum, published_by, published_at, yanked FROM versions WHERE package_name = '" +esc_name + "' AND version = '" +esc_ver + "'")
 }
 
 /// Publish a new version.
@@ -165,14 +165,14 @@ fun publish_version(package_name: String, version: String, checksum: String, pub
     var esc_v = version.replace("'", "''")
     var esc_c = checksum.replace("'", "''")
     var esc_pb = published_by.replace("'", "''")
-    _exec("INSERT INTO versions (package_name, version, checksum, published_by) VALUES (''" + esc_pn + "'', ''" + esc_v + "'', ''" + esc_c + "'', ''" + esc_pb + "'')")
+    _exec("INSERT INTO versions (package_name, version, checksum, published_by) VALUES ('" +esc_pn + "', '" + esc_v + "', '" + esc_c + "', '" + esc_pb + "')")
 }
 
 /// Mark a version as yanked.
 fun yank_version(package_name: String, version: String) {
     var esc_pn = package_name.replace("'", "''")
     var esc_v = version.replace("'", "''")
-    _exec("UPDATE versions SET yanked = 1 WHERE package_name = '" +esc_pn + "'' AND version = '" +esc_v + "'")
+    _exec("UPDATE versions SET yanked = 1 WHERE package_name = '" +esc_pn + "' AND version = '" +esc_v + "'")
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fun yank_version(package_name: String, version: String) {
 fun record_download(package_name: String, version: String) {
     var esc_pn = package_name.replace("'", "''")
     var esc_v = version.replace("'", "''")
-    _exec("INSERT INTO downloads (package_name, version) VALUES (''" + esc_pn + "'', ''" + esc_v + "'')")
+    _exec("INSERT INTO downloads (package_name, version) VALUES ('" +esc_pn + "', '" + esc_v + "')")
     _exec("UPDATE packages SET total_downloads = total_downloads + 1 WHERE name = '" +esc_pn + "'")
 }
 
@@ -191,7 +191,7 @@ fun record_download(package_name: String, version: String) {
 fun get_download_count(package_name: String, version: String): Number {
     var esc_pn = package_name.replace("'", "''")
     var esc_v = version.replace("'", "''")
-    var row = _query_one("SELECT count(*) as cnt FROM downloads WHERE package_name = '" +esc_pn + "'' AND version = '" +esc_v + "'")
+    var row = _query_one("SELECT count(*) as cnt FROM downloads WHERE package_name = '" +esc_pn + "' AND version = '" +esc_v + "'")
     if (row == nil) { return 0 }
     return row.get("cnt").to_number()
 }
@@ -205,7 +205,7 @@ fun ensure_user(username: String): String {
     var esc_u = username.replace("'", "''")
     var row = _query_one("SELECT id FROM users WHERE username = '" +esc_u + "'")
     if (row != nil) { return row.get("id") }
-    _exec("INSERT OR IGNORE INTO users (username) VALUES (''" + esc_u + "'')")
+    _exec("INSERT OR IGNORE INTO users (username) VALUES ('" +esc_u + "')")
     var new_row = _query_one("SELECT id FROM users WHERE username = '" +esc_u + "'")
     if (new_row == nil) { return "0" }
     return new_row.get("id")
@@ -215,7 +215,7 @@ fun ensure_user(username: String): String {
 fun store_token(token_hash: String, user_id: String) {
     var esc_h = token_hash.replace("'", "''")
     var esc_uid = user_id.replace("'", "''")
-    _exec("INSERT INTO tokens (token_hash, user_id) VALUES (''" + esc_h + "'', ''" + esc_uid + "'')")
+    _exec("INSERT INTO tokens (token_hash, user_id) VALUES ('" +esc_h + "', '" + esc_uid + "')")
 }
 
 /// Validate a token hash. Returns the username if valid and not revoked, or "" if invalid.
@@ -240,14 +240,14 @@ fun revoke_token(token_hash: String) {
 fun add_owner(package_name: String, user_id: String) {
     var esc_pn = package_name.replace("'", "''")
     var esc_uid = user_id.replace("'", "''")
-    _exec("INSERT OR IGNORE INTO owners (package_name, user_id) VALUES (''" + esc_pn + "'', ''" + esc_uid + "'')")
+    _exec("INSERT OR IGNORE INTO owners (package_name, user_id) VALUES ('" +esc_pn + "', '" + esc_uid + "')")
 }
 
 /// Check if a user owns a package.
 fun is_owner(package_name: String, user_id: String): Bool {
     var esc_pn = package_name.replace("'", "''")
     var esc_uid = user_id.replace("'", "''")
-    var row = _query_one("SELECT 1 as ok FROM owners WHERE package_name = '" +esc_pn + "'' AND user_id = '" +esc_uid + "'")
+    var row = _query_one("SELECT 1 as ok FROM owners WHERE package_name = '" +esc_pn + "' AND user_id = '" +esc_uid + "'")
     return row != nil
 }
 
@@ -262,7 +262,7 @@ fun search(query: String, limit: String): List<Map<String, String>> {
         return list_packages()
     }
     var esc_q = query.replace("'", "''")
-    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p WHERE p.name LIKE ''%" + esc_q + "%'' OR p.description LIKE ''%" + esc_q + "%'' ORDER BY p.total_downloads DESC LIMIT " + limit)
+    return _query_all("SELECT p.name, p.description, p.total_downloads, (SELECT v.version FROM versions v WHERE v.package_name = p.name ORDER BY v.id DESC LIMIT 1) as latest FROM packages p WHERE p.name LIKE '%" + esc_q + "%' OR p.description LIKE '%" + esc_q + "%' ORDER BY p.total_downloads DESC LIMIT " + limit)
 }
 
 /// List packages with pagination.
