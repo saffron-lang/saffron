@@ -139,6 +139,11 @@ enum Mode {
 @extern("void js_push_state(void*)") fun _js_push_state(path: String)
 @extern("void* js_get_pathname()") fun _js_get_pathname(): String
 
+// DOM FFI — needed for reactive outlet rendering
+@extern("i64 js_dom_create_element(void*)") fun _rt_create(tag: String): Float
+@extern("void js_dom_append_child(i64, i64)") fun _rt_append(parent: Float, child: Float)
+@extern("void js_dom_set_inner_html(i64, void*)") fun _rt_set_html(handle: Float, html: String)
+
 class RouteDef {
     var pattern: String
     var handler: (RouteParams) => Nil
@@ -193,14 +198,23 @@ class Router {
         return RouteParams(current_path, {}, {})
     }
 
-    fun dispatch() {
-        var current_path: String = this.path.get()
+    fun dispatch(current_path: String) {
+        // Split path from query string
+        var path_part: String = current_path
+        var query_part: String = ""
+        var qmark: Float = current_path.index_of("?")
+        if (qmark >= 0) {
+            path_part = current_path.slice(0, qmark)
+            query_part = current_path.slice(qmark + 1, current_path.length())
+        }
+        var query: Map<String, String> = parse_query(query_part)
+
         var i: Float = 0
         while (i < this.routes.length()) {
             var r: RouteDef = this.routes[i]
-            var params: Map<String, String> = match_pattern(r.pattern, current_path)
+            var params: Map<String, String> = match_pattern(r.pattern, path_part)
             if (params != nil) {
-                r.handler(RouteParams(current_path, params, {}))
+                r.handler(RouteParams(current_path, params, query))
                 return
             }
             i = i + 1
@@ -208,8 +222,26 @@ class Router {
     }
 
     fun render() {
-        this.path.get()
-        this.dispatch()
+        // Create a persistent outlet element
+        var outlet: Float = _rt_create("div")
+        var parent: Float = _tc_current()
+        _rt_append(parent, outlet)
+
+        // Use effect to reactively re-render when path changes
+        var self = this
+        Sig.effect(fun () => {
+            var current_path: String = self.path.get()
+            // Clear outlet contents
+            _rt_set_html(outlet, "")
+            // Render matched route into outlet with tracking disabled
+            // (so signal reads inside page components don't subscribe to this effect)
+            var was: Bool = Sig._tracking
+            Sig._tracking = false
+            _tc_push(outlet)
+            self.dispatch(current_path)
+            _tc_pop()
+            Sig._tracking = was
+        })
     }
 
 
