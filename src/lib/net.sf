@@ -33,6 +33,7 @@
 //! var fd: Number = conn.raw_fd()
 //! ```
 
+import "@scheduler" as Scheduler
 // import "@dns" as DNS  // disabled: dns coroutine codegen crashes runtime
 
 // =============================================================================

@@ -4006,7 +4006,7 @@ class Codegen {
             this.collect_calls_from_stmts(body, lambda_calls)
             var lci: Float = 0
             while (lci < lambda_calls.length()) {
-                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci])) {
+                if (this.str_in_list(this.coroutine_funcs,lambda_calls[lci]) or this.str_in_list(this.coroutine_funcs,this.current_prefix + lambda_calls[lci]) or this.coro_method_match(lambda_calls[lci])) {
                     this.coroutine_funcs.push(lambda_name)
                     lci = lambda_calls.length()
                 }
@@ -4194,9 +4194,7 @@ class Codegen {
 
         // Check if this closure is a coroutine
         var is_coro: Bool = this.str_in_list(this.coroutine_funcs,name)
-        if (is_coro) {
-            this.is_coroutine = true
-        }
+        this.is_coroutine = is_coro
 
         var param_list: List<String> = []
         if (params.length() > 0) {
@@ -6977,6 +6975,39 @@ class Codegen {
                         mpi = mpi + 1
                     }
                 }
+            } else if (kind == "class") {
+                // Also scan class methods for yield / coroutine calls
+                var cls_name: String = ""
+                var cls_methods: List<AST.Stmt> = []
+                match (program[i]) {
+                    ClassDecl(cn, cp, cf, cm, cd) => {
+                        cls_name = cn
+                        cls_methods = cm
+                    }
+                }
+                var cmi: Float = 0
+                while (cmi < cls_methods.length()) {
+                    var mname: String = this.get_fun_name(cls_methods[cmi])
+                    var mbody: List<AST.Stmt> = this.get_fun_body(cls_methods[cmi])
+                    if (mname.length() > 0) {
+                        var mfull: String = this.current_prefix + cls_name + "__" + mname
+                        func_names.push(mfull)
+                        func_bodies.push(mbody)
+                        if (this.stmts_have_yield(mbody)) {
+                            this.coroutine_funcs.push(mfull)
+                            // Also push bare method name for cross-module matching
+                            if (!this.str_in_list(this.coroutine_funcs, mname)) {
+                                this.coroutine_funcs.push(mname)
+                            }
+                            // Push ClassName__method without prefix
+                            var unprefixed: String = cls_name + "__" + mname
+                            if (!this.str_in_list(this.coroutine_funcs, unprefixed)) {
+                                this.coroutine_funcs.push(unprefixed)
+                            }
+                        }
+                    }
+                    cmi = cmi + 1
+                }
             }
             i = i + 1
         }
@@ -6995,7 +7026,7 @@ class Codegen {
                     while (ci < calls.length()) {
                         var callee: String = calls[ci]
                         // Check both bare name and prefixed name
-                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee)) {
+                        if (this.str_in_list(this.coroutine_funcs,callee) or this.str_in_list(this.coroutine_funcs,this.current_prefix + callee) or this.coro_method_match(callee)) {
                             this.coroutine_funcs.push(fn_name)
                             changed = true
                             ci = calls.length()
@@ -7006,6 +7037,20 @@ class Codegen {
                 fi = fi + 1
             }
         }
+    }
+
+    fun coro_method_match(callee: String): Bool {
+        // Check if any known coroutine function ends with __callee
+        // This handles bare method names like "read" matching "stdlib_net_TcpConnection__read"
+        var suffix: String = "__" + callee
+        var k: Float = 0
+        while (k < this.coroutine_funcs.length()) {
+            if (this.coroutine_funcs[k].ends_with(suffix)) {
+                return true
+            }
+            k = k + 1
+        }
+        return false
     }
 
     fun str_in_list(lst: List<String>, needle: String): Bool {
@@ -7700,7 +7745,7 @@ class Codegen {
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc) or this.coro_method_match(bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 }
@@ -8462,7 +8507,9 @@ class Codegen {
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
-                    out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_raw = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_ptr = inttoptr i64 %__entry_raw to i8*\n")
+                    out.append("  %__entry_i64 = call i64 @__val_tag_ptr(i8* %__entry_ptr)\n")
                     out.append("  call i64 @" + enqueue_fn + "(i64 %__entry_i64)\n")
                     out.append("  call i64 @" + sched_fn + "()\n")
                     out.append("  ret i32 0\n")
@@ -8488,7 +8535,9 @@ class Codegen {
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
-                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  %__main_raw = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  %__main_ptr = inttoptr i64 %__main_raw to i8*\n")
+                        out.append("  %__main_i64 = call i64 @__val_tag_ptr(i8* %__main_ptr)\n")
                         out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
                         out.append("  call i64 @" + sched_fn2 + "()\n")
                         out.append("  ret i32 0\n")
@@ -9221,6 +9270,82 @@ class Codegen {
         }
     }
     this.called_functions.push(full_method)
+
+    // Coroutine-aware method call: if this function is a coroutine and the
+    // callee is also a coroutine, emit the await pattern instead of plain call.
+    if (this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
+        var mc_hdl: String = this.fresh_local()
+        this.emit_indent(mc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        var mc_hdl_i64: String = this.fresh_local()
+        this.emit_indent(mc_hdl_i64 + " = ptrtoint ptr " + mc_hdl + " to i64")
+        var mc_await_loop: String = this.fresh_label("await.loop")
+        var mc_await_yield: String = this.fresh_label("await.yield")
+        var mc_await_cleanup: String = this.fresh_label("await.cleanup")
+        var mc_await_done: String = this.fresh_label("await.done")
+        var mc_await_check: String = this.fresh_label("await.check")
+        this.emit_terminator("br label %" + mc_await_check)
+        this.start_block(mc_await_check)
+        var mc_done: String = this.fresh_local()
+        this.emit_indent(mc_done + " = call i64 @__sched_coro_done(i64 " + mc_hdl_i64 + ")")
+        var mc_done_cmp: String = this.fresh_local()
+        this.emit_indent(mc_done_cmp + " = icmp eq i64 " + mc_done + ", 1")
+        this.emit_terminator("br i1 " + mc_done_cmp + ", label %" + mc_await_done + ", label %" + mc_await_yield)
+        this.start_block(mc_await_yield)
+        var mc_save: String = this.fresh_local()
+        this.emit_indent(mc_save + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+        var mc_susp: String = this.fresh_local()
+        this.emit_indent(mc_susp + " = call i8 @llvm.coro.suspend(token " + mc_save + ", i1 false)")
+        this.emit_terminator("switch i8 " + mc_susp + ", label %__coro_suspend [i8 0, label %" + mc_await_loop + " i8 1, label %" + mc_await_cleanup + "]")
+        this.start_block(mc_await_cleanup)
+        this.emit_terminator("br label %__coro_cleanup")
+        this.start_block(mc_await_loop)
+        this.emit_indent("call void @__sched_coro_resume(i64 " + mc_hdl_i64 + ")")
+        this.emit_terminator("br label %" + mc_await_check)
+        this.start_block(mc_await_done)
+        var mc_result: String = this.fresh_local()
+        this.emit_indent(mc_result + " = load i64, i64* @__task_result")
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return mc_result
+    }
+
+    // Sync-calls-coro for method calls: non-coroutine calling a coroutine method
+    if (!this.is_coroutine and this.str_in_list(this.coroutine_funcs, full_method)) {
+        var sc_hdl: String = this.fresh_local()
+        this.emit_indent(sc_hdl + " = call ptr @" + full_method + "(" + arg_strs.join(", ") + ")")
+        var sc_i64: String = this.fresh_local()
+        this.emit_indent(sc_i64 + " = ptrtoint ptr " + sc_hdl + " to i64")
+        var sc_check: String = this.fresh_label("sync.check")
+        var sc_loop: String = this.fresh_label("sync.loop")
+        var sc_done: String = this.fresh_label("sync.done")
+        this.emit_terminator("br label %" + sc_check)
+        this.start_block(sc_check)
+        var sc_d: String = this.fresh_local()
+        this.emit_indent(sc_d + " = call i64 @__sched_coro_done(i64 " + sc_i64 + ")")
+        var sc_cmp: String = this.fresh_local()
+        this.emit_indent(sc_cmp + " = icmp eq i64 " + sc_d + ", 1")
+        this.emit_terminator("br i1 " + sc_cmp + ", label %" + sc_done + ", label %" + sc_loop)
+        this.start_block(sc_loop)
+        this.emit_indent("call void @__sched_coro_resume(i64 " + sc_i64 + ")")
+        this.emit_terminator("br label %" + sc_check)
+        this.start_block(sc_done)
+        var sc_result: String = this.fresh_local()
+        this.emit_indent(sc_result + " = load i64, i64* @__task_result")
+        if (this.func_ret_types.has(full_method)) {
+            this.last_type = this.func_ret_types.get(full_method)
+        } else if (this.func_ret_types.has(canonical)) {
+            this.last_type = this.func_ret_types.get(canonical)
+        } else {
+            this.last_type = AST.Type.IntType
+        }
+        return sc_result
+    }
+
     var local: String = this.fresh_local()
     if (this.use_llvm_lib) {
         this.emit_indent(this.lib_call(local, "i64", full_method, arg_strs.join(", ")))
@@ -9237,8 +9362,8 @@ class Codegen {
                 }
                 mc_ai = mc_ai + 1
             }
-            var mc_result: LLVMTypes.Value = this.llvm_block_builder.call(full_method, LLVMTypes.Type.I64, mc_arg_vals)
-            this.llvm_values.set(local, mc_result)
+            var mc_result2: LLVMTypes.Value = this.llvm_block_builder.call(full_method, LLVMTypes.Type.I64, mc_arg_vals)
+            this.llvm_values.set(local, mc_result2)
         }
     } else {
         this.emit_indent(local + " = call i64 @" + full_method + "(" + arg_strs.join(", ") + ")")

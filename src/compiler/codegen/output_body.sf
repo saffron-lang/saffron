@@ -242,7 +242,7 @@
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc) or this.coro_method_match(bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 }
@@ -1004,7 +1004,9 @@
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
-                    out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_raw = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_ptr = inttoptr i64 %__entry_raw to i8*\n")
+                    out.append("  %__entry_i64 = call i64 @__val_tag_ptr(i8* %__entry_ptr)\n")
                     out.append("  call i64 @" + enqueue_fn + "(i64 %__entry_i64)\n")
                     out.append("  call i64 @" + sched_fn + "()\n")
                     out.append("  ret i32 0\n")
@@ -1030,7 +1032,9 @@
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
-                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  %__main_raw = ptrtoint ptr %__main_hdl to i64\n")
+                        out.append("  %__main_ptr = inttoptr i64 %__main_raw to i8*\n")
+                        out.append("  %__main_i64 = call i64 @__val_tag_ptr(i8* %__main_ptr)\n")
                         out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
                         out.append("  call i64 @" + sched_fn2 + "()\n")
                         out.append("  ret i32 0\n")
