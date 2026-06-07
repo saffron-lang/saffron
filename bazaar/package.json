@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "test": "npx playwright test",
+    "test:api": "npx playwright test --project=api",
+    "test:frontend": "npx playwright test --project=frontend",
     "test:headed": "npx playwright test --headed"
   },
   "devDependencies": {
