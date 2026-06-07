@@ -1139,12 +1139,10 @@ class Codegen {
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
-                if (!this.typed_vars.has(name)) {
-                    if (this.module_globals.has(this.current_prefix + name)) {
-                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
-                    } else if (this.module_globals.has(name)) {
-                        var_ref = "@__g_" + this.sanitize_name(name)
-                    }
+                if (this.module_globals.has(this.current_prefix + name)) {
+                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                } else if (this.module_globals.has(name)) {
+                    var_ref = "@__g_" + this.sanitize_name(name)
                 }
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_load(local, "i64", var_ref))
@@ -1171,12 +1169,10 @@ class Codegen {
                 var val: String = this.gen_arg_value(value)
                 if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
-                    if (!this.typed_vars.has(name)) {
-                        if (this.module_globals.has(this.current_prefix + name)) {
-                            var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
-                        } else if (this.module_globals.has(name)) {
-                            var_ref = "@__g_" + this.sanitize_name(name)
-                        }
+                    if (this.module_globals.has(this.current_prefix + name)) {
+                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    } else if (this.module_globals.has(name)) {
+                        var_ref = "@__g_" + this.sanitize_name(name)
                     }
                     if (this.use_llvm_lib) {
                         this.emit_indent(this.lib_store(val, "i64", var_ref))
@@ -2330,12 +2326,10 @@ class Codegen {
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
-            if (!this.typed_vars.has(vname)) {
-                if (this.module_globals.has(this.current_prefix + vname)) {
-                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
-                } else if (this.module_globals.has(vname)) {
-                    var_ref = "@__g_" + this.sanitize_name(vname)
-                }
+            if (this.module_globals.has(this.current_prefix + vname)) {
+                var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
+            } else if (this.module_globals.has(vname)) {
+                var_ref = "@__g_" + this.sanitize_name(vname)
             }
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_load(local, "i64", var_ref))
@@ -8277,7 +8271,9 @@ class Codegen {
             }
             var vi: Float = 0
             while (vi < top_vars.length()) {
-                this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
+                if (!this.module_globals.has(this.current_prefix + top_vars[vi]) and !this.module_globals.has(top_vars[vi])) {
+                    this.emit_indent("%" + this.sanitize_name(top_vars[vi]) + " = alloca i64")
+                }
                 vi = vi + 1
             }
             if (!this.identity_mode) {
