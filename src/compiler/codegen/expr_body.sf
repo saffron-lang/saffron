@@ -660,6 +660,24 @@
                 return local
             }
 
+            // Float equality: untag both sides as float and compare at double level.
+            // Raw icmp eq fails when one value is int-tagged (0x7FF9...) and the
+            // other is float-tagged (after arithmetic), even if semantically equal.
+            if (left_type == "Float" or right_type == "Float") {
+                var lf: String = this.fresh_local()
+                this.emit_indent(lf + " = call double @__val_untag_float(i64 " + lhs + ")")
+                var rf: String = this.fresh_local()
+                this.emit_indent(rf + " = call double @__val_untag_float(i64 " + rhs + ")")
+                var cmp_local: String = this.fresh_local()
+                if (op == "==") { this.emit_indent(cmp_local + " = fcmp oeq double " + lf + ", " + rf) }
+                else { this.emit_indent(cmp_local + " = fcmp une double " + lf + ", " + rf) }
+                var raw_bool: String = this.fresh_local()
+                this.emit_indent(raw_bool + " = zext i1 " + cmp_local + " to i64")
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }

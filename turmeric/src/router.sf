@@ -50,9 +50,28 @@ class RouteParams {
 // Route pattern matching
 // =============================================================================
 
+fun _find_char(s: String, ch: String): Float {
+    // Find the first occurrence of a single character in a string
+    // Returns -1 if not found
+    var i: Float = 0
+    while (i < s.length()) {
+        if (s.slice(i, i + 1) == ch) {
+            return i
+        }
+        i = i + 1
+    }
+    return 0 - 1
+}
+
 fun split_path(path: String): List<String> {
+    // Strip query string before splitting on "/"
+    var clean: String = path
+    var qpos: Float = _find_char(path, "?")
+    if (qpos >= 0) {
+        clean = path.slice(0, qpos)
+    }
     var segments: List<String> = []
-    var parts: List<String> = path.split("/")
+    var parts: List<String> = clean.split("/")
     var i: Float = 0
     while (i < parts.length()) {
         if (parts[i].length() > 0) {
@@ -72,9 +91,23 @@ fun parse_query(qs: String): Map<String, String> {
     var i: Float = 0
     while (i < pairs.length()) {
         var pair: String = pairs[i]
-        var eq: Float = pair.index_of("=")
-        if (eq > 0) {
-            result.set(pair.slice(0, eq), pair.slice(eq + 1, pair.length()))
+        if (pair.contains("=")) {
+            // Split on first "=" only: key is before, value is everything after
+            var kv: List<String> = pair.split("=")
+            var key: String = kv[0]
+            var val: String = ""
+            if (kv.length() > 1) {
+                // Rejoin remaining parts with "=" for values containing "="
+                var vi: Float = 1
+                while (vi < kv.length()) {
+                    if (vi > 1) { val = val + "=" }
+                    val = val + kv[vi]
+                    vi = vi + 1
+                }
+            }
+            if (key.length() > 0) {
+                result.set(key, val)
+            }
         }
         i = i + 1
     }
@@ -140,9 +173,8 @@ enum Mode {
 @extern("void* js_get_pathname()") fun _js_get_pathname(): String
 
 // DOM FFI — needed for reactive outlet rendering
-@extern("i64 js_dom_create_element(void*)") fun _rt_create(tag: String): Float
-@extern("void js_dom_append_child(i64, i64)") fun _rt_append(parent: Float, child: Float)
 @extern("void js_dom_set_inner_html(i64, void*)") fun _rt_set_html(handle: Float, html: String)
+@extern("i64 js_dom_query_selector(void*)") fun _rt_query(selector: String): Float
 
 class RouteDef {
     var pattern: String
@@ -153,6 +185,8 @@ class RouteDef {
         this.handler = handler
     }
 }
+
+var _router_container: Float = 0
 
 class Router {
     var mode: Mode
@@ -173,7 +207,10 @@ class Router {
 
     fun go(url: String) {
         _js_set_hash(url)
-        this.path.set(url)
+        if (_router_container > 0) {
+            _rt_set_html(_router_container, "")
+            this.dispatch(url)
+        }
     }
 
     fun current(): String {
@@ -186,26 +223,13 @@ class Router {
 
     fun resolve(): RouteParams {
         var current_path: String = this.path.get()
-        var i: Float = 0
-        while (i < this.routes.length()) {
-            var r: RouteDef = this.routes[i]
-            var params: Map<String, String> = match_pattern(r.pattern, current_path)
-            if (params != nil) {
-                return RouteParams(current_path, params, {})
-            }
-            i = i + 1
-        }
-        return RouteParams(current_path, {}, {})
-    }
-
-    fun dispatch(current_path: String) {
         // Split path from query string
         var path_part: String = current_path
         var query_part: String = ""
-        var qmark: Float = current_path.index_of("?")
-        if (qmark >= 0) {
-            path_part = current_path.slice(0, qmark)
-            query_part = current_path.slice(qmark + 1, current_path.length())
+        var qs_parts: List<String> = current_path.split("?")
+        if (qs_parts.length() > 1) {
+            path_part = qs_parts[0]
+            query_part = qs_parts[1]
         }
         var query: Map<String, String> = parse_query(query_part)
 
@@ -214,6 +238,32 @@ class Router {
             var r: RouteDef = this.routes[i]
             var params: Map<String, String> = match_pattern(r.pattern, path_part)
             if (params != nil) {
+                return RouteParams(current_path, params, query)
+            }
+            i = i + 1
+        }
+        return RouteParams(current_path, {}, query)
+    }
+
+    fun dispatch(current_path: String) {
+        // Extract query string
+        var query_part: String = ""
+        var qi: Float = 0
+        while (qi < current_path.length()) {
+            if (current_path.char_at(qi) == "?") {
+                query_part = current_path.slice(qi + 1, current_path.length())
+                qi = current_path.length()
+            }
+            qi = qi + 1
+        }
+        var query: Map<String, String> = parse_query(query_part)
+
+        // match_pattern uses split_path which strips query automatically
+        var i: Float = 0
+        while (i < this.routes.length()) {
+            var r: RouteDef = this.routes[i]
+            var params: Map<String, String> = match_pattern(r.pattern, current_path)
+            if (params != nil) {
                 r.handler(RouteParams(current_path, params, query))
                 return
             }
@@ -221,32 +271,42 @@ class Router {
         }
     }
 
-    fun render() {
-        // Create a persistent outlet element
-        var outlet: Float = _rt_create("div")
-        var parent: Float = _tc_current()
-        _rt_append(parent, outlet)
+    fun render(selector: String = "#app") {
+        // Query the container element that will serve as the router outlet
+        _router_container = _rt_query(selector)
 
-        // Use effect to reactively re-render when path changes
-        var self = this
-        Sig.effect(fun () => {
-            var current_path: String = self.path.get()
-            // Clear outlet contents
-            _rt_set_html(outlet, "")
-            // Render matched route into outlet with tracking disabled
-            // (so signal reads inside page components don't subscribe to this effect)
-            var was: Bool = Sig._tracking
-            Sig._tracking = false
-            _tc_push(outlet)
-            self.dispatch(current_path)
-            _tc_pop()
-            Sig._tracking = was
-        })
+        // Render the initial route
+        var initial_path: String = this.path.value
+        _rt_set_html(_router_container, "")
+        this.dispatch(initial_path)
     }
 
 
     fun _on_external_change() {
-        this.path.set(_js_get_hash())
+        var hash: String = _js_get_hash()
+        // Normalize: ensure path starts with /
+        if (!hash.starts_with("/")) {
+            hash = "/" + hash
+        }
+        // Re-render with the new path from the URL
+        this.path.value = hash
+        if (_router_container > 0) {
+            _rt_set_html(_router_container, "")
+            this.dispatch(hash)
+        }
+    }
+}
+
+// =============================================================================
+// Global router instance — for __on_navigate export
+// =============================================================================
+
+var _active_router: Router = nil
+
+// Called from JS on hashchange/popstate (auto-exported via __ prefix)
+fun __on_navigate() {
+    if (_active_router != nil) {
+        _active_router._on_external_change()
     }
 }
 
@@ -257,16 +317,23 @@ class Router {
 fun hash(): Router {
     var initial: String = _js_get_hash()
     if (initial.length() == 0) { initial = "/" }
-    return Router(Mode.Hash, initial)
+    if (!initial.starts_with("/")) { initial = "/" + initial }
+    var r: Router = Router(Mode.Hash, initial)
+    _active_router = r
+    return r
 }
 
 fun history(): Router {
     var initial: String = _js_get_pathname()
-    return Router(Mode.History, initial)
+    var r: Router = Router(Mode.History, initial)
+    _active_router = r
+    return r
 }
 
 fun memory(initial: String): Router {
-    return Router(Mode.Memory, initial)
+    var r: Router = Router(Mode.Memory, initial)
+    _active_router = r
+    return r
 }
 
 // =============================================================================
@@ -284,9 +351,9 @@ fun memory(initial: String): Router {
 
 fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String = "", block: () => Nil = nil) {
     var href: String = to
-    if (r._mode == Mode.Hash) {
+    if (r.mode == Mode.Hash) {
         href = "#" + to
-    } else if (r._mode == Mode.Memory) {
+    } else if (r.mode == Mode.Memory) {
         href = "javascript:void(0)"
     }
     a(cls=cls, id=id, style=style, href=href, block=block)

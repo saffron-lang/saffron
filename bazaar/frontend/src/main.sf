@@ -405,7 +405,7 @@ fun PackageDetailPage() {
 // =============================================================================
 
 fun App() {
-    router.render()
+    router.render("#app")
 }
 
 router.route("/", fun (p: Router.RouteParams) => HomePage())

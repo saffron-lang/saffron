@@ -1707,6 +1707,7 @@
             }
             if (method == "index_of") {
                 this.called_functions.push("rt_str_index_of")
+                this.called_function_arity.set("rt_str_index_of", 2)
                 var __si_arg: String = this.gen_arg_value(args[0])
                 var __si_local: String = this.fresh_local()
                 if (this.use_llvm_lib) {
@@ -1720,6 +1721,7 @@
             }
             if (method == "repeat") {
                 this.called_functions.push("rt_str_repeat")
+                this.called_function_arity.set("rt_str_repeat", 2)
                 var __sr_arg: String = this.gen_arg_value(args[0])
                 var __sr_local: String = this.fresh_local()
                 if (this.use_llvm_lib) {
@@ -2802,6 +2804,16 @@
     }
 
     fun gen_set_field(object: AST.Expr, field: String, value: AST.Expr): String {
+    // Check for module global write: ModuleAlias._field = value
+    var sf_obj_name: String = this.get_variable_name(object)
+    if (sf_obj_name.length() > 0 and this.module_prefixes.has(sf_obj_name)) {
+        var sf_mp_resolved: String = this.module_prefixes.get(sf_obj_name) + field
+        if (this.module_globals.has(sf_mp_resolved)) {
+            var sf_val: String = this.gen_arg_value(value)
+            this.emit_indent("store i64 " + sf_val + ", i64* @__g_" + this.sanitize_name(sf_mp_resolved))
+            return sf_val
+        }
+    }
     var obj_val: String = this.gen_arg_value(object)
     var class_name: String = this.type_to_string(this.last_type)
     if (class_name == "Int" or class_name == "Any" or !this.class_fields.has(class_name)) {
