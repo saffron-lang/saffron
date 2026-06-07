@@ -40,11 +40,11 @@ var val2 = match (y) {
 }
 Test.assert_eq(val2, -1, "enum None match")
 
-// BUG: Enum data extraction is broken. All of the following fail:
-// - Numeric extraction returns garbage (NaN-boxed pointer)
-// - String extraction returns garbage (NaN-boxed pointer)
-// - With 2 enums, extraction returns the wrong enum's match value
-// - With 3+ enums using extraction, runtime segfaults
+// BUG: Enum data extraction is broken in NaN-box mode.
+// The simple encoding (tag << 56 | value) corrupts NaN-boxed values because
+// the OR operation overwrites the NaN-box tag bits in the upper 8 bits.
+// Fix requires either: untagging before enum storage, or using array encoding
+// for all enums in NaN-box mode.
 //
 // Leaving one test to document the bug without crashing:
 var x = Option.Some(42)
