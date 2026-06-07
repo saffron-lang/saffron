@@ -102,3 +102,18 @@ test('search triggers route change', async ({ page }) => {
     expect(url).toContain('search');
     expect(url).toContain('q=hello');
 });
+
+test('search navigation renders search results page', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(1000);
+
+    const input = page.locator('input[placeholder*="Search"]').first();
+    await input.fill('mypackage');
+    await input.press('Enter');
+    await page.waitForTimeout(2000);
+
+    // Router should re-render: search results page replaces home page
+    const text = await page.locator('#app').textContent();
+    expect(text).toContain('Search results');
+    expect(text).toContain('mypackage');
+});
