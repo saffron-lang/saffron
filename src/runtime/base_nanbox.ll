@@ -249,9 +249,9 @@ entry:
 
 define double @__val_untag_float(i64 %v) {
 entry:
-  ; Check if value has int tag (top 16 bits == 0x7FF8)
+  ; Check if value has int tag (top 16 bits == 0x7FF9)
   %tag_bits = lshr i64 %v, 48
-  %is_int = icmp eq i64 %tag_bits, 32760
+  %is_int = icmp eq i64 %tag_bits, 32761
   br i1 %is_int, label %convert_int, label %as_float
 convert_int:
   ; Extract int payload (sign-extend from 48 bits) and convert to double
@@ -446,6 +446,62 @@ not_equal:
 define i64 @__string_ne(i64 %a, i64 %b) {
 entry:
   %eq = call i64 @__string_eq(i64 %a, i64 %b)
+  %ne = xor i64 %eq, 1
+  ret i64 %ne
+}
+
+; =============================================================================
+; __any_eq — Deep equality for Any-typed values
+; =============================================================================
+; When both operands are typed as Any, raw i64 equality (icmp eq) is wrong for
+; heap-allocated strings: two strings with the same content but different
+; allocations would compare unequal. This function checks NaN-box tags and
+; dispatches to strcmp for pointer-tagged values that are strings.
+;
+; Returns 1 (equal) or 0 (not equal) as i64.
+define i64 @__any_eq(i64 %a, i64 %b) {
+entry:
+  ; Fast path: bitwise-identical values are always equal
+  %same = icmp eq i64 %a, %b
+  br i1 %same, label %equal, label %check_tags
+
+check_tags:
+  ; Check if both are pointer-tagged (upper 16 bits == 0x7FF8)
+  %a_upper = lshr i64 %a, 48
+  %b_upper = lshr i64 %b, 48
+  %a_is_ptr = icmp eq i64 %a_upper, 32760
+  %b_is_ptr = icmp eq i64 %b_upper, 32760
+  %both_ptr = and i1 %a_is_ptr, %b_is_ptr
+  br i1 %both_ptr, label %ptr_compare, label %not_equal
+
+ptr_compare:
+  ; Both are pointer-tagged — do strcmp (works for strings; for non-string
+  ; heap objects with same content this is a safe conservative comparison
+  ; since different object types will have different byte prefixes)
+  %a_raw = call i8* @__val_untag_ptr(i64 %a)
+  %b_raw = call i8* @__val_untag_ptr(i64 %b)
+  %a_null = icmp eq i8* %a_raw, null
+  br i1 %a_null, label %not_equal, label %check_b_null
+
+check_b_null:
+  %b_null = icmp eq i8* %b_raw, null
+  br i1 %b_null, label %not_equal, label %do_strcmp
+
+do_strcmp:
+  %cmp = call i32 @strcmp(i8* %a_raw, i8* %b_raw)
+  %is_eq = icmp eq i32 %cmp, 0
+  br i1 %is_eq, label %equal, label %not_equal
+
+equal:
+  ret i64 1
+not_equal:
+  ret i64 0
+}
+
+; __any_ne: Deep inequality for Any-typed values (complement of __any_eq)
+define i64 @__any_ne(i64 %a, i64 %b) {
+entry:
+  %eq = call i64 @__any_eq(i64 %a, i64 %b)
   %ne = xor i64 %eq, 1
   ret i64 %ne
 }

@@ -1687,6 +1687,20 @@ class Codegen {
                 }
             }
 
+            // Any-typed equality: use __any_eq/__any_ne for deep comparison
+            // (handles strings with different pointers but same content)
+            if (left_type == "Any" or right_type == "Any") {
+                var raw_bool: String = this.fresh_local()
+                if (op == "==") {
+                    this.emit_indent(raw_bool + " = call i64 @__any_eq(i64 " + lhs + ", i64 " + rhs + ")")
+                } else {
+                    this.emit_indent(raw_bool + " = call i64 @__any_ne(i64 " + lhs + ", i64 " + rhs + ")")
+                }
+                this.last_type = AST.Type.BoolType
+                var local: String = this.emit_tag_bool(raw_bool)
+                return local
+            }
+
             // Integer comparison (tagged values compare equal correctly)
             var cmp_local: String = this.fresh_local()
             if (op == "==") { this.emit_indent(cmp_local + " = icmp eq i64 " + lhs + ", " + rhs) }
@@ -2496,10 +2510,20 @@ class Codegen {
     }
 
     fun gen_unary(op: String, right: AST.Expr): String {
+        var right_type: String = this.get_expr_type(right)
         var rhs: String = this.gen_arg_value(right)
 
         if (op == "-") {
-            // NaN-boxed negation: untag → negate → retag
+            if (right_type == "Float") {
+                // Float negation: untag as double, fsub from 0.0, retag
+                var raw_f: String = this.emit_untag_float(rhs)
+                var negated: String = this.fresh_local()
+                this.emit_indent(negated + " = fsub double 0.0, " + raw_f)
+                var local: String = this.emit_tag_float(negated)
+                this.last_type = AST.Type.FloatType
+                return local
+            }
+            // NaN-boxed integer negation: untag → negate → retag
             var raw: String = this.emit_untag_int(rhs)
             var negated: String = this.fresh_local()
             this.emit_indent(negated + " = sub i64 0, " + raw)
@@ -8314,6 +8338,8 @@ class Codegen {
         out.append("declare i64 @__float_to_string(i64)\n")
         out.append("declare i64 @__string_eq(i64, i64)\n")
         out.append("declare i64 @__string_ne(i64, i64)\n")
+        out.append("declare i64 @__any_eq(i64, i64)\n")
+        out.append("declare i64 @__any_ne(i64, i64)\n")
         out.append("declare i64 @__string_intern(i64)\n")
         if (!this.identity_mode) {
             out.append("; --- NaN-boxing value helpers ---\n")
@@ -10645,34 +10671,44 @@ class Codegen {
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "String") {
             this.last_type = AST.Type.StringType
             return obj
         } else if (obj_type == "Float") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__float_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "Bool") {
             var raw: String = this.emit_untag_bool(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + raw + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type.starts_with("List")) {
             this.called_functions.push("__list_to_string")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__list_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type.starts_with("Map")) {
             var const_name: String = this.add_string_constant("[Map]")
             var gep: String = this.fresh_local()
@@ -11045,8 +11081,10 @@ class Codegen {
             var ts_func: String = obj_type + "__to_string"
             var ts_local: String = this.fresh_local()
             this.emit_indent(ts_local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            var ts_tagged_e: String = this.fresh_local()
+            this.emit_indent(ts_tagged_e + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
             this.last_type = AST.Type.StringType
-            return ts_local
+            return ts_tagged_e
         }
         var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()
