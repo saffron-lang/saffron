@@ -3617,22 +3617,17 @@ class Codegen {
         var key: String = enum_name + "." + variant
         var tag: Float = this.enum_variant_tags.get(key)
 
-        // Check if this enum uses simple encoding (max 1 field) or array encoding
+        // Check if this enum uses simple encoding (no fields) or array encoding
         var max_fields: Float = this.get_max_fields(enum_name)
 
-        if (max_fields <= 1) {
-            // Simple encoding: (tag << 56) | value
+        if (max_fields == 0) {
+            // Simple encoding for enums with no data fields at all: tag << 56
             if (args.length() == 0) {
                 var local: String = this.fresh_local()
                 this.emit_indent(local + " = shl i64 " + tag.floor().to_string() + ", 56")
                 this.last_type = AST.Type.EnumType(enum_name); return local
             }
-            var val: String = this.gen_arg_value(args[0])
-            var tag_shifted: String = this.fresh_local()
-            this.emit_indent(tag_shifted + " = shl i64 " + tag.floor().to_string() + ", 56")
-            var combined: String = this.fresh_local()
-            this.emit_indent(combined + " = or i64 " + tag_shifted + ", " + val)
-            this.last_type = AST.Type.EnumType(enum_name); return combined
+            // Shouldn't happen (max_fields==0 but args>0), fall through to array encoding
         }
 
         // Array encoding for enums with multi-field variants: [tag, f0, f1, ...]
@@ -3760,19 +3755,12 @@ class Codegen {
 
         // If enum not found, just generate the first arm's body as default
         if (enum_name == "Unknown") {
-            // Unknown enum — extract bindings from subject
+            // Unknown enum — extract bindings from subject using array encoding
             var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
                 _ => []
             }
-            if (first_bindings.length() == 1) {
-                // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF, retag
-                var bname: String = first_bindings[0]
-                var raw: String = this.fresh_local()
-                this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-                var extracted: String = this.emit_tag_int(raw)
-                this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-            } else if (first_bindings.length() > 1) {
-                // Multi-field variant: inttoptr → GEP for each binding
+            if (first_bindings.length() >= 1) {
+                // Array encoding: inttoptr → GEP for each binding
                 var num_slots: Float = first_bindings.length() + 1
                 var total_str: String = num_slots.floor().to_string()
                 var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
@@ -3808,13 +3796,13 @@ class Codegen {
 
         // Extract tag based on encoding
         var tag_val: String = this.fresh_local()
-        if (max_fields <= 1) {
-            // Single-field or no-field: (tag << 56) | value encoding
+        if (max_fields == 0) {
+            // No-data enum: tag << 56 encoding
             var tag_shifted: String = this.fresh_local()
             this.emit_indent(tag_shifted + " = lshr i64 " + subj + ", 56")
             this.emit_indent(tag_val + " = trunc i64 " + tag_shifted + " to i8")
         } else {
-            // Multi-field: ptrtoint encoding, tag at array[0]
+            // Enum with data: heap-allocated array encoding, tag at array[0]
             var arr_ptr: String = this.val_to_typed_ptr(subj, "i64*")
             var tag_i64: String = this.fresh_local()
             this.emit_indent(tag_i64 + " = load i64, i64* " + arr_ptr)
@@ -3910,25 +3898,17 @@ class Codegen {
 
     fun extract_arm_bindings(bindings: List<String>, subj: String, max_fields: Float) {
         var bind_count: Float = bindings.length()
-        if (max_fields <= 1) {
-            // Simple encoding: extract raw value with AND mask, then retag as int
-            var bname: String = bindings[0]
-            var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = and i64 " + subj + ", 72057594037927935")
-            var extracted: String = this.emit_tag_int(raw)
-            this.emit_indent("store i64 " + extracted + ", i64* %" + this.sanitize_name(bname))
-        } else {
-            // Array encoding: inttoptr and GEP to extract fields
-            var total: Float = bind_count + 1
-            var total_str: String = total.floor().to_string()
-            var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
-            // Extract each field individually to avoid VM loop variable bug
-            if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
-            if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
-            if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
-            if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
-            if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
-        }
+        // Always use array encoding: inttoptr and GEP to extract fields
+        // (max_fields >= 1 means heap-allocated [tag, field0, field1, ...])
+        var total: Float = bind_count + 1
+        var total_str: String = total.floor().to_string()
+        var arr_ptr: String = this.val_to_typed_ptr(subj, "[" + total_str + " x i64]*")
+        // Extract each field individually to avoid VM loop variable bug
+        if (bind_count >= 1) { this.extract_one_field(bindings[0], arr_ptr, total_str, 1) }
+        if (bind_count >= 2) { this.extract_one_field(bindings[1], arr_ptr, total_str, 2) }
+        if (bind_count >= 3) { this.extract_one_field(bindings[2], arr_ptr, total_str, 3) }
+        if (bind_count >= 4) { this.extract_one_field(bindings[3], arr_ptr, total_str, 4) }
+        if (bind_count >= 5) { this.extract_one_field(bindings[4], arr_ptr, total_str, 5) }
     }
 
     fun extract_one_field(bname: String, arr_ptr: String, total_str: String, idx: Float) {
@@ -4254,8 +4234,9 @@ class Codegen {
             i = i + 1
         }
 
-        // Extract capture VALUES from __env
-        // Env stores the actual i64 values of captured variables (copy semantics)
+        // Extract capture POINTERS from __env (reference semantics)
+        // Env stores the actual i64 values of captured variables — we point directly
+        // at the env slots so mutations persist between closure calls.
         var env_size: Float = captures.length()
         var env_int: String = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
@@ -4263,13 +4244,8 @@ class Codegen {
         var ci: Float = 0
         while (ci < captures.length()) {
             var cap_name: String = captures[ci]
-            var cap_slot: String = this.fresh_local()
-            this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-            var cap_val: String = this.fresh_local()
-            this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
-            // Allocate local storage for captured variable and initialize with env value
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
-            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
+            // Point directly at the env slot — no alloca, no copy
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
             // Register captured variable in typed_vars
             // Use the outer scope's type if available (preserves generic class types)
             if (outer_typed_vars.has(cap_name)) {

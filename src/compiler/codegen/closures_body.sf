@@ -269,8 +269,9 @@
             i = i + 1
         }
 
-        // Extract capture VALUES from __env
-        // Env stores the actual i64 values of captured variables (copy semantics)
+        // Extract capture POINTERS from __env (reference semantics)
+        // Env stores the actual i64 values of captured variables — we point directly
+        // at the env slots so mutations persist between closure calls.
         var env_size: Float = captures.length()
         var env_int: String = this.fresh_local()
         this.emit_indent(env_int + " = load i64, i64* %__env")
@@ -278,13 +279,8 @@
         var ci: Float = 0
         while (ci < captures.length()) {
             var cap_name: String = captures[ci]
-            var cap_slot: String = this.fresh_local()
-            this.emit_indent(cap_slot + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
-            var cap_val: String = this.fresh_local()
-            this.emit_indent(cap_val + " = load i64, i64* " + cap_slot)
-            // Allocate local storage for captured variable and initialize with env value
-            this.emit_indent("%" + this.sanitize_name(cap_name) + " = alloca i64")
-            this.emit_indent("store i64 " + cap_val + ", i64* %" + this.sanitize_name(cap_name))
+            // Point directly at the env slot — no alloca, no copy
+            this.emit_indent("%" + this.sanitize_name(cap_name) + " = getelementptr [" + env_size.floor().to_string() + " x i64], [" + env_size.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
             // Register captured variable in typed_vars
             // Use the outer scope's type if available (preserves generic class types)
             if (outer_typed_vars.has(cap_name)) {
