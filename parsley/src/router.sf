@@ -93,23 +93,39 @@ class ApiRouter {
             var h = ep.handler
             if (ep.method == "GET") {
                 app.get(ep.path, fun (req: Http.Request): Http.Response => {
-                    var result = h(req)
-                    return Http.json(JSON.to_string(result))
+                    try {
+                        var result = h(req)
+                        return Http.json(JSON.to_string(result))
+                    } catch (e) {
+                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
+                    }
                 })
             } else if (ep.method == "POST") {
                 app.post(ep.path, fun (req: Http.Request): Http.Response => {
-                    var result = h(req)
-                    return Http.json(JSON.to_string(result))
+                    try {
+                        var result = h(req)
+                        return Http.json(JSON.to_string(result))
+                    } catch (e) {
+                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
+                    }
                 })
             } else if (ep.method == "PUT") {
                 app.put(ep.path, fun (req: Http.Request): Http.Response => {
-                    var result = h(req)
-                    return Http.json(JSON.to_string(result))
+                    try {
+                        var result = h(req)
+                        return Http.json(JSON.to_string(result))
+                    } catch (e) {
+                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
+                    }
                 })
             } else if (ep.method == "DELETE") {
                 app.delete(ep.path, fun (req: Http.Request): Http.Response => {
-                    var result = h(req)
-                    return Http.json(JSON.to_string(result))
+                    try {
+                        var result = h(req)
+                        return Http.json(JSON.to_string(result))
+                    } catch (e) {
+                        return Http.Response(500, "{\"error\":\"" + e.to_string() + "\"}").header("Content-Type", "application/json")
+                    }
                 })
             }
             i = i + 1

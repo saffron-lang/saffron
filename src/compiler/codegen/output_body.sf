@@ -242,7 +242,7 @@
             var bci: Float = 0
             while (bci < body_calls.length()) {
                 var bc: String = body_calls[bci]
-                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc) or this.coro_method_match(bc)) {
+                if (this.str_in_list(this.coroutine_funcs,bc) or this.str_in_list(this.coroutine_funcs,this.current_prefix + bc)) {
                     is_coro = true
                     bci = body_calls.length()
                 }
