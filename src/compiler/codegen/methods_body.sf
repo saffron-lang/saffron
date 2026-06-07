@@ -2156,34 +2156,44 @@
         if (obj_type == "StringBuilder" or obj_type == "SB") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__sb_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "String") {
             this.last_type = AST.Type.StringType
             return obj
         } else if (obj_type == "Float") {
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__float_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "Bool") {
             var raw: String = this.emit_untag_bool(obj)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + raw + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (this.enum_defs.has(obj_type)) {
             var ts_func: String = obj_type + "__to_string"
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type.starts_with("List")) {
             this.called_functions.push("__list_to_string")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__list_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type.starts_with("Map")) {
             var const_name: String = this.add_string_constant("[Map]")
             var gep: String = this.fresh_local()
@@ -2556,8 +2566,10 @@
             var ts_func: String = obj_type + "__to_string"
             var ts_local: String = this.fresh_local()
             this.emit_indent(ts_local + " = call i64 @" + ts_func + "(i64 " + obj + ")")
+            var ts_tagged_e: String = this.fresh_local()
+            this.emit_indent(ts_tagged_e + " = call i64 @__rt_tag_ptr(i64 " + ts_local + ")")
             this.last_type = AST.Type.StringType
-            return ts_local
+            return ts_tagged_e
         }
         var ts_raw: String = this.emit_untag_int(obj)
         var ts_local: String = this.fresh_local()

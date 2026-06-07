@@ -70,20 +70,18 @@ try {
 }
 Test.assert_eq(outer_catch, "rethrown: inner", "nested try/catch rethrow")
 
-// Recursion (NOTE: recursive functions cause bus error/segfault at runtime)
-// These are commented out to allow the rest of the test to run.
-// BUG: any recursive function call crashes with Bus error: 10
-// fun factorial(n: Float): Float {
-//     if (n <= 1) { return 1 }
-//     return n * factorial(n - 1)
-// }
-// Test.assert_eq(factorial(5), 120, "recursion factorial")
-// Test.assert_eq(factorial(0), 1, "recursion base case")
-//
-// fun fib(n: Float): Float {
-//     if (n <= 1) { return n }
-//     return fib(n - 1) + fib(n - 2)
-// }
-// Test.assert_eq(fib(10), 55, "fibonacci")
+// Recursion
+fun factorial(n: Int): Int {
+    if (n <= 1) { return 1 }
+    return n * factorial(n - 1)
+}
+Test.assert_eq(factorial(5), 120, "recursion factorial")
+Test.assert_eq(factorial(0), 1, "recursion base case")
+
+fun fib(n: Int): Int {
+    if (n <= 1) { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+Test.assert_eq(fib(10), 55, "fibonacci")
 
 Test.summary()
