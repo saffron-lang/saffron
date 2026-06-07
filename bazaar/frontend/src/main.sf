@@ -23,10 +23,26 @@ var auth_username_global = signal("")
 var packages_query = Api.getPackages()
 var search_q = signal("")
 var detail_name_sig = signal("")
+var _detail_name_raw: String = ""
 
 // Derived queries (re-created when params change)
 var search_results_query = signal(nil)
 var detail_query = signal(nil)
+
+// Login page state (module-level to avoid closure forward-reference bug)
+var login_username_input = signal("")
+var login_auth_error = signal("")
+var login_auth_token_display = signal("")
+var login_is_loading = signal(false)
+
+// Publish page state (module-level to avoid closure forward-reference bug)
+var publish_pkg_name = signal("")
+var publish_pkg_version = signal("")
+var publish_pkg_description = signal("")
+var publish_pkg_tarball = signal("")
+var publish_error = signal("")
+var publish_success = signal("")
+var publish_is_loading = signal(false)
 
 // =============================================================================
 // Actions
@@ -423,15 +439,132 @@ fun SearchResultsPage() {
 // Pages — Package Detail
 // =============================================================================
 
+fun PackageDetailContent(pkg_name: String, data: Any, description: String, latest: String, versions: List<Any>) {
+    var display_name: String = pkg_name
+    if (display_name.length() == 0) { display_name = "unknown-pkg" }
+    var license_str: String = ""
+    if (data.has("license")) { license_str = data.get("license").to_string() }
+    var downloads_str: String = ""
+    if (data.has("total_downloads")) { downloads_str = data.get("total_downloads").to_string() }
+    var ver_count_str: String = versions.length().to_string()
+
+    <div cls="pkg-header">
+        <div cls="pkg-header-inner">
+            <div cls="pkg-header-top">
+                <div cls="pkg-header-ico">{text(display_name.char_at(0))}</div>
+                <div>
+                    <div cls="pkg-header-title-row">
+                        <h1 cls="pkg-header-title">{text(display_name)}</h1>
+                        <span cls="ver">{text(latest)}</span>
+                    </div>
+                    {if (description.length() > 0) {
+                        <p cls="pkg-header-desc">{text(description)}</p>
+                    }}
+                    <div cls="pkg-header-stats">
+                        <span cls="pkg-hstat">{text("License: " + license_str)}</span>
+                        <span cls="pkg-hstat-sep">{text("·")}</span>
+                        <span cls="pkg-hstat">{text(ver_count_str + " versions")}</span>
+                        <span cls="pkg-hstat-sep">{text("·")}</span>
+                        <span cls="pkg-hstat">{text(downloads_str + " downloads")}</span>
+                    </div>
+                    <div cls="pkg-install">
+                        <code>{text("pantry add " + display_name)}</code>
+                        <button cls="pkg-copy">COPY</button>
+                    </div>
+                </div>
+            </div>
+            <div cls="pkg-tabs">
+                <div cls="pkg-tab on">Readme</div>
+                <div cls="pkg-tab">Versions</div>
+                <div cls="pkg-tab">Dependencies</div>
+            </div>
+        </div>
+    </div>
+
+    <div cls="detail-layout">
+        <article cls="readme">
+            <h2>Installation</h2>
+            <pre><code>{text("pantry add " + display_name)}</code></pre>
+            {if (description.length() > 0) {
+                <div>
+                    <h2>About</h2>
+                    <p>{text(description)}</p>
+                </div>
+            }}
+        </article>
+
+        <aside cls="meta-sidebar">
+            <div cls="meta-card">
+                <span cls="meta-title">About</span>
+                <div cls="meta-row">
+                    <span cls="meta-key">Version</span>
+                    <span cls="meta-val mono">{text(latest)}</span>
+                </div>
+                <div cls="meta-row">
+                    <span cls="meta-key">License</span>
+                    <span cls="meta-val">{text(license_str)}</span>
+                </div>
+                <div cls="meta-row">
+                    <span cls="meta-key">Downloads</span>
+                    <span cls="meta-val">{text(downloads_str)}</span>
+                </div>
+                <div cls="meta-row">
+                    <span cls="meta-key">Versions</span>
+                    <span cls="meta-val">{text(ver_count_str)}</span>
+                </div>
+                {if (data.has("repository") and data.get("repository").length() > 0) {
+                    <div cls="meta-row">
+                        <span cls="meta-key">Repository</span>
+                        <span cls="meta-val">{text(data.get("repository").to_string())}</span>
+                    </div>
+                }}
+            </div>
+
+            {if (versions.length() > 0) {
+                <div cls="meta-card">
+                    <span cls="meta-title">Version history</span>
+                    {var i: Float = versions.length() - 1
+                    while (i >= 0 and i > versions.length() - 6) {
+                        var v = versions[i]
+                        <div cls="ver-row">
+                            <span cls="ver-row-num">{text(v.get("vers"))}</span>
+                            {if (i == versions.length() - 1) {
+                                <span cls="ver-row-cur">CURRENT</span>
+                            }}
+                        </div>
+                        i = i - 1
+                    }}
+                </div>
+            }}
+        </aside>
+    </div>
+}
+
+fun _extract_pkg_name(path: String): String {
+    // Extract name from "/packages/<name>" path
+    var parts: List<String> = path.split("/")
+    // parts: ["", "packages", "<name>"] or ["packages", "<name>"]
+    var i: Float = 0
+    while (i < parts.length()) {
+        if (parts[i] == "packages" and i + 1 < parts.length()) {
+            return parts[i + 1]
+        }
+        i = i + 1
+    }
+    return _detail_name_raw
+}
+
 fun PackageDetailPage() {
     var query = detail_query.get()
-    var name: String = detail_name_sig.get()
 
     <div>
         {NavBarWithSearch()}
 
         {if (query != nil and query.data.get() != nil) {
             var data = query.data.get()
+            var name: String = _detail_name_raw
+            if (name.length() == 0) { name = detail_name_sig.get() }
+            if (name.length() == 0) { name = _extract_pkg_name(router.current()) }
             var latest: String = ""
             var description: String = ""
             var versions = []
@@ -443,96 +576,7 @@ fun PackageDetailPage() {
                 }
             }
 
-            <div cls="pkg-header">
-                <div cls="pkg-header-inner">
-                    <div cls="pkg-header-top">
-                        <div cls="pkg-header-ico">{name.char_at(0)}</div>
-                        <div>
-                            <div cls="pkg-header-title-row">
-                                <h1 cls="pkg-header-title">{name}</h1>
-                                <span cls="ver">{latest}</span>
-                            </div>
-                            {if (description.length() > 0) {
-                                <p cls="pkg-header-desc">{description}</p>
-                            }}
-                            <div cls="pkg-header-stats">
-                                <span cls="pkg-hstat">License: <strong>{data.get("license")}</strong></span>
-                                <span cls="pkg-hstat-sep">·</span>
-                                <span cls="pkg-hstat"><strong>{versions.length().to_string()}</strong> versions</span>
-                                <span cls="pkg-hstat-sep">·</span>
-                                <span cls="pkg-hstat"><strong>{data.get("total_downloads")}</strong> downloads</span>
-                            </div>
-                            <div cls="pkg-install">
-                                <code><b>pantry</b> add {name}</code>
-                                <button cls="pkg-copy">COPY</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div cls="pkg-tabs">
-                        <div cls="pkg-tab on">Readme</div>
-                        <div cls="pkg-tab">Versions</div>
-                        <div cls="pkg-tab">Dependencies</div>
-                    </div>
-                </div>
-            </div>
-
-            <div cls="detail-layout">
-                <article cls="readme">
-                    <h2>Installation</h2>
-                    <pre><code>pantry add {name}</code></pre>
-                    {if (description.length() > 0) {
-                        <div>
-                            <h2>About</h2>
-                            <p>{description}</p>
-                        </div>
-                    }}
-                </article>
-
-                <aside cls="meta-sidebar">
-                    <div cls="meta-card">
-                        <span cls="meta-title">About</span>
-                        <div cls="meta-row">
-                            <span cls="meta-key">Version</span>
-                            <span cls="meta-val mono">{latest}</span>
-                        </div>
-                        <div cls="meta-row">
-                            <span cls="meta-key">License</span>
-                            <span cls="meta-val">{data.get("license")}</span>
-                        </div>
-                        <div cls="meta-row">
-                            <span cls="meta-key">Downloads</span>
-                            <span cls="meta-val">{data.get("total_downloads")}</span>
-                        </div>
-                        <div cls="meta-row">
-                            <span cls="meta-key">Versions</span>
-                            <span cls="meta-val">{versions.length().to_string()}</span>
-                        </div>
-                        {if (data.has("repository") and data.get("repository").length() > 0) {
-                            <div cls="meta-row">
-                                <span cls="meta-key">Repository</span>
-                                <span cls="meta-val">{data.get("repository")}</span>
-                            </div>
-                        }}
-                    </div>
-
-                    {if (versions.length() > 0) {
-                        <div cls="meta-card">
-                            <span cls="meta-title">Version history</span>
-                            {var i: Float = versions.length() - 1
-                            while (i >= 0 and i > versions.length() - 6) {
-                                var v = versions[i]
-                                <div cls="ver-row">
-                                    <span cls="ver-row-num">{v.get("vers")}</span>
-                                    {if (i == versions.length() - 1) {
-                                        <span cls="ver-row-cur">CURRENT</span>
-                                    }}
-                                </div>
-                                i = i - 1
-                            }}
-                        </div>
-                    }}
-                </aside>
-            </div>
+            {PackageDetailContent(name, data, description, latest, versions)}
         } else {
             LoadingIndicator(query)
         }}
@@ -546,31 +590,26 @@ fun PackageDetailPage() {
 // =============================================================================
 
 fun LoginPage() {
-    var username_input = signal("")
-    var auth_error = signal("")
-    var auth_token_display = signal("")
-    var is_loading = signal(false)
-
     var register_mutation = Api.createAuthRegister()
 
     fun do_register() {
-        var username: String = username_input.get()
+        var username: String = login_username_input.get()
         if (username.length() == 0) {
-            auth_error.set("Please enter a username")
+            login_auth_error.set("Please enter a username")
             return
         }
-        is_loading.set(true)
-        auth_error.set("")
+        login_is_loading.set(true)
+        login_auth_error.set("")
         register_mutation.on_success(fun (data: Any) => {
-            is_loading.set(false)
+            login_is_loading.set(false)
             if (data.has("token")) {
                 var token: String = data.get("token")
                 var uname: String = data.get("username")
                 auth_token_global.set(token)
                 auth_username_global.set(uname)
-                auth_token_display.set(token)
+                login_auth_token_display.set(token)
             } else if (data.has("error")) {
-                auth_error.set(data.get("error"))
+                login_auth_error.set(data.get("error"))
             }
         })
         register_mutation.mutate({"username": username})
@@ -587,26 +626,26 @@ fun LoginPage() {
                     <p cls="auth-desc">Get a token for publishing packages</p>
                 </div>
 
-                {if (auth_token_display.get().length() > 0) {
+                {if (login_auth_token_display.get().length() > 0) {
                     <div cls="token-display">
                         <div cls="token-success-ico">&#10003;</div>
                         <p cls="token-label">Your API token:</p>
-                        <pre cls="token-value"><code>{auth_token_display.get()}</code></pre>
+                        <pre cls="token-value"><code>{login_auth_token_display.get()}</code></pre>
                         <p cls="token-hint">Save this token! Use it with:</p>
-                        <pre cls="token-cmd"><code>pantry login {auth_token_display.get()}</code></pre>
+                        <pre cls="token-cmd"><code>pantry login {login_auth_token_display.get()}</code></pre>
                         {Router.Link(router, "/", cls="btn-primary") { text("Go to Home") }}
                     </div>
                 } else {
                     <form cls="auth-form" on_submit={fun (e: Event) => do_register()}>
                         <div cls="form-group">
                             <label cls="form-label">Username</label>
-                            <input cls="form-input" type="text" placeholder="your-username" on_input={fun (e: Event) => username_input.set(event_target_value())} />
+                            <input cls="form-input" type="text" placeholder="your-username" on_input={fun (e: Event) => login_username_input.set(event_target_value())} />
                         </div>
-                        {if (auth_error.get().length() > 0) {
-                            <div cls="form-error">{auth_error.get()}</div>
+                        {if (login_auth_error.get().length() > 0) {
+                            <div cls="form-error">{login_auth_error.get()}</div>
                         }}
                         <button cls="btn-primary" type="submit">
-                            {if (is_loading.get()) { text("Registering...") } else { text("Get Token") }}
+                            {if (login_is_loading.get()) { text("Registering...") } else { text("Get Token") }}
                         </button>
                     </form>
                 }}
@@ -626,21 +665,13 @@ fun LoginPage() {
 // =============================================================================
 
 fun PublishPage() {
-    var pkg_name_input = signal("")
-    var pkg_version_input = signal("")
-    var pkg_description_input = signal("")
-    var pkg_tarball_input = signal("")
-    var publish_error = signal("")
-    var publish_success = signal("")
-    var is_loading = signal(false)
-
     var publish_mutation = Api.createPublish()
 
     fun do_publish() {
-        var name: String = pkg_name_input.get()
-        var vers: String = pkg_version_input.get()
-        var description: String = pkg_description_input.get()
-        var tarball: String = pkg_tarball_input.get()
+        var name: String = publish_pkg_name.get()
+        var vers: String = publish_pkg_version.get()
+        var description: String = publish_pkg_description.get()
+        var tarball: String = publish_pkg_tarball.get()
 
         if (name.length() == 0) {
             publish_error.set("Package name is required")
@@ -651,20 +682,20 @@ fun PublishPage() {
             return
         }
 
-        is_loading.set(true)
+        publish_is_loading.set(true)
         publish_error.set("")
         publish_success.set("")
 
         publish_mutation.on_success(fun (data: Any) => {
-            is_loading.set(false)
+            publish_is_loading.set(false)
             if (data.has("error")) {
                 publish_error.set(data.get("error"))
             } else {
-                publish_success.set("Published " + name + " v" + vers + " successfully!")
-                pkg_name_input.set("")
-                pkg_version_input.set("")
-                pkg_description_input.set("")
-                pkg_tarball_input.set("")
+                publish_success.set("Published " + publish_pkg_name.get() + " v" + publish_pkg_version.get() + " successfully!")
+                publish_pkg_name.set("")
+                publish_pkg_version.set("")
+                publish_pkg_description.set("")
+                publish_pkg_tarball.set("")
             }
         })
 
@@ -705,26 +736,26 @@ fun PublishPage() {
                             <form cls="auth-form" on_submit={fun (e: Event) => do_publish()}>
                                 <div cls="form-group">
                                     <label cls="form-label">Package Name</label>
-                                    <input cls="form-input" type="text" placeholder="my-package" on_input={fun (e: Event) => pkg_name_input.set(event_target_value())} />
+                                    <input cls="form-input" type="text" placeholder="my-package" on_input={fun (e: Event) => publish_pkg_name.set(event_target_value())} />
                                 </div>
                                 <div cls="form-group">
                                     <label cls="form-label">Version</label>
-                                    <input cls="form-input" type="text" placeholder="1.0.0" on_input={fun (e: Event) => pkg_version_input.set(event_target_value())} />
+                                    <input cls="form-input" type="text" placeholder="1.0.0" on_input={fun (e: Event) => publish_pkg_version.set(event_target_value())} />
                                 </div>
                                 <div cls="form-group">
                                     <label cls="form-label">Description</label>
-                                    <input cls="form-input" type="text" placeholder="A useful Saffron package" on_input={fun (e: Event) => pkg_description_input.set(event_target_value())} />
+                                    <input cls="form-input" type="text" placeholder="A useful Saffron package" on_input={fun (e: Event) => publish_pkg_description.set(event_target_value())} />
                                 </div>
                                 <div cls="form-group">
                                     <label cls="form-label">Tarball (base64)</label>
-                                    <input cls="form-input" type="text" placeholder="Base64-encoded package tarball" on_input={fun (e: Event) => pkg_tarball_input.set(event_target_value())} />
+                                    <input cls="form-input" type="text" placeholder="Base64-encoded package tarball" on_input={fun (e: Event) => publish_pkg_tarball.set(event_target_value())} />
                                     <span cls="form-hint">Paste base64-encoded .tar.gz content</span>
                                 </div>
                                 {if (publish_error.get().length() > 0) {
                                     <div cls="form-error">{publish_error.get()}</div>
                                 }}
                                 <button cls="btn-primary" type="submit">
-                                    {if (is_loading.get()) { text("Publishing...") } else { text("Publish") }}
+                                    {if (publish_is_loading.get()) { text("Publishing...") } else { text("Publish") }}
                                 </button>
                             </form>
                         }}
@@ -756,6 +787,7 @@ router.route("/search", fun (p: Router.RouteParams) => {
 })
 router.route("/packages/:name", fun (p: Router.RouteParams) => {
     var name: String = p.get("name")
+    _detail_name_raw = name
     detail_name_sig.set(name)
     detail_query.set(Api.getPackage(name))
     PackageDetailPage()
