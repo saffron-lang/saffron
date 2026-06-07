@@ -4,7 +4,7 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
-import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, mount, event_target_value } from "turmeric/prelude"
+import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, label, mount, event_target_value } from "turmeric/prelude"
 import "./api.sf" as Api
 
 // =============================================================================

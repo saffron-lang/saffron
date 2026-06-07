@@ -64,6 +64,36 @@ class Mutation<TRequest, TResponse> {
         })
     }
 
+    fun mutate_auth(body: TRequest, token: String) {
+        this.isLoading.set(true)
+        this.error.set("")
+        this._mutation_id = this._mutation_id + 1
+        var expected_id: Float = this._mutation_id
+        var self = this
+        var body_json: String = JSON.to_string(body)
+        BasilFetch.post_auth(self.url, body_json, token, fun (response: String) => {
+            if (self._cancelled or self._mutation_id != expected_id) { return }
+            Signal.batch(fun () => {
+                var parsed = JSON.parse(response)
+                if (parsed != nil) {
+                    self.data.set(parsed)
+                    self.error.set("")
+                    var i: Float = 0
+                    while (i < self._invalidates.length()) {
+                        BasilCache.store.invalidate_matching(self._invalidates[i])
+                        i = i + 1
+                    }
+                    if (self._on_success != nil) {
+                        self._on_success(parsed)
+                    }
+                } else {
+                    self.error.set("Request failed")
+                }
+                self.isLoading.set(false)
+            })
+        })
+    }
+
     fun invalidates(prefixes: List<String>): Mutation<TRequest, TResponse> {
         this._invalidates = prefixes
         return this
