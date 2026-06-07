@@ -14,6 +14,10 @@ import "./api.sf" as Api
 var router = Router.hash()
 var search_query = signal("")
 
+// Auth state — persists across page navigations
+var auth_token_global = signal("")
+var auth_username_global = signal("")
+
 // Basil queries — auto-caching, signal-based
 var packages_query = Api.getPackages()
 var search_q = signal("")
@@ -65,8 +69,13 @@ fun NavBar() {
         {Router.Link(router, "/search?q=", cls="nav-link") { text("Browse") }}
         <a cls="nav-link">Docs</a>
         <div cls="nav-r">
-            <a cls="btn-g">Sign in</a>
-            <a cls="btn-a">Publish</a>
+            {if (auth_token_global.get().length() > 0) {
+                {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
+                <span cls="nav-user">{auth_username_global.get()}</span>
+            } else {
+                {Router.Link(router, "/login", cls="btn-g") { text("Sign in") }}
+                {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
+            }}
         </div>
     </nav>
 }
@@ -81,8 +90,13 @@ fun NavBarWithSearch() {
             <button cls="nav-search-btn" type="submit">→</button>
         </form>
         <div cls="nav-r">
-            <a cls="btn-g">Sign in</a>
-            <a cls="btn-a">Publish</a>
+            {if (auth_token_global.get().length() > 0) {
+                {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
+                <span cls="nav-user">{auth_username_global.get()}</span>
+            } else {
+                {Router.Link(router, "/login", cls="btn-g") { text("Sign in") }}
+                {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
+            }}
         </div>
     </nav>
 }
@@ -314,10 +328,10 @@ fun SearchResultsPage() {
         {NavBarWithSearch()}
 
         <div cls="tab-strip">
-            <div cls="tab on">All</div>
-            <div cls="tab">Libraries</div>
-            <div cls="tab">CLI Tools</div>
-            <div cls="tab">Utilities</div>
+            <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
             <div cls="tab-r">
                 <span cls="result-ct">{total_str} results</span>
             </div>
@@ -480,6 +494,202 @@ fun PackageDetailPage() {
 }
 
 // =============================================================================
+// Pages — Login / Register
+// =============================================================================
+
+fun LoginPage() {
+    var username_input = signal("")
+    var auth_error = signal("")
+    var auth_token_display = signal("")
+    var is_loading = signal(false)
+
+    var register_mutation = Api.createAuthRegister()
+
+    fun do_register() {
+        var username: String = username_input.get()
+        if (username.length() == 0) {
+            auth_error.set("Please enter a username")
+            return
+        }
+        is_loading.set(true)
+        auth_error.set("")
+        register_mutation.on_success(fun (data: Any) => {
+            is_loading.set(false)
+            if (data.has("token")) {
+                var token: String = data.get("token")
+                var uname: String = data.get("username")
+                auth_token_global.set(token)
+                auth_username_global.set(uname)
+                auth_token_display.set(token)
+            } else if (data.has("error")) {
+                auth_error.set(data.get("error"))
+            }
+        })
+        register_mutation.mutate({"username": username})
+    }
+
+    <div>
+        {NavBar()}
+
+        <div cls="page-container">
+            <div cls="auth-card">
+                <div cls="auth-header">
+                    <div cls="auth-ico">B</div>
+                    <h1 cls="auth-title">Sign in to Bazaar</h1>
+                    <p cls="auth-desc">Get a token for publishing packages</p>
+                </div>
+
+                {if (auth_token_display.get().length() > 0) {
+                    <div cls="token-display">
+                        <div cls="token-success-ico">&#10003;</div>
+                        <p cls="token-label">Your API token:</p>
+                        <pre cls="token-value"><code>{auth_token_display.get()}</code></pre>
+                        <p cls="token-hint">Save this token! Use it with:</p>
+                        <pre cls="token-cmd"><code>pantry login {auth_token_display.get()}</code></pre>
+                        {Router.Link(router, "/", cls="btn-primary") { text("Go to Home") }}
+                    </div>
+                } else {
+                    <form cls="auth-form" on_submit={fun (e: Event) => do_register()}>
+                        <div cls="form-group">
+                            <label cls="form-label">Username</label>
+                            <input cls="form-input" type="text" placeholder="your-username" on_input={fun (e: Event) => username_input.set(event_target_value())} />
+                        </div>
+                        {if (auth_error.get().length() > 0) {
+                            <div cls="form-error">{auth_error.get()}</div>
+                        }}
+                        <button cls="btn-primary" type="submit">
+                            {if (is_loading.get()) { text("Registering...") } else { text("Get Token") }}
+                        </button>
+                    </form>
+                }}
+
+                <p cls="auth-footer-text">
+                    Bazaar uses token-based authentication. No password needed.
+                </p>
+            </div>
+        </div>
+
+        {Footer()}
+    </div>
+}
+
+// =============================================================================
+// Pages — Publish
+// =============================================================================
+
+fun PublishPage() {
+    var pkg_name_input = signal("")
+    var pkg_version_input = signal("")
+    var pkg_description_input = signal("")
+    var pkg_tarball_input = signal("")
+    var publish_error = signal("")
+    var publish_success = signal("")
+    var is_loading = signal(false)
+
+    var publish_mutation = Api.createPublish()
+
+    fun do_publish() {
+        var name: String = pkg_name_input.get()
+        var vers: String = pkg_version_input.get()
+        var description: String = pkg_description_input.get()
+        var tarball: String = pkg_tarball_input.get()
+
+        if (name.length() == 0) {
+            publish_error.set("Package name is required")
+            return
+        }
+        if (vers.length() == 0) {
+            publish_error.set("Version is required")
+            return
+        }
+
+        is_loading.set(true)
+        publish_error.set("")
+        publish_success.set("")
+
+        publish_mutation.on_success(fun (data: Any) => {
+            is_loading.set(false)
+            if (data.has("error")) {
+                publish_error.set(data.get("error"))
+            } else {
+                publish_success.set("Published " + name + " v" + vers + " successfully!")
+                pkg_name_input.set("")
+                pkg_version_input.set("")
+                pkg_description_input.set("")
+                pkg_tarball_input.set("")
+            }
+        })
+
+        var token: String = auth_token_global.get()
+        publish_mutation.mutate_auth(
+            {"name": name, "vers": vers, "description": description, "tarball": tarball},
+            token
+        )
+    }
+
+    <div>
+        {NavBar()}
+
+        <div cls="page-container">
+            <div cls="publish-card">
+                <div cls="auth-header">
+                    <h1 cls="auth-title">Publish a Package</h1>
+                    <p cls="auth-desc">Share your Saffron package with the community</p>
+                </div>
+
+                {if (auth_token_global.get().length() == 0) {
+                    <div cls="auth-required">
+                        <div cls="auth-required-ico">!</div>
+                        <p cls="auth-required-text">You need to sign in before publishing</p>
+                        {Router.Link(router, "/login", cls="btn-primary") { text("Sign in") }}
+                    </div>
+                } else {
+                    <div>
+                        {if (publish_success.get().length() > 0) {
+                            <div cls="publish-success">
+                                <div cls="token-success-ico">&#10003;</div>
+                                <p>{publish_success.get()}</p>
+                                {Router.Link(router, "/", cls="btn-secondary") { text("View packages") }}
+                            </div>
+                        }}
+
+                        {if (publish_success.get().length() == 0) {
+                            <form cls="auth-form" on_submit={fun (e: Event) => do_publish()}>
+                                <div cls="form-group">
+                                    <label cls="form-label">Package Name</label>
+                                    <input cls="form-input" type="text" placeholder="my-package" on_input={fun (e: Event) => pkg_name_input.set(event_target_value())} />
+                                </div>
+                                <div cls="form-group">
+                                    <label cls="form-label">Version</label>
+                                    <input cls="form-input" type="text" placeholder="1.0.0" on_input={fun (e: Event) => pkg_version_input.set(event_target_value())} />
+                                </div>
+                                <div cls="form-group">
+                                    <label cls="form-label">Description</label>
+                                    <input cls="form-input" type="text" placeholder="A useful Saffron package" on_input={fun (e: Event) => pkg_description_input.set(event_target_value())} />
+                                </div>
+                                <div cls="form-group">
+                                    <label cls="form-label">Tarball (base64)</label>
+                                    <input cls="form-input" type="text" placeholder="Base64-encoded package tarball" on_input={fun (e: Event) => pkg_tarball_input.set(event_target_value())} />
+                                    <span cls="form-hint">Paste base64-encoded .tar.gz content</span>
+                                </div>
+                                {if (publish_error.get().length() > 0) {
+                                    <div cls="form-error">{publish_error.get()}</div>
+                                }}
+                                <button cls="btn-primary" type="submit">
+                                    {if (is_loading.get()) { text("Publishing...") } else { text("Publish") }}
+                                </button>
+                            </form>
+                        }}
+                    </div>
+                }}
+            </div>
+        </div>
+
+        {Footer()}
+    </div>
+}
+
+// =============================================================================
 // App + Routes
 // =============================================================================
 
@@ -502,6 +712,8 @@ router.route("/packages/:name", fun (p: Router.RouteParams) => {
     detail_query.set(Api.getPackage(name))
     PackageDetailPage()
 })
+router.route("/login", fun (p: Router.RouteParams) => LoginPage())
+router.route("/publish", fun (p: Router.RouteParams) => PublishPage())
 
 // =============================================================================
 // Entry
