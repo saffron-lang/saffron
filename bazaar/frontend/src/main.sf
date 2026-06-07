@@ -4,7 +4,7 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
-import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, mount, event_target_value } from "turmeric/prelude"
+import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, mount, event_target_value } from "turmeric/prelude"
 import "./api.sf" as Api
 
 // =============================================================================
@@ -77,7 +77,7 @@ fun NavBarWithSearch() {
         {Router.Link(router, "/search?q=", cls="nav-link on") { text("Browse") }}
         <a cls="nav-link">Docs</a>
         <form cls="nav-search" on_submit={fun (e: Event) => do_search()}>
-            <input type="text" placeholder="Search packages..." on_input={fun (e: Event) => search_query.set(event_target_value())} />
+            <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => search_query.set(event_target_value())} />
             <button cls="nav-search-btn" type="submit">→</button>
         </form>
         <div cls="nav-r">
@@ -150,6 +150,8 @@ fun PackageRow(pkg: Map<String, String>) {
     if (pkg.has("latest")) { version = pkg.get("latest") }
     var description: String = ""
     if (pkg.has("description")) { description = pkg.get("description") }
+    var downloads: String = ""
+    if (pkg.has("total_downloads")) { downloads = pkg.get("total_downloads") }
 
     {Router.Link(router, "/packages/" + name, cls="pkg-row") {
         <div cls="pkg-row-top">
@@ -168,6 +170,10 @@ fun PackageRow(pkg: Map<String, String>) {
                     <div cls="pkg-row-tags">
                         <span cls="tag">saffron</span>
                     </div>
+                    {if (downloads.length() > 0) {
+                        <span cls="pkg-stat">↓ <b>{downloads}</b></span>
+                    }}
+                    <span cls="pkg-stat">MIT</span>
                     <code cls="pkg-row-cmd">pantry add {name}</code>
                 </div>
             </div>
@@ -189,7 +195,7 @@ fun HomePage() {
                 <h1 cls="hero-h">Find the right package. Build something lasting.</h1>
                 <p cls="hero-sub">Browse packages from the Saffron community. Open source, forever free.</p>
                 <form cls="hero-form" on_submit={fun (e: Event) => do_search()}>
-                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." on_input={fun (e: Event) => search_query.set(event_target_value())} />
+                    <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." value={search_query.get()} on_input={fun (e: Event) => search_query.set(event_target_value())} />
                     <button cls="hero-btn" type="submit">Search</button>
                 </form>
                 <div cls="hero-pills">
@@ -233,29 +239,98 @@ fun HomePage() {
 // Pages — Search Results
 // =============================================================================
 
+fun SearchSidebar() {
+    <aside cls="sidebar">
+        <div cls="sb-section">
+            <span cls="sb-label">Sort by</span>
+            <select cls="sb-sort">
+                <option>Relevance</option>
+                <option>Downloads</option>
+                <option>Last Updated</option>
+            </select>
+        </div>
+        <div cls="sb-section">
+            <span cls="sb-label">Category</span>
+            <div cls="sb-opt checked">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">All</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Libraries</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">CLI Tools</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Utilities</span>
+            </div>
+        </div>
+        <div cls="sb-section">
+            <span cls="sb-label">License</span>
+            <div cls="sb-opt checked">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">MIT</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Apache 2.0</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">BSD</span>
+            </div>
+        </div>
+        <div cls="sb-section">
+            <span cls="sb-label">Platform</span>
+            <div cls="sb-opt checked">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Universal</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Server</span>
+            </div>
+            <div cls="sb-opt">
+                <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
+                <span cls="sb-opt-name">Browser</span>
+            </div>
+        </div>
+    </aside>
+}
+
 fun SearchResultsPage() {
     var query = search_results_query.get()
+    var total_str: String = "0"
+    var pkg_count: Float = 0
+    if (query != nil and query.data.get() != nil) {
+        var qdata = query.data.get()
+        if (qdata.has("total")) { total_str = qdata.get("total").to_string() }
+    }
 
     <div>
         {NavBarWithSearch()}
 
         <div cls="tab-strip">
             <div cls="tab on">All</div>
+            <div cls="tab">Libraries</div>
+            <div cls="tab">CLI Tools</div>
+            <div cls="tab">Utilities</div>
             <div cls="tab-r">
-                <span cls="result-ct">
-                    {if (query != nil and query.data.get() != nil) {
-                        text(query.data.get().get("total").to_string() + " results")
-                    }}
-                </span>
+                <span cls="result-ct">{total_str} results</span>
             </div>
         </div>
 
         {LoadingIndicator(query)}
 
         <div cls="layout">
+            {SearchSidebar()}
+
             <main cls="results">
                 <p cls="result-hd">
-                    Results for "<strong>{search_query.get()}</strong>"
+                    Showing results for "<strong>{search_query.get()}</strong>"
                 </p>
                 {if (query != nil) {
                     var data = query.data.get()
@@ -271,6 +346,10 @@ fun SearchResultsPage() {
                         }
                     }
                 }}
+
+                <div cls="pager">
+                    <div cls="page-btn on">1</div>
+                </div>
             </main>
         </div>
 
