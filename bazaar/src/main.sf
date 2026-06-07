@@ -9,29 +9,33 @@ import "./routes.sf" as Routes
 import "./db.sf" as Db
 
 fun main() {
-    var port_str = OS.env("BAZAAR_PORT")
-    var port = 3000
-    if (port_str.length() > 0) {
-        port = port_str.to_number()
+    try {
+        var port_str = OS.env("BAZAAR_PORT")
+        var port = 3000
+        if (port_str.length() > 0) {
+            port = port_str.to_number()
+        }
+
+        Db.init()
+
+        var app = Http.server(port)
+
+        // Middleware
+        app.use(Http.cors())
+        app.use(Http.logger())
+        // app.use(Http.static_files("/", "static"))  // disabled: causes blocking on API routes
+        app.after(Http.cors_headers())
+
+        // Build API router with parsley
+        var api = router("/api/v1")
+        Routes.register(api)
+        api.mount(app)
+
+        IO.println("Bazaar registry server v0.1.0")
+        app.serve()
+    } catch (e) {
+        IO.println("Fatal: " + e.to_string())
     }
-
-    Db.init()
-
-    var app = Http.server(port)
-
-    // Middleware
-    app.use(Http.cors())
-    app.use(Http.logger())
-    // app.use(Http.static_files("/", "static"))  // disabled: causes blocking on API routes
-    app.after(Http.cors_headers())
-
-    // Build API router with parsley
-    var api = router("/api/v1")
-    Routes.register(api)
-    api.mount(app)
-
-    IO.println("Bazaar registry server v0.1.0")
-    app.serve()
 }
 
 main()

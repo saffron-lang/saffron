@@ -1139,10 +1139,12 @@ class Codegen {
                 }
                 var local: String = this.fresh_local()
                 var var_ref: String = "%" + this.sanitize_name(name)
-                if (this.module_globals.has(this.current_prefix + name)) {
-                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
-                } else if (this.module_globals.has(name)) {
-                    var_ref = "@__g_" + this.sanitize_name(name)
+                if (!this.typed_vars.has(name)) {
+                    if (this.module_globals.has(this.current_prefix + name)) {
+                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                    } else if (this.module_globals.has(name)) {
+                        var_ref = "@__g_" + this.sanitize_name(name)
+                    }
                 }
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_load(local, "i64", var_ref))
@@ -1169,10 +1171,12 @@ class Codegen {
                 var val: String = this.gen_arg_value(value)
                 if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
-                    if (this.module_globals.has(this.current_prefix + name)) {
-                        var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
-                    } else if (this.module_globals.has(name)) {
-                        var_ref = "@__g_" + this.sanitize_name(name)
+                    if (!this.typed_vars.has(name)) {
+                        if (this.module_globals.has(this.current_prefix + name)) {
+                            var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
+                        } else if (this.module_globals.has(name)) {
+                            var_ref = "@__g_" + this.sanitize_name(name)
+                        }
                     }
                     if (this.use_llvm_lib) {
                         this.emit_indent(this.lib_store(val, "i64", var_ref))
@@ -2326,10 +2330,12 @@ class Codegen {
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
-            if (this.module_globals.has(this.current_prefix + vname)) {
-                var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
-            } else if (this.module_globals.has(vname)) {
-                var_ref = "@__g_" + this.sanitize_name(vname)
+            if (!this.typed_vars.has(vname)) {
+                if (this.module_globals.has(this.current_prefix + vname)) {
+                    var_ref = "@__g_" + this.current_prefix + this.sanitize_name(vname)
+                } else if (this.module_globals.has(vname)) {
+                    var_ref = "@__g_" + this.sanitize_name(vname)
+                }
             }
             if (this.use_llvm_lib) {
                 this.emit_indent(this.lib_load(local, "i64", var_ref))
@@ -5995,9 +6001,23 @@ class Codegen {
     fun gen_throw(value: AST.Expr) {
         var val: String = this.gen_arg_value(value)
         this.emit_indent("store i64 " + val + ", i64* @__exception_value")
-        // Load the current jmp_buf pointer and longjmp to it
+        // Load the current jmp_buf pointer and check for null (uncaught exception)
         var jmp_ptr: String = this.fresh_local()
         this.emit_indent(jmp_ptr + " = load i8*, i8** @__jmp_buf_current")
+        var is_null: String = this.fresh_local()
+        this.emit_indent(is_null + " = icmp eq i8* " + jmp_ptr + ", null")
+        var uncaught_label: String = this.fresh_label("uncaught")
+        var do_throw_label: String = this.fresh_label("do_throw")
+        this.emit_terminator("br i1 " + is_null + ", label %" + uncaught_label + ", label %" + do_throw_label)
+        // Uncaught exception: convert to string, print fatal error, and exit
+        this.start_block(uncaught_label)
+        var msg_str: String = this.fresh_local()
+        this.emit_indent(msg_str + " = call i64 @__any_to_string(i64 " + val + ")")
+        this.emit_indent("call i64 @__runtime_error_fatal(i64 " + msg_str + ")")
+        this.emit_indent("call void @exit(i32 1)")
+        this.emit_terminator("unreachable")
+        // Normal throw: longjmp to handler
+        this.start_block(do_throw_label)
         this.emit_indent("call void @longjmp(i8* " + jmp_ptr + ", i32 1)")
         this.emit_terminator("unreachable")
     }
@@ -8383,8 +8403,8 @@ class Codegen {
         out.append("declare i8* @popen(i8*, i8*)\n")
         out.append("declare i8* @fgets(i8*, i32, i8*)\n")
         out.append("declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)\n")
-        out.append("declare i32 @setjmp(i8*)\n")
-        out.append("declare void @longjmp(i8*, i32)\n")
+        out.append("declare i32 @setjmp(i8*) returns_twice\n")
+        out.append("declare void @longjmp(i8*, i32) noreturn\n")
         out.append("declare void @__io_println_str(i64)\n")
         out.append("declare void @__io_println_int(i64)\n")
         out.append("declare void @__io_println_bool(i64)\n")
