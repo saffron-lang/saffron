@@ -648,7 +648,7 @@
     // Function types can be: "Fun(Nil)", "(T) => R", "() => Nil", etc.
     if (has_self and this.class_fields.has(ns)) {
         var ft: String = this.get_field_type(ns, method)
-        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.contains("=>")
+        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.starts_with("(") and ft.contains("=>") or ft.starts_with("() =>")
         if (is_fn_type) {
             // Check there's no actual method with this name
             var full_check: String = ns + "__" + method
