@@ -20,6 +20,7 @@ class Query<T> {
     var _stale_time: Float
     var _cancelled: Bool
     var _fetch_id: Float
+    var _on_data: (T) => Nil
 
     fun init(url: String, stale_time: Float) {
         this.url = url
@@ -29,6 +30,7 @@ class Query<T> {
         this._stale_time = stale_time
         this._cancelled = false
         this._fetch_id = 0
+        this._on_data = nil
         this._do_fetch()
     }
 
@@ -44,12 +46,25 @@ class Query<T> {
                 if (parsed != nil) {
                     self.data.set(parsed)
                     self.error.set("")
+                    if (self._on_data != nil) {
+                        self._on_data(parsed)
+                    }
                 } else {
                     self.error.set("Failed to parse response")
                 }
                 self.isLoading.set(false)
             })
         })
+    }
+
+    fun on_data(handler: (T) => Nil): Query<T> {
+        this._on_data = handler
+        // If data already arrived, fire immediately
+        var current = this.data.value
+        if (current != nil) {
+            handler(current)
+        }
+        return this
     }
 
     fun refetch() {

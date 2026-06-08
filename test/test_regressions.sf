@@ -1,0 +1,179 @@
+// Regression tests for bugs fixed during this session.
+// Each test verifies a specific scenario that was previously broken.
+
+import "@test" as Test
+import "@json" as JSON
+
+// =============================================================================
+// 1. Float parameters always 0
+// Previously, Float function params were read as 0 inside the function body.
+// =============================================================================
+
+fun add_floats(a: Float, b: Float): Float {
+    return a + b
+}
+
+Test.assert_eq(add_floats(3.0, 4.0), 7.0, "float params: 3.0 + 4.0 = 7.0")
+Test.assert_eq(add_floats(0.5, 0.25), 0.75, "float params: 0.5 + 0.25 = 0.75")
+Test.assert_eq(add_floats(1.0, -1.0), 0.0, "float params: 1.0 + -1.0 = 0.0")
+Test.assert_eq(add_floats(0.0, 0.0), 0.0, "float params: 0.0 + 0.0 = 0.0")
+
+// =============================================================================
+// 2. Recursion crash
+// Previously, recursive functions would segfault.
+// =============================================================================
+
+fun factorial(n: Int): Int {
+    if (n <= 1) { return 1 }
+    return n * factorial(n - 1)
+}
+
+fun fib(n: Int): Int {
+    if (n <= 1) { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+Test.assert_eq(factorial(1), 1, "recursion: factorial(1)")
+Test.assert_eq(factorial(5), 120, "recursion: factorial(5)")
+Test.assert_eq(factorial(10), 3628800, "recursion: factorial(10)")
+Test.assert_eq(fib(0), 0, "recursion: fib(0)")
+Test.assert_eq(fib(1), 1, "recursion: fib(1)")
+Test.assert_eq(fib(10), 55, "recursion: fib(10)")
+
+// =============================================================================
+// 3. Mutable closure captures
+// Previously, closures would not correctly capture mutable variables.
+// =============================================================================
+
+fun make_counter(): () => Float {
+    var count: Float = 0
+    return fun (): Float => {
+        count = count + 1
+        return count
+    }
+}
+
+var c = make_counter()
+Test.assert_eq(c(), 1, "mutable capture: first call")
+Test.assert_eq(c(), 2, "mutable capture: second call")
+Test.assert_eq(c(), 3, "mutable capture: third call")
+
+// Two independent counters don't interfere
+var c2 = make_counter()
+Test.assert_eq(c2(), 1, "mutable capture: independent counter starts at 1")
+Test.assert_eq(c(), 4, "mutable capture: original counter continues at 4")
+
+// =============================================================================
+// 4. Enum data extraction
+// Previously, extracting data from enum variants in match failed.
+// =============================================================================
+
+enum Option {
+    Some(value: Float),
+    None
+}
+
+var x = Option.Some(42)
+var val = match (x) {
+    Some(v) => v
+    None => 0
+}
+Test.assert_eq(val, 42, "enum data extraction: Some(42)")
+
+var y = Option.None
+var val2 = match (y) {
+    Some(v) => v
+    None => -1
+}
+Test.assert_eq(val2, -1, "enum data extraction: None case")
+
+// Nested enum usage
+enum Result {
+    Ok(value: Float),
+    Err(msg: String)
+}
+
+var r = Result.Ok(99)
+var r_val = match (r) {
+    Ok(v) => v
+    Err(m) => -1
+}
+Test.assert_eq(r_val, 99, "enum data extraction: Result.Ok(99)")
+
+// =============================================================================
+// 5. Any-boxed string equality
+// Previously, strings compared through Any were not equal even when they should be.
+// =============================================================================
+
+fun check_eq(a: Any, b: Any): Bool {
+    return a == b
+}
+
+Test.assert_eq(check_eq("hello", "hello"), true, "any string eq: same literal")
+Test.assert_eq(check_eq("hello".slice(0, 3), "hel"), true, "any string eq: sliced vs literal")
+Test.assert_eq(check_eq("abc", "xyz"), false, "any string eq: different strings")
+Test.assert_eq(check_eq(42, 42), true, "any int eq: same number")
+Test.assert_eq(check_eq(42, 43), false, "any int eq: different numbers")
+
+// =============================================================================
+// 6. Map.get nil comparison
+// Previously, checking nil on Map.get for missing keys failed.
+// =============================================================================
+
+var mymap: Map<String, String> = {}
+Test.assert(mymap.get("missing") == nil, "map get nil: missing key is nil")
+
+mymap.set("present", "value")
+Test.assert(mymap.get("present") != nil, "map get nil: present key is not nil")
+Test.assert_eq(mymap.get("present"), "value", "map get nil: present key has value")
+Test.assert(mymap.get("other") == nil, "map get nil: another missing key is nil")
+
+// =============================================================================
+// 7. Module-level variable load/store
+// Previously, top-level variables (lists, etc.) failed to load/store correctly.
+// =============================================================================
+
+var top_list = [10, 20, 30]
+var top_str = "module level"
+var top_num: Float = 3.14
+
+Test.assert_eq(top_list.length(), 3, "module var: list length")
+Test.assert_eq(top_list[0], 10, "module var: list[0]")
+Test.assert_eq(top_list[1], 20, "module var: list[1]")
+Test.assert_eq(top_list[2], 30, "module var: list[2]")
+Test.assert_eq(top_str, "module level", "module var: string")
+Test.assert_eq(top_num, 3.14, "module var: float")
+
+// Mutate and verify
+top_list.push(40)
+Test.assert_eq(top_list.length(), 4, "module var: list after push")
+Test.assert_eq(top_list[3], 40, "module var: pushed element")
+
+// =============================================================================
+// 8. JSON map serialization
+// Previously, JSON.to_string on maps would output null keys.
+// =============================================================================
+
+var json_map: Map<String, String> = {}
+json_map.set("name", "hello")
+json_map.set("version", "1.0")
+var json_str = JSON.to_string(json_map)
+Test.assert(json_str.contains("name"), "json map serialization: has key 'name'")
+Test.assert(json_str.contains("hello"), "json map serialization: has value 'hello'")
+Test.assert(json_str.contains("version"), "json map serialization: has key 'version'")
+Test.assert(json_str.contains("1.0"), "json map serialization: has value '1.0'")
+
+// =============================================================================
+// 9. Int.to_string NaN-box display
+// Previously, numbers displayed incorrectly due to NaN-boxing issues.
+// =============================================================================
+
+Test.assert_eq((42).to_string(), "42", "int to_string: 42")
+Test.assert_eq((0).to_string(), "0", "int to_string: 0")
+Test.assert_eq((-1).to_string(), "-1", "int to_string: -1")
+Test.assert_eq((100).to_string(), "100", "int to_string: 100")
+
+// Float to_string
+Test.assert_eq((3.14).to_string(), "3.14", "float to_string: 3.14")
+
+Test.summary()

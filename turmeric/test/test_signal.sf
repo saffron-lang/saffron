@@ -1,0 +1,110 @@
+// Regression tests for turmeric signal system.
+// Tests the reactive primitives (Signal, batch, subscribe) in native context.
+// NOTE: Computed and effect use Any-typed dep dispatch which requires the full
+// turmeric codegen pipeline (WASM). These tests cover Signal-level primitives.
+
+import "@test" as Test
+import "../src/signal.sf" as Sig
+
+// =============================================================================
+// 1. Signal.set() notifies subscribers
+// Previously, set() did not trigger subscriber callbacks.
+// =============================================================================
+
+var notify_count: Float = 0
+var s1 = Sig.signal(0)
+s1.subscribe(fun () => { notify_count = notify_count + 1 })
+s1.set(5)
+Test.assert_eq(notify_count, 1, "set notifies subscriber once")
+s1.set(10)
+Test.assert_eq(notify_count, 2, "set notifies subscriber again")
+
+// =============================================================================
+// 2. Signal.get() returns current value
+// Previously, get() could return stale or incorrect values.
+// =============================================================================
+
+var s2 = Sig.signal("hello")
+Test.assert_eq(s2.get(), "hello", "get returns initial value")
+s2.set("world")
+Test.assert_eq(s2.get(), "world", "get returns updated value")
+s2.set("final")
+Test.assert_eq(s2.get(), "final", "get returns final value")
+
+// =============================================================================
+// 3. Signal with numeric values
+// =============================================================================
+
+var s3 = Sig.signal(42)
+Test.assert_eq(s3.get(), 42, "signal stores int initial")
+s3.set(100)
+Test.assert_eq(s3.get(), 100, "signal stores int after set")
+
+// =============================================================================
+// 4. Batch defers notifications
+// =============================================================================
+
+var batch_count: Float = 0
+var sb = Sig.signal(0)
+sb.subscribe(fun () => { batch_count = batch_count + 1 })
+Sig.batch(fun () => {
+    sb.set(1)
+    sb.set(2)
+    sb.set(3)
+})
+// Batch defers notifications until flush, then fires each queued notify
+Test.assert_eq(batch_count, 3, "batch defers then fires all queued notifications")
+Test.assert_eq(sb.get(), 3, "batch: final value is last set")
+
+// =============================================================================
+// 5. Unsubscribe stops notifications
+// =============================================================================
+
+var unsub_count: Float = 0
+var su = Sig.signal(0)
+var sub_id: Float = su.subscribe(fun () => { unsub_count = unsub_count + 1 })
+su.set(1)
+Test.assert_eq(unsub_count, 1, "unsubscribe: notified before unsub")
+su.unsubscribe(sub_id)
+su.set(2)
+Test.assert_eq(unsub_count, 1, "unsubscribe: not notified after unsub")
+
+// =============================================================================
+// 6. Subscribe returns unique IDs
+// =============================================================================
+
+var sid_signal = Sig.signal(0)
+var id1: Float = sid_signal.subscribe(fun () => {})
+var id2: Float = sid_signal.subscribe(fun () => {})
+Test.assert(id1 != id2, "subscribe returns unique IDs")
+
+// =============================================================================
+// 7. Signal.update() applies function to current value
+// =============================================================================
+
+var su2 = Sig.signal(10)
+su2.update(fun (v: Float): Float => v + 5)
+Test.assert_eq(su2.get(), 15, "update: adds 5 to 10")
+su2.update(fun (v: Float): Float => v * 2)
+Test.assert_eq(su2.get(), 30, "update: doubles 15 to 30")
+
+// =============================================================================
+// 8. Nested batch defers until outermost completes
+// =============================================================================
+
+var nested_count: Float = 0
+var sn = Sig.signal(0)
+sn.subscribe(fun () => { nested_count = nested_count + 1 })
+Sig.batch(fun () => {
+    sn.set(1)
+    Sig.batch(fun () => {
+        sn.set(2)
+        sn.set(3)
+    })
+    sn.set(4)
+})
+// All notifications deferred until outermost batch flushes, then each fires
+Test.assert_eq(nested_count, 4, "nested batch: all deferred notifications fire")
+Test.assert_eq(sn.get(), 4, "nested batch: final value is 4")
+
+Test.summary()
