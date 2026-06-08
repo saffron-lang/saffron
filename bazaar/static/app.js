@@ -185,30 +185,6 @@ const imports = { env: new Proxy({
                 if (fn) fn(callbackId, ptr);
             });
     },
-    js_fetch_post_auth: (urlPtr, bodyPtr, tokenPtr, callbackId) => {
-        const url = readCString(urlPtr);
-        const body = readCString(bodyPtr);
-        const token = readCString(tokenPtr);
-        fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body
-        }).then(r => r.text()).then(text => {
-            const ptr = writeCString(text);
-            const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
-        }).catch(() => {
-            const ptr = writeCString('{"error":"fetch failed"}');
-            const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
-        });
-    },
-    js_storage_set: (keyPtr, valuePtr) => {
-        try { localStorage.setItem(readCString(keyPtr), readCString(valuePtr)); } catch (e) { /* noop */ }
-    },
-    js_storage_get: (keyPtr) => {
-        try { return writeCString(localStorage.getItem(readCString(keyPtr)) || ''); } catch (e) { return writeCString(''); }
-    },
     __string_intern: (ptr) => ptr,
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };

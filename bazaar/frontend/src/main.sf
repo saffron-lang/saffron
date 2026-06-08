@@ -408,7 +408,9 @@ fun SearchResultsPage() {
 
             <main cls="results">
                 <p cls="result-hd">
-                    Showing results for "<strong>{search_query.get()}</strong>"
+                    {text("Showing results for \"")}
+                    <strong>{text(search_query.get())}</strong>
+                    {text("\"")}
                 </p>
                 {if (query != nil) {
                     var data = query.data.get()
