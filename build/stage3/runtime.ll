@@ -1678,6 +1678,8 @@ entry:
   %kp = alloca i64
   %list = alloca i64
   %i = alloca i64
+  %raw_key = alloca i64
+  %tagged_key = alloca i64
   store i64 %map.arg, i64* %map
   %t1 = load i64, i64* %map
   %t2 = add i64 0, 0
@@ -1714,23 +1716,28 @@ while.cond157:
   %t21 = trunc i64 %t19 to i1
   br i1 %t21, label %while.body158, label %while.end159
 while.body158:
-  %t22 = load i64, i64* %list
-  %t23 = load i64, i64* %kp
-  %t24 = load i64, i64* %i
-  %t25 = add i64 0, 8
-  %t26 = mul i64 %t24, %t25
-  %t27 = add i64 %t23, %t26
-  %t28 = inttoptr i64 %t27 to i64*
-  %t29 = load i64, i64* %t28
-  %t30 = call i64 @__list_push(i64 %t22, i64 %t29)
-  %t31 = load i64, i64* %i
-  %t32 = add i64 0, 1
-  %t33 = add i64 %t31, %t32
-  store i64 %t33, i64* %i
+  %t22 = load i64, i64* %kp
+  %t23 = load i64, i64* %i
+  %t24 = add i64 0, 8
+  %t25 = mul i64 %t23, %t24
+  %t26 = add i64 %t22, %t25
+  %t27 = inttoptr i64 %t26 to i64*
+  %t28 = load i64, i64* %t27
+  store i64 %t28, i64* %raw_key
+  %t29 = load i64, i64* %raw_key
+  %t30 = call i64 @__rt_tag_ptr(i64 %t29)
+  store i64 %t30, i64* %tagged_key
+  %t31 = load i64, i64* %list
+  %t32 = load i64, i64* %tagged_key
+  %t33 = call i64 @__list_push(i64 %t31, i64 %t32)
+  %t34 = load i64, i64* %i
+  %t35 = add i64 0, 1
+  %t36 = add i64 %t34, %t35
+  store i64 %t36, i64* %i
   br label %while.cond157
 while.end159:
-  %t34 = load i64, i64* %list
-  ret i64 %t34
+  %t37 = load i64, i64* %list
+  ret i64 %t37
 }
 
 define i64 @__map_values(i64 %map.arg) {
