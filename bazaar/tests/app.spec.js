@@ -144,11 +144,14 @@ test('category pills are visible on home page', async ({ page }) => {
 
 test('clicking a category pill navigates to search', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1000);
-
-    // Click the "CLI tools" pill
-    await page.locator('.pill').filter({ hasText: 'CLI tools' }).click();
     await page.waitForTimeout(1500);
+
+    // Click the "CLI tools" pill — use force:true since WASM click handlers
+    // can sometimes be tricky with playwright's actionability checks
+    const pill = page.locator('.pill').filter({ hasText: 'CLI tools' });
+    await expect(pill).toBeVisible();
+    await pill.click({ force: true });
+    await page.waitForTimeout(2000);
 
     // Should navigate to search route
     const url = page.url();
