@@ -4548,6 +4548,23 @@ class Codegen {
                     free.push("self")
                 }
             }
+            MapLit => {}
+            IfExpr(c, tb, tv, eb, ev) => {
+                this.find_free_vars_expr(c, bound, free)
+                this.find_free_vars_stmts(tb, bound, free)
+                this.find_free_vars_expr(tv, bound, free)
+                this.find_free_vars_stmts(eb, bound, free)
+                this.find_free_vars_expr(ev, bound, free)
+            }
+            TryExpr(tb, tv, cn, cb, cv) => {
+                this.find_free_vars_stmts(tb, bound, free)
+                this.find_free_vars_expr(tv, bound, free)
+                if (cn.length() > 0) {
+                    bound.push(cn)
+                }
+                this.find_free_vars_stmts(cb, bound, free)
+                this.find_free_vars_expr(cv, bound, free)
+            }
         }
     }
 
