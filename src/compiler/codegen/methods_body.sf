@@ -645,9 +645,11 @@
     fun gen_namespace_call(ns: String, method: String, obj: String, args: List<AST.Expr>, has_self: Bool): String {
     // Check if 'method' is actually a function-type field (not a real method).
     // e.g. this.compute() where compute is `var compute: () => T`
+    // Function types can be: "Fun(Nil)", "(T) => R", "() => Nil", etc.
     if (has_self and this.class_fields.has(ns)) {
         var ft: String = this.get_field_type(ns, method)
-        if (ft.starts_with("Fun(")) {
+        var is_fn_type: Bool = ft.starts_with("Fun(") or ft.contains("=>")
+        if (is_fn_type) {
             // Check there's no actual method with this name
             var full_check: String = ns + "__" + method
             var has_method: Bool = this.known_functions.contains(full_check)
