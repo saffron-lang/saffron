@@ -2540,7 +2540,8 @@ class Parser {
             }
             else {
                 // Text tokens (identifiers, numbers, symbols) until < or { or EOF
-                var text_parts: List<String> = []
+                var full_text: String = ""
+                var prev_part: String = ""
                 while (!this.match_kind_check("<") and !this.match_kind_check("{") and !this.match_kind_check("eof")) {
                     var kind: Lexer.TokenKind = this.current_kind()
                     var text_part: String = match (kind) {
@@ -2548,11 +2549,20 @@ class Parser {
                         TkInt(v) => v.to_string()
                         _ => this.kind_name(kind)
                     }
-                    text_parts.push(text_part)
+                    if (full_text.length() == 0) {
+                        full_text = text_part
+                    } else if (text_part == "." or text_part == "," or text_part == "!" or text_part == "?" or text_part == ":" or text_part == ";") {
+                        full_text = full_text + text_part
+                    } else if (prev_part == "-" or text_part == "-") {
+                        // Hyphenated words: no space around -
+                        full_text = full_text + text_part
+                    } else {
+                        full_text = full_text + " " + text_part
+                    }
+                    prev_part = text_part
                     this.advance()
                 }
-                if (text_parts.length() > 0) {
-                    var full_text: String = text_parts.join(" ")
+                if (full_text.length() > 0) {
                     stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [AST.Expr.StringLit(full_text)])))
                 } else {
                     this.advance()

@@ -144,6 +144,7 @@ fun register(app: Http.App, prefix: String) {
     _mount_publish(app, prefix + "/packages/publish")
     _mount_yank(app, prefix + "/packages/:name/yank/:version")
     _mount_register(app, prefix + "/auth/register")
+    _mount_login(app, prefix + "/auth/login")
     _mount_revoke(app, prefix + "/auth/revoke")
 }
 
@@ -190,6 +191,12 @@ fun _mount_yank(app: Http.App, path: String) {
 fun _mount_register(app: Http.App, path: String) {
     app.post(path, fun (req: Http.Request): Http.Response => {
         return _handle_register(req)
+    })
+}
+
+fun _mount_login(app: Http.App, path: String) {
+    app.post(path, fun (req: Http.Request): Http.Response => {
+        return _handle_login(req)
     })
 }
 
@@ -411,7 +418,7 @@ fun search_packages(req: Http.Request): SearchResponse {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/v1/auth/register — register a user and get a token
+// POST /api/v1/auth/register — register a user with password and get a token
 // ---------------------------------------------------------------------------
 
 fun _handle_register(req: Http.Request): Http.Response {
@@ -426,9 +433,51 @@ fun _handle_register(req: Http.Request): Http.Response {
         return _error_json(400, "username is required")
     }
 
-    var token = Auth.create_token(username)
+    var password = ""
+    if (body.has("password")) { password = body.get("password") }
+    if (password == "" or password == nil) {
+        return _error_json(400, "password is required")
+    }
+    if (password.length() < 6) {
+        return _error_json(400, "password must be at least 6 characters")
+    }
 
-    return _json_response(AuthResponse(true, username, token))
+    var result = Auth.register(username, password)
+    if (result.has("error")) {
+        return _error_json(400, result.get("error"))
+    }
+
+    return _json_response(AuthResponse(true, result.get("username"), result.get("token")))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/auth/login — login with username/password and get a token
+// ---------------------------------------------------------------------------
+
+fun _handle_login(req: Http.Request): Http.Response {
+    var body = parse_body(req)
+    if (body == nil) {
+        return _error_json(400, "invalid or empty request body")
+    }
+
+    var username = ""
+    if (body.has("username")) { username = body.get("username") }
+    if (username == "" or username == nil) {
+        return _error_json(400, "username is required")
+    }
+
+    var password = ""
+    if (body.has("password")) { password = body.get("password") }
+    if (password == "" or password == nil) {
+        return _error_json(400, "password is required")
+    }
+
+    var result = Auth.login(username, password)
+    if (result.has("error")) {
+        return _error_json(401, result.get("error"))
+    }
+
+    return _json_response(AuthResponse(true, result.get("username"), result.get("token")))
 }
 
 // ---------------------------------------------------------------------------
