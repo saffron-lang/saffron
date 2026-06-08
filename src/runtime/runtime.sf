@@ -634,14 +634,14 @@ fun __str_split(input: Int, delim: Int): Int {
         if (m == 0) {
             var lb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
             rt_strcpy(lb, pos)
-            __split_push(list, lb)
+            __split_push(list, __rt_tag_ptr(lb))
             rt_free(buf)
             return list
         }
         store8(m, 0)
         var tb: Int = __gc_alloc_safe(rt_strlen(pos) + 1, 1)
         rt_strcpy(tb, pos)
-        __split_push(list, tb)
+        __split_push(list, __rt_tag_ptr(tb))
         pos = m + dlen
     }
     rt_free(buf)
@@ -675,9 +675,9 @@ fun __str_replace(str: Int, old: Int, replacement: Int): Int {
     if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
-    if (ro == 0 or rr == 0) { return rt_strdup(rs) }
+    if (ro == 0 or rr == 0) { return __rt_tag_ptr(rt_strdup(rs)) }
     var slen: Int = rt_strlen(rs)
     var olen: Int = rt_strlen(ro)
     var nlen: Int = rt_strlen(rr)
@@ -695,21 +695,21 @@ fun __str_replace(str: Int, old: Int, replacement: Int): Int {
         var found: Int = rt_strstr(src, ro)
         if (found == 0) {
             __join_append(buf_p, len_p, cap_p, src, rt_strlen(src))
-            return load64(buf_p)
+            return __rt_tag_ptr(load64(buf_p))
         }
         var plen: Int = found - src
         __join_append(buf_p, len_p, cap_p, src, plen)
         __join_append(buf_p, len_p, cap_p, rr, nlen)
         src = found + olen
     }
-    return load64(buf_p)
+    return __rt_tag_ptr(load64(buf_p))
 }
 
 fun __list_join(list: Int, sep: Int): Int {
     if (list == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var rs: Int = __rt_untag_ptr(sep)
     var count: Int = load64(list)
@@ -739,7 +739,7 @@ fun __list_join(list: Int, sep: Int): Int {
         }
         i = i + 1
     }
-    return load64(buf_p)
+    return __rt_tag_ptr(load64(buf_p))
 }
 
 fun __list_contains(list: Int, val: Int): Int {
@@ -770,7 +770,7 @@ fun __io_read_file(path: Int): Int {
     if (rp == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
@@ -780,7 +780,7 @@ fun __io_read_file(path: Int): Int {
     if (fp == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     rt_fseek(fp, 0, 2)
     var size: Int = rt_ftell(fp)
@@ -789,7 +789,7 @@ fun __io_read_file(path: Int): Int {
     rt_fread(buf, 1, size, fp)
     store8(buf + size, 0)
     rt_fclose(fp)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun __io_file_size(path: Int): Int {
@@ -924,7 +924,7 @@ fun __io_read_stdin(n: Int): Int {
     if (rn <= 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var buf: Int = rt_malloc(rn + 1)
     var total: Int = 0
@@ -934,7 +934,7 @@ fun __io_read_stdin(n: Int): Int {
         total = total + got
     }
     store8(buf + total, 0)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun __io_readline(): Int {
@@ -948,7 +948,7 @@ fun __io_readline(): Int {
         len = len + 1
     }
     store8(buf + len, 0)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 // =============================================================================
@@ -961,14 +961,14 @@ fun __os_cwd(): Int {
     if (result == 0) {
         store8(buf, 0)
     }
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun __os_path_sep(): Int {
     var s: Int = rt_malloc(2)
     store8(s, 47)
     store8(s + 1, 0)
-    return s
+    return __rt_tag_ptr(s)
 }
 
 fun __os_platform(): Int {
@@ -979,7 +979,7 @@ fun __os_platform(): Int {
     store8(s + 3, 111)
     store8(s + 4, 115)
     store8(s + 5, 0)
-    return s
+    return __rt_tag_ptr(s)
 }
 
 fun __os_env(name: Int): Int {
@@ -988,9 +988,9 @@ fun __os_env(name: Int): Int {
     if (val == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
-    return rt_strdup(val)
+    return __rt_tag_ptr(rt_strdup(val))
 }
 
 @extern("i32 system(i8*)") fun __rt_system(cmd: Int): Int
@@ -1006,7 +1006,7 @@ fun __os_exec(cmd: Int): Int {
     if (rc == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var mode: Int = rt_malloc(2)
     store8(mode, 114)
@@ -1016,7 +1016,7 @@ fun __os_exec(cmd: Int): Int {
     if (fp == 0) {
         var empty: Int = rt_malloc(1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var buf_p: Int = rt_malloc(8)
     var len_p: Int = rt_malloc(8)
@@ -1035,7 +1035,7 @@ fun __os_exec(cmd: Int): Int {
     }
     rt_free(tmp)
     rt_pclose(fp)
-    return load64(buf_p)
+    return __rt_tag_ptr(load64(buf_p))
 }
 
 @intrinsic fun load_argc(): Int
@@ -1090,7 +1090,7 @@ fun rt_str_trim(s: Int): Int {
     if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var len: Int = rt_strlen(rs)
     var start: Int = 0
@@ -1115,7 +1115,7 @@ fun rt_str_trim(s: Int): Int {
     var buf: Int = __gc_alloc(new_len + 1, 1)
     rt_memcpy(buf, rs + start, new_len)
     store8(buf + new_len, 0)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun rt_str_index_of(s: Int, needle: Int): Int {
@@ -1133,7 +1133,7 @@ fun rt_str_repeat(s: Int, count: Int): Int {
     if (rs == 0 or rc <= 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var len: Int = rt_strlen(rs)
     var total: Int = len * rc
@@ -1144,7 +1144,7 @@ fun rt_str_repeat(s: Int, count: Int): Int {
         rt_strcat(buf, rs)
         i = i + 1
     }
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun rt_str_to_upper(s: Int): Int {
@@ -1152,7 +1152,7 @@ fun rt_str_to_upper(s: Int): Int {
     if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var len: Int = rt_strlen(rs)
     var buf: Int = __gc_alloc(len + 1, 1)
@@ -1167,7 +1167,7 @@ fun rt_str_to_upper(s: Int): Int {
         i = i + 1
     }
     store8(buf + len, 0)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 fun rt_str_to_lower(s: Int): Int {
@@ -1175,7 +1175,7 @@ fun rt_str_to_lower(s: Int): Int {
     if (rs == 0) {
         var empty: Int = __gc_alloc(1, 1)
         store8(empty, 0)
-        return empty
+        return __rt_tag_ptr(empty)
     }
     var len: Int = rt_strlen(rs)
     var buf: Int = __gc_alloc(len + 1, 1)
@@ -1190,7 +1190,7 @@ fun rt_str_to_lower(s: Int): Int {
         i = i + 1
     }
     store8(buf + len, 0)
-    return buf
+    return __rt_tag_ptr(buf)
 }
 
 // =============================================================================
