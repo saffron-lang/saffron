@@ -140,3 +140,28 @@ test('package detail page renders from direct URL', async ({ page }) => {
     expect(text).toContain('test-pkg');
     expect(text).toContain('pantry add test-pkg');
 });
+
+test('home page makes API request for packages', async ({ page }) => {
+    const apiRequests = [];
+    page.on('request', req => {
+        if (req.url().includes('/api/')) apiRequests.push(req.url());
+    });
+
+    await page.goto('/');
+    await page.waitForTimeout(2000);
+
+    // Should have attempted to fetch packages from API
+    expect(apiRequests.some(u => u.includes('/api/v1/packages'))).toBe(true);
+});
+
+test('login page renders with auth form', async ({ page }) => {
+    await page.goto('/#/login');
+    await page.waitForTimeout(1500);
+
+    const text = await page.locator('#app').textContent();
+    // Should show login/register UI
+    expect(text).toContain('Sign in') || expect(text).toContain('Create');
+    // Should have at least 2 inputs (username + password)
+    const inputs = await page.locator('input').count();
+    expect(inputs).toBeGreaterThanOrEqual(2);
+});
