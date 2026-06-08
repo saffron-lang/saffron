@@ -29,42 +29,10 @@ class Query<T> {
         this._stale_time = stale_time
         this._cancelled = false
         this._fetch_id = 0
-        this._fetch()
+        this._do_fetch()
     }
 
-    fun _fetch() {
-        IO.println("[basil] _fetch called")
-        IO.println("[basil] about to call cache.get")
-        var cached = BasilCache.store.get(this.url)
-        IO.println("[basil] cache.get returned")
-        IO.println("[basil] skipping cache check, going direct to fetch")
-        this.isLoading.set(true)
-        this._fetch_id = this._fetch_id + 1
-        var expected_id: Float = this._fetch_id
-        var self = this
-        IO.println("[basil] calling BasilFetch.get")
-        BasilFetch.get(self.url, fun (response: String) => {
-            if (self._cancelled or self._fetch_id != expected_id) { return }
-            Signal.batch(fun () => {
-                var parsed = JSON.parse(response)
-                if (parsed != nil) {
-                    self.data.set(parsed)
-                    self.error.set("")
-                    BasilCache.store.set(self.url, parsed, self._stale_time)
-                } else {
-                    self.error.set("Failed to parse response")
-                }
-                self.isLoading.set(false)
-            })
-        })
-        IO.println("[basil] BasilFetch.get called successfully")
-        return
-        // Original cache logic (bypassed for debugging):
-        if (cached != nil and !cached.is_stale) {
-            this.data.set(cached.data)
-            return
-        }
-
+    fun _do_fetch() {
         this.isLoading.set(true)
         this._fetch_id = this._fetch_id + 1
         var expected_id: Float = this._fetch_id
@@ -76,7 +44,6 @@ class Query<T> {
                 if (parsed != nil) {
                     self.data.set(parsed)
                     self.error.set("")
-                    BasilCache.store.set(self.url, parsed, self._stale_time)
                 } else {
                     self.error.set("Failed to parse response")
                 }
@@ -86,12 +53,11 @@ class Query<T> {
     }
 
     fun refetch() {
-        BasilCache.store.invalidate(this.url)
-        this._fetch()
+        this._do_fetch()
     }
 
     fun invalidate() {
-        BasilCache.store.invalidate(this.url)
+        this.data.set(nil)
     }
 
     fun cancel() {
