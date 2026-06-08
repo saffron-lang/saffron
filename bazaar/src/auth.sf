@@ -1,11 +1,100 @@
-//! Token-based authentication for the Bazaar registry.
+//! Password + token authentication for the Bazaar registry.
+//! Passwords are stored as salted SHA-256 hashes.
 //! Tokens are stored hashed in the SQLite database.
 
 import "@crypto" as Crypto
 import "./db.sf" as Db
 
 // ---------------------------------------------------------------------------
-// Public API
+// Password hashing
+// ---------------------------------------------------------------------------
+
+/// Hash a password with a static salt prefix.
+/// Uses SHA-256 for simplicity (not bcrypt — acceptable for a package registry).
+fun hash_password(password: String): String {
+    return Crypto.sha256("bazaar_salt:" + password)
+}
+
+// ---------------------------------------------------------------------------
+// Registration & Login
+// ---------------------------------------------------------------------------
+
+/// Register a new user with a password.
+/// Returns a map with keys: "ok", "username", "token" on success,
+/// or "error" on failure.
+fun register(username: String, password: String): Map<String, String> {
+    var result: Map<String, String> = {}
+
+    if (username.length() == 0) {
+        result.set("error", "username is required")
+        return result
+    }
+    if (password.length() < 6) {
+        result.set("error", "password must be at least 6 characters")
+        return result
+    }
+
+    // Check if user already exists
+    if (Db.user_exists(username)) {
+        result.set("error", "username already taken")
+        return result
+    }
+
+    // Hash password and create user
+    var pw_hash = hash_password(password)
+    var user_id = Db.create_user(username, pw_hash)
+    if (user_id == "") {
+        result.set("error", "failed to create user")
+        return result
+    }
+
+    // Create token for the new user
+    var token = create_token(username)
+    result.set("ok", "true")
+    result.set("username", username)
+    result.set("token", token)
+    return result
+}
+
+/// Login with username and password.
+/// Returns a map with keys: "ok", "username", "token" on success,
+/// or "error" on failure.
+fun login(username: String, password: String): Map<String, String> {
+    var result: Map<String, String> = {}
+
+    if (username.length() == 0) {
+        result.set("error", "username is required")
+        return result
+    }
+    if (password.length() == 0) {
+        result.set("error", "password is required")
+        return result
+    }
+
+    // Check user exists
+    if (!Db.user_exists(username)) {
+        result.set("error", "invalid username or password")
+        return result
+    }
+
+    // Verify password
+    var stored_hash = Db.get_user_password_hash(username)
+    var provided_hash = hash_password(password)
+    if (stored_hash != provided_hash) {
+        result.set("error", "invalid username or password")
+        return result
+    }
+
+    // Create new token
+    var token = create_token(username)
+    result.set("ok", "true")
+    result.set("username", username)
+    result.set("token", token)
+    return result
+}
+
+// ---------------------------------------------------------------------------
+// Token API (unchanged)
 // ---------------------------------------------------------------------------
 
 /// Validate an API token. Returns the username if valid, or "" if invalid.

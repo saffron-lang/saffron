@@ -100,7 +100,9 @@ fun init() {
 fun _run_migrations() {
     _exec("CREATE TABLE IF NOT EXISTS packages (name TEXT PRIMARY KEY, description TEXT DEFAULT '', repository TEXT DEFAULT '', license TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now')), total_downloads INTEGER DEFAULT 0)")
     _exec("CREATE TABLE IF NOT EXISTS versions (id INTEGER PRIMARY KEY AUTOINCREMENT, package_name TEXT NOT NULL REFERENCES packages(name), version TEXT NOT NULL, checksum TEXT NOT NULL, published_by TEXT DEFAULT '', published_at TEXT DEFAULT (datetime('now')), yanked INTEGER DEFAULT 0, UNIQUE(package_name, version))")
-    _exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, created_at TEXT DEFAULT (datetime('now')))")
+    _exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now')))")
+    // Migration: add password_hash column if missing (existing databases)
+    _exec("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
     _exec("CREATE TABLE IF NOT EXISTS tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT UNIQUE NOT NULL, user_id INTEGER REFERENCES users(id), created_at TEXT DEFAULT (datetime('now')), revoked INTEGER DEFAULT 0)")
     _exec("CREATE TABLE IF NOT EXISTS downloads (id INTEGER PRIMARY KEY AUTOINCREMENT, package_name TEXT NOT NULL, version TEXT NOT NULL, downloaded_at TEXT DEFAULT (datetime('now')))")
     _exec("CREATE TABLE IF NOT EXISTS owners (package_name TEXT NOT NULL REFERENCES packages(name), user_id INTEGER NOT NULL REFERENCES users(id), PRIMARY KEY (package_name, user_id))")
@@ -209,6 +211,37 @@ fun ensure_user(username: String): String {
     var new_row = _query_one("SELECT id FROM users WHERE username = '" +esc_u + "'")
     if (new_row == nil) { return "0" }
     return new_row.get("id")
+}
+
+/// Create a user with a password hash. Returns the user id as a string.
+/// Returns "" if the user already exists.
+fun create_user(username: String, password_hash: String): String {
+    var esc_u = username.replace("'", "''")
+    var esc_h = password_hash.replace("'", "''")
+    // Check if user already exists
+    var existing = _query_one("SELECT id FROM users WHERE username = '" + esc_u + "'")
+    if (existing != nil) { return "" }
+    _exec("INSERT INTO users (username, password_hash) VALUES ('" + esc_u + "', '" + esc_h + "')")
+    var new_row = _query_one("SELECT id FROM users WHERE username = '" + esc_u + "'")
+    if (new_row == nil) { return "" }
+    return new_row.get("id")
+}
+
+/// Get the stored password hash for a user. Returns "" if user not found.
+fun get_user_password_hash(username: String): String {
+    var esc_u = username.replace("'", "''")
+    var row = _query_one("SELECT password_hash FROM users WHERE username = '" + esc_u + "'")
+    if (row == nil) { return "" }
+    var hash = row.get("password_hash")
+    if (hash == nil) { return "" }
+    return hash
+}
+
+/// Check if a user exists by username.
+fun user_exists(username: String): Bool {
+    var esc_u = username.replace("'", "''")
+    var row = _query_one("SELECT id FROM users WHERE username = '" + esc_u + "'")
+    return row != nil
 }
 
 /// Store a hashed token for a user.

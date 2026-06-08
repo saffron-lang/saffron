@@ -344,7 +344,9 @@ fun __map_keys(map: Int): Int {
     var list: Int = __list_new()
     var i: Int = 0
     while (i < count) {
-        __list_push(list, load64(kp + i * 8))
+        var raw_key: Int = load64(kp + i * 8)
+        var tagged_key: Int = __rt_tag_ptr(raw_key)
+        __list_push(list, tagged_key)
         i = i + 1
     }
     return list

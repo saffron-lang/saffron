@@ -31,9 +31,11 @@ var detail_query = signal(nil)
 
 // Login page state (module-level to avoid closure forward-reference bug)
 var login_username_input = signal("")
+var login_password_input = signal("")
 var login_auth_error = signal("")
 var login_auth_token_display = signal("")
 var login_is_loading = signal(false)
+var login_is_register_mode = signal(true)
 
 // Publish page state (module-level to avoid closure forward-reference bug)
 var publish_pkg_name = signal("")
@@ -593,28 +595,58 @@ fun PackageDetailPage() {
 
 fun LoginPage() {
     var register_mutation = Api.createAuthRegister()
+    var login_mutation = Api.createAuthLogin()
+
+    fun _handle_auth_response(data: Any) {
+        login_is_loading.set(false)
+        if (data.has("token")) {
+            var token: String = data.get("token")
+            var uname: String = data.get("username")
+            auth_token_global.set(token)
+            auth_username_global.set(uname)
+            login_auth_token_display.set(token)
+        } else if (data.has("error")) {
+            login_auth_error.set(data.get("error"))
+        }
+    }
 
     fun do_register() {
         var username: String = login_username_input.get()
+        var password: String = login_password_input.get()
         if (username.length() == 0) {
             login_auth_error.set("Please enter a username")
             return
         }
+        if (password.length() < 6) {
+            login_auth_error.set("Password must be at least 6 characters")
+            return
+        }
         login_is_loading.set(true)
         login_auth_error.set("")
-        register_mutation.on_success(fun (data: Any) => {
-            login_is_loading.set(false)
-            if (data.has("token")) {
-                var token: String = data.get("token")
-                var uname: String = data.get("username")
-                auth_token_global.set(token)
-                auth_username_global.set(uname)
-                login_auth_token_display.set(token)
-            } else if (data.has("error")) {
-                login_auth_error.set(data.get("error"))
-            }
-        })
-        register_mutation.mutate({"username": username})
+        register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+        register_mutation.mutate({"username": username, "password": password})
+    }
+
+    fun do_login() {
+        var username: String = login_username_input.get()
+        var password: String = login_password_input.get()
+        if (username.length() == 0) {
+            login_auth_error.set("Please enter a username")
+            return
+        }
+        if (password.length() == 0) {
+            login_auth_error.set("Please enter a password")
+            return
+        }
+        login_is_loading.set(true)
+        login_auth_error.set("")
+        login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+        login_mutation.mutate({"username": username, "password": password})
+    }
+
+    fun toggle_mode() {
+        login_is_register_mode.set(!login_is_register_mode.get())
+        login_auth_error.set("")
     }
 
     <div>
@@ -624,8 +656,12 @@ fun LoginPage() {
             <div cls="auth-card">
                 <div cls="auth-header">
                     <div cls="auth-ico">B</div>
-                    <h1 cls="auth-title">Sign in to Bazaar</h1>
-                    <p cls="auth-desc">Get a token for publishing packages</p>
+                    <h1 cls="auth-title">
+                        {if (login_is_register_mode.get()) { text("Create an account") } else { text("Sign in to Bazaar") }}
+                    </h1>
+                    <p cls="auth-desc">
+                        {if (login_is_register_mode.get()) { text("Register to start publishing packages") } else { text("Sign in with your credentials") }}
+                    </p>
                 </div>
 
                 {if (login_auth_token_display.get().length() > 0) {
@@ -638,22 +674,39 @@ fun LoginPage() {
                         {Router.Link(router, "/", cls="btn-primary") { text("Go to Home") }}
                     </div>
                 } else {
-                    <form cls="auth-form" on_submit={fun (e: Event) => do_register()}>
+                    <form cls="auth-form" on_submit={fun (e: Event) => { if (login_is_register_mode.get()) { do_register() } else { do_login() } }}>
                         <div cls="form-group">
                             <label cls="form-label">Username</label>
                             <input cls="form-input" type="text" placeholder="your-username" on_input={fun (e: Event) => login_username_input.set(event_target_value())} />
+                        </div>
+                        <div cls="form-group">
+                            <label cls="form-label">Password</label>
+                            <input cls="form-input" type="password" placeholder="your-password" on_input={fun (e: Event) => login_password_input.set(event_target_value())} />
+                            {if (login_is_register_mode.get()) {
+                                <span cls="form-hint">Must be at least 6 characters</span>
+                            }}
                         </div>
                         {if (login_auth_error.get().length() > 0) {
                             <div cls="form-error">{login_auth_error.get()}</div>
                         }}
                         <button cls="btn-primary" type="submit">
-                            {if (login_is_loading.get()) { text("Registering...") } else { text("Get Token") }}
+                            {if (login_is_loading.get()) {
+                                {if (login_is_register_mode.get()) { text("Creating account...") } else { text("Signing in...") }}
+                            } else {
+                                {if (login_is_register_mode.get()) { text("Create Account") } else { text("Sign In") }}
+                            }}
                         </button>
                     </form>
                 }}
 
                 <p cls="auth-footer-text">
-                    Bazaar uses token-based authentication. No password needed.
+                    {if (login_is_register_mode.get()) {
+                        {text("Already have an account? ")}
+                        <a cls="auth-toggle-link" on_click={fun (e: Event) => toggle_mode()}>Sign in</a>
+                    } else {
+                        {text("Don't have an account? ")}
+                        <a cls="auth-toggle-link" on_click={fun (e: Event) => toggle_mode()}>Create one</a>
+                    }}
                 </p>
             </div>
         </div>

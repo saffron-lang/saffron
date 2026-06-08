@@ -30,9 +30,14 @@ fun createYank(name: String, version: String): Mutation {
     return mutation("/api/v1/packages/${name}/yank/${version}")
 }
 
-/// Register a new user and get a token
+/// Register a new user with password and get a token
 fun createAuthRegister(): Mutation {
     return mutation("/api/v1/auth/register")
+}
+
+/// Login with username and password, get a token
+fun createAuthLogin(): Mutation {
+    return mutation("/api/v1/auth/login")
 }
 
 /// Revoke current token
