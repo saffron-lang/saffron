@@ -317,15 +317,13 @@ fun HomePage() {
                 <h2 cls="section-title">All packages</h2>
                 {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
             </div>
-            {var grid_el = div(cls="pkg-grid")
+            {var grid_el = div(cls="pkg-grid", block=fun () => {
+                <div cls="empty-state">No packages published yet. Be the first!</div>
+            })
             // on_data fires immediately if data already cached, else on fetch completion
             packages_query.on_data(fun (data: Any) => {
                 _render_pkg_grid(grid_el, data)
             })
-            // Render empty state if data hasn't arrived yet
-            if (packages_query.data.value == nil) {
-                _render_pkg_grid(grid_el, nil)
-            }
             nil}
         </div>
 
@@ -462,7 +460,9 @@ fun SearchResultsPage() {
                     <strong>{text(search_query.get())}</strong>
                     <span>"</span>
                 </p>
-                {list_el = div(cls="results-list")
+                {list_el = div(cls="results-list", block=fun () => {
+                    <div cls="empty-state">No packages found matching your query.</div>
+                })
                 nil}
 
                 <div cls="pager">
@@ -648,7 +648,26 @@ fun PackageDetailPage() {
     <div>
         {NavBarWithSearch()}
 
-        {container_el = div(cls="detail-container")
+        {container_el = div(cls="detail-container", block=fun () => {
+            <div cls="pkg-header">
+                <div cls="pkg-header-inner">
+                    <div cls="pkg-header-top">
+                        <div cls="pkg-header-ico">{text(pkg_name.char_at(0))}</div>
+                        <div>
+                            <h1 cls="pkg-header-title">{text(pkg_name)}</h1>
+                            <div cls="pkg-install">
+                                <code>{text("pantry add " + pkg_name)}</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div cls="pkg-tabs">
+                        <div cls="pkg-tab on">Readme</div>
+                        <div cls="pkg-tab">Versions</div>
+                        <div cls="pkg-tab">Dependencies</div>
+                    </div>
+                </div>
+            </div>
+        })
         nil}
 
         {Footer()}
