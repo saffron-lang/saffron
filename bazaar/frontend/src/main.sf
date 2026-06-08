@@ -257,6 +257,25 @@ fun PackageRow(pkg: Map<String, String>) {
 // Pages — Landing
 // =============================================================================
 
+fun _render_pkg_grid(grid_el: Float, data: Any) {
+    render_into(grid_el, fun () => {
+        if (data != nil and data.has("packages")) {
+            var pkgs = data.get("packages")
+            if (pkgs.length() == 0) {
+                <div cls="empty-state">No packages published yet. Be the first!</div>
+            } else {
+                var i: Float = 0
+                while (i < pkgs.length()) {
+                    {PackageCard(pkgs[i])}
+                    i = i + 1
+                }
+            }
+        } else {
+            <div cls="empty-state">No packages published yet. Be the first!</div>
+        }
+    })
+}
+
 fun HomePage() {
     <div>
         {NavBar()}
@@ -298,9 +317,16 @@ fun HomePage() {
                 <h2 cls="section-title">All packages</h2>
                 {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
             </div>
-            <div cls="pkg-grid">
-                <div cls="empty-state">No packages published yet. Be the first!</div>
-            </div>
+            {var grid_el = div(cls="pkg-grid")
+            // on_data fires immediately if data already cached, else on fetch completion
+            packages_query.on_data(fun (data: Any) => {
+                _render_pkg_grid(grid_el, data)
+            })
+            // Render empty state if data hasn't arrived yet
+            if (packages_query.data.value == nil) {
+                _render_pkg_grid(grid_el, nil)
+            }
+            nil}
         </div>
 
         {Footer()}
@@ -373,8 +399,44 @@ fun SearchSidebar() {
     </aside>
 }
 
+fun _render_search_results(list_el: Float, count_el: Float, data: Any) {
+    // Update results count
+    var total: Float = 0
+    if (data != nil and data.has("total")) {
+        total = data.get("total")
+    } else if (data != nil and data.has("packages")) {
+        total = data.get("packages").length()
+    }
+    render_into(count_el, fun () => {
+        text(total.to_string() + " results")
+    })
+    // Update results list
+    render_into(list_el, fun () => {
+        if (data != nil and data.has("packages")) {
+            var pkgs = data.get("packages")
+            if (pkgs.length() == 0) {
+                <div cls="empty-state">No packages found matching your query.</div>
+            } else {
+                var i: Float = 0
+                while (i < pkgs.length()) {
+                    {PackageRow(pkgs[i])}
+                    i = i + 1
+                }
+            }
+        } else {
+            <div cls="empty-state">No packages found matching your query.</div>
+        }
+    })
+}
+
 fun SearchResultsPage() {
     var _sq = search_query.get()
+    // Pre-capture the query so on_data can reference it
+    var query = search_results_query.get()
+    // We'll store element handles to update later
+    var count_el: Float = 0
+    var list_el: Float = 0
+
     <div>
         {NavBarWithSearch()}
 
@@ -384,7 +446,10 @@ fun SearchResultsPage() {
             {Router.Link(router, "/search?q=cli", cls="tab") { text("CLI Tools") }}
             {Router.Link(router, "/search?q=util", cls="tab") { text("Utilities") }}
             <div cls="tab-r">
-                <span cls="result-ct">0 results</span>
+                {count_el = span(cls="result-ct", block=fun () => {
+                    text("0 results")
+                })
+                nil}
             </div>
         </div>
 
@@ -397,9 +462,8 @@ fun SearchResultsPage() {
                     <strong>{text(search_query.get())}</strong>
                     <span>"</span>
                 </p>
-                <div cls="results-list">
-                    <div cls="empty-state">No packages found matching your query.</div>
-                </div>
+                {list_el = div(cls="results-list")
+                nil}
 
                 <div cls="pager">
                     <div cls="page-btn on">1</div>
@@ -409,6 +473,19 @@ fun SearchResultsPage() {
 
         {Footer()}
     </div>
+
+    // Wire up data callback after DOM is built
+    if (query != nil) {
+        query.on_data(fun (data: Any) => {
+            _render_search_results(list_el, count_el, data)
+        })
+        // Render empty state if data hasn't arrived yet
+        if (query.data.value == nil) {
+            _render_search_results(list_el, count_el, nil)
+        }
+    } else {
+        _render_search_results(list_el, count_el, nil)
+    }
 }
 
 // =============================================================================
@@ -530,13 +607,17 @@ fun _extract_pkg_name(path: String): String {
     return _detail_name_raw
 }
 
-fun PackageDetailPage() {
-    <div>
-        {NavBarWithSearch()}
-
-        {var pkg_name: String = _detail_name_raw
-        if (pkg_name.length() == 0) { pkg_name = _extract_pkg_name(router.current()) }
-        <div cls="detail-container">
+fun _render_detail_content(container_el: Float, pkg_name: String, data: Any) {
+    render_into(container_el, fun () => {
+        if (data != nil) {
+            var description: String = ""
+            if (data.has("description")) { description = data.get("description").to_string() }
+            var latest: String = ""
+            if (data.has("latest")) { latest = data.get("latest").to_string() }
+            var versions: List<Any> = []
+            if (data.has("versions")) { versions = data.get("versions") }
+            {PackageDetailContent(pkg_name, data, description, latest, versions)}
+        } else {
             <div cls="pkg-header">
                 <div cls="pkg-header-inner">
                     <div cls="pkg-header-top">
@@ -555,11 +636,36 @@ fun PackageDetailPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        }
+    })
+}
+
+fun PackageDetailPage() {
+    var pkg_name: String = _detail_name_raw
+    if (pkg_name.length() == 0) { pkg_name = _extract_pkg_name(router.current()) }
+    var container_el: Float = 0
+
+    <div>
+        {NavBarWithSearch()}
+
+        {container_el = div(cls="detail-container")
         nil}
 
         {Footer()}
     </div>
+
+    // Wire up data callback
+    var query = detail_query.get()
+    if (query != nil) {
+        query.on_data(fun (data: Any) => {
+            _render_detail_content(container_el, pkg_name, data)
+        })
+        if (query.data.value == nil) {
+            _render_detail_content(container_el, pkg_name, nil)
+        }
+    } else {
+        _render_detail_content(container_el, pkg_name, nil)
+    }
 }
 
 // =============================================================================
