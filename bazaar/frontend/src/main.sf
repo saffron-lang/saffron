@@ -593,9 +593,10 @@ fun PackageDetailPage() {
 // Pages — Login / Register
 // =============================================================================
 
+var _register_mutation = Api.createAuthRegister()
+var _login_mutation = Api.createAuthLogin()
+
 fun LoginPage() {
-    var register_mutation = Api.createAuthRegister()
-    var login_mutation = Api.createAuthLogin()
 
     fun _handle_auth_response(data: Any) {
         login_is_loading.set(false)
@@ -623,8 +624,8 @@ fun LoginPage() {
         }
         login_is_loading.set(true)
         login_auth_error.set("")
-        register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
-        register_mutation.mutate({"username": username, "password": password})
+        _register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+        _register_mutation.mutate({"username": username, "password": password})
     }
 
     fun do_login() {
@@ -640,8 +641,8 @@ fun LoginPage() {
         }
         login_is_loading.set(true)
         login_auth_error.set("")
-        login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
-        login_mutation.mutate({"username": username, "password": password})
+        _login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+        _login_mutation.mutate({"username": username, "password": password})
     }
 
     fun toggle_mode() {
