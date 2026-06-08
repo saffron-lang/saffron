@@ -14,10 +14,8 @@ import { signal, computed, effect, batch, untrack, Signal, Computed, EffectHandl
 import { hash, history, memory, Link, Router, RouteParams, RouteDef, Mode, split_path, parse_query, match_pattern } from "./router.sf"
 
 // =============================================================================
-// Events — typed DOM event system
+// Events — Event class lives in prelude (auto-imported)
 // =============================================================================
-
-import { Event, MouseEventData, KeyboardEventData, InputEventData, FocusEventData, SubmitEventData, DragEventData, TouchPoint, TouchEventData, WheelEventData, register_handler, register_handler_with_options, unregister_handler, on, on_prevent, off, on_click, on_dblclick, on_mousedown, on_mouseup, on_mousemove, on_mouseenter, on_mouseleave, on_keydown, on_keyup, on_input, on_change, on_focus, on_blur, on_submit, on_wheel, on_scroll, bind_value, bind_checked } from "./events.sf"
 
 // =============================================================================
 // Style — CSS utilities

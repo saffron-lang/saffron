@@ -2,7 +2,7 @@
 // HTML elements (div, h1, button, etc.) come from turmeric prelude automatically
 import { signal, computed, effect } from "turmeric/signal"
 import { cx } from "turmeric/style"
-import { Event } from "turmeric/events"
+import { Event } from "turmeric/prelude"
 import "turmeric/router" as Router
 
 // =============================================================================
