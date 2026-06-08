@@ -130,6 +130,7 @@ class Signal<T> {
 
     fun set(next: T) {
         this.value = next
+        _schedule_notify(this, fun () => this.notify())
     }
 
     fun update(fn: (T) => T) {

@@ -4,7 +4,7 @@
 import { signal, computed, effect } from "turmeric/signal"
 import { Event } from "turmeric/events"
 import "turmeric/router" as Router
-import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, label, mount, event_target_value } from "turmeric/prelude"
+import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, label, mount, event_target_value, render_into } from "turmeric/prelude"
 import "./api.sf" as Api
 
 // =============================================================================
@@ -288,27 +288,42 @@ fun HomePage() {
             </div>
         </section>
 
-        {LoadingIndicator(packages_query)}
+        {var loading_container: Float = div(cls="loading-area")
+        effect(fun () => {
+            var loading: Bool = packages_query.isLoading.get()
+            render_into(loading_container, fun () => {
+                if (loading) {
+                    <div cls="loading">
+                        <div cls="spinner"></div>
+                        <span>Loading...</span>
+                    </div>
+                }
+            })
+        })}
 
         <div cls="section wrap">
             <div cls="section-hd">
                 <h2 cls="section-title">All packages</h2>
                 {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
             </div>
-            <div cls="pkg-grid">
-                {var data = packages_query.data.get()
-                if (data != nil and data.has("packages")) {
-                    var pkgs = data.get("packages")
-                    var i: Float = 0
-                    while (i < pkgs.length()) {
-                        PackageCard(pkgs[i])
-                        i = i + 1
+            {var pkg_grid_container: Float = div(cls="pkg-grid")
+            effect(fun () => {
+                var data = packages_query.data.get()
+                var loading: Bool = packages_query.isLoading.get()
+                render_into(pkg_grid_container, fun () => {
+                    if (data != nil and data.has("packages")) {
+                        var pkgs = data.get("packages")
+                        var i: Float = 0
+                        while (i < pkgs.length()) {
+                            PackageCard(pkgs[i])
+                            i = i + 1
+                        }
+                        if (pkgs.length() == 0 and !loading) {
+                            <div cls="empty-state">No packages published yet. Be the first!</div>
+                        }
                     }
-                    if (pkgs.length() == 0 and !packages_query.isLoading.get()) {
-                        <div cls="empty-state">No packages published yet. Be the first!</div>
-                    }
-                }}
-            </div>
+                })
+            })}
         </div>
 
         {Footer()}
@@ -382,28 +397,27 @@ fun SearchSidebar() {
 }
 
 fun SearchResultsPage() {
-    var query = search_results_query.get()
-    var total_str: String = "0"
-    var pkg_count: Float = 0
-    if (query != nil and query.data.get() != nil) {
-        var qdata = query.data.get()
-        if (qdata.has("total")) { total_str = qdata.get("total").to_string() }
-    }
-
     <div>
         {NavBarWithSearch()}
 
-        <div cls="tab-strip">
-            <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
-            <div cls="tab-r">
-                <span cls="result-ct">{total_str} results</span>
-            </div>
-        </div>
-
-        {LoadingIndicator(query)}
+        {var tab_strip_container: Float = div(cls="tab-strip")
+        effect(fun () => {
+            var query = search_results_query.get()
+            var total_str: String = "0"
+            if (query != nil and query.data.get() != nil) {
+                var qdata = query.data.get()
+                if (qdata.has("total")) { total_str = qdata.get("total").to_string() }
+            }
+            render_into(tab_strip_container, fun () => {
+                <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
+                <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
+                <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
+                <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
+                <div cls="tab-r">
+                    <span cls="result-ct">{total_str} results</span>
+                </div>
+            })
+        })}
 
         <div cls="layout">
             {SearchSidebar()}
@@ -414,20 +428,34 @@ fun SearchResultsPage() {
                     <strong>{text(search_query.get())}</strong>
                     {text("\"")}
                 </p>
-                {if (query != nil) {
-                    var data = query.data.get()
-                    if (data != nil and data.has("packages")) {
-                        var pkgs = data.get("packages")
-                        var i: Float = 0
-                        while (i < pkgs.length()) {
-                            PackageRow(pkgs[i])
-                            i = i + 1
-                        }
-                        if (pkgs.length() == 0 and !query.isLoading.get()) {
-                            <div cls="empty-state">No packages found matching your query.</div>
-                        }
+                {var results_container: Float = div(cls="results-list")
+                effect(fun () => {
+                    var query = search_results_query.get()
+                    var data: Any = nil
+                    var loading: Bool = false
+                    if (query != nil) {
+                        data = query.data.get()
+                        loading = query.isLoading.get()
                     }
-                }}
+                    render_into(results_container, fun () => {
+                        if (loading) {
+                            <div cls="loading">
+                                <div cls="spinner"></div>
+                                <span>Loading...</span>
+                            </div>
+                        } else if (data != nil and data.has("packages")) {
+                            var pkgs = data.get("packages")
+                            var i: Float = 0
+                            while (i < pkgs.length()) {
+                                PackageRow(pkgs[i])
+                                i = i + 1
+                            }
+                            if (pkgs.length() == 0) {
+                                <div cls="empty-state">No packages found matching your query.</div>
+                            }
+                        }
+                    })
+                })}
 
                 <div cls="pager">
                     <div cls="page-btn on">1</div>
@@ -559,31 +587,56 @@ fun _extract_pkg_name(path: String): String {
 }
 
 fun PackageDetailPage() {
-    var query = detail_query.get()
-
     <div>
         {NavBarWithSearch()}
 
-        {if (query != nil and query.data.get() != nil) {
-            var data = query.data.get()
-            var name: String = _detail_name_raw
-            if (name.length() == 0) { name = detail_name_sig.get() }
-            if (name.length() == 0) { name = _extract_pkg_name(router.current()) }
-            var latest: String = ""
-            var description: String = ""
-            var versions = []
-            if (data.has("description")) { description = data.get("description") }
-            if (data.has("versions")) {
-                versions = data.get("versions")
-                if (versions.length() > 0) {
-                    latest = versions[versions.length() - 1].get("vers")
-                }
+        {var detail_container: Float = div(cls="detail-container")
+        effect(fun () => {
+            var query = detail_query.get()
+            var data: Any = nil
+            var loading: Bool = false
+            if (query != nil) {
+                data = query.data.get()
+                loading = query.isLoading.get()
             }
-
-            {PackageDetailContent(name, data, description, latest, versions)}
-        } else {
-            LoadingIndicator(query)
-        }}
+            var pkg_name: String = _detail_name_raw
+            if (pkg_name.length() == 0) { pkg_name = detail_name_sig.get() }
+            if (pkg_name.length() == 0) { pkg_name = _extract_pkg_name(router.current()) }
+            render_into(detail_container, fun () => {
+                if (data != nil) {
+                    var latest: String = ""
+                    var description: String = ""
+                    var versions = []
+                    if (data.has("description")) { description = data.get("description") }
+                    if (data.has("versions")) {
+                        versions = data.get("versions")
+                        if (versions.length() > 0) {
+                            latest = versions[versions.length() - 1].get("vers")
+                        }
+                    }
+                    PackageDetailContent(pkg_name, data, description, latest, versions)
+                } else if (loading) {
+                    <div cls="loading">
+                        <div cls="spinner"></div>
+                        <span>Loading...</span>
+                    </div>
+                } else {
+                    <div cls="pkg-header">
+                        <div cls="pkg-header-inner">
+                            <div cls="pkg-header-top">
+                                <div cls="pkg-header-ico">{text(pkg_name.char_at(0))}</div>
+                                <div>
+                                    <h1 cls="pkg-header-title">{text(pkg_name)}</h1>
+                                    <div cls="pkg-install">
+                                        <code>{text("pantry add " + pkg_name)}</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            })
+        })}
 
         {Footer()}
     </div>
