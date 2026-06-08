@@ -837,6 +837,8 @@ router.route("/search", fun (p: Router.RouteParams) => {
     if (q.length() > 0) {
         search_query.set(q)
         search_results_query.set(Api.searchPackages(q))
+    } else {
+        search_results_query.set(packages_query)
     }
     SearchResultsPage()
 })
