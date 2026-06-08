@@ -371,7 +371,7 @@ fun generate_imports(used_elements: List<String>, source: String): String {
         sb.append("import { Node, mount } from \"turmeric/element\"\n")
     }
     if (source.contains("Event") or source.contains("on_click") or source.contains("on_input") or source.contains("on_keydown")) {
-        sb.append("import { Event, on_click, on_input, on_keydown, on_change, on_submit, bind_value } from \"turmeric/events\"\n")
+        sb.append("import { Event, event_target_value } from \"turmeric/prelude\"\n")
     }
     if (source.contains("cx(")) {
         sb.append("import { cx } from \"turmeric/style\"\n")
