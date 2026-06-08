@@ -94,6 +94,7 @@ const imports = { env: new Proxy({
         if (!el) return;
         const name = readCString(eventPtr);
         el.addEventListener(name, (e) => {
+            if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             const typed = _findExport(`__dispatch_${name}`);
             if (typed) { typed(callbackId, 0n); }
@@ -106,6 +107,7 @@ const imports = { env: new Proxy({
         if (!el) return;
         const name = readCString(eventPtr);
         el.addEventListener(name, (e) => {
+            if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
             const typed = _findExport(`__dispatch_${name}`);
             if (typed) { typed(callbackId, 0n); }
