@@ -1066,6 +1066,127 @@
             nparams = this.func_param_count.get(fn_name)
         }
 
+        // Check if this function has captures (nested function with free variables).
+        // If so, we must build a closure that packs the captured variable addresses
+        // into an environment, and generate a trampoline that unpacks them.
+        var has_captures: Bool = this.called_function_arity.has("__captures_" + fn_name)
+        var cap_names: List<String> = []
+        if (has_captures) {
+            var caps_str: String = this.func_prefix_map.get("__caps_" + fn_name)
+            if (caps_str.length() > 0) {
+                cap_names = caps_str.split(",")
+            } else {
+                has_captures = false
+            }
+        }
+
+        if (has_captures and cap_names.length() > 0) {
+            // --- Nested function with captures: build a proper closure ---
+            // The real function signature is: (cap0_ptr, cap1_ptr, ..., user_arg0, ...)
+            // We create:
+            //   1. An environment array holding the capture pointer values
+            //   2. A trampoline that takes (env, user_args...), unpacks captures from
+            //      env, and calls the real function with (caps..., user_args...)
+
+            var num_caps: Float = cap_names.length()
+
+            // Allocate environment: array of i64, one slot per capture
+            var env_bytes: Float = num_caps * 8
+            var env_raw: String = this.fresh_local()
+            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            var env_ptr: String = this.fresh_local()
+            this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + num_caps.floor().to_string() + " x i64]*")
+
+            // Store capture pointer values into the environment
+            var ci: Float = 0
+            while (ci < num_caps) {
+                var cap_val: String = this.typed_ptr_to_val("%" + this.sanitize_name(cap_names[ci]), "i64*")
+                var slot: String = this.fresh_local()
+                this.emit_indent(slot + " = getelementptr [" + num_caps.floor().to_string() + " x i64], [" + num_caps.floor().to_string() + " x i64]* " + env_ptr + ", i64 0, i64 " + ci.floor().to_string())
+                this.emit_indent("store i64 " + cap_val + ", i64* " + slot)
+                ci = ci + 1
+            }
+
+            // Generate trampoline: takes (i64 env, user_args...) and calls real function
+            this.label_counter = this.label_counter + 1
+            var wrap_name: String = "__wrap_" + this.label_counter.floor().to_string() + "_" + this.sanitize_name(fn_name)
+
+            var wrap_params: List<String> = []
+            wrap_params.push("i64 %__env.arg")
+            var pi: Float = 0
+            while (pi < nparams) {
+                wrap_params.push("i64 %__a" + pi.floor().to_string() + ".arg")
+                pi = pi + 1
+            }
+
+            var wrap_linkage: String = "define linkonce_odr"
+            if (this.target == "wasm" or this.target == "wasm64" or this.target == "wasm32") {
+                wrap_linkage = "define"
+            }
+
+            // Trampoline body: unpack captures from env, then call real function
+            var wrap_ir: String = "\n" + wrap_linkage + " i64 @" + wrap_name + "(" + wrap_params.join(", ") + ") {\nentry:\n"
+
+            // Cast env to typed array pointer
+            if (this.target == "wasm32") {
+                wrap_ir = wrap_ir + "  %__env_i32 = trunc i64 %__env.arg to i32\n"
+                wrap_ir = wrap_ir + "  %__env_ptr = inttoptr i32 %__env_i32 to [" + num_caps.floor().to_string() + " x i64]*\n"
+            } else {
+                wrap_ir = wrap_ir + "  %__env_ptr = inttoptr i64 %__env.arg to [" + num_caps.floor().to_string() + " x i64]*\n"
+            }
+
+            // Extract each capture from env
+            var fwd_args: List<String> = []
+            ci = 0
+            while (ci < num_caps) {
+                var slot_name: String = "%__cap_slot_" + ci.floor().to_string()
+                var val_name: String = "%__cap_" + ci.floor().to_string()
+                wrap_ir = wrap_ir + "  " + slot_name + " = getelementptr [" + num_caps.floor().to_string() + " x i64], [" + num_caps.floor().to_string() + " x i64]* %__env_ptr, i64 0, i64 " + ci.floor().to_string() + "\n"
+                wrap_ir = wrap_ir + "  " + val_name + " = load i64, i64* " + slot_name + "\n"
+                fwd_args.push("i64 " + val_name)
+                ci = ci + 1
+            }
+
+            // Add user args
+            pi = 0
+            while (pi < nparams) {
+                fwd_args.push("i64 %__a" + pi.floor().to_string() + ".arg")
+                pi = pi + 1
+            }
+
+            // Call the real function
+            wrap_ir = wrap_ir + "  %r = call i64 @" + fn_name + "(" + fwd_args.join(", ") + ")\n"
+            wrap_ir = wrap_ir + "  ret i64 %r\n}\n"
+            this.globals.push(wrap_ir)
+
+            // Build closure pair [trampoline_fn_ptr, env_ptr]
+            var num_total_params: Float = nparams + 1
+            var fn_type_str: String = "i64 ("
+            var tti: Float = 0
+            while (tti < num_total_params) {
+                if (tti > 0) { fn_type_str = fn_type_str + ", " }
+                fn_type_str = fn_type_str + "i64"
+                tti = tti + 1
+            }
+            fn_type_str = fn_type_str + ")*"
+
+            var closure_raw: String = this.fresh_local()
+            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            var closure_ptr: String = this.fresh_local()
+            this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
+            var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
+            var fn_slot: String = this.fresh_local()
+            this.emit_indent(fn_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 0")
+            this.emit_indent("store i64 " + fn_as_int + ", i64* " + fn_slot)
+            var env_as_int: String = this.typed_ptr_to_val(env_ptr, "[" + num_caps.floor().to_string() + " x i64]*")
+            var env_slot: String = this.fresh_local()
+            this.emit_indent(env_slot + " = getelementptr [2 x i64], [2 x i64]* " + closure_ptr + ", i64 0, i64 1")
+            this.emit_indent("store i64 " + env_as_int + ", i64* " + env_slot)
+            var result: String = this.typed_ptr_to_val(closure_ptr, "[2 x i64]*")
+            return result
+        }
+
+        // --- No captures: plain function reference ---
         // Generate a trampoline wrapper that accepts (i64 env, <original params>)
         // and forwards to the real function (dropping env). This ensures the closure
         // calling convention (env first) works for plain function references.

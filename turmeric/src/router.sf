@@ -358,9 +358,19 @@ fun memory(initial: String): Router {
 //   History: href="/about"      (clean URLs, needs server fallback)
 //   Memory:  href="javascript:void(0)"  (no real navigation)
 //
-// Usage:
+// Two forms are available:
+//
+//   // Explicit router (legacy, always works):
 //   import { Link } from "turmeric/router"
 //   Link(router, "/about", cls="nav-link") { text("About") }
+//
+//   // Implicit router (preferred — uses the module-level active router):
+//   import { link } from "turmeric/router"
+//   link("/about", cls="nav-link") { text("About") }
+//
+// The active router is set automatically when you call Router.hash(),
+// Router.history(), or Router.memory(). In practice you always have
+// exactly one router per app, so `link` is almost always the right choice.
 
 fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String = "", block: () => Nil = nil) {
     var href: String = to
@@ -370,4 +380,10 @@ fun Link(r: Router, to: String, cls: String = "", id: String = "", style: String
         href = "javascript:void(0)"
     }
     a(cls=cls, id=id, style=style, href=href, block=block)
+}
+
+// Convenience wrapper — uses the module-level active router (_active_router).
+// Call this instead of Link(router, ...) when you only have one router (the common case).
+fun link(to: String, cls: String = "", id: String = "", style: String = "", block: () => Nil = nil) {
+    Link(_active_router, to, cls=cls, id=id, style=style, block=block)
 }

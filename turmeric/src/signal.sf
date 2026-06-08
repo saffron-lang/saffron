@@ -139,12 +139,13 @@ class Signal<T> {
 
     fun notify() {
         var n: Float = this.subs.length()
-        var i: Float = 0
-        while (i < n) {
-            if (this.subs[i].active) {
-                this.subs[i].fn()
+        var idx: Float = 0
+        while (idx < n) {
+            var sub: Subscription = this.subs[idx.floor()]
+            if (sub.active) {
+                sub.fn()
             }
-            i = i + 1
+            idx = idx + 1
         }
     }
 
@@ -155,12 +156,12 @@ class Signal<T> {
     }
 
     fun unsubscribe(id: Float) {
-        var i: Float = 0
-        while (i < this.subs.length()) {
-            if (this.subs[i].id == id) {
-                this.subs[i].active = false
+        var idx: Float = 0
+        while (idx < this.subs.length()) {
+            if (this.subs[idx.floor()].id == id) {
+                this.subs[idx.floor()].active = false
             }
-            i = i + 1
+            idx = idx + 1
         }
     }
 }
@@ -206,12 +207,13 @@ class Computed<T> {
 
     fun notify() {
         var n: Float = this.subs.length()
-        var i: Float = 0
-        while (i < n) {
-            if (this.subs[i].active) {
-                this.subs[i].fn()
+        var idx: Float = 0
+        while (idx < n) {
+            var sub: Subscription = this.subs[idx.floor()]
+            if (sub.active) {
+                sub.fn()
             }
-            i = i + 1
+            idx = idx + 1
         }
     }
 
@@ -222,12 +224,12 @@ class Computed<T> {
     }
 
     fun unsubscribe(id: Float) {
-        var i: Float = 0
-        while (i < this.subs.length()) {
-            if (this.subs[i].id == id) {
-                this.subs[i].active = false
+        var idx: Float = 0
+        while (idx < this.subs.length()) {
+            if (this.subs[idx.floor()].id == id) {
+                this.subs[idx.floor()].active = false
             }
-            i = i + 1
+            idx = idx + 1
         }
     }
 }
@@ -257,7 +259,7 @@ class EffectHandle {
         this.disposed = true
         var i: Float = 0
         while (i < this.deps.length()) {
-            this.deps[i].unsubscribe(this.sub_ids[i])
+            this.deps[i.floor()].unsubscribe(this.sub_ids[i.floor()])
             i = i + 1
         }
         this.sub_ids = []
@@ -268,12 +270,17 @@ class EffectHandle {
 fun effect(fn: () => Nil): EffectHandle {
     var handle: EffectHandle = EffectHandle([], [])
 
-    fun run_effect() {
+    // Use a list to hold the self-reference so the lambda can capture it by reference.
+    // The lambda captures `self_ref` (a heap-allocated list), and slot 0 holds
+    // the closure itself after assignment — enabling re-subscription.
+    var self_ref: List<Any> = []
+
+    var run_effect: () => Nil = fun () {
         if (handle.disposed) { return }
         // Unsubscribe from previous deps
         var j: Float = 0
         while (j < handle.deps.length()) {
-            handle.deps[j].unsubscribe(handle.sub_ids[j])
+            handle.deps[j.floor()].unsubscribe(handle.sub_ids[j.floor()])
             j = j + 1
         }
         // Re-track dependencies
@@ -283,12 +290,16 @@ fun effect(fn: () => Nil): EffectHandle {
         var new_sub_ids: List<Float> = []
         var i: Float = 0
         while (i < new_deps.length()) {
-            new_sub_ids.push(new_deps[i].subscribe(run_effect))
+            var cb: Any = self_ref[0]
+            new_sub_ids.push(new_deps[i.floor()].subscribe(cb))
             i = i + 1
         }
         handle.sub_ids = new_sub_ids
         handle.deps = new_deps
     }
+
+    // Store the closure in the self-reference list so it can re-subscribe itself
+    self_ref.push(run_effect)
 
     run_effect()
     return handle

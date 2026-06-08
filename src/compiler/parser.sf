@@ -2519,17 +2519,45 @@ class Parser {
                 stmts.push(AST.Stmt.ExprStmt(child))
             }
             // Code block: {stmts...}
+            // If the block contains a single expression that is not a top-level
+            // function Call (e.g. {name}, {count.get()}, {"hi " + x}), auto-wrap
+            // it in text() so string expressions render as text nodes.
+            // Top-level Calls are excluded because they are typically element builders
+            // (div(), SomeComponent()) or helpers (for_each(), text()) that manage
+            // their own DOM output.
             else if (this.match_kind_check("{")) {
                 this.advance()
                 var saved_depth: Float = this.html_depth
                 this.html_depth = 0
+                var interp_stmts: List<AST.Stmt> = []
                 while (!this.match_kind_check("}") and !this.match_kind_check("eof")) {
                     while (this.match_kind(";")) {}
                     if (this.match_kind_check("}") or this.match_kind_check("eof")) { break }
-                    stmts.push(this.parse_stmt())
+                    interp_stmts.push(this.parse_stmt())
                 }
                 this.consume("}")
                 this.html_depth = saved_depth
+                // Auto-wrap: single ExprStmt whose expr is NOT a Call/Assign → text(expr)
+                if (interp_stmts.length() == 1) {
+                    var interp_is_expr: Bool = match (interp_stmts[0]) { ExprStmt(e) => true   _ => false }
+                    if (interp_is_expr) {
+                        var interp_expr: AST.Expr = match (interp_stmts[0]) { ExprStmt(e) => e }
+                        var interp_skip: Bool = match (interp_expr) { Call(c, a) => true   Assign(n, v) => true   _ => false }
+                        if (!interp_skip) {
+                            stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [interp_expr])))
+                        } else {
+                            stmts.push(interp_stmts[0])
+                        }
+                    } else {
+                        stmts.push(interp_stmts[0])
+                    }
+                } else {
+                    var interp_i: Float = 0
+                    while (interp_i < interp_stmts.length()) {
+                        stmts.push(interp_stmts[interp_i])
+                        interp_i = interp_i + 1
+                    }
+                }
             }
             // Text content — accumulate until < or { or EOF
             else if (this.match_kind_check("string")) {
