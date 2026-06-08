@@ -68,9 +68,13 @@ fun main() {
     match (command) {
         "init" => Init.run(parsed)
         "build" => Build.run(parsed)
+        "b" => Build.run(parsed)
         "test" => TestCmd.run(parsed)
+        "t" => TestCmd.run(parsed)
         "install" => Install.run(parsed)
+        "i" => Install.run(parsed)
         "list" => ListCmd.run(parsed)
+        "ls" => ListCmd.run(parsed)
         "clean" => Clean.run(parsed)
         "new" => {
             if (positional.length() < 2) {
@@ -85,7 +89,16 @@ fun main() {
         "deps.graph" => Deps.run_graph(parsed)
         "version" => IO.println("pantry 0.1.0")
         "--version" => IO.println("pantry 0.1.0")
+        "-v" => IO.println("pantry 0.1.0")
         "run" => {
+            if (positional.length() < 2) {
+                IO.println("pantry run: missing script name")
+                IO.println("Usage: pantry run <script_name>")
+                OS.exit(1)
+            }
+            Run.run(positional[1], parsed)
+        }
+        "r" => {
             if (positional.length() < 2) {
                 IO.println("pantry run: missing script name")
                 IO.println("Usage: pantry run <script_name>")
@@ -101,6 +114,14 @@ fun main() {
             }
             Add.run(positional[1], parsed)
         }
+        "a" => {
+            if (positional.length() < 2) {
+                IO.println("pantry add: missing package name")
+                IO.println("Usage: pantry add <package> [--version <constraint>]")
+                OS.exit(1)
+            }
+            Add.run(positional[1], parsed)
+        }
         "remove" => {
             if (positional.length() < 2) {
                 IO.println("pantry remove: missing package name")
@@ -109,9 +130,26 @@ fun main() {
             }
             Remove.run(positional[1], parsed)
         }
+        "rm" => {
+            if (positional.length() < 2) {
+                IO.println("pantry remove: missing package name")
+                IO.println("Usage: pantry remove <package>")
+                OS.exit(1)
+            }
+            Remove.run(positional[1], parsed)
+        }
         "publish" => Publish.run(parsed)
+        "pub" => Publish.run(parsed)
         "login" => Login.run(parsed)
         "search" => {
+            if (positional.length() < 2) {
+                IO.println("pantry search: missing query")
+                IO.println("Usage: pantry search <query>")
+                OS.exit(1)
+            }
+            Search.run(positional[1], parsed)
+        }
+        "s" => {
             if (positional.length() < 2) {
                 IO.println("pantry search: missing query")
                 IO.println("Usage: pantry search <query>")
@@ -142,26 +180,26 @@ fun print_usage() {
     IO.println("")
     IO.println("Commands:")
     IO.println("  init              Create a new pantry.toml in the current directory")
-    IO.println("  run <script>      Run a named script defined in [scripts]")
-    IO.println("  build             Compile the project (runs [scripts.build] or default)")
-    IO.println("  test              Run tests (runs [scripts.test] or finds test files)")
-    IO.println("  add <pkg>         Add a dependency to pantry.toml")
-    IO.println("  remove <pkg>      Remove a dependency from pantry.toml")
-    IO.println("  install           Install all dependencies from pantry.toml")
-    IO.println("  list              List installed packages")
+    IO.println("  run, r <script>   Run a named script defined in [scripts]")
+    IO.println("  build, b          Compile the project (runs [scripts.build] or default)")
+    IO.println("  test, t           Run tests (runs [scripts.test] or finds test files)")
+    IO.println("  add, a <pkg>      Add a dependency to pantry.toml")
+    IO.println("  remove, rm <pkg>  Remove a dependency from pantry.toml")
+    IO.println("  install, i        Install all dependencies from pantry.toml")
+    IO.println("  list, ls          List installed packages")
     IO.println("  clean             Remove build artifacts and lockfile")
     IO.println("  deps              Show dependency tree (alias for deps.tree)")
     IO.println("  deps.tree         Show dependency tree with ASCII art")
     IO.println("  deps.graph        Output dependency graph in DOT format")
-    IO.println("  publish           Package and upload to the Bazaar registry")
-    IO.println("  search <query>    Search the registry for packages")
+    IO.println("  publish, pub      Package and upload to the Bazaar registry")
+    IO.println("  search, s <query> Search the registry for packages")
     IO.println("  login             Store API token for publishing")
     IO.println("  script <cmd>      Run a shell command in the project context")
-    IO.println("  version           Show pantry version")
+    IO.println("  version, -v       Show pantry version")
     IO.println("")
     IO.println("Options:")
     IO.println("  --help, -h        Show this help message")
-    IO.println("  --verbose, -v     Verbose output")
+    IO.println("  --verbose         Verbose output")
 }
 
 main()

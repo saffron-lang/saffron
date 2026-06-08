@@ -18,7 +18,6 @@
 //   router.back()
 
 import "./signal.sf" as Sig
-import { Event } from "./events.sf"
 import { _tc_push, _tc_pop } from "./prelude.sf"
 
 // =============================================================================
