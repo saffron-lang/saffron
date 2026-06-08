@@ -142,9 +142,7 @@ test('category pills are visible on home page', async ({ page }) => {
     expect(text).toContain('Testing');
 });
 
-test.skip('clicking a category pill navigates to search', async ({ page }) => {
-    // Skip: WASM click event dispatch has a BigInt conversion bug that
-    // prevents pill on_click handlers from executing in the test environment.
+test('clicking a category pill navigates to search', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(1500);
 
@@ -451,9 +449,7 @@ test('login page has username and password inputs', async ({ page }) => {
     expect(inputCount).toBeGreaterThanOrEqual(2);
 });
 
-test.skip('login page toggle to sign in mode works', async ({ page }) => {
-    // Skip: WASM event dispatch crashes with "Cannot convert X to a BigInt" on
-    // the login page, preventing on_click handlers from executing in headless tests.
+test('login page toggle to sign in mode works', async ({ page }) => {
     await page.goto('/#/login');
     await page.waitForTimeout(1500);
 
@@ -468,9 +464,7 @@ test.skip('login page toggle to sign in mode works', async ({ page }) => {
     expect(text).toContain('Sign In');
 });
 
-test.skip('login page empty username shows validation error', async ({ page }) => {
-    // Skip: WASM event dispatch crashes on login page — form on_submit handler
-    // cannot execute, so validation errors are never triggered in headless tests.
+test('login page empty username shows validation error', async ({ page }) => {
     await page.goto('/#/login');
     await page.waitForTimeout(1500);
 
@@ -481,9 +475,7 @@ test.skip('login page empty username shows validation error', async ({ page }) =
     expect(text).toContain('Please enter a username');
 });
 
-test.skip('login page short password shows validation error', async ({ page }) => {
-    // Skip: WASM event dispatch crashes on login page — on_input handlers don't
-    // fire so signal values are never set, and form submit also fails.
+test('login page short password shows validation error', async ({ page }) => {
     await page.goto('/#/login');
     await page.waitForTimeout(1500);
 
@@ -510,8 +502,7 @@ test('login page shows password hint in register mode', async ({ page }) => {
     expect(text).toContain('Must be at least 6 characters');
 });
 
-test.skip('login page sign in mode: submit button says Sign In', async ({ page }) => {
-    // Skip: depends on on_click toggle which crashes in WASM event dispatch.
+test('login page sign in mode: submit button says Sign In', async ({ page }) => {
     await page.goto('/#/login');
     await page.waitForTimeout(1500);
 
