@@ -321,6 +321,8 @@ fun HomePage() {
                         if (pkgs.length() == 0 and !loading) {
                             <div cls="empty-state">No packages published yet. Be the first!</div>
                         }
+                    } else if (!loading) {
+                        <div cls="empty-state">No packages published yet. Be the first!</div>
                     }
                 })
             })}
@@ -453,6 +455,8 @@ fun SearchResultsPage() {
                             if (pkgs.length() == 0) {
                                 <div cls="empty-state">No packages found matching your query.</div>
                             }
+                        } else if (!loading) {
+                            <div cls="empty-state">No packages found matching your query.</div>
                         }
                     })
                 })}
