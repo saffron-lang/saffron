@@ -691,71 +691,73 @@ fun PackageDetailPage() {
 // Pages — Login / Register
 // =============================================================================
 
+// Login page logic — module-level to avoid wasm32 closure capture issues
+var _register_mutation = Api.createAuthRegister()
+var _login_mutation = Api.createAuthLogin()
+
+fun _handle_auth_response(data: Any) {
+    login_is_loading.set(false)
+    if (data.has("token")) {
+        var token: String = data.get("token")
+        var uname: String = data.get("username")
+        auth_token_global.set(token)
+        auth_username_global.set(uname)
+        is_logged_in.set(true)
+        login_auth_token_display.set(token)
+        login_has_token.set(true)
+    } else if (data.has("error")) {
+        login_auth_error.set(data.get("error"))
+        login_has_error.set(true)
+    }
+}
+
+fun _login_do_register() {
+    var username: String = login_username_input.get()
+    var password: String = login_password_input.get()
+    if (username.length() == 0) {
+        login_auth_error.set("Please enter a username")
+        login_has_error.set(true)
+        return
+    }
+    if (password.length() < 6) {
+        login_auth_error.set("Password must be at least 6 characters")
+        login_has_error.set(true)
+        return
+    }
+    login_is_loading.set(true)
+    login_auth_error.set("")
+    login_has_error.set(false)
+    _register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+    _register_mutation.mutate({"username": username, "password": password})
+}
+
+fun _login_do_login() {
+    var username: String = login_username_input.get()
+    var password: String = login_password_input.get()
+    if (username.length() == 0) {
+        login_auth_error.set("Please enter a username")
+        login_has_error.set(true)
+        return
+    }
+    if (password.length() == 0) {
+        login_auth_error.set("Please enter a password")
+        login_has_error.set(true)
+        return
+    }
+    login_is_loading.set(true)
+    login_auth_error.set("")
+    login_has_error.set(false)
+    _login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
+    _login_mutation.mutate({"username": username, "password": password})
+}
+
+fun _login_toggle_mode() {
+    login_is_register_mode.set(!login_is_register_mode.get())
+    login_auth_error.set("")
+    login_has_error.set(false)
+}
+
 fun LoginPage() {
-    var _register_mutation = Api.createAuthRegister()
-    var _login_mutation = Api.createAuthLogin()
-
-    fun _handle_auth_response(data: Any) {
-        login_is_loading.set(false)
-        if (data.has("token")) {
-            var token: String = data.get("token")
-            var uname: String = data.get("username")
-            auth_token_global.set(token)
-            auth_username_global.set(uname)
-            is_logged_in.set(true)
-            login_auth_token_display.set(token)
-            login_has_token.set(true)
-        } else if (data.has("error")) {
-            login_auth_error.set(data.get("error"))
-            login_has_error.set(true)
-        }
-    }
-
-    fun do_register() {
-        var username: String = login_username_input.get()
-        var password: String = login_password_input.get()
-        if (username.length() == 0) {
-            login_auth_error.set("Please enter a username")
-            login_has_error.set(true)
-            return
-        }
-        if (password.length() < 6) {
-            login_auth_error.set("Password must be at least 6 characters")
-            login_has_error.set(true)
-            return
-        }
-        login_is_loading.set(true)
-        login_auth_error.set("")
-        login_has_error.set(false)
-        _register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
-        _register_mutation.mutate({"username": username, "password": password})
-    }
-
-    fun do_login() {
-        var username: String = login_username_input.get()
-        var password: String = login_password_input.get()
-        if (username.length() == 0) {
-            login_auth_error.set("Please enter a username")
-            login_has_error.set(true)
-            return
-        }
-        if (password.length() == 0) {
-            login_auth_error.set("Please enter a password")
-            login_has_error.set(true)
-            return
-        }
-        login_is_loading.set(true)
-        login_auth_error.set("")
-        login_has_error.set(false)
-        _login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
-        _login_mutation.mutate({"username": username, "password": password})
-    }
-
-    fun toggle_mode() {
-        login_is_register_mode.set(!login_is_register_mode.get())
-        login_auth_error.set("")
-        login_has_error.set(false)
-    }
 
     <div>
         {NavBar()}
@@ -782,7 +784,7 @@ fun LoginPage() {
                         {Router.Link(router, "/", cls="btn-primary") { text("Go to Home") }}
                     </div>
                 } else {
-                    <form cls="auth-form" on_submit={fun (e: Event) => { if (login_is_register_mode.get()) { do_register() } else { do_login() } }}>
+                    <form cls="auth-form" on_submit={fun (e: Event) => { if (login_is_register_mode.get()) { _login_do_register() } else { _login_do_login() } }}>
                         <div cls="form-group">
                             <label cls="form-label">Username</label>
                             <input cls="form-input" type="text" placeholder="your-username" on_input={fun (e: Event) => login_username_input.set(event_target_value())} />
@@ -810,10 +812,10 @@ fun LoginPage() {
                 <p cls="auth-footer-text">
                     {if (login_is_register_mode.get()) {
                         {text("Already have an account? ")}
-                        <a cls="auth-toggle-link" on_click={fun (e: Event) => toggle_mode()}>Sign in</a>
+                        <a cls="auth-toggle-link" on_click={fun (e: Event) => _login_toggle_mode()}>Sign in</a>
                     } else {
                         {text("Don't have an account? ")}
-                        <a cls="auth-toggle-link" on_click={fun (e: Event) => toggle_mode()}>Create one</a>
+                        <a cls="auth-toggle-link" on_click={fun (e: Event) => _login_toggle_mode()}>Create one</a>
                     }}
                 </p>
             </div>

@@ -77,9 +77,12 @@ const imports = { env: new Proxy({
         el.addEventListener(name, (e) => {
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
-            // Prelude path: always use generic __dispatch_event (1 arg).
-            // Handlers registered here use event_target_value() FFI for input data.
-            if (_genericDispatch) _genericDispatch(callbackId);
+            try {
+                if (_genericDispatch) _genericDispatch(callbackId);
+            } catch (err) {
+                // Silently ignore null function errors from nil on_click defaults
+                if (!err.message || !err.message.includes('null function')) throw err;
+            }
             _eventStack.pop();
         });
     },

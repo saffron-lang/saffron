@@ -38,6 +38,7 @@ fun _tc_add_event(handle: Float, event: String, handler: Any) {
     _tc_add_event_raw(handle, event, id)
 }
 
+
 // Exported: JS calls this when a DOM event fires
 fun __dispatch_event(callback_id: Float) {
     if (callback_id >= 0 and callback_id < _tc_callbacks.length()) {
@@ -227,12 +228,16 @@ fun a(cls: String = "", id: String = "", style: String = "",
 
 fun abbr(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("abbr", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("abbr", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun address(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("address", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("address", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun area(cls: String = "", id: String = "", style: String = "",
@@ -261,22 +266,30 @@ fun area(cls: String = "", id: String = "", style: String = "",
 
 fun article(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("article", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("article", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun aside(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("aside", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("aside", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun audio(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("audio", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("audio", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun b(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("b", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("b", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun base(cls: String = "", id: String = "", style: String = "",
@@ -299,12 +312,16 @@ fun base(cls: String = "", id: String = "", style: String = "",
 
 fun bdi(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("bdi", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("bdi", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun bdo(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("bdo", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("bdo", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun blockquote(cls: String = "", id: String = "", style: String = "",
@@ -384,17 +401,23 @@ fun canvas(cls: String = "", id: String = "", style: String = "",
 
 fun caption(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("caption", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("caption", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun cite(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("cite", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("cite", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun code(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("code", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("code", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun col(cls: String = "", id: String = "", style: String = "",
@@ -451,12 +474,16 @@ fun data(cls: String = "", id: String = "", style: String = "",
 
 fun datalist(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("datalist", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("datalist", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun dd(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("dd", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("dd", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun del(cls: String = "", id: String = "", style: String = "",
@@ -503,7 +530,9 @@ fun details(cls: String = "", id: String = "", style: String = "",
 
 fun dfn(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("dfn", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("dfn", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun dialog(cls: String = "", id: String = "", style: String = "",
@@ -530,22 +559,30 @@ fun dialog(cls: String = "", id: String = "", style: String = "",
 
 fun div(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("div", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("div", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun dl(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("dl", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("dl", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun dt(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("dt", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("dt", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun em(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("em", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("em", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun embed(cls: String = "", id: String = "", style: String = "",
@@ -592,17 +629,23 @@ fun fieldset(cls: String = "", id: String = "", style: String = "",
 
 fun figcaption(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun figure(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("figure", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("figure", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun footer(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("footer", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("footer", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun form(cls: String = "", id: String = "", style: String = "",
@@ -641,42 +684,58 @@ fun form(cls: String = "", id: String = "", style: String = "",
 
 fun h1(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h1", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h1", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun h2(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h2", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h2", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun h3(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h3", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h3", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun h4(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h4", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h4", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun h5(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h5", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h5", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun h6(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("h6", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("h6", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun header(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("header", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("header", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun hgroup(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("hgroup", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("hgroup", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun hr(cls: String = "", id: String = "", style: String = "",
@@ -694,7 +753,9 @@ fun hr(cls: String = "", id: String = "", style: String = "",
 
 fun i(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("i", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("i", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun iframe(cls: String = "", id: String = "", style: String = "",
@@ -835,17 +896,23 @@ fun ins(cls: String = "", id: String = "", style: String = "",
 
 fun kbd(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("kbd", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("kbd", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun label(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("label", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("label", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun legend(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("legend", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("legend", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun li(cls: String = "", id: String = "", style: String = "",
@@ -902,7 +969,9 @@ fun link(cls: String = "", id: String = "", style: String = "",
 
 fun main(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("main", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("main", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun map_el(cls: String = "", id: String = "", style: String = "",
@@ -925,12 +994,16 @@ fun map_el(cls: String = "", id: String = "", style: String = "",
 
 fun mark(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("mark", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("mark", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun menu(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("menu", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("menu", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun meta(cls: String = "", id: String = "", style: String = "",
@@ -987,7 +1060,9 @@ fun meter(cls: String = "", id: String = "", style: String = "",
 
 fun nav(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("nav", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("nav", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun object(cls: String = "", id: String = "", style: String = "",
@@ -1104,17 +1179,23 @@ fun output(cls: String = "", id: String = "", style: String = "",
 
 fun p(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("p", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("p", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun picture(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("picture", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("picture", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun pre(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("pre", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("pre", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun progress(cls: String = "", id: String = "", style: String = "",
@@ -1157,37 +1238,51 @@ fun q(cls: String = "", id: String = "", style: String = "",
 
 fun rp(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("rp", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("rp", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun rt(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("rt", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("rt", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun ruby(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("ruby", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("ruby", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun s(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("s", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("s", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun samp(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("samp", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("samp", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun search(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("search", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("search", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun section(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("section", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("section", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun select(cls: String = "", id: String = "", style: String = "",
@@ -1226,7 +1321,9 @@ fun select(cls: String = "", id: String = "", style: String = "",
 
 fun small(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("small", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("small", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun source(cls: String = "", id: String = "", style: String = "",
@@ -1255,27 +1352,37 @@ fun source(cls: String = "", id: String = "", style: String = "",
 
 fun span(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("span", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("span", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun strong(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("strong", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("strong", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun sub(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("sub", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("sub", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun summary(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("summary", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("summary", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun sup(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("sup", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("sup", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun table(cls: String = "", id: String = "", style: String = "",
@@ -1308,7 +1415,9 @@ fun table(cls: String = "", id: String = "", style: String = "",
 
 fun tbody(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("tbody", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("tbody", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun td(cls: String = "", id: String = "", style: String = "",
@@ -1387,7 +1496,9 @@ fun textarea(cls: String = "", id: String = "", style: String = "",
 
 fun tfoot(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("tfoot", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("tfoot", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun th(cls: String = "", id: String = "", style: String = "",
@@ -1418,7 +1529,9 @@ fun th(cls: String = "", id: String = "", style: String = "",
 
 fun thead(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("thead", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("thead", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun time(cls: String = "", id: String = "", style: String = "",
@@ -1441,12 +1554,16 @@ fun time(cls: String = "", id: String = "", style: String = "",
 
 fun title(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("title", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("title", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun tr(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("tr", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("tr", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun track(cls: String = "", id: String = "", style: String = "",
@@ -1475,17 +1592,23 @@ fun track(cls: String = "", id: String = "", style: String = "",
 
 fun u(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("u", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("u", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun ul(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("ul", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("ul", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun var_(cls: String = "", id: String = "", style: String = "",
        on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
-    return _tc_el_with_common("var", cls, id, style, attrs, block)
+    var el: Float = _tc_el_with_common("var", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(nil)) }
+    return el
 }
 
 fun video(cls: String = "", id: String = "", style: String = "",

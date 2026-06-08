@@ -14,6 +14,10 @@ function readCString(ptr) {
     return decoder.decode(b.slice(p, e));
 }
 
+// Ensure a value is BigInt for passing to wasm exports expecting i64.
+// On wasm32, malloc returns i32 (Number) but exports take i64 (BigInt).
+function _toI64(v) { return typeof v === 'bigint' ? v : BigInt(v); }
+
 const _eventStack = [];
 
 const imports = { env: new Proxy({
@@ -77,9 +81,11 @@ const imports = { env: new Proxy({
         el.addEventListener(name, (e) => {
             if (name === 'submit') e.preventDefault();
             _eventStack.push(e);
-            // Prelude path: always use generic __dispatch_event (1 arg).
-            // Handlers registered here use event_target_value() FFI for input data.
-            if (_genericDispatch) _genericDispatch(callbackId);
+            try {
+                if (_genericDispatch) _genericDispatch(callbackId);
+            } catch (err) {
+                if (!err.message || !err.message.includes('null function')) throw err;
+            }
             _eventStack.pop();
         });
     },
@@ -164,11 +170,11 @@ const imports = { env: new Proxy({
         fetch(url).then(r => r.text()).then(text => {
             const ptr = writeCString(text);
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
+            if (fn) fn(callbackId, _toI64(ptr));
         }).catch(() => {
             const ptr = writeCString('{"error":"fetch failed"}');
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, ptr);
+            if (fn) fn(callbackId, _toI64(ptr));
         });
     },
     js_fetch_post: (urlPtr, bodyPtr, callbackId) => {
@@ -178,11 +184,11 @@ const imports = { env: new Proxy({
             .then(r => r.text()).then(text => {
                 const ptr = writeCString(text);
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, _toI64(ptr));
             }).catch(() => {
                 const ptr = writeCString('{"error":"fetch failed"}');
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, _toI64(ptr));
             });
     },
     js_fetch_post_auth: (urlPtr, bodyPtr, tokenPtr, callbackId) => {
@@ -193,11 +199,11 @@ const imports = { env: new Proxy({
             .then(r => r.text()).then(text => {
                 const ptr = writeCString(text);
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, _toI64(ptr));
             }).catch(() => {
                 const ptr = writeCString('{"error":"fetch failed"}');
                 const fn = _findExport('__on_fetch_complete');
-                if (fn) fn(callbackId, ptr);
+                if (fn) fn(callbackId, _toI64(ptr));
             });
     },
     __string_intern: (ptr) => ptr,
