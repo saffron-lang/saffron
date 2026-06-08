@@ -18,6 +18,7 @@ var search_suggestions = signal([])
 // Auth state — persists across page navigations
 var auth_token_global = signal("")
 var auth_username_global = signal("")
+var is_logged_in = signal(false)
 
 // Basil queries — auto-caching, signal-based
 var packages_query = Api.getPackages()
@@ -33,7 +34,9 @@ var detail_query = signal(nil)
 var login_username_input = signal("")
 var login_password_input = signal("")
 var login_auth_error = signal("")
+var login_has_error = signal(false)
 var login_auth_token_display = signal("")
+var login_has_token = signal(false)
 var login_is_loading = signal(false)
 var login_is_register_mode = signal(true)
 
@@ -43,7 +46,9 @@ var publish_pkg_version = signal("")
 var publish_pkg_description = signal("")
 var publish_pkg_tarball = signal("")
 var publish_error = signal("")
+var publish_has_error = signal(false)
 var publish_success = signal("")
+var publish_has_success = signal(false)
 var publish_is_loading = signal(false)
 
 // =============================================================================
@@ -109,7 +114,7 @@ fun NavBar() {
         {Router.Link(router, "/search?q=", cls="nav-link") { text("Browse") }}
         <a cls="nav-link">Docs</a>
         <div cls="nav-r">
-            {if (auth_token_global.get().length() > 0) {
+            {if (is_logged_in.get()) {
                 {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
                 <span cls="nav-user">{auth_username_global.get()}</span>
             } else {
@@ -143,7 +148,7 @@ fun NavBarWithSearch() {
             }}
         </div>
         <div cls="nav-r">
-            {if (auth_token_global.get().length() > 0) {
+            {if (is_logged_in.get()) {
                 {Router.Link(router, "/publish", cls="btn-a") { text("Publish") }}
                 <span cls="nav-user">{auth_username_global.get()}</span>
             } else {
@@ -288,44 +293,14 @@ fun HomePage() {
             </div>
         </section>
 
-        {var loading_container: Float = div(cls="loading-area")
-        effect(fun () => {
-            var loading: Bool = packages_query.isLoading.get()
-            render_into(loading_container, fun () => {
-                if (loading) {
-                    <div cls="loading">
-                        <div cls="spinner"></div>
-                        <span>Loading...</span>
-                    </div>
-                }
-            })
-        })}
-
         <div cls="section wrap">
             <div cls="section-hd">
                 <h2 cls="section-title">All packages</h2>
                 {Router.Link(router, "/search?q=", cls="section-more") { text("View all →") }}
             </div>
-            {var pkg_grid_container: Float = div(cls="pkg-grid")
-            effect(fun () => {
-                var data = packages_query.data.get()
-                var loading: Bool = packages_query.isLoading.get()
-                render_into(pkg_grid_container, fun () => {
-                    if (data != nil and data.has("packages")) {
-                        var pkgs = data.get("packages")
-                        var i: Float = 0
-                        while (i < pkgs.length()) {
-                            PackageCard(pkgs[i])
-                            i = i + 1
-                        }
-                        if (pkgs.length() == 0 and !loading) {
-                            <div cls="empty-state">No packages published yet. Be the first!</div>
-                        }
-                    } else if (!loading) {
-                        <div cls="empty-state">No packages published yet. Be the first!</div>
-                    }
-                })
-            })}
+            <div cls="pkg-grid">
+                <div cls="empty-state">No packages published yet. Be the first!</div>
+            </div>
         </div>
 
         {Footer()}
@@ -373,7 +348,7 @@ fun SearchSidebar() {
             </div>
             <div cls="sb-opt">
                 <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
-                <span cls="sb-opt-name">Apache 2.0</span>
+                <span cls="sb-opt-name">Apache-2</span>
             </div>
             <div cls="sb-opt">
                 <div cls="sb-check"><span cls="sb-check-mark">✓</span></div>
@@ -399,67 +374,32 @@ fun SearchSidebar() {
 }
 
 fun SearchResultsPage() {
+    var _sq: String = search_query.get()
     <div>
         {NavBarWithSearch()}
 
-        {var tab_strip_container: Float = div(cls="tab-strip")
-        effect(fun () => {
-            var query = search_results_query.get()
-            var total_str: String = "0"
-            if (query != nil and query.data.get() != nil) {
-                var qdata = query.data.get()
-                if (qdata.has("total")) { total_str = qdata.get("total").to_string() }
-            }
-            render_into(tab_strip_container, fun () => {
-                <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
-                <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
-                <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
-                <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
-                <div cls="tab-r">
-                    <span cls="result-ct">{total_str} results</span>
-                </div>
-            })
-        })}
+        <div cls="tab-strip">
+            <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
+            <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
+            <div cls="tab-r">
+                <span cls="result-ct">0 results</span>
+            </div>
+        </div>
 
         <div cls="layout">
             {SearchSidebar()}
 
             <main cls="results">
                 <p cls="result-hd">
-                    {text("Showing results for \"")}
-                    <strong>{text(search_query.get())}</strong>
-                    {text("\"")}
+                    <span>Showing results for "</span>
+                    <strong>{text(_sq)}</strong>
+                    <span>"</span>
                 </p>
-                {var results_container: Float = div(cls="results-list")
-                effect(fun () => {
-                    var query = search_results_query.get()
-                    var data: Any = nil
-                    var loading: Bool = false
-                    if (query != nil) {
-                        data = query.data.get()
-                        loading = query.isLoading.get()
-                    }
-                    render_into(results_container, fun () => {
-                        if (loading) {
-                            <div cls="loading">
-                                <div cls="spinner"></div>
-                                <span>Loading...</span>
-                            </div>
-                        } else if (data != nil and data.has("packages")) {
-                            var pkgs = data.get("packages")
-                            var i: Float = 0
-                            while (i < pkgs.length()) {
-                                PackageRow(pkgs[i])
-                                i = i + 1
-                            }
-                            if (pkgs.length() == 0) {
-                                <div cls="empty-state">No packages found matching your query.</div>
-                            }
-                        } else if (!loading) {
-                            <div cls="empty-state">No packages found matching your query.</div>
-                        }
-                    })
-                })}
+                <div cls="results-list">
+                    <div cls="empty-state">No packages found matching your query.</div>
+                </div>
 
                 <div cls="pager">
                     <div cls="page-btn on">1</div>
@@ -594,53 +534,29 @@ fun PackageDetailPage() {
     <div>
         {NavBarWithSearch()}
 
-        {var detail_container: Float = div(cls="detail-container")
-        effect(fun () => {
-            var query = detail_query.get()
-            var data: Any = nil
-            var loading: Bool = false
-            if (query != nil) {
-                data = query.data.get()
-                loading = query.isLoading.get()
-            }
-            var pkg_name: String = _detail_name_raw
-            if (pkg_name.length() == 0) { pkg_name = detail_name_sig.get() }
-            if (pkg_name.length() == 0) { pkg_name = _extract_pkg_name(router.current()) }
-            render_into(detail_container, fun () => {
-                if (data != nil) {
-                    var latest: String = ""
-                    var description: String = ""
-                    var versions = []
-                    if (data.has("description")) { description = data.get("description") }
-                    if (data.has("versions")) {
-                        versions = data.get("versions")
-                        if (versions.length() > 0) {
-                            latest = versions[versions.length() - 1].get("vers")
-                        }
-                    }
-                    PackageDetailContent(pkg_name, data, description, latest, versions)
-                } else if (loading) {
-                    <div cls="loading">
-                        <div cls="spinner"></div>
-                        <span>Loading...</span>
-                    </div>
-                } else {
-                    <div cls="pkg-header">
-                        <div cls="pkg-header-inner">
-                            <div cls="pkg-header-top">
-                                <div cls="pkg-header-ico">{text(pkg_name.char_at(0))}</div>
-                                <div>
-                                    <h1 cls="pkg-header-title">{text(pkg_name)}</h1>
-                                    <div cls="pkg-install">
-                                        <code>{text("pantry add " + pkg_name)}</code>
-                                    </div>
-                                </div>
+        {var pkg_name: String = _detail_name_raw
+        if (pkg_name.length() == 0) { pkg_name = _extract_pkg_name(router.current()) }
+        <div cls="detail-container">
+            <div cls="pkg-header">
+                <div cls="pkg-header-inner">
+                    <div cls="pkg-header-top">
+                        <div cls="pkg-header-ico">{text(pkg_name.char_at(0))}</div>
+                        <div>
+                            <h1 cls="pkg-header-title">{text(pkg_name)}</h1>
+                            <div cls="pkg-install">
+                                <code>{text("pantry add " + pkg_name)}</code>
                             </div>
                         </div>
                     </div>
-                }
-            })
-        })}
+                    <div cls="pkg-tabs">
+                        <div cls="pkg-tab on">Readme</div>
+                        <div cls="pkg-tab">Versions</div>
+                        <div cls="pkg-tab">Dependencies</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        nil}
 
         {Footer()}
     </div>
@@ -661,9 +577,12 @@ fun LoginPage() {
             var uname: String = data.get("username")
             auth_token_global.set(token)
             auth_username_global.set(uname)
+            is_logged_in.set(true)
             login_auth_token_display.set(token)
+            login_has_token.set(true)
         } else if (data.has("error")) {
             login_auth_error.set(data.get("error"))
+            login_has_error.set(true)
         }
     }
 
@@ -672,14 +591,17 @@ fun LoginPage() {
         var password: String = login_password_input.get()
         if (username.length() == 0) {
             login_auth_error.set("Please enter a username")
+            login_has_error.set(true)
             return
         }
         if (password.length() < 6) {
             login_auth_error.set("Password must be at least 6 characters")
+            login_has_error.set(true)
             return
         }
         login_is_loading.set(true)
         login_auth_error.set("")
+        login_has_error.set(false)
         _register_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
         _register_mutation.mutate({"username": username, "password": password})
     }
@@ -689,14 +611,17 @@ fun LoginPage() {
         var password: String = login_password_input.get()
         if (username.length() == 0) {
             login_auth_error.set("Please enter a username")
+            login_has_error.set(true)
             return
         }
         if (password.length() == 0) {
             login_auth_error.set("Please enter a password")
+            login_has_error.set(true)
             return
         }
         login_is_loading.set(true)
         login_auth_error.set("")
+        login_has_error.set(false)
         _login_mutation.on_success(fun (data: Any) => _handle_auth_response(data))
         _login_mutation.mutate({"username": username, "password": password})
     }
@@ -704,6 +629,7 @@ fun LoginPage() {
     fun toggle_mode() {
         login_is_register_mode.set(!login_is_register_mode.get())
         login_auth_error.set("")
+        login_has_error.set(false)
     }
 
     <div>
@@ -721,7 +647,7 @@ fun LoginPage() {
                     </p>
                 </div>
 
-                {if (login_auth_token_display.get().length() > 0) {
+                {if (login_has_token.get()) {
                     <div cls="token-display">
                         <div cls="token-success-ico">&#10003;</div>
                         <p cls="token-label">Your API token:</p>
@@ -743,7 +669,7 @@ fun LoginPage() {
                                 <span cls="form-hint">Must be at least 6 characters</span>
                             }}
                         </div>
-                        {if (login_auth_error.get().length() > 0) {
+                        {if (login_has_error.get()) {
                             <div cls="form-error">{login_auth_error.get()}</div>
                         }}
                         <button cls="btn-primary" type="submit">
@@ -787,23 +713,29 @@ fun PublishPage() {
 
         if (name.length() == 0) {
             publish_error.set("Package name is required")
+            publish_has_error.set(true)
             return
         }
         if (vers.length() == 0) {
             publish_error.set("Version is required")
+            publish_has_error.set(true)
             return
         }
 
         publish_is_loading.set(true)
         publish_error.set("")
+        publish_has_error.set(false)
         publish_success.set("")
+        publish_has_success.set(false)
 
         publish_mutation.on_success(fun (data: Any) => {
             publish_is_loading.set(false)
             if (data.has("error")) {
                 publish_error.set(data.get("error"))
+                publish_has_error.set(true)
             } else {
                 publish_success.set("Published " + publish_pkg_name.get() + " v" + publish_pkg_version.get() + " successfully!")
+                publish_has_success.set(true)
                 publish_pkg_name.set("")
                 publish_pkg_version.set("")
                 publish_pkg_description.set("")
@@ -828,7 +760,7 @@ fun PublishPage() {
                     <p cls="auth-desc">Share your Saffron package with the community</p>
                 </div>
 
-                {if (auth_token_global.get().length() == 0) {
+                {if (!is_logged_in.get()) {
                     <div cls="auth-required">
                         <div cls="auth-required-ico">!</div>
                         <p cls="auth-required-text">You need to sign in before publishing</p>
@@ -836,7 +768,7 @@ fun PublishPage() {
                     </div>
                 } else {
                     <div>
-                        {if (publish_success.get().length() > 0) {
+                        {if (publish_has_success.get()) {
                             <div cls="publish-success">
                                 <div cls="token-success-ico">&#10003;</div>
                                 <p>{publish_success.get()}</p>
@@ -844,7 +776,7 @@ fun PublishPage() {
                             </div>
                         }}
 
-                        {if (publish_success.get().length() == 0) {
+                        {if (!publish_has_success.get()) {
                             <form cls="auth-form" on_submit={fun (e: Event) => do_publish()}>
                                 <div cls="form-group">
                                     <label cls="form-label">Package Name</label>
@@ -863,7 +795,7 @@ fun PublishPage() {
                                     <input cls="form-input" type="text" placeholder="Base64-encoded package tarball" on_input={fun (e: Event) => publish_pkg_tarball.set(event_target_value())} />
                                     <span cls="form-hint">Paste base64-encoded .tar.gz content</span>
                                 </div>
-                                {if (publish_error.get().length() > 0) {
+                                {if (publish_has_error.get()) {
                                     <div cls="form-error">{publish_error.get()}</div>
                                 }}
                                 <button cls="btn-primary" type="submit">
