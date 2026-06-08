@@ -33,7 +33,33 @@ class Query<T> {
     }
 
     fun _fetch() {
+        IO.println("[basil] _fetch called")
+        IO.println("[basil] about to call cache.get")
         var cached = BasilCache.store.get(this.url)
+        IO.println("[basil] cache.get returned")
+        IO.println("[basil] skipping cache check, going direct to fetch")
+        this.isLoading.set(true)
+        this._fetch_id = this._fetch_id + 1
+        var expected_id: Float = this._fetch_id
+        var self = this
+        IO.println("[basil] calling BasilFetch.get")
+        BasilFetch.get(self.url, fun (response: String) => {
+            if (self._cancelled or self._fetch_id != expected_id) { return }
+            Signal.batch(fun () => {
+                var parsed = JSON.parse(response)
+                if (parsed != nil) {
+                    self.data.set(parsed)
+                    self.error.set("")
+                    BasilCache.store.set(self.url, parsed, self._stale_time)
+                } else {
+                    self.error.set("Failed to parse response")
+                }
+                self.isLoading.set(false)
+            })
+        })
+        IO.println("[basil] BasilFetch.get called successfully")
+        return
+        // Original cache logic (bypassed for debugging):
         if (cached != nil and !cached.is_stale) {
             this.data.set(cached.data)
             return
@@ -78,14 +104,10 @@ var DEFAULT_STALE_TIME: Float = 30.0
 
 /// Create a typed cached query.
 fun query(url: String): Query {
-    var q: Query = Query(url, DEFAULT_STALE_TIME)
-    q._fetch()
-    return q
+    return Query(url, DEFAULT_STALE_TIME)
 }
 
 /// Create a typed cached query with custom stale time.
 fun query_with(url: String, stale_time: Float): Query {
-    var q: Query = Query(url, stale_time)
-    q._fetch()
-    return q
+    return Query(url, stale_time)
 }

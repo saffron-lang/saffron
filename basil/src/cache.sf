@@ -22,9 +22,15 @@ class CacheStore {
     }
 
     fun get(key: String): CacheEntry {
-        if (this.entries.has(key)) {
+        IO.println("[cache] get called for key: " + key)
+        var has_it: Bool = this.entries.has(key)
+        IO.println("[cache] has_it:")
+        IO.println(has_it)
+        if (has_it) {
+            IO.println("[cache] found in cache, returning entry")
             return this.entries.get(key)
         }
+        IO.println("[cache] NOT found, returning nil")
         return nil
     }
 

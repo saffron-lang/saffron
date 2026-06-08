@@ -29,7 +29,7 @@ var _detail_name_raw: String = ""
 var search_results_query = signal(nil)
 var detail_query = signal(nil)
 
-// Login page state (module-level to avoid closure forward-reference bug)
+// Login page state
 var login_username_input = signal("")
 var login_password_input = signal("")
 var login_auth_error = signal("")
@@ -37,7 +37,7 @@ var login_auth_token_display = signal("")
 var login_is_loading = signal(false)
 var login_is_register_mode = signal(true)
 
-// Publish page state (module-level to avoid closure forward-reference bug)
+// Publish page state
 var publish_pkg_name = signal("")
 var publish_pkg_version = signal("")
 var publish_pkg_description = signal("")
@@ -593,10 +593,9 @@ fun PackageDetailPage() {
 // Pages — Login / Register
 // =============================================================================
 
-var _register_mutation = Api.createAuthRegister()
-var _login_mutation = Api.createAuthLogin()
-
 fun LoginPage() {
+    var _register_mutation = Api.createAuthRegister()
+    var _login_mutation = Api.createAuthLogin()
 
     fun _handle_auth_response(data: Any) {
         login_is_loading.set(false)
