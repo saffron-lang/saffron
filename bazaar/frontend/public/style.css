@@ -33,7 +33,7 @@ button { font-family:'DM Sans',sans-serif; }
 .nav-search:focus-within { border-color:var(--abb); }
 .nav-search input { flex:1; background:transparent; border:none; outline:none; padding:8px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--ink); }
 .nav-search input::placeholder { color:var(--ink3); }
-.nav-search-btn { padding:0 14px; background:var(--ac); border:none; cursor:pointer; color:oklch(15% .02 68); font-size:14px; font-weight:700; transition:background .15s; }
+.nav-search-btn { padding:0 14px; background:var(--ac); border:none; cursor:pointer; color:#1a1a1a; font-size:14px; font-weight:700; transition:background .15s; }
 .nav-search-btn:hover { background:oklch(73% .13 72); }
 
 /* Search wrapper + autocomplete */

@@ -374,15 +374,15 @@ fun SearchSidebar() {
 }
 
 fun SearchResultsPage() {
-    var _sq: String = search_query.get()
+    var _sq = search_query.get()
     <div>
         {NavBarWithSearch()}
 
         <div cls="tab-strip">
-            <div cls="tab on" on_click={fun (e: Event) => search_category("")}>All</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("library")}>Libraries</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("cli")}>CLI Tools</div>
-            <div cls="tab" on_click={fun (e: Event) => search_category("util")}>Utilities</div>
+            {Router.Link(router, "/search?q=" + _sq, cls="tab on") { text("All") }}
+            {Router.Link(router, "/search?q=library", cls="tab") { text("Libraries") }}
+            {Router.Link(router, "/search?q=cli", cls="tab") { text("CLI Tools") }}
+            {Router.Link(router, "/search?q=util", cls="tab") { text("Utilities") }}
             <div cls="tab-r">
                 <span cls="result-ct">0 results</span>
             </div>
@@ -394,7 +394,7 @@ fun SearchResultsPage() {
             <main cls="results">
                 <p cls="result-hd">
                     <span>Showing results for "</span>
-                    <strong>{text(_sq)}</strong>
+                    <strong>{text(search_query.get())}</strong>
                     <span>"</span>
                 </p>
                 <div cls="results-list">

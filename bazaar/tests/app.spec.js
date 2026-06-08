@@ -302,11 +302,17 @@ test('search results page displays query text from URL', async ({ page }) => {
 
     const text = await page.locator('#app').textContent();
     expect(text).toContain('Showing results for');
-    // Note: signal.get() in templates has a NaN-boxing bug that renders
-    // type annotation "string" instead of the actual value. The query IS
-    // set correctly (search API request shows q=mylib) but display is broken.
-    // Verify the page structure renders correctly instead.
+    expect(text).not.toContain('for "string"');
     expect(text).toContain('No packages found');
+});
+
+test('search results shows actual query not literal "string"', async ({ page }) => {
+    await page.goto('/#/search?q=mypackage');
+    await page.waitForTimeout(2000);
+
+    const text = await page.locator('#app').textContent();
+    expect(text).not.toContain('for "string"');
+    expect(text).toContain('Showing results for');
 });
 
 test('tab filters are visible on search page', async ({ page }) => {
