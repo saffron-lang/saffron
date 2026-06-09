@@ -2542,7 +2542,7 @@ class Parser {
                     var interp_is_expr: Bool = match (interp_stmts[0]) { ExprStmt(e) => true   _ => false }
                     if (interp_is_expr) {
                         var interp_expr: AST.Expr = match (interp_stmts[0]) { ExprStmt(e) => e }
-                        var interp_skip: Bool = match (interp_expr) { Call(c, a) => true   Assign(n, v) => true   _ => false }
+                        var interp_skip: Bool = match (interp_expr) { Call(c, a) => true   MethodCall(o, m, a) => true   Assign(n, v) => true   _ => false }
                         if (!interp_skip) {
                             stmts.push(AST.Stmt.ExprStmt(AST.Expr.Call(AST.Expr.Variable("text"), [interp_expr])))
                         } else {
