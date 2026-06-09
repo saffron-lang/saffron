@@ -1,0 +1,10 @@
+// Turmeric Prelude — auto-imported into any app that depends on turmeric
+// Provides HTML element builder functions that create real DOM nodes
+//
+// Element functions are auto-generated from the TypeScript DOM spec.
+// To regenerate: saffron run tools/generate_types.sf
+// Then run: tools/build_prelude.sh (concatenates infra + generated elements)
+
+// --- DOM FFI (provided by wasm_base.ll) ---
+@extern("i64 js_event_get_string(i64, void*)") fun _tc_event_get_string(event_ptr: Float, field: String): String
+@extern("i64 js_dom_create_element(void*)") fun _tc_create(tag: String): Float

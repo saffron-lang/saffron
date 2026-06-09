@@ -1,0 +1,54 @@
+
+// --- Reactive text: re-evaluates and updates DOM when signals change ---
+// Usage: reactive(fun () => count.get().to_string())
+// Creates a <span>, renders initial value, and re-renders when deps change.
+// Uses the turmeric signal module's effect() for dependency tracking.
+// compute is logically () => String, but must remain Any because the prelude
+// has no module prefix and the codegen can't resolve generic function types here.
+fun reactive(compute: Any) {
+    var parent: Float = _tc_current()
+    var text_el: Float = _tc_create("span")
+    _tc_append(parent, text_el)
+    turmeric_signal_effect(fun () => {
+        var val: String = compute()
+        _tc_set_text(text_el, val)
+    })
+}
+
+// --- Reactive class: updates element className when deps change ---
+// Usage: var el = div(); reactive_class(el, fun () => cx({"active": sig.get()}))
+// rc_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
+fun reactive_class(rc_el: Float, rc_compute: Any) {
+    var rc_handle: Float = rc_el
+    turmeric_signal_effect(fun () => {
+        var cls: String = rc_compute()
+        _tc_set_attr(rc_handle, "class", cls)
+    })
+}
+
+// --- Reactive attr: updates any attribute reactively ---
+// Usage: reactive_attr(el, "style", fun () => "color:" + color.get())
+// ra_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
+fun reactive_attr(ra_el: Float, ra_name: String, ra_compute: Any) {
+    var ra_handle: Float = ra_el
+    var ra_attr: String = ra_name
+    turmeric_signal_effect(fun () => {
+        var val: String = ra_compute()
+        _tc_set_attr(ra_handle, ra_attr, val)
+    })
+}
+
+// --- Reactive visibility: show/hide element based on signal ---
+// Usage: reactive_show(el, fun () => if (visible) { return "" } return "display:none")
+// Compute must return "" (show) or "display:none" (hide).
+// rs_compute is logically () => String, but must remain Any — codegen can't
+// resolve generic function types in the no-prefix prelude context.
+fun reactive_show(rs_el: Float, rs_compute: Any) {
+    var rs_handle: Float = rs_el
+    turmeric_signal_effect(fun () => {
+        var style_val: String = rs_compute()
+        _tc_set_attr(rs_handle, "style", style_val)
+    })
+}
