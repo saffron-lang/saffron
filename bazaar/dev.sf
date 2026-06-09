@@ -90,32 +90,37 @@ fun send_file(fd: Int, mime: String, path: String) {
 }
 
 fun proxy_to_backend(fd: Int, raw: String) {
-    // Forward the raw HTTP request to the backend via curl
     var lines: List<String> = raw.split("\r\n")
     var parts: List<String> = lines[0].split(" ")
     var method: String = parts[0]
     var path: String = parts[1]
+    var url: String = "http://localhost:" + BACKEND_PORT.to_string() + path
 
-    var curl_cmd: String = "curl -s -X " + method + " http://localhost:" + BACKEND_PORT.to_string() + path
-    // For POST/PUT, include body
-    if (method == "POST" or method == "PUT") {
-        // Extract body (after double CRLF)
-        var body_start: Int = raw.index_of("\r\n\r\n")
-        if (body_start >= 0) {
-            var body: String = raw.slice(body_start + 4, raw.length())
-            if (body.length() > 0) {
-                curl_cmd = curl_cmd + " -H 'Content-Type: application/json' -d '" + body + "'"
-            }
-        }
-    }
+    // Build curl args in a temp file to avoid shell quoting issues
+    var curl_cmd: String = "curl -s -X " + method + " -H 'Content-Type: application/json'"
+
     // Extract auth header if present
     var i: Int = 0
     while (i < lines.length()) {
         if (lines[i].starts_with("Authorization:")) {
-            curl_cmd = curl_cmd + " -H '" + lines[i] + "'"
+            curl_cmd = curl_cmd + " -H \"" + lines[i].trim() + "\""
         }
         i = i + 1
     }
+
+    // For POST/PUT, write body to temp file to avoid quoting issues
+    if (method == "POST" or method == "PUT") {
+        var body_start: Int = raw.index_of("\r\n\r\n")
+        if (body_start >= 0) {
+            var body: String = raw.slice(body_start + 4, raw.length())
+            if (body.length() > 0) {
+                IO.write_file("/tmp/_bazaar_proxy_body.json", body)
+                curl_cmd = curl_cmd + " -d @/tmp/_bazaar_proxy_body.json"
+            }
+        }
+    }
+
+    curl_cmd = curl_cmd + " \"" + url + "\""
 
     var result = Process.run(curl_cmd)
     if (result.success and result.stdout.length() > 0) {
