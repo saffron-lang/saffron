@@ -1,0 +1,13 @@
+
+// --- Render Into: clears a container and executes a builder into it ---
+// Used by router outlet. Temporarily disables tracking so inner signal
+// reads don't subscribe the caller's effect.
+fun render_into(container: Float, builder: () => Nil) {
+    var was: Bool = turmeric_signal__tracking
+    turmeric_signal__tracking = false
+    _tc_set_html(container, "")
+    _tc_push(container)
+    builder()
+    _tc_pop()
+    turmeric_signal__tracking = was
+}

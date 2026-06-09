@@ -1,0 +1,9 @@
+
+// =============================================================================
+// Mount: set the root element and call the app function
+// =============================================================================
+
+fun mount(selector: String, app: () => Nil) {
+    _tc_root = _tc_query(selector)
+    app()
+}

@@ -757,7 +757,7 @@ fun generate_prelude_fn(sb: StringBuilder, tag: String, fn_name: String,
     ei = 0
     while (ei < events.length()) {
         var ev: List<String> = events[ei]
-        sb.append("    if (" + ev[0] + " != nil) { _tc_add_event(el, \"" + ev[1] + "\", " + ev[0] + ") }\n")
+        sb.append("    if (" + ev[0] + " != nil) { _tc_add_event(el, \"" + ev[1] + "\", fun () => " + ev[0] + "(_tc_event)) }\n")
         ei = ei + 1
     }
 
@@ -781,12 +781,12 @@ fun generate_prelude_fn(sb: StringBuilder, tag: String, fn_name: String,
 fun generate_simple_prelude_fn(sb: StringBuilder, tag: String, fn_name: String, is_void: Bool) {
     if (is_void) {
         sb.append("fun " + fn_name + "(cls: String = \"\", id: String = \"\", style: String = \"\",\n")
-        sb.append("       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {\n")
+        sb.append("       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}): Float {\n")
         sb.append("    var el: Float = _tc_create(\"" + tag + "\")\n")
         sb.append("    if (cls.length() > 0) { _tc_set_attr(el, \"class\", cls) }\n")
         sb.append("    if (id.length() > 0) { _tc_set_attr(el, \"id\", id) }\n")
         sb.append("    if (style.length() > 0) { _tc_set_attr(el, \"style\", style) }\n")
-        sb.append("    if (on_click != nil) { _tc_add_event(el, \"click\", on_click) }\n")
+        sb.append("    if (on_click != nil) { _tc_add_event(el, \"click\", fun () => on_click(_tc_event)) }\n")
         sb.append("    _tc_apply_attrs(el, attrs)\n")
         sb.append("    var parent: Float = _tc_current()\n")
         sb.append("    _tc_append(parent, el)\n")
@@ -794,8 +794,10 @@ fun generate_simple_prelude_fn(sb: StringBuilder, tag: String, fn_name: String, 
         sb.append("}\n\n")
     } else {
         sb.append("fun " + fn_name + "(cls: String = \"\", id: String = \"\", style: String = \"\",\n")
-        sb.append("       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {\n")
-        sb.append("    return _tc_el_with_common(\"" + tag + "\", cls, id, style, attrs, block)\n")
+        sb.append("       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {\n")
+        sb.append("    var el: Float = _tc_el_with_common(\"" + tag + "\", cls, id, style, attrs, block)\n")
+        sb.append("    if (on_click != nil) { _tc_add_event(el, \"click\", fun () => on_click(_tc_event)) }\n")
+        sb.append("    return el\n")
         sb.append("}\n\n")
     }
 }

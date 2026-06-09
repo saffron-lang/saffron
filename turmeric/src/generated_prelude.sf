@@ -17,9 +17,9 @@ fun a(cls: String = "", id: String = "", style: String = "",
       target: String = "",
       type_: String = "",
       href: String = "",
-      on_click: Any = nil,
+      on_click: (Event) => Nil = nil,
       attrs: Map<String, Any> = {},
-      block: Any = nil): Float {
+      block: () => Nil = nil): Float {
     var el: Float = _tc_create("a")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -30,7 +30,7 @@ fun a(cls: String = "", id: String = "", style: String = "",
     if (target.length() > 0) { _tc_set_attr(el, "target", target) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
     if (href.length() > 0) { _tc_set_attr(el, "href", href) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -39,13 +39,17 @@ fun a(cls: String = "", id: String = "", style: String = "",
 }
 
 fun abbr(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("abbr", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("abbr", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun address(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("address", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("address", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun area(cls: String = "", id: String = "", style: String = "",
@@ -54,7 +58,7 @@ fun area(cls: String = "", id: String = "", style: String = "",
          rel: String = "",
          target: String = "",
          href: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("area")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -65,7 +69,7 @@ fun area(cls: String = "", id: String = "", style: String = "",
     if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
     if (target.length() > 0) { _tc_set_attr(el, "target", target) }
     if (href.length() > 0) { _tc_set_attr(el, "href", href) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -73,29 +77,37 @@ fun area(cls: String = "", id: String = "", style: String = "",
 }
 
 fun article(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("article", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("article", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun aside(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("aside", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("aside", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun audio(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("audio", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("audio", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun b(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("b", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("b", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun base(cls: String = "", id: String = "", style: String = "",
          href: String = "",
          target: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("base")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -103,7 +115,7 @@ fun base(cls: String = "", id: String = "", style: String = "",
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (href.length() > 0) { _tc_set_attr(el, "href", href) }
     if (target.length() > 0) { _tc_set_attr(el, "target", target) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -111,26 +123,30 @@ fun base(cls: String = "", id: String = "", style: String = "",
 }
 
 fun bdi(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("bdi", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("bdi", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun bdo(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("bdo", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("bdo", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun blockquote(cls: String = "", id: String = "", style: String = "",
                cite: String = "",
-               on_click: Any = nil,
+               on_click: (Event) => Nil = nil,
                attrs: Map<String, Any> = {},
-               block: Any = nil): Float {
+               block: () => Nil = nil): Float {
     var el: Float = _tc_create("blockquote")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -139,12 +155,12 @@ fun blockquote(cls: String = "", id: String = "", style: String = "",
 }
 
 fun br(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("br")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -155,10 +171,10 @@ fun button(cls: String = "", id: String = "", style: String = "",
            disabled: Bool = false,
            name: String = "",
            value: String = "",
-           on_click: Any = nil,
-           on_submit: Any = nil,
+           on_click: (Event) => Nil = nil,
+           on_submit: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("button")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -166,8 +182,8 @@ fun button(cls: String = "", id: String = "", style: String = "",
     if (disabled) { _tc_set_attr(el, "disabled", "true") }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", fun () => on_submit(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -178,16 +194,16 @@ fun button(cls: String = "", id: String = "", style: String = "",
 fun canvas(cls: String = "", id: String = "", style: String = "",
            height: Float = 0,
            width: Float = 0,
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("canvas")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (height != 0) { _tc_set_attr(el, "height", height.to_string()) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -196,30 +212,36 @@ fun canvas(cls: String = "", id: String = "", style: String = "",
 }
 
 fun caption(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("caption", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("caption", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun cite(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("cite", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("cite", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun code(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("code", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("code", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun col(cls: String = "", id: String = "", style: String = "",
         span: Float = 0,
-        on_click: Any = nil,
+        on_click: (Event) => Nil = nil,
         attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("col")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (span != 0) { _tc_set_attr(el, "span", span.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -228,15 +250,15 @@ fun col(cls: String = "", id: String = "", style: String = "",
 
 fun colgroup(cls: String = "", id: String = "", style: String = "",
              span: Float = 0,
-             on_click: Any = nil,
+             on_click: (Event) => Nil = nil,
              attrs: Map<String, Any> = {},
-             block: Any = nil): Float {
+             block: () => Nil = nil): Float {
     var el: Float = _tc_create("colgroup")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (span != 0) { _tc_set_attr(el, "span", span.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -246,15 +268,15 @@ fun colgroup(cls: String = "", id: String = "", style: String = "",
 
 fun data(cls: String = "", id: String = "", style: String = "",
          value: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {},
-         block: Any = nil): Float {
+         block: () => Nil = nil): Float {
     var el: Float = _tc_create("data")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -263,28 +285,32 @@ fun data(cls: String = "", id: String = "", style: String = "",
 }
 
 fun datalist(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("datalist", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("datalist", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun dd(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("dd", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("dd", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun del(cls: String = "", id: String = "", style: String = "",
         cite: String = "",
         date_time: String = "",
-        on_click: Any = nil,
+        on_click: (Event) => Nil = nil,
         attrs: Map<String, Any> = {},
-        block: Any = nil): Float {
+        block: () => Nil = nil): Float {
     var el: Float = _tc_create("del")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
     if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -295,18 +321,18 @@ fun del(cls: String = "", id: String = "", style: String = "",
 fun details(cls: String = "", id: String = "", style: String = "",
             name: String = "",
             open: Bool = false,
-            on_click: Any = nil,
-            on_toggle: Any = nil,
+            on_click: (Event) => Nil = nil,
+            on_toggle: (Event) => Nil = nil,
             attrs: Map<String, Any> = {},
-            block: Any = nil): Float {
+            block: () => Nil = nil): Float {
     var el: Float = _tc_create("details")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (open) { _tc_set_attr(el, "open", "true") }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_toggle != nil) { _tc_add_event(el, "toggle", on_toggle) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_toggle != nil) { _tc_add_event(el, "toggle", fun () => on_toggle(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -315,17 +341,19 @@ fun details(cls: String = "", id: String = "", style: String = "",
 }
 
 fun dfn(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("dfn", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("dfn", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun dialog(cls: String = "", id: String = "", style: String = "",
            closed_by: String = "",
            open: Bool = false,
            return_value: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("dialog")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -333,7 +361,7 @@ fun dialog(cls: String = "", id: String = "", style: String = "",
     if (closed_by.length() > 0) { _tc_set_attr(el, "closedby", closed_by) }
     if (open) { _tc_set_attr(el, "open", "true") }
     if (return_value.length() > 0) { _tc_set_attr(el, "returnvalue", return_value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -342,23 +370,31 @@ fun dialog(cls: String = "", id: String = "", style: String = "",
 }
 
 fun div(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("div", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("div", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun dl(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("dl", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("dl", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun dt(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("dt", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("dt", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun em(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("em", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("em", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun embed(cls: String = "", id: String = "", style: String = "",
@@ -366,7 +402,7 @@ fun embed(cls: String = "", id: String = "", style: String = "",
           src: String = "",
           type_: String = "",
           width: String = "",
-          on_click: Any = nil,
+          on_click: (Event) => Nil = nil,
           attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("embed")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -376,7 +412,7 @@ fun embed(cls: String = "", id: String = "", style: String = "",
     if (src.length() > 0) { _tc_set_attr(el, "src", src) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
     if (width.length() > 0) { _tc_set_attr(el, "width", width) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -386,16 +422,16 @@ fun embed(cls: String = "", id: String = "", style: String = "",
 fun fieldset(cls: String = "", id: String = "", style: String = "",
              disabled: Bool = false,
              name: String = "",
-             on_click: Any = nil,
+             on_click: (Event) => Nil = nil,
              attrs: Map<String, Any> = {},
-             block: Any = nil): Float {
+             block: () => Nil = nil): Float {
     var el: Float = _tc_create("fieldset")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (disabled) { _tc_set_attr(el, "disabled", "true") }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -404,18 +440,24 @@ fun fieldset(cls: String = "", id: String = "", style: String = "",
 }
 
 fun figcaption(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("figcaption", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun figure(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("figure", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("figure", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun footer(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("footer", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("footer", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun form(cls: String = "", id: String = "", style: String = "",
@@ -426,11 +468,11 @@ fun form(cls: String = "", id: String = "", style: String = "",
          no_validate: Bool = false,
          rel: String = "",
          target: String = "",
-         on_click: Any = nil,
-         on_submit: Any = nil,
-         on_reset: Any = nil,
+         on_click: (Event) => Nil = nil,
+         on_submit: (Event) => Nil = nil,
+         on_reset: (Event) => Nil = nil,
          attrs: Map<String, Any> = {},
-         block: Any = nil): Float {
+         block: () => Nil = nil): Float {
     var el: Float = _tc_create("form")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -442,9 +484,9 @@ fun form(cls: String = "", id: String = "", style: String = "",
     if (no_validate) { _tc_set_attr(el, "novalidate", "true") }
     if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
     if (target.length() > 0) { _tc_set_attr(el, "target", target) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_submit != nil) { _tc_add_event(el, "submit", on_submit) }
-    if (on_reset != nil) { _tc_add_event(el, "reset", on_reset) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_submit != nil) { _tc_add_event(el, "submit", fun () => on_submit(_tc_event)) }
+    if (on_reset != nil) { _tc_add_event(el, "reset", fun () => on_reset(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -453,52 +495,68 @@ fun form(cls: String = "", id: String = "", style: String = "",
 }
 
 fun h1(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h1", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h1", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun h2(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h2", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h2", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun h3(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h3", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h3", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun h4(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h4", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h4", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun h5(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h5", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h5", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun h6(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("h6", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("h6", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun header(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("header", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("header", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun hgroup(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("hgroup", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("hgroup", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun hr(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("hr")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -506,8 +564,10 @@ fun hr(cls: String = "", id: String = "", style: String = "",
 }
 
 fun i(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("i", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("i", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun iframe(cls: String = "", id: String = "", style: String = "",
@@ -517,9 +577,9 @@ fun iframe(cls: String = "", id: String = "", style: String = "",
            name: String = "",
            src: String = "",
            width: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("iframe")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -530,7 +590,7 @@ fun iframe(cls: String = "", id: String = "", style: String = "",
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (src.length() > 0) { _tc_set_attr(el, "src", src) }
     if (width.length() > 0) { _tc_set_attr(el, "width", width) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -544,7 +604,7 @@ fun img(cls: String = "", id: String = "", style: String = "",
         name: String = "",
         src: String = "",
         width: Float = 0,
-        on_click: Any = nil,
+        on_click: (Event) => Nil = nil,
         attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("img")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -555,7 +615,7 @@ fun img(cls: String = "", id: String = "", style: String = "",
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (src.length() > 0) { _tc_set_attr(el, "src", src) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -583,12 +643,12 @@ fun input(cls: String = "", id: String = "", style: String = "",
           type_: String = "",
           value: String = "",
           width: Float = 0,
-          on_click: Any = nil,
-          on_input: Any = nil,
-          on_change: Any = nil,
-          on_focus: Any = nil,
-          on_blur: Any = nil,
-          on_keydown: Any = nil,
+          on_click: (Event) => Nil = nil,
+          on_input: (Event) => Nil = nil,
+          on_change: (Event) => Nil = nil,
+          on_focus: (Event) => Nil = nil,
+          on_blur: (Event) => Nil = nil,
+          on_keydown: (Event) => Nil = nil,
           attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("input")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -614,12 +674,12 @@ fun input(cls: String = "", id: String = "", style: String = "",
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
-    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_input != nil) { _tc_add_event(el, "input", fun () => on_input(_tc_event)) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(_tc_event)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(_tc_event)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(_tc_event)) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", fun () => on_keydown(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -629,16 +689,16 @@ fun input(cls: String = "", id: String = "", style: String = "",
 fun ins(cls: String = "", id: String = "", style: String = "",
         cite: String = "",
         date_time: String = "",
-        on_click: Any = nil,
+        on_click: (Event) => Nil = nil,
         attrs: Map<String, Any> = {},
-        block: Any = nil): Float {
+        block: () => Nil = nil): Float {
     var el: Float = _tc_create("ins")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
     if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -647,31 +707,37 @@ fun ins(cls: String = "", id: String = "", style: String = "",
 }
 
 fun kbd(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("kbd", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("kbd", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun label(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("label", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("label", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun legend(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("legend", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("legend", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun li(cls: String = "", id: String = "", style: String = "",
        value: Float = 0,
-       on_click: Any = nil,
+       on_click: (Event) => Nil = nil,
        attrs: Map<String, Any> = {},
-       block: Any = nil): Float {
+       block: () => Nil = nil): Float {
     var el: Float = _tc_create("li")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -690,7 +756,7 @@ fun link(cls: String = "", id: String = "", style: String = "",
          media: String = "",
          rel: String = "",
          type_: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("link")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -706,7 +772,7 @@ fun link(cls: String = "", id: String = "", style: String = "",
     if (media.length() > 0) { _tc_set_attr(el, "media", media) }
     if (rel.length() > 0) { _tc_set_attr(el, "rel", rel) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -714,21 +780,23 @@ fun link(cls: String = "", id: String = "", style: String = "",
 }
 
 fun main(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("main", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("main", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun map_el(cls: String = "", id: String = "", style: String = "",
            name: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("map")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -737,13 +805,17 @@ fun map_el(cls: String = "", id: String = "", style: String = "",
 }
 
 fun mark(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("mark", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("mark", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun menu(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("menu", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("menu", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun meta(cls: String = "", id: String = "", style: String = "",
@@ -752,7 +824,7 @@ fun meta(cls: String = "", id: String = "", style: String = "",
          media: String = "",
          name: String = "",
          scheme: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("meta")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -763,7 +835,7 @@ fun meta(cls: String = "", id: String = "", style: String = "",
     if (media.length() > 0) { _tc_set_attr(el, "media", media) }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (scheme.length() > 0) { _tc_set_attr(el, "scheme", scheme) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -777,9 +849,9 @@ fun meter(cls: String = "", id: String = "", style: String = "",
           min: Float = 0,
           optimum: Float = 0,
           value: Float = 0,
-          on_click: Any = nil,
+          on_click: (Event) => Nil = nil,
           attrs: Map<String, Any> = {},
-          block: Any = nil): Float {
+          block: () => Nil = nil): Float {
     var el: Float = _tc_create("meter")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -790,7 +862,7 @@ fun meter(cls: String = "", id: String = "", style: String = "",
     if (min != 0) { _tc_set_attr(el, "min", min.to_string()) }
     if (optimum != 0) { _tc_set_attr(el, "optimum", optimum.to_string()) }
     if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -799,8 +871,10 @@ fun meter(cls: String = "", id: String = "", style: String = "",
 }
 
 fun nav(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("nav", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("nav", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun object(cls: String = "", id: String = "", style: String = "",
@@ -809,9 +883,9 @@ fun object(cls: String = "", id: String = "", style: String = "",
            name: String = "",
            type_: String = "",
            width: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("object")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -821,7 +895,7 @@ fun object(cls: String = "", id: String = "", style: String = "",
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
     if (width.length() > 0) { _tc_set_attr(el, "width", width) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -833,9 +907,9 @@ fun ol(cls: String = "", id: String = "", style: String = "",
        reversed: Bool = false,
        start: Float = 0,
        type_: String = "",
-       on_click: Any = nil,
+       on_click: (Event) => Nil = nil,
        attrs: Map<String, Any> = {},
-       block: Any = nil): Float {
+       block: () => Nil = nil): Float {
     var el: Float = _tc_create("ol")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -843,7 +917,7 @@ fun ol(cls: String = "", id: String = "", style: String = "",
     if (reversed) { _tc_set_attr(el, "reversed", "true") }
     if (start != 0) { _tc_set_attr(el, "start", start.to_string()) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -854,16 +928,16 @@ fun ol(cls: String = "", id: String = "", style: String = "",
 fun optgroup(cls: String = "", id: String = "", style: String = "",
              disabled: Bool = false,
              label: String = "",
-             on_click: Any = nil,
+             on_click: (Event) => Nil = nil,
              attrs: Map<String, Any> = {},
-             block: Any = nil): Float {
+             block: () => Nil = nil): Float {
     var el: Float = _tc_create("optgroup")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (disabled) { _tc_set_attr(el, "disabled", "true") }
     if (label.length() > 0) { _tc_set_attr(el, "label", label) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -876,9 +950,9 @@ fun option(cls: String = "", id: String = "", style: String = "",
            label: String = "",
            selected: Bool = false,
            value: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("option")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -887,7 +961,7 @@ fun option(cls: String = "", id: String = "", style: String = "",
     if (label.length() > 0) { _tc_set_attr(el, "label", label) }
     if (selected) { _tc_set_attr(el, "selected", "true") }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -898,16 +972,16 @@ fun option(cls: String = "", id: String = "", style: String = "",
 fun output(cls: String = "", id: String = "", style: String = "",
            name: String = "",
            value: String = "",
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("output")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (name.length() > 0) { _tc_set_attr(el, "name", name) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -916,33 +990,39 @@ fun output(cls: String = "", id: String = "", style: String = "",
 }
 
 fun p(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("p", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("p", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun picture(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("picture", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("picture", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun pre(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("pre", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("pre", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun progress(cls: String = "", id: String = "", style: String = "",
              max: Float = 0,
              value: Float = 0,
-             on_click: Any = nil,
+             on_click: (Event) => Nil = nil,
              attrs: Map<String, Any> = {},
-             block: Any = nil): Float {
+             block: () => Nil = nil): Float {
     var el: Float = _tc_create("progress")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (max != 0) { _tc_set_attr(el, "max", max.to_string()) }
     if (value != 0) { _tc_set_attr(el, "value", value.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -952,15 +1032,15 @@ fun progress(cls: String = "", id: String = "", style: String = "",
 
 fun q(cls: String = "", id: String = "", style: String = "",
       cite: String = "",
-      on_click: Any = nil,
+      on_click: (Event) => Nil = nil,
       attrs: Map<String, Any> = {},
-      block: Any = nil): Float {
+      block: () => Nil = nil): Float {
     var el: Float = _tc_create("q")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (cite.length() > 0) { _tc_set_attr(el, "cite", cite) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -969,38 +1049,52 @@ fun q(cls: String = "", id: String = "", style: String = "",
 }
 
 fun rp(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("rp", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("rp", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun rt(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("rt", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("rt", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun ruby(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("ruby", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("ruby", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun s(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("s", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("s", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun samp(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("samp", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("samp", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun search(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("search", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("search", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun section(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("section", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("section", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun select(cls: String = "", id: String = "", style: String = "",
@@ -1010,12 +1104,12 @@ fun select(cls: String = "", id: String = "", style: String = "",
            required: Bool = false,
            size: Float = 0,
            value: String = "",
-           on_click: Any = nil,
-           on_change: Any = nil,
-           on_focus: Any = nil,
-           on_blur: Any = nil,
+           on_click: (Event) => Nil = nil,
+           on_change: (Event) => Nil = nil,
+           on_focus: (Event) => Nil = nil,
+           on_blur: (Event) => Nil = nil,
            attrs: Map<String, Any> = {},
-           block: Any = nil): Float {
+           block: () => Nil = nil): Float {
     var el: Float = _tc_create("select")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1026,10 +1120,10 @@ fun select(cls: String = "", id: String = "", style: String = "",
     if (required) { _tc_set_attr(el, "required", "true") }
     if (size != 0) { _tc_set_attr(el, "size", size.to_string()) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(_tc_event)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(_tc_event)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1038,8 +1132,10 @@ fun select(cls: String = "", id: String = "", style: String = "",
 }
 
 fun small(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("small", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("small", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun source(cls: String = "", id: String = "", style: String = "",
@@ -1048,7 +1144,7 @@ fun source(cls: String = "", id: String = "", style: String = "",
            src: String = "",
            type_: String = "",
            width: Float = 0,
-           on_click: Any = nil,
+           on_click: (Event) => Nil = nil,
            attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("source")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -1059,7 +1155,7 @@ fun source(cls: String = "", id: String = "", style: String = "",
     if (src.length() > 0) { _tc_set_attr(el, "src", src) }
     if (type_.length() > 0) { _tc_set_attr(el, "type", type_) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1067,28 +1163,38 @@ fun source(cls: String = "", id: String = "", style: String = "",
 }
 
 fun span(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("span", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("span", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun strong(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("strong", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("strong", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun sub(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("sub", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("sub", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun summary(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("summary", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("summary", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun sup(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("sup", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("sup", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun table(cls: String = "", id: String = "", style: String = "",
@@ -1098,9 +1204,9 @@ fun table(cls: String = "", id: String = "", style: String = "",
           rules: String = "",
           summary: String = "",
           width: String = "",
-          on_click: Any = nil,
+          on_click: (Event) => Nil = nil,
           attrs: Map<String, Any> = {},
-          block: Any = nil): Float {
+          block: () => Nil = nil): Float {
     var el: Float = _tc_create("table")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1111,7 +1217,7 @@ fun table(cls: String = "", id: String = "", style: String = "",
     if (rules.length() > 0) { _tc_set_attr(el, "rules", rules) }
     if (summary.length() > 0) { _tc_set_attr(el, "summary", summary) }
     if (width.length() > 0) { _tc_set_attr(el, "width", width) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1120,8 +1226,10 @@ fun table(cls: String = "", id: String = "", style: String = "",
 }
 
 fun tbody(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("tbody", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("tbody", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun td(cls: String = "", id: String = "", style: String = "",
@@ -1130,9 +1238,9 @@ fun td(cls: String = "", id: String = "", style: String = "",
        headers: String = "",
        row_span: Float = 0,
        scope: String = "",
-       on_click: Any = nil,
+       on_click: (Event) => Nil = nil,
        attrs: Map<String, Any> = {},
-       block: Any = nil): Float {
+       block: () => Nil = nil): Float {
     var el: Float = _tc_create("td")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1142,7 +1250,7 @@ fun td(cls: String = "", id: String = "", style: String = "",
     if (headers.length() > 0) { _tc_set_attr(el, "headers", headers) }
     if (row_span != 0) { _tc_set_attr(el, "rowspan", row_span.to_string()) }
     if (scope.length() > 0) { _tc_set_attr(el, "scope", scope) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1162,14 +1270,14 @@ fun textarea(cls: String = "", id: String = "", style: String = "",
              rows: Float = 0,
              value: String = "",
              wrap: String = "",
-             on_click: Any = nil,
-             on_input: Any = nil,
-             on_change: Any = nil,
-             on_focus: Any = nil,
-             on_blur: Any = nil,
-             on_keydown: Any = nil,
+             on_click: (Event) => Nil = nil,
+             on_input: (Event) => Nil = nil,
+             on_change: (Event) => Nil = nil,
+             on_focus: (Event) => Nil = nil,
+             on_blur: (Event) => Nil = nil,
+             on_keydown: (Event) => Nil = nil,
              attrs: Map<String, Any> = {},
-             block: Any = nil): Float {
+             block: () => Nil = nil): Float {
     var el: Float = _tc_create("textarea")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1185,12 +1293,12 @@ fun textarea(cls: String = "", id: String = "", style: String = "",
     if (rows != 0) { _tc_set_attr(el, "rows", rows.to_string()) }
     if (value.length() > 0) { _tc_set_attr(el, "value", value) }
     if (wrap.length() > 0) { _tc_set_attr(el, "wrap", wrap) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_input != nil) { _tc_add_event(el, "input", on_input) }
-    if (on_change != nil) { _tc_add_event(el, "change", on_change) }
-    if (on_focus != nil) { _tc_add_event(el, "focus", on_focus) }
-    if (on_blur != nil) { _tc_add_event(el, "blur", on_blur) }
-    if (on_keydown != nil) { _tc_add_event(el, "keydown", on_keydown) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_input != nil) { _tc_add_event(el, "input", fun () => on_input(_tc_event)) }
+    if (on_change != nil) { _tc_add_event(el, "change", fun () => on_change(_tc_event)) }
+    if (on_focus != nil) { _tc_add_event(el, "focus", fun () => on_focus(_tc_event)) }
+    if (on_blur != nil) { _tc_add_event(el, "blur", fun () => on_blur(_tc_event)) }
+    if (on_keydown != nil) { _tc_add_event(el, "keydown", fun () => on_keydown(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1199,8 +1307,10 @@ fun textarea(cls: String = "", id: String = "", style: String = "",
 }
 
 fun tfoot(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("tfoot", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("tfoot", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun th(cls: String = "", id: String = "", style: String = "",
@@ -1209,9 +1319,9 @@ fun th(cls: String = "", id: String = "", style: String = "",
        headers: String = "",
        row_span: Float = 0,
        scope: String = "",
-       on_click: Any = nil,
+       on_click: (Event) => Nil = nil,
        attrs: Map<String, Any> = {},
-       block: Any = nil): Float {
+       block: () => Nil = nil): Float {
     var el: Float = _tc_create("th")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1221,7 +1331,7 @@ fun th(cls: String = "", id: String = "", style: String = "",
     if (headers.length() > 0) { _tc_set_attr(el, "headers", headers) }
     if (row_span != 0) { _tc_set_attr(el, "rowspan", row_span.to_string()) }
     if (scope.length() > 0) { _tc_set_attr(el, "scope", scope) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1230,21 +1340,23 @@ fun th(cls: String = "", id: String = "", style: String = "",
 }
 
 fun thead(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("thead", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("thead", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun time(cls: String = "", id: String = "", style: String = "",
          date_time: String = "",
-         on_click: Any = nil,
+         on_click: (Event) => Nil = nil,
          attrs: Map<String, Any> = {},
-         block: Any = nil): Float {
+         block: () => Nil = nil): Float {
     var el: Float = _tc_create("time")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
     if (date_time.length() > 0) { _tc_set_attr(el, "datetime", date_time) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1253,13 +1365,17 @@ fun time(cls: String = "", id: String = "", style: String = "",
 }
 
 fun title(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("title", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("title", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun tr(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("tr", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("tr", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun track(cls: String = "", id: String = "", style: String = "",
@@ -1268,7 +1384,7 @@ fun track(cls: String = "", id: String = "", style: String = "",
           label: String = "",
           src: String = "",
           srclang: String = "",
-          on_click: Any = nil,
+          on_click: (Event) => Nil = nil,
           attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("track")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
@@ -1279,7 +1395,7 @@ fun track(cls: String = "", id: String = "", style: String = "",
     if (label.length() > 0) { _tc_set_attr(el, "label", label) }
     if (src.length() > 0) { _tc_set_attr(el, "src", src) }
     if (srclang.length() > 0) { _tc_set_attr(el, "srclang", srclang) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1287,18 +1403,24 @@ fun track(cls: String = "", id: String = "", style: String = "",
 }
 
 fun u(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("u", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("u", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun ul(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("ul", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("ul", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun var_(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}, block: Any = nil): Float {
-    return _tc_el_with_common("var", cls, id, style, attrs, block)
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}, block: () => Nil = nil): Float {
+    var el: Float = _tc_el_with_common("var", cls, id, style, attrs, block)
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    return el
 }
 
 fun video(cls: String = "", id: String = "", style: String = "",
@@ -1307,12 +1429,12 @@ fun video(cls: String = "", id: String = "", style: String = "",
           plays_inline: Bool = false,
           poster: String = "",
           width: Float = 0,
-          on_click: Any = nil,
-          on_play: Any = nil,
-          on_pause: Any = nil,
-          on_ended: Any = nil,
+          on_click: (Event) => Nil = nil,
+          on_play: (Event) => Nil = nil,
+          on_pause: (Event) => Nil = nil,
+          on_ended: (Event) => Nil = nil,
           attrs: Map<String, Any> = {},
-          block: Any = nil): Float {
+          block: () => Nil = nil): Float {
     var el: Float = _tc_create("video")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
@@ -1322,10 +1444,10 @@ fun video(cls: String = "", id: String = "", style: String = "",
     if (plays_inline) { _tc_set_attr(el, "playsinline", "true") }
     if (poster.length() > 0) { _tc_set_attr(el, "poster", poster) }
     if (width != 0) { _tc_set_attr(el, "width", width.to_string()) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
-    if (on_play != nil) { _tc_add_event(el, "play", on_play) }
-    if (on_pause != nil) { _tc_add_event(el, "pause", on_pause) }
-    if (on_ended != nil) { _tc_add_event(el, "ended", on_ended) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
+    if (on_play != nil) { _tc_add_event(el, "play", fun () => on_play(_tc_event)) }
+    if (on_pause != nil) { _tc_add_event(el, "pause", fun () => on_pause(_tc_event)) }
+    if (on_ended != nil) { _tc_add_event(el, "ended", fun () => on_ended(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)
@@ -1334,12 +1456,12 @@ fun video(cls: String = "", id: String = "", style: String = "",
 }
 
 fun wbr(cls: String = "", id: String = "", style: String = "",
-       on_click: Any = nil, attrs: Map<String, Any> = {}): Float {
+       on_click: (Event) => Nil = nil, attrs: Map<String, Any> = {}): Float {
     var el: Float = _tc_create("wbr")
     if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
     if (id.length() > 0) { _tc_set_attr(el, "id", id) }
     if (style.length() > 0) { _tc_set_attr(el, "style", style) }
-    if (on_click != nil) { _tc_add_event(el, "click", on_click) }
+    if (on_click != nil) { _tc_add_event(el, "click", fun () => on_click(_tc_event)) }
     _tc_apply_attrs(el, attrs)
     var parent: Float = _tc_current()
     _tc_append(parent, el)

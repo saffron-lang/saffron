@@ -1,0 +1,26 @@
+
+// --- Context stack: tracks current parent for nesting ---
+var _tc_stack: List<Float> = []
+var _tc_root: Float = 0
+
+fun _tc_push(handle: Float) {
+    _tc_stack.push(handle)
+}
+
+fun _tc_pop(): Float {
+    if (_tc_stack.length() == 0) {
+        throw "turmeric: element stack underflow — more pops than pushes (check nesting)"
+    }
+    return _tc_stack.pop()
+}
+
+fun _tc_current(): Float {
+    if (_tc_stack.length() == 0) { return _tc_root }
+    return _tc_stack[_tc_stack.length() - 1]
+}
+
+// --- Text node ---
+fun text(content: String) {
+    var parent: Float = _tc_current()
+    _tc_set_text(parent, content)
+}

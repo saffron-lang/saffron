@@ -1,0 +1,98 @@
+
+// --- Event value accessor: reads from the current JS event on the _eventStack ---
+// Used by prelude on_input/on_change handlers where the full typed Event is unavailable.
+fun event_target_value(): String {
+    return _tc_event_get_string(0, "target.value")
+}
+
+// =============================================================================
+// Event class — lightweight wrapper around the JS event stack
+// Passed to all on_* handlers so users can access event properties directly.
+// Methods read from the _eventStack via FFI (the event is on the stack while
+// the handler executes).
+// =============================================================================
+
+@extern("void js_event_prevent_default(i64)") fun _tc_event_prevent_default(event_ptr: Float)
+@extern("void js_event_stop_propagation(i64)") fun _tc_event_stop_propagation(event_ptr: Float)
+@extern("i64 js_event_get_float(i64, void*)") fun _tc_event_get_float(event_ptr: Float, field: String): Float
+@extern("i64 js_event_get_bool(i64, void*)") fun _tc_event_get_bool(event_ptr: Float, field: String): Bool
+
+class Event {
+    fun init() {}
+
+    fun target_value(): String {
+        return _tc_event_get_string(0, "target.value")
+    }
+
+    fun target_checked(): Bool {
+        return _tc_event_get_bool(0, "target.checked")
+    }
+
+    fun key(): String {
+        return _tc_event_get_string(0, "key")
+    }
+
+    fun code(): String {
+        return _tc_event_get_string(0, "code")
+    }
+
+    fun prevent_default() {
+        _tc_event_prevent_default(0)
+    }
+
+    fun stop_propagation() {
+        _tc_event_stop_propagation(0)
+    }
+
+    fun client_x(): Float {
+        return _tc_event_get_float(0, "clientX")
+    }
+
+    fun client_y(): Float {
+        return _tc_event_get_float(0, "clientY")
+    }
+
+    fun offset_x(): Float {
+        return _tc_event_get_float(0, "offsetX")
+    }
+
+    fun offset_y(): Float {
+        return _tc_event_get_float(0, "offsetY")
+    }
+
+    fun button(): Float {
+        return _tc_event_get_float(0, "button")
+    }
+
+    fun alt_key(): Bool {
+        return _tc_event_get_bool(0, "altKey")
+    }
+
+    fun ctrl_key(): Bool {
+        return _tc_event_get_bool(0, "ctrlKey")
+    }
+
+    fun shift_key(): Bool {
+        return _tc_event_get_bool(0, "shiftKey")
+    }
+
+    fun meta_key(): Bool {
+        return _tc_event_get_bool(0, "metaKey")
+    }
+
+    fun get_string(field: String): String {
+        return _tc_event_get_string(0, field)
+    }
+
+    fun get_float(field: String): Float {
+        return _tc_event_get_float(0, field)
+    }
+
+    fun get_bool(field: String): Bool {
+        return _tc_event_get_bool(0, field)
+    }
+}
+
+// Shared Event instance — reused across dispatches (the Event class reads
+// lazily from the JS event stack, so a single instance works for all calls).
+var _tc_event: Event = Event()

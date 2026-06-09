@@ -1,0 +1,41 @@
+
+// --- Attribute application: maps keys to DOM operations ---
+// attrs values are heterogeneous: String for attributes, () => Nil for on_ handlers.
+// Map<String, Any> is intentional — no union type covers both cleanly.
+fun _tc_apply_attrs(el: Float, attrs: Map<String, Any>) {
+    var keys = attrs.keys()
+    var i = 0
+    while (i < keys.length()) {
+        var key = keys[i]
+        var value = attrs.get(key)
+        if (key == "cls" or key == "class") {
+            _tc_set_attr(el, "class", value)
+        } else if (key == "id") {
+            _tc_set_attr(el, "id", value)
+        } else if (key.starts_with("on_")) {
+            var event_name = key.slice(3, key.length())
+            _tc_add_event(el, event_name, value)
+        } else {
+            _tc_set_attr(el, key, value)
+        }
+        i = i + 1
+    }
+}
+
+// --- Common attribute helper: creates element, sets typed common attrs, applies overflow, nests block ---
+fun _tc_el_with_common(tag: String, cls: String, id: String, style: String,
+                       attrs: Map<String, Any>, block: () => Nil): Float {
+    var el: Float = _tc_create(tag)
+    if (cls.length() > 0) { _tc_set_attr(el, "class", cls) }
+    if (id.length() > 0) { _tc_set_attr(el, "id", id) }
+    if (style.length() > 0) { _tc_set_attr(el, "style", style) }
+    _tc_apply_attrs(el, attrs)
+    var parent: Float = _tc_current()
+    _tc_append(parent, el)
+    if (block != nil) {
+        _tc_push(el)
+        block()
+        _tc_pop()
+    }
+    return el
+}

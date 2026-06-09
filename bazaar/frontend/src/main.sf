@@ -132,7 +132,7 @@ fun NavBarWithSearch() {
         <div cls="search-wrapper">
             <form cls="nav-search" on_submit={fun (e: Event) => { search_suggestions.set([]); do_search() }}>
                 <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => { search_query.set(event_target_value()); update_suggestions(event_target_value()) }} on_blur={fun (e: Event) => search_suggestions.set([])} />
-                <button cls="nav-search-btn" type="submit">→</button>
+                <button cls="nav-search-btn" type="submit">{text("→")}</button>
             </form>
             {if (search_suggestions.get().length() > 0) {
                 <div cls="autocomplete">
@@ -454,11 +454,7 @@ fun SearchResultsPage() {
             {SearchSidebar()}
 
             <main cls="results">
-                <p cls="result-hd">
-                    <span>Showing results for "</span>
-                    <strong>{text(search_query.get())}</strong>
-                    <span>"</span>
-                </p>
+                <p cls="result-hd">{text("Showing results for " + search_query.get())}</p>
                 {list_el = div(cls="results-list", block=fun () => {
                     <div cls="empty-state">No packages found matching your query.</div>
                 })
