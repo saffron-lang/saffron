@@ -239,10 +239,7 @@ build_project() {
         for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__dispatch_[a-zA-Z0-9_]+' "$ll_path" | sed 's/define i64 @//'); do
             EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
         done
-        for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__on_fetch_complete[a-zA-Z0-9_]*' "$ll_path" | sed 's/define i64 @//'); do
-            EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
-        done
-        for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__on_navigate[a-zA-Z0-9_]*' "$ll_path" | sed 's/define i64 @//'); do
+        for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__on_[a-zA-Z0-9_]+' "$ll_path" | sed 's/define i64 @//'); do
             EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
         done
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
