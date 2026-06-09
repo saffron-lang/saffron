@@ -179,7 +179,7 @@ build_frontend()
 build_backend()
 
 // Start backend API server as subprocess
-var backend_proc = Process.spawn("./build/bazaar")
+var backend_proc = Process.spawn("BAZAAR_PORT=3001 ./build/bazaar")
 IO.println("  [backend]  http://localhost:" + BACKEND_PORT.to_string() + " (API)")
 
 // Start frontend static server

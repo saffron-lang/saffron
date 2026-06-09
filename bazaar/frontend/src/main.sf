@@ -3,7 +3,7 @@
 
 import { signal, computed, effect } from "turmeric/signal"
 import "turmeric/router" as Router
-import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, label, mount, event_target_value, render_into, Event } from "turmeric/prelude"
+import { div, span, p, a, b, strong, pre, h1, h2, nav, footer, section, form, input, button, code, text, main, aside, article, select, option, label, mount, event_target_value, render_into, Event, set_timeout, clear_timeout, debounce } from "turmeric/prelude"
 import "./api.sf" as Api
 
 // =============================================================================
@@ -63,6 +63,22 @@ fun do_search() {
     }
     router.go("/search?q=" + q)
     search_results_query.set(Api.searchPackages(q))
+}
+
+var _search_timer: Float = -1
+
+fun do_live_search(q: String) {
+    search_query.set(q)
+    if (q.length() < 2) {
+        search_suggestions.set([])
+        return
+    }
+    update_suggestions(q)
+    // Debounce the API search: wait 300ms after typing stops
+    if (_search_timer >= 0) { clear_timeout(_search_timer) }
+    _search_timer = set_timeout(fun () => {
+        do_search()
+    }, 300)
 }
 
 fun update_suggestions(q: String) {
@@ -131,7 +147,7 @@ fun NavBarWithSearch() {
         <a cls="nav-link">Docs</a>
         <div cls="search-wrapper">
             <form cls="nav-search" on_submit={fun (e: Event) => { search_suggestions.set([]); do_search() }}>
-                <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => { search_query.set(event_target_value()); update_suggestions(event_target_value()) }} on_blur={fun (e: Event) => search_suggestions.set([])} />
+                <input type="text" placeholder="Search packages..." value={search_query.get()} on_input={fun (e: Event) => do_live_search(event_target_value())} on_blur={fun (e: Event) => search_suggestions.set([])} />
                 <button cls="nav-search-btn" type="submit">{text("→")}</button>
             </form>
             {if (search_suggestions.get().length() > 0) {
@@ -286,7 +302,7 @@ fun HomePage() {
                 <p cls="hero-sub">Browse packages from the Saffron community. Open source, forever free.</p>
                 <div cls="search-wrapper hero-search-wrapper">
                     <form cls="hero-form" on_submit={fun (e: Event) => { search_suggestions.set([]); do_search() }}>
-                        <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." value={search_query.get()} on_input={fun (e: Event) => { search_query.set(event_target_value()); update_suggestions(event_target_value()) }} on_blur={fun (e: Event) => search_suggestions.set([])} />
+                        <input cls="hero-input" type="text" placeholder="Search packages, tools, components..." value={search_query.get()} on_input={fun (e: Event) => do_live_search(event_target_value())} on_blur={fun (e: Event) => search_suggestions.set([])} />
                         <button cls="hero-btn" type="submit">Search</button>
                     </form>
                     {if (search_suggestions.get().length() > 0) {

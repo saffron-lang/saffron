@@ -205,6 +205,26 @@ const imports = { env: new Proxy({
                 if (fn) fn(callbackId, ptr);
             });
     },
+    js_set_timeout: (callbackId, ms) => {
+        const id = setTimeout(() => {
+            const fn = _findExport('__on_timeout');
+            if (fn) fn(callbackId);
+        }, Number(ms));
+        return BigInt(id);
+    },
+    js_clear_timeout: (timerId) => {
+        clearTimeout(Number(timerId));
+    },
+    js_set_interval: (callbackId, ms) => {
+        const id = setInterval(() => {
+            const fn = _findExport('__on_timeout');
+            if (fn) fn(callbackId);
+        }, Number(ms));
+        return BigInt(id);
+    },
+    js_clear_interval: (timerId) => {
+        clearInterval(Number(timerId));
+    },
     __string_intern: (ptr) => ptr,
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };

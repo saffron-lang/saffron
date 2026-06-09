@@ -274,6 +274,59 @@ fun _tc_el_with_common(tag: String, cls: String, id: String, style: String,
 }
 
 // =============================================================================
+// Timers — setTimeout / setInterval / debounce
+// =============================================================================
+
+@extern("i64 js_set_timeout(i64, i64)") fun _tc_set_timeout(callback_id: Float, ms: Float): Float
+@extern("void js_clear_timeout(i64)") fun _tc_clear_timeout(timer_id: Float)
+@extern("i64 js_set_interval(i64, i64)") fun _tc_set_interval(callback_id: Float, ms: Float): Float
+@extern("void js_clear_interval(i64)") fun _tc_clear_interval(timer_id: Float)
+
+var _tc_timer_callbacks: List<Any> = []
+
+fun _tc_register_timer(handler: () => Nil): Float {
+    _tc_timer_callbacks.push(handler)
+    return _tc_timer_callbacks.length() - 1
+}
+
+fun __on_timeout(callback_id: Float) {
+    if (callback_id >= 0 and callback_id < _tc_timer_callbacks.length()) {
+        var handler: Any = _tc_timer_callbacks[callback_id]
+        if (handler != nil) {
+            handler()
+        }
+    }
+}
+
+fun set_timeout(handler: () => Nil, ms: Float): Float {
+    var id: Float = _tc_register_timer(handler)
+    return _tc_set_timeout(id, ms)
+}
+
+fun clear_timeout(timer_id: Float) {
+    _tc_clear_timeout(timer_id)
+}
+
+fun set_interval(handler: () => Nil, ms: Float): Float {
+    var id: Float = _tc_register_timer(handler)
+    return _tc_set_interval(id, ms)
+}
+
+fun clear_interval(timer_id: Float) {
+    _tc_clear_interval(timer_id)
+}
+
+fun debounce(handler: () => Nil, ms: Float): () => Nil {
+    var timer_id: Float = -1
+    return fun () => {
+        if (timer_id >= 0) {
+            clear_timeout(timer_id)
+        }
+        timer_id = set_timeout(handler, ms)
+    }
+}
+
+// =============================================================================
 // Element Builder Functions (auto-generated from DOM spec via generate_types.sf)
 // DO NOT EDIT below this line manually — regenerate with tools/build_prelude.sh
 // =============================================================================
