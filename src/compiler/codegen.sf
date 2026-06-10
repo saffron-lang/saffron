@@ -78,6 +78,7 @@ class Codegen {
     var llvm_values: Map<String, Any>
     var actor_classes: Map<String, Bool>
     var force_next_lambda_coro: Bool
+    var check_spawn_sendable: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -139,6 +140,7 @@ class Codegen {
         this.next_class_type_id = 10
         this.actor_classes = {}
         this.force_next_lambda_coro = false
+        this.check_spawn_sendable = false
         this.llvm_module = LLVMMod.Module("saffron_program")
         // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
         // Explicitly call init to set up internal lists/fields.

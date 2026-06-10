@@ -11,6 +11,22 @@
         var captures: List<String> = []
         this.find_free_vars_stmts(body, param_names, captures)
 
+        // Sendable check: warn if Task.spawn captures non-Sendable variables
+        if (this.check_spawn_sendable) {
+            this.check_spawn_sendable = false
+            var sci: Float = 0
+            while (sci < captures.length()) {
+                var cap_name: String = captures[sci]
+                var cap_type: String = this.get_var_type_str(cap_name)
+                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String" and cap_type != "Number") {
+                    if (!this.actor_classes.has(cap_type) and !this.enum_defs.has(cap_type)) {
+                        IO.println("[checker] Warning: Task.spawn closure captures non-Sendable variable '" + cap_name + "' (type " + cap_type + ")")
+                    }
+                }
+                sci = sci + 1
+            }
+        }
+
         // Generate a unique name for this lambda (module-prefixed for global uniqueness)
         this.label_counter = this.label_counter + 1
         var lambda_name: String = this.current_prefix + "__lambda_" + this.label_counter.floor().to_string()

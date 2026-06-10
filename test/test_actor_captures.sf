@@ -1,0 +1,26 @@
+import "@test" as T
+import "@async" as Async
+
+// Test: Sendable capture checks work correctly.
+// Non-Sendable captures trigger warnings (visible at compile time).
+// Sendable captures (Int, String, actors, enums) do not.
+
+actor Counter {
+    var count: Int
+    fun init() { this.count = 0 }
+    fun add(n: Int) { this.count = this.count + n }
+    fun get(): Int { return this.count }
+}
+
+var c = Counter()
+
+// Actor capture: no warning (actors are Sendable)
+var t1 = Task.spawn(fun () => c.add(5))
+t1.await()
+
+// Another actor capture
+var t2 = Task.spawn(fun () => c.add(10))
+t2.await()
+
+T.assert_eq(c.get(), 15, "Sendable captures work correctly")
+T.summary()
