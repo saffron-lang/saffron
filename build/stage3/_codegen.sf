@@ -77,6 +77,7 @@ class Codegen {
     var llvm_values: Map<String, Any>
     var actor_classes: Map<String, Bool>
     var force_next_lambda_coro: Bool
+    var check_spawn_sendable: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -138,6 +139,7 @@ class Codegen {
         this.next_class_type_id = 10
         this.actor_classes = {}
         this.force_next_lambda_coro = false
+        this.check_spawn_sendable = false
         this.llvm_module = LLVMMod.Module("saffron_program")
         // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
         // Explicitly call init to set up internal lists/fields.
@@ -4118,6 +4120,22 @@ class Codegen {
         }
         var captures: List<String> = []
         this.find_free_vars_stmts(body, param_names, captures)
+
+        // Sendable check: warn if Task.spawn captures non-Sendable variables
+        if (this.check_spawn_sendable) {
+            this.check_spawn_sendable = false
+            var sci: Float = 0
+            while (sci < captures.length()) {
+                var cap_name: String = captures[sci]
+                var cap_type: String = this.get_var_type_str(cap_name)
+                if (cap_type.length() > 0 and cap_type != "Any" and cap_type != "Int" and cap_type != "Float" and cap_type != "Bool" and cap_type != "String" and cap_type != "Number") {
+                    if (!this.actor_classes.has(cap_type) and !this.enum_defs.has(cap_type)) {
+                        IO.println("[checker] Warning: Task.spawn closure captures non-Sendable variable '" + cap_name + "' (type " + cap_type + ")")
+                    }
+                }
+                sci = sci + 1
+            }
+        }
 
         // Generate a unique name for this lambda (module-prefixed for global uniqueness)
         this.label_counter = this.label_counter + 1
@@ -10162,6 +10180,7 @@ class Codegen {
         // Get the lambda as a function pointer (i64)
         // Force the lambda to be a coroutine (Task.spawn expects a coro handle)
         this.force_next_lambda_coro = true
+        this.check_spawn_sendable = true
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
         // Lambda names start with __lambda — check if in coroutine_funcs
