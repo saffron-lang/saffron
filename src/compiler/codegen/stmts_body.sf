@@ -282,6 +282,14 @@
                 }
             }
         }
+        // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
+        if (this.actor_classes.has(name)) {
+            if (all_fields.length() > 0) {
+                all_fields = "__actor_busy:Int,__actor_queue:Int," + all_fields
+            } else {
+                all_fields = "__actor_busy:Int,__actor_queue:Int"
+            }
+        }
         // Generate the class with inherited fields
         this.current_parent = parent
         this.gen_class_decl(name, all_fields, methods)

@@ -1006,11 +1006,15 @@
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
-                    out.append("  %__entry_raw = ptrtoint ptr %__entry_hdl to i64\n")
-                    out.append("  %__entry_ptr = inttoptr i64 %__entry_raw to i8*\n")
-                    out.append("  %__entry_i64 = call i64 @__val_tag_ptr(i8* %__entry_ptr)\n")
+                    out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_done = call i64 @__sched_coro_done(i64 %__entry_i64)\n")
+                    out.append("  %__entry_is_done = icmp eq i64 %__entry_done, 1\n")
+                    out.append("  br i1 %__entry_is_done, label %__entry_skip, label %__entry_run\n")
+                    out.append("__entry_run:\n")
                     out.append("  call i64 @" + enqueue_fn + "(i64 %__entry_i64)\n")
                     out.append("  call i64 @" + sched_fn + "()\n")
+                    out.append("  br label %__entry_skip\n")
+                    out.append("__entry_skip:\n")
                     out.append("  ret i32 0\n")
                 } else if (has_top_level) {
                     out.append("  call i64 @__saffron_entry()\n")
@@ -1034,9 +1038,7 @@
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
-                        out.append("  %__main_raw = ptrtoint ptr %__main_hdl to i64\n")
-                        out.append("  %__main_ptr = inttoptr i64 %__main_raw to i8*\n")
-                        out.append("  %__main_i64 = call i64 @__val_tag_ptr(i8* %__main_ptr)\n")
+                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
                         out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
                         out.append("  call i64 @" + sched_fn2 + "()\n")
                         out.append("  ret i32 0\n")

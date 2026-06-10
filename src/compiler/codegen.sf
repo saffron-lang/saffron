@@ -76,6 +76,8 @@ class Codegen {
     var llvm_func_builder: LLVMFunc.FunctionBuilder
     var llvm_block_builder: LLVMBlock.BlockBuilder
     var llvm_values: Map<String, Any>
+    var actor_classes: Map<String, Bool>
+    var force_next_lambda_coro: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -135,6 +137,8 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.actor_classes = {}
+        this.force_next_lambda_coro = false
         this.llvm_module = LLVMMod.Module("saffron_program")
         // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
         // Explicitly call init to set up internal lists/fields.
@@ -622,6 +626,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => m
                     _ => []
                 }
+                var cd3: String = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => d
+                    _ => ""
+                }
+                if (cd3.starts_with("@actor")) {
+                    gen.actor_classes.set(cn3, true)
+                    if (prefix3.length() > 0) { gen.actor_classes.set(prefix3 + cn3, true) }
+                }
                 if (cn3.length() > 0 and !gen.class_fields.has(cn3)) {
                     var cf3_str: String = gen.params_to_string(cf3)
                     var cf3_all: String = cf3_str
@@ -633,6 +644,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                             } else {
                                 cf3_all = cpf3
                             }
+                        }
+                    }
+                    if (gen.actor_classes.has(cn3)) {
+                        if (cf3_all.length() > 0) {
+                            cf3_all = "__actor_busy:Int,__actor_queue:Int," + cf3_all
+                        } else {
+                            cf3_all = "__actor_busy:Int,__actor_queue:Int"
                         }
                     }
                     gen.class_fields.set(cn3, cf3_all)
@@ -1229,6 +1247,12 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, p, f, m, d) => m
                 _ => []
             }
+            var pr_doc: String = match (program[pri]) { ClassDecl(n, p, f, m, d) => d
+                _ => ""
+            }
+            if (pr_doc.starts_with("@actor")) {
+                gen.actor_classes.set(pr_name, true)
+            }
             if (pr_name.length() > 0) {
                 var pr_fields_str: String = gen.params_to_string(pr_fields)
                 var pr_all_fields: String = pr_fields_str
@@ -1240,6 +1264,13 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         } else {
                             pr_all_fields = pr_parent_fields
                         }
+                    }
+                }
+                if (gen.actor_classes.has(pr_name)) {
+                    if (pr_all_fields.length() > 0) {
+                        pr_all_fields = "__actor_busy:Int,__actor_queue:Int," + pr_all_fields
+                    } else {
+                        pr_all_fields = "__actor_busy:Int,__actor_queue:Int"
                     }
                 }
                 gen.class_fields.set(pr_name, pr_all_fields)

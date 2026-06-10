@@ -1301,6 +1301,7 @@ class Parser {
         if (this.match_kind_check("enum")) return this.parse_enum_decl_with_doc(docstring)
         if (this.match_kind_check("class")) return this.parse_class_decl_with_doc(docstring)
         if (this.is_ident_named("interface")) return this.parse_class_decl_with_doc(docstring)
+        if (this.is_ident_named("actor")) return this.parse_class_decl_with_doc("@actor\n" + docstring)
         if (this.match_kind_check("import")) return this.parse_import()
         if (this.match_kind_check("return")) return this.parse_return()
         if (this.match_kind_check("if")) return this.parse_if()
