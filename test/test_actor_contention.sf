@@ -1,0 +1,67 @@
+import "@test" as T
+import "@async" as Async
+
+actor BankAccount {
+    var balance: Int
+
+    fun init(initial: Int) {
+        this.balance = initial
+    }
+
+    fun deposit(amount: Int) {
+        // Simulate work with a read-modify-write
+        var current: Int = this.balance
+        this.balance = current + amount
+    }
+
+    fun withdraw(amount: Int): Int {
+        var current: Int = this.balance
+        if (current >= amount) {
+            this.balance = current - amount
+            return amount
+        }
+        return 0
+    }
+
+    fun get_balance(): Int {
+        return this.balance
+    }
+}
+
+// Test: multiple tasks depositing concurrently
+var account = BankAccount(100)
+
+var t1 = Task.spawn(fun () => account.deposit(10))
+var t2 = Task.spawn(fun () => account.deposit(10))
+var t3 = Task.spawn(fun () => account.deposit(10))
+var t4 = Task.spawn(fun () => account.deposit(10))
+var t5 = Task.spawn(fun () => account.deposit(10))
+t1.await()
+t2.await()
+t3.await()
+t4.await()
+t5.await()
+
+T.assert_eq(account.get_balance(), 150, "5 deposits of 10 on initial 100")
+
+// Test: self-call (no deadlock)
+actor Calculator {
+    var result: Int
+    fun init() { this.result = 0 }
+
+    fun compute(n: Int): Int {
+        this.result = this.helper(n)
+        return this.result
+    }
+
+    fun helper(n: Int): Int {
+        return n * n
+    }
+}
+
+var calc = Calculator()
+var t_calc = Task.spawn(fun () => calc.compute(7))
+t_calc.await()
+T.assert_eq(calc.result, 49, "self-call works without deadlock")
+
+T.summary()
