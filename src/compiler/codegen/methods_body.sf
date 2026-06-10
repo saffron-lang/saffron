@@ -1414,6 +1414,7 @@
         // Get the lambda as a function pointer (i64)
         // Force the lambda to be a coroutine (Task.spawn expects a coro handle)
         this.force_next_lambda_coro = true
+        this.check_spawn_sendable = true
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
         // Lambda names start with __lambda — check if in coroutine_funcs
