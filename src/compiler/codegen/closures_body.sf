@@ -16,7 +16,10 @@
         var lambda_name: String = this.current_prefix + "__lambda_" + this.label_counter.floor().to_string()
 
         // Check if this lambda is a coroutine (contains yield or calls a coroutine)
-        if (this.stmts_have_yield(body)) {
+        if (this.force_next_lambda_coro) {
+            this.coroutine_funcs.push(lambda_name)
+            this.force_next_lambda_coro = false
+        } else if (this.stmts_have_yield(body)) {
             this.coroutine_funcs.push(lambda_name)
         } else {
             var lambda_calls: List<String> = []

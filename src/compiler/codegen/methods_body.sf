@@ -1386,6 +1386,8 @@
             }
         }
         // Get the lambda as a function pointer (i64)
+        // Force the lambda to be a coroutine (Task.spawn expects a coro handle)
+        this.force_next_lambda_coro = true
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
         // Lambda names start with __lambda — check if in coroutine_funcs
@@ -2677,6 +2679,61 @@
             this.has_errors = true
             this.last_type = AST.Type.IntType
             return "0"
+        }
+        // Actor dispatch: serialize access with busy-check
+        if (this.actor_classes.has(class_name) and this.is_coroutine and method != "init") {
+            var actor_check: String = this.fresh_label("actor.check")
+            var actor_suspend: String = this.fresh_label("actor.suspend")
+            var actor_loop: String = this.fresh_label("actor.loop")
+            var actor_cleanup: String = this.fresh_label("actor.cleanup")
+            var actor_run: String = this.fresh_label("actor.run")
+            var actor_done: String = this.fresh_label("actor.done")
+            this.emit_terminator("br label %" + actor_check)
+            this.start_block(actor_check)
+            var busy_ptr: String = this.fresh_local()
+            this.emit_indent(busy_ptr + " = inttoptr i64 " + obj + " to i64*")
+            var busy_val: String = this.fresh_local()
+            this.emit_indent(busy_val + " = load i64, i64* " + busy_ptr)
+            var busy_cmp: String = this.fresh_local()
+            this.emit_indent(busy_cmp + " = icmp ne i64 " + busy_val + ", 0")
+            this.emit_terminator("br i1 " + busy_cmp + ", label %" + actor_suspend + ", label %" + actor_run)
+            this.start_block(actor_suspend)
+            this.emit_indent("store i64 5, i64* @__yield_reason")
+            this.emit_indent("store i64 " + obj + ", i64* @__yield_arg")
+            var save_tok: String = this.fresh_local()
+            this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var susp: String = this.fresh_local()
+            this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+            this.emit_terminator("switch i8 " + susp + ", label %__coro_suspend [i8 0, label %" + actor_loop + " i8 1, label %" + actor_cleanup + "]")
+            this.start_block(actor_cleanup)
+            this.emit_terminator("br label %__coro_cleanup")
+            this.start_block(actor_loop)
+            this.emit_terminator("br label %" + actor_check)
+            this.start_block(actor_run)
+            this.emit_indent("store i64 1, i64* " + busy_ptr)
+            var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
+            this.emit_indent("store i64 0, i64* " + busy_ptr)
+            var wake_name: String = "scheduler__wake_actor_waiters"
+            if (this.known_functions.contains("stdlib_scheduler_wake_actor_waiters")) {
+                wake_name = "stdlib_scheduler_wake_actor_waiters"
+            }
+            var wake_discard: String = this.fresh_local()
+            this.emit_indent(wake_discard + " = call i64 @" + wake_name + "(i64 " + obj + ")")
+            this.called_functions.push(wake_name)
+            var ns_ret_str: String = this.type_to_string(this.last_type)
+            if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
+                if (obj_name.length() > 0) {
+                    var recv_type: String = this.get_var_type_str(obj_name)
+                    if (recv_type.contains("<") and recv_type.contains(">")) {
+                        var rg_start: Float = recv_type.index_of("<")
+                        var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
+                        if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
+                            this.last_type = this.str_to_type(rg_inner)
+                        }
+                    }
+                }
+            }
+            return ns_result
         }
         var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
         // Resolve generic type parameter in return type (e.g. T -> String)

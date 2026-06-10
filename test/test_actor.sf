@@ -1,0 +1,30 @@
+import "@test" as T
+
+actor Counter {
+    var count: Int
+
+    fun init() {
+        this.count = 0
+    }
+
+    fun increment() {
+        this.count = this.count + 1
+    }
+
+    fun get(): Int {
+        return this.count
+    }
+
+    fun add(n: Int) {
+        this.count = this.count + n
+    }
+}
+
+var c = Counter()
+c.increment()
+c.increment()
+c.increment()
+T.assert_eq(c.get(), 3, "direct actor calls work")
+c.add(7)
+T.assert_eq(c.get(), 10, "actor add works")
+T.summary()

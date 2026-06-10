@@ -1,0 +1,34 @@
+import "@test" as T
+import "@async" as Async
+
+actor Counter {
+    var count: Int
+
+    fun init() {
+        this.count = 0
+    }
+
+    fun increment() {
+        this.count = this.count + 1
+    }
+
+    fun get(): Int {
+        return this.count
+    }
+
+    fun add(n: Int) {
+        this.count = this.count + n
+    }
+}
+
+var c = Counter()
+
+// Concurrent calls should serialize correctly
+var t1 = Task.spawn(fun () => c.add(10))
+var t2 = Task.spawn(fun () => c.add(20))
+var t3 = Task.spawn(fun () => c.add(5))
+t1.await()
+t2.await()
+t3.await()
+T.assert_eq(c.get(), 35, "concurrent actor calls serialize")
+T.summary()

@@ -162,6 +162,7 @@ class NullChecker {
     var class_parents: Map<String, String>
     var class_method_names: Map<String, String>
     var receiver_params: Map<String, String>
+    var actor_classes: Map<String, Bool>
 
     fun init() {
         this.env = TypeEnv()
@@ -172,6 +173,7 @@ class NullChecker {
         this.class_parents = {}
         this.class_method_names = {}
         this.receiver_params = {}
+        this.actor_classes = {}
     }
 
     fun error(msg: String) {
@@ -651,6 +653,9 @@ class NullChecker {
                 this.register_enum(name, variants)
             }
             ClassDecl(name, parent, fields, methods, doc) => {
+                if (doc.starts_with("@actor")) {
+                    this.actor_classes.set(name, true)
+                }
                 this.env.class_fields.set(name, this.params_list_to_string(fields))
                 // Register class constructor as a function returning the class type
                 this.env.define_func(name, AST.Type.ClassType(name))
