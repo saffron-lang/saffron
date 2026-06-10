@@ -218,6 +218,34 @@ var task = Task.spawn(fun () => worker("A", 0.1))
 var result = Async.await(task)
 ```
 
+### Actors
+
+Actors provide serialized access to mutable state across concurrent tasks. Only one method executes at a time per actor instance.
+
+```saffron
+import "@async" as Async
+
+actor Counter {
+    var count: Int
+    fun init() { this.count = 0 }
+    fun increment() { this.count = this.count + 1 }
+    fun get(): Int { return this.count }
+}
+
+var c = Counter()
+
+// Concurrent calls are serialized — no data races
+var t1 = Task.spawn(fun () => c.increment())
+var t2 = Task.spawn(fun () => c.increment())
+t1.await()
+t2.await()
+// c.get() == 2, guaranteed
+
+// Self-calls (this.method()) execute synchronously — no deadlock
+```
+
+Actors are a soft keyword (like `interface`). On WASM targets, actor methods compile as synchronous calls (single-threaded, no contention possible).
+
 ### Modules and Imports
 
 ```saffron
