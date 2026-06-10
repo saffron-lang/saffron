@@ -1,0 +1,46 @@
+import "@test" as T
+
+// A mutable class — NOT Sendable
+class Buffer {
+    var data: List<String>
+    fun init() { this.data = [] }
+    fun append(s: String) { this.data.push(s) }
+}
+
+// A Sendable class (extends Sendable)
+class Point extends Sendable {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
+}
+
+// This actor should trigger warnings for non-Sendable params
+actor Worker {
+    var count: Int
+    fun init() { this.count = 0 }
+
+    // WARNING: buf is not Sendable (mutable class)
+    fun process(buf: Buffer) {
+        this.count = this.count + 1
+    }
+
+    // OK: Int is Sendable
+    fun add(n: Int) {
+        this.count = this.count + n
+    }
+
+    // OK: Point is Sendable (extends Sendable)
+    fun move_to(p: Point) {
+        this.count = this.count + p.x
+    }
+
+    fun get(): Int {
+        return this.count
+    }
+}
+
+// Verify it still compiles and runs (warnings don't block)
+var w = Worker()
+w.add(5)
+T.assert_eq(w.get(), 5, "actor with Sendable check compiles and runs")
+T.summary()
