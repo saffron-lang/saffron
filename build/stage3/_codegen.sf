@@ -75,6 +75,8 @@ class Codegen {
     var llvm_func_builder: LLVMFunc.FunctionBuilder
     var llvm_block_builder: LLVMBlock.BlockBuilder
     var llvm_values: Map<String, Any>
+    var actor_classes: Map<String, Bool>
+    var force_next_lambda_coro: Bool
 
     fun init() {
         this.sb = StringBuilder()
@@ -134,6 +136,8 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.actor_classes = {}
+        this.force_next_lambda_coro = false
         this.llvm_module = LLVMMod.Module("saffron_program")
         // Workaround: gen2 doesn't emit init calls for cross-module class constructors.
         // Explicitly call init to set up internal lists/fields.
@@ -4120,7 +4124,10 @@ class Codegen {
         var lambda_name: String = this.current_prefix + "__lambda_" + this.label_counter.floor().to_string()
 
         // Check if this lambda is a coroutine (contains yield or calls a coroutine)
-        if (this.stmts_have_yield(body)) {
+        if (this.force_next_lambda_coro) {
+            this.coroutine_funcs.push(lambda_name)
+            this.force_next_lambda_coro = false
+        } else if (this.stmts_have_yield(body)) {
             this.coroutine_funcs.push(lambda_name)
         } else {
             var lambda_calls: List<String> = []
@@ -4876,13 +4883,9 @@ class Codegen {
                 var dbl: String = this.emit_untag_float(val)
                 call_args.push("double " + dbl)
             } else {
-                // Use ptr-style untag (mask only, no sign extend) — safe for
-                // both small ints and pointer-as-int values in i64 params
-                var ptr: String = this.fresh_local()
-                this.emit_indent(ptr + " = call i8* @__val_untag_ptr(i64 " + val + ")")
-                var as_i64: String = this.fresh_local()
-                this.emit_indent(as_i64 + " = ptrtoint i8* " + ptr + " to i64")
-                call_args.push("i64 " + as_i64)
+                // Pass i64 values directly — no untagging needed.
+                // Saffron uses identity mode for pointer-as-int values (coro handles, etc.)
+                call_args.push("i64 " + val)
             }
             i = i + 1
         }
@@ -5249,6 +5252,14 @@ class Codegen {
                 } else {
                     all_fields = parent_fields
                 }
+            }
+        }
+        // For actors, prepend hidden fields: __actor_busy (Int), __actor_queue (Int)
+        if (this.actor_classes.has(name)) {
+            if (all_fields.length() > 0) {
+                all_fields = "__actor_busy:Int,__actor_queue:Int," + all_fields
+            } else {
+                all_fields = "__actor_busy:Int,__actor_queue:Int"
             }
         }
         // Generate the class with inherited fields
@@ -8668,11 +8679,15 @@ class Codegen {
                         sched_fn = "stdlib_scheduler_scheduler_run"
                     }
                     out.append("  %__entry_hdl = call ptr @__saffron_entry()\n")
-                    out.append("  %__entry_raw = ptrtoint ptr %__entry_hdl to i64\n")
-                    out.append("  %__entry_ptr = inttoptr i64 %__entry_raw to i8*\n")
-                    out.append("  %__entry_i64 = call i64 @__val_tag_ptr(i8* %__entry_ptr)\n")
+                    out.append("  %__entry_i64 = ptrtoint ptr %__entry_hdl to i64\n")
+                    out.append("  %__entry_done = call i64 @__sched_coro_done(i64 %__entry_i64)\n")
+                    out.append("  %__entry_is_done = icmp eq i64 %__entry_done, 1\n")
+                    out.append("  br i1 %__entry_is_done, label %__entry_skip, label %__entry_run\n")
+                    out.append("__entry_run:\n")
                     out.append("  call i64 @" + enqueue_fn + "(i64 %__entry_i64)\n")
                     out.append("  call i64 @" + sched_fn + "()\n")
+                    out.append("  br label %__entry_skip\n")
+                    out.append("__entry_skip:\n")
                     out.append("  ret i32 0\n")
                 } else if (has_top_level) {
                     out.append("  call i64 @__saffron_entry()\n")
@@ -8696,9 +8711,7 @@ class Codegen {
                             sched_fn2 = "stdlib_scheduler_scheduler_run"
                         }
                         out.append("  %__main_hdl = call ptr @__saffron_main()\n")
-                        out.append("  %__main_raw = ptrtoint ptr %__main_hdl to i64\n")
-                        out.append("  %__main_ptr = inttoptr i64 %__main_raw to i8*\n")
-                        out.append("  %__main_i64 = call i64 @__val_tag_ptr(i8* %__main_ptr)\n")
+                        out.append("  %__main_i64 = ptrtoint ptr %__main_hdl to i64\n")
                         out.append("  call i64 @" + enqueue_fn2 + "(i64 %__main_i64)\n")
                         out.append("  call i64 @" + sched_fn2 + "()\n")
                         out.append("  ret i32 0\n")
@@ -10121,6 +10134,8 @@ class Codegen {
             }
         }
         // Get the lambda as a function pointer (i64)
+        // Force the lambda to be a coroutine (Task.spawn expects a coro handle)
+        this.force_next_lambda_coro = true
         var spawn_arg: String = this.gen_arg_value(args[0])
         // Check if the lambda/function is a coroutine
         // Lambda names start with __lambda — check if in coroutine_funcs
@@ -11413,6 +11428,61 @@ class Codegen {
             this.last_type = AST.Type.IntType
             return "0"
         }
+        // Actor dispatch: serialize access with busy-check
+        if (this.actor_classes.has(class_name) and this.is_coroutine and method != "init") {
+            var actor_check: String = this.fresh_label("actor.check")
+            var actor_suspend: String = this.fresh_label("actor.suspend")
+            var actor_loop: String = this.fresh_label("actor.loop")
+            var actor_cleanup: String = this.fresh_label("actor.cleanup")
+            var actor_run: String = this.fresh_label("actor.run")
+            var actor_done: String = this.fresh_label("actor.done")
+            this.emit_terminator("br label %" + actor_check)
+            this.start_block(actor_check)
+            var busy_ptr: String = this.fresh_local()
+            this.emit_indent(busy_ptr + " = inttoptr i64 " + obj + " to i64*")
+            var busy_val: String = this.fresh_local()
+            this.emit_indent(busy_val + " = load i64, i64* " + busy_ptr)
+            var busy_cmp: String = this.fresh_local()
+            this.emit_indent(busy_cmp + " = icmp ne i64 " + busy_val + ", 0")
+            this.emit_terminator("br i1 " + busy_cmp + ", label %" + actor_suspend + ", label %" + actor_run)
+            this.start_block(actor_suspend)
+            this.emit_indent("store i64 5, i64* @__yield_reason")
+            this.emit_indent("store i64 " + obj + ", i64* @__yield_arg")
+            var save_tok: String = this.fresh_local()
+            this.emit_indent(save_tok + " = call token @llvm.coro.save(ptr %__coro_hdl)")
+            var susp: String = this.fresh_local()
+            this.emit_indent(susp + " = call i8 @llvm.coro.suspend(token " + save_tok + ", i1 false)")
+            this.emit_terminator("switch i8 " + susp + ", label %__coro_suspend [i8 0, label %" + actor_loop + " i8 1, label %" + actor_cleanup + "]")
+            this.start_block(actor_cleanup)
+            this.emit_terminator("br label %__coro_cleanup")
+            this.start_block(actor_loop)
+            this.emit_terminator("br label %" + actor_check)
+            this.start_block(actor_run)
+            this.emit_indent("store i64 1, i64* " + busy_ptr)
+            var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
+            this.emit_indent("store i64 0, i64* " + busy_ptr)
+            var wake_name: String = "scheduler__wake_actor_waiters"
+            if (this.known_functions.contains("stdlib_scheduler_wake_actor_waiters")) {
+                wake_name = "stdlib_scheduler_wake_actor_waiters"
+            }
+            var wake_discard: String = this.fresh_local()
+            this.emit_indent(wake_discard + " = call i64 @" + wake_name + "(i64 " + obj + ")")
+            this.called_functions.push(wake_name)
+            var ns_ret_str: String = this.type_to_string(this.last_type)
+            if (ns_ret_str.length() > 0 and ns_ret_str.length() <= 2 and ns_ret_str == ns_ret_str.to_upper() and ns_ret_str != "IO" and ns_ret_str != "OS") {
+                if (obj_name.length() > 0) {
+                    var recv_type: String = this.get_var_type_str(obj_name)
+                    if (recv_type.contains("<") and recv_type.contains(">")) {
+                        var rg_start: Float = recv_type.index_of("<")
+                        var rg_inner: String = recv_type.slice(rg_start + 1, recv_type.length() - 1)
+                        if (rg_inner.length() > 0 and rg_inner != ns_ret_str) {
+                            this.last_type = this.str_to_type(rg_inner)
+                        }
+                    }
+                }
+            }
+            return ns_result
+        }
         var ns_result: String = this.gen_namespace_call(class_name, method, obj, args, true)
         // Resolve generic type parameter in return type (e.g. T -> String)
         var ns_ret_str: String = this.type_to_string(this.last_type)
@@ -11868,6 +11938,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                 var cm3: List<AST.Stmt> = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => m
                     _ => []
                 }
+                var cd3: String = match (stmts3[si3]) { ClassDecl(n, p, f, m, d) => d
+                    _ => ""
+                }
+                if (cd3.starts_with("@actor")) {
+                    gen.actor_classes.set(cn3, true)
+                    if (prefix3.length() > 0) { gen.actor_classes.set(prefix3 + cn3, true) }
+                }
                 if (cn3.length() > 0 and !gen.class_fields.has(cn3)) {
                     var cf3_str: String = gen.params_to_string(cf3)
                     var cf3_all: String = cf3_str
@@ -11879,6 +11956,13 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                             } else {
                                 cf3_all = cpf3
                             }
+                        }
+                    }
+                    if (gen.actor_classes.has(cn3)) {
+                        if (cf3_all.length() > 0) {
+                            cf3_all = "__actor_busy:Int,__actor_queue:Int," + cf3_all
+                        } else {
+                            cf3_all = "__actor_busy:Int,__actor_queue:Int"
                         }
                     }
                     gen.class_fields.set(cn3, cf3_all)
@@ -12475,6 +12559,12 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
             var pr_methods: List<AST.Stmt> = match (program[pri]) { ClassDecl(n, p, f, m, d) => m
                 _ => []
             }
+            var pr_doc: String = match (program[pri]) { ClassDecl(n, p, f, m, d) => d
+                _ => ""
+            }
+            if (pr_doc.starts_with("@actor")) {
+                gen.actor_classes.set(pr_name, true)
+            }
             if (pr_name.length() > 0) {
                 var pr_fields_str: String = gen.params_to_string(pr_fields)
                 var pr_all_fields: String = pr_fields_str
@@ -12486,6 +12576,13 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                         } else {
                             pr_all_fields = pr_parent_fields
                         }
+                    }
+                }
+                if (gen.actor_classes.has(pr_name)) {
+                    if (pr_all_fields.length() > 0) {
+                        pr_all_fields = "__actor_busy:Int,__actor_queue:Int," + pr_all_fields
+                    } else {
+                        pr_all_fields = "__actor_busy:Int,__actor_queue:Int"
                     }
                 }
                 gen.class_fields.set(pr_name, pr_all_fields)
