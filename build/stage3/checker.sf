@@ -350,6 +350,22 @@ class NullChecker {
         }
     }
 
+    fun is_sendable(typ: String): Bool {
+        if (typ == "Int" or typ == "Float" or typ == "Number") return true
+        if (typ == "Bool") return true
+        if (typ == "String") return true
+        if (typ == "Nil" or typ == "Any") return true
+        if (this.actor_classes.has(typ)) return true
+        if (this.env.enum_variants.has(typ)) return true
+        if (typ.starts_with("List") or typ.starts_with("Map")) return false
+        if (typ.starts_with("Fun") or typ.contains("=>")) return false
+        if (this.class_parents.has(typ)) {
+            var parent: String = this.class_parents.get(typ)
+            if (parent.contains("Sendable")) return true
+        }
+        return false
+    }
+
     // --- Type analysis (string-based to avoid native codegen crash) ---
 
     fun is_nullable(typ: String): Bool {
@@ -690,6 +706,42 @@ class NullChecker {
                 }
                 if (method_names_list.length() > 0) {
                     this.class_method_names.set(name, method_names_list.join(","))
+                }
+                // Actor Sendable enforcement: check method params and return types
+                if (this.actor_classes.has(name)) {
+                    var ami: Float = 0
+                    while (ami < methods.length()) {
+                        var am_name: String = match (methods[ami]) {
+                            FunDecl(mn, mp, mr, mb, md) => mn
+                            _ => ""
+                        }
+                        if (am_name.length() > 0 and am_name != "init") {
+                            var am_params: List<AST.Param> = match (methods[ami]) {
+                                FunDecl(mn, mp, mr, mb, md) => mp
+                                _ => []
+                            }
+                            var am_ret: AST.Type = match (methods[ami]) {
+                                FunDecl(mn, mp, mr, mb, md) => mr
+                                _ => AST.Type.NilType
+                            }
+                            var api: Float = 0
+                            while (api < am_params.length()) {
+                                var ap: AST.Param = am_params[api]
+                                var ap_name: String = match (ap) { Param(n, t, d) => n }
+                                var ap_type: AST.Type = match (ap) { Param(n, t, d) => t }
+                                var ap_type_str: String = this.type_node_to_string(ap_type)
+                                if (ap_type_str != "Any" and !this.is_sendable(ap_type_str)) {
+                                    this.warn("actor '" + name + "' method '" + am_name + "' parameter '" + ap_name + "' has non-Sendable type '" + ap_type_str + "'")
+                                }
+                                api = api + 1
+                            }
+                            var am_ret_str: String = this.type_node_to_string(am_ret)
+                            if (am_ret_str != "Any" and am_ret_str != "Nil" and !this.is_sendable(am_ret_str)) {
+                                this.warn("actor '" + name + "' method '" + am_name + "' returns non-Sendable type '" + am_ret_str + "'")
+                            }
+                        }
+                        ami = ami + 1
+                    }
                 }
             }
             VarDecl(n, t, i, d) => {}
@@ -2217,6 +2269,14 @@ class NullChecker {
     }
 
     fun error_report(): String {
+        // Print warnings (non-blocking) to stderr
+        if (this.warnings.length() > 0) {
+            var wi: Float = 0
+            while (wi < this.warnings.length()) {
+                IO.println("[checker] Warning: " + this.warnings[wi])
+                wi = wi + 1
+            }
+        }
         if (this.errors.length() == 0) {
             return ""
         }
