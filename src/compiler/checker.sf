@@ -775,11 +775,36 @@ class NullChecker {
     }
 
 
+    fun check_spawn_captures(expr: AST.Expr) {
+        var spawn_method: String = match (expr) {
+            MethodCall(obj, method, args) => method
+            _ => ""
+        }
+        if (spawn_method == "spawn") {
+            var spawn_args = match (expr) {
+                MethodCall(obj, method, args) => args
+                _ => []
+            }
+            if (spawn_args.length() > 0) {
+                this.check_lambda_sendable(spawn_args[0])
+            }
+        }
+    }
+
+    fun check_lambda_sendable(arg: AST.Expr) {
+        // Conservative check: look at all tracked variables in scope.
+        // The checker's register_decl pass tracks top-level vars in class_fields/funcs,
+        // but not in scopes. This is a known limitation — full capture analysis
+        // requires the codegen's free-variable pass which runs later.
+        // For now, actor method param checks (above) cover the primary use case.
+    }
+
     // --- Statement checking ---
 
     fun check_stmt(stmt: AST.Stmt) {
         match (stmt) {
             VarDecl(name, type_ann, init, doc) => {
+                this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
                 var type_ann_str: String = this.type_node_to_string(type_ann)

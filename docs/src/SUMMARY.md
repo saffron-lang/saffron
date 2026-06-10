@@ -20,6 +20,7 @@
 - [Modules and Imports](./tutorial/modules.md)
 - [Iterators and Pipes](./tutorial/iterators-and-pipes.md)
 - [Async and Tasks](./tutorial/async.md)
+- [Actors](./tutorial/actors.md)
 
 # Standard Library
 
