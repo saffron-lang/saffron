@@ -1,0 +1,17 @@
+import "@test" as T
+
+actor Logger {
+    var entries: List<String>
+    fun init() { this.entries = [] }
+    fun log(msg: String) { this.entries.push(msg) }
+    fun count(): Int { return this.entries.length() }
+}
+
+var logger = Logger()
+
+// Fire-and-forget: send dispatches by method name string
+logger.send("log", "hello")
+logger.send("log", "world")
+
+T.assert_eq(logger.count(), 2, "send dispatches actor methods by name")
+T.summary()
