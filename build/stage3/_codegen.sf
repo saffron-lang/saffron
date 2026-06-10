@@ -8851,6 +8851,13 @@ class Codegen {
     return name
     }
 
+    fun get_string_literal(expr: AST.Expr): String {
+        return match (expr) {
+            StringLit(s) => s
+            _ => ""
+        }
+    }
+
     fun get_expr_type(expr: AST.Expr): String {
     var ek: String = this.classify_expr(expr)
     if (ek == "variable") {
@@ -9577,6 +9584,25 @@ class Codegen {
         var self_val: String = this.fresh_local()
         this.emit_indent(self_val + " = load i64, i64* %self")
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
+    }
+
+    // Actor fire-and-forget: actor.send("method_name", args...)
+    if (method == "send" and args.length() >= 1 and obj_name.length() > 0) {
+        var send_obj_type: String = this.get_var_type_str(obj_name)
+        var send_class: String = send_obj_type
+        if (this.class_fields.has(send_obj_type) and this.actor_classes.has(send_obj_type)) {
+            var send_method_name: String = this.get_string_literal(args[0])
+            if (send_method_name.length() > 0) {
+                var send_args = []
+                var sai: Float = 1
+                while (sai < args.length()) {
+                    send_args.push(args[sai])
+                    sai = sai + 1
+                }
+                var send_obj: String = this.gen_arg_value(object)
+                return this.gen_namespace_call(send_class, send_method_name, send_obj, send_args, true)
+            }
+        }
     }
 
     // Package namespace dispatch: check named_imports for "Alias.method" pattern.
@@ -12094,6 +12120,12 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
                 _ => ""
             }
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => d
+                _ => ""
+            }
+            if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
+                gen.actor_classes.set(pr_cname2, true)
+            }
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
             }
@@ -12725,6 +12757,12 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         } else if (pr_pk == "class") {
             var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
                 _ => ""
+            }
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => d
+                _ => ""
+            }
+            if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
+                gen.actor_classes.set(pr_cname2, true)
             }
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
@@ -13402,6 +13440,12 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         } else if (pr_pk == "class") {
             var pr_cname2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => n
                 _ => ""
+            }
+            var pr_cdoc2: String = match (program[pr_pi]) { ClassDecl(n, p, f, m, d) => d
+                _ => ""
+            }
+            if (pr_cdoc2.starts_with("@actor") and pr_cname2.length() > 0) {
+                gen.actor_classes.set(pr_cname2, true)
             }
             if (pr_cname2.length() > 0 and !gen.str_in_list(gen.known_functions,pr_cname2)) {
                 gen.known_functions.push(pr_cname2)
