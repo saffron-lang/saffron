@@ -89,9 +89,8 @@ This is the basis of Turmeric's element builder DSL.
 ```saffron
 import "@iter" as Iter
 
-var result = [1, 2, 3, 4, 5]
-    |> Iter.filter { n => n % 2 == 0 }
-    |> Iter.map { n => n * 10 }
+var evens = Iter.filter([1, 2, 3, 4, 5]) { n => n % 2 == 0 }
+var result = Iter.map(evens) { n => n * 10 }
 
 IO.println(result)  // [20, 40]
 ```

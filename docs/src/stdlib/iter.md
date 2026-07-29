@@ -6,7 +6,7 @@ import "@iter" as Iter
 import { map, filter, reduce } from "@iter"
 ```
 
-Functional utilities for working with iterables (lists, maps, strings, or any type implementing the iterator protocol).
+Functional utilities for working with iterables — lists, maps, strings, or any type with an `.iter()` method returning an object that has `has_next()` and `next()`.
 
 ## Transforming
 

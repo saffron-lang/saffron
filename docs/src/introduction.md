@@ -8,7 +8,7 @@ Saffron is a statically typed scripting language designed to be expressive, fast
 - **Pattern matching** — enums with associated data and exhaustive `match` expressions
 - **Cooperative async** — lightweight tasks with `spawn`, `await`, and `sleep`
 - **First-class functions** — lambdas, closures, trailing closures, and higher-order functions
-- **Iterators and pipes** — composable data transformations with `|>`
+- **Iterators** — a small `has_next()`/`next()` protocol that `for-in` and `@iter` build on
 - **Classes and interfaces** — single inheritance with multiple interface conformance
 - **FFI** — call C functions directly via `@extern` for system-level integration
 - **Garbage collected** — mark-sweep GC so you never manage memory manually
