@@ -10430,7 +10430,9 @@ class Codegen {
                 return __lpop_local
             }
             if (method == "remove") {
-                var __lrm_val: String = this.gen_arg_value(args[0])
+                // @__list_remove takes a RAW i64 index; gen_arg_value returns tagged.
+                var __lrm_tagged: String = this.gen_arg_value(args[0])
+                var __lrm_val: String = this.emit_untag_int(__lrm_tagged)
                 var __lrm_local: String = this.fresh_local()
                 if (this.use_llvm_lib) {
                     this.emit_indent(this.lib_call(__lrm_local, "i64", "__list_remove", "i64 " + obj + ", i64 " + __lrm_val))
@@ -10884,8 +10886,11 @@ class Codegen {
         }
         if (slice_obj_type.starts_with("List") or slice_obj_type == "Any") {
             // For Any type, default to list slice (safer than string slice which dereferences a pointer)
-            var sl_start: String = this.gen_arg_value(args[0])
-            var sl_end: String = this.gen_arg_value(args[1])
+            // @__list_slice takes RAW i64 indices; gen_arg_value returns tagged values.
+            var sl_start_tagged: String = this.gen_arg_value(args[0])
+            var sl_start: String = this.emit_untag_int(sl_start_tagged)
+            var sl_end_tagged: String = this.gen_arg_value(args[1])
+            var sl_end: String = this.emit_untag_int(sl_end_tagged)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__list_slice(i64 " + obj + ", i64 " + sl_start + ", i64 " + sl_end + ")")
             // Preserve element type from the receiver list
