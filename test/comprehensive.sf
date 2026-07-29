@@ -100,10 +100,10 @@ T.assert(true is Bool, "bool is Bool")
 T.assert(nil is Nil, "nil is Nil")
 T.assert(!(42 is String), "number not String")
 
-T.section("Pipe + Imports")
+T.section("Named Imports")
 import { map } from "@iter"
-var doubled = [1, 2, 3] |> map(fun (x: Number): Number => x * 2)
-T.assert_eq(doubled[0], 2, "pipe map first")
-T.assert_eq(doubled[2], 6, "pipe map last")
+var doubled = map([1, 2, 3], fun (x: Number): Number => x * 2)
+T.assert_eq(doubled[0], 2, "map first")
+T.assert_eq(doubled[2], 6, "map last")
 
 T.summary()
