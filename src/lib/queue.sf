@@ -10,7 +10,7 @@ class QueueIter {
         this._pos = 0
     }
 
-    fun next?(): Bool {
+    fun has_next(): Bool {
         return this._pos < this._items.length()
     }
 
