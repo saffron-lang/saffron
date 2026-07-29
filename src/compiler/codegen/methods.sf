@@ -913,8 +913,11 @@ extend fun Codegen.gen_method_call(object: AST.Expr, method: String, args: List<
         }
         if (slice_obj_type.starts_with("List") or slice_obj_type == "Any") {
             // For Any type, default to list slice (safer than string slice which dereferences a pointer)
-            var sl_start: String = this.gen_arg_value(args[0])
-            var sl_end: String = this.gen_arg_value(args[1])
+            // @__list_slice takes RAW i64 indices; gen_arg_value returns tagged values.
+            var sl_start_tagged: String = this.gen_arg_value(args[0])
+            var sl_start: String = this.emit_untag_int(sl_start_tagged)
+            var sl_end_tagged: String = this.gen_arg_value(args[1])
+            var sl_end: String = this.emit_untag_int(sl_end_tagged)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__list_slice(i64 " + obj + ", i64 " + sl_start + ", i64 " + sl_end + ")")
             this.set_last_type(this.last_type)
