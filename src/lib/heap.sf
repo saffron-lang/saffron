@@ -10,7 +10,7 @@ class HeapIter {
         this._has_next = heap.length() > 0
     }
 
-    fun next?(): Bool {
+    fun has_next(): Bool {
         return this._heap.length() > 0
     }
 
