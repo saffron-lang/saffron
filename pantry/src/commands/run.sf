@@ -11,6 +11,24 @@ import "@toml" as TOML
 import "@process" as Process
 import "../config.sf" as Config
 
+// Call libc `system` directly rather than going through OS.system. `OS.*` names
+// are mangled straight to runtime externs whose i64 return is left untagged, so
+// `OS.system(...) == 0` compares a raw 0 against a NaN-boxed 0 and is always
+// false — the value prints as 0 but never compares equal. The @extern path tags
+// its result correctly. See BUGS.md #23.
+@extern("i32 system(i8*)") fun _libc_system(cmd: String): Int
+
+/// Run a shell command, returning a shell-style exit code.
+/// C `system()` yields a packed `wait()` status (exit 1 arrives as 256), so
+/// decode it; a signal death is reported as 128 + signal, as shells do.
+fun _shell_status(cmd: String): Int {
+    var status: Int = _libc_system(cmd)
+    if (status < 0) { return status }
+    var signal: Int = status % 128
+    if (signal != 0) { return 128 + signal }
+    return status / 256
+}
+
 /// Build a PATH prefix that includes all dep bin directories.
 fun _bin_path_prefix(): String {
     var packages_dir: String = ".pantry/packages"
@@ -53,7 +71,8 @@ fun _bin_path_prefix(): String {
     return result
 }
 
-fun _exec_shell(cmd: String) {
+/// Run a shell command, returning its exit code. Never swallows failure.
+fun _exec_shell(cmd: String): Int {
     var bin_path: String = _bin_path_prefix()
 
     IO.println("> " + cmd)
@@ -66,7 +85,7 @@ fun _exec_shell(cmd: String) {
     if (OS.file_exists(".pantry/packages")) {
         env_prefix = env_prefix + "SAFFRON_LIB_PATH=.pantry/packages "
     }
-    OS.system(env_prefix + cmd)
+    return _shell_status(env_prefix + cmd)
 }
 
 /// Resolve a bin command by prefixing relative file paths with the package directory.
@@ -184,7 +203,8 @@ fun _rest_after_first(s: String): String {
 /// Only expands if the ENTIRE command matches a script name, or if the
 /// first word matches. Otherwise passes the full command to the shell
 /// (preserving && short-circuit semantics).
-fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
+/// Returns the exit code of the command that ultimately ran.
+fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int): Int {
     if (depth > 10) {
         throw "pantry: script recursion depth exceeded (circular reference?)"
     }
@@ -194,8 +214,7 @@ fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
     // Exact match — the whole command is a script name
     if (scripts.has(trimmed)) {
         var expanded: String = scripts.get(trimmed)
-        _exec_command(expanded, scripts, depth + 1)
-        return
+        return _exec_command(expanded, scripts, depth + 1)
     }
 
     // Check first word — for "sfx arg1 arg2" where sfx is a bin script
@@ -204,13 +223,12 @@ fun _exec_command(cmd: String, scripts: Map<String, String>, depth: Int) {
         var replacement: String = scripts.get(first)
         var args: String = _rest_after_first(trimmed)
         // If the replacement itself contains &&, let the shell handle it
-        _exec_shell(replacement + args)
-        return
+        return _exec_shell(replacement + args)
     }
 
     // No expansion needed — pass the entire command to the shell as-is
     // This preserves && short-circuit, ||, pipes, etc.
-    _exec_shell(trimmed)
+    return _exec_shell(trimmed)
 }
 
 /// Run a named script from the [scripts] section (or dep bin scripts).
@@ -236,10 +254,17 @@ fun run(script_name: String, parsed: Args.ParsedArgs) {
     }
 
     var cmd: String = scripts.get(script_name)
-    _exec_command(cmd, scripts, 0)
+    var code: Int = _exec_command(cmd, scripts, 0)
+    if (code != 0) {
+        IO.println("pantry: script '${script_name}' failed (exit ${code})")
+        OS.exit(code)
+    }
 }
 
 /// Run a raw shell command in the project context.
 fun run_raw(cmd: String, parsed: Args.ParsedArgs) {
-    _exec_shell(cmd)
+    var code: Int = _exec_shell(cmd)
+    if (code != 0) {
+        OS.exit(code)
+    }
 }

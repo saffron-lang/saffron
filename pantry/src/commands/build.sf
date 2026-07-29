@@ -15,7 +15,11 @@ fun run(parsed: Args.ParsedArgs) {
     // If there's a build script defined, run it (with script expansion)
     if (scripts.has("build")) {
         var cmd: String = scripts.get("build")
-        Run._exec_command(cmd, scripts, 0)
+        var code: Int = Run._exec_command(cmd, scripts, 0)
+        if (code != 0) {
+            IO.println("✗ Build failed (exit ${code})")
+            OS.exit(code)
+        }
         var elapsed: Float = Time.now() - start
         IO.println("✓ Built in " + elapsed.floor().to_string() + "s")
         return
@@ -32,16 +36,39 @@ fun run(parsed: Args.ParsedArgs) {
     if (output_name == "") {
         output_name = "a.out"
     }
-    var output_path: String = "build/" + output_name
 
     OS.exec("mkdir -p build")
 
-    var cmd: String = "saffron build ${entry} -o ${output_path}"
-    if (OS.file_exists(".pantry/packages")) {
-        cmd = cmd + " --lib-path .pantry/packages"
+    // Libraries have no `main`, so they cannot be linked into an executable.
+    // Compile them to LLVM IR instead; consumers link them via --lib-path.
+    var cmd: String = ""
+    if (manifest.package_type == "library") {
+        var output_path: String = "build/" + output_name + ".ll"
+        cmd = "saffronc"
+        if (manifest.target != "") {
+            cmd = cmd + " --target " + manifest.target
+        }
+        if (OS.file_exists(".pantry/packages")) {
+            cmd = cmd + " --lib-path .pantry/packages"
+        }
+        cmd = cmd + " ${entry} ${output_path}"
+    } else {
+        var output_path: String = "build/" + output_name
+        cmd = "saffron build"
+        if (manifest.target != "") {
+            cmd = cmd + " --target " + manifest.target
+        }
+        if (OS.file_exists(".pantry/packages")) {
+            cmd = cmd + " --lib-path .pantry/packages"
+        }
+        cmd = cmd + " ${entry} -o ${output_path}"
     }
 
-    IO.println("> ${cmd}")
-    var output: String = OS.exec(cmd)
-    IO.print(output)
+    var code: Int = Run._exec_shell(cmd)
+    if (code != 0) {
+        IO.println("✗ Build failed (exit ${code})")
+        OS.exit(code)
+    }
+    var elapsed: Float = Time.now() - start
+    IO.println("✓ Built in " + elapsed.floor().to_string() + "s")
 }

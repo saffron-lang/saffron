@@ -24,6 +24,10 @@ class Manifest {
     var authors: List<String>
     var license: String
     var entry: String
+    /// "library" for packages with no `main`, otherwise "binary".
+    var package_type: String
+    /// Compilation target ("wasm32", "wasm64", ...). Empty means native.
+    var target: String
     var dependencies: Map<String, Any>
     var dev_dependencies: Map<String, Any>
     var scripts: Map<String, String>
@@ -37,6 +41,8 @@ class Manifest {
         this.authors = []
         this.license = ""
         this.entry = "src/main.sf"
+        this.package_type = "binary"
+        this.target = ""
         this.dependencies = {}
         this.dev_dependencies = {}
         this.scripts = {}
@@ -144,6 +150,8 @@ fun load_from(path: String): Manifest {
         manifest.description = pkg.string_or("description", "")
         manifest.license = pkg.string_or("license", "")
         manifest.entry = pkg.string_or("entry", "src/main.sf")
+        manifest.package_type = pkg.string_or("type", "binary")
+        manifest.target = pkg.string_or("target", "")
         if (pkg.has("authors")) {
             manifest.authors = pkg.list("authors")
         }
@@ -185,6 +193,8 @@ fun save(manifest: Manifest, path: String) {
     if (manifest.description != "") { pkg.set("description", manifest.description) }
     if (manifest.license != "") { pkg.set("license", manifest.license) }
     if (manifest.entry != "src/main.sf") { pkg.set("entry", manifest.entry) }
+    if (manifest.package_type != "binary") { pkg.set("type", manifest.package_type) }
+    if (manifest.target != "") { pkg.set("target", manifest.target) }
     if (manifest.authors.length() > 0) { pkg.set("authors", manifest.authors) }
     toml_data.set("package", pkg)
 

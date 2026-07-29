@@ -3,16 +3,20 @@ import "@args" as Args
 
 import "@os" as OS
 import "../config.sf" as Config
+import "./run.sf" as Run
 
 fun run(parsed: Args.ParsedArgs) {
     var manifest = Config.load()
+    var scripts: Map<String, String> = Run._collect_scripts(manifest)
 
     // If there's a test script, use it
-    if (manifest.scripts.has("test")) {
-        var cmd = manifest.scripts.get("test")
-        IO.println("> ${cmd}")
-        var output = OS.exec(cmd)
-        IO.print(output)
+    if (scripts.has("test")) {
+        var cmd = scripts.get("test")
+        var script_code: Int = Run._exec_command(cmd, scripts, 0)
+        if (script_code != 0) {
+            IO.println("pantry test: test script failed (exit ${script_code})")
+            OS.exit(script_code)
+        }
         return
     }
 
@@ -32,14 +36,22 @@ fun run(parsed: Args.ParsedArgs) {
     var i: Int = 0
     while (i < sf_tests.length()) {
         var file: String = sf_tests[i]
+        if (file == "") {
+            i = i + 1
+            continue
+        }
         IO.print("  ${file} ... ")
-        var output: String = OS.exec("saffron run ${file}")
-        if (output.contains("passed") and !(output.contains("failed"))) {
+        // Judge by exit code, not by grepping output: compiler warnings such as
+        // "type inference failed" contain the word "failed" and would otherwise
+        // mark a fully passing test as a failure.
+        var code: Int = Run._shell_status("saffron run ${file} > /dev/null 2>&1")
+        if (code == 0) {
             IO.println("ok")
             passed = passed + 1
         } else {
             IO.println("FAIL")
-            IO.println(output)
+            // Re-run with output shown so the failure is diagnosable.
+            Run._shell_status("saffron run ${file} 2>&1 | grep -v '^\\[codegen\\] Warning' | grep -v '^\\[checker\\] Warning'")
             failed = failed + 1
         }
         i = i + 1

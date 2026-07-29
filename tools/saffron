@@ -119,6 +119,44 @@ if [[ ! -f "$INPUT" ]]; then
     error "file not found: $INPUT"
 fi
 
+# --- Dependency discovery ---
+#
+# Package dependencies live in <project>/.pantry/packages. Find them without
+# making the user pass --lib-path by hand: honor SAFFRON_LIB_PATH (colon-
+# separated, as pantry sets it), then walk up from the input file to the nearest
+# pantry.toml and add its .pantry/packages if present.
+
+if [[ -n "${SAFFRON_LIB_PATH:-}" ]]; then
+    IFS=':' read -r -a _env_libs <<< "$SAFFRON_LIB_PATH"
+    for _lp in "${_env_libs[@]}"; do
+        [[ -n "$_lp" && -d "$_lp" ]] && LIB_PATHS+=("$_lp")
+    done
+fi
+
+find_project_root() {
+    local dir
+    dir="$(cd "$(dirname "$1")" && pwd)"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -f "$dir/pantry.toml" ]]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+if PROJECT_ROOT="$(find_project_root "$INPUT")"; then
+    if [[ -d "$PROJECT_ROOT/.pantry/packages" ]]; then
+        # Skip if the user already passed this path explicitly.
+        _already=false
+        for _lp in "${LIB_PATHS[@]:-}"; do
+            [[ "$_lp" == "$PROJECT_ROOT/.pantry/packages" ]] && _already=true
+        done
+        [[ "$_already" == false ]] && LIB_PATHS+=("$PROJECT_ROOT/.pantry/packages")
+    fi
+fi
+
 # --- Check prerequisites ---
 
 if [[ ! -x "$SAFFRONC" ]]; then
@@ -139,8 +177,13 @@ STDLIB="${SAFFRON_STDLIB:-$SCRIPT_DIR/src/lib}"
 compile_to_ir() {
     local input="$1"
     local output="$2"
+    local flags=""
+    [[ -n "$TARGET" ]] && flags="--target $TARGET"
+    for lp in "${LIB_PATHS[@]:-}"; do
+        [[ -n "$lp" ]] && flags="$flags --lib-path $lp"
+    done
     [[ "$VERBOSE" == true ]] && echo "  compile: $input -> $output"
-    "$SAFFRONC" --stdlib "$STDLIB" "$input" "$output"
+    "$SAFFRONC" --stdlib "$STDLIB" $flags "$input" "$output"
 }
 
 # Recursively discover all .sf files imported (via relative paths) from an entry file.

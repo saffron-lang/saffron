@@ -995,10 +995,23 @@ fun __os_env(name: Int): Int {
 
 @extern("i32 system(i8*)") fun __rt_system(cmd: Int): Int
 
+/// Run a command with stdout/stderr inherited, returning its exit code.
+/// C `system()` yields a packed `wait()` status (a child exiting 1 comes back
+/// as 256), so decode it here: callers expect a shell-style exit code. A child
+/// killed by a signal has no exit status, so report 128 + signal as shells do.
+///
+/// NOTE: the value this returns reaches Saffron untagged, because `OS.*` calls
+/// are mangled directly to these externs and the i64 return is not NaN-boxed.
+/// It prints correctly but compares unequal to any literal. Callers that need
+/// `== 0` must use their own `@extern` declaration until that is fixed.
 fun __os_system(cmd: Int): Int {
     var rc: Int = __rt_untag_ptr(cmd)
     if (rc == 0) { return -1 }
-    return __rt_system(rc)
+    var status: Int = __rt_system(rc)
+    if (status < 0) { return status }
+    var signal: Int = status % 128
+    if (signal != 0) { return 128 + signal }
+    return status / 256
 }
 
 fun __os_exec(cmd: Int): Int {
