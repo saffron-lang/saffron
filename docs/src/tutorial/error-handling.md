@@ -37,9 +37,11 @@ try {
 }
 ```
 
-## Typed catch clauses
+## Discriminating error types
 
-Catch specific error types:
+`catch` binds a single, untyped name — there is no type annotation on the binding. To handle
+different error kinds differently, throw a class or enum and branch inside the catch block
+with `is` or `match`:
 
 ```saffron
 class HttpError {
@@ -53,10 +55,12 @@ class HttpError {
 
 try {
     throw HttpError(404, "Not Found")
-} catch (e: HttpError) {
-    IO.println("HTTP ${e.code}: ${e.message}")
 } catch (e) {
-    IO.println("Unknown error: ${e}")
+    if (e is HttpError) {
+        IO.println("HTTP ${e.code}: ${e.message}")
+    } else {
+        IO.println("Unknown error: ${e}")
+    }
 }
 ```
 

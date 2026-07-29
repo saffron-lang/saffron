@@ -74,7 +74,7 @@ for (line in f.lines()) {
 }
 ```
 
-`lines()` returns an object implementing the iterator protocol (`iter()`, `next?()`, `next()`). Each call to `next()` returns the next line (with trailing `\n` stripped).
+`lines()` returns an object implementing the iterator protocol (`iter()`, `has_next()`, `next()`). Each call to `next()` returns the next line (with trailing `\n` stripped).
 
 ### Standard streams
 
@@ -142,7 +142,7 @@ Add `read_bytes(n)` and `write_bytes(buf)`. These construct/consume `Buffer` obj
 
 ### Phase 4: Iterator and streams
 
-Implement `LineIterator` class with `iter()`, `next?()`, `next()`. Wire up `IO.stdin`/`stdout`/`stderr` from special-cased handle values (0/1/2 mapped to C's standard streams).
+Implement `LineIterator` class with `iter()`, `has_next()`, `next()`. Wire up `IO.stdin`/`stdout`/`stderr` from special-cased handle values (0/1/2 mapped to C's standard streams).
 
 ### Phase 5: Encoding (future, depends on @encoding)
 

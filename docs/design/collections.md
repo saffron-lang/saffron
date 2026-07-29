@@ -2,7 +2,7 @@
 
 Additional collection types for the Saffron standard library. Each is a separate importable module, implemented in pure Saffron (no runtime/C support needed), backed by Lists with appropriate algorithms.
 
-All collections implement the iterator protocol (`iter()` returning an object with `next?()` and `next()`) so they work with `for-in` loops and `@iter` utilities.
+All collections implement the iterator protocol (`iter()` returning an object with `has_next()` and `next()`) so they work with `for-in` loops and `@iter` utilities.
 
 ---
 
@@ -249,7 +249,7 @@ All collections follow these conventions (matching `@set`):
 - **Constructor**: `Module.new()` or factory functions (`Heap.min()`, `Heap.max()`)
 - **Convenience builder**: `Module.from(list)` to construct from an existing list
 - **Chainable mutators**: mutating methods return `this` where it makes sense
-- **Iterator protocol**: `iter()` returns an object with `next?(): Bool` and `next(): T`
+- **Iterator protocol**: `iter()` returns an object with `has_next(): Bool` and `next(): T`
 - **Conversion**: `to_list()` produces a plain List snapshot
 - **Inspection**: `length()`, `is_empty()`, `to_string()`
 - **Pure Saffron**: no C runtime extensions required; all implementable today

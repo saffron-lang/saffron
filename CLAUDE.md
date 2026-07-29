@@ -142,7 +142,8 @@ let Some(value) = Option.Some(42)
 ### Control Flow
 
 ```saffron
-// For-in (uses iterator protocol: .iter(), .next?(), .next())
+// For-in (uses iterator protocol: .iter() -> object with .has_next(), .next())
+// Works over Lists, Strings (char by char), Maps ([key, value] pairs), and custom types
 for (item in [1, 2, 3]) {
     if (item == 2) continue
     IO.println(item)
@@ -256,12 +257,6 @@ import "../other/file.sf" as M  // relative path
 
 The `@` prefix resolves to `src/lib/<name>.sf` relative to the executable.
 
-### Pipe Operator
-
-```saffron
-[1, 2, 3] |> IO.println()
-```
-
 ### Maps
 
 ```saffron
@@ -272,9 +267,14 @@ m.has("b")       // true
 m.keys()         // ["a", "b", "c"]
 m.values()       // [1, 2, 3]
 
-// Iteration via .iter() returns [key, value] tuples
+// Iteration yields [key, value] pairs
+for (entry in m) {
+    IO.println("${entry[0]} = ${entry[1]}")
+}
+
+// Or drive the iterator manually
 var iter = m.iter()
-while (iter.next?()) {
+while (iter.has_next()) {
     IO.println(iter.next())  // [key, value]
 }
 ```
@@ -338,7 +338,7 @@ T.summary()
 ```saffron
 import { map, filter, reduce } from "@iter"
 
-var doubled = [1, 2, 3] |> map(fun (x: Number): Number => x * 2)
+var doubled = map([1, 2, 3], fun (x: Number): Number => x * 2)
 ```
 
 ### Operator Overloading

@@ -34,13 +34,26 @@ for (var i = 0; i < 5; i = i + 1) {
 
 ## For-in loops
 
-Iterate over anything that implements the iterator protocol (`.iter()`, `.next?()`, `.next()`):
+Iterate over anything iterable — an `.iter()` method returning an object with `has_next()` and `next()`:
 
 ```saffron
+// Lists
 for (item in [10, 20, 30]) {
     IO.println(item)
 }
+
+// Strings — character by character
+for (ch in "abc") {
+    IO.println(ch)  // a, b, c
+}
+
+// Maps — yields [key, value] pairs
+for (entry in {"a": 1, "b": 2}) {
+    IO.println("${entry[0]} = ${entry[1]}")
+}
 ```
+
+Custom types can join in too — see [Iterators](./iterators.md).
 
 ## Break and continue
 

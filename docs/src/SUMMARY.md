@@ -18,7 +18,7 @@
 - [Enums and Pattern Matching](./tutorial/enums-and-matching.md)
 - [Error Handling](./tutorial/error-handling.md)
 - [Modules and Imports](./tutorial/modules.md)
-- [Iterators and Pipes](./tutorial/iterators-and-pipes.md)
+- [Iterators](./tutorial/iterators.md)
 - [Async and Tasks](./tutorial/async.md)
 - [Actors](./tutorial/actors.md)
 

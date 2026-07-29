@@ -67,7 +67,6 @@ enum TokenKind {
     TkLt, TkLtEq, TkGt, TkGtEq,
     TkAmpersand, TkPipe, TkCaret, TkTilde,
     TkShiftLeft, TkShiftRight,
-    TkPipeGt,   // |>
     TkArrow,    // ->
     TkFatArrow, // =>
 

@@ -1589,7 +1589,7 @@ Our explicit `read_u32_le` / `read_u16_be` methods are the practical equivalent.
 
 4. **Should `Buffer` be iterable?**
    - `for (byte in buf) { ... }` iterating over byte values
-   - **Proposed:** Yes. Implement the iterator protocol (`.iter()`, `.next?()`, `.next()`).
+   - **Proposed:** Yes. Implement the iterator protocol (`.iter()`, `.has_next()`, `.next()`).
      Each iteration yields an `Int` (0-255).
 
 5. **Should typed reads return `Int` or a new `U8`/`U16`/`U32` type?**
