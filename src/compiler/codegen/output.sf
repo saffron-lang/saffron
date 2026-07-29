@@ -560,6 +560,12 @@ extend fun Codegen.generate(program: List<AST.Stmt>): String {
             out.append("declare i64 @__val_tag_bool(i64)\n")
             out.append("declare i64 @__val_untag_bool(i64)\n")
         }
+        // Always declared, even in identity mode. The tag/untag helpers above
+        // are no-ops there and so are elided, but __rt_tag_ptr is the explicit
+        // boundary out of identity mode: runtime.sf is compiled with
+        // --identity-mode and calls it to hand tagged values back to value
+        // space. Omitting the declare left gen4 unable to link.
+        out.append("declare i64 @__rt_tag_ptr(i64)\n")
         out.append("declare i64 @__val_nil()\n")
         out.append("declare double @strtod(i8*, i8*)\n")
         out.append("declare double @llvm.floor.f64(double)\n\n")

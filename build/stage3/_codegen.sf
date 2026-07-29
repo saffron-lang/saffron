@@ -1444,14 +1444,14 @@ class Codegen {
             if (rt_func.length() > 0) {
                 var check_result: String = this.fresh_local()
                 this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = zext i1 " + check_result + " to i64")
-                return local
+                var raw_bool: String = this.fresh_local()
+                this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
+                return this.emit_tag_bool(raw_bool)
             }
             // Unknown class type with Any — cannot resolve at runtime yet, return false
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
-            return local
+            return this.emit_tag_bool(local)
         }
 
         // Compile-time resolution when type is statically known
@@ -1473,7 +1473,7 @@ class Codegen {
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
-        return local
+        return this.emit_tag_bool(local)
     }
 
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
@@ -8594,8 +8594,13 @@ class Codegen {
             out.append("declare double @__val_untag_float(i64)\n")
             out.append("declare i64 @__val_tag_bool(i64)\n")
             out.append("declare i64 @__val_untag_bool(i64)\n")
-            out.append("declare i64 @__rt_tag_ptr(i64)\n")
         }
+        // Always declared, even in identity mode. The tag/untag helpers above
+        // are no-ops there and so are elided, but __rt_tag_ptr is the explicit
+        // boundary out of identity mode: runtime.sf is compiled with
+        // --identity-mode and calls it to hand tagged values back to value
+        // space. Omitting the declare left gen4 unable to link.
+        out.append("declare i64 @__rt_tag_ptr(i64)\n")
         out.append("declare double @strtod(i8*, i8*)\n")
         out.append("declare double @llvm.floor.f64(double)\n\n")
 
