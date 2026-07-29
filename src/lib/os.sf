@@ -24,7 +24,12 @@ fun exec(cmd: String): String {
 }
 
 /// Run a command with stdout/stderr passed through to the terminal.
-/// Returns the exit code.
+/// Returns the exit code (0 on success), decoded from the raw `wait()` status.
+///
+/// CAVEAT: the returned value is not NaN-boxed, so `OS.system(c) == 0` is
+/// always false even when the command succeeded (it prints as 0 but compares
+/// unequal). Until that codegen gap is closed, declare your own
+/// `@extern("i32 system(i8*)")` when you need to branch on the result.
 fun system(cmd: String): Int {
     return _system(cmd)
 }

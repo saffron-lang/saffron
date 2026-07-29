@@ -1,5 +1,7 @@
 //! Test framework with assertions and reporting for native compilation.
 
+@extern("void exit(i32)") fun _exit(code: Int)
+
 var _passed = 0
 var _failed = 0
 var _total = 0
@@ -133,11 +135,15 @@ fun run_all() {
 /// Test.summary()
 /// // All 1 assertions passed
 /// ```
+/// Print the assertion summary and exit nonzero if anything failed, so that
+/// shells, CI, and `pantry test` can detect failure from the exit code alone
+/// rather than by grepping output.
 fun summary() {
     IO.println("")
     if (_failed == 0) {
         IO.println("  All ${_total} assertions passed")
     } else {
         IO.println("  ${_passed}/${_total} passed, ${_failed} failed")
+        _exit(1)
     }
 }
