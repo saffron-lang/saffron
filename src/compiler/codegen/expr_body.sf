@@ -395,14 +395,14 @@
             if (rt_func.length() > 0) {
                 var check_result: String = this.fresh_local()
                 this.emit_indent(check_result + " = call i1 @" + rt_func + "(i64 " + val + ")")
-                var local: String = this.fresh_local()
-                this.emit_indent(local + " = zext i1 " + check_result + " to i64")
-                return local
+                var raw_bool: String = this.fresh_local()
+                this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
+                return this.emit_tag_bool(raw_bool)
             }
             // Unknown class type with Any — cannot resolve at runtime yet, return false
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
-            return local
+            return this.emit_tag_bool(local)
         }
 
         // Compile-time resolution when type is statically known
@@ -424,7 +424,7 @@
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
-        return local
+        return this.emit_tag_bool(local)
     }
 
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
