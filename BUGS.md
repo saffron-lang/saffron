@@ -223,8 +223,73 @@ is what would let codegen tell the two cases apart.
 `"${x}".to_upper()` silently produce nonsense rather than failing.
 
 
+### 28. An `Int` literal assigned to a `Float` annotation becomes NaN
+
+**Reproduction:**
+```saffron
+var f: Float = 1
+IO.println(f.to_string())   // nan
+var g: Float = 1.0
+IO.println(g.to_string())   // 1 — correct
+```
+
+**Expected:** `1`. Int→Float widening is meant to be implicit.
+**Actual:** the integer literal keeps its `TAG_INT` payload but the annotation
+makes every downstream read treat the bits as a double, so `1` is read as the
+subnormal `4.94e-324` — or, once it reaches a tag-inspecting path, as NaN.
+
+The declaration is what miscompiles, not the arithmetic: mixed-mode `1 + 1.0`
+widens correctly in codegen. Only the annotated-declaration path is missing the
+`__val_tag_float`/`__val_untag_int` conversion.
+
+**Impact:** silent wrong answers in any code that annotates a counter as `Float`
+and initializes it from an int literal. The compiler source does this in several
+places (`Parser.pos`, `Parser.html_depth`) and gets away with it only because
+those values are never read as floats.
+
+**Related:** this is exactly the widening rule Phase B has to enforce in the
+checker; the codegen side has to land with it.
+
+### 29. Indexing a String segfaults
+
+**Reproduction:**
+```saffron
+var s = "ab"
+IO.println(s[0])       // segfault
+IO.println(s.char_at(0))  // "a" — correct
+```
+
+`IndexGet` on a String has no codegen path, so the list path runs against a
+`char*` and dereferences a character as if it were a list header. This is why
+`for (c in "ab")` cannot work: the `for-in` desugaring is index-based, so string
+iteration goes straight through `s[i]`.
+
+### 30. A builtin module function can't be passed as a value
+
+**Reproduction:**
+```saffron
+import "@iter" as Iter
+Iter.each(["a", "b"], IO.println)
+// [codegen] error: use of undefined value '%IO'
+```
+
+**Expected:** `IO.println` evaluates to a callable value.
+**Actual:** bare `IO.println` in value position emits a load from `%IO`, which
+does not exist — the same MemberAccess fallthrough as #22, but for functions
+rather than globals.
+
+**Workaround:** wrap it — `fun (s: String) => IO.println(s)`.
+
 ## Fixed
 
+- ~~#31: a nested `for-in` visited only the first element of the outer loop~~ —
+  Fixed: `desugar_for_in` in `src/compiler/parser.sf` named its temporaries
+  `__for_list` / `__for_i` unconditionally. Nested loops share a scope chain, so
+  the inner loop redeclared the outer loop's cursor and left it past the end,
+  making the outer `while` condition false on the first re-test. The names are now
+  gensym'd through `Parser.next_for_uid()`, and `parse_for_in` — which carried a
+  second, near-identical copy of the desugaring — delegates to the one
+  implementation so the two cannot drift again.
 - ~~#26: `0.0 / 0.0` printed `(null)` and faulted through a Map~~ — Fixed: canonical
   quiet NaN is `0x7FF8000000000000`, bit-identical to TAG_PTR with a null payload,
   so `__val_is_ptr` (`upper == 0x7FF8`) read every NaN as a null pointer.

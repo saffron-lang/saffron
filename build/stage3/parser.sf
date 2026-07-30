@@ -10,6 +10,7 @@ class Parser {
     var error_count: Float
     var source: String
     var html_depth: Float
+    var for_counter: Int
 
     fun init(tokens: List<Lexer.Token>) {
         this.tokens = tokens
@@ -18,6 +19,16 @@ class Parser {
         this.error_count = 0
         this.source = ""
         this.html_depth = 0
+        this.for_counter = 0
+    }
+
+    /// Suffix that makes each desugared `for-in`'s temporaries unique.
+    ///
+    /// Nested loops share a scope chain, so fixed names let the inner loop
+    /// redeclare — and leave behind — the outer loop's cursor.
+    fun next_for_uid(): String {
+        this.for_counter = this.for_counter + 1
+        return "_" + this.for_counter.to_string()
     }
 
     fun current(): Lexer.Token {
@@ -2095,54 +2106,31 @@ class Parser {
     }
 
     fun parse_for_in(item_name: String): AST.Stmt {
-        // Desugar: for (item in list) { body }
-        // Into: { var __list = list; var __i = 0; while (__i < __list.length()) { var item = __list[__i]; body; __i = __i + 1 } }
         var iter_expr: AST.Expr = this.parse_expr()
         this.consume(")")
         var body: List<AST.Stmt> = this.parse_block_stmts()
-
-        var list_var: String = "__for_list"
-        var idx_var: String = "__for_i"
-
-        // var __for_list = iter_expr
-        var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
-        // var __for_i = 0
-        var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
-        // __for_i < __for_list.length()
-        var cond: AST.Expr = AST.Expr.Binary(
-            AST.Expr.Variable(idx_var),
-            "<",
-            AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", [])
-        )
-        // var item = __for_list[__for_i]
-        var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any",
-            AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
-        // __for_i = __for_i + 1
-        var increment: AST.Stmt = AST.Stmt.ExprStmt(AST.Expr.Assign(idx_var,
-            AST.Expr.Binary(AST.Expr.Variable(idx_var), "+", AST.Expr.IntLit(1))))
-
-        // Build while body: item decl + increment + user body
-        // (increment before body so that `continue` doesn't skip it)
-        var while_body: List<AST.Stmt> = []
-        while_body.push(item_init)
-        while_body.push(increment)
-        var bi: Float = 0
-        while (bi < body.length()) {
-            while_body.push(body[bi])
-            bi = bi + 1
-        }
-
-        // Build block: list init + idx init + while
-        var stmts: List<AST.Stmt> = []
-        stmts.push(init_list)
-        stmts.push(init_idx)
-        stmts.push(AST.Stmt.While(cond, while_body))
-        return AST.Stmt.Block(stmts)
+        return this.desugar_for_in(item_name, iter_expr, body)
     }
 
+    /// Desugar `for (item in coll) { body }` into an index-driven while loop:
+    ///
+    ///   { var src = coll
+    ///     var i = 0
+    ///     while (i < src.length()) { var item = src[i]; i = i + 1; body } }
+    ///
+    /// The temporaries are gensym'd. They used to be the fixed names
+    /// `__for_list` / `__for_i`, which meant an inner loop redeclared the outer
+    /// loop's cursor in the same scope chain: the inner loop ran its course,
+    /// left the shared `__for_i` past the end, and the outer `while` condition
+    /// then failed immediately — so `for (a in xs) { for (b in ys) {...} }`
+    /// silently visited only the first element of `xs`.
+    ///
+    /// The increment is emitted before the user body so `continue` cannot skip
+    /// it and spin forever.
     fun desugar_for_in(item_name: String, iter_expr: AST.Expr, body: List<AST.Stmt>): AST.Stmt {
-        var list_var: String = "__for_list"
-        var idx_var: String = "__for_i"
+        var uid: String = this.next_for_uid()
+        var list_var: String = "__for_src" + uid
+        var idx_var: String = "__for_i" + uid
         var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
         var init_idx: AST.Stmt = AST.Stmt.VarDecl(idx_var, "Int", AST.Expr.IntLit(0), "")
         var cond: AST.Expr = AST.Expr.Binary(AST.Expr.Variable(idx_var), "<", AST.Expr.MethodCall(AST.Expr.Variable(list_var), "length", []))
