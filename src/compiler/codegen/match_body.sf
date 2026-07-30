@@ -1,5 +1,6 @@
     fun gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
         var subj: String = this.gen_arg_value(subject)
+        var subj_type: String = this.type_to_string(this.last_type)
         var result_ptr: String = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
@@ -84,6 +85,55 @@
             // Unknown enum — extract bindings from subject using array encoding
             var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
                 _ => []
+            }
+            // `match (x) { is Dog(d) => ..., is Cat(c) => ... }` — class
+            // patterns, not enum variants. There is no payload to index into:
+            // the binding IS the subject. The arm is picked at compile time
+            // from the subject's static type, since that is all the checker
+            // knows; the binding must also be registered in typed_vars or
+            // `d.bark()` cannot resolve, and since BUGS #37 an unresolved
+            // Variable is a hard error rather than a silent bad load.
+            if (this.class_fields.has(first_variant)) {
+                var chosen: Float = -1
+                var ci: Float = 0
+                while (ci < arms.length()) {
+                    var cpat: AST.Pattern = this.get_arm_pattern(arms[ci])
+                    var cname: String = match (cpat) { VariantPattern(v, b) => v
+                        _ => ""
+                    }
+                    if (chosen < 0) {
+                        // A wildcard arm is the fallback; a name equal to the
+                        // subject's static type wins outright.
+                        if (cname == subj_type) {
+                            chosen = ci
+                        } else if (cname == "_") {
+                            chosen = ci
+                        }
+                    }
+                    ci = ci + 1
+                }
+                if (chosen < 0) { chosen = 0 }
+                var cls_pat: AST.Pattern = this.get_arm_pattern(arms[chosen.floor()])
+                var cls_binds: List<String> = this.get_pattern_bindings(cls_pat)
+                var cls_name: String = match (cls_pat) { VariantPattern(v, b) => v
+                    _ => ""
+                }
+                if (cls_binds.length() >= 1) {
+                    this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cls_binds[0]))
+                    this.typed_vars.set(cls_binds[0], this.str_to_type(cls_name))
+                }
+                var cls_body: AST.Expr = this.get_arm_body(arms[chosen.floor()])
+                var cls_val: String = this.gen_arg_value(cls_body)
+                var cls_type: AST.Type = this.last_type
+                this.emit_indent("store i64 " + cls_val + ", i64* " + result_ptr)
+                var cls_result: String = this.fresh_local()
+                this.emit_indent(cls_result + " = load i64, i64* " + result_ptr)
+                this.last_type = cls_type
+                if (!this.identity_mode) {
+                    var cmr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                    this.llvm_values.set(cls_result, cmr)
+                }
+                return cls_result
             }
             if (first_bindings.length() >= 1) {
                 // Array encoding: inttoptr → GEP for each binding
@@ -257,7 +307,11 @@
         if (name_type.length() < 2) return "Int"
         var ftype: String = name_type[1]
         if (ftype == "String") return "String"
-        if (ftype == "Float" or ftype == "Number") return "Int"
+        // Float must stay Float. Collapsing it to Int made arithmetic on a
+        // match binding emit integer ops against a NaN-boxed double, so
+        // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
+        // wants Int, and type_to_string_for_target already applies that.
+        if (ftype == "Float" or ftype == "Number") return "Float"
         if (ftype == "Bool") return "Int"
         if (ftype.starts_with("List")) return "List<String>"
         return "Int"
