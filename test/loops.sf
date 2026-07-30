@@ -4,7 +4,7 @@ for (var i = 0; i < 10; i = i + 1) {
 
 import "@iter" as Iter
 
-fun predicate(item: Number): Bool {
+fun predicate(item: Int): Bool {
     return (item % 2) == 0
 }
 

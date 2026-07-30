@@ -3,13 +3,13 @@
 // - Missing implementation for 'perimeter' from interface
 
 interface Shape {
-    fun area(): Number
-    fun perimeter(): Number
+    fun area(): Int
+    fun perimeter(): Int
 }
 
 class Circle extends Shape {
-    var radius: Number
-    fun init(r: Number) {
+    var radius: Int
+    fun init(r: Int) {
         this.radius = r
     }
     // Missing area() and perimeter() implementations

@@ -1,8 +1,8 @@
 // Test: Operator overloading via method dispatch
 class Vec2 {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) {
         this.x = x
         this.y = y
     }

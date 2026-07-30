@@ -38,7 +38,7 @@ try {
 IO.println(result)
 
 // --- is type check tests ---
-var n: Number = 42
+var n: Int = 42
 var s: String = "hello"
 
 if (n is Number) {

@@ -1,7 +1,7 @@
 // Test: if/else inside match arm producing a value
 enum Choice { A, B, C }
 
-fun test_basic(c: Choice): Number {
+fun test_basic(c: Choice): Int {
     return match (c) {
         A => {
             if (true) { 1 } else { 2 }
@@ -11,10 +11,10 @@ fun test_basic(c: Choice): Number {
     }
 }
 
-fun test_with_var(c: Choice, flag: Bool): Number {
+fun test_with_var(c: Choice, flag: Bool): Int {
     return match (c) {
         A => {
-            var x: Number = 10
+            var x: Int = 10
             if (flag) {
                 x + 1
             } else {

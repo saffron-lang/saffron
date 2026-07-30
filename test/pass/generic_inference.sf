@@ -11,9 +11,9 @@ IO.println(s.length())  // Works if s is inferred as String
 // Multiple type params inferred
 fun apply<T, R>(x: T, f: (T) => R): R { return f(x) }
 
-var result = apply(42, fun (n: Number): String => "num:" + n.to_string())
+var result = apply(42, fun (n: Int): String => "num:" + n.to_string())
 IO.println(result.length())  // Works if result is inferred as String
 
 // Type mismatch correctly detected
-var annotated: Number = identity(100)
+var annotated: Int = identity(100)
 IO.println(annotated.abs())  // Should work: T=Number, return is Number

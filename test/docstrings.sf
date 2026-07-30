@@ -4,7 +4,7 @@
 import "reflect" as Reflect
 
 /// Adds two numbers together.
-fun add(a: Number, b: Number): Number {
+fun add(a: Int, b: Int): Int {
     return a + b
 }
 
@@ -22,7 +22,7 @@ IO.println(Reflect.doc(Greeter))
 // Test multi-line doc comments
 /// Computes the product
 /// of two numbers.
-fun multiply(a: Number, b: Number): Number {
+fun multiply(a: Int, b: Int): Int {
     return a * b
 }
 

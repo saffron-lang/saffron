@@ -13,7 +13,7 @@ var z = try { 50 } catch (e) { 0 }
 IO.println(z.to_string())
 
 // Let destructuring
-enum Option { Some(value: Number), None }
+enum Option { Some(value: Int), None }
 var opt = Option.Some(7)
 let Some(v) = opt
 IO.println(v.to_string())

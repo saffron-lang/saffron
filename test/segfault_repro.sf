@@ -1,10 +1,10 @@
 // Minimal repro: @decorator on a function segfaults the type checker
-fun identity(fn: Number): Number {
+fun identity(fn: Int): Int {
     return fn
 }
 
 @identity
-fun double(x: Number): Number {
+fun double(x: Int): Int {
     return x * 2
 }
 

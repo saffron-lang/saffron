@@ -1,12 +1,12 @@
 import "time" as Time
 
 class Zoo {
-  var aardvark: Number;
-  var baboon: Number;
-  var cat: Number;
-  var donkey: Number;
-  var elephant: Number;
-  var fox: Number;
+  var aardvark: Int;
+  var baboon: Int;
+  var cat: Int;
+  var donkey: Int;
+  var elephant: Int;
+  var fox: Int;
 
   init() {
     this.aardvark = 1;

@@ -1,8 +1,8 @@
-fun add_one(x: Number) {
+fun add_one(x: Int) {
     return x + 1
 }
 
-fun times_two(x: Number) {
+fun times_two(x: Int) {
     return x * 2
 }
 
@@ -11,7 +11,7 @@ fun times_two(x: Number) {
   |> times_two()
   |> IO.println()
 
-var b: Number;
+var b: Int;
 b = 3;
 IO.println(b);
 

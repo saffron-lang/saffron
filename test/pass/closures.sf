@@ -17,9 +17,9 @@ fun makeGreeter(name: String): String {
 IO.println(makeGreeter("world"))
 
 // Test: Closure returned and called later
-fun counter(): Number {
+fun counter(): Int {
     var count = 0
-    fun increment(): Number {
+    fun increment(): Int {
         count = count + 1
         return count
     }
@@ -30,8 +30,8 @@ fun counter(): Number {
 IO.println(counter())
 
 // Test: Lambda capturing
-fun apply(x: Number): Number {
-    var double = fun (n: Number): Number => n * 2
+fun apply(x: Int): Int {
+    var double = fun (n: Int): Int => n * 2
     return double(x)
 }
 IO.println(apply(21))

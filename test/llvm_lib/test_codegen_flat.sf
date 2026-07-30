@@ -108,7 +108,7 @@ fun fmt_ptrtoint(result: String, val: String): String {
 
 // ============================================================================
 // Test 1: Verify that the add function body matches expected codegen
-// Expected from compiling: fun add(a: Number, b: Number): Number { return a + b }
+// Expected from compiling: fun add(a: Int, b: Int): Int { return a + b }
 // ============================================================================
 fun test_add(): Bool {
     // What the @llvm library would produce (matching current codegen):

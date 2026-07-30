@@ -2,14 +2,14 @@ import "reflect" as Reflect
 
 // Nested data classes
 data class Coord {
-    var lat: Number
-    var lng: Number
+    var lat: Int
+    var lng: Int
 }
 
 data class Address {
     var street: String
     var city: String
-    var zip: Number
+    var zip: Int
     var coord: Coord
 }
 
@@ -20,7 +20,7 @@ data class Company {
 
 data class Person {
     var name: String
-    var age: Number
+    var age: Int
     var company: Company
 }
 

@@ -1,9 +1,9 @@
-fun make_list(): List<Number> {
-    var items: List<Number> = [10, 20, 30]
+fun make_list(): List<Int> {
+    var items: List<Int> = [10, 20, 30]
     return items
 }
 
 fun main() {
-    var list: List<Number> = make_list()
+    var list: List<Int> = make_list()
     IO.println(list)
 }

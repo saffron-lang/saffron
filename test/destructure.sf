@@ -22,7 +22,7 @@ IO.println(others);
 
 // Enum destructuring
 enum Option {
-    Some(value: Number),
+    Some(value: Int),
     None
 }
 

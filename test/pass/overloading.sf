@@ -1,12 +1,12 @@
 // Arity-based overloading
-fun add(a: Number, b: Number): Number { return a + b }
-fun add(a: Number, b: Number, c: Number): Number { return a + b + c }
+fun add(a: Int, b: Int): Int { return a + b }
+fun add(a: Int, b: Int, c: Int): Int { return a + b + c }
 
 IO.println(add(1, 2))
 IO.println(add(1, 2, 3))
 
 // Type-based overloading (same arity, different first param type)
-fun format(n: Number): String { return "num: " + n.to_string() }
+fun format(n: Int): String { return "num: " + n.to_string() }
 fun format(s: String): String { return "str: " + s }
 fun format(items: List<Any>): String { return "list of " + items.length().to_string() }
 

@@ -1,10 +1,10 @@
 // Test: Forward references to functions
-fun isEven(n: Number): Bool {
+fun isEven(n: Int): Bool {
     if (n == 0) return true
     return isOdd(n - 1)
 }
 
-fun isOdd(n: Number): Bool {
+fun isOdd(n: Int): Bool {
     if (n == 0) return false
     return isEven(n - 1)
 }

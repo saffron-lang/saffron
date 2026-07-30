@@ -9,8 +9,8 @@ import "task" as Task
 
 // --- Pipe operator with iterators ---
 var epic_sum = [1,3,5,7,9]
-    |> Iter.map(fun (x: Number) => x + 1)
-    |> Iter.filter(fun (x: Number) => x % 2 == 0)
+    |> Iter.map(fun (x: Int) => x + 1)
+    |> Iter.filter(fun (x: Int) => x % 2 == 0)
     |> Iter.sum()
 
 // --- Enums with generics ---
@@ -21,11 +21,11 @@ enum Result<T, E> {
 
 // --- Interfaces with default methods ---
 interface Container<T> {
-    var capacity: Number
+    var capacity: Int
 
     fun add_item(item: T): Bool
 
-    fun get_size(): Number
+    fun get_size(): Int
 
     fun full?(): Bool {
         return this.get_size() >= capacity
@@ -34,8 +34,8 @@ interface Container<T> {
 
 // --- Class implementing interface (extends keyword, comma-separated) ---
 class Backpack extends Container {
-    var capacity: Number
-    var items: List<Number>
+    var capacity: Int
+    var items: List<Int>
 
     fun init() {
         this.capacity = 16
@@ -50,7 +50,7 @@ class Backpack extends Container {
         return this.items.iter()
     }
 
-    fun add_item(item: Number): Bool {
+    fun add_item(item: Int): Bool {
         if (this.items.length() >= this.capacity) {
             throw "Attempted to add to a full container!"
         }
@@ -58,7 +58,7 @@ class Backpack extends Container {
         return true
     }
 
-    fun get_size(): Number {
+    fun get_size(): Int {
         return this.items.length()
     }
 }
@@ -91,7 +91,7 @@ let [*init, last] = [1, 2, 3, 4, 5]
 // --- Dataclasses (structural types) ---
 data class User {
     var username: String
-    var age: Number
+    var age: Int
 }
 
 var henry = User("henry", 10)
@@ -110,14 +110,14 @@ Task.spawn(get_dogs)
 
 // --- Decorators ---
 fun logged(fn: (Number) => Number): (Number) => Number {
-    return fun (x: Number) => {
+    return fun (x: Int) => {
         IO.println("calling...")
         return fn(x)
     }
 }
 
 @logged
-fun double(x: Number): Number {
+fun double(x: Int): Int {
     return x * 2
 }
 
@@ -141,7 +141,7 @@ while (iter.next?()) {
 }
 
 // --- Match with type patterns ---
-// var x: Number | String = 42
+// var x: Int | String = 42
 // var label = match (x) {
 //     Number(n) => "number: ${n}"
 //     String(s) => "string: ${s}"

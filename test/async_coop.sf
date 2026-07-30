@@ -1,6 +1,6 @@
 import "@async" as Async
 
-fun worker(name: String, duration: Number) {
+fun worker(name: String, duration: Int) {
     IO.println(name + " starting")
     Async.sleep(duration)
     IO.println(name + " done")
