@@ -312,8 +312,34 @@ entry:
   %not_int = xor i1 %is_int, true
   %not_spec = xor i1 %is_spec, true
   %a = and i1 %not_ptr, %not_int
-  %result = and i1 %a, %not_spec
-  ret i1 %result
+  %notag = and i1 %a, %not_spec
+  ; Ruling out the three tags is not enough: a heap object passed through an
+  ; `Any` binding arrives as a RAW (untagged) GC pointer, so `upper` is neither
+  ; the PTR tag nor int/spec — and this predicate used to call it a float.
+  ; `__val_is_list`/`__val_is_map` already probe the GC magic sentinel for that
+  ; case; do the same here. A raw heap address has its top 16 bits clear (heap
+  ; addresses < 2^48), whereas a genuine normalized double always has a non-zero
+  ; exponent there — so only when `upper == 0` is it safe to dereference v-8.
+  ; (+0.0 is 0x0; positive subnormals are the sole theoretical false-deref, the
+  ; same negligible risk the existing list/map probes already accept.)
+  br i1 %notag, label %maybe, label %no
+maybe:
+  %hi_clear = icmp eq i64 %upper, 0
+  br i1 %hi_clear, label %probe, label %yes
+probe:
+  %nonzero = icmp ne i64 %v, 0
+  br i1 %nonzero, label %deref, label %yes
+deref:
+  %magic_addr = sub i64 %v, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  %is_float = xor i1 %has_gc, true
+  ret i1 %is_float
+yes:
+  ret i1 true
+no:
+  ret i1 false
 }
 
 define i1 @__val_is_int(i64 %v) {
