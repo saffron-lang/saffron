@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Bootstrap the Saffron compiler
+# bootstrap_test.sh — older, diverged copy of bootstrap.sh
+#
+# This predates bootstrap.sh's --identity-mode flags and its gen2 fallback, so
+# prefer ./bootstrap.sh for real work.
 #
 # Normal:  gen2 (checked-in) compiles gen3 from source
-# Full:    C VM → gen2 → gen3 (rebuilds gen2 from scratch)
+# Full:    no longer available — see the --full branch below
 #
-# Usage: ./bootstrap.sh [--full] [--verbose]
+# Usage: ./bootstrap_test.sh [--verbose]
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-VM="$ROOT/cvm/cmake-build-debug/saffron"
 COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
 RUNTIME_BASE="$ROOT/src/runtime/base.ll"
@@ -52,40 +54,11 @@ echo "╚═══════════════════════�
 echo ""
 
 # =============================================================================
-# Full rebuild: C VM → gen2 (only with --full)
+# Full rebuild: retired (see bootstrap.sh for the rationale)
 # =============================================================================
 
 if [[ "$FULL" == true ]]; then
-    info "FULL" "Rebuilding gen2 from C VM..."
-
-    # Build C VM
-    cmake -B "$ROOT/cvm/cmake-build-debug" -DCMAKE_BUILD_TYPE=Debug -S "$ROOT/cvm" > /dev/null 2>&1
-    cmake --build "$ROOT/cvm/cmake-build-debug" > /dev/null 2>&1
-    [[ -x "$VM" ]] || fail "FULL" "Failed to build C VM"
-
-    SOURCES=(lexer parser codegen main)
-    for src in "${SOURCES[@]}"; do
-        [[ "$VERBOSE" == true ]] && echo "  compile: $src.sf"
-        "$VM" --no-check "$COMPILER_DIR/main.sf" "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage2/${src}.ll" \
-            || fail "FULL" "Failed to compile $src.sf"
-    done
-
-    [[ "$VERBOSE" == true ]] && echo "  compile: runtime.sf"
-    "$VM" --no-check "$COMPILER_DIR/main.sf" "$RUNTIME_SRC" "$BUILD_DIR/stage2/runtime.ll" \
-        || fail "FULL" "Failed to compile runtime.sf"
-
-    [[ "$VERBOSE" == true ]] && echo "  linking gen2..."
-    clang -O2 -w -Wl,-stack_size,0x10000000 -o "$GEN2" \
-        "$BUILD_DIR/stage2/main.ll" \
-        "$BUILD_DIR/stage2/lexer.ll" \
-        "$BUILD_DIR/stage2/parser.ll" \
-        "$BUILD_DIR/stage2/codegen.ll" \
-        "$BUILD_DIR/stage2/runtime.ll" \
-        "$RUNTIME_BASE" \
-        || fail "FULL" "Linking gen2 failed"
-
-    pass "FULL" "gen2 rebuilt: $GEN2"
-    echo ""
+    fail "FULL" "--full is no longer supported: the C VM (now in legacy/) cannot parse the current compiler source. Recover build/stage2/saffronc from git history instead."
 fi
 
 # =============================================================================
