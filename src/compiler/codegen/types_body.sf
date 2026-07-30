@@ -34,8 +34,22 @@
     fun str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
-        if (s == "Int" or s == "Number") return AST.Type.IntType
-        if (s == "Float") return AST.Type.FloatType
+        if (s == "Int") return AST.Type.IntType
+        // "Number" is the surface spelling of a float, not of an int.
+        //
+        // Mapping it to IntType made the declared type lie in one direction that no
+        // amount of care at the use sites could repair: `fun area(...): Number`
+        // returning 12.0 was relabelled Int at the boundary, so the caller's
+        // `.to_string()` untagged a double as an integer and printed garbage
+        // (37357358909038) or 0. Enum payloads had the same defect from the other
+        // end. This is M2 in docs/design/compiler-rewrite.md — "Int is the bottom
+        // type" — at the point where the surface syntax enters the type lattice.
+        //
+        // Safe for identity mode, which is what the compiler compiles itself with:
+        // type_to_string collapses Float back to "Int" there, so every existing
+        // `var pos: Float` / Number site in compiler source keeps the exact string
+        // it had before.
+        if (s == "Float" or s == "Number") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "Nil") return AST.Type.NilType
         if (s == "Any") return AST.Type.AnyType
