@@ -28,7 +28,7 @@
 @extern("void* malloc(i64)") fun dns_malloc(size: Int): Int
 @extern("void free(void*)") fun dns_free(ptr: Int)
 @extern("i64 strlen(void*)") fun dns_strlen(s: Int): Int
-@extern("double sf_time_now()") fun time_now(): Number
+@extern("double sf_time_now()") fun time_now(): Float
 
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
@@ -38,7 +38,7 @@
 var DEFAULT_NAMESERVER: String = "8.8.8.8"
 var DNS_PORT: Int = 53
 var MAX_PACKET_SIZE: Int = 512
-var TIMEOUT_SECONDS: Number = 5.0
+var TIMEOUT_SECONDS: Float = 5.0
 
 // DNS record types
 var TYPE_A: Int = 1       // IPv4 address
@@ -279,8 +279,8 @@ fun _udp_send(fd: Int, buf: Int, len: Int, host: String, port: Int): Int {
 }
 
 // Receive a UDP packet with timeout, yielding if would block.
-fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Number): Int {
-    var start: Number = time_now()
+fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Float): Int {
+    var start: Float = time_now()
 
     while (true) {
         var n: Int = udp_recvfrom_raw(fd, buf, max_len)
@@ -292,7 +292,7 @@ fun _udp_recv_timeout(fd: Int, buf: Int, max_len: Int, timeout: Number): Int {
             return -1
         }
         // n == -1: would block
-        var elapsed: Number = time_now() - start
+        var elapsed: Float = time_now() - start
         if (elapsed >= timeout) {
             return -1  // Timeout
         }

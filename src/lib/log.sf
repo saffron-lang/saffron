@@ -73,7 +73,7 @@ class Record {
     var level: Level
     var message: String
     var logger_name: String
-    var timestamp: Number
+    var timestamp: Float
     var fields: Map<String, String>
 
     fun init(level: Level, message: String, logger_name: String, fields: Map<String, String>) {
@@ -418,7 +418,7 @@ fun from_env(name: String): Logger {
 
 // --- Internal helpers ---
 
-fun _format_timestamp(ts: Number): String {
+fun _format_timestamp(ts: Float): String {
     // Simple ISO-ish timestamp from unix seconds
     // Full ISO 8601 would need date math; for now use seconds since epoch
     return Time.to_iso(ts)

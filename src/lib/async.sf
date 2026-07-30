@@ -7,7 +7,7 @@ import "@scheduler" as Scheduler
 @intrinsic fun __suspend(reason: Int, arg: Int)
 
 /// Suspend the current task for the given duration in seconds.
-fun sleep(duration: Number) {
+fun sleep(duration: Float) {
     __suspend(1, duration)
 }
 
@@ -47,10 +47,10 @@ fun race(tasks: List<Int>): Int {
 /// Run a function with a timeout. Returns the result if it completes
 /// within the deadline, or nil if it times out.
 /// Usage: var result = Async.timeout(fun () => Http.get(url), 5.0)
-fun timeout(fn: Fun, seconds: Number): Int {
+fun timeout(fn: Fun, seconds: Float): Int {
     var task = Task.spawn(fn)
-    var elapsed: Number = 0.0
-    var step: Number = 0.01
+    var elapsed: Float = 0.0
+    var step: Float = 0.01
     while (elapsed < seconds) {
         if (task.isReady()) {
             return task.getResult()
