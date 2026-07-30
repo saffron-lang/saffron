@@ -109,7 +109,8 @@ class TypeEnv {
     }
 
     fun parse_type_str(s: String): AST.Type {
-        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "String") return AST.Type.StringType
         if (s == "Nil") return AST.Type.NilType
@@ -223,7 +224,8 @@ class NullChecker {
     // --- String → Type node conversion ---
 
     fun parse_type_node(s: String): AST.Type {
-        if (s == "Int" or s == "Number" or s == "Float") return AST.Type.IntType
+        if (s == "Int" or s == "Number") return AST.Type.IntType
+        if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
         if (s == "String") return AST.Type.StringType
         if (s == "Nil") return AST.Type.NilType
