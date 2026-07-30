@@ -6,13 +6,7 @@ Create a file called `hello.sf`:
 IO.println("Hello, world!")
 ```
 
-Run it with the C VM:
-
-```bash
-./cvm/cmake-build-debug/saffron hello.sf
-```
-
-Or with the native compiler:
+Run it:
 
 ```bash
 tools/saffron run hello.sf
@@ -22,6 +16,13 @@ Output:
 
 ```
 Hello, world!
+```
+
+Or compile it to a standalone binary:
+
+```bash
+tools/saffron build hello.sf -o hello
+./hello
 ```
 
 ## What just happened?
@@ -52,4 +53,4 @@ IO.println("2 + 2 = ${2 + 2}")
 
 ## Next steps
 
-Try the [REPL](./repl.md) for interactive exploration, or jump into the [tutorial](../tutorial/variables-and-types.md).
+Jump into the [tutorial](../tutorial/variables-and-types.md), or see [Interactive Use](./repl.md) for tips on iterating quickly.

@@ -99,4 +99,4 @@ IO.println(result)  // [20, 40]
 
 - Trailing closures are syntactic sugar — they compile to the same code as passing a lambda
 - The return value of the last expression in a trailing closure is the closure's return value
-- Trailing closures are supported in the LLVM compiler; CVM support may vary for complex nesting
+- A trailing closure captures its enclosing scope like any other lambda

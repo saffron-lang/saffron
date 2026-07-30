@@ -135,7 +135,7 @@ The Bazaar server exposes a JSON API:
 Bazaar is itself a Saffron application (built with the `@http/server` stdlib). To run your own registry:
 
 ```bash
-git clone https://github.com/henry232323/saffron.git
+git clone https://github.com/saffron-lang/saffron.git
 cd saffron/bazaar
 pantry build
 ./build/bazaar

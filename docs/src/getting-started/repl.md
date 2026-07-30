@@ -1,43 +1,48 @@
-# The REPL
+# Interactive Use
 
-Launch the REPL by running the C VM binary with no arguments:
+**Saffron does not currently have a REPL.**
+
+Earlier versions shipped one as part of the C bytecode interpreter. That interpreter now lives in `legacy/` and is no longer supported — it has drifted well behind the language and rejects modern syntax such as `@` annotations, the `Int` type, and `actor` declarations. Its REPL went with it.
+
+## Iterating quickly instead
+
+Compilation is fast enough that a scratch file plus `tools/saffron run` covers most of what a REPL is used for. Create a file:
+
+```saffron
+var greeting = "hello"
+IO.println(greeting.to_upper())
+IO.println([1, 2, 3].length())
+```
+
+And run it:
 
 ```bash
-./cvm/cmake-build-debug/saffron
+tools/saffron run scratch.sf
 ```
 
 ```
-saffron v0.1 REPL
->>>
+HELLO
+3
 ```
 
-## Basic usage
+Edit and re-run as you go. Because the whole file is type-checked on every run, you also get errors a line-at-a-time REPL would not catch until later.
 
-Type expressions and statements directly:
+## Exploring the standard library
 
-```
->>> var x = 42
->>> IO.println(x * 2)
-84
-```
+`IO.println` works on scalars — numbers, strings, and booleans. To inspect a list or a map, loop over it and print the elements:
 
-Variables, functions, and classes persist across lines within a session.
-
-## Multi-line input
-
-The REPL detects unclosed braces, parentheses, and brackets. It will prompt with `...` until the expression is complete:
-
-```
->>> fun greet(name: String) {
-...   IO.println("Hello, ${name}!")
-... }
->>> greet("world")
-Hello, world!
+```saffron
+var nums = [1, 2, 3, 4]
+for (n in nums) {
+    IO.println(n * n)
+}
 ```
 
-## Tips
+```
+1
+4
+9
+16
+```
 
-- Use the REPL to test small expressions and explore the standard library
-- Define helper functions to iterate quickly on an idea
-- All imports work in the REPL just like in files
-- The REPL uses the C VM interpreter (not the LLVM compiler), so it starts instantly
+For a reference on what is available, see the [Standard Library](../stdlib/io.md) section.

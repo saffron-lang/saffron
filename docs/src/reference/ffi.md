@@ -60,7 +60,7 @@ The `@intrinsic` decorator marks functions that map to LLVM intrinsics or compil
 
 ## Notes
 
-- `@extern` is only available in the LLVM compiler (`tools/saffron`), not the C VM interpreter
+- The C signature string is required — `@extern fun name(...)` without it is not currently handled by the compiler
 - The declared function has no body — the compiler generates a direct call to the named C symbol
 - You are responsible for type correctness — the compiler trusts your signature
 - Link the object file or library that provides the symbol when building: `tools/saffron build app.sf -o app` (the runtime already links standard C library functions)

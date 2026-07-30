@@ -6,7 +6,7 @@
 
 - [Installation](./getting-started/installation.md)
 - [Hello World](./getting-started/hello-world.md)
-- [The REPL](./getting-started/repl.md)
+- [Interactive Use](./getting-started/repl.md)
 
 # Tutorial
 

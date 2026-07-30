@@ -1,6 +1,6 @@
 # The Saffron Programming Language
 
-Saffron is a statically typed scripting language designed to be expressive, fast to write, and safe by default. It ships with two runtimes: a bytecode interpreter (C VM with REPL) for scripting, and a self-hosted LLVM compiler for native binaries and WebAssembly.
+Saffron is a statically typed scripting language designed to be expressive, fast to write, and safe by default. It is compiled by a self-hosted compiler — written in Saffron — that emits LLVM IR, targeting both native binaries and WebAssembly.
 
 ## Features
 
