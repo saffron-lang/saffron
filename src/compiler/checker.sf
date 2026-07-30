@@ -504,7 +504,21 @@ class NullChecker {
             AnyType => "Any"
             ClassType(n) => n
             EnumType(n) => n
-            GenericType(base, args) => base
+            GenericType(base, args) => {
+                // Render the type arguments, not just the base. Collapsing
+                // Map<String,Int> to "Map" here erased the K/V that get()/keys()/
+                // values() narrowing depends on — every extract_map_*_type then
+                // saw a bare "Map" and returned Any. The downstream base-name
+                // checks all use starts_with("Map<"), so the rendered form works.
+                var rendered: String = base + "<"
+                var gi: Float = 0
+                while (gi < args.length()) {
+                    if (gi > 0) { rendered = rendered + "," }
+                    rendered = rendered + this.type_to_str(args[gi])
+                    gi = gi + 1
+                }
+                rendered + ">"
+            }
             FuncType(p, r) => "Fun"
             NullableType(inner) => this.type_to_str(inner) + "|Nil"
             UnionType(types) => {
@@ -629,6 +643,16 @@ class NullChecker {
         while (i < classes.length()) {
             var child_name: String = classes[i]
             var parent_name: String = this.class_parents.get(child_name)
+            // The parent of an `extends` must actually name a class or interface.
+            // Both register in class_fields during the first pass; List/Map/Sendable
+            // are built-in bases. Without this check, `class OhNo extends NotClass`
+            // where NotClass is a String variable compiled cleanly — inheriting from
+            // a value is meaningless and must be rejected.
+            if (!this.env.class_fields.has(parent_name)
+                and parent_name != "List" and parent_name != "Map"
+                and parent_name != "Sendable") {
+                this.error(child_name + " extends unknown type " + parent_name + " (not a class or interface)")
+            }
             if (this.class_abstract_methods.has(parent_name)) {
                 var required_str: String = this.class_abstract_methods.get(parent_name)
                 var required_methods: List<String> = required_str.split(",")
@@ -841,15 +865,27 @@ class NullChecker {
                 this.check_spawn_captures(init)
                 var init_type_node: AST.Type = this.infer_type(init)
                 var init_type: String = this.type_to_str(init_type_node)
-                var type_ann_str: String = this.type_node_to_string(type_ann)
+                // type_ann is a raw String on the AST (ast.sf VarDecl.type_ann),
+                // NOT an AST.Type node. Passing it straight to the node-typed
+                // helpers (type_node_to_string / is_nullable_type / define_var)
+                // made every match arm miss and fall through to the first one —
+                // so every declared variable's stored type collapsed to Int, and
+                // `match (d)` on an enum variable saw Int, missed enum_variants,
+                // and silently skipped the exhaustiveness check. Parse it first.
+                var type_ann_str: String = type_ann
+                var type_ann_node: AST.Type = this.parse_type_node(type_ann)
                 if (type_ann_str != "Any") {
                     // Explicit type annotation: only error on direct nil assignment.
                     // Other nullable expressions (e.g. Map.get()) are treated as
                     // non-null assertions by the programmer's explicit annotation.
-                    if (!this.is_nullable_type(type_ann) and this.is_nil_init(init)) {
+                    //
+                    // A type alias (`type Name = T`) desugars to a VarDecl with a
+                    // synthetic NilLit initializer and doc "@type_alias"; that nil is
+                    // an implementation artifact, not a real assignment, so skip it.
+                    if (doc != "@type_alias" and !this.is_nullable_type(type_ann_node) and this.is_nil_init(init)) {
                         this.error(name + ": cannot assign nil to non-nullable " + type_ann_str)
                     }
-                    this.env.define_var(name, type_ann)
+                    this.env.define_var(name, type_ann_node)
                 } else if (init_type != "Any") {
                     // Inferred from initializer
                     this.env.define_var(name, init_type_node)
@@ -1243,7 +1279,15 @@ class NullChecker {
                 if (try_str != catch_str and try_str != "Any" and catch_str != "Any" and try_str != "Nil" and catch_str != "Nil") {
                     this.error("try-expression branches have incompatible types: " + try_str + " vs " + catch_str)
                 }
-                try_type
+                // A try body that diverges (throws) has no value — its value slot
+                // types as Nil. In that case the expression's type is whatever the
+                // catch branch yields, so `var y = try { throw ... } catch { 99 }`
+                // is an Int, not Nil.
+                if (try_str == "Nil" and catch_str != "Nil") {
+                    catch_type
+                } else {
+                    try_type
+                }
             }
         }
     }
