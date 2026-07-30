@@ -67,7 +67,24 @@
                 if (this.typed_vars.has(name)) {
                     this.last_type = this.typed_vars.get(name)
                 } else {
-                    this.last_type = AST.Type.IntType
+                    // Module-level globals are registered in global_var_types by the
+                    // pre-scan, not in typed_vars. This arm used to fall straight to
+                    // IntType without consulting that table, so a global read from
+                    // inside any function claimed to be an Int — the dishonest
+                    // "unknown means Int" fallback of BUGS #32/#33. Method dispatch
+                    // then took no branch and returned a literal "0" (#37):
+                    //
+                    //   var _order = "abc"          // module level
+                    //   fun f() { _order.index_of("b") }   // was 0, ignoring the string
+                    //
+                    // Reading the same global at top level worked, because typed_vars
+                    // has it there. That asymmetry is what made this survive so long.
+                    var gv_type: String = this.get_var_type_str(name)
+                    if (gv_type.length() > 0) {
+                        this.last_type = this.str_to_type(gv_type)
+                    } else {
+                        this.last_type = AST.Type.IntType
+                    }
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
@@ -578,6 +595,26 @@
             var left_class: String = ""
             if (left_name.length() > 0) {
                 left_class = this.get_var_type_str(left_name)
+            } else {
+                // The left operand is not a plain variable. It used to be given
+                // up on here, so `Vec2(1,2) + Vec2(3,4)` — a constructor call,
+                // `this.pos`, a method result — skipped overload dispatch
+                // entirely and fell through to the primitive integer path,
+                // emitting `add i64` on two *pointers* and printing a garbage
+                // address. Silent wrong answer, no diagnostic. get_expr_type
+                // already resolves calls and field accesses, so just ask it.
+                //
+                // Accept the answer ONLY if it names a declared class.
+                // get_expr_type also returns primitives ("Int", "Number",
+                // "Any"), and letting those through made `a + b + c` — whose
+                // left operand is itself a Binary — resolve to a primitive that
+                // collided with a user function sharing the overload method
+                // name, rewriting the addition into a call to the user's own
+                // global `add`: "'add' expects 3 arguments, got 2".
+                var inferred_class: String = this.get_expr_type(left)
+                if (this.class_fields.has(inferred_class)) {
+                    left_class = inferred_class
+                }
             }
             if (left_class.length() > 0) {
                 if (this.class_methods.has(left_class)) {
@@ -619,12 +656,34 @@
             // Must come before string comparison to handle cases like:
             // map.get("missing") == nil where get returns "String" type but actual value is nil
             if (!this.identity_mode) {
+                // Which side is the *literal* nil, syntactically. This is the only
+                // reliable signal for "test the other operand for nil".
+                //
+                // Keying off the inferred type alone is wrong when both sides are typed
+                // Nil, which happens for `var x: Any = nil; ...; x == nil`: the
+                // declaration used to narrow x to Nil (now fixed in gen_var_decl, but
+                // any other Nil-typed expression reaches here too), and then
+                // `check_val` picked whichever side the type test happened to name —
+                // ending up testing the nil literal against itself, which is
+                // unconditionally true regardless of what the variable holds.
+                var left_is_literal_nil: Bool = this.is_nil_expr(left)
+                var right_is_literal_nil: Bool = this.is_nil_expr(right)
+
                 var is_nil_cmp: Bool = false
                 if (left_type == "Nil") { is_nil_cmp = true }
                 if (right_type == "Nil") { is_nil_cmp = true }
+                if (left_is_literal_nil or right_is_literal_nil) { is_nil_cmp = true }
                 if (is_nil_cmp) {
+                    // Prefer the syntactic literal: check the side that is NOT `nil`.
                     var check_val: String = lhs
-                    if (left_type == "Nil") { check_val = rhs }
+                    if (left_is_literal_nil and !right_is_literal_nil) {
+                        check_val = rhs
+                    } else if (right_is_literal_nil) {
+                        check_val = lhs
+                    } else if (left_type == "Nil") {
+                        // Neither side is a literal; fall back to the type test.
+                        check_val = rhs
+                    }
                     var is_nil_raw: String = this.fresh_local()
                     this.emit_indent(is_nil_raw + " = call i1 @__val_is_nil(i64 " + check_val + ")")
                     var nil_bool: String = is_nil_raw
@@ -640,7 +699,16 @@
                 }
             }
 
-            if (left_type == "String" or right_type == "String") {
+            // Static-String comparison. Requires BOTH sides to be statically known
+            // non-Any: __string_eq / __string_ne dereference their operands as char*
+            // without inspecting the tag, so an Any operand holding nil (or an int,
+            // or a list) segfaults inside strcmp.
+            //
+            // An `Any` operand must therefore fall through to the __any_eq/__any_ne
+            // branch below, which unmasks and routes on the real tag and compares
+            // string *contents* when both sides do turn out to be strings. Before
+            // this ordering fix, `var x: Any = nil; x != "something"` crashed.
+            if ((left_type == "String" or right_type == "String") and left_type != "Any" and right_type != "Any") {
                 var raw_bool: String = this.fresh_local()
                 if (op == "==") {
                     this.emit_indent(raw_bool + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
@@ -2765,6 +2833,31 @@
         var i: Float = 0
         while (i < args.length()) {
             var val: String = this.gen_arg_value(args[i])
+            // Int -> Float widening at the payload store, the same fix as BUGS #28
+            // applied to enum construction instead of variable declaration.
+            //
+            // A `Number` field stores whatever representation the argument happened
+            // to have: `Some(7)` stored a TAG_INT, `Some(7.5)` a double. The
+            // declared field type therefore did not describe the bits, so a binding
+            // extracted by `let Some(v) = ...` was unreadable either way — typing it
+            // Float made `Some(7)` print nan, and typing it Int made
+            // `Circle(2.0)` arithmetic produce nan. Neither static choice can be
+            // right while construction is inconsistent.
+            //
+            // Normalising here makes the declared type true: a Float/Number field
+            // always holds a double, so get_variant_field_type's "Float" is correct
+            // for every construction. Reuses the untag/tag round trip so the sitofp
+            // lives in one place.
+            //
+            // Gated on !identity_mode for the reason given at the declaration site:
+            // identity mode has no tags and Float *is* Int there.
+            if (!this.identity_mode) {
+                var decl_type: String = this.get_variant_field_type(enum_name, variant, i)
+                if (decl_type == "Float" and this.type_to_string(this.last_type) == "Int") {
+                    var widened: String = this.emit_untag_float(val)
+                    val = this.emit_tag_float(widened)
+                }
+            }
             var field_idx: Float = i + 1
             var field_slot: String = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())

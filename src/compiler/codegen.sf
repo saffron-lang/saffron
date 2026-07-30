@@ -1192,6 +1192,16 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
+                // Infer from the initializer when unannotated, exactly as the
+                // module-level pre-scan does (BUGS #36). This copy only ever read
+                // the annotation, so `var _order = "abc"` in the main program
+                // stayed untyped and every method on it misdispatched (#37).
+                if (gvtype.length() == 0 or gvtype == "Any") {
+                    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+                    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+                        gvtype = gvinit
+                    }
+                }
                 if (gvtype.length() > 0 and gvtype != "Any") {
                     gen.global_var_types.set(gvname, gvtype)
                 }
@@ -1789,6 +1799,16 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                 gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
+                // Infer from the initializer when unannotated, exactly as the
+                // module-level pre-scan does (BUGS #36). This copy only ever read
+                // the annotation, so `var _order = "abc"` in the main program
+                // stayed untyped and every method on it misdispatched (#37).
+                if (gvtype.length() == 0 or gvtype == "Any") {
+                    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+                    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+                        gvtype = gvinit
+                    }
+                }
                 if (gvtype.length() > 0 and gvtype != "Any") {
                     gen.global_var_types.set(gvname, gvtype)
                 }
