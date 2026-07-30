@@ -431,7 +431,7 @@ class Project {
 }
 
 class Env {
-    var opt_level: Number
+    var opt_level: Int
     fun define(key: String, value: String)
 }
 
@@ -448,9 +448,9 @@ class Workspace {
 }
 
 class TestResults {
-    var passed: Number
-    var failed: Number
-    var skipped: Number
+    var passed: Int
+    var failed: Int
+    var skipped: Int
 }
 
 fun project(config: (Project) => Nil)

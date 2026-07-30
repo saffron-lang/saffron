@@ -5,7 +5,7 @@ Maps are built-in — no import needed.
 ## Creating maps
 
 ```saffron
-var empty: Map<String, Number> = {}
+var empty: Map<String, Int> = {}
 var scores = {"alice": 95, "bob": 87}
 ```
 
@@ -18,7 +18,7 @@ var scores = {"alice": 95, "bob": 87}
 | `m.has(key)` | `Bool` | Check if key exists |
 | `m.keys()` | `List` | All keys |
 | `m.values()` | `List` | All values |
-| `m.length()` | `Number` | Number of entries |
+| `m.length()` | `Int` | Number of entries |
 
 ## Iteration
 
@@ -35,7 +35,7 @@ for (entry in m) {
 ## Example
 
 ```saffron
-var counts: Map<String, Number> = {}
+var counts: Map<String, Int> = {}
 
 var words = ["hello", "world", "hello", "saffron", "world", "hello"]
 for (word in words) {

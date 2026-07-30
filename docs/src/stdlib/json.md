@@ -22,7 +22,7 @@ JSON types map to Saffron types:
 - Object -> `Map<String, Any>`
 - Array -> `List`
 - String -> `String`
-- Number -> `Number`
+- Number -> `Int` or `Float` (per the spelling of the literal)
 - Boolean -> `Bool`
 - null -> `Nil`
 

@@ -19,11 +19,11 @@ Prepare the Saffron language to be capable of expressing a compiler. These are f
 #### Done
 - [x] Indexed assignment (`list[i] = x`)
 - [x] StringBuilder (efficient IR generation without O(n²) string concat)
-- [x] Recursive types (enums that reference themselves: `enum Expr { Binary(left: Expr, ...), Literal(value: Number) }`)
+- [x] Recursive types (enums that reference themselves: `enum Expr { Binary(left: Expr, ...), Literal(value: Float) }`)
 
 #### Remaining
 - [ ] **Increase FRAMES_MAX** — 64 is too low for recursive AST traversal. Raise to 256 or 512.
-- [ ] **Bitwise operators** — `&`, `|`, `^`, `<<`, `>>`, `~` on Number. Needed for flag manipulation and encoding in codegen.
+- [ ] **Bitwise operators** — `&`, `|`, `^`, `<<`, `>>`, `~` on Int. Needed for flag manipulation and encoding in codegen.
 - [ ] **Multi-line strings** — triple-quote `"""..."""` syntax for LLVM IR templates.
 - [ ] **Exhaustive match checking** — warn when match arms don't cover all enum variants.
 
@@ -64,7 +64,7 @@ src/compiler/
 
 Emit LLVM IR as text (`.ll` files). Use StringBuilder for efficient construction. Invoke `clang` via `OS.exec()` to assemble into a binary.
 
-Example target output for `fun main(): Number { return 42 }`:
+Example target output for `fun main(): Int { return 42 }`:
 
 ```llvm
 define i64 @main() {

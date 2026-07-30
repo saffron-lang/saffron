@@ -70,8 +70,8 @@ Same as `load` but takes a string instead of a file path.
 |--------|---------|-------------|
 | `t.string(key)` | `String` | Get string value (throws if missing) |
 | `t.string_or(key, default)` | `String` | Get string or default |
-| `t.number(key)` | `Number` | Get number value |
-| `t.number_or(key, default)` | `Number` | Get number or default |
+| `t.number(key)` | `Any` | Get number value (`Int` or `Float`, per the spelling in the file) |
+| `t.number_or(key, default)` | `Any` | Get number or default |
 | `t.bool(key)` | `Bool` | Get boolean value |
 | `t.bool_or(key, default)` | `Bool` | Get boolean or default |
 | `t.table(key)` | `TomlTable` | Get sub-table |

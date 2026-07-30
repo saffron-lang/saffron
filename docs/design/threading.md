@@ -127,9 +127,9 @@ import "@thread" as Thread
 var pool = Thread.pool(4)
 
 // Submit work — returns a Future<T>
-var f1 = pool.submit(fun (): Number => fibonacci(40))
-var f2 = pool.submit(fun (): Number => fibonacci(41))
-var f3 = pool.submit(fun (): Number => fibonacci(42))
+var f1 = pool.submit(fun (): Int => fibonacci(40))
+var f2 = pool.submit(fun (): Int => fibonacci(41))
+var f3 = pool.submit(fun (): Int => fibonacci(42))
 
 // Get results (blocks calling thread until ready)
 IO.println("fib(40) = ${f1.get()}")
@@ -307,7 +307,7 @@ consumer.join()
 Also provide an unbounded variant:
 
 ```saffron
-var ch = Thread.unbounded_channel<Number>()
+var ch = Thread.unbounded_channel<Int>()
 // send() never blocks (until OOM)
 ```
 
@@ -319,7 +319,7 @@ var ch = Thread.unbounded_channel<Number>()
 
 Saffron does not have a borrow checker or lifetime system. Adding `Send`/`Sync` as type-system constraints would be a massive language change. Instead:
 
-- **Immutable values** (Number, Bool, String, nil) are inherently safe to share — they cannot be mutated.
+- **Immutable values** (Int, Float, Bool, String, nil) are inherently safe to share — they cannot be mutated.
 - **Mutable containers** (List, Map, class instances) are NOT safe without synchronization.
 - In debug mode, we can add **runtime race detection** (similar to Go's `-race` flag or TSan): track which thread last wrote to an object, warn if another thread reads without synchronization.
 
@@ -492,7 +492,7 @@ Internally, `spawn_blocking` does:
 Saffron takes a **pragmatic** approach — not as strict as Rust (no borrow checker), not as lax as C (no undefined behavior from races):
 
 **Tier 1: Safe by default (immutable values)**
-- Number, Bool, String, nil — these are immutable. Reading them from any thread is always safe.
+- Int, Float, Bool, String, nil — these are immutable. Reading them from any thread is always safe.
 - Enum variants with only immutable fields are also safe.
 
 **Tier 2: Protected containers**

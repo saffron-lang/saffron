@@ -6,7 +6,7 @@ Strings are immutable. All methods return new values.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `s.length()` | `Number` | Number of characters |
+| `s.length()` | `Int` | Number of characters |
 | `s.split(delim)` | `List<String>` | Split by delimiter |
 | `s.trim()` | `String` | Remove leading/trailing whitespace |
 | `s.contains(sub)` | `Bool` | Check if substring exists |
@@ -16,9 +16,9 @@ Strings are immutable. All methods return new values.
 | `s.to_upper()` | `String` | Uppercase |
 | `s.to_lower()` | `String` | Lowercase |
 | `s.slice(start, end)` | `String` | Substring by index |
-| `s.index_of(sub)` | `Number` | First index of substring (-1 if not found) |
+| `s.index_of(sub)` | `Int` | First index of substring (-1 if not found) |
 | `s.repeat(n)` | `String` | Repeat n times |
-| `s.to_number()` | `Number \| Nil` | Parse as number |
+| `s.to_number()` | `Int \| Nil` | Parse as number |
 
 ## Examples
 

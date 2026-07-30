@@ -110,7 +110,7 @@ use `init()` to set values until default field initialization is implemented.
 ```saffron
 class Config {
     var name: String
-    var port: Number
+    var port: Int
     fun init() {
         this.name = ""
         this.port = 8080

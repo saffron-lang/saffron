@@ -16,7 +16,7 @@ All request functions return a `Response`:
 
 ```saffron
 class Response {
-    var status: Number
+    var status: Int
     var status_text: String
     var headers: Map<String, String>
     var body: String

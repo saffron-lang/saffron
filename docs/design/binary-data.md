@@ -250,7 +250,7 @@ This enables the Buffer type to support `buf1 & buf2` syntax (see Section 8).
   unreachable.
 - **Bounds-checked.** Every access validates the index (with fast-path elision possible
   in release mode).
-- **Value is a Number (0-255).** Bytes are represented as integers in the 0-255 range.
+- **Value is an Int (0-255).** Bytes are represented as integers in the 0-255 range.
 
 ### 3.2 Creation
 
@@ -1162,7 +1162,7 @@ var encoded: Buffer = Encoding.encode(text, "shift_jis")
 Buffer.write_file("output.csv", encoded)
 ```
 
-This replaces the `List<Number>` approach in the unicode-support.md design with the
+This replaces the `List<Int>` approach in the unicode-support.md design with the
 more appropriate `Buffer` type.
 
 ### 11.2 @socket (Network)

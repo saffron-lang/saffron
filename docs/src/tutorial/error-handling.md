@@ -45,9 +45,9 @@ with `is` or `match`:
 
 ```saffron
 class HttpError {
-    var code: Number
+    var code: Int
     var message: String
-    fun init(code: Number, message: String) {
+    fun init(code: Int, message: String) {
         this.code = code
         this.message = message
     }
@@ -74,7 +74,7 @@ enum Result<T, E> {
     Err(error: E)
 }
 
-fun parse_int(s: String): Result<Number, String> {
+fun parse_int(s: String): Result<Int, String> {
     var n = s.to_number()
     if (n is Nil) {
         return Result.Err("not a number: ${s}")

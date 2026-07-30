@@ -10,9 +10,9 @@ Semantic Versioning 2.0 -- parse, compare, and match version constraints.
 
 ```saffron
 class Version {
-    var major: Number
-    var minor: Number
-    var patch: Number
+    var major: Int
+    var minor: Int
+    var patch: Int
     var prerelease: String
     var build: String
 }
@@ -32,7 +32,7 @@ class Version {
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `SemVer.compare(a, b)` | `Number` | -1, 0, or 1 |
+| `SemVer.compare(a, b)` | `Int` | -1, 0, or 1 |
 | `SemVer.gt(a, b)` | `Bool` | a > b |
 | `SemVer.lt(a, b)` | `Bool` | a < b |
 | `SemVer.eq(a, b)` | `Bool` | a == b |

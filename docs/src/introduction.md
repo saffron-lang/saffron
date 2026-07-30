@@ -20,18 +20,18 @@ Saffron is a statically typed scripting language designed to be expressive, fast
 import "@iter" as Iter
 
 enum Shape {
-    Circle(radius: Number),
-    Rect(width: Number, height: Number)
+    Circle(radius: Float),
+    Rect(width: Float, height: Float)
 }
 
-fun area(shape: Shape): Number {
+fun area(shape: Shape): Float {
     return match (shape) {
         Circle(r) => 3.14159 * r * r,
         Rect(w, h) => w * h
     }
 }
 
-var shapes = [Shape.Circle(5), Shape.Rect(3, 4)]
+var shapes = [Shape.Circle(5.0), Shape.Rect(3.0, 4.0)]
 var areas = Iter.map(shapes, area)
 IO.println(areas)  // [78.5397, 12]
 ```

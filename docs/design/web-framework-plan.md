@@ -73,7 +73,7 @@ These are testable without any DOM — pure reactive graph.
 Element functions with trailing blocks define the component tree:
 
 ```saffron
-fun Counter(initial: Number): UI.Element {
+fun Counter(initial: Int): UI.Element {
     var count = UI.signal(initial)
 
     div(class: "counter") {
@@ -127,7 +127,7 @@ Implements a keyed reconciliation algorithm (similar to Solid's `<For>`).
 Framework completeness:
 
 ```saffron
-fun UserProfile(id: Number): UI.Element {
+fun UserProfile(id: Int): UI.Element {
     var user = UI.resource(fun () => fetchUser(id))
 
     match (user.get()) {
@@ -194,7 +194,7 @@ The framework is unaware — it only sees function calls with trailing blocks re
 
 - **Closures** → component functions
 - **Enums + pattern matching** → conditional rendering (`match` on state)
-- **Generics** → typed props and signals (`Signal<Number>`)
+- **Generics** → typed props and signals (`Signal<Int>`)
 - **Interfaces** → component contracts
 - **Trailing closures** → builder-style element nesting
 - **Cooperative async** → data fetching / suspense

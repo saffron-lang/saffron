@@ -228,7 +228,7 @@ Byte-level repetition produces correct UTF-8 output. No change.
 `byte_length()` is O(1) — it returns the stored byte count directly (what
 `length()` used to return).
 
-`bytes()` returns an iterator over raw byte values as Numbers.
+`bytes()` returns an iterator over raw byte values as `Int`s.
 
 ### 4.2 Codepoint iteration
 
@@ -274,7 +274,7 @@ if (input.is_ascii()) {
 ### 4.5 Encoding conversion
 
 ```saffron
-var bytes: List<Number> = "hello".encode("utf-8")    // [104, 101, 108, 108, 111]
+var bytes: List<Int> = "hello".encode("utf-8")    // [104, 101, 108, 108, 111]
 var s = String.decode([0xC3, 0xA9], "utf-8")         // "é"
 
 // Supported encodings (Phase 1): "utf-8", "ascii", "latin-1"
@@ -393,7 +393,7 @@ fun is_letter(s: String): Bool {
     return cat.starts_with("L")
 }
 
-fun width(s: String): Number {
+fun width(s: String): Int {
     return _native.char_width(s)
 }
 
@@ -433,7 +433,7 @@ else if (esc == "u") {
             hex.append(this.advance())
         }
         this.advance() // skip }
-        var codepoint: Number = parse_hex(hex.to_string())
+        var codepoint: Int = parse_hex(hex.to_string())
         result.append(codepoint_to_utf8(codepoint))
     }
 }
@@ -456,7 +456,7 @@ var mixed = "café résumé naïve"
 // Future: Unicode identifiers
 var π = 3.14159
 var 名前 = "Saffron"
-fun добавить(a: Number, b: Number): Number { return a + b }
+fun добавить(a: Int, b: Int): Int { return a + b }
 ```
 
 **Source encoding rule:** All `.sf` files MUST be valid UTF-8. The compiler rejects
@@ -958,7 +958,7 @@ str.trim()           -> String   // Unicode whitespace
 str.to_upper()       -> String   // Unicode simple uppercase
 str.to_lower()       -> String   // Unicode simple lowercase
 str.repeat(n)        -> String   // unchanged
-str.to_number()      -> Number   // unchanged
+str.to_number()      -> Int      // unchanged
 str.is_ascii()       -> Bool     // true if all bytes < 0x80
 str.bytes()          -> Iterator<Int>   // raw byte values
 str.codepoints()     -> Iterator<Int>   // codepoint values
@@ -1019,11 +1019,11 @@ var content: String = Encoding.read_file("data.csv", "windows-1252")
 Encoding.write_file("output.txt", content, "shift_jis")
 
 // Low-level: decode raw bytes to UTF-8 string
-var bytes: List<Number> = IO.read_bytes("legacy.dat")
+var bytes: List<Int> = IO.read_bytes("legacy.dat")
 var text: String = Encoding.decode(bytes, "iso-8859-1")
 
 // Low-level: encode a UTF-8 string to bytes in target encoding
-var encoded: List<Number> = Encoding.encode(content, "utf-16le")
+var encoded: List<Int> = Encoding.encode(content, "utf-16le")
 IO.write_bytes("output.bin", encoded)
 
 // List available encodings
@@ -1048,12 +1048,12 @@ Encoding.encode("hello 🎉", "ascii")
 
 // Replace mode: substitute unmappable chars
 var opts: Map<String, String> = {"errors": "replace", "replacement": "?"}
-var bytes: List<Number> = Encoding.encode_with("hello 🎉", "ascii", opts)
+var bytes: List<Int> = Encoding.encode_with("hello 🎉", "ascii", opts)
 // bytes represent "hello ?"
 
 // Ignore mode: skip unmappable chars
 var opts2: Map<String, String> = {"errors": "ignore"}
-var bytes2: List<Number> = Encoding.encode_with("hello 🎉", "ascii", opts2)
+var bytes2: List<Int> = Encoding.encode_with("hello 🎉", "ascii", opts2)
 // bytes represent "hello "
 ```
 
@@ -1071,8 +1071,8 @@ Encoding.read_file("legacy.csv", "windows-1252")
 Encoding.write_file("output.csv", data, "windows-1252")
 
 // Binary I/O (raw bytes, no encoding)
-IO.read_bytes("image.png")       // List<Number>
-IO.write_bytes("out.bin", bytes) // List<Number>
+IO.read_bytes("image.png")       // List<Int>
+IO.write_bytes("out.bin", bytes) // List<Int>
 ```
 
 ### Supported Encodings (Phase 1)
@@ -1112,7 +1112,7 @@ For the LLVM-compiled path, encoding functions are C runtime calls:
 ```c
 // runtime/encoding.c
 int64_t __encoding_decode(int64_t bytes_list, int64_t encoding_str);  // -> String
-int64_t __encoding_encode(int64_t string, int64_t encoding_str);      // -> List<Number>
+int64_t __encoding_encode(int64_t string, int64_t encoding_str);      // -> List<Int>
 ```
 
 ### BOM Handling

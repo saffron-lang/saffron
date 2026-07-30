@@ -62,7 +62,7 @@ Import specific names directly from a module:
 ```saffron
 import { map, filter, reduce } from "@iter"
 
-var doubled = map([1, 2, 3], fun (x: Number): Number => x * 2)
+var doubled = map([1, 2, 3], fun (x: Int): Int => x * 2)
 ```
 
 ## Using imported modules
@@ -86,18 +86,18 @@ Any `.sf` file is a module. Top-level `fun`, `class`, `enum`, and `var` declarat
 
 ```saffron
 // geometry.sf
-fun circle_area(radius: Number): Number {
+fun circle_area(radius: Float): Float {
     return 3.14159 * radius * radius
 }
 
 class Rectangle {
-    var width: Number
-    var height: Number
-    fun init(w: Number, h: Number) {
+    var width: Float
+    var height: Float
+    fun init(w: Float, h: Float) {
         this.width = w
         this.height = h
     }
-    fun area(): Number {
+    fun area(): Float {
         return this.width * this.height
     }
 }

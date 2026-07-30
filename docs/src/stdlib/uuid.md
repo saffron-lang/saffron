@@ -15,7 +15,7 @@ Generate and parse UUIDs (RFC 4122).
 | `UUID.parse(s)` | `Map<String, String>` | Parse UUID into components |
 | `UUID.nil_uuid()` | `String` | The nil UUID (all zeros) |
 | `UUID.eq(a, b)` | `Bool` | Compare two UUIDs (case-insensitive) |
-| `UUID.version(s)` | `Number` | Extract the version number from a UUID |
+| `UUID.version(s)` | `Int` | Extract the version number from a UUID |
 
 ## Example
 

@@ -22,9 +22,9 @@ Runtime type introspection for the native LLVM compiler.
 import "@reflect" as Reflect
 
 class Point {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) {
+    var x: Float
+    var y: Float
+    fun init(x: Float, y: Float) {
         this.x = x
         this.y = y
     }
@@ -40,5 +40,5 @@ IO.println(Reflect.number_to_string(42))  // "42"
 ## Notes
 
 - `Reflect.fields()` returns a `Map<String, Any>` (not a list of names), where keys are field names and values are current field values
-- The `is` operator can be used for type checks in user code: `42 is Number`, `"hi" is String`, `value is MyClass`
+- The `is` operator can be used for type checks in user code: `42 is Int`, `3.14 is Float`, `"hi" is String`, `value is MyClass`. `is Number` still works but is deprecated along with the `Number` type.
 - These functions are implemented in the compiler's code generator, so they resolve at compile time rather than by runtime lookup

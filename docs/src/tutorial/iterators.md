@@ -70,13 +70,13 @@ import "@iter" as Iter
 
 var numbers = [1, 2, 3, 4, 5]
 
-var doubled = Iter.map(numbers, fun (x: Number): Number => x * 2)
+var doubled = Iter.map(numbers, fun (x: Int): Int => x * 2)
 // [2, 4, 6, 8, 10]
 
-var evens = Iter.filter(numbers, fun (x: Number): Bool => x % 2 == 0)
+var evens = Iter.filter(numbers, fun (x: Int): Bool => x % 2 == 0)
 // [2, 4]
 
-var total = Iter.reduce(numbers, fun (acc: Number, x: Number): Number => acc + x, 0)
+var total = Iter.reduce(numbers, fun (acc: Int, x: Int): Int => acc + x, 0)
 // 15
 ```
 
@@ -89,7 +89,7 @@ Import specific functions directly:
 ```saffron
 import { map, filter, reduce } from "@iter"
 
-var result = filter([1, 2, 3, 4], fun (x: Number): Bool => x > 2)
+var result = filter([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
 // [3, 4]
 ```
 
@@ -102,14 +102,14 @@ import { map, filter } from "@iter"
 
 // Nested
 var result = map(
-    filter([1, 2, 3, 4, 5], fun (x: Number): Bool => x % 2 == 0),
-    fun (x: Number): Number => x * 10
+    filter([1, 2, 3, 4, 5], fun (x: Int): Bool => x % 2 == 0),
+    fun (x: Int): Int => x * 10
 )
 IO.println(result)  // [20, 40]
 
 // Named steps read top-to-bottom
-var evens = filter([1, 2, 3, 4, 5], fun (x: Number): Bool => x % 2 == 0)
-var scaled = map(evens, fun (x: Number): Number => x * 10)
+var evens = filter([1, 2, 3, 4, 5], fun (x: Int): Bool => x % 2 == 0)
+var scaled = map(evens, fun (x: Int): Int => x * 10)
 IO.println(scaled)  // [20, 40]
 ```
 
@@ -119,11 +119,11 @@ Make your own type work with `for-in` by implementing the protocol — an `iter(
 returning an object with `has_next()` and `next()`:
 
 ```saffron
-class NumberRange {
-    var start: Number
-    var end: Number
+class IntRange {
+    var start: Int
+    var end: Int
 
-    fun init(start: Number, end: Number) {
+    fun init(start: Int, end: Int) {
         this.start = start
         this.end = end
     }
@@ -134,10 +134,10 @@ class NumberRange {
 }
 
 class RangeIterator {
-    var current: Number
-    var end: Number
+    var current: Int
+    var end: Int
 
-    fun init(start: Number, end: Number) {
+    fun init(start: Int, end: Int) {
         this.current = start
         this.end = end
     }
@@ -146,23 +146,23 @@ class RangeIterator {
         return this.current < this.end
     }
 
-    fun next(): Number {
+    fun next(): Int {
         var value = this.current
         this.current = this.current + 1
         return value
     }
 }
 
-for (i in NumberRange(0, 5)) {
+for (i in IntRange(0, 5)) {
     IO.println(i)  // 0, 1, 2, 3, 4
 }
 ```
 
-Because `NumberRange` is iterable, it also works with everything in `@iter`:
+Because `IntRange` is iterable, it also works with everything in `@iter`:
 
 ```saffron
 import "@iter" as Iter
 
-var squares = Iter.map(NumberRange(1, 5), fun (n: Number): Number => n * n)
+var squares = Iter.map(IntRange(1, 5), fun (n: Int): Int => n * n)
 // [1, 4, 9, 16]
 ```

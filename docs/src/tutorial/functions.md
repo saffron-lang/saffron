@@ -5,7 +5,7 @@
 Functions are declared with `fun`, with type annotations on parameters and return type:
 
 ```saffron
-fun add(a: Number, b: Number): Number {
+fun add(a: Int, b: Int): Int {
     return a + b
 }
 
@@ -17,7 +17,7 @@ IO.println(add(2, 3))  // 5
 If the return type is omitted, it's inferred from the function body:
 
 ```saffron
-fun double(x: Number) {
+fun double(x: Int) {
     return x * 2
 }
 ```
@@ -27,7 +27,7 @@ fun double(x: Number) {
 Anonymous functions use the `fun` keyword with `=>` for single-expression bodies:
 
 ```saffron
-var double = fun (x: Number): Number => x * 2
+var double = fun (x: Int): Int => x * 2
 IO.println(double(5))  // 10
 ```
 
@@ -44,11 +44,11 @@ var greet = fun (name: String): String {
 Functions are values. Pass them as arguments, return them, store them in variables:
 
 ```saffron
-fun apply(f: (Number) => Number, x: Number): Number {
+fun apply(f: (Int) => Int, x: Int): Int {
     return f(x)
 }
 
-IO.println(apply(fun (n: Number): Number => n * n, 4))  // 16
+IO.println(apply(fun (n: Int): Int => n * n, 4))  // 16
 ```
 
 ## Closures
@@ -56,9 +56,9 @@ IO.println(apply(fun (n: Number): Number => n * n, 4))  // 16
 Functions capture variables from their enclosing scope:
 
 ```saffron
-fun counter(): () => Number {
+fun counter(): () => Int {
     var count = 0
-    return fun (): Number {
+    return fun (): Int {
         count = count + 1
         return count
     }

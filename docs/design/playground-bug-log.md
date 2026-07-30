@@ -28,7 +28,10 @@ mapping as committed and actively regressing `@http/server` route dispatch. That
 mapping was reverted; Bug 27's repro (`var i: Number` as a list index) now prints
 `0 -> a` / `1 -> b` correctly. The durable finding — that `Number` is one surface
 name for two representations and no single lattice entry is right for both uses —
-is #49, which carries the measurements from both directions.
+is #49, which carries the measurements from both directions. The resolution taken
+since is to deprecate `Number` outright in favour of the explicit `Int` and
+`Float`; the entries below are kept as written, so they still spell `Number` where
+the original repros did.
 
 Bugs 24, 28, 29 and 30 are not in `BUGS.md` yet: 24 needs a fresh repro (the
 colliding stdlib name may have moved), and 28–30 are playground/turmeric build

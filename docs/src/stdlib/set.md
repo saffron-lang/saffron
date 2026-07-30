@@ -22,7 +22,7 @@ s.add(1).add(2).add(3)
 | `s.add(value)` | `Set` | Add an element (chainable) |
 | `s.remove(value)` | `Set` | Remove an element (chainable) |
 | `s.has(value)` | `Bool` | Check membership |
-| `s.size()` | `Number` | Number of elements |
+| `s.size()` | `Int` | Number of elements |
 | `s.values()` | `List` | All values as a list |
 
 ## Creating from a list

@@ -55,7 +55,7 @@ This pattern is foundational for:
 
 ## 2. What "Reified Types" Means for Saffron
 
-In many languages, generic type parameters are erased at runtime (Java generics, for example). Saffron already has partial type reification — classes are first-class values, `42 is Number` works, and `Reflect.type_of(x)` returns a string. But the current system lacks:
+In many languages, generic type parameters are erased at runtime (Java generics, for example). Saffron already has partial type reification — classes are first-class values, `42 is Int` works, and `Reflect.type_of(x)` returns a string. But the current system lacks:
 
 1. **Structured field metadata** — knowing that class `Manifest` has field `package` of type `PackageConfig`
 2. **Generic type parameters at runtime** — knowing that `List<String>` means "list where elements are strings"
@@ -86,7 +86,7 @@ For each class, the following metadata must be available:
 
 ```saffron
 enum TypeTag {
-    Primitive,       // String, Number, Bool, Nil
+    Primitive,       // String, Int, Float, Bool, Nil
     Class,           // user-defined class — recurse
     List,            // List<T> — check element type
     Map,             // Map<K, V> — check key/value types
@@ -102,7 +102,7 @@ enum TypeTag {
 class TypeDescriptor {
     var class_name: String
     var fields: List<FieldDescriptor>
-    var constructor_arity: Number
+    var constructor_arity: Int
 }
 
 class FieldDescriptor {
@@ -192,7 +192,7 @@ var user: User = JSON.deserialize(User, "{\"name\": \"alice\", \"age\": 30}")
 var config = TOML.deserialize(Config, "app.toml", {
     "strict": false,                    // ignore unknown keys (default: true)
     "rename": {"pkg": "package"},       // remap source keys to field names
-    "coerce": true                      // attempt type coercion (Number -> String, etc.)
+    "coerce": true                      // attempt type coercion (Int -> String, etc.)
 })
 ```
 
@@ -391,7 +391,7 @@ TOML.deserialize(Manifest, "incomplete.toml")
 
 // Type mismatch
 TOML.deserialize(Config, "bad.toml")
-// throws: "TOML deserialize: field 'port' on Config expects Number, got String (value: \"8080\") at path 'port'"
+// throws: "TOML deserialize: field 'port' on Config expects Int, got String (value: \"8080\") at path 'port'"
 
 // Unknown key in strict mode
 TOML.deserialize(Config, "extra.toml")
@@ -399,11 +399,11 @@ TOML.deserialize(Config, "extra.toml")
 
 // Nested error with path
 TOML.deserialize(Manifest, "nested_bad.toml")
-// throws: "TOML deserialize: field 'version' on PackageConfig expects String, got Number at path 'package.version'"
+// throws: "TOML deserialize: field 'version' on PackageConfig expects String, got Int at path 'package.version'"
 
 // Array element type mismatch
 TOML.deserialize(Config, "bad_array.toml")
-// throws: "TOML deserialize: element 2 of field 'tags' on Config expects String, got Number at path 'tags[2]'"
+// throws: "TOML deserialize: element 2 of field 'tags' on Config expects String, got Int at path 'tags[2]'"
 ```
 
 ### Error Accumulation Mode
@@ -444,7 +444,7 @@ class Config {
     var version: String
     
     @default(8080)
-    var port: Number
+    var port: Int
     
     @default([])
     var tags: List<String>
@@ -710,7 +710,7 @@ The TOML/JSON modules parse to `Map<String, Any>` first (which they already do),
 **Changes**:
 - New file `src/lib/serde.sf` with `from_map(Type, Map<String, Any>): T`
 - Walks type descriptor fields, extracts values from map, validates types
-- Handles primitives (String, Number, Bool), lists, maps, nested classes
+- Handles primitives (String, Int, Float, Bool), lists, maps, nested classes
 - Produces clear error messages with field paths
 
 **Estimated effort**: 3-4 days
@@ -777,7 +777,7 @@ The parser already handles `@name` and `@name("arg")` on functions and classes. 
 
 ### How deep should generic type info go?
 
-For `List<List<Map<String, Number>>>`, the type descriptor string is sufficient for the runtime deserializer to parse and validate. The string format `"List<List<Map<String, Number>>>"` can be parsed with the same `split_respecting_generics` utility used in codegen.
+For `List<List<Map<String, Int>>>`, the type descriptor string is sufficient for the runtime deserializer to parse and validate. The string format `"List<List<Map<String, Int>>>"` can be parsed with the same `split_respecting_generics` utility used in codegen.
 
 **Depth limit**: No artificial limit. The type string is finite and the recursion depth matches the nesting depth of the source data.
 
@@ -845,8 +845,8 @@ Provide `@construct` class decorator to opt into calling `init` instead:
 ```saffron
 @construct
 class ValidatedConfig {
-    var port: Number
-    fun init(port: Number) {
+    var port: Int
+    fun init(port: Int) {
         if (port < 1 or port > 65535) { throw "invalid port" }
         this.port = port
     }

@@ -30,7 +30,7 @@ var result = t.await()
 ```saffron
 import "@async" as Async
 
-fun fetch(id: Number): String {
+fun fetch(id: Int): String {
     Async.sleep(0.1)
     return "result_${id}"
 }
