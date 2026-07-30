@@ -1524,7 +1524,11 @@
     }
     if (method == "getResult") {
         var gr_obj_name: String = this.get_variable_name(object)
-        var gr_result_type: AST.Type = AST.Type.IntType
+        // Unknown, not Int (BUGS #32). get_variable_name only answers for a bare
+        // Variable, so `tasks[i].getResult()` yields "" and we learn nothing about
+        // the result type. Any routes such values through the runtime-dispatching
+        // helpers (__any_length etc.); Int sent a String straight to __list_length.
+        var gr_result_type: AST.Type = AST.Type.AnyType
         if (gr_obj_name.length() > 0 and this.typed_vars.has(gr_obj_name)) {
             gr_result_type = this.typed_vars.get(gr_obj_name)
         }
@@ -1539,7 +1543,8 @@
     if (method == "await" and !this.is_coroutine) {
         // Determine the task's result type from the task variable's stored type
         var await_obj_name: String = this.get_variable_name(object)
-        var await_result_type: AST.Type = AST.Type.IntType
+        // Falls back to Any, not Int — see the note on getResult above (BUGS #32).
+        var await_result_type: AST.Type = AST.Type.AnyType
         if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
             await_result_type = this.typed_vars.get(await_obj_name)
         }
@@ -1561,7 +1566,8 @@
     if (method == "await" and this.is_coroutine) {
         // Determine the task's result type from the task variable's stored type
         var await_obj_name: String = this.get_variable_name(object)
-        var await_result_type: AST.Type = AST.Type.IntType
+        // Falls back to Any, not Int — see the note on getResult above (BUGS #32).
+        var await_result_type: AST.Type = AST.Type.AnyType
         if (await_obj_name.length() > 0 and this.typed_vars.has(await_obj_name)) {
             await_result_type = this.typed_vars.get(await_obj_name)
         }
