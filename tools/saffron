@@ -277,7 +277,15 @@ build_project() {
         local runtime_ll="$TMPDIR/runtime.ll"
         "$SAFFRONC" --target wasm32 "$RUNTIME_SRC" "$runtime_ll" 2>/dev/null || true
         # Discover dispatch/callback symbols to export (module-prefixed names)
-        local EXPORT_FLAGS="-Wl,--no-entry -Wl,--export=_start -Wl,--export=malloc -Wl,--export=memory"
+        # No --export=memory: memory is not a linker symbol, so wasm-ld errors on it
+        # ("symbol exported via --export not found: memory"). It exports the memory
+        # automatically anyway unless --import-memory is passed. This error was
+        # present before and masked by --allow-undefined.
+        local EXPORT_FLAGS="-Wl,--no-entry -Wl,--export=_start -Wl,--export=malloc"
+        # __sched_pump drives the cooperative scheduler from the host event loop.
+        # Exported if-defined so non-async programs, which never pull in the
+        # scheduler, still link.
+        EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=__sched_pump"
         # Scan the compiled IR for functions that need JS-side dispatch
         for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__dispatch_[a-zA-Z0-9_]+' "$ll_path" | sed 's/define i64 @//'); do
             EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
@@ -285,10 +293,16 @@ build_project() {
         for sym in $(grep -oE 'define i64 @[a-zA-Z0-9_]*__on_[a-zA-Z0-9_]+' "$ll_path" | sed 's/define i64 @//'); do
             EXPORT_FLAGS="$EXPORT_FLAGS -Wl,--export-if-defined=$sym"
         done
+        # --import-undefined, not --allow-undefined. Both let the js_* imports
+        # through, but --allow-undefined silently accepts EVERY missing symbol: it
+        # was hiding the fact that nothing scheduler-related was linked, producing a
+        # 441-byte module that looked like a successful build. --import-undefined
+        # turns genuinely-missing internals back into link errors while still
+        # importing the js_* functions the glue supplies.
         "$WASM_CLANG" --target=wasm32-unknown-unknown -O2 -w --no-standard-libraries \
             -fuse-ld="$WASM_LD_PATH" \
             $EXPORT_FLAGS \
-            -Wl,--allow-multiple-definition -Wl,--allow-undefined \
+            -Wl,--allow-multiple-definition -Wl,--import-undefined \
             -Wl,--initial-memory=4194304 -Wl,--max-memory=16777216 \
             -o "$output" "$WASM_BASE" "$runtime_ll" "$ll_path" || {
             echo "saffron: wasm32 linking failed" >&2

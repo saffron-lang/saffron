@@ -26,6 +26,17 @@ target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 ; Runtime global: SLOT_SIZE is always 8 (sizeof i64).
 @__g_SLOT_SIZE = global i64 8
 
+; --- Cooperative scheduler state ---
+; The native build gets these from base_nanbox.ll plus async_native.c. WASM has
+; no async_native.c (it is compiled for the host), so the equivalent lives here
+; in IR. Nothing in the scheduler needs threads: LLVM coroutines are an IR-level
+; transformation (CoroSplit turns each coroutine into a state machine with a
+; heap-allocated frame before instruction selection), so they lower to wasm32
+; unchanged. What was missing was only this plumbing.
+@__yield_reason = global i64 0
+@__yield_arg = global i64 0
+@__task_result = global i64 0
+
 ; --- JS Imports ---
 ; These are provided by the JS glue code via WebAssembly.imports
 
@@ -591,8 +602,8 @@ entry:
 }
 
 ; --- exit ---
-
-declare void @__builtin_trap()
+; __builtin_trap is defined further down (it lowers to wasm's own trap
+; instruction and needs no host import).
 
 define void @exit(i32 %code) {
 entry:
@@ -1498,11 +1509,275 @@ ret_zero:
 }
 
 ; =============================================================================
+; Cooperative scheduler support
+;
+; Ports the ~10 __sched_* helpers from async_native.c to wasm32 IR. They are all
+; trivial accessors plus a fixed-size result table; the only real difference from
+; the C original is pointer width.
+;
+; POINTER WIDTH: a coroutine handle travels through Saffron as an i64 (every
+; value is i64), but a wasm32 frame pointer is 32-bit. The codegen produces the
+; handle with `ptrtoint ptr %frame to i64`, which zero-extends, so the top 32
+; bits are always clear and truncating back is lossless. Each helper truncates
+; explicitly rather than relying on inttoptr's implicit narrowing, so the
+; intent is visible at the point it matters.
+; =============================================================================
+
+define i64 @__sched_get_yield_reason() {
+entry:
+  %v = load i64, i64* @__yield_reason
+  ret i64 %v
+}
+
+define i64 @__sched_get_yield_arg() {
+entry:
+  %v = load i64, i64* @__yield_arg
+  ret i64 %v
+}
+
+define i64 @__sched_get_task_result() {
+entry:
+  %v = load i64, i64* @__task_result
+  ret i64 %v
+}
+
+define void @__sched_reset_yield() {
+entry:
+  store i64 0, i64* @__yield_reason
+  store i64 0, i64* @__yield_arg
+  ret void
+}
+
+; --- Per-task result storage ---
+; Fixed 256-entry (handle, value) table, matching async_native.c. Linear scan
+; from the newest entry backwards so a re-used handle resolves to its latest
+; result.
+@__task_res_handles = global [256 x i64] zeroinitializer
+@__task_res_values = global [256 x i64] zeroinitializer
+@__task_res_count = global i32 0
+
+define void @__sched_store_result(i64 %handle, i64 %value) {
+entry:
+  %n = load i32, i32* @__task_res_count
+  %full = icmp sge i32 %n, 256
+  br i1 %full, label %done, label %store
+store:
+  %hp = getelementptr [256 x i64], [256 x i64]* @__task_res_handles, i32 0, i32 %n
+  store i64 %handle, i64* %hp
+  %vp = getelementptr [256 x i64], [256 x i64]* @__task_res_values, i32 0, i32 %n
+  store i64 %value, i64* %vp
+  %n1 = add i32 %n, 1
+  store i32 %n1, i32* @__task_res_count
+  br label %done
+done:
+  ret void
+}
+
+define i64 @__sched_get_stored_result(i64 %handle) {
+entry:
+  %n = load i32, i32* @__task_res_count
+  %i0 = sub i32 %n, 1
+  br label %loop
+loop:
+  %i = phi i32 [ %i0, %entry ], [ %inext, %next ]
+  %in_range = icmp sge i32 %i, 0
+  br i1 %in_range, label %check, label %not_found
+check:
+  %hp = getelementptr [256 x i64], [256 x i64]* @__task_res_handles, i32 0, i32 %i
+  %h = load i64, i64* %hp
+  %match = icmp eq i64 %h, %handle
+  br i1 %match, label %found, label %next
+found:
+  %vp = getelementptr [256 x i64], [256 x i64]* @__task_res_values, i32 0, i32 %i
+  %v = load i64, i64* %vp
+  ret i64 %v
+next:
+  %inext = sub i32 %i, 1
+  br label %loop
+not_found:
+  ret i64 0
+}
+
+define i64 @__sched_has_stored_result(i64 %handle) {
+entry:
+  %n = load i32, i32* @__task_res_count
+  %i0 = sub i32 %n, 1
+  br label %loop
+loop:
+  %i = phi i32 [ %i0, %entry ], [ %inext, %next ]
+  %in_range = icmp sge i32 %i, 0
+  br i1 %in_range, label %check, label %not_found
+check:
+  %hp = getelementptr [256 x i64], [256 x i64]* @__task_res_handles, i32 0, i32 %i
+  %h = load i64, i64* %hp
+  %match = icmp eq i64 %h, %handle
+  br i1 %match, label %found, label %next
+found:
+  ret i64 1
+next:
+  %inext = sub i32 %i, 1
+  br label %loop
+not_found:
+  ret i64 0
+}
+
+; --- Coroutine frame access ---
+; After CoroSplit the frame layout is:
+;   offset 0: resume function pointer
+;   offset 4: destroy function pointer   (offset 8 on 64-bit hosts)
+; A null resume pointer means the coroutine has run to completion, which is what
+; llvm.coro.done tests.
+;
+; Note the offsets differ from async_native.c: that file indexes a
+; coro_fn_t array, which is 8-byte-strided on the host and 4-byte-strided here.
+
+define void @__sched_coro_resume(i64 %hdl) {
+entry:
+  %h32 = trunc i64 %hdl to i32
+  %null = icmp eq i32 %h32, 0
+  br i1 %null, label %done, label %load_fn
+load_fn:
+  %frame = inttoptr i32 %h32 to ptr
+  %fn = load ptr, ptr %frame
+  %fn_null = icmp eq ptr %fn, null
+  br i1 %fn_null, label %done, label %call_fn
+call_fn:
+  call void %fn(ptr %frame)
+  br label %done
+done:
+  ret void
+}
+
+define i64 @__sched_coro_done(i64 %hdl) {
+entry:
+  %h32 = trunc i64 %hdl to i32
+  %null = icmp eq i32 %h32, 0
+  br i1 %null, label %is_done, label %load_fn
+load_fn:
+  %frame = inttoptr i32 %h32 to ptr
+  %fn = load ptr, ptr %frame
+  %fn_null = icmp eq ptr %fn, null
+  br i1 %fn_null, label %is_done, label %not_done
+is_done:
+  ret i64 1
+not_done:
+  ret i64 0
+}
+
+define void @__sched_coro_destroy(i64 %hdl) {
+entry:
+  %h32 = trunc i64 %hdl to i32
+  %null = icmp eq i32 %h32, 0
+  br i1 %null, label %done, label %load_fn
+load_fn:
+  %frame = inttoptr i32 %h32 to ptr
+  ; destroy pointer sits one pointer-width in: 4 bytes on wasm32.
+  %dp = getelementptr i8, ptr %frame, i32 4
+  %fn = load ptr, ptr %dp
+  %fn_null = icmp eq ptr %fn, null
+  br i1 %fn_null, label %done, label %call_fn
+call_fn:
+  call void %fn(ptr %frame)
+  br label %done
+done:
+  ret void
+}
+
+; --- Host-only helpers that the wasm build still references ---
+
+; The native runtime interns strings so identical literals share one allocation.
+; Returning the input unchanged is safe here: @__string_eq (above) compares
+; contents with a real strcmp rather than relying on pointer identity, so
+; skipping the intern table costs memory, never correctness.
+define i64 @__string_intern(i64 %str) {
+entry:
+  ret i64 %str
+}
+
+; Native builds print the source location alongside a runtime error. There is no
+; stderr in a bare wasm module, so this is a no-op; errors surface through the JS
+; glue's js_log_str instead.
+define void @__print_debug_location() {
+entry:
+  ret void
+}
+
+; wasm has a real trap instruction, so this needs no host support. It was
+; previously only declared, which left it undefined at link time.
+define void @__builtin_trap() {
+entry:
+  call void @llvm.trap()
+  unreachable
+}
+
+declare void @llvm.trap()
+
+; --- Monotonic clock ---
+; Supplied by the JS glue (performance.now() / 1000). Declared, not defined:
+; there is no clock_gettime in a bare wasm32 module.
+declare double @js_time_now()
+
+define double @sf_time_now() {
+entry:
+  %t = call double @js_time_now()
+  ret double %t
+}
+
+; --- Socket readiness ---
+; There are no file descriptors in a browser. The scheduler calls this when it
+; has IO waiters; returning 0 (never ready) means an fd-parked task stays parked.
+; Browser IO arrives through JS callbacks instead — see the yield-reason 6 path
+; in the scheduler pump.
+define i64 @sf_tcp_poll(i64 %fd, i64 %events, i64 %timeout_ms) {
+entry:
+  ret i64 0
+}
+
+; =============================================================================
+; Scheduler pump — the JS interop entry point
+;
+; The native driver spins `while (scheduler_tick() == 1) {}`, which would freeze
+; a browser tab. But scheduler_tick() was written to be called one step at a
+; time: it returns 1 while work remains, 0 when the queues are drained. So the
+; browser's own event loop can drive it:
+;
+;   function pump() {
+;     if (wasm.exports.__sched_pump() === 1) queueMicrotask(pump)
+;   }
+;
+; That makes the event loop the scheduler loop. Exported here so the JS glue
+; does not need to know the module-prefixed name of the Saffron function.
+; =============================================================================
+
+; Weak, so a program that never imports "@async" still links: the scheduler
+; function simply is not present, the reference resolves to null, and the pump
+; reports "no work". A plain `declare` would make every non-async WASM build fail
+; to link on a symbol it has no reason to provide.
+declare extern_weak i64 @stdlib_scheduler_scheduler_tick()
+
+define i64 @__sched_pump() {
+entry:
+  %absent = icmp eq ptr @stdlib_scheduler_scheduler_tick, null
+  br i1 %absent, label %no_sched, label %tick
+tick:
+  %more = call i64 @stdlib_scheduler_scheduler_tick()
+  ret i64 %more
+no_sched:
+  ret i64 0
+}
+
+; =============================================================================
 ; Entry point wrapper
 ; WASM entry point -- initializes heap, then calls __saffron_entry.
 ; =============================================================================
 
-declare i64 @__saffron_entry()
+; Calls __saffron_boot, not __saffron_entry directly. Once a program contains a
+; suspend point its entry point is emitted as `ptr @__saffron_entry()
+; presplitcoroutine` — it returns a coroutine frame, not a value — and calling it
+; through an `i64` signature traps. The codegen-emitted boot shim has a stable
+; `i64 ()` signature either way and, for the coroutine case, enqueues the frame on
+; the scheduler rather than treating it as a result.
+declare i64 @__saffron_boot()
 
 define void @_start() {
 entry:
@@ -1513,6 +1788,6 @@ entry:
   %aligned = add i32 %hb_ptr, 7
   %heap_start = and i32 %aligned, -8
   store i32 %heap_start, i32* @__heap_ptr
-  call i64 @__saffron_entry()
+  call i64 @__saffron_boot()
   ret void
 }
