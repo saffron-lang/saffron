@@ -440,6 +440,47 @@
         return parts[0]
     }
 
+    // Fold one map-literal entry's key/value types into the receiver's Map type.
+    //
+    // Called once per desugared .set() of a map literal. Each call merges the
+    // new entry against what the earlier entries established: agreement keeps
+    // the precise type, disagreement widens that side to Any. A side already
+    // widened to Any stays there.
+    //
+    // Restricted to the parser's map-literal temporary. That is exactly the
+    // scope of the bug, and it means an explicit `var m: Map<String, Any> = ...`
+    // is never touched: a user-named variable keeps the type its annotation
+    // gave it, rather than being silently narrowed by its own initializer.
+    fun refine_map_entry_type(name: String, key_type: String, val_type: String) {
+        if (!name.starts_with("__map")) { return }
+        var current: String = this.get_var_type_str(name)
+        if (current.length() == 0) { return }
+        if (!(current == "Map" or current.starts_with("Map<"))) { return }
+        var known_k: String = this.get_map_key_type(current)
+        var known_v: String = this.get_map_value_type(current)
+        // Seed from nothing on the first entry. A bare "Map" annotation resolves
+        // through str_to_type to Map<String, Any>, so treating that String as an
+        // observation would make {1: "x"} merge Int against String and widen the
+        // key back to Any — learning nothing. The literal's own entries are the
+        // only evidence here, so start both sides unknown.
+        if (current == "Map") {
+            known_k = "Any"
+            known_v = "Any"
+        }
+        var next_k: String = this.merge_entry_type(known_k, key_type)
+        var next_v: String = this.merge_entry_type(known_v, val_type)
+        this.typed_vars.set(name, this.make_generic_type("Map", [this.str_to_type(next_k), this.str_to_type(next_v)]))
+    }
+
+    // Merge one entry's observed type into the accumulated type for that side.
+    // "Any" on either side is the unknown/widened state, so it absorbs.
+    fun merge_entry_type(known: String, observed: String): String {
+        if (observed.length() == 0 or observed == "Any" or observed == "Nil") { return "Any" }
+        if (known == "Any") { return observed }
+        if (known == observed) { return known }
+        return "Any"
+    }
+
     // Get the type string for a variable from typed_vars (the single source of truth).
     // Returns "" if the variable is not registered.
     fun get_var_type_str(name: String): String {

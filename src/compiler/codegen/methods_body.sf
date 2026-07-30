@@ -2022,12 +2022,28 @@
         // a second `set()` on a Map<Int, _> dereferenced the number itself and
         // segfaulted. __map_key_cmp reads the tag; it needs the tag intact.
         var key_raw_s: String = this.gen_arg_value(args[0])
+        var key_entry_type: String = this.type_to_string(this.last_type)
         var val: String = this.gen_arg_value(args[1])
+        var val_entry_type: String = this.type_to_string(this.last_type)
         var discard: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val))
         } else {
             this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val + ")")
+        }
+        // Recover the K and V of a map *literal* from the entries themselves.
+        //
+        // The parser desugars {"a": 1} into a VarDecl of a temporary annotated
+        // just "Map", plus one .set() per entry. Nothing ever looked at the
+        // entries, so every literal came out Map<String, Any> — the value type
+        // erased to Any even when every entry agreed. gen_var_decl_with_name
+        // re-reads last_type after the initializer runs, so tightening
+        // typed_vars here is what reaches the enclosing `var`.
+        //
+        // Widen to Any on disagreement rather than guessing from entry 0 (the
+        // mistake gen_list_lit still makes).
+        if (obj_name.length() > 0) {
+            this.refine_map_entry_type(obj_name, key_entry_type, val_entry_type)
         }
         this.last_type = AST.Type.NilType
         return "0"
