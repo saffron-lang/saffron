@@ -8,8 +8,8 @@
 //! What this does NOT do: it does not sandbox the *compiler*. See README.md.
 
 import "@process" as Process
-import "@uuid" as UUID
 import "@os" as OS
+import "time" as Time
 
 /// Largest program we will accept, in bytes. Keeps a pathological input from
 /// turning into an unbounded compile.
@@ -46,14 +46,42 @@ fun _find_timeout(): String {
     return ""
 }
 
-/// Repo root, so we can find tools/saffron regardless of the server's cwd.
+/// Repo root, as an ABSOLUTE path, so we can find tools/saffron regardless of cwd.
+///
+/// Absolute is not a nicety here: the build runs with the per-request work
+/// directory as its cwd (so stray compiler output lands somewhere we are about to
+/// delete), which means a relative ".." resolves against /tmp/saffron_playground_*
+/// and the driver is simply not found.
 fun _repo_root(): String {
     var from_env: String = OS.env("SAFFRON_ROOT")
     if (from_env.length() > 0) {
         return from_env
     }
-    // The service is started from playground/, so the repo root is one level up.
+    // The service is started from playground/, so the repo root is one level up —
+    // resolved to an absolute path before any cwd change can invalidate it.
+    var here: String = Process.run("pwd").stdout.trim()
+    if (here.length() > 0) {
+        if (here.ends_with("/playground")) {
+            return here.slice(0, here.length() - 11)
+        }
+        return here
+    }
     return ".."
+}
+
+/// Monotonic part of the work-directory name.
+var _request_counter: Int = 0
+
+/// A token unique to this request.
+///
+/// The counter alone would collide across restarts (two servers, or a restart
+/// while an old directory lingers); the clock alone would collide between two
+/// requests landing in the same microsecond. Together they are good enough, and
+/// unlike UUID.v4() they are actually distinct — see the note at the call site.
+fun _unique_token(): String {
+    _request_counter = _request_counter + 1
+    var stamp: Int = (Time.now() * 1000000).floor()
+    return stamp.to_string() + "_" + _request_counter.to_string()
 }
 
 /// Reject source that is too large before spending a process on it.
@@ -89,10 +117,14 @@ fun compile_to_wasm(source: String): CompileResult {
             " bytes (limit " + MAX_SOURCE_BYTES.to_string() + ")")
     }
 
-    // Fresh directory per request. The name is random so two concurrent compiles
-    // can never collide on main.sf, and so a previous request's artifacts are never
-    // visible to the next one.
-    var work_dir: String = "/tmp/saffron_playground_" + UUID.v4()
+    // Fresh directory per request, so two concurrent compiles can never collide
+    // on main.sf and a previous request's artifacts are never visible to the next.
+    //
+    // Deliberately NOT UUID.v4(): it returns the all-zero UUID on every call (see
+    // bug 17 in /tmp/playground_bugs.md — it indexes a hex-digit list with a Float,
+    // which always reads element 0). Using it here would have given every request
+    // the *same* directory. A counter plus the clock is uglier but actually unique.
+    var work_dir: String = "/tmp/saffron_playground_" + _unique_token()
     IO.mkdir(work_dir)
 
     var src_path: String = work_dir + "/main.sf"
