@@ -867,6 +867,18 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
                     gen.func_defaults.set(df_emit, df_defaults)
                     gen.func_param_count.set(df_emit, df_params.length())
                     gen.func_param_names.set(df_emit, df_pnames)
+                    // Return type too, or a call compiled before the callee's own
+                    // gen_function runs falls back to Int and misdispatches every
+                    // method on the result (BUGS #33). gen_function still sets this,
+                    // but only when it reaches the declaration — too late for a
+                    // caller that appears earlier in the same module.
+                    var df_ret: String = gen.get_fun_ret(df_stmts[df_si])
+                    if (df_ret.length() > 0) {
+                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
+                        if (df_prefix.length() > 0) {
+                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
+                        }
+                    }
                 }
             } else if (df_kind == "class") {
                 var df_cname: String = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
@@ -1506,6 +1518,18 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                     gen.func_defaults.set(df_emit, df_defaults)
                     gen.func_param_count.set(df_emit, df_params.length())
                     gen.func_param_names.set(df_emit, df_pnames)
+                    // Return type too, or a call compiled before the callee's own
+                    // gen_function runs falls back to Int and misdispatches every
+                    // method on the result (BUGS #33). gen_function still sets this,
+                    // but only when it reaches the declaration — too late for a
+                    // caller that appears earlier in the same module.
+                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
+                    if (df_ret.length() > 0) {
+                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
+                        if (df_prefix.length() > 0) {
+                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
+                        }
+                    }
                 }
             } else if (df_kind == "class") {
                 var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
@@ -2189,6 +2213,18 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                     gen.func_defaults.set(df_emit, df_defaults)
                     gen.func_param_count.set(df_emit, df_params.length())
                     gen.func_param_names.set(df_emit, df_pnames)
+                    // Return type too, or a call compiled before the callee's own
+                    // gen_function runs falls back to Int and misdispatches every
+                    // method on the result (BUGS #33). gen_function still sets this,
+                    // but only when it reaches the declaration — too late for a
+                    // caller that appears earlier in the same module.
+                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
+                    if (df_ret.length() > 0) {
+                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
+                        if (df_prefix.length() > 0) {
+                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
+                        }
+                    }
                 }
             } else if (df_kind == "class") {
                 var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n

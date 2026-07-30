@@ -248,50 +248,6 @@ is what would let codegen tell the two cases apart.
 `"${x}".to_upper()` silently produce nonsense rather than failing.
 
 
-### 33. `to_lower()` on a function's return value produces a null receiver
-
-**Reproduction** — `src/lib/http/client.sf:352`, reduced:
-
-```saffron
-var transfer_enc = _extract_header_value(header_section, "transfer-encoding")
-if (transfer_enc.to_lower().contains("chunked")) { ... }
-```
-
-**Actual:** segfault in `_platform_strstr`. The emitted IR skips the
-`rt_str_to_lower` call entirely and passes the literal `0` as the receiver:
-
-```llvm
-  %t139 = call i64 @stdlib_http_client__extract_header_value(...)
-  store i64 %t139, i64* %transfer_enc
-  %t139 = load i64, i64* %transfer_enc
-  %t141 = call i8* @__val_untag_ptr(i64 0)      ; <-- receiver is 0; %t140 absent
-  %t145 = call i8* @strstr(i8* %t141, i8* %t144)
-```
-
-`%t140` is never defined — the `to_lower` branch produced no value at all, so
-`contains` untagged `0` and `strstr` dereferenced null.
-
-**Root cause (partial):** the String-method branch at `methods_body.sf:1793`
-gates on `__str_type_match` (`obj_type == "String" or obj_type == "Any"`). Here
-`obj_type` is neither, so no branch emits anything and dispatch falls through
-returning an empty/zero value rather than failing loudly. Why `obj_type` resolves
-to a third thing for a cross-module `String`-returning function is not yet
-pinned down; `func_ret_types` registration (`stmts.sf:41`, `output_body.sf:10`)
-is the place to look.
-
-**Not reproducible in isolation.** Direct chains (`s.to_lower().contains(...)`),
-function-returned strings, cross-module returns, and the same chain inside a
-coroutine all work. Only the real `http/client.sf` path fails, so something
-about its combination of conditions is required.
-
-**Impact:** `test_httpx` segfaults before its first `println`. Blocks all of
-`@http/client`, hence every HTTPS/HTTP consumer. Independent of #32 — the
-baseline before #32's fix crashes identically here, and the pre-#24 tree only
-avoided it by failing at connect first.
-
-**Related:** the silent fall-through is the real hazard. A dispatch path that
-matches no branch should emit a compile error, not a zero.
-
 ### 34. `bootstrap.sh` never builds a gen4, contradicting the promotion criteria
 
 `CLAUDE.md` states, as a promotion criterion, "Gen3 can compile itself
@@ -339,6 +295,52 @@ before an `await` in a loop body is silently duplicated, which is worse.
 
 ## Fixed
 
+- ~~#33: `to_lower()` on a function's return value produced a null receiver~~ —
+  Fixed. Filed as a String-dispatch bug; it was actually a declaration-order bug
+  in return-type registration, one call frame earlier.
+
+  The symptom was a segfault in `_platform_strstr` from `client.sf:352`
+  (`transfer_enc.to_lower().contains("chunked")`). The IR skipped the
+  `rt_str_to_lower` call entirely and passed a literal `0` as the receiver —
+  `%t140` was allocated but never defined, the tell-tale of a `fresh_local()`
+  whose branch emitted nothing.
+
+  **Root cause:** `codegen.sf`'s pre-scan registers `func_defaults`,
+  `func_param_count` and `func_param_names` for every function in every module
+  before any IR generation — but *not* `func_ret_types`. That was left to
+  `gen_function` (`output_body.sf:10`), which only runs when compilation reaches
+  the declaration. `_recv_response` is defined *above* `_extract_header_value` in
+  the same file, so at the call site the table had no entry and `last_type` fell
+  back to `IntType` — the same dishonest "unknown means Int" fallback as #32.
+  `transfer_enc` was then typed `Int`, `to_lower` matched neither the `String`
+  nor the `Any` branch, and dispatch fell through returning nothing.
+
+  Instrumenting the compiler was what settled it: printing `obj_type` at the
+  String-method gate showed `objtype=[Int] objname=[transfer_enc]` among a dozen
+  correct `[String]` dispatches, and printing registration order showed
+  `_recv_response` compiled before `_extract_header_value` registered.
+
+  The fix adds return types to the pre-scan, in all **three** copies of that loop
+  (`generate_with_modules`, `generate_with_modules_flat_opts`, and
+  `..._flat_opts3` — the two `flat` variants iterate `all_stmts`, not
+  `df_stmts`, which the first attempt got wrong and the build caught).
+
+  **Why it resisted isolation:** direct chains, function-returned strings,
+  cross-module returns and the same chain inside a coroutine all worked, because
+  each happened to have the callee registered first. Only same-module
+  caller-above-callee ordering triggers it.
+
+  `test_httpx` now passes (139 → 0) and full-suite exit codes are otherwise
+  identical. Verified against a local server, since `httpbin.org` — the test's
+  target — currently returns 503: `Status: 200` and a body length of exactly
+  5000 bytes for a 5000-byte file, both sequentially and through two parallel
+  `Task.spawn`ed requests. HTTPS reaches a real handshake (the 503 arrives over
+  TLS).
+
+  **Note:** the residual hazard is the silent fall-through, not this instance. A
+  builtin-dispatch path that matches no branch returns a zero-valued register
+  rather than failing the compile, so the next type-inference gap of this shape
+  will also surface as a null-pointer segfault far from its cause.
 - ~~#32: `__list_length` receives a tagged list pointer and segfaults~~ — Fixed,
   and the filed diagnosis was wrong in both its title and its root cause.
 
