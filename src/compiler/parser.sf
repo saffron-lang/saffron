@@ -1455,6 +1455,26 @@ class Parser {
             return this.parse_tuple_destructure()
         }
         var name: String = this.expect_ident()
+        // Qualified variant pattern: `let Shape.Circle(r) = ...`. Unqualified
+        // `let Circle(r) = ...` already worked, but writing the enum name — the
+        // natural thing to do, and how the value itself is constructed — was a
+        // parse error ("expected '=' but found '.'"). Only the variant name is
+        // kept: patterns resolve by variant, and gen_match /
+        // find_enum_for_variant recover the enum from it.
+        // A loop, not a single step, so a module-qualified enum
+        // (`let Shapes.Shape.Circle(r) = ...`) also parses.
+        var was_qualified: Bool = false
+        while (this.match_kind_check(".")) {
+            this.advance()
+            name = this.expect_ident()
+            was_qualified = true
+        }
+        // A dotted name is only meaningful as a variant pattern. Anything else
+        // (`var x.y = 5`) is malformed, and saying so beats silently declaring
+        // `y`.
+        if (was_qualified and !this.match_kind_check("(")) {
+            this.parse_error("qualified name is only valid in a destructuring pattern, e.g. let Shape.Circle(r) = ...")
+        }
         // Variant pattern: let Some(x) = expr
         if (this.match_kind_check("(")) {
             this.advance()
