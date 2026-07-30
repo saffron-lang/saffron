@@ -154,6 +154,25 @@
                 vtype = post_type
             }
         }
+        // A nil initialiser says nothing about the variable's type, so do not let it
+        // narrow to "Nil".
+        //
+        // `var parsed: Any = nil` (and the inferred `var x = nil`) used to type the
+        // variable as Nil for the rest of its life. Nothing widened it on
+        // reassignment, so after `parsed = JSON.parse(body)` the variable still
+        // claimed to be Nil — and the `== nil` comparison in gen_binary keys off the
+        // *static* type, emitting `__val_is_nil` against the nil literal rather than
+        // against the variable. The result was a comparison that was unconditionally
+        // true: `parsed == nil` reported nil for a live object, and the playground's
+        // /api/compile rejected every request as "missing 'source' field".
+        //
+        // "Any" is the honest type here — it routes through the runtime dispatch
+        // helpers, which inspect the actual tag. This is I2 in
+        // docs/design/compiler-rewrite.md ("Unknown is distinct"), applied to the one
+        // case where the current tree spells unknown as a concrete type.
+        if (vtype == "Nil") {
+            vtype = "Any"
+        }
         // Resolve generic type parameters from lambda argument return types.
         // e.g. var x = computed(fun (): String => ...) infers Computed<String> not Computed<T>
         if (vtype.contains("<") and vtype.contains(">")) {
