@@ -244,6 +244,65 @@ fun __safe_strcmp(a: Int, b: Int): Int {
     return rt_strcmp(ra, rb)
 }
 
+// Is this map key safe to hand to strcmp?
+//
+// Map keys reach the runtime in two forms, because the compiler compiles
+// *itself* in identity mode (base.ll), where tagging is a no-op, while user
+// programs run against base_nanbox.ll, where it is not. So a key is either a
+// NaN-boxed value or a bare pointer, and this has to accept both.
+//
+//   TAG_PTR (0x7FF8)  → NaN-boxed heap pointer; strcmp the payload
+//   upper == 0        → identity mode / bare pointer. Small values cannot be
+//                       pointers, so the same >65536 guard used by
+//                       __rt_as_list_ptr keeps numeric keys out of the deref.
+//   anything else     → TAG_INT, TAG_SPEC, or a float: never a string
+//
+// Returns the raw char* to compare, or 0 when the key is not a string.
+fun __map_key_str(v: Int): Int {
+    if (v == 0) { return 0 }
+    var upper: Int = v >> 48
+    if (upper == 32760) { return __rt_untag_ptr(v) }
+    if (upper == 0 and v > 65536) { return v }
+    return 0
+}
+
+// Compare two map keys. Returns 0 when equal, non-zero otherwise (same
+// convention as strcmp, so callers read `== 0`).
+//
+// __map_set used to hand every stored key straight to __safe_strcmp, which
+// untags and calls strcmp unconditionally. For a NaN-boxed Int the low 48 bits
+// ARE the number, so `m.set(10, ...)` followed by `m.set(20, ...)` called
+// strcmp(0xA, 0x14) and segfaulted on the second insertion. A single-entry map
+// never enters the comparison loop at all, which is why the crash needed two
+// keys to appear.
+//
+// Only two string keys are compared by content; everything else is compared by
+// exact bit pattern, which is right for ints, bools, nil, and floats alike
+// (keys come from literals and stored values, not from arithmetic that could
+// produce -0.0 or NaN).
+fun __map_key_cmp(a: Int, b: Int): Int {
+    if (a == b) { return 0 }
+    var ra: Int = __map_key_str(a)
+    if (ra == 0) { return 1 }
+    var rb: Int = __map_key_str(b)
+    if (rb == 0) { return 1 }
+    return rt_strcmp(ra, rb)
+}
+
+// Tag a stored map key for handing back out to Saffron code (__map_keys).
+//
+// Identity-mode keys are bare pointers and must be tagged on the way out, the
+// way __map_keys always did. NaN-boxed keys already carry their tag and must be
+// passed through untouched — re-tagging stamped TAG_PTR onto numeric keys and
+// turned `for (k in m.keys())` on a Map<Int, _> into a pointer built out of the
+// number itself.
+fun __map_key_box(v: Int): Int {
+    if (v == 0) { return v }
+    var upper: Int = v >> 48
+    if (upper == 0) { return __rt_tag_ptr(v) }
+    return v
+}
+
 fun __string_contains_str(haystack: Int, needle: Int): Int {
     var h: Int = __rt_untag_ptr(haystack)
     var n: Int = __rt_untag_ptr(needle)
@@ -288,7 +347,7 @@ fun __map_set(map: Int, key: Int, value: Int) {
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
-        if (__safe_strcmp(key, kval) == 0) {
+        if (__map_key_cmp(key, kval) == 0) {
             store64(vals + i * 8, value)
             return
         }
@@ -320,7 +379,7 @@ fun __map_get(map: Int, key: Int): Int {
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
-        if (__safe_strcmp(key, kval) == 0) {
+        if (__map_key_cmp(key, kval) == 0) {
             return load64(vals + i * 8)
         }
         i = i + 1
@@ -335,7 +394,7 @@ fun __map_has(map: Int, key: Int): Int {
     var i: Int = 0
     while (i < count) {
         var kval: Int = load64(keys + i * 8)
-        if (__safe_strcmp(key, kval) == 0) {
+        if (__map_key_cmp(key, kval) == 0) {
             return 1
         }
         i = i + 1
@@ -350,9 +409,11 @@ fun __map_keys(map: Int): Int {
     var list: Int = __list_new()
     var i: Int = 0
     while (i < count) {
-        var raw_key: Int = load64(kp + i * 8)
-        var tagged_key: Int = __rt_tag_ptr(raw_key)
-        __list_push(list, tagged_key)
+        // Keys are stored already NaN-boxed, so push them through unchanged.
+        // This used to call __rt_tag_ptr on every key, which stamped TAG_PTR
+        // onto numeric keys and made `for (k in m.keys())` on a Map<Int, _>
+        // hand consumers a pointer built out of the number itself.
+        __list_push(list, __map_key_box(load64(kp + i * 8)))
         i = i + 1
     }
     return list
@@ -582,10 +643,11 @@ fun __map_to_string(map: Int): Int {
         if (i > 0) {
             __join_append(buf_p, len_p, cap_p, sep_b, 2)
         }
-        // Keys are stored untagged, as __map_keys' __rt_tag_ptr call attests.
-        // Tag before dispatching so a bare string pointer is not mistaken for
-        // a float bit pattern.
-        var key: Int = __rt_tag_ptr(load64(keys + i * 8))
+        // Keys are stored already NaN-boxed. __map_key_box tags only the
+        // identity-mode bare-pointer case and passes real NaN-boxed keys
+        // through untouched — an unconditional __rt_tag_ptr here stamped
+        // TAG_PTR onto numeric keys and printed a garbage string pointer.
+        var key: Int = __map_key_box(load64(keys + i * 8))
         var key_str: Int = __rt_elem_to_string(key)
         if (key_str != 0) {
             __join_append(buf_p, len_p, cap_p, key_str, rt_strlen(key_str))

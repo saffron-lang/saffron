@@ -420,10 +420,10 @@
         var ig_otype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_otype.starts_with("Map")) {
             var map_obj: String = this.gen_arg_value(object)
-            var key_val: String = this.gen_arg_value(index)
-            var key_ptr: String = this.emit_untag_ptr(key_val)
-            var key_raw: String = this.fresh_local()
-            this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+            // Key passed through NaN-boxed, NOT untagged — see Map.set. The
+            // runtime's __map_key_cmp reads the tag to tell string keys from
+            // numeric ones; untagging here destroyed that discriminator.
+            var key_raw: String = this.gen_arg_value(index)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_get(i64 " + map_obj + ", i64 " + key_raw + ")")
             if (ig_otype.starts_with("Map<")) {
@@ -2014,11 +2014,14 @@
             this.last_type = AST.Type.NilType
             return "0"
         }
-        // Map.set(key, value) -> __map_set (untag key for runtime)
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_s: String = this.emit_untag_ptr(key_val)
-        var key_raw_s: String = this.fresh_local()
-        this.emit_indent(key_raw_s + " = ptrtoint i8* " + key_ptr_s + " to i64")
+        // Map.set(key, value) -> __map_set
+        //
+        // The key is passed through NaN-boxed, NOT untagged. Untagging threw
+        // away the only thing that distinguishes a string key from a numeric
+        // one, and the runtime then compared every stored key with strcmp — so
+        // a second `set()` on a Map<Int, _> dereferenced the number itself and
+        // segfaulted. __map_key_cmp reads the tag; it needs the tag intact.
+        var key_raw_s: String = this.gen_arg_value(args[0])
         var val: String = this.gen_arg_value(args[1])
         var discard: String = this.fresh_local()
         if (this.use_llvm_lib) {
@@ -2038,11 +2041,10 @@
         if (has_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        // Untag string key for runtime (expects raw pointer)
-        var key_ptr: String = this.emit_untag_ptr(key_val)
-        var key_raw: String = this.fresh_local()
-        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_has
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw))
@@ -2062,10 +2064,10 @@
         if (get_recv_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_g: String = this.emit_untag_ptr(key_val)
-        var key_raw_g: String = this.fresh_local()
-        this.emit_indent(key_raw_g + " = ptrtoint i8* " + key_ptr_g + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_get
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw_g: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g))
