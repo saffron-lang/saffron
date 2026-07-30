@@ -2,6 +2,50 @@
 
 ## Open
 
+### 40. A module global shadows a like-named parameter — silent wrong answer
+
+**Reproduction:**
+
+```saffron
+import "math" as Math
+var x = 42
+IO.println(Math.sqrt(16))   // prints 6.48074 (= sqrt(42)), should be 4
+```
+
+Remove `var x` and it prints `4`. The input IR is correct — `16` is passed — but
+the callee reads the global:
+
+```llvm
+define i64 @math_sqrt(i64 %x.arg) {
+  %x = alloca i64
+  store i64 %x.arg, i64* %x
+  %t1 = load i64, i64* @__g_x   ; ← user's global, not the parameter
+```
+
+Variable resolution in `expr_body.sf` (three sites: the `Variable` read ~:105,
+`Assign` ~:135, and the `gen_arg_value` variable branch ~:1416) checks
+`module_globals` before locals, so any function parameter whose name collides
+with a user global — `x`, `y`, `n`, `value` — loads the global. `math_pow`,
+`math_abs`, etc. are all affected; trivially triggerable from user code.
+
+**Attempted fix and why it was reverted.** An `is_current_param(name)` helper
+that shadows the global when `name` is a parameter of the function being
+compiled fixed the repro and the direct cases, but regressed `test/pantry_config`
+into invalid IR (`use of undefined value '%p'`). Root cause of the regression:
+`current_function_name` is not a reliable "am I inside this function's body"
+signal. `gen_function` sets it *before* its `register_only` / already-defined
+early returns (so the pre-scan leaks a lambda's name), `gen_closure_function`
+never sets it at all, and neither restores it — so at the top level it still
+points at a previously-compiled lambda whose parameter happens to be named `p`.
+The whole attempt was reverted rather than shipped fragile.
+
+**Real fix:** track the parameters of the function currently being *emitted*
+explicitly — e.g. a `current_params` set pushed where param allocas are created
+and popped at function end — instead of inferring scope from
+`current_function_name`. Then have the three resolution sites prefer a local
+parameter over a global. Was previously noted as the "global-shadows-param"
+work item (task #4 area).
+
 ### 39. IO.println on lists/maps prints garbage on wasm32
 
 Fixed on native (commit 88297ca) but deliberately skipped on wasm32. The fix
