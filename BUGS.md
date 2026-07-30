@@ -248,36 +248,141 @@ is what would let codegen tell the two cases apart.
 `"${x}".to_upper()` silently produce nonsense rather than failing.
 
 
-### 32. `__list_length` receives a tagged list pointer and segfaults
+### 33. `to_lower()` on a function's return value produces a null receiver
 
-**Reproduction** — two or more IO-performing tasks whose handles pass through a
-`List`:
+**Reproduction** — `src/lib/http/client.sf:352`, reduced:
 
 ```saffron
-import "@async" as Async
-var tasks: List<Any> = []
-tasks.push(Task.spawn(fun () => fetch("http://localhost:8000/")))
-tasks.push(Task.spawn(fun () => fetch("http://localhost:8000/")))
-var i = 0
-while (i < tasks.length()) { Async.await(tasks[i]); i = i + 1 }
+var transfer_enc = _extract_header_value(header_section, "transfer-encoding")
+if (transfer_enc.to_lower().contains("chunked")) { ... }
 ```
 
-**Actual:** `EXC_BAD_ACCESS` in `__list_length + 4`, with
-`x0 = 0x7ff800012d00a200` — that is `TAG_PTR | 0x12d00a200`, a tagged list
-pointer reaching a function that expects a raw one. A conditional breakpoint
-localizes the caller to `__saffron_entry`, i.e. top-level user code.
+**Actual:** segfault in `_platform_strstr`. The emitted IR skips the
+`rt_str_to_lower` call entirely and passes the literal `0` as the receiver:
 
-**Root cause:** `methods_body.sf:2173-2186` emits `call i64 @__list_length(i64
-%obj)` **directly**, bypassing `gen_extern_call`, so it never untags its
-receiver. It is one of the three hardcoded tagging allowlists that #24's step 4
-deletes; routing it through the single FFI path fixes it.
+```llvm
+  %t139 = call i64 @stdlib_http_client__extract_header_value(...)
+  store i64 %t139, i64* %transfer_enc
+  %t139 = load i64, i64* %transfer_enc
+  %t141 = call i8* @__val_untag_ptr(i64 0)      ; <-- receiver is 0; %t140 absent
+  %t145 = call i8* @strstr(i8* %t141, i8* %t144)
+```
 
-**Note:** pre-existing, but only *reachable* since #24's parameter fix, because
-before that nothing could complete a socket connect. `test_async_io` and
-`test_httpx` fail here now instead of at connect.
+`%t140` is never defined — the `to_lower` branch produced no value at all, so
+`contains` untagged `0` and `strstr` dereferenced null.
+
+**Root cause (partial):** the String-method branch at `methods_body.sf:1793`
+gates on `__str_type_match` (`obj_type == "String" or obj_type == "Any"`). Here
+`obj_type` is neither, so no branch emits anything and dispatch falls through
+returning an empty/zero value rather than failing loudly. Why `obj_type` resolves
+to a third thing for a cross-module `String`-returning function is not yet
+pinned down; `func_ret_types` registration (`stmts.sf:41`, `output_body.sf:10`)
+is the place to look.
+
+**Not reproducible in isolation.** Direct chains (`s.to_lower().contains(...)`),
+function-returned strings, cross-module returns, and the same chain inside a
+coroutine all work. Only the real `http/client.sf` path fails, so something
+about its combination of conditions is required.
+
+**Impact:** `test_httpx` segfaults before its first `println`. Blocks all of
+`@http/client`, hence every HTTPS/HTTP consumer. Independent of #32 — the
+baseline before #32's fix crashes identically here, and the pre-#24 tree only
+avoided it by failing at connect first.
+
+**Related:** the silent fall-through is the real hazard. A dispatch path that
+matches no branch should emit a compile error, not a zero.
+
+### 34. `bootstrap.sh` never builds a gen4, contradicting the promotion criteria
+
+`CLAUDE.md` states, as a promotion criterion, "Gen3 can compile itself
+(bootstrap a gen4 from gen3): the test stage in bootstrap.sh verifies this." The
+TEST stage does not do this — it compiles and runs sample programs, never a
+gen4.
+
+The gap matters because a hand-built gen4 **does not work**: it segfaults on
+`IO.println("hi")`. Verified pre-existing by building a gen4 from the unmodified
+baseline, which crashes identically, so this is not a regression from any recent
+change — but it does mean the documented criterion has never actually held.
+
+Either the criterion or the script should change. Until then, promotion decisions
+rest on the sample-program tests alone, and that should be stated honestly rather
+than implying a self-hosting check that isn't run.
+
+### 35. An await loop's body re-executes after coroutine resume
+
+**Reproduction** — a `while` loop that awaits inside its body prints its first
+iteration twice:
+
+```saffron
+var i = 0
+while (i < tasks.length()) {
+    IO.println("iter i=${i}")     // prints "iter i=0" twice
+    var result = tasks[i].await()
+    i = i + 1
+}
+```
+
+**Expected:** one line per iteration.
+**Actual:** the statements before the suspend point run again after resume, so
+side effects preceding an `await` happen twice and output contains spurious
+extra iterations.
+
+**Root cause:** the resume path re-enters the loop body block rather than the
+block following the suspend point. `gen_method_call`'s coroutine await branch
+(`methods_body.sf:1567`) emits `task.await.loop -> task.await.check`, which is
+correct for the polling retry, but the surrounding loop's block structure lets a
+resumed coroutine re-run earlier body statements.
+
+**Note:** pre-existing and unrelated to #24/#32 — byte-identical wrong output on
+a pre-#24 baseline. Printing is the visible symptom; any effectful statement
+before an `await` in a loop body is silently duplicated, which is worse.
 
 ## Fixed
 
+- ~~#32: `__list_length` receives a tagged list pointer and segfaults~~ — Fixed,
+  and the filed diagnosis was wrong in both its title and its root cause.
+
+  The crash is not in `tasks.length()` and the tagged pointer is not a list. In
+  the repro, `__list_length` receives a **String** — a NaN-tagged `char*` from
+  `TAG_PTR`. Disassembling the caller settled it: the instructions immediately
+  before the faulting `bl __list_length` are `strcpy`/`strcat`/`__string_intern`,
+  i.e. the `i.to_string() + ": "` concatenation on the *next* line. The receiver
+  is `result`, not `tasks`.
+
+  Localizing it took a detour. Breakpoint commands (`br command add`) never fired
+  before the fault, and a watchpoint on `@__g_tasks` showed only one write — the
+  `__list_new()` from the declaration — proving nothing ever stored a tagged value
+  into the list global. Only disassembling the return address (`__saffron_entry +
+  776`) revealed the true call site.
+
+  **Root cause:** the `await`/`getResult` branches read the result type from
+  `typed_vars[get_variable_name(object)]`, and `get_variable_name` returns `""`
+  for anything that is not a bare `Variable`. So `tasks[i].await()` — an
+  `IndexGet` — learns nothing and the fallback applied. That fallback was
+  `IntType`: a *claim* the value is an integer, when in fact the type is unknown.
+  `result.length()` then took the non-String, non-Any branch and emitted
+  `call i64 @__list_length(i64 %result)` on a tagged string pointer.
+
+  The fix is to fall back to `AnyType` at all three sites. `Any` is the honest
+  answer and the dispatch machinery already handles it: `__any_length`
+  (`base_nanbox.ll:1186`) unmasks `TAG_PTR`, checks the GC magic sentinel, and
+  routes to `strlen`/`__list_length`/map-count at runtime.
+
+  Not the filed fix. #32 proposed untagging the receiver at
+  `methods_body.sf:2201`, which would have masked the tag off a string and fed
+  `__list_length` a valid-looking pointer to character data — a silent wrong
+  answer in place of a loud crash. It also credited #24's `Ptr` work with fixing
+  this; unrelated.
+
+  `test_async_io` now passes end to end for the first time (all three sections:
+  Sequential, Parallel, Fan-out). Verified across the full 111-test suite against
+  a baseline built from the previous commit: the *only* changed exit code is
+  `test_async_io` 139 → 0.
+
+  One rough edge left deliberately: the `Any` path prints
+  `[codegen] Warning: dispatching 'length' on untyped value` on stderr for code
+  that is now perfectly correct. Silencing it would need real inference of a
+  task's result type through a container, which is a larger change than this fix.
 - ~~#28: an `Int` literal assigned to a `Float` annotation became NaN~~ — Fixed:
   `gen_var_decl_with_name` stored the literal with its `TAG_INT` intact while every
   downstream read treated the bits as a double, so `var f: Float = 1` came back as
