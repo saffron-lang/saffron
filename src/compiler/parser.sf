@@ -66,6 +66,35 @@ class Parser {
         }
     }
 
+    // Can the current token begin a map-literal key?
+    //
+    // Numeric keys used to be missing here, so `{1: "one"}` was not recognised
+    // as a map literal at all. It fell through to the block-expression path,
+    // where `1:` was discarded and the block's value became "one" — so the
+    // variable silently held a *string*, and calling a Map method on it
+    // segfaulted. Map<Int, V> literals were simply unconstructible.
+    fun is_map_key_start(): Bool {
+        if (this.match_kind_check("string")) { return true }
+        if (this.match_kind_check("ident")) { return true }
+        if (this.match_kind_check("int")) { return true }
+        if (this.match_kind_check("float")) { return true }
+        return false
+    }
+
+    // Parse one key of a map literal: {"a": 1} or {a: 1}.
+    //
+    // An ident key is shorthand for the string of the same name, so it must
+    // become a StringLit here. Routing it through parse_primary() instead made
+    // `{a: 1}` compile the key as a *variable reference* — which emitted
+    // `call i64 @a()` and failed to link, or silently read an unrelated
+    // in-scope `a`. Both desugaring sites call this.
+    fun parse_map_key(): AST.Expr {
+        if (this.match_kind_check("ident")) {
+            return AST.Expr.StringLit(this.expect_ident())
+        }
+        return this.parse_primary()
+    }
+
     fun match_kind(expected: String): Bool {
         if (this.match_kind_check(expected)) {
             this.advance()
@@ -642,18 +671,18 @@ class Parser {
                 }
             }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
-            if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
+            if (this.is_map_key_start() and this.peek_is(":")) {
                 // Parse as map literal — desugar to BlockExpr that builds the map
                 var map_stmts: List<AST.Stmt> = []
                 map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
                 // First entry
-                var key: AST.Expr = this.parse_primary()
+                var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
                 map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
-                    var k: AST.Expr = this.parse_primary()
+                    var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
                     map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
@@ -2465,17 +2494,17 @@ class Parser {
                 }
             }
             // Check for map literal: {"key": val, ...} or {ident: val, ...}
-            if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
+            if (this.is_map_key_start() and this.peek_is(":")) {
                 var map_stmts: List<AST.Stmt> = []
                 map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
                 // First entry
-                var key: AST.Expr = this.parse_primary()
+                var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
                 map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
-                    var k: AST.Expr = this.parse_primary()
+                    var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
                     map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))

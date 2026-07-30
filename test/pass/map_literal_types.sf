@@ -1,0 +1,62 @@
+// Map literals: key/value types come from the entries, and the key syntax
+// accepts more than just string literals.
+//
+// Two bugs met here. The parser only recognised `string` and `ident` as the
+// start of a map-literal key, so `{1: "one"}` was not parsed as a map at all —
+// it fell through to the block-expression path, `1:` was discarded, and the
+// variable silently held the *string* "one". Calling a Map method on it
+// segfaulted. Separately, an `ident` key was routed through parse_primary(),
+// which compiled `{a: 1}` as a *variable* reference and emitted `call i64 @a()`.
+//
+// The value/key types were also hardcoded to Map<String, Any> regardless of
+// what the entries actually contained.
+
+import "@test" as Test
+
+// --- numeric keys build a real map ---
+var by_id = {1: "one", 2: "two"}
+Test.assert_eq(by_id.get(1), "one", "Int key literal is a real map entry")
+Test.assert_eq(by_id.get(2), "two", "second Int key entry")
+Test.assert(by_id.has(1), "has() finds an Int key")
+Test.assert(!by_id.has(99), "has() rejects an absent Int key")
+
+// keys() must yield numbers, not string pointers
+var key_sum: Int = 0
+for (k in by_id.keys()) {
+    key_sum = key_sum + k
+}
+Test.assert_eq(key_sum, 3, "Int keys from a literal sum as numbers")
+
+// --- ident keys are shorthand for the same string ---
+var shorthand = {a: 1, b: 2}
+Test.assert_eq(shorthand.get("a"), 1, "ident key means the string of that name")
+Test.assert_eq(shorthand.get("b"), 2, "second ident key")
+
+// An in-scope variable of the same name must not shadow the key.
+var a = "SHADOW"
+var shadowed = {a: 7}
+Test.assert_eq(shadowed.get("a"), 7, "ident key is not a variable reference")
+
+// --- value type inferred from entries ---
+var counts = {"x": 10, "y": 20}
+var total: Int = 0
+for (v in counts.values()) {
+    total = total + v
+}
+Test.assert_eq(total, 30, "Int values from a literal sum as numbers")
+
+// --- mixed entry types widen instead of guessing from entry 0 ---
+var mixed = {"n": 1, "s": "two"}
+Test.assert_eq(mixed.get("s"), "two", "mixed literal keeps a String value intact")
+
+// --- string keys and values still behave ---
+var pairs = {"k": "v", "k2": "v2"}
+Test.assert_eq(pairs.get("k"), "v", "String key/value literal")
+Test.assert_eq(pairs.keys().length(), 2, "literal key count")
+
+// --- empty literal then set() ---
+var empty = {}
+empty.set("later", 5)
+Test.assert_eq(empty.get("later"), 5, "empty literal accepts set()")
+
+Test.summary()
