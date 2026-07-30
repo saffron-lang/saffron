@@ -1,0 +1,56 @@
+// Scientific-notation float literals: 1e300, 1.5e10, 2E3, 1.0e-5, 3e+2.
+//
+// The lexer used to stop a numeric literal at the mantissa, so `1e300` lexed as
+// the int `1` followed by the identifier `e300` and every use was a parse error
+// ("expected ')' but found 'ident'"). Two things had to be right beyond just
+// consuming the exponent:
+//
+//   - The exponent is only an exponent if a digit follows (after an optional
+//     sign). Otherwise `2 * e` — a multiplication by a variable named `e` —
+//     would swallow the `e` and produce a truncated literal.
+//   - LLVM's IR parser reads a mantissa with no decimal point as an *integer*
+//     constant, which cannot have type double ("integer constant must have
+//     integer type"). So `1e300` has to reach codegen as `1.0e300`.
+
+import "@test" as Test
+
+// --- exponent forms all lex and evaluate ---
+Test.assert_eq(1e3, 1000.0, "bare mantissa with positive exponent")
+Test.assert_eq(1.5e3, 1500.0, "decimal mantissa with exponent")
+Test.assert_eq(2E3, 2000.0, "uppercase E")
+Test.assert_eq(3e+2, 300.0, "explicit + sign in exponent")
+Test.assert_eq(1e-3, 0.001, "negative exponent")
+Test.assert_eq(1.0e-3, 0.001, "decimal mantissa, negative exponent")
+
+// --- an exponent always yields a Float, even with no decimal point ---
+Test.assert(1e3 is Float, "bare mantissa with exponent is a Float")
+var typed: Float = 1e10
+Test.assert_eq(typed, 10000000000.0, "annotated Float accepts an exponent literal")
+
+// --- large magnitudes survive, which is the point of the syntax ---
+Test.assert(1e300 > 1e299, "very large exponents are distinct")
+Test.assert(1e-300 < 1e-299, "very small exponents are distinct")
+
+// --- exponent literals are ordinary values ---
+Test.assert_eq(1e3 + 1e3, 2000.0, "arithmetic on exponent literals")
+Test.assert_eq((2.5e2).floor(), 250, "method call on a parenthesised exponent literal")
+Test.assert_eq("${1.5e3}", "1500", "interpolation of an exponent literal")
+var lst = [1e1, 2e2]
+Test.assert_eq(lst[1], 200.0, "exponent literals inside a list")
+
+// --- a trailing e/E with no digit is NOT an exponent ---
+var e = 7
+Test.assert_eq(2 * e, 14, "`2 * e` multiplies by the variable, not a literal")
+var E = 3
+Test.assert_eq(1 + E, 4, "uppercase E as a variable name still resolves")
+
+// --- hex is scanned before the exponent check, so its e/E stay hex digits ---
+Test.assert_eq(0xe, 14, "e is a hex digit, not an exponent marker")
+Test.assert_eq(0x1e, 30, "trailing hex e")
+Test.assert_eq(0xE3, 227, "uppercase hex E followed by a digit")
+
+// --- plain literals unaffected ---
+Test.assert_eq(42, 42, "plain int")
+Test.assert_eq(1.5, 1.5, "plain float")
+
+Test.summary()

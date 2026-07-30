@@ -2,6 +2,27 @@
 
 ## Open
 
+### 41. A nested map literal overwrites its parent — silent wrong answer
+
+**Reproduction:**
+
+```saffron
+var nest = {"outer": {"inner": 5}}
+IO.println(nest.to_string())   // prints {inner: 5}, should be {outer: {inner: 5}}
+```
+
+The parser desugars a map literal into a `BlockExpr` holding a `VarDecl` of a
+temporary plus one `.set()` per entry, and that temporary is always named
+`__map` (`parser.sf`, both desugaring sites). A literal nested inside another
+literal therefore declares a *second* `__map` in the same scope: the inner one
+wins, the outer map is discarded, and the variable ends up bound to the inner
+map. No diagnostic — the program just holds the wrong value.
+
+Needs a unique temporary per literal (a counter, the way `fresh_local()` works
+in codegen) rather than the fixed name. Note the two desugaring sites are
+copies of each other, so both need it — an instance of the duplicated-logic
+mechanism (M5) described in `docs/design/compiler-rewrite.md`.
+
 ### 40. A module global shadows a like-named parameter — silent wrong answer
 
 **Reproduction:**
@@ -433,6 +454,23 @@ before flipping, since a fall-through can also be reached by valid-but-unhandled
 builtin methods rather than only by bad types.
 
 ## Fixed
+
+- ~~#42: The lexer rejected scientific-notation float literals~~ — `IO.println(1e300)`
+  failed with `expected ')' but found 'ident'`: `read_number` stopped at the
+  mantissa, so `1e300` lexed as the int `1` followed by an identifier `e300`.
+  Every exponent form was unusable — there was no way to write a very large or
+  very small literal. `read_number` now consumes `e`/`E`, an optional sign, and
+  the exponent digits, but only when a digit actually follows, so `2 * e`
+  (multiplication by a variable named `e`) is untouched and `1.e` leaves the
+  letter to the identifier scanner. The exponent scan runs after the hex branch
+  returns, so `0xe` / `0x1e` keep treating `e` as a hex digit.
+
+  An exponent always produces a `TkFloat`. When the source omits the decimal
+  point the mantissa gets a `.0` spliced in (`1e300` → `1.0e300`), because LLVM's
+  IR parser reads a point-free mantissa as an *integer* constant and rejects it
+  with "integer constant must have integer type" — `emit_tag_float` drops the
+  literal text straight into `double` position. Regression test:
+  `test/pass/scientific_notation.sf`.
 
 - ~~#39: `IO.println` on lists/maps printed garbage on wasm32~~ — Fixed by
   unifying the wasm32 GC header with native's. The native half (`88297ca`) routes
