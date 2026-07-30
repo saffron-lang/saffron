@@ -1,0 +1,61 @@
+// Regression test for BUGS #35: a loop body containing an await must run its
+// pre-await statements exactly once per iteration.
+//
+// #35 was filed from observed duplicate output ("iter i=0" printed twice) and
+// diagnosed as the resume path re-entering the loop body block. That diagnosis
+// was wrong: the duplication was a symptom of #32's memory corruption (a String
+// receiver reaching __list_length), and the repro is correct once #32 is fixed.
+//
+// Rather than trusting output shape, this test *counts* side effects, so a
+// re-executed body overshoots the count instead of merely looking odd.
+
+import "@async" as Async
+import "@test" as Test
+
+fun work(n: Int): Int {
+    Async.sleep(0.01)
+    return n * 10
+}
+
+// --- Suspension via sleep ---
+
+var effects = 0
+var tasks: List<Int> = []
+var i = 0
+while (i < 5) {
+    tasks.push(Task.spawn(fun () => work(i)))
+    i = i + 1
+}
+
+var total = 0
+i = 0
+while (i < tasks.length()) {
+    effects = effects + 1
+    var result = tasks[i].await()
+    total = total + result
+    i = i + 1
+}
+
+Test.assert_eq(effects, 5, "pre-await statement runs exactly once per iteration")
+Test.assert_eq(total, 100, "every awaited result accumulates (0+10+20+30+40)")
+
+// --- A statement after the await must also run exactly once ---
+
+var post = 0
+var tasks2: List<Int> = []
+var j = 0
+while (j < 4) {
+    tasks2.push(Task.spawn(fun () => work(j)))
+    j = j + 1
+}
+
+j = 0
+while (j < tasks2.length()) {
+    var r2 = tasks2[j].await()
+    post = post + 1
+    j = j + 1
+}
+
+Test.assert_eq(post, 4, "post-await statement runs exactly once per iteration")
+
+Test.summary()
