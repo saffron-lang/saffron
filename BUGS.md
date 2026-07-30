@@ -2,6 +2,207 @@
 
 ## Open
 
+The block of bugs numbered 50–57 came out of building the playground; the full
+narrative log for that work, including the ones that were fixed along the way and
+the workarounds each one forced, is at `docs/design/playground-bug-log.md`. Every
+entry below was re-verified against `build/saffronc` on 2026-07-30 before being
+filed here — the log also contains entries that no longer reproduce, which are
+noted there rather than carried forward.
+
+### 50. An overridden method is not dispatched from an inherited method
+
+**Reproduction:**
+
+```saffron
+class Animal {
+    var name: String
+    fun init(name: String) { this.name = name }
+    fun speak(): String { return "..." }
+    fun describe(): String { return "${this.name} says ${this.speak()}" }
+}
+class Dog extends Animal {
+    fun speak(): String { return "Woof" }
+}
+var d = Dog("Rex")
+IO.println(d.speak())      // "Woof"          — correct
+IO.println(d.describe())   // "Rex says ..."  — wrong, want "Rex says Woof"
+```
+
+A direct call on a statically-known `Dog` is fine. The failure is specifically a
+self-call from inside an *inherited* method: `Dog__describe` is emitted as a
+forwarder to `Animal__describe`, whose body calls `Animal__speak` by static name,
+so the override is invisible. Same through a `List<Animal>` holding `Dog`s.
+
+Method calls lower to `<StaticType>__<method>` — there is no vtable and no runtime
+dispatch on the object's class tag. This is a design limitation, not a patch:
+fixing it means either re-emitting inherited method bodies per subclass (covers
+the static-type case only) or real vtables (covers both, much larger).
+
+**`CLAUDE.md` currently advertises polymorphic `speak()` overriding as supported,
+so the documentation oversells this.**
+
+### 51. Mutation of a captured variable is lost — captures are by value
+
+**Reproduction:**
+
+```saffron
+fun main() {
+    var count: Float = 0
+    var bump = fun (): Float => {
+        count = count + 1
+        return count
+    }
+    IO.println(bump().to_string())    // 0, want 1
+    IO.println(bump().to_string())    // 0, want 2
+    IO.println("count = ${count}")    // 0, want 2
+}
+main()
+```
+
+*Reading* a captured variable works; only writes are lost, in both directions —
+the closure never sees its own increment, and the enclosing scope never sees the
+write.
+
+`src/compiler/codegen/output_body.sf:26-85` hoists nested functions to top level
+with their free variables appended as ordinary by-value `i64` parameters
+(`find_free_vars_stmts` → `full_params`), so a write assigns to the callee's own
+copy. Real mutable capture needs boxed cells — captures passed as pointers, with
+the enclosing frame's variable promoted to a heap cell — which the comment at
+line 26 hints at ("capture POINTERS") but the code does not do.
+
+**`CLAUDE.md` shows a mutable-counter closure as a supported pattern, so the
+documentation is wrong here too.**
+
+### 52. Indexing a list with a `Float`-typed value silently reads element 0
+
+**Reproduction:**
+
+```saffron
+var chars = ["a", "b", "c", "d"]
+var f: Float = 2.0
+IO.println(chars[f])   // "a" — want "c"
+var i: Int = 2
+IO.println(chars[i])   // "c" — correct
+```
+
+No warning, no error. The index path emits `__val_untag_int` on a float-tagged
+value, so the double's bit pattern is *reinterpreted* as an integer rather than
+converted; for small values the low bits are zero, which lands on index 0.
+`.floor()` is the workaround and nothing tells you that you need it.
+
+Same underlying confusion as the identity-mode float bug, but on the native
+target and reachable from ordinary user code, which makes it more dangerous. #53
+is a live instance of it in the shipped stdlib.
+
+### 53. `UUID.v4()` always returns the all-zero UUID
+
+**Reproduction:**
+
+```saffron
+import "@uuid" as UUID
+IO.println(UUID.v4())   // 00000000-0000-4000-8000-000000000000, every time
+```
+
+`src/lib/uuid.sf` builds the string with `_to_hex(Random.int(0, 15))`, and
+`_to_hex` indexes a 16-element list of hex digits. `Random.int` is declared to
+return `Float` (`src/lib/random.sf:13`), so every one of those indexes hits #52
+and returns `"0"`. Calling `Random.int(0, 15)` directly returns properly random
+values — the corruption is entirely in the list-index step.
+
+Beyond the obvious: any code trusting `UUID.v4()` for uniqueness — request IDs,
+temp file names, database keys — is silently getting a constant. `Random.choice`
+and `Random.shuffle` index by `Float` the same way and are presumably affected.
+
+Fixing #52 fixes this; declaring `Random.int` as `Int` would also work and is the
+honest signature.
+
+### 54. An `Int` literal in a `Float` position yields `nan`
+
+**Reproduction:**
+
+```saffron
+fun f(): Float { return 0 }
+IO.println(f().to_string())     // nan, want 0
+```
+
+`return 0.0` works. There is no implicit Int→Float widening at a `Float`-typed
+return (and presumably also at `Float` params and fields), so the integer NaN-box
+tag reaches float-formatting code and reads as `nan`. Numeric literals are very
+common in `Float` positions.
+
+Belongs in the type checker's coercion rules rather than a codegen patch. Note
+implicit Int→Float widening is the agreed direction for the language, so this is
+the missing half of that rule rather than a new feature.
+
+### 55. An `@extern` used before its declaration links against the wrong symbol
+
+**Reproduction:**
+
+```saffron
+fun use_it(): Float { return later(1.0) }   // used here...
+@extern("double sqrt(double)")
+fun later(x: Float): Float                  // ...declared here
+IO.println(use_it().to_string())
+```
+
+The call is emitted as `call i64 @later(...)` — the *Saffron-level* name, which
+nothing defines — instead of the extern target `@sqrt`. The `declare` is emitted
+correctly, so the file compiles without complaint and fails at link time with
+`use of undefined value '@later'`. Worse, string arguments are lowered as `i64 0`
+on that path, so even a coincidentally-matching symbol would be called with null
+pointers.
+
+Declaration order does not matter for an ordinary top-level `fun`, so this is an
+ordering dependency specific to `@extern` resolution. Workaround: declare externs
+above first use. Related to the `@extern` rework in flight (see #24).
+
+### 56. A field access on the result of an indirect call reads 0
+
+**Reproduction:**
+
+```saffron
+class Box { var v: Int
+    fun init(v: Int) { this.v = v } }
+fun mk(): Fun { return fun (x: Int): Box { return Box(7) } }
+
+var f: Fun = mk()
+var typed: Box = f(1)
+IO.println(typed.v.to_string())   // 7 — correct
+IO.println(f(1).v.to_string())    // 0 — wrong
+```
+
+Binding the result to a variable with an explicit `: Box` annotation is correct;
+accessing the field directly on the call expression, or through an inferred
+variable, reads 0. The object is constructed fine and the receiver is fine — field
+*offset* resolution is what fails, because the static type of an indirect call's
+result is not recovered (`Fun` carries no return type) and codegen falls back to
+offset 0 rather than reporting that it does not know.
+
+M1/M2 from `docs/design/compiler-rewrite.md`: codegen re-deriving a type it does
+not have, and spelling "unknown" as something concrete. The real fix is to give
+`Fun` a return type in the type system, which is a language change. Workaround:
+always annotate a variable holding the result of an indirect call.
+
+### 57. A repeated `--lib-path` duplicates every global in the output IR
+
+**Reproduction:**
+
+```
+saffronc --target wasm32 --lib-path .pantry/packages \
+                         --lib-path "$PWD/.pantry/packages" src/main.sf out.ll
+# error: redefinition of global '@__g_turmeric_prelude__tc_event'
+```
+
+Passing the same directory twice — once relative, once absolute, as happens
+naturally when a caller adds `--lib-path` and the driver's own auto-discovery in
+`tools/saffron:149-158` adds it again — makes the compiler emit each module's
+globals twice. The dedupe compares path strings literally, so two spellings of one
+directory are two packages. The failure surfaces as an LLVM redefinition error
+naming an internal symbol, with no hint that a duplicated flag is the cause.
+
+Fix: canonicalise paths before comparing. Workaround: let the driver discover
+`.pantry/packages` itself and do not pass `--lib-path` explicitly.
+
 ### 49. `Number` is one surface name for two representations
 
 `str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
