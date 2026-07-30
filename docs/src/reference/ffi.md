@@ -8,6 +8,10 @@ The `@extern` decorator lets you call C functions (or any function with C callin
 @extern("C_SIGNATURE") fun saffron_name(params): ReturnType
 ```
 
+The signature string is **required**. `@extern fun name(...)` without the
+parenthesized C signature is a parse error — the compiler needs the C types to
+know how to marshal each argument.
+
 The string argument is the C function signature using LLVM IR type names:
 
 | LLVM type | Saffron equivalent |
@@ -60,7 +64,7 @@ The `@intrinsic` decorator marks functions that map to LLVM intrinsics or compil
 
 ## Notes
 
-- The C signature string is required — `@extern fun name(...)` without it is not currently handled by the compiler
+- The C signature string is required — `@extern fun name(...)` without it is a parse error
 - The declared function has no body — the compiler generates a direct call to the named C symbol
 - You are responsible for type correctness — the compiler trusts your signature
 - Link the object file or library that provides the symbol when building: `tools/saffron build app.sf -o app` (the runtime already links standard C library functions)
