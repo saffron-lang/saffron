@@ -264,34 +264,46 @@ Either the criterion or the script should change. Until then, promotion decision
 rest on the sample-program tests alone, and that should be stated honestly rather
 than implying a self-hosting check that isn't run.
 
-### 35. An await loop's body re-executes after coroutine resume
+### 38. Forwarding an `await` through a wrapper function returns the handle, not the result
 
-**Reproduction** — a `while` loop that awaits inside its body prints its first
-iteration twice:
+`Async.gather()` — shipped, documented, and used by `@promise` — returns garbage.
+The awaited value comes back as the raw task handle rather than the task's
+result:
 
 ```saffron
-var i = 0
-while (i < tasks.length()) {
-    IO.println("iter i=${i}")     // prints "iter i=0" twice
-    var result = tasks[i].await()
-    i = i + 1
-}
+fun mk_int(): Int { Async.sleep(0.01); return 42 }
+var t: Task<Int> = Task.spawn(fun () => mk_int())
+IO.println(t.await().to_string())          // 42            — correct
+// the same await one call frame deeper, inside a coroutine wrapper:
+IO.println(Async.await(t).to_string())     // 105553180263168 — the handle
 ```
 
-**Expected:** one line per iteration.
-**Actual:** the statements before the suspend point run again after resume, so
-side effects preceding an `await` happen twice and output contains spurious
-extra iterations.
+**Not a typing problem.** This was first mistaken for one, because a String
+result printed as `5.21502e-310` (a tagged pointer read as a float) — the
+signature of #32/#37. It isn't: an **`Int`** fails identically, and `Int` needs
+no tag interpretation. Annotating `Task<Int>` / `Task<String>` changes the
+garbage but does not fix it. A generic `await<T>(task: Task<T>): T` does not fix
+it either. The value crossing the return boundary is simply the wrong value.
 
-**Root cause:** the resume path re-enters the loop body block rather than the
-block following the suspend point. `gen_method_call`'s coroutine await branch
-(`methods_body.sf:1567`) emits `task.await.loop -> task.await.check`, which is
-correct for the polling retry, but the surrounding loop's block structure lets a
-resumed coroutine re-run earlier body statements.
+Narrowed by elimination — these all work, so the defect is specifically *an
+await whose result is returned out of a suspending wrapper*:
+- a coroutine returning a String it built itself (no await crossing)
+- forwarding an awaited `Int` through a wrapper that suspends
+- `Task<String>` as a parameter type across a function boundary
+- `t.await()` inline at the call site, any result type
 
-**Note:** pre-existing and unrelated to #24/#32 — byte-identical wrong output on
-a pre-#24 baseline. Printing is the visible symptom; any effectful statement
-before an `await` in a loop body is silently duplicated, which is worse.
+**Affected:** `Async.gather()` and `Async.race()` in `src/lib/async.sf`;
+`Promise.all()` / `Promise.race()` in `src/lib/promise.sf`, which call
+`Async.await`.
+
+**Also missing:** `Async.await` does not exist in `src/lib/async.sf` at all,
+though `CLAUDE.md:219` documents it and both `src/lib/promise.sf:10,26` and
+`test/async_coop.sf:16-18` call it. Those fail to link
+(`_stdlib_async_await` undefined) — which is why `async_coop` is at exit 1.
+Adding the function is a two-line change but is **blocked on this bug**: it
+would link and then silently return handles instead of results, so it must not
+be added until the forwarding path is fixed. Verified pre-existing on both the
+pre-#32 and pre-#37 baselines.
 
 ### 37. Method dispatch that matches no branch returns a silent zero
 
@@ -335,6 +347,28 @@ terminal would turn it into a build failure, so the test must be fixed (add
 case must be diagnosed earlier and more precisely than "no such method".
 
 ## Fixed
+
+- ~~#35: An await loop's body re-executes after coroutine resume~~ — **Filed on a
+  wrong diagnosis; not a real loop-structure bug.** The report was written from
+  observed duplicate output (`"iter i=0"` printed twice) and attributed to the
+  resume path re-entering the loop body block. It was actually a *symptom of
+  #32*: the same repro did `result.length()` on an awaited value whose type fell
+  back to `Int`, so a String receiver reached `__list_length` and corrupted
+  memory — the duplicate lines were garbage output from that corruption, not a
+  second pass through the body.
+
+  With #32 fixed (`0b7542a`), the original repro (`tasks[i].await()` over three
+  network fetches) segfaults on a pre-#32 tree and prints correct output on the
+  current one. Verified by *counting* side effects rather than eyeballing output
+  shape, across both suspension paths — `Async.sleep` and real socket I/O: the
+  pre-await statement runs exactly once per iteration and every awaited result
+  accumulates.
+
+  Regression test at `test/test_await_loop_once.sf`. Note it passes on a pre-#32
+  baseline too, precisely because the duplication required #32's corruption to
+  manifest; the discriminating case is the network repro, which belongs to #32.
+  The test is kept because it pins the property directly by count, which no
+  existing test did.
 
 - ~~#36: `push`/`set` on an unannotated module-level list silently vanished~~ —
   Fixed. A module global declared `var _items = []` (no annotation) never had a
