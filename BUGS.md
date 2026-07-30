@@ -2,6 +2,50 @@
 
 ## Open
 
+### 49. `Number` is one surface name for two representations
+
+`str_to_type` maps `"Number"` to `IntType`, which is a lie in one direction:
+
+```saffron
+fun area(r: Number): Number { return 3.0 * r * r }
+IO.println(area(2.0).to_string())   // prints 0, should be 12
+```
+
+The declared type is relabelled `Int` at the boundary, so the caller's
+`.to_string()` untags a double as an integer and prints `0` (or garbage like
+`37357358909038`). Enum payloads had the same defect from the other end, and that
+half **is** fixed — see #45 and #43.
+
+Mapping `"Number"` to `FloatType` instead is the honest reading of the surface
+syntax and fixes the case above, but it is a worse lie in the other direction:
+stdlib code writes `Number` for values it then uses as list indices and integer
+counters. `src/lib/toml.sf:23`'s `fun peek_at(offset: Number)` is the clearest
+case — as a double, that offset breaks indexing. Measured both ways
+(2026-07-30):
+
+| mapping | `pantry_config` | `test_sorted_set` | `area(): Number` |
+|---|---|---|---|
+| `Number` → `Int` | 29/29 | 33/33 | `0` (wrong) |
+| `Number` → `Float` | 8 failed | `IndexError` | `12` (right) |
+
+Neither mapping is right, because `Number` itself is the defect: one surface name
+for two representations, so no single lattice entry can be correct for both uses.
+This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type")
+showing up as a genuine fork in the road rather than a one-line fix.
+
+**Real fix:** retire `Number` in favour of explicit `Int` and `Float` — the
+intended direction for the language. That means auditing every `Number` in
+`src/lib/*.sf` and deciding per site which one is meant (`peek_at(offset: Int)`,
+`number(key: String): Float`, etc.), then removing the surface spelling. Until
+then `Int` is the mapping that keeps the stdlib working, and it stays, with the
+trade-off documented at the mapping site.
+
+**Correction note.** An earlier version of this file recorded `Number` → `Float`
+as fixed and claimed the regression above did not exist ("`pantry_config` passes
+29/29 with the Float mapping"). That measurement was taken against a `saffronc`
+that did not yet contain the change, and was wrong; the regression is real and
+reproduces. The mapping was reverted to `Int`.
+
 ### 41. A nested map literal overwrites its parent — silent wrong answer
 
 **Reproduction:**
@@ -474,29 +518,6 @@ a fall-through can also be reached by valid-but-unhandled builtin methods rather
 than only by bad types.
 
 ## Fixed
-
-- ~~#48: `Number` entered the type lattice as an `Int`~~ — `str_to_type` mapped the
-  surface spelling `"Number"` to `IntType`, so a declared type lied in a direction
-  no care at the use sites could repair: `fun area(r: Number): Number` returning
-  `3.0 * r * r` was relabelled `Int` at the boundary, and the caller's
-  `.to_string()` untagged a double as an integer — printing garbage
-  (`37357358909038`) or `0`. Enum payloads had the same defect from the other end.
-  This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type") at
-  the exact point where surface syntax enters the lattice, so it is fixed there:
-  both `Float` and `Number` now map to `FloatType`.
-
-  Safe for `--identity-mode`, which is how the compiler compiles itself:
-  `type_to_string` collapses `Float` back to `"Int"` there, so every existing
-  `var pos: Float` / `Number` site in compiler source keeps the exact string it had
-  before, and the bootstrap is unaffected.
-
-  **A claim to the contrary was measured and is false.** A note briefly asserted
-  that the `Float` mapping regresses `pantry_config`, `test_sorted_set` and
-  `test_base64` — that stdlib code writes `Number` for values it then uses as list
-  indices and integer counters. Checked directly: `pantry_config` passes 29/29 and
-  `test_sorted_set` passes 33/33 with the `Float` mapping. `test_base64` does fail,
-  but on a non-ASCII/encoding assertion unrelated to numeric typing, and it already
-  failed before this change. Full suite: failure set byte-identical to baseline.
 
 - ~~#47: `[1, 2, 3].join(", ")` segfaulted~~ — `__list_join` did a bare
   `__rt_untag_ptr` + `rt_strlen` on every element, which is valid only when the
