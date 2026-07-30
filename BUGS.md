@@ -163,15 +163,40 @@ returns `code=-1, stdout=""`. `sf_process_poll`, `_write_stdin` and every other
 `i64`-param extern in `src/lib/process.sf`, `ssl.sf`, `watch.sf` are equally
 affected. 114 of 224 extern declarations take an `i64` parameter.
 
+**Wider than first written: all networking was dead.**
+`@extern("i64 sf_tcp_connect(i8*, i64)")` received a tagged `port`, so the
+baseline could not connect even to a local `python3 -m http.server`. Nothing
+above the socket layer — `httpx`, `net.sf`, async I/O — could ever have worked.
+
 **Why the raw passthrough exists:** roughly 49 of those 114 params are
 pointer-as-int values (coroutine handles, `malloc` results, buffer addresses)
 that legitimately travel untagged. Blanket untagging would corrupt them; blanket
 tagging would corrupt the other 65. The signature cannot disambiguate because
 both spell themselves `i64` in C and `Int` in Saffron.
 
-**Immediate fix:** dispatch `gen_extern_call` on the Saffron parameter type, so
-`Int` + `i64` gets `emit_untag_int` exactly as `i32` already does. This alone
-makes `@process` work and is independently shippable.
+**Immediate fix:** untag `i64` params exactly as the `i32` path already does.
+This alone makes `@process` and all networking work, and is independently
+shippable.
+
+**Why unconditional untagging is safe here** — not, as first argued, because
+handle sites "are annotated `Int`" (so are 194 of the `i64` params, handles
+included; that reasoning is backwards). The real justification is arithmetic:
+`__val_untag_int` masks 48 bits and sign-extends, so it is the *identity* on a
+genuine address while correctly stripping a tag. All four shapes an `Int` param
+can carry survive:
+
+| value in | untag out |
+|---|---|
+| NaN-boxed positive int | payload |
+| NaN-boxed negative int | payload (sign-extended) |
+| `tag_ptr`'d handle | address, TAG_PTR stripped |
+| raw address (coro handle) | unchanged — real addresses are < 2^47 |
+
+Measured over 111 tests at `b5fd568`, comparing exact exit codes:
+`gc_test` 139 → 0; `test_file` segfault → 19/20 passing; `@process`
+`out=[]` → `out=[hi]`; `malloc`/`memset`/`free` correct. `test_async_io` and
+`test_httpx` go 1 → 139, which is **not** a regression: they previously failed
+at connect and now get far enough to hit #32.
 
 **Not a runtime tag test.** Sniffing the top 16 bits for `0x7FF8..0x7FFA` looks
 tempting but is unsound: a real integer whose payload happens to match, or a heap
@@ -223,65 +248,88 @@ is what would let codegen tell the two cases apart.
 `"${x}".to_upper()` silently produce nonsense rather than failing.
 
 
-### 28. An `Int` literal assigned to a `Float` annotation becomes NaN
+### 32. `__list_length` receives a tagged list pointer and segfaults
 
-**Reproduction:**
+**Reproduction** — two or more IO-performing tasks whose handles pass through a
+`List`:
+
 ```saffron
-var f: Float = 1
-IO.println(f.to_string())   // nan
-var g: Float = 1.0
-IO.println(g.to_string())   // 1 — correct
+import "@async" as Async
+var tasks: List<Any> = []
+tasks.push(Task.spawn(fun () => fetch("http://localhost:8000/")))
+tasks.push(Task.spawn(fun () => fetch("http://localhost:8000/")))
+var i = 0
+while (i < tasks.length()) { Async.await(tasks[i]); i = i + 1 }
 ```
 
-**Expected:** `1`. Int→Float widening is meant to be implicit.
-**Actual:** the integer literal keeps its `TAG_INT` payload but the annotation
-makes every downstream read treat the bits as a double, so `1` is read as the
-subnormal `4.94e-324` — or, once it reaches a tag-inspecting path, as NaN.
+**Actual:** `EXC_BAD_ACCESS` in `__list_length + 4`, with
+`x0 = 0x7ff800012d00a200` — that is `TAG_PTR | 0x12d00a200`, a tagged list
+pointer reaching a function that expects a raw one. A conditional breakpoint
+localizes the caller to `__saffron_entry`, i.e. top-level user code.
 
-The declaration is what miscompiles, not the arithmetic: mixed-mode `1 + 1.0`
-widens correctly in codegen. Only the annotated-declaration path is missing the
-`__val_tag_float`/`__val_untag_int` conversion.
+**Root cause:** `methods_body.sf:2173-2186` emits `call i64 @__list_length(i64
+%obj)` **directly**, bypassing `gen_extern_call`, so it never untags its
+receiver. It is one of the three hardcoded tagging allowlists that #24's step 4
+deletes; routing it through the single FFI path fixes it.
 
-**Impact:** silent wrong answers in any code that annotates a counter as `Float`
-and initializes it from an int literal. The compiler source does this in several
-places (`Parser.pos`, `Parser.html_depth`) and gets away with it only because
-those values are never read as floats.
-
-**Related:** this is exactly the widening rule Phase B has to enforce in the
-checker; the codegen side has to land with it.
-
-### 29. Indexing a String segfaults
-
-**Reproduction:**
-```saffron
-var s = "ab"
-IO.println(s[0])       // segfault
-IO.println(s.char_at(0))  // "a" — correct
-```
-
-`IndexGet` on a String has no codegen path, so the list path runs against a
-`char*` and dereferences a character as if it were a list header. This is why
-`for (c in "ab")` cannot work: the `for-in` desugaring is index-based, so string
-iteration goes straight through `s[i]`.
-
-### 30. A builtin module function can't be passed as a value
-
-**Reproduction:**
-```saffron
-import "@iter" as Iter
-Iter.each(["a", "b"], IO.println)
-// [codegen] error: use of undefined value '%IO'
-```
-
-**Expected:** `IO.println` evaluates to a callable value.
-**Actual:** bare `IO.println` in value position emits a load from `%IO`, which
-does not exist — the same MemberAccess fallthrough as #22, but for functions
-rather than globals.
-
-**Workaround:** wrap it — `fun (s: String) => IO.println(s)`.
+**Note:** pre-existing, but only *reachable* since #24's parameter fix, because
+before that nothing could complete a socket connect. `test_async_io` and
+`test_httpx` fail here now instead of at connect.
 
 ## Fixed
 
+- ~~#28: an `Int` literal assigned to a `Float` annotation became NaN~~ — Fixed:
+  `gen_var_decl_with_name` stored the literal with its `TAG_INT` intact while every
+  downstream read treated the bits as a double, so `var f: Float = 1` came back as
+  the subnormal `4.94e-324`, or NaN once it reached a tag-inspecting path.
+
+  Only the declaration path was broken. Mixed arithmetic (`1 + 1.0`) always
+  worked because `__val_untag_float` (`base_nanbox.ll:263`) already converts an
+  int-tagged operand via `sitofp`; the fix reuses exactly that conversion as an
+  untag_float/tag_float round trip rather than duplicating a `sitofp`.
+
+  **Gated on `!identity_mode`, deliberately.** Identity mode has no tags and
+  compiles `Float` arithmetic as `add i64`, so `Float` *is* `Int` there — and the
+  compiler's own sources rely on that in 455 places (`var pos: Float = 0`,
+  `var depth: Float = 1`, `var slash_idx: Float = -1`). Converting unconditionally
+  would have corrupted every one of them.
+- ~~#30: a builtin module function couldn't be passed as a value~~ — Fixed, and it
+  was narrower than the write-up suggested. The MemberAccess handler in
+  `expr_body.sf` *does* have a module-prefixed function-reference branch, and
+  `module_prefixes` *does* map `IO -> __io_`; the branch was skipped only because
+  it gates on `known_functions`, and `__io_println`/`__io_print` were the sole
+  `IO.*` entries never registered there. They are special-cased earlier on the
+  *call* path (`methods_body.sf:976`, `expr_body.sf:1748`), so nothing ever
+  needed them in the table — until they appeared in value position, where the
+  miss fell through to a load from the nonexistent local `%IO`.
+
+  So this was not the same defect as #22: #22 is a genuinely missing branch for
+  module-level globals, this was a missing table entry. `IO.read_file` and every
+  `OS.*` function already worked as values.
+
+  Registering the two names in `known_functions` and `runtime_declares()`, plus
+  `func_param_count` entries (`gen_func_ref` sizes the trampoline from it and
+  would otherwise emit a 0-arg `call` against a 1-param declaration), is the whole
+  fix. The call path is unaffected because its special cases run first.
+
+  This makes the `Iter.each(["a","b","c"], IO.println)` example in
+  `src/lib/iter.sf`'s docstring — previously aspirational — actually run.
+- ~~#29: indexing a String segfaulted~~ — Fixed: `gen_index_get` had a `Map`
+  special case but nothing for `String`, so `s[0]` fell through to the list path
+  and `__list_get` read a character as if it were a list header. It now
+  dispatches on `last_type == "String"` — the same `last_type` that already made
+  `s.length()` resolve correctly, including through an `Any` annotation — and
+  calls a new `__str_get` runtime helper.
+
+  This also makes **`for (c in "ab")` work**, since the `for-in` desugaring is
+  index-based and went straight through `s[i]`.
+
+  `__str_get` mirrors `__list_get`, not `char_at`: negative indices count from
+  the end (`s[-1]`), and out of range raises a fatal IndexError instead of
+  reading past the terminator. `char_at(5)` on a 2-char string still returns
+  garbage silently — matching that would have been the wrong precedent. It
+  allocates with `rt_malloc` rather than `__gc_alloc` because, per #23, tagging
+  GC-allocated memory makes the collector sweep it while live.
 - ~~#31: a nested `for-in` visited only the first element of the outer loop~~ —
   Fixed: `desugar_for_in` in `src/compiler/parser.sf` named its temporaries
   `__for_list` / `__for_i` unconditionally. Nested loops share a scope chain, so
