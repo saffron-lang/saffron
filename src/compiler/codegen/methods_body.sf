@@ -413,6 +413,25 @@
     }
     var obj: String = this.gen_arg_value(object)
     var obj_type: AST.Type = this.last_type
+    // String indexing: s[i] → __str_get(s, i), a one-character String.
+    // Without this the list path runs against a char*, reading a character as
+    // if it were a list header (BUGS #29). It also blocked `for (c in "ab")`,
+    // since the for-in desugaring is index-based. __str_get does its own
+    // bounds check and negative-index adjustment, so the length/select dance
+    // below is skipped entirely.
+    if (this.type_to_string(obj_type) == "String") {
+        var sg_idx_tagged: String = this.gen_arg_value(index)
+        var sg_idx: String = this.emit_untag_int(sg_idx_tagged)
+        var sg_local: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(sg_local, "i64", "__str_get", "i64 " + obj + ", i64 " + sg_idx))
+        } else {
+            this.emit_indent(sg_local + " = call i64 @__str_get(i64 " + obj + ", i64 " + sg_idx + ")")
+        }
+        this.called_functions.push("__str_get")
+        this.last_type = AST.Type.StringType
+        return sg_local
+    }
     var idx_tagged: String = this.gen_arg_value(index)
     // Untag the index for arithmetic and runtime call
     var idx: String = this.emit_untag_int(idx_tagged)

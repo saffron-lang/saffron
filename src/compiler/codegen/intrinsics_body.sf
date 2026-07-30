@@ -183,9 +183,17 @@
                 var dbl: String = this.emit_untag_float(val)
                 call_args.push("double " + dbl)
             } else {
-                // Pass i64 values directly — no untagging needed.
-                // Saffron uses identity mode for pointer-as-int values (coro handles, etc.)
-                call_args.push("i64 " + val)
+                // Untag i64 params, exactly as the i32 path already does. This is
+                // safe for all three things an `Int` param can carry, because
+                // __val_untag_int masks 48 bits and sign-extends:
+                //   - a NaN-boxed Int      -> payload recovered (incl. negatives)
+                //   - a tag_ptr'd handle   -> TAG_PTR stripped, address recovered
+                //   - a raw address        -> identity (real addresses are < 2^47)
+                // Passing the value through raw was BUG #24: malloc(64) received
+                // 0x7FF9000000000040, and every i64-param extern got garbage —
+                // sf_tcp_connect could never connect and @process captured nothing.
+                var untagged64: String = this.emit_untag_int(val)
+                call_args.push("i64 " + untagged64)
             }
             i = i + 1
         }

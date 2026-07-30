@@ -173,6 +173,26 @@
         if (vtype == "String") {
             this.string_vars.push(name)
         }
+        // Int -> Float widening at an annotated declaration (BUGS #28).
+        //
+        // `var f: Float = 1` used to store the literal with its TAG_INT intact
+        // while every downstream read treated the bits as a double, so `1` came
+        // back as the subnormal 4.94e-324 — or NaN once it reached a
+        // tag-inspecting path. Mixed arithmetic (`1 + 1.0`) was never affected
+        // because `__val_untag_float` already converts an int-tagged operand
+        // via sitofp; only the declaration path skipped the conversion.
+        //
+        // The round trip through untag_float/tag_float reuses exactly that
+        // conversion rather than duplicating a sitofp here.
+        //
+        // Gated on !identity_mode deliberately: identity mode has no tags and
+        // compiles Float arithmetic as `add i64`, so Float *is* Int there. The
+        // compiler's own sources rely on that in 455 places (`Parser.pos`,
+        // `var depth: Float = 1`); converting would corrupt every one of them.
+        if (!this.identity_mode and vtype == "Float" and this.type_to_string(this.last_type) == "Int") {
+            var widened: String = this.emit_untag_float(val)
+            val = this.emit_tag_float(widened)
+        }
         var var_ref: String = "%" + this.sanitize_name(name)
         if (this.module_globals.has(this.current_prefix + name)) {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)

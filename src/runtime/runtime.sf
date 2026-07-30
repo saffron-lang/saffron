@@ -824,6 +824,39 @@ fun __list_contains(list: Int, val: Int): Int {
     return 0
 }
 
+/// s[i] — one-character String at byte offset i.
+///
+/// Indexing a String used to fall through to the list path, which read a
+/// character as if it were a list header and segfaulted (BUGS #29). Because the
+/// `for-in` desugaring is index-based, that also made `for (c in "ab")`
+/// impossible.
+///
+/// Bounds and negative indices behave exactly as `__list_get`: `s[-1]` is the
+/// last character, and out of range raises a fatal IndexError rather than
+/// reading past the terminator — `char_at` does neither, which is why `s[5]` on
+/// a 2-char string must not silently mirror it.
+fun __str_get(str: Int, index: Int): Int {
+    var rs: Int = __rt_untag_ptr(str)
+    if (rs == 0) { __null_pointer_error() }
+    var count: Int = rt_strlen(rs)
+    var actual_idx: Int = index
+    if (actual_idx < 0) {
+        actual_idx = count + actual_idx
+    }
+    if (actual_idx < 0 or actual_idx >= count) {
+        __index_error(actual_idx, count)
+        return 0
+    }
+    // rt_malloc, not __gc_alloc: per BUGS #23, __gc_is_heap_ptr rejects a
+    // NaN-tagged value, so tagging GC-allocated memory makes the collector
+    // sweep it while live. __list_join is safe for the same reason. The
+    // 2-byte buffer therefore leaks, exactly as `char_at` already does.
+    var buf: Int = rt_malloc(2)
+    store8(buf, load8(rs + actual_idx))
+    store8(buf + 1, 0)
+    return __rt_tag_ptr(buf)
+}
+
 // =============================================================================
 // I/O
 // =============================================================================

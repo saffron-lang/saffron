@@ -110,6 +110,12 @@ fun qsort(arr: Int, count: Int, size: Int, cmp: (Int, Int) => Int)
 
 ### 4. Typed Opaque Pointers — MEDIUM
 
+> **Superseded by [ffi-pointer-discipline.md](ffi-pointer-discipline.md).** This is
+> no longer only an ergonomics gap: because pointers and integers are both `Int`,
+> `gen_extern_call` cannot decide whether to unbox an `i64` parameter and passes it
+> raw, so `malloc(64)` receives `0x7FF9000000000040` and `@process` is entirely
+> non-functional. See BUGS #24.
+
 **Problem:** All C pointers are `Int` in Saffron — no type safety.
 
 **What's needed:**

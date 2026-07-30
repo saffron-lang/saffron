@@ -492,12 +492,24 @@
         this.known_functions.push("__map_has")
         this.known_functions.push("__map_keys")
         this.known_functions.push("__str_ends_with")
+        this.known_functions.push("__str_get")
         this.known_functions.push("__str_split")
         this.known_functions.push("__str_replace")
         this.known_functions.push("__int_to_string")
         this.known_functions.push("__list_join")
         this.known_functions.push("__join_append")
         this.known_functions.push("__list_contains")
+        // __io_println / __io_print are handled by a special case in the *call*
+        // path (methods_body.sf and expr_body.sf both intercept them before
+        // generic dispatch), so they were never registered here — unlike every
+        // other `IO.*` entry below. That made them the only builtins invisible to
+        // the module-prefixed function-reference branch in gen_expr's
+        // MemberAccess handler, so `IO.println` in value position fell through to
+        // a load from the nonexistent local `%IO` (BUGS #30). Registering them
+        // costs nothing on the call path — the special cases run first — and
+        // makes the reference path resolve them like `IO.read_file` already does.
+        this.known_functions.push("__io_println")
+        this.known_functions.push("__io_print")
         this.known_functions.push("__io_read_file")
         this.known_functions.push("__io_write_file")
         this.known_functions.push("__io_file_exists")
@@ -550,6 +562,12 @@
         this.known_functions.push("__gc_env_alloc")
         this.known_functions.push("__gc_instance_alloc")
         this.func_ret_types.set("StringBuilder", this.str_to_type("StringBuilder"))
+        // Arity for the two IO builtins reachable as values (BUGS #30). gen_func_ref
+        // reads func_param_count to size the trampoline's parameter list; without an
+        // entry it assumes 0 and emits `call i64 @__io_println()`, which fails to
+        // verify against the 1-param declaration.
+        this.func_param_count.set("__io_println", 1)
+        this.func_param_count.set("__io_print", 1)
 
         // Pre-scan: register extension methods before compilation
         var ei: Float = 0
