@@ -2,6 +2,23 @@
 
 ## Open
 
+### 39. IO.println on lists/maps prints garbage on wasm32
+
+Fixed on native (commit 88297ca) but deliberately skipped on wasm32. The fix
+routes bare collection pointers through `__rt_as_list_ptr`/`__rt_as_map_ptr`
+before the pointer/float split in `__any_to_string`. Those functions guard on
+the GC header magic sentinel (`6557403441622859503` at `ptr - 8`) before
+trusting the type tag. On wasm32 the GC header has **no sentinel** — `__gc_alloc`
+in `wasm_base_32.ll` stores only the type tag at `ptr - 8` (`[type_tag: i64][user
+data]`), so the guard is unsound there: it reads a small type tag (1/2/3), which
+never equals the sentinel, so every collection is rejected and still falls
+through to `do_float`. Applying the native fix regressed string printing
+(`IO.println("hi")` → `[]`), so it was reverted for wasm32.
+
+Real fix requires either giving the wasm32 GC header the same magic sentinel as
+native, or a sentinel-free discriminator for wasm32. See the WasmGC discussion —
+adopting reference types would eliminate this pointer/float ambiguity entirely.
+
 ### 2. Forward references in nested closures
 
 **Reproduction:**
