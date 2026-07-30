@@ -31,21 +31,21 @@ fun stats() {
 }
 
 /// Return the number of live GC-tracked allocations.
-fun alloc_count(): Number {
+fun alloc_count(): Int {
     return _alloc_count()
 }
 
 /// Return the total bytes allocated (with GC headers).
-fun total_bytes(): Number {
+fun total_bytes(): Int {
     return _total_bytes()
 }
 
 /// Return the current auto-collection threshold in bytes.
-fun threshold(): Number {
+fun threshold(): Int {
     return _threshold()
 }
 
 /// Set the auto-collection threshold in bytes.
-fun set_threshold(bytes: Number) {
+fun set_threshold(bytes: Int) {
     _set_threshold(bytes)
 }

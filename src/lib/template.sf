@@ -37,7 +37,7 @@ fun _to_str(value: Any): String {
 
 /// Find the index of a substring starting from a given position.
 /// Returns -1 if not found.
-fun _index_from(source: String, needle: String, start: Number): Number {
+fun _index_from(source: String, needle: String, start: Int): Int {
     var remaining = source.slice(start, source.length())
     var idx = remaining.index_of(needle)
     if (idx == -1) { return -1 }
@@ -47,7 +47,7 @@ fun _index_from(source: String, needle: String, start: Number): Number {
 /// Find the matching closing tag for a block (handles nesting).
 /// Returns the index of the opening `{{` of the closing tag.
 /// tag_name is "if", "unless", or "each".
-fun _find_closing_tag(template: String, tag_name: String, start: Number): Number {
+fun _find_closing_tag(template: String, tag_name: String, start: Int): Int {
     var open_tag = "{{#" + tag_name
     var close_tag = "{{/" + tag_name + "}}"
     var depth = 1
@@ -81,7 +81,7 @@ fun _find_closing_tag(template: String, tag_name: String, start: Number): Number
 /// Find the {{else}} marker at the current nesting level within a block.
 /// Searches between start and end positions.
 /// Returns -1 if no else found at depth 0.
-fun _find_else(template: String, tag_name: String, start: Number, end: Number): Number {
+fun _find_else(template: String, tag_name: String, start: Int, end: Int): Int {
     var open_tag = "{{#" + tag_name
     var close_tag = "{{/" + tag_name + "}}"
     var else_tag = "{{else}}"

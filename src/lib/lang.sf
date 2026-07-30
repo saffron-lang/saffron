@@ -89,7 +89,7 @@ fun string_lit(value: String): Any {
 }
 
 /// Create an integer literal expression.
-fun int_lit(value: Number): Any {
+fun int_lit(value: Int): Any {
     return AST.Expr.IntLit(value)
 }
 

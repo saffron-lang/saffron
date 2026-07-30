@@ -30,7 +30,7 @@
 //! var ips = Net.resolve("example.com")
 //!
 //! // Escape hatch: raw fd access for advanced use (select/poll/etc.)
-//! var fd: Number = conn.raw_fd()
+//! var fd: Int = conn.raw_fd()
 //! ```
 
 import "@scheduler" as Scheduler

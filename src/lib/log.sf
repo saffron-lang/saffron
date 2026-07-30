@@ -37,7 +37,7 @@ fun level_name(level: Level): String {
 }
 
 /// Convert a Level to its numeric priority (higher = more severe).
-fun level_priority(level: Level): Number {
+fun level_priority(level: Level): Int {
     return match (level) {
         Trace => 0,
         Debug => 1,
@@ -229,7 +229,7 @@ class MemoryHandler extends Handler {
     }
 
     /// Get the number of stored records.
-    fun count(): Number {
+    fun count(): Int {
         return this.records.length()
     }
 }

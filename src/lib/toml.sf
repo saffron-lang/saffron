@@ -20,7 +20,7 @@ fun parse(source: String): Map<String, Any> {
         return source.char_at(pos)
     }
 
-    fun peek_at(offset: Number): String {
+    fun peek_at(offset: Int): String {
         var idx = pos + offset
         if (idx >= source.length()) { return "" }
         return source.char_at(idx)
@@ -761,14 +761,14 @@ class TomlTable {
         return this.data.get(key)
     }
 
-    fun number(key: String): Number {
+    fun number(key: String): Any {
         if (!this.data.has(key)) {
             throw "TOML: missing key '${key}'"
         }
         return this.data.get(key)
     }
 
-    fun number_or(key: String, default: Number): Number {
+    fun number_or(key: String, default: Any): Any {
         if (!this.data.has(key)) { return default }
         return this.data.get(key)
     }

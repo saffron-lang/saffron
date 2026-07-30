@@ -113,7 +113,7 @@ fun first(finder: FileFinder): String {
 }
 
 /// Return the total number of files found.
-fun count(finder: FileFinder): Number {
+fun count(finder: FileFinder): Int {
     var all = files(finder)
     return all.length()
 }

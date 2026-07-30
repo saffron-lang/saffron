@@ -12,13 +12,13 @@
 
 /// Represents a parsed semantic version.
 class Version {
-    var major: Number
-    var minor: Number
-    var patch: Number
+    var major: Int
+    var minor: Int
+    var patch: Int
     var prerelease: String
     var build: String
 
-    fun init(major: Number, minor: Number, patch: Number, prerelease: String, build: String) {
+    fun init(major: Int, minor: Int, patch: Int, prerelease: String, build: String) {
         this.major = major
         this.minor = minor
         this.patch = patch
@@ -48,7 +48,7 @@ fun _is_all_digits(s: String): Bool {
 
 var _ascii_order = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
-fun _strcmp(a: String, b: String): Number {
+fun _strcmp(a: String, b: String): Int {
     var i = 0
     var len = a.length()
     if (b.length() < len) { len = b.length() }
@@ -68,7 +68,7 @@ fun _strcmp(a: String, b: String): Number {
 /// Numeric identifiers are compared as integers; alphanumeric identifiers are
 /// compared lexically. Numeric identifiers always have lower precedence than
 /// alphanumeric identifiers.
-fun _compare_identifiers(a: String, b: String): Number {
+fun _compare_identifiers(a: String, b: String): Int {
     var a_num = _is_all_digits(a)
     var b_num = _is_all_digits(b)
     if (a_num and b_num) {
@@ -85,7 +85,7 @@ fun _compare_identifiers(a: String, b: String): Number {
 }
 
 /// Compare prerelease strings per semver precedence rules.
-fun _compare_prerelease(a: String, b: String): Number {
+fun _compare_prerelease(a: String, b: String): Int {
     // No prerelease on either — equal
     if (a == "" and b == "") { return 0 }
     // A version without prerelease has HIGHER precedence
@@ -194,7 +194,7 @@ fun parse(version_str: String): Version {
 /// SemVer.compare(SemVer.parse("1.0.0"), SemVer.parse("2.0.0"))  // -1
 /// SemVer.compare(SemVer.parse("1.0.0"), SemVer.parse("1.0.0"))  // 0
 /// ```
-fun compare(a: Version, b: Version): Number {
+fun compare(a: Version, b: Version): Int {
     if (a.major < b.major) { return -1 }
     if (a.major > b.major) { return 1 }
     if (a.minor < b.minor) { return -1 }

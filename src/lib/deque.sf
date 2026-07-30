@@ -3,7 +3,7 @@
 /// Iterator for traversing a Deque from front to back.
 class DequeIter {
     var _items: List<Any>
-    var _pos: Number
+    var _pos: Int
 
     fun init(items: List<Any>) {
         this._items = items
@@ -35,7 +35,7 @@ class DequeIter {
 class Deque {
     var _front: List<Any>
     var _back: List<Any>
-    var _len: Number
+    var _len: Int
 
     fun init() {
         this._front = []
@@ -98,7 +98,7 @@ class Deque {
     }
 
     /// Return the number of elements.
-    fun length(): Number {
+    fun length(): Int {
         return this._len
     }
 

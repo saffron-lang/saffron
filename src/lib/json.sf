@@ -236,11 +236,11 @@ fun parse_into(klass: Any, source: String): Any {
 /// // }
 /// ```
 fun pretty(value: Any): String {
-    fun pad(depth: Number): String {
+    fun pad(depth: Int): String {
         return "  ".repeat(depth)
     }
 
-    fun fmt(val: Any, depth: Number): String {
+    fun fmt(val: Any, depth: Int): String {
         if (val == nil) { return "null" }
         if (val == true) { return "true" }
         if (val == false) { return "false" }

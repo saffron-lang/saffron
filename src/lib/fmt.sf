@@ -52,7 +52,7 @@ fun format(template: String, values: List<Any>): String {
 /// import "@fmt" as Fmt
 /// Fmt.pad_left("42", 5, "0")  // "00042"
 /// ```
-fun pad_left(text: String, width: Number, fill: String): String {
+fun pad_left(text: String, width: Int, fill: String): String {
     var sb = StringBuilder()
     var needed = width - text.length()
     var i = 0
@@ -70,7 +70,7 @@ fun pad_left(text: String, width: Number, fill: String): String {
 /// import "@fmt" as Fmt
 /// Fmt.pad_right("hi", 5, ".")  // "hi..."
 /// ```
-fun pad_right(text: String, width: Number, fill: String): String {
+fun pad_right(text: String, width: Int, fill: String): String {
     var sb = StringBuilder()
     sb.append(text)
     var needed = width - text.length()
@@ -88,7 +88,7 @@ fun pad_right(text: String, width: Number, fill: String): String {
 /// import "@fmt" as Fmt
 /// Fmt.center("hi", 6, "-")  // "--hi--"
 /// ```
-fun center(text: String, width: Number, fill: String): String {
+fun center(text: String, width: Int, fill: String): String {
     var total = width - text.length()
     if (total <= 0) { return text }
     var left = total / 2
@@ -108,6 +108,6 @@ fun center(text: String, width: Number, fill: String): String {
 /// import "@fmt" as Fmt
 /// Fmt.repeat("ha", 3)  // "hahaha"
 /// ```
-fun repeat(text: String, n: Number): String {
+fun repeat(text: String, n: Int): String {
     return text.repeat(n)
 }

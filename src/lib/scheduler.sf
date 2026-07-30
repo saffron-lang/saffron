@@ -14,7 +14,7 @@
 
 var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
-var sleep_times: List<Number> = []
+var sleep_times: List<Float> = []
 var result_handles: List<Int> = []
 var result_values: List<Int> = []
 

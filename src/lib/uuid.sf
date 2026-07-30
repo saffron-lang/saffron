@@ -3,7 +3,7 @@
 import "@random" as Random
 
 /// Convert a number 0-15 to its lowercase hexadecimal character.
-fun _to_hex(n: Number): String {
+fun _to_hex(n: Int): String {
     var chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]
     return chars[n]
 }
@@ -133,6 +133,6 @@ fun eq(a: String, b: String): Bool {
 /// import "@uuid" as UUID
 /// UUID.version("550e8400-e29b-41d4-a716-446655440000")  // 4
 /// ```
-fun version(s: String): Number {
+fun version(s: String): Int {
     return s.char_at(14).to_number()
 }
