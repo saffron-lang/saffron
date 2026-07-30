@@ -9,17 +9,23 @@
 import "@test" as Test
 
 // --- Annotated maps keep narrowing (the type system must not regress) ---
+//
+// get() on an annotated Map<K, V> narrows to V|Nil — a missing key yields nil
+// regardless of the map's declared value type, so the result is nullable. An
+// explicit annotation on the result variable is the programmer's non-null
+// assertion (per the checker's VarDecl rule), which is how you unwrap it before
+// calling a method. `var sv = strs.get("k")` (unannotated) is correctly String|Nil.
 
 var ints: Map<String, Int> = {"a": 7}
-var iv = ints.get("a")
+var iv: Int = ints.get("a")
 Test.assert_eq(iv + 1, 8, "Map<String, Int> get narrows to Int")
 
 var strs: Map<String, String> = {"k": "hi"}
-var sv = strs.get("k")
+var sv: String = strs.get("k")
 Test.assert_eq(sv.to_upper(), "HI", "Map<String, String> get narrows to String")
 
 var lists: Map<String, List<Int>> = {"xs": [1, 2]}
-var lv = lists.get("xs")
+var lv: List<Int> = lists.get("xs")
 Test.assert_eq(lv.length(), 2, "Map<String, List<Int>> get narrows to List<Int>")
 
 // --- Unannotated maps yield Any and dispatch at runtime ---
