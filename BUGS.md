@@ -293,7 +293,68 @@ resumed coroutine re-run earlier body statements.
 a pre-#24 baseline. Printing is the visible symptom; any effectful statement
 before an `await` in a loop body is silently duplicated, which is worse.
 
+### 37. Method dispatch that matches no branch returns a silent zero
+
+`gen_method_call` (`methods_body.sf`) ends with `this.last_type =
+AST.Type.IntType; return "0"` and emits an error *only* when `obj_type` is a
+known user class missing the method. For a builtin/`Int`/`Any`/empty `obj_type`
+— exactly the "type inference failed" case — it falls through emitting **no
+call at all** and hands back the literal `0`:
+
+```saffron
+fun make(): Int { return 0 }
+var x = make()
+x.push(5)          // no __list_push emitted; the push vanishes, x unchanged
+```
+
+This is the mechanism that turned #33 into a segfault and #36 into lost data:
+whenever type inference lands on `Int` for something that isn't, the method
+silently no-ops instead of failing the compile.
+
+**Proposed fix:** make the terminal fall-through an error (`has_errors = true`)
+for builtin/unknown `obj_type` too, symmetric with the user-class arm. **Blocked
+on** the 8 remaining legitimate-looking fall-throughs — `Json.parse` /
+`parse_into` (module-namespace resolution, not a receiver method) and one
+`String.push` in `toml_test.sf` (a genuine invalid call the checker doesn't
+reject). Those must be routed or rejected earlier first, or hardening the
+terminal breaks `json.sf` / `toml_test.sf` at build time. Related to #33's
+closing note.
+
 ## Fixed
+
+- ~~#36: `push`/`set` on an unannotated module-level list silently vanished~~ —
+  Fixed. A module global declared `var _items = []` (no annotation) never had a
+  type inferred, so `_items.push(x)` from any function in that module hit the
+  #37 fall-through and emitted no `__list_push` — the element was dropped and
+  the list stayed empty.
+
+  ```saffron
+  // lib.sf
+  var _items = []
+  fun add(x: Any) { _items.push(x) }
+  fun count(): Int { return _items.length() }
+  // main.sf:  Lib.add(5); Lib.add(10); Lib.count()  ==> was 0, now 2
+  ```
+
+  **Root cause:** the module-global pre-scan in `codegen.sf` registered a global's
+  type only from its *annotation* (`get_var_type`), never from its initializer.
+  Local `var`s infer through `gen_var_decl_with_name`, but a module global is
+  registered by this earlier pass so functions compiled before the module init
+  can resolve list/map/string dispatch — and that pass skipped inference
+  entirely. So `_items` fell back to `Int`, and `.push` misdispatched.
+
+  The fix infers from the initializer when the annotation is absent, in all
+  **three** copies of the pre-scan (`generate_with_modules` and the two `flat`
+  variants). Because this pass runs before function return types are registered,
+  only literal shapes — list, map, string — are resolved here; that is exactly
+  the `[]` / `{}` / `""` global case that misfires. `test.sf`'s `_tests`/
+  `_test_errors`, `bytes.sf`'s buffers, and similar stdlib globals are covered.
+
+  Cut the suite's silent fall-throughs from 96 to 8 (the remainder are #37's
+  `Json.parse` namespace resolution and one invalid `String.push`), fixed
+  `test_buffer` (17/20 → 20/20 — three assertions had been losing pushes to a
+  module-global `Buffer`), and changed no other exit code across all 111 tests.
+
 
 - ~~#33: `to_lower()` on a function's return value produced a null receiver~~ —
   Fixed. Filed as a String-dispatch bug; it was actually a declaration-order bug
