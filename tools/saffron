@@ -273,9 +273,23 @@ build_project() {
         if [[ ! -x "$WASM_CLANG" ]]; then
             WASM_CLANG="clang"
         fi
-        # Compile runtime for wasm32
+        # Compile runtime for wasm32.
+        #
+        # --identity-mode is REQUIRED and was missing. runtime.sf is the layer
+        # that implements NaN-boxing, so it must be compiled with values treated
+        # as raw i64 bits; without the flag the compiler re-boxes them and every
+        # tag inspection in the runtime operates on doubly-tagged values.
+        # bootstrap.sh has always passed it for the native runtime (see the
+        # `--identity-mode` calls there); only this wasm32 path did not.
+        #
+        # The visible symptom was `[3.0, 6.0].join(", ")` yielding ", " on
+        # wasm32: `elem >> 48` in __list_join went through __val_untag_int,
+        # which on wasm32 converts a float to its integer VALUE (fptosi), so
+        # 3.0 became 3, `3 >> 48` became 0, and 0 is exactly the "plausible
+        # bare heap pointer" case — the float was then dereferenced as a string.
         local runtime_ll="$TMPDIR/runtime.ll"
-        "$SAFFRONC" --target wasm32 "$RUNTIME_SRC" "$runtime_ll" 2>/dev/null || true
+        "$SAFFRONC" --target wasm32 --identity-mode --stdlib "$SCRIPT_DIR/src/lib" \
+            "$RUNTIME_SRC" "$runtime_ll" 2>/dev/null || true
         # Discover dispatch/callback symbols to export (module-prefixed names)
         # No --export=memory: memory is not a linker symbol, so wasm-ld errors on it
         # ("symbol exported via --export not found: memory"). It exports the memory
