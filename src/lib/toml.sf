@@ -620,7 +620,7 @@ fun stringify(table_data: Any): String {
         if (value == nil) { return "\"\"" }
         if (value == true) { return "true" }
         if (value == false) { return "false" }
-        if (value is Number) { return value.to_string() }
+        if (value is Int or value is Float) { return value.to_string() }
         if (value is String) { return escape_basic_string(value) }
         if (value is List) {
             var result = StringBuilder()

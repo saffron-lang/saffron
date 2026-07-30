@@ -172,7 +172,7 @@ fun to_string(value: Any): String {
     if (value == nil) { return "null" }
     if (value == true) { return "true" }
     if (value == false) { return "false" }
-    if (value is Number) { return Reflect.number_to_string(value) }
+    if (value is Int or value is Float) { return Reflect.number_to_string(value) }
     if (value is String) { return escape_string(value) }
 
     if (value is List) {
@@ -244,7 +244,7 @@ fun pretty(value: Any): String {
         if (val == nil) { return "null" }
         if (val == true) { return "true" }
         if (val == false) { return "false" }
-        if (val is Number) { return Reflect.number_to_string(val) }
+        if (val is Int or val is Float) { return Reflect.number_to_string(val) }
         if (val is String) { return escape_string(val) }
 
         if (val is List) {
