@@ -321,7 +321,32 @@
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
-                if (!this.str_in_list(child_methods,mname) and mname != "init") {
+                var forward_method: Bool = !this.str_in_list(child_methods,mname)
+                if (mname == "init") {
+                    // `init` used to be excluded here, which meant a child that
+                    // declares no constructor of its own got no Child__init at
+                    // all. The call site in gen_call only emits the __init call
+                    // when it is a known function, so `Child("Rex")` compiled to
+                    // a bare `call @Child()` with every argument silently
+                    // dropped; the fields stayed zero and the first field read
+                    // through an inherited method segfaulted.
+                    //
+                    // Forwarding is safe because the parent's fields are
+                    // prepended to the child's, so parent field index i is also
+                    // child field index i and all fields are i64. The one case
+                    // where that does not hold is an actor inheriting from a
+                    // non-actor: the actor gets two hidden fields prepended,
+                    // shifting every inherited index by two.
+                    if (this.actor_classes.has(name) and !this.actor_classes.has(parent)) {
+                        forward_method = false
+                    }
+                    // Without a known arity we cannot emit matching parameters,
+                    // and a forwarder with the wrong arity is worse than none.
+                    if (!this.called_function_arity.has(this.current_prefix + parent + "__init")) {
+                        forward_method = false
+                    }
+                }
+                if (forward_method) {
                     // Register parent method as callable on child
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
@@ -355,13 +380,19 @@
                 }
                 i = i + 1
             }
-            // Interface conformance: if parent has no fields, check all methods are implemented
-            var parent_fields_str: String = this.class_fields.get(parent)
-            if (parent_fields_str.length() == 0) {
-                // This is an interface — check conformance
+            // Conformance: only the parent's ABSTRACT (bodyless) methods are
+            // requirements. Previously this keyed off "parent has no fields" as a
+            // proxy for "parent is an interface", then demanded every parent method
+            // be redeclared — which rejected legitimate inheritance from a
+            // fieldless base class and forced implementors to copy interface
+            // default-method bodies. Note child_methods has already had inherited
+            // names pushed into it above, so a method inherited from a grandparent
+            // correctly counts as satisfying the requirement.
+            if (this.class_abstract_methods.has(parent)) {
+                var required_methods: List = this.class_abstract_methods.get(parent)
                 var pi: Int = 0
-                while (pi < parent_methods.length()) {
-                    var required: String = parent_methods[pi]
+                while (pi < required_methods.length()) {
+                    var required: String = required_methods[pi]
                     if (required != "init" and !this.str_in_list(child_methods,required)) {
                         IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
                     }
@@ -419,12 +450,19 @@
 
         // Register method names
         var method_names: List<String> = []
+        var abstract_method_names: List<String> = []
         i = 0
         while (i < methods.length()) {
-            method_names.push(this.get_fun_name(methods[i]))
+            var reg_mname: String = this.get_fun_name(methods[i])
+            method_names.push(reg_mname)
+            // Bodyless == abstract == a requirement on subclasses.
+            if (this.get_fun_body(methods[i]).length() == 0) {
+                abstract_method_names.push(reg_mname)
+            }
             i = i + 1
         }
         this.class_methods.set(name, method_names)
+        this.class_abstract_methods.set(name, abstract_method_names)
 
         // Pre-register all method return types so forward references resolve correctly
         i = 0

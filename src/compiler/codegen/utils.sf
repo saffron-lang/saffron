@@ -112,11 +112,23 @@ extend fun Codegen.gen_logical(left: AST.Expr, op: String, right: AST.Expr): Str
         this.start_block(rhs_label)
         var rhs_raw: String = this.gen_arg_value(right)
         var rhs: String = this.to_i1(rhs_raw)
-        this.emit_terminator("br label %" + end_label)
+        // See utils_body.sf: the phi predecessor must be the block control
+        // actually leaves from, not rhs_label, which gen_arg_value may have left.
+        var rhs_reaches_end: Bool = !this.block_terminated
+        var rhs_exit: String = this.fresh_label("rhs.exit")
+        if (rhs_reaches_end) {
+            this.emit_terminator("br label %" + rhs_exit)
+            this.start_block(rhs_exit)
+            this.emit_terminator("br label %" + end_label)
+        }
 
         this.start_block(end_label)
         var phi_result: String = this.fresh_local()
-        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
+        if (rhs_reaches_end) {
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_exit + "]")
+        } else {
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "]")
+        }
         // Extend back to i64 for uniform value type
         var result: String = this.fresh_local()
         this.emit_indent(result + " = zext i1 " + phi_result + " to i64")

@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn Saffron in Y minutes</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1c1b19;
+    --muted: #6b6862;
+    --rule: #e3e0d8;
+    --accent: #b3541e;
+    --code-bg: #faf8f3;
+    --kw: #a1361a;
+    --str: #4a6b28;
+    --com: #96938c;
+    --num: #7a4c9e;
+    --typ: #1f6383;
+    --int: #2a6f7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17161a;
+      --fg: #e8e6e1;
+      --muted: #9a968e;
+      --rule: #2e2c31;
+      --accent: #e8944a;
+      --code-bg: #1e1d22;
+      --kw: #e8825e;
+      --str: #a8c973;
+      --com: #6e6a72;
+      --num: #c99ae0;
+      --typ: #77c4de;
+      --int: #7fd4c1;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  header { border-bottom: 1px solid var(--rule); padding-bottom: 1.75rem; margin-bottom: 2rem; }
+  .eyebrow {
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 .6rem;
+  }
+  h1 { font-size: clamp(1.9rem, 4.5vw, 2.9rem); line-height: 1.1; margin: 0 0 .75rem; font-weight: 700; letter-spacing: -.02em; }
+  h1 .lang { color: var(--accent); }
+  .lede { color: var(--muted); margin: 0; max-width: 46rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .5rem .75rem;
+    margin: 1.5rem 0 0; padding: 0; list-style: none;
+    font-size: .8rem; color: var(--muted);
+  }
+  .meta li { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 999px; padding: .18rem .7rem; }
+  .note {
+    margin: 0 0 2rem; padding: .85rem 1.1rem;
+    border-left: 3px solid var(--accent); background: var(--code-bg);
+    font-size: .88rem; color: var(--muted); border-radius: 0 4px 4px 0;
+  }
+  .note strong { color: var(--fg); font-weight: 600; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.25rem 1.4rem;
+    overflow-x: auto;
+    margin: 0;
+    font: 13.5px/1.7 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    tab-size: 4;
+  }
+  code { font-family: inherit; }
+  .k { color: var(--kw); font-weight: 600; }
+  .s { color: var(--str); }
+  .i { color: var(--int); }
+  .c { color: var(--com); font-style: italic; }
+  .n { color: var(--num); }
+  .t { color: var(--typ); }
+  footer {
+    margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: .85rem; color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+  @media (max-width: 40rem) {
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    pre { font-size: 12.5px; padding: 1rem; border-radius: 0; border-left: 0; border-right: 0; margin: 0 -1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Learn X in Y minutes</p>
+  <h1>Learn <span class="lang">Saffron</span> in Y minutes</h1>
+  <p class="lede">Saffron is a small statically typed scripting language implemented in C17 and self-hosted
+  in itself. Source compiles to bytecode for a stack VM, or through LLVM to a native binary. It borrows
+  algebraic data types and exhaustive matching from the ML family, classes and interfaces from the
+  object-oriented tradition, and cooperative tasks plus actors for concurrency.</p>
+  <ul class="meta">
+    <li>Statically typed</li>
+    <li>Bytecode VM + LLVM backend</li>
+    <li>Self-hosted compiler</li>
+    <li>Mark-sweep GC</li>
+    <li>Cooperative async</li>
+    <li>Actors</li>
+  </ul>
+</header>
+
+<pre><code><span class="c">// Saffron is a small statically typed scripting language. It compiles to</span>
+<span class="c">// bytecode for a VM, or through LLVM to a native binary. Everything below</span>
+<span class="c">// is the whole language — it fits in one file on purpose.</span>
+
+<span class="c">// Single-line comments start with two slashes.</span>
+
+<span class="c">/* Block comments
+   span multiple lines. */</span>
+
+<span class="c">// Statements end at the newline. Semicolons are optional, and mostly</span>
+<span class="c">// used to squeeze several statements onto one line.</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 1. Values and variables</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// `var` declares a mutable binding, `let` an immutable one.</span>
+<span class="k">var</span> counter = <span class="n">0</span>
+<span class="k">let</span> language = <span class="s">"Saffron"</span>
+
+<span class="c">// Type annotations go after a colon. They&#x27;re optional when the type is</span>
+<span class="c">// obvious from the initializer.</span>
+<span class="k">var</span> pi: <span class="t">Number</span> = <span class="n">3.14159</span>
+<span class="k">var</span> greeting = <span class="s">"hello"</span>      <span class="c">// inferred as String</span>
+<span class="k">var</span> ready = <span class="k">true</span>            <span class="c">// inferred as Bool</span>
+<span class="k">var</span> nothing = <span class="k">nil</span>           <span class="c">// Nil</span>
+
+<span class="c">// The primitive types are Number, String, Bool, and Nil. Int and Float</span>
+<span class="c">// are also accepted, and kept distinct internally for optimization.</span>
+<span class="k">var</span> tick: <span class="t">Int</span> = <span class="n">42</span>
+<span class="k">var</span> ratio: <span class="t">Float</span> = <span class="n">0.5</span>
+
+<span class="c">// Types are checked at compile time. This would not compile:</span>
+<span class="c">// var oops: Number = &quot;hello&quot;   // Error: expected Number, got String</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 2. Operators</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="t">IO</span>.println(<span class="n">1</span> + <span class="n">1</span>)        <span class="c">// 2</span>
+<span class="t">IO</span>.println(<span class="n">10</span> - <span class="n">3</span>)       <span class="c">// 7</span>
+<span class="t">IO</span>.println(<span class="n">6</span> * <span class="n">7</span>)        <span class="c">// 42</span>
+<span class="t">IO</span>.println(<span class="n">10</span> / <span class="n">4</span>)       <span class="c">// 2 — integer division when both sides are Ints</span>
+<span class="t">IO</span>.println(<span class="n">7</span> % <span class="n">3</span>)        <span class="c">// 1</span>
+
+<span class="c">// Comparisons produce Bool.</span>
+<span class="t">IO</span>.println(<span class="n">1</span> &lt; <span class="n">2</span>)        <span class="c">// true</span>
+<span class="t">IO</span>.println(<span class="n">3</span> != <span class="n">3</span>)       <span class="c">// false</span>
+
+<span class="c">// The logical operators are words, not symbols.</span>
+<span class="t">IO</span>.println(<span class="k">true</span> <span class="k">and</span> <span class="k">false</span>)   <span class="c">// false</span>
+<span class="t">IO</span>.println(<span class="k">true</span> <span class="k">or</span> <span class="k">false</span>)    <span class="c">// true</span>
+<span class="t">IO</span>.println(!<span class="k">true</span>)            <span class="c">// false</span>
+
+<span class="c">// Bitwise operators work on Ints. Hex literals use the 0x prefix.</span>
+<span class="t">IO</span>.println(<span class="n">0xF0</span> &amp; <span class="n">0x0F</span>)  <span class="c">// 0</span>
+<span class="t">IO</span>.println(<span class="n">0xF0</span> | <span class="n">0x0F</span>)  <span class="c">// 255</span>
+<span class="t">IO</span>.println(<span class="n">0xFF</span> ^ <span class="n">0x0F</span>)  <span class="c">// 240</span>
+<span class="t">IO</span>.println(<span class="n">1</span> &lt;&lt; <span class="n">4</span>)       <span class="c">// 16</span>
+<span class="t">IO</span>.println(<span class="n">16</span> &gt;&gt; <span class="n">2</span>)      <span class="c">// 4</span>
+<span class="t">IO</span>.println(~<span class="n">0</span>)           <span class="c">// -1</span>
+
+<span class="c">// `is` tests a value&#x27;s type at runtime. Types are first-class values.</span>
+<span class="t">IO</span>.println(<span class="n">42</span> <span class="k">is</span> <span class="t">Number</span>)   <span class="c">// true</span>
+<span class="t">IO</span>.println(<span class="s">"hi"</span> <span class="k">is</span> <span class="t">String</span>) <span class="c">// true</span>
+<span class="t">IO</span>.println(<span class="k">nil</span> <span class="k">is</span> <span class="t">Nil</span>)     <span class="c">// true</span>
+
+<span class="c">// Numbers and Bools have methods. Parenthesize a literal to call one.</span>
+<span class="t">IO</span>.println((-<span class="n">5</span>).abs())     <span class="c">// 5</span>
+<span class="t">IO</span>.println((<span class="n">3.7</span>).floor())  <span class="c">// 3</span>
+<span class="t">IO</span>.println((<span class="n">3.2</span>).ceil())   <span class="c">// 4</span>
+<span class="t">IO</span>.println(<span class="k">true</span>.to_string())  <span class="c">// &quot;true&quot;</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 3. Strings</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// Interpolation uses ${}, and any expression fits inside it.</span>
+<span class="t">IO</span>.println(<span class="s">"Welcome to </span><span class="i">${language}</span><span class="s">!"</span>)
+<span class="t">IO</span>.println(<span class="s">"2 + 2 = </span><span class="i">${2 + 2}</span><span class="s">"</span>)
+
+<span class="k">var</span> text = <span class="s">"hello world"</span>
+<span class="t">IO</span>.println(text.length())          <span class="c">// 11</span>
+<span class="t">IO</span>.println(text.to_upper())        <span class="c">// HELLO WORLD</span>
+<span class="t">IO</span>.println(text.slice(<span class="n">0</span>, <span class="n">5</span>))       <span class="c">// hello</span>
+<span class="t">IO</span>.println(text.contains(<span class="s">"wor"</span>))   <span class="c">// true</span>
+<span class="t">IO</span>.println(text.starts_with(<span class="s">"he"</span>)) <span class="c">// true</span>
+<span class="t">IO</span>.println(text.index_of(<span class="s">"world"</span>)) <span class="c">// 6</span>
+<span class="t">IO</span>.println(text.replace(<span class="s">"l"</span>, <span class="s">"L"</span>)) <span class="c">// heLLo worLd</span>
+<span class="t">IO</span>.println(<span class="s">"  padded  "</span>.trim())    <span class="c">// padded</span>
+<span class="t">IO</span>.println(<span class="s">"ha"</span>.repeat(<span class="n">3</span>))         <span class="c">// hahaha</span>
+<span class="t">IO</span>.println(<span class="s">"42"</span>.to_number())       <span class="c">// 42</span>
+
+<span class="c">// split() gives you a List&lt;String&gt;; join() puts one back together.</span>
+<span class="k">var</span> words = text.split(<span class="s">" "</span>)
+<span class="t">IO</span>.println(words[<span class="n">0</span>])               <span class="c">// hello</span>
+<span class="t">IO</span>.println(words.join(<span class="s">" + "</span>))      <span class="c">// hello + world</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 4. Control flow</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">var</span> n = <span class="n">10</span>
+
+<span class="k">if</span> (n &gt; <span class="n">5</span>) {
+    <span class="t">IO</span>.println(<span class="s">"big"</span>)
+} <span class="k">else</span> <span class="k">if</span> (n &gt; <span class="n">0</span>) {
+    <span class="t">IO</span>.println(<span class="s">"small"</span>)
+} <span class="k">else</span> {
+    <span class="t">IO</span>.println(<span class="s">"nonpositive"</span>)
+}
+
+<span class="c">// While loop.</span>
+<span class="k">var</span> i = <span class="n">0</span>
+<span class="k">while</span> (i &lt; <span class="n">3</span>) {
+    <span class="t">IO</span>.println(<span class="s">"while </span><span class="i">${i}</span><span class="s">"</span>)
+    i = i + <span class="n">1</span>
+}
+
+<span class="c">// C-style for loop.</span>
+<span class="k">for</span> (<span class="k">var</span> j = <span class="n">0</span>; j &lt; <span class="n">3</span>; j = j + <span class="n">1</span>) {
+    <span class="t">IO</span>.println(<span class="s">"for </span><span class="i">${j}</span><span class="s">"</span>)
+}
+
+<span class="c">// for-in walks anything implementing the iterator protocol — that is,</span>
+<span class="c">// anything with an .iter() that returns an object with .has_next() and</span>
+<span class="c">// .next(). Lists, strings, and maps all do. `break` and `continue`</span>
+<span class="c">// behave as you&#x27;d expect.</span>
+<span class="k">for</span> (x <span class="k">in</span> [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>]) {
+    <span class="k">if</span> (x == <span class="n">3</span>) <span class="k">continue</span>
+    <span class="k">if</span> (x == <span class="n">5</span>) <span class="k">break</span>
+    <span class="t">IO</span>.println(<span class="s">"item </span><span class="i">${x}</span><span class="s">"</span>)   <span class="c">// 1, 2, 4</span>
+}
+
+<span class="c">// Strings iterate by character.</span>
+<span class="k">for</span> (ch <span class="k">in</span> <span class="s">"abc"</span>) {
+    <span class="t">IO</span>.println(ch)
+}
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 5. Lists and maps</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">var</span> nums = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
+nums.push(<span class="n">4</span>)
+<span class="t">IO</span>.println(nums.length())   <span class="c">// 4</span>
+<span class="t">IO</span>.println(nums[<span class="n">0</span>])         <span class="c">// 1</span>
+<span class="t">IO</span>.println(nums[-<span class="n">1</span>])        <span class="c">// 4 — negative indices count from the end</span>
+<span class="t">IO</span>.println(nums.pop())      <span class="c">// 4</span>
+nums.reverse()
+nums.sort()
+<span class="k">var</span> copy = nums.copy()
+
+<span class="c">// Maps are written with braces. Keys and values are both typed.</span>
+<span class="k">var</span> ages: <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">Number</span>&gt; = {<span class="s">"ada"</span>: <span class="n">36</span>, <span class="s">"alan"</span>: <span class="n">41</span>}
+ages.set(<span class="s">"grace"</span>, <span class="n">45</span>)
+<span class="t">IO</span>.println(ages.get(<span class="s">"ada"</span>))   <span class="c">// 36</span>
+<span class="t">IO</span>.println(ages.has(<span class="s">"alan"</span>))  <span class="c">// true</span>
+<span class="t">IO</span>.println(ages.keys())       <span class="c">// [&quot;ada&quot;, &quot;alan&quot;, &quot;grace&quot;]</span>
+<span class="t">IO</span>.println(ages.values())     <span class="c">// [36, 41, 45]</span>
+
+<span class="c">// Iterating a map yields [key, value] pairs.</span>
+<span class="k">for</span> (entry <span class="k">in</span> ages) {
+    <span class="t">IO</span>.println(<span class="s">"</span><span class="i">${entry[0]}</span><span class="s"> is </span><span class="i">${entry[1]}</span><span class="s">"</span>)
+}
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 6. Functions</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// Annotate the parameters and the return type.</span>
+<span class="k">fun</span> add(a: <span class="t">Number</span>, b: <span class="t">Number</span>): <span class="t">Number</span> {
+    <span class="k">return</span> a + b
+}
+<span class="t">IO</span>.println(add(<span class="n">2</span>, <span class="n">3</span>))   <span class="c">// 5</span>
+
+<span class="c">// The return type may be omitted, and is inferred from the body.</span>
+<span class="k">fun</span> triple(x: <span class="t">Number</span>) {
+    <span class="k">return</span> x * <span class="n">3</span>
+}
+<span class="t">IO</span>.println(triple(<span class="n">5</span>))   <span class="c">// 15</span>
+
+<span class="c">// Lambdas use `fun` with `=&gt;` for a single-expression body.</span>
+<span class="k">var</span> double = <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * <span class="n">2</span>
+<span class="t">IO</span>.println(double(<span class="n">21</span>))  <span class="c">// 42</span>
+
+<span class="c">// Or a block body, when you need statements.</span>
+<span class="k">var</span> shout = <span class="k">fun</span> (s: <span class="t">String</span>): <span class="t">String</span> {
+    <span class="k">return</span> s.to_upper() + <span class="s">"!"</span>
+}
+<span class="t">IO</span>.println(shout(<span class="s">"hey"</span>))  <span class="c">// HEY!</span>
+
+<span class="c">// Functions are values. Function types are written (A, B) =&gt; C.</span>
+<span class="k">fun</span> apply(f: (<span class="t">Number</span>) =&gt; <span class="t">Number</span>, x: <span class="t">Number</span>): <span class="t">Number</span> {
+    <span class="k">return</span> f(x)
+}
+<span class="t">IO</span>.println(apply(double, <span class="n">5</span>))  <span class="c">// 10</span>
+
+<span class="c">// Closures capture their enclosing scope by reference.</span>
+<span class="k">fun</span> make_counter(): () =&gt; <span class="t">Number</span> {
+    <span class="k">var</span> count = <span class="n">0</span>
+    <span class="k">return</span> <span class="k">fun</span> (): <span class="t">Number</span> {
+        count = count + <span class="n">1</span>
+        <span class="k">return</span> count
+    }
+}
+<span class="k">var</span> next = make_counter()
+<span class="t">IO</span>.println(next())  <span class="c">// 1</span>
+<span class="t">IO</span>.println(next())  <span class="c">// 2</span>
+
+<span class="c">// Functions can be generic over types.</span>
+<span class="k">fun</span> identity&lt;T&gt;(value: T): T {
+    <span class="k">return</span> value
+}
+<span class="t">IO</span>.println(identity(<span class="s">"generic"</span>))  <span class="c">// generic</span>
+
+<span class="c">// A closure in the last argument position can go outside the parens.</span>
+<span class="k">fun</span> each(items: <span class="t">List</span>&lt;<span class="t">String</span>&gt;, f: (<span class="t">String</span>) =&gt; <span class="t">Nil</span>) {
+    <span class="k">for</span> (item <span class="k">in</span> items) { f(item) }
+}
+each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { item =&gt;
+    <span class="t">IO</span>.println(item)
+}
+
+<span class="c">// If the closure takes no parameters, drop the `=&gt;` too.</span>
+<span class="c">//     spawn { IO.println(&quot;hello&quot;) }</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 7. Destructuring</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">let</span> [a, b, c] = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
+<span class="t">IO</span>.println(b)   <span class="c">// 2</span>
+
+<span class="c">// A splat captures the middle.</span>
+<span class="k">let</span> [head, *middle, tail] = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>]
+<span class="t">IO</span>.println(head)     <span class="c">// 1</span>
+<span class="t">IO</span>.println(middle)   <span class="c">// [2, 3, 4]</span>
+<span class="t">IO</span>.println(tail)     <span class="c">// 5</span>
+
+<span class="c">// Tuples are fixed-size and heterogeneous. Fields are ._0, ._1, ...</span>
+<span class="k">var</span> pair = (<span class="n">1</span>, <span class="s">"two"</span>)
+<span class="t">IO</span>.println(pair._0)   <span class="c">// 1</span>
+<span class="t">IO</span>.println(pair._1)   <span class="c">// two</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 8. Enums and pattern matching</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">enum</span> Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+<span class="c">// Variants can carry named, typed fields, and enums can be generic.</span>
+<span class="k">enum</span> <span class="t">Option</span>&lt;T&gt; {
+    Some(value: T),
+    None
+}
+
+<span class="k">var</span> heading = Direction.North
+
+<span class="c">// `match` is an expression. The compiler checks exhaustiveness, so</span>
+<span class="c">// leaving out a variant is a compile error, not a silent fallthrough.</span>
+<span class="k">var</span> label = <span class="k">match</span> (heading) {
+    North =&gt; <span class="s">"north"</span>,
+    South =&gt; <span class="s">"south"</span>,
+    East =&gt; <span class="s">"east"</span>,
+    West =&gt; <span class="s">"west"</span>
+}
+<span class="t">IO</span>.println(label)   <span class="c">// north</span>
+
+<span class="c">// Matching a variant binds its fields.</span>
+<span class="k">var</span> maybe: <span class="t">Option</span>&lt;<span class="t">Number</span>&gt; = <span class="t">Option</span>.Some(<span class="n">42</span>)
+<span class="t">IO</span>.println(<span class="k">match</span> (maybe) {
+    Some(v) =&gt; <span class="s">"got </span><span class="i">${v}</span><span class="s">"</span>,
+    None =&gt; <span class="s">"got nothing"</span>
+})
+
+<span class="c">// Outside of `match`, `let` destructures a variant you know you have.</span>
+<span class="k">let</span> Some(unwrapped) = <span class="t">Option</span>.Some(<span class="n">7</span>)
+<span class="t">IO</span>.println(unwrapped)   <span class="c">// 7</span>
+
+<span class="c">// Recursive enums plus match give you tree walkers almost for free.</span>
+<span class="k">enum</span> Expr {
+    Num(value: <span class="t">Number</span>),
+    Add(left: Expr, right: Expr),
+    Mul(left: Expr, right: Expr)
+}
+
+<span class="k">fun</span> eval(e: Expr): <span class="t">Number</span> {
+    <span class="k">return</span> <span class="k">match</span> (e) {
+        Num(v) =&gt; v,
+        Add(l, r) =&gt; eval(l) + eval(r),
+        Mul(l, r) =&gt; eval(l) * eval(r)
+    }
+}
+
+<span class="c">// 1 + (2 * 3)</span>
+<span class="k">var</span> tree = Expr.Add(Expr.Num(<span class="n">1</span>), Expr.Mul(Expr.Num(<span class="n">2</span>), Expr.Num(<span class="n">3</span>)))
+<span class="t">IO</span>.println(eval(tree))   <span class="c">// 7</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 9. Classes</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">class</span> Point {
+    <span class="k">var</span> x: <span class="t">Number</span>
+    <span class="k">var</span> y: <span class="t">Number</span>
+
+    <span class="c">// `init` is the constructor. Fields are assigned through `this`.</span>
+    <span class="k">fun</span> init(x: <span class="t">Number</span>, y: <span class="t">Number</span>) {
+        <span class="k">this</span>.x = x
+        <span class="k">this</span>.y = y
+    }
+
+    <span class="k">fun</span> to_string(): <span class="t">String</span> {
+        <span class="k">return</span> <span class="s">"(</span><span class="i">${this.x}</span><span class="s">, </span><span class="i">${this.y}</span><span class="s">)"</span>
+    }
+}
+
+<span class="c">// Instantiate by calling the class. There is no `new`.</span>
+<span class="k">var</span> origin = Point(<span class="n">0</span>, <span class="n">0</span>)
+<span class="t">IO</span>.println(origin.to_string())   <span class="c">// (0, 0)</span>
+
+<span class="c">// `extends` inherits fields and methods; a subclass overrides by</span>
+<span class="c">// redeclaring a method, and reaches the parent version via `super`.</span>
+<span class="k">class</span> Animal {
+    <span class="k">var</span> name: <span class="t">String</span>
+    <span class="k">fun</span> init(name: <span class="t">String</span>) { <span class="k">this</span>.name = name }
+    <span class="k">fun</span> speak(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"..."</span> }
+}
+
+<span class="k">class</span> Dog <span class="k">extends</span> Animal {
+    <span class="k">fun</span> speak(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"Woof!"</span> }
+}
+
+<span class="k">class</span> LoudDog <span class="k">extends</span> Dog {
+    <span class="k">fun</span> speak(): <span class="t">String</span> { <span class="k">return</span> <span class="k">super</span>.speak() + <span class="s">"!!"</span> }
+}
+
+<span class="k">var</span> rex = LoudDog(<span class="s">"Rex"</span>)
+<span class="t">IO</span>.println(<span class="s">"</span><span class="i">${rex.name}</span><span class="s"> says </span><span class="i">${rex.speak()}</span><span class="s">"</span>)   <span class="c">// Rex says Woof!!!</span>
+
+<span class="c">// Classes can be generic.</span>
+<span class="k">class</span> Box&lt;T&gt; {
+    <span class="k">var</span> value: T
+    <span class="k">fun</span> init(value: T) { <span class="k">this</span>.value = value }
+    <span class="k">fun</span> get(): T { <span class="k">return</span> <span class="k">this</span>.value }
+}
+<span class="t">IO</span>.println(Box(<span class="s">"boxed"</span>).get())   <span class="c">// boxed</span>
+
+<span class="c">// Defining add/sub/mul/div/mod/lt/gt/eq overloads the matching operator,</span>
+<span class="c">// so `a + b` calls a.add(b).</span>
+<span class="k">class</span> Vec2 {
+    <span class="k">var</span> x: <span class="t">Number</span>
+    <span class="k">var</span> y: <span class="t">Number</span>
+    <span class="k">fun</span> init(x: <span class="t">Number</span>, y: <span class="t">Number</span>) { <span class="k">this</span>.x = x; <span class="k">this</span>.y = y }
+    <span class="k">fun</span> add(other: Vec2): Vec2 { <span class="k">return</span> Vec2(<span class="k">this</span>.x + other.x, <span class="k">this</span>.y + other.y) }
+    <span class="k">fun</span> eq(other: Vec2): <span class="t">Bool</span> { <span class="k">return</span> <span class="k">this</span>.x == other.x <span class="k">and</span> <span class="k">this</span>.y == other.y }
+    <span class="k">fun</span> to_string(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"&lt;</span><span class="i">${this.x}</span><span class="s">, </span><span class="i">${this.y}</span><span class="s">&gt;"</span> }
+}
+<span class="t">IO</span>.println((Vec2(<span class="n">1</span>, <span class="n">2</span>) + Vec2(<span class="n">3</span>, <span class="n">4</span>)).to_string())   <span class="c">// &lt;4, 6&gt;</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 10. Interfaces</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// An interface declares methods implementors must provide. Methods with</span>
+<span class="c">// a body are defaults, and are inherited as-is.</span>
+<span class="k">interface</span> Drawable {
+    <span class="k">fun</span> draw(): <span class="t">String</span>              <span class="c">// abstract — must be implemented</span>
+    <span class="k">fun</span> describe(): <span class="t">String</span> {        <span class="c">// default — inherited</span>
+        <span class="k">return</span> <span class="s">"a shape drawn as "</span> + <span class="k">this</span>.draw()
+    }
+}
+
+<span class="c">// Conformance uses the same `extends` keyword. Multiple interfaces are</span>
+<span class="c">// comma-separated: class Duck extends Flyable, Swimmable { ... }</span>
+<span class="k">class</span> Circle <span class="k">extends</span> Drawable {
+    <span class="k">fun</span> init() {}
+    <span class="k">fun</span> draw(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"O"</span> }
+}
+
+<span class="k">class</span> Square <span class="k">extends</span> Drawable {
+    <span class="k">fun</span> init() {}
+    <span class="k">fun</span> draw(): <span class="t">String</span> { <span class="k">return</span> <span class="s">"[]"</span> }
+}
+
+<span class="t">IO</span>.println(Circle().describe())   <span class="c">// a shape drawn as O</span>
+
+<span class="c">// An `is` pattern in a match dispatches on the runtime class.</span>
+<span class="k">fun</span> name_of(shape: Drawable): <span class="t">String</span> {
+    <span class="k">return</span> <span class="k">match</span> (shape) {
+        <span class="k">is</span> Circle(c) =&gt; <span class="s">"circle"</span>,
+        <span class="k">is</span> Square(s) =&gt; <span class="s">"square"</span>
+    }
+}
+<span class="t">IO</span>.println(name_of(Square()))   <span class="c">// square</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 11. Custom iterators</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// Give a type an .iter() returning an object with .has_next() and .next()</span>
+<span class="c">// and for-in works on it.</span>
+<span class="k">class</span> Countdown {
+    <span class="k">var</span> <span class="k">from</span>: <span class="t">Number</span>
+    <span class="k">fun</span> init(<span class="k">from</span>: <span class="t">Number</span>) { <span class="k">this</span>.<span class="k">from</span> = <span class="k">from</span> }
+    <span class="k">fun</span> iter(): CountdownIter { <span class="k">return</span> CountdownIter(<span class="k">this</span>.<span class="k">from</span>) }
+}
+
+<span class="k">class</span> CountdownIter {
+    <span class="k">var</span> current: <span class="t">Number</span>
+    <span class="k">fun</span> init(current: <span class="t">Number</span>) { <span class="k">this</span>.current = current }
+    <span class="k">fun</span> has_next(): <span class="t">Bool</span> { <span class="k">return</span> <span class="k">this</span>.current &gt; <span class="n">0</span> }
+    <span class="k">fun</span> next(): <span class="t">Number</span> {
+        <span class="k">var</span> value = <span class="k">this</span>.current
+        <span class="k">this</span>.current = <span class="k">this</span>.current - <span class="n">1</span>
+        <span class="k">return</span> value
+    }
+}
+
+<span class="k">for</span> (t <span class="k">in</span> Countdown(<span class="n">3</span>)) {
+    <span class="t">IO</span>.println(t)   <span class="c">// 3, 2, 1</span>
+}
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 12. Error handling</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// Any value can be thrown — a String, a Number, an object.</span>
+<span class="k">try</span> {
+    <span class="k">throw</span> <span class="s">"something broke"</span>
+} <span class="k">catch</span> (e) {
+    <span class="t">IO</span>.println(<span class="s">"caught: </span><span class="i">${e}</span><span class="s">"</span>)
+} <span class="k">finally</span> {
+    <span class="t">IO</span>.println(<span class="s">"finally always runs"</span>)
+}
+
+<span class="c">// Runtime errors are catchable too.</span>
+<span class="k">try</span> {
+    <span class="k">var</span> short = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
+    <span class="t">IO</span>.println(short[<span class="n">99</span>])
+} <span class="k">catch</span> (e) {
+    <span class="t">IO</span>.println(<span class="s">"caught: </span><span class="i">${e}</span><span class="s">"</span>)   <span class="c">// caught: IndexError: index 99 out of bounds</span>
+}
+
+<span class="c">// For failures you expect, prefer a Result enum over exceptions. This</span>
+<span class="c">// puts the failure in the type, so callers can&#x27;t quietly ignore it.</span>
+<span class="k">enum</span> <span class="t">Result</span>&lt;T, E&gt; {
+    Ok(value: T),
+    Err(error: E)
+}
+
+<span class="k">fun</span> safe_divide(a: <span class="t">Number</span>, b: <span class="t">Number</span>): <span class="t">Result</span>&lt;<span class="t">Number</span>, <span class="t">String</span>&gt; {
+    <span class="k">if</span> (b == <span class="n">0</span>) {
+        <span class="k">return</span> <span class="t">Result</span>.Err(<span class="s">"division by zero"</span>)
+    }
+    <span class="k">return</span> <span class="t">Result</span>.Ok(a / b)
+}
+
+<span class="t">IO</span>.println(<span class="k">match</span> (safe_divide(<span class="n">10</span>, <span class="n">2</span>)) {
+    Ok(v) =&gt; <span class="s">"= </span><span class="i">${v}</span><span class="s">"</span>,
+    Err(msg) =&gt; <span class="s">"error: </span><span class="i">${msg}</span><span class="s">"</span>
+})                                     <span class="c">// = 5</span>
+
+<span class="t">IO</span>.println(<span class="k">match</span> (safe_divide(<span class="n">1</span>, <span class="n">0</span>)) {
+    Ok(v) =&gt; <span class="s">"= </span><span class="i">${v}</span><span class="s">"</span>,
+    Err(msg) =&gt; <span class="s">"error: </span><span class="i">${msg}</span><span class="s">"</span>
+})                                     <span class="c">// error: division by zero</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 13. Modules</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// The @ prefix imports a stdlib module. Aliases are conventionally</span>
+<span class="c">// PascalCase; single-letter aliases are discouraged.</span>
+<span class="k">import</span> <span class="s">"@math"</span> <span class="k">as</span> Math
+<span class="k">import</span> <span class="s">"@iter"</span> <span class="k">as</span> Iter
+
+<span class="t">IO</span>.println(Math.sqrt(<span class="n">16.0</span>))   <span class="c">// 4</span>
+<span class="t">IO</span>.println(Math.pi)           <span class="c">// 3.14159</span>
+
+<span class="c">// Import specific names instead of the whole namespace:</span>
+<span class="k">import</span> { map, filter, reduce } <span class="k">from</span> <span class="s">"@iter"</span>
+
+<span class="c">// ...or import a file relative to this one:</span>
+<span class="c">//     import &quot;./geometry.sf&quot; as Geometry</span>
+
+<span class="c">// Any .sf file is a module. Its top-level fun/class/enum/var are</span>
+<span class="c">// exported. The stdlib ships @iter, @json, @toml, @csv, @time, @os,</span>
+<span class="c">// @path, @fmt, @random, @uuid, @test, @regex, @http/client,</span>
+<span class="c">// @http/server, @socket, @async, @sync, @supervisor, and plenty more.</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 14. Iterator utilities</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">var</span> values = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>]
+
+<span class="t">IO</span>.println(Iter.map(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * <span class="n">2</span>))
+<span class="t">IO</span>.println(Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x % <span class="n">2</span> == <span class="n">0</span>))
+<span class="t">IO</span>.println(Iter.reduce(values, <span class="k">fun</span> (acc: <span class="t">Number</span>, x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; acc + x, <span class="n">0</span>))
+<span class="t">IO</span>.println(Iter.sum(values))
+
+<span class="c">// Also: any, all, each, count, find, flat_map, zip, enumerate, take, skip.</span>
+
+<span class="c">// Every one of these takes any iterable, so they compose by nesting.</span>
+<span class="t">IO</span>.println(Iter.map(
+    Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>),
+    <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * x
+))                   <span class="c">// [9, 16, 25]</span>
+
+<span class="c">// Naming the steps usually reads better than deep nesting.</span>
+<span class="k">var</span> big = Iter.filter(values, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Bool</span> =&gt; x &gt; <span class="n">2</span>)
+<span class="k">var</span> squares = Iter.map(big, <span class="k">fun</span> (x: <span class="t">Number</span>): <span class="t">Number</span> =&gt; x * x)
+<span class="t">IO</span>.println(squares)  <span class="c">// [9, 16, 25]</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 15. Async and tasks</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="k">import</span> <span class="s">"@async"</span> <span class="k">as</span> Async
+
+<span class="c">// Tasks are lightweight and cooperatively scheduled on one thread.</span>
+<span class="k">fun</span> fetch(label: <span class="t">String</span>, delay: <span class="t">Float</span>): <span class="t">String</span> {
+    Async.sleep(delay)   <span class="c">// yields control to the scheduler</span>
+    <span class="k">return</span> <span class="s">"</span><span class="i">${label}</span><span class="s"> done"</span>
+}
+
+<span class="k">var</span> t1 = <span class="t">Task</span>.spawn(<span class="k">fun</span> () =&gt; fetch(<span class="s">"users"</span>, <span class="n">0.1</span>))
+<span class="k">var</span> t2 = <span class="t">Task</span>.spawn(<span class="k">fun</span> () =&gt; fetch(<span class="s">"posts"</span>, <span class="n">0.1</span>))
+
+<span class="c">// Both sleep concurrently, so this takes about 0.1s, not 0.2s.</span>
+<span class="t">IO</span>.println(t1.await())
+<span class="t">IO</span>.println(t2.await())
+
+<span class="c">// `yield` hands control over without sleeping — useful for keeping a long</span>
+<span class="c">// computation from starving the scheduler.</span>
+<span class="k">fun</span> long_computation(): <span class="t">Number</span> {
+    <span class="k">var</span> sum = <span class="n">0</span>
+    <span class="k">for</span> (<span class="k">var</span> k = <span class="n">0</span>; k &lt; <span class="n">1000000</span>; k = k + <span class="n">1</span>) {
+        sum = sum + k
+        <span class="k">if</span> (k % <span class="n">10000</span> == <span class="n">0</span>) <span class="k">yield</span>
+    }
+    <span class="k">return</span> sum
+}
+
+<span class="c">// Scheduling is cooperative, not preemptive. Tasks switch only at</span>
+<span class="c">// `yield`, `Async.sleep()`, and `.await()` — so between yield points you</span>
+<span class="c">// have exclusive access to all state, and no data races are possible.</span>
+
+<span class="c">////////////////////////////////////////////////</span>
+<span class="c">// 16. Actors</span>
+<span class="c">////////////////////////////////////////////////</span>
+
+<span class="c">// An actor is a class with serialized access: only one method body runs</span>
+<span class="c">// at a time per instance, so its state cannot be raced. It&#x27;s the tool for</span>
+<span class="c">// mutable state that outlives a single task.</span>
+<span class="k">actor</span> BankAccount {
+    <span class="k">var</span> balance: <span class="t">Int</span>
+
+    <span class="k">fun</span> init(amount: <span class="t">Int</span>) { <span class="k">this</span>.balance = amount }
+
+    <span class="k">fun</span> deposit(n: <span class="t">Int</span>) { <span class="k">this</span>.balance = <span class="k">this</span>.balance + n }
+
+    <span class="k">fun</span> get_balance(): <span class="t">Int</span> { <span class="k">return</span> <span class="k">this</span>.balance }
+
+    <span class="c">// Calls on `this` run synchronously and never deadlock.</span>
+    <span class="k">fun</span> deposit_twice(n: <span class="t">Int</span>) {
+        <span class="k">this</span>.deposit(n)
+        <span class="k">this</span>.deposit(n)
+    }
+}
+
+<span class="k">var</span> account = BankAccount(<span class="n">100</span>)
+
+<span class="c">// Concurrent callers are serialized automatically. If the actor is busy,</span>
+<span class="c">// the caller suspends and retries when it goes idle.</span>
+<span class="k">var</span> w1 = <span class="t">Task</span>.spawn(<span class="k">fun</span> () =&gt; account.deposit(<span class="n">50</span>))
+<span class="k">var</span> w2 = <span class="t">Task</span>.spawn(<span class="k">fun</span> () =&gt; account.deposit_twice(<span class="n">15</span>))
+w1.await()
+w2.await()
+
+<span class="t">IO</span>.println(account.get_balance())   <span class="c">// always 180, whatever the interleaving</span>
+
+<span class="c">// `.send(method, args)` enqueues a message without waiting for a reply —</span>
+<span class="c">// handy for logging, metrics, and other fire-and-forget work.</span>
+<span class="k">actor</span> Logger {
+    <span class="k">var</span> entries: <span class="t">List</span>&lt;<span class="t">String</span>&gt;
+    <span class="k">fun</span> init() { <span class="k">this</span>.entries = [] }
+    <span class="k">fun</span> log(msg: <span class="t">String</span>) { <span class="k">this</span>.entries.push(msg) }
+}
+
+<span class="k">var</span> logger = Logger()
+logger.send(<span class="s">"log"</span>, <span class="s">"request started"</span>)    <span class="c">// returns immediately</span>
+logger.send(<span class="s">"log"</span>, <span class="s">"request finished"</span>)   <span class="c">// doesn&#x27;t wait for the first</span>
+
+<span class="c">// Actor method parameters must be Sendable — safe to hand across a task</span>
+<span class="c">// boundary. Int, Float, Bool, String, Nil, enums, and other actors are.</span>
+<span class="c">// Mutable containers (List, Map) and closures are not, and the compiler</span>
+<span class="c">// warns when one crosses an actor boundary. Opt a class in explicitly:</span>
+<span class="k">class</span> Money <span class="k">extends</span> <span class="t">Sendable</span> {
+    <span class="k">var</span> cents: <span class="t">Int</span>
+    <span class="k">fun</span> init(cents: <span class="t">Int</span>) { <span class="k">this</span>.cents = cents }
+}
+
+<span class="c">// On WASM targets actors compile down to ordinary synchronous classes,</span>
+<span class="c">// since the browser is single-threaded and contention can&#x27;t happen.</span>
+
+<span class="t">IO</span>.println(<span class="s">"Done!"</span>)
+</code></pre>
+
+<footer>
+  <p>The full reference lives in the project's <code>docs/</code> book, alongside a standard library
+  covering JSON, TOML, CSV, HTTP client and server, sockets, regex, and a test framework. Run a program
+  with <code>tools/saffron run program.sf</code>, or build a native binary with
+  <code>tools/saffron build program.sf -o app</code>.</p>
+</footer>
+</div>
+</body>
+</html>

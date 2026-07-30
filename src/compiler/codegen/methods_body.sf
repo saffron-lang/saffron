@@ -2366,12 +2366,13 @@
             this.last_type = AST.Type.StringType
             return tagged
         } else if (obj_type.starts_with("Map")) {
-            var const_name: String = this.add_string_constant("[Map]")
-            var gep: String = this.fresh_local()
-            this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.emit_tag_ptr(gep)
+            this.called_functions.push("__map_to_string")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "Any") {
             // Unknown type at compile time: dispatch via __any_to_string which
             // does runtime NaN-box tag inspection to choose the right converter.

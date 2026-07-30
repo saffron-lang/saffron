@@ -1280,12 +1280,27 @@ class Parser {
             if (decorator == "intrinsic") {
                 annotation = "@intrinsic"
             } else if (decorator == "extern") {
+                // @extern requires a parenthesized C signature string:
+                //   @extern("double sqrt(double)") fun sqrt(x: Float): Float
+                // Guard every step. The bare form `@extern fun ...` used to reach
+                // the unguarded `match (kind) { TkString(s) => s }` below with a
+                // `fun` token and crash the compiler with a SIGSEGV instead of a
+                // diagnostic. A malformed decorator must be a parse error.
                 this.consume("(")
-                var kind: Lexer.TokenKind = this.current_kind()
-                var sig: String = match (kind) { TkString(s) => s }
-                this.advance()
-                this.consume(")")
-                annotation = "@extern:" + sig
+                if (!this.match_kind_check("string")) {
+                    this.parse_error("@extern requires a signature string, e.g. @extern(\"double sqrt(double)\")")
+                    var sig: String = ""
+                    annotation = "@extern:" + sig
+                } else {
+                    var kind: Lexer.TokenKind = this.current_kind()
+                    var sig: String = match (kind) {
+                        TkString(s) => s
+                        _ => ""
+                    }
+                    this.advance()
+                    this.consume(")")
+                    annotation = "@extern:" + sig
+                }
             } else {
                 // General decorator: @name or @name("args")
                 annotation = "@" + decorator

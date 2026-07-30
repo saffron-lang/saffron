@@ -1,0 +1,32 @@
+//! Classes, inheritance and operator overloading
+class Animal {
+    var name: String
+    fun init(name: String) { this.name = name }
+    fun speak(): String { return "..." }
+    fun describe(): String { return "${this.name} says ${this.speak()}" }
+}
+
+class Dog extends Animal {
+    fun speak(): String { return "Woof" }
+}
+
+class Cat extends Animal {
+    fun speak(): String { return "Meow" }
+}
+
+var pets: List<Animal> = [Dog("Rex"), Cat("Mia")]
+for (p in pets) {
+    IO.println(p.describe())
+}
+
+// Operator overloading: define `add` to make `+` work
+class Vec2 {
+    var x: Float
+    var y: Float
+    fun init(x: Float, y: Float) { this.x = x; this.y = y }
+    fun add(other: Vec2): Vec2 { return Vec2(this.x + other.x, this.y + other.y) }
+    fun to_string(): String { return "(${this.x}, ${this.y})" }
+}
+
+var sum = Vec2(1, 2) + Vec2(3, 4)
+IO.println(sum.to_string())

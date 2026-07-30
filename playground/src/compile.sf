@@ -1,0 +1,167 @@
+//! Compile a user-supplied Saffron program to a wasm32 module.
+//!
+//! Every compile runs in a freshly created temp directory that is deleted when the
+//! request finishes, under an external wall-clock timeout, with a hard cap on source
+//! size. The produced module is returned to the caller as base64 and is NEVER
+//! executed on the host — the browser instantiates it inside its own wasm sandbox.
+//!
+//! What this does NOT do: it does not sandbox the *compiler*. See README.md.
+
+import "@process" as Process
+import "@uuid" as UUID
+import "@os" as OS
+
+/// Largest program we will accept, in bytes. Keeps a pathological input from
+/// turning into an unbounded compile.
+var MAX_SOURCE_BYTES: Int = 64000
+
+/// Wall clock budget for one compile, in seconds. Enforced by `timeout(1)` around
+/// the whole `saffron build` invocation, so a compiler hang cannot wedge a worker.
+var COMPILE_TIMEOUT_SECS: Int = 20
+
+class CompileResult {
+    var ok: Bool
+    var wasm_base64: String
+    var diagnostics: String
+
+    fun init(ok: Bool, wasm_base64: String, diagnostics: String) {
+        this.ok = ok
+        this.wasm_base64 = wasm_base64
+        this.diagnostics = diagnostics
+    }
+}
+
+/// Locate the `timeout` binary. GNU coreutils installs it as `gtimeout` on macOS
+/// when the unprefixed names are not linked, so try both before giving up.
+fun _find_timeout(): String {
+    var candidates: List<String> = ["timeout", "gtimeout"]
+    var i: Int = 0
+    while (i < candidates.length()) {
+        var found: String = Process.which(candidates[i])
+        if (found.length() > 0) {
+            return found
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+/// Repo root, so we can find tools/saffron regardless of the server's cwd.
+fun _repo_root(): String {
+    var from_env: String = OS.env("SAFFRON_ROOT")
+    if (from_env.length() > 0) {
+        return from_env
+    }
+    // The service is started from playground/, so the repo root is one level up.
+    return ".."
+}
+
+/// Reject source that is too large before spending a process on it.
+fun _too_large(source: String): Bool {
+    return source.length() > MAX_SOURCE_BYTES
+}
+
+/// Report whether the wasm32 toolchain is actually usable. Apple's system clang
+/// cannot target wasm32 at all, so a machine without Homebrew LLVM will compile
+/// nothing — better to say so at startup than to fail every request opaquely.
+fun toolchain_status(): String {
+    var clang_path: String = "/opt/homebrew/opt/llvm/bin/clang"
+    var wasm_ld: String = "/opt/homebrew/bin/wasm-ld"
+    var missing: List<String> = []
+    if (!IO.file_exists(clang_path)) { missing.push(clang_path) }
+    if (!IO.file_exists(wasm_ld)) { missing.push(wasm_ld) }
+    if (missing.length() > 0) {
+        return "unavailable (missing: " + missing.join(", ") + ")"
+    }
+    if (_find_timeout().length() == 0) {
+        return "ok (WARNING: no timeout(1) found — compiles are unbounded)"
+    }
+    return "ok"
+}
+
+fun compile_to_wasm(source: String): CompileResult {
+    if (source.trim().length() == 0) {
+        return CompileResult(false, "", "empty program")
+    }
+    if (_too_large(source)) {
+        return CompileResult(false, "",
+            "program too large: " + source.length().to_string() +
+            " bytes (limit " + MAX_SOURCE_BYTES.to_string() + ")")
+    }
+
+    // Fresh directory per request. The name is random so two concurrent compiles
+    // can never collide on main.sf, and so a previous request's artifacts are never
+    // visible to the next one.
+    var work_dir: String = "/tmp/saffron_playground_" + UUID.v4()
+    IO.mkdir(work_dir)
+
+    var src_path: String = work_dir + "/main.sf"
+    var out_path: String = work_dir + "/out.wasm"
+    IO.write_file(src_path, source)
+
+    var root: String = _repo_root()
+    var build_cmd: String = root + "/tools/saffron build --target wasm32 " +
+        src_path + " -o " + out_path
+
+    // Wrap in timeout(1) so a compiler hang is bounded. Without this a single
+    // pathological program could pin a worker forever.
+    var timeout_bin: String = _find_timeout()
+    var cmd: String = build_cmd
+    if (timeout_bin.length() > 0) {
+        cmd = timeout_bin + " " + COMPILE_TIMEOUT_SECS.to_string() + " " + build_cmd
+    }
+
+    // Run with the work dir as cwd so any stray file the compiler drops lands in
+    // the directory we are about to delete.
+    var result = Process.run_in(cmd + " 2>&1", work_dir)
+    var diagnostics: String = result.stdout + result.stderr
+
+    if (timeout_bin.length() > 0 and result.exit_code == 124) {
+        _cleanup(work_dir)
+        return CompileResult(false, "",
+            "compile timed out after " + COMPILE_TIMEOUT_SECS.to_string() + "s")
+    }
+
+    if (!IO.file_exists(out_path)) {
+        _cleanup(work_dir)
+        return CompileResult(false, "", _clean_diagnostics(diagnostics, work_dir))
+    }
+
+    // Deliberately NOT `Base64.encode(IO.read_file(out_path))`: IO.read_file stops
+    // at the first NUL byte, and a wasm module's magic number is literally "\0asm",
+    // so that path yields the empty string for every module. See bug 2 in
+    // /tmp/playground_bugs.md. Shelling out to base64(1) keeps the bytes out of
+    // Saffron strings entirely — its stdout is pure ASCII, which round-trips fine.
+    var enc_result = Process.run("base64 -i " + out_path + " | tr -d '\\n'")
+    if (!enc_result.success) {
+        _cleanup(work_dir)
+        return CompileResult(false, "", "failed to encode module: " + enc_result.stderr)
+    }
+    var encoded: String = enc_result.stdout.trim()
+    _cleanup(work_dir)
+
+    if (encoded.length() == 0) {
+        return CompileResult(false, "", "compiled module was empty")
+    }
+
+    return CompileResult(true, encoded, _clean_diagnostics(diagnostics, work_dir))
+}
+
+/// Remove the per-request working directory. Best effort: a failure here must not
+/// turn a successful compile into an error response.
+fun _cleanup(work_dir: String) {
+    // Guard the rm target so a malformed work_dir can never widen the blast radius.
+    if (work_dir.starts_with("/tmp/saffron_playground_")) {
+        Process.run("rm -rf " + work_dir)
+    }
+}
+
+/// Strip host paths out of compiler output. The user does not need to see the
+/// server's temp directory names, and leaking them is needless information
+/// disclosure.
+fun _clean_diagnostics(diagnostics: String, work_dir: String): String {
+    var cleaned: String = diagnostics.replace(work_dir + "/", "")
+    cleaned = cleaned.replace(work_dir, "")
+    cleaned = cleaned.replace("main.sf", "program.sf")
+    return cleaned.trim()
+}

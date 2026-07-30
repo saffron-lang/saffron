@@ -1,0 +1,13 @@
+//! FizzBuzz — loops and conditionals
+fun fizzbuzz(n: Float): String {
+    if (n % 15 == 0) { return "FizzBuzz" }
+    if (n % 3 == 0)  { return "Fizz" }
+    if (n % 5 == 0)  { return "Buzz" }
+    return n.to_string()
+}
+
+var i: Float = 1
+while (i <= 20) {
+    IO.println(fizzbuzz(i))
+    i = i + 1
+}

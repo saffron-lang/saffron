@@ -1,0 +1,16 @@
+//! Cooperative async — Task.spawn and await
+// The playground drives Saffron's scheduler from the browser event loop,
+// so sleeping tasks interleave without blocking the page.
+import "@async" as Async
+
+fun worker(name: String, delay: Float): String {
+    Async.sleep(delay)
+    return "${name} finished"
+}
+
+var a = Task.spawn(fun () => worker("task-A", 0.05))
+var b = Task.spawn(fun () => worker("task-B", 0.01))
+
+IO.println(Async.await(b))
+IO.println(Async.await(a))
+IO.println("both done")

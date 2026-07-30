@@ -87,7 +87,7 @@ class ApiRouter {
 
     /// Mount all routes to an Http.App
     fun mount(app: Http.App) {
-        var i: Float = 0
+        var i: Int = 0
         while (i < this.endpoints.length()) {
             var ep = this.endpoints[i]
             if (ep.method == "GET") {

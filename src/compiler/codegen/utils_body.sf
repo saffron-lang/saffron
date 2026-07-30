@@ -162,11 +162,30 @@
         this.start_block(rhs_label)
         var rhs_raw: String = this.gen_arg_value(right)
         var rhs: String = this.to_i1(rhs_raw)
-        this.emit_terminator("br label %" + end_label)
+        // The phi predecessor must be the block control actually leaves from, not
+        // rhs_label. When `right` is itself a logical op (or anything else that
+        // opens new blocks — a match, a nested short-circuit), gen_arg_value above
+        // has already left rhs_label behind, so naming rhs_label in the phi
+        // produced "PHI node entries do not match predecessors". Funnel every
+        // path through one join block whose identity is known here; -O2 folds it
+        // away.
+        var rhs_reaches_end: Bool = !this.block_terminated
+        var rhs_exit: String = this.fresh_label("rhs.exit")
+        if (rhs_reaches_end) {
+            this.emit_terminator("br label %" + rhs_exit)
+            this.start_block(rhs_exit)
+            this.emit_terminator("br label %" + end_label)
+        }
 
         this.start_block(end_label)
         var phi_result: String = this.fresh_local()
-        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
+        if (rhs_reaches_end) {
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_exit + "]")
+        } else {
+            // The RHS ended in its own terminator (e.g. a throw), so end_label has
+            // exactly one predecessor. A single-entry phi is still valid IR.
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "]")
+        }
         // Extend back to i64 for uniform value type
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = zext i1 " + phi_result + " to i64")

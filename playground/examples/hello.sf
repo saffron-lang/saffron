@@ -1,0 +1,10 @@
+//! Hello, Saffron
+// Every program is just top-level code. IO.println writes to the output pane.
+
+var name: String = "world"
+IO.println("hello ${name}!")
+IO.println("${1 + 2} is three")
+
+// String methods
+IO.println("saffron".to_upper())
+IO.println("a,b,c".split(",").join(" | "))

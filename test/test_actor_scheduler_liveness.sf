@@ -1,0 +1,87 @@
+// Regression test: scheduler_tick() must not silently drop tasks parked on a
+// busy actor (yield reason 5).
+//
+// The bug: scheduler_tick()'s idle check re-listed the wait queues by hand and
+// omitted `actor_wait_handles`, so when the only work left was a task parked on
+// a busy actor, tick returned 0, `scheduler_run()`'s `while (tick() == 1)` loop
+// exited, and that task was abandoned with no diagnostic. `_has_pending()`
+// checked all five queues, so the two disagreed.
+//
+// Before the fix, `_has_pending() == 1` while a tick over the same state
+// returned 0 with `deadlock_flag() == 0` — the abandoned-task signature. After
+// the fix the two agree on which queues count, and an actor-only wait queue is
+// reported as a deadlock instead of being dropped.
+
+import "@test" as Test
+import "@scheduler" as Scheduler
+
+// --- 1. Baseline: an empty scheduler is idle, and not deadlocked. ---
+
+Test.assert_eq(Scheduler._has_pending(), 0, "empty scheduler has no pending work")
+Test.assert_eq(Scheduler._has_parked_work(), 0, "empty scheduler has nothing parked")
+Test.assert_eq(Scheduler.scheduler_tick(), 0, "tick on empty scheduler returns 0")
+Test.assert_eq(Scheduler.deadlock_flag(), 0, "empty scheduler is not a deadlock")
+
+// --- 2. A task parked on a busy actor is pending work. ---
+//
+// Park a handle exactly as reason-5 suspension does. Neither the fake handle nor
+// the fake actor address is ever dereferenced: the fixed tick returns before it
+// touches the run queue, and the drain below removes the handle before any tick
+// could resume it.
+
+var fake_actor: Int = 999001
+
+Scheduler._park_on_actor(44100, fake_actor)
+
+Test.assert_eq(Scheduler._has_parked_work(), 1, "actor waiter counts as parked work")
+Test.assert_eq(Scheduler._has_pending(), 1, "actor waiter counts as pending work")
+
+// The regression assertion. `_has_pending()` says there is work; the idle check
+// inside `scheduler_tick()` must be looking at the same set of queues.
+// Pre-fix this returned 0 with deadlock_flag() still 0 (silent abandonment).
+Test.assert_eq(Scheduler.scheduler_tick(), 0, "actor-only wait queue stops the loop")
+Test.assert_eq(Scheduler.deadlock_flag(), 1, "...and is reported as a deadlock, not dropped")
+
+// The parked task is still recorded — the scheduler did not quietly discard it.
+Test.assert_eq(Scheduler.actor_wait_handles.length(), 1, "parked task was not discarded")
+
+// --- 3. wake_actor_waiters must move it back to the run queue. ---
+
+Scheduler.wake_actor_waiters(fake_actor)
+Test.assert_eq(Scheduler.run_queue.length(), 1, "woken task returns to the run queue")
+Test.assert_eq(Scheduler._has_pending(), 1, "woken task is still pending work")
+
+// NOTE: `actor_wait_handles` is deliberately NOT asserted empty here. The
+// dequeue in `wake_actor_waiters` uses `List.remove(i)`, which is currently a
+// no-op because the codegen hands `__list_remove` a NaN-boxed index (see the
+// comment above `wake_actor_waiters` in src/lib/scheduler.sf). Asserting 0 would
+// fail for that unrelated reason and mask this test's actual subject. What
+// matters for the liveness fix is that the tick and `_has_pending()` agree about
+// which queues count -- verified above.
+
+// --- 4. A fresh scheduler is idle and un-flagged again. ---
+
+Scheduler._reset_for_test()
+Test.assert_eq(Scheduler._has_pending(), 0, "reset scheduler has no pending work")
+Test.assert_eq(Scheduler.deadlock_flag(), 0, "reset clears the deadlock flag")
+Test.assert_eq(Scheduler.scheduler_tick(), 0, "tick on reset scheduler returns 0")
+Test.assert_eq(Scheduler.deadlock_flag(), 0, "empty tick does not report a deadlock")
+
+// --- 5. Actors still work end to end (the fix must not change live behavior). ---
+
+actor Counter {
+    var count: Int
+    fun init() { this.count = 0 }
+    fun increment() { this.count = this.count + 1 }
+    fun get(): Int { return this.count }
+}
+
+var counter = Counter()
+var first = Task.spawn(fun () => counter.increment())
+first.await()
+var second = Task.spawn(fun () => counter.increment())
+second.await()
+
+Test.assert_eq(counter.get(), 2, "serialized actor increments still land")
+
+Test.summary()

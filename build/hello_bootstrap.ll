@@ -127,6 +127,9 @@ declare i64 @__os_cwd()
 declare i64 @__os_path_sep()
 declare i64 @__os_platform()
 declare i64 @__os_env(i64)
+declare i64 @__str_get(i64, i64)
+declare i64 @__io_println(i64)
+declare i64 @__io_print(i64)
 @__debug_location = external global i8*
 declare i64 @__val_nil()
 declare i1 @__val_is_int(i64)
@@ -262,8 +265,6 @@ entry:
   %t65 = call i64 @__io_println(i64 %t64)
   ret i64 0
 }
-declare i64 @__io_println(i64)
-
 
 define i32 @main(i32 %argc, i8** %argv) {
 entry:

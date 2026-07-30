@@ -33,7 +33,7 @@ fun area(shape: Shape): Number {
 
 var shapes = [Shape.Circle(5), Shape.Rect(3, 4)]
 var areas = Iter.map(shapes, area)
-IO.println(areas)  // [78.5398, 12]
+IO.println(areas)  // [78.5397, 12]
 ```
 
 ## Who is this for?

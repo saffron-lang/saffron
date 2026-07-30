@@ -31,6 +31,9 @@ class Codegen {
     var class_field_list: Map<String, List<String>>
     var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
+    // Methods declared with an empty body. Only these are requirements on a
+    // subclass; a parent method WITH a body is simply inherited.
+    var class_abstract_methods: Map<String, List<String>>
     var current_class: String
     var current_parent: String
     var current_function_name: String
@@ -97,6 +100,7 @@ class Codegen {
         this.class_field_list = {}
         this.class_struct_names = {}
         this.class_methods = {}
+        this.class_abstract_methods = {}
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
