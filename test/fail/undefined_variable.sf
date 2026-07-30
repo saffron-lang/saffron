@@ -1,0 +1,16 @@
+// Negative test for BUGS #37: referencing an undeclared variable must be a
+// codegen ERROR, not a warning.
+//
+// This used to warn and then emit `%missing_name` as an LLVM load operand with
+// no corresponding alloca. The compile still failed, but as an opaque
+// "use of undefined value '%missing_name'" from llc, with no source location
+// and no variable name a user would recognise. It also meant `has_errors` stayed
+// false, so the compiler reported success right up to the assembler.
+//
+// Expected: "[codegen] Error: undefined variable 'missing_name'" and exit 1.
+
+fun use_undeclared(): Int {
+    return missing_name + 1
+}
+
+IO.println(use_undeclared().to_string())

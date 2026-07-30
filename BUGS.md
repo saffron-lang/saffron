@@ -84,6 +84,16 @@ that emits `load i64, i64* @__g_<prefix><field>` for module-level variables.
 **Impact:** Blocks any library that uses module-level globals accessed cross-module
 (e.g. basil's `Cache.store` singleton). Workaround: inline the global or avoid module-qualified access.
 
+**Confirmed hitting turmeric (2026-07-30).** Not just basil: `turmeric/src/`
+`router.sf`, `prelude.sf` and `index.sf` all reference `_tracking`, a real global
+at `turmeric/src/signal.sf:20`, and codegen emits `load i64, i64*
+%turmeric_signal__tracking` with no definition. `clang -x ir` rejects the
+emitted IR, so **turmeric does not currently build** — this is the blocker, and
+it was previously masked because the undefined-variable check only warned (see
+#37). The same measurement found zero other occurrences across `test/*.sf`,
+`src/lib/*.sf`, and the compiler's own source, so this one variable is the whole
+remaining surface of #22 in-repo.
+
 ### 23. Runtime functions return untagged i64 into NaN-boxed value space
 
 `src/runtime/runtime.sf` is compiled with `--identity-mode`, where the tag/untag
@@ -338,13 +348,45 @@ Annotated maps still narrow to `V`, so this only widens what was already
 unknown. `toml_test` 1 → 0; suite fall-throughs 8 → 7; regression test at
 `test/test_map_get_types.sf` (fails on the parent commit, passes after).
 
-**Still blocked on** the remaining 7, all in `test/json.sf`: that file calls
-`Json.parse` / `Json.parse_into` **with no `import` statement at all**, so
-`Json` is an undeclared name. This is a defect in the test file, not a
-namespace-resolution gap in the compiler as originally filed — but hardening the
-terminal would turn it into a build failure, so the test must be fixed (add
-`import "@json" as Json`, matching `test/test_json.sf`) or the undeclared-name
-case must be diagnosed earlier and more precisely than "no such method".
+**Progress (2026-07-30), part 2 — undefined variables are now errors.** The
+remaining 7 fall-throughs were all `test/json.sf`, which calls `Json.parse` with
+**no `import` statement at all**. Chasing that surfaced a bigger defect in the
+same "silent" family: an undeclared variable produced a *warning*
+(`expr_body.sf:75` and `:1403`) and then emitted `load i64, i64* %name` with no
+matching alloca. The compile still failed — but as `use of undefined value
+'%data'` from llc, with no source location, no recognisable name, and
+`has_errors` left false, so the compiler reported success right up to the
+assembler.
+
+Both sites are now errors that set `has_errors`. Measured before changing
+anything, so the "false positives in multi-module context" caveat in the old
+comment could be checked rather than trusted:
+
+| Corpus | Files | Files warning |
+|---|---|---|
+| `test/*.sf` | 111 | 1 (`json.sf`, genuinely broken) |
+| `src/lib/*.sf` | 67 | 0 |
+| `parsley` + `basil` + `turmeric` src | — | 3 (all one variable) |
+| compiler's own source | ~30k lines | 0 (it self-bootstraps clean) |
+
+The 3 app hits are all `turmeric_signal__tracking`, a real global at
+`turmeric/src/signal.sf:20` unresolved across the import — i.e. **#22**, not a
+false positive. Verified that turmeric's emitted IR *already* fails to assemble
+(`clang -x ir` rejects `%turmeric_signal__tracking`), so the hardening does not
+break anything that currently works; it converts an opaque IR failure into a
+named diagnostic. Suite exit codes unchanged, `test/fail/*` output
+byte-identical. Negative test at `test/fail/undefined_variable.sf` — errors and
+exits 1 here, warns and exits **0** on the parent commit.
+
+`test/json.sf` also gets its missing `import "@json" as Json`.
+
+**Still open:** the terminal fall-through in `gen_method_call` itself. With
+undefined variables now caught earlier, `test/json.sf`'s 7 hits are diagnosed at
+their real cause, but the terminal still returns a silent zero for any *other*
+receiver whose type inference lands on a builtin. Hardening it is now unblocked
+in principle; it needs its own measurement pass over the same four corpora
+before flipping, since a fall-through can also be reached by valid-but-unhandled
+builtin methods rather than only by bad types.
 
 ## Fixed
 
