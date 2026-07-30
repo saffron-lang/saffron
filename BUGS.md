@@ -9,6 +9,64 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 59. A function's local variable writes into a like-named module global
+
+**Reproduction:**
+
+```saffron
+var i: Int = 5
+fun f() { var i: Int = 99 }
+f()
+IO.println(i)          // 99 — the local declaration overwrote the global
+```
+
+No loop required, no aliasing on the call, no shared name passed anywhere. A
+`var` declaration inside a function body silently becomes a *store into the
+global* whenever the module has a global of the same name. The emitted IR has no
+local slot at all:
+
+```llvm
+@__g_i = global i64 0
+define i64 @f() {
+entry:
+  %t1 = add i64 0, 99
+  %t2 = call i64 @__val_tag_int(i64 %t1)
+  store i64 %t2, i64* @__g_i      ; ← should be a local alloca
+  ret i64 0
+}
+```
+
+`for-in` loop variables do it too (`fun f() { for (item in [1,2,3]) {} }` leaves
+a global `item` at 3), which is how this was found: a `while (i < 3)` loop whose
+body called `Random.shuffle` — whose own loop counter is named `i` — never
+terminated, because each call reset the caller's counter to 0.
+
+**Cause.** `gen_var_decl` in `stmts_body.sf:216-223` picks the store destination
+by asking `module_globals.has(name)` and nothing else. There is no check for
+whether the declaration is inside a function body, so scope is never consulted.
+The matching alloca is not emitted either: `emit_block_alloca_for`
+(`stmts_body.sf:1007`) skips any name already in `typed_vars`, and the global put
+it there — so naively redirecting the store to `%i` would emit a reference to an
+undefined value rather than fix anything. Both halves have to move together.
+
+**Relationship to #40.** Same root cause — global-before-local name resolution —
+but the opposite direction and a distinct failure. #40 is a *read*: a callee's
+parameter resolves to a like-named global, so `Math.sqrt(16)` returns
+`sqrt(42)`. This one is a *write*: a callee's local clobbers the global, so
+unrelated caller state changes underneath it. #40's reverted fix attempt
+(`is_current_param`) would not have touched this case, since a `var` declaration
+is not a parameter. The `current_params`-style scope tracking that #40 calls for
+is the shared prerequisite: this is I2/M1 territory in
+`docs/design/compiler-rewrite.md` — resolution decided per-name at emission time
+instead of by a real scope structure. A resolve pass with `DefId`s (stage 2 of
+that document) removes the whole family at once.
+
+**Severity.** Higher than #40's. It is trivially reachable — any stdlib helper
+with a loop counter named `i`, `n`, or `idx` corrupts a user program that happens
+to have a global of that name — it fails as a hang or as silent state
+corruption rather than a wrong-looking number, and the affected code is
+correct-by-inspection in both files.
+
 ### 50. An overridden method is not dispatched from an inherited method
 
 **Reproduction:**
@@ -246,6 +304,32 @@ as fixed and claimed the regression above did not exist ("`pantry_config` passes
 29/29 with the Float mapping"). That measurement was taken against a `saffronc`
 that did not yet contain the change, and was wrong; the regression is real and
 reproduces. The mapping was reverted to `Int`.
+
+**Progress (2026-07-30).** The retirement is underway; the mapping is unchanged
+but its blast radius is shrinking:
+
+- `src/lib/*.sf`: all 134 `Number` annotations converted. Bulk → `Int`
+  (indices, counters, ports, handles, lengths, byte values, char codes);
+  `scheduler.sleep_times` → `List<Float>`; `reflect.number_to_string`,
+  `toml.number`/`number_or` → `Any` (genuinely int-OR-float pass-throughs that
+  do no arithmetic). `toml.sf`'s `peek_at(offset: Number)` — the example cited
+  above — is now `offset: Int`. **No `Number` annotation remains in `src/lib`.**
+- `test/*.sf`: all 152 annotations → `Int` across 49 files. The 9 `is Number`
+  checks are kept deliberately: they cover the feature while it still exists.
+- `checker.sf` no longer collapses `Float` into `IntType` when parsing type
+  strings, so `Int` and `Float` are finally distinct in the checker. This alone
+  turned two `test/fail/` cases from "compiled cleanly" (itself a failure) into
+  correct rejections, taking the suite from 90/47 to 92/45.
+- A latent runtime bug surfaced and was fixed on the way: `__val_is_float`
+  called every raw untagged heap pointer a float, so rewriting `is Number` to
+  `is Int or is Float` made `JSON.to_string({...})` serialize a Map as an
+  integer. `is Number` had masked it by only ever checking the int tag — which
+  also means **`is Number` returns false for every float**, so all seven stdlib
+  `is Number` guards were already silently wrong. See the Fixed section.
+
+**Remaining:** user-facing docs, then removing the surface spelling from the
+lexer/parser/checker/codegen — which is a breaking change for user programs and
+wants its own decision.
 
 ### 41. A nested map literal overwrites its parent — silent wrong answer
 
@@ -719,6 +803,27 @@ a fall-through can also be reached by valid-but-unhandled builtin methods rather
 than only by bad types.
 
 ## Fixed
+
+- ~~#58: `is Float` was true for every Map, List, and instance; `is Number` was
+  false for every float~~ — two halves of one defect. `__val_is_float` in
+  `base_nanbox.ll` defined "float" as "none of the three NaN-box tags", but a
+  heap object passed through an `Any` binding arrives as a **raw untagged GC
+  pointer** — top bits clear, so no tag matches, so it was called a float.
+  `is Number` masked this because it lowered to `__val_is_int`, a *positive*
+  tag match, correctly false for a pointer — but for the same reason `is Number`
+  answered false for every genuine float, so all seven `is Number` guards in the
+  stdlib (each a "numeric? then format it" branch) were silently falling through
+  to their default for float input. Rewriting them to `is Int or is Float`
+  exposed the pointer half: `JSON.to_string({"name": "hello"})` took the number
+  branch and printed `5502959640`. `__val_is_float` now mirrors what
+  `__val_is_list`/`__val_is_map` already did on this base — when no tag matches
+  and the top 16 bits are clear, probe the GC magic sentinel at `v-8` before
+  concluding "float". Only `base_nanbox.ll` needed it; the other three IR bases
+  keep collections PTR-tagged, and their own `__val_is_list` checks only the PTR
+  tag, which confirms raw pointers never reach a type check there.
+  `test_regressions` 44/44 (was 40/44). Found by running the full suite after a
+  stdlib change — the `opt -verify` gate alone would not have caught it, since
+  the IR was well-formed and merely wrong.
 
 - ~~#47: `[1, 2, 3].join(", ")` segfaulted~~ — `__list_join` did a bare
   `__rt_untag_ptr` + `rt_strlen` on every element, which is valid only when the
