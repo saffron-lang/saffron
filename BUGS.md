@@ -46,35 +46,6 @@ and popped at function end — instead of inferring scope from
 parameter over a global. Was previously noted as the "global-shadows-param"
 work item (task #4 area).
 
-### 39. IO.println on lists/maps prints garbage on wasm32
-
-Fixed on native (commit 88297ca) but deliberately skipped on wasm32. The fix
-routes bare collection pointers through `__rt_as_list_ptr`/`__rt_as_map_ptr`
-before the pointer/float split in `__any_to_string`. Those functions guard on
-the GC header magic sentinel (`6557403441622859503` at `ptr - 8`) before
-trusting the type tag. On wasm32 the GC header has **no sentinel** — `__gc_alloc`
-in `wasm_base_32.ll` stores only the type tag at `ptr - 8` (`[type_tag: i64][user
-data]`), so the guard is unsound there: it reads a small type tag (1/2/3), which
-never equals the sentinel, so every collection is rejected and still falls
-through to `do_float`. Applying the native fix regressed string printing
-(`IO.println("hi")` → `[]`), so it was reverted for wasm32.
-
-**Real fix:** give the wasm32 GC header the same magic sentinel as native, so
-`__rt_as_list_ptr`'s guard means the same thing on every target. That is the
-header-layout unification described as stage 9 of
-`docs/design/compiler-rewrite.md` (one header definition, four targets), and #39
-is the bug that stage cites as its motivation. It requires bumping the wasm32
-header from 8 to 16 bytes (sentinel + type tag) and updating `__gc_alloc`,
-`__gc_alloc_zeroed`, `__gc_realloc`, `__gc_alloc_safe`, `__gc_get_type_tag`,
-`__gc_list_new` and every hand-written `ptr - 8` offset in `wasm_base_32.ll` in
-one atomic change — a partial conversion corrupts every heap read.
-
-WasmGC is **not** the direction: it would mean abandoning LLVM for the wasm
-target (LLVM's wasm backend emits linear memory only, not reference types), and
-the existing GC is adequate. `docs/design/compiler-rewrite.md` part 5 likewise
-keeps NaN boxing — the representation is fine, only its discipline is unmanaged,
-which invariant I5 (`Val`/`Raw<T>`/`Ptr<T>`) addresses without changing targets.
-
 ### 2. Forward references in nested closures
 
 **Reproduction:**
@@ -462,6 +433,40 @@ before flipping, since a fall-through can also be reached by valid-but-unhandled
 builtin methods rather than only by bad types.
 
 ## Fixed
+
+- ~~#39: `IO.println` on lists/maps printed garbage on wasm32~~ — Fixed by
+  unifying the wasm32 GC header with native's. The native half (`88297ca`) routes
+  bare collection pointers through `__rt_as_list_ptr`/`__rt_as_map_ptr` before the
+  pointer/float split in `__any_to_string`; those helpers read `load64(raw - 8)`
+  and require the magic sentinel `0x5AFFC0DEDEADBEEF` before trusting the type
+  tag. wasm32's header was 8 bytes holding *only* the type tag, so `raw - 8` read
+  a small integer, the guard never matched, and collections fell through to
+  `do_float` and printed as reinterpreted doubles. Applying the native fix without
+  changing the header regressed string printing to `[]`, which is why it was
+  reverted the first time.
+
+  The header is now 16 bytes — `[type_tag: i64][magic: i64][user data]` — putting
+  the sentinel at `ptr - 8` exactly where native has it. Native uses 24 bytes
+  (`[next][info][magic]`) because it threads a real collector; wasm32 never
+  collects, so it needs neither the free-list link nor the packed size word, and
+  only the magic's *position* has to agree. Every header-touching function in
+  `wasm_base_32.ll` was converted in one change (`__gc_alloc`,
+  `__gc_alloc_zeroed`, `__gc_realloc`, `__gc_alloc_safe`, `__gc_get_type_tag`,
+  `__gc_string_alloc`, `__gc_list_new`, `__gc_list_push`'s realloc path,
+  `__gc_map_new`, `__gc_stringbuilder_new`, `__gc_closure_new`, `__gc_env_alloc`,
+  `__gc_instance_alloc`) — a partial conversion would corrupt every heap read.
+  Struct-field offsets that happen to be `+8` (list capacity, closure env slot)
+  are deliberately unchanged; only header offsets moved.
+
+  wasm32 and native now produce byte-identical output for collections, nested
+  collections, empty collections, strings, floats and interpolation. This is the
+  header-layout unification that stage 9 of `docs/design/compiler-rewrite.md`
+  describes, done for one target ahead of the generated-runtime work.
+
+  WasmGC was considered and rejected: it would mean abandoning LLVM for the wasm
+  target (LLVM's wasm backend emits linear memory only, not reference types), and
+  the existing GC is adequate. `compiler-rewrite.md` part 5 likewise keeps NaN
+  boxing — the representation is fine, only its discipline is unmanaged.
 
 - ~~#35: An await loop's body re-executes after coroutine resume~~ — **Filed on a
   wrong diagnosis; not a real loop-structure bug.** The report was written from

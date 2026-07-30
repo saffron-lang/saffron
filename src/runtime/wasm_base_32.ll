@@ -888,12 +888,122 @@ entry:
   ret i64 %r
 }
 
+; __float_to_string -- format a double as decimal text.
+;
+; This used to be `fptosi` + __int_to_string, i.e. it simply TRUNCATED. Every
+; float printed on a wasm target lost its fractional part: 12.5664 came out as
+; "12" and 3.5 as "3", silently and everywhere -- to_string(), string
+; interpolation, and __any_to_string alike. The native targets format with
+; snprintf("%g"), but snprintf is only a stub here (see above), so the digits
+; have to be produced by hand.
+;
+; Integer part via the existing __wasm_uint_to_str, then up to 6 fractional
+; digits. The fraction is scaled to an integer ONCE and the digits extracted
+; with exact integer division; generating them one at a time by repeated
+; multiply-and-truncate accumulates binary representation error and turns
+; 12.5664 into "12.566399". Trailing zeros are trimmed, so a whole number still
+; prints as "3" rather than "3.000000".
+;
+; Divergence from %g worth knowing: this is 6 decimal PLACES, not 6 significant
+; digits, and there is no exponent form. Very small magnitudes therefore print
+; as "0.000012" where the native runtime would say "1.2345e-05", and values
+; beyond i64 range are not representable at all.
 define i64 @__float_to_string(i64 %v) {
 entry:
-  %f = bitcast i64 %v to double
-  %ival = fptosi double %f to i64
-  %result = call i64 @__int_to_string(i64 %ival)
-  ret i64 %result
+  %f0 = bitcast i64 %v to double
+  %buf = call i8* @malloc(i64 48)
+  %isneg = fcmp olt double %f0, 0.000000e+00
+  br i1 %isneg, label %do_neg, label %after_sign
+
+do_neg:
+  store i8 45, i8* %buf
+  %bufn = getelementptr i8, i8* %buf, i64 1
+  %fneg = fsub double 0.000000e+00, %f0
+  br label %after_sign
+
+after_sign:
+  %cur = phi i8* [ %buf, %entry ], [ %bufn, %do_neg ]
+  %f = phi double [ %f0, %entry ], [ %fneg, %do_neg ]
+  %ipart0 = fptosi double %f to i64
+  %ipd0 = sitofp i64 %ipart0 to double
+  %frac = fsub double %f, %ipd0
+  ; scaled = round(frac * 1e6), as exact integer math from here on
+  %scaled_f = fmul double %frac, 1.000000e+06
+  %scaled_r = fadd double %scaled_f, 5.000000e-01
+  %scaled0 = fptosi double %scaled_r to i64
+  ; frac ~= 0.9999995 rounds up to a full unit: carry into the integer part
+  %carry = icmp sge i64 %scaled0, 1000000
+  %ipart_inc = add i64 %ipart0, 1
+  %ipart = select i1 %carry, i64 %ipart_inc, i64 %ipart0
+  %scaled = select i1 %carry, i64 0, i64 %scaled0
+  call void @__wasm_uint_to_str(i64 %ipart, i8* %cur)
+  %ilen = call i64 @strlen(i8* %cur)
+  %fracpos = getelementptr i8, i8* %cur, i64 %ilen
+  %no_frac = icmp eq i64 %scaled, 0
+  br i1 %no_frac, label %finish_int, label %digits
+
+digits:
+  ; Fill tmp[0..5] most-significant first by peeling off the low digit and
+  ; walking backwards.
+  %tmp = alloca [8 x i8]
+  %tmpp = getelementptr [8 x i8], [8 x i8]* %tmp, i64 0, i64 0
+  br label %dloop
+
+dloop:
+  %di = phi i64 [ 6, %digits ], [ %dinext, %dloop ]
+  %sv = phi i64 [ %scaled, %digits ], [ %svnext, %dloop ]
+  %dinext = sub i64 %di, 1
+  %rem = urem i64 %sv, 10
+  %svnext = udiv i64 %sv, 10
+  %dgc = add i64 %rem, 48
+  %dgc8 = trunc i64 %dgc to i8
+  %dslot = getelementptr i8, i8* %tmpp, i64 %dinext
+  store i8 %dgc8, i8* %dslot
+  %ddone = icmp eq i64 %dinext, 0
+  br i1 %ddone, label %trim, label %dloop
+
+trim:
+  br label %tloop
+
+tloop:
+  ; Walk back over trailing '0's. %scaled is nonzero here, so at least one
+  ; significant digit survives and this cannot run off the front.
+  %tn = phi i64 [ 6, %trim ], [ %tnnext, %tcont ]
+  %lastidx = sub i64 %tn, 1
+  %lastp = getelementptr i8, i8* %tmpp, i64 %lastidx
+  %lastc = load i8, i8* %lastp
+  %iszero = icmp eq i8 %lastc, 48
+  br i1 %iszero, label %tcont, label %write_frac
+
+tcont:
+  %tnnext = sub i64 %tn, 1
+  br label %tloop
+
+write_frac:
+  store i8 46, i8* %fracpos
+  %fstart = getelementptr i8, i8* %fracpos, i64 1
+  br label %wloop
+
+wloop:
+  %wi = phi i64 [ 0, %write_frac ], [ %winext, %wloop ]
+  %srcp = getelementptr i8, i8* %tmpp, i64 %wi
+  %sc = load i8, i8* %srcp
+  %dstp = getelementptr i8, i8* %fstart, i64 %wi
+  store i8 %sc, i8* %dstp
+  %winext = add i64 %wi, 1
+  %wdone = icmp uge i64 %winext, %tn
+  br i1 %wdone, label %wend, label %wloop
+
+wend:
+  %endp = getelementptr i8, i8* %fstart, i64 %tn
+  store i8 0, i8* %endp
+  %r1 = ptrtoint i8* %buf to i64
+  ret i64 %r1
+
+finish_int:
+  ; __wasm_uint_to_str already NUL-terminated; nothing fractional to add.
+  %r0 = ptrtoint i8* %buf to i64
+  ret i64 %r0
 }
 
 ; Wrapper: tag a raw pointer as a Saffron string value (i64 -> i64)
@@ -953,62 +1063,88 @@ entry:
   ret void
 }
 
-; __gc_alloc: allocate with 8-byte type-tag header before the user pointer.
-; Both size and type_tag are i64 (what the codegen emits).
-; Layout: [type_tag: i64][user data...]
-;         ^              ^-- returned pointer
-;         +-- ptr - 8
+; =============================================================================
+; GC header layout (wasm32)
+; =============================================================================
+;
+; Layout: [type_tag: i64][magic: i64][user data...]
+;         ^                          ^-- returned pointer
+;         ptr - 16                   ptr - 8 holds the magic
+;
+; The header is 16 bytes, not the 8 it used to be, so that the magic sentinel
+; lands at ptr - 8 -- the same offset native uses. `runtime.sf` hardcodes that
+; offset in __rt_as_list_ptr / __rt_as_map_ptr / __rt_as_string_ptr, which read
+; load64(raw - 8) and compare against the sentinel before trusting the type tag.
+; With the old 8-byte header those helpers read the *type tag* instead (a small
+; integer, never equal to the sentinel), so every collection was rejected and
+; IO.println fell through to the float path -- BUGS #39.
+;
+; Native's header is 24 bytes ([next][info][magic]) because it threads a real
+; collector: a linked list and a packed size/tag word. wasm32 never collects, so
+; it needs neither; only the magic's *position* has to agree. Keeping the tag as
+; a plain word (rather than native's packed `info`) is why __gc_get_type_tag
+; below reads it directly instead of calling __gc_info_tag.
+;
+; 0x5AFFC0DEDEADBEEF = 6557403441622859503
+
 define i64 @__gc_alloc(i64 %size, i64 %type_tag) {
 entry:
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @malloc(i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
-  ; Store type tag at the start
+  ; header[0] = type tag
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 %type_tag, i64* %tag_ptr
-  ; Return pointer offset by 8 (user data starts here)
-  %user = add i64 %raw_int, 8
+  ; header[8] = magic sentinel
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  ; user data starts after the 16-byte header
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
-; __gc_alloc_zeroed: calloc with 8-byte type-tag header
+; __gc_alloc_zeroed: calloc with the 16-byte header
 define i64 @__gc_alloc_zeroed(i64 %size, i64 %type_tag) {
 entry:
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @calloc(i64 1, i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
-  ; Store type tag at the start
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 %type_tag, i64* %tag_ptr
-  ; Return pointer offset by 8
-  %user = add i64 %raw_int, 8
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
-; __gc_realloc: realloc preserving the type-tag header
+; __gc_realloc: realloc preserving the header
 define i64 @__gc_realloc(i64 %old_ptr, i64 %new_size, i64 %type_tag) {
 entry:
-  ; old_ptr points to user data; the real allocation is at old_ptr - 8
-  %old_raw = sub i64 %old_ptr, 8
+  ; old_ptr points to user data; the real allocation is at old_ptr - 16
+  %old_raw = sub i64 %old_ptr, 16
   %old_raw_p = inttoptr i64 %old_raw to i8*
-  %new_total = add i64 %new_size, 8
+  %new_total = add i64 %new_size, 16
   %new_raw_p = call i8* @realloc(i8* %old_raw_p, i64 %new_total)
   %new_raw = ptrtoint i8* %new_raw_p to i64
-  ; Re-store type tag (realloc may have moved the block)
+  ; Re-store the header (realloc may have moved the block)
   %tag_ptr = inttoptr i64 %new_raw to i64*
   store i64 %type_tag, i64* %tag_ptr
-  ; Return user pointer
-  %user = add i64 %new_raw, 8
+  %magic_addr = add i64 %new_raw, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %new_raw, 16
   ret i64 %user
 }
 
-; __gc_get_type_tag: read the type tag stored at ptr - 8
+; __gc_get_type_tag: read the type tag stored at ptr - 16
 define i64 @__gc_get_type_tag(i64 %ptr) {
 entry:
   %is_null = icmp eq i64 %ptr, 0
   br i1 %is_null, label %ret_zero, label %read_tag
 read_tag:
-  %tag_addr = sub i64 %ptr, 8
+  %tag_addr = sub i64 %ptr, 16
   %tag_ptr = inttoptr i64 %tag_addr to i64*
   %tag = load i64, i64* %tag_ptr
   ret i64 %tag
@@ -1017,30 +1153,37 @@ ret_zero:
 }
 
 ; __gc_list_new: allocate a list { count@0, capacity@8, data_ptr@16 }
-; Stores type tag 2 at offset -8 from the returned pointer.
-; Data buffer also has an 8-byte type tag header (type 7 = data array).
+; Stores type tag 2 and the magic in the 16-byte header before the returned
+; pointer. The data buffer carries the same header (type 7 = data array).
 define i64 @__gc_list_new() {
 entry:
-  ; Allocate 8 (tag) + 24 (list struct) = 32 bytes
-  %raw = call i8* @calloc(i64 1, i64 32)
+  ; Allocate 16 (header) + 24 (list struct) = 40 bytes
+  %raw = call i8* @calloc(i64 1, i64 40)
   %raw_int = ptrtoint i8* %raw to i64
-  ; Store type tag = 2 (list) at offset 0
+  ; Store type tag = 2 (list) at header[0]
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 2, i64* %tag_ptr
-  ; User pointer starts at offset 8
-  %list = add i64 %raw_int, 8
-  ; capacity = 8
+  ; Store the magic at header[8]
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  ; User pointer starts after the header
+  %list = add i64 %raw_int, 16
+  ; capacity = 8  (struct field, not a header offset)
   %cap_addr = add i64 %list, 8
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 8, i64* %cap_ptr
-  ; data = calloc(8 + 64) for 8 slots, with type tag header
-  %data_raw = call i8* @calloc(i64 1, i64 72)
+  ; data = calloc(16 + 64) for 8 slots, with its own header
+  %data_raw = call i8* @calloc(i64 1, i64 80)
   %data_raw_int = ptrtoint i8* %data_raw to i64
   ; Store data type tag = 7 (data array)
   %data_tag_ptr = inttoptr i64 %data_raw_int to i64*
   store i64 7, i64* %data_tag_ptr
-  ; Data user pointer at offset 8
-  %data = add i64 %data_raw_int, 8
+  %data_magic_addr = add i64 %data_raw_int, 8
+  %data_magic_ptr = inttoptr i64 %data_magic_addr to i64*
+  store i64 6557403441622859503, i64* %data_magic_ptr
+  ; Data user pointer after its header
+  %data = add i64 %data_raw_int, 16
   %data_addr = add i64 %list, 16
   %data_ptr = inttoptr i64 %data_addr to i64*
   store i64 %data, i64* %data_ptr
@@ -1048,7 +1191,7 @@ entry:
 }
 
 ; __gc_list_push: push a value onto a list
-; Data buffer has 8-byte type tag header, so realloc adjusts for it.
+; The data buffer has a 16-byte header, so realloc adjusts for it.
 define void @__gc_list_push(i64 %list, i64 %value) {
 entry:
   %is_null = icmp eq i64 %list, 0
@@ -1064,19 +1207,22 @@ check:
 grow:
   %new_cap = shl i64 %cap, 1
   %new_bytes = shl i64 %new_cap, 3
-  ; Data has 8-byte header: raw allocation is at old_data - 8
+  ; Data has a 16-byte header: raw allocation is at old_data - 16
   %data_addr_g = add i64 %list, 16
   %data_ptr_g = inttoptr i64 %data_addr_g to i64*
   %old_data = load i64, i64* %data_ptr_g
-  %old_raw = sub i64 %old_data, 8
+  %old_raw = sub i64 %old_data, 16
   %old_raw_p = inttoptr i64 %old_raw to i8*
-  %new_total = add i64 %new_bytes, 8
+  %new_total = add i64 %new_bytes, 16
   %new_raw_p = call i8* @realloc(i8* %old_raw_p, i64 %new_total)
   %new_raw = ptrtoint i8* %new_raw_p to i64
-  ; Re-store type tag (realloc may move)
+  ; Re-store the header (realloc may move)
   %new_tag_ptr = inttoptr i64 %new_raw to i64*
   store i64 7, i64* %new_tag_ptr
-  %new_data = add i64 %new_raw, 8
+  %new_magic_addr = add i64 %new_raw, 8
+  %new_magic_ptr = inttoptr i64 %new_magic_addr to i64*
+  store i64 6557403441622859503, i64* %new_magic_ptr
+  %new_data = add i64 %new_raw, 16
   store i64 %new_cap, i64* %cap_ptr
   store i64 %new_data, i64* %data_ptr_g
   br label %store
@@ -1096,37 +1242,46 @@ done:
 }
 
 ; __gc_map_new: allocate a map { count@0, capacity@8, keys_ptr@16, values_ptr@24 }
-; Stores type tag 3 at offset -8 from the returned pointer.
-; Key/value buffers also have 8-byte type tag headers (type 8 = key/value array).
+; Stores type tag 3 and the magic in the 16-byte header before the returned
+; pointer. Key/value buffers carry the same header (type 8 = key/value array).
 define i64 @__gc_map_new() {
 entry:
-  ; Allocate 8 (tag) + 32 (map struct) = 40 bytes
-  %raw = call i8* @calloc(i64 1, i64 40)
+  ; Allocate 16 (header) + 32 (map struct) = 48 bytes
+  %raw = call i8* @calloc(i64 1, i64 48)
   %raw_int = ptrtoint i8* %raw to i64
-  ; Store type tag = 3 (map) at offset 0
+  ; Store type tag = 3 (map) at header[0]
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 3, i64* %tag_ptr
-  ; User pointer starts at offset 8
-  %map = add i64 %raw_int, 8
-  ; capacity = 16
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  ; User pointer starts after the header
+  %map = add i64 %raw_int, 16
+  ; capacity = 16  (struct field, not a header offset)
   %cap_addr = add i64 %map, 8
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 16, i64* %cap_ptr
-  ; keys = calloc(8 + 128) with type tag header
-  %keys_raw = call i8* @calloc(i64 1, i64 136)
+  ; keys = calloc(16 + 128) with its own header
+  %keys_raw = call i8* @calloc(i64 1, i64 144)
   %keys_raw_int = ptrtoint i8* %keys_raw to i64
   %keys_tag_ptr = inttoptr i64 %keys_raw_int to i64*
   store i64 8, i64* %keys_tag_ptr
-  %keys = add i64 %keys_raw_int, 8
+  %keys_magic_addr = add i64 %keys_raw_int, 8
+  %keys_magic_ptr = inttoptr i64 %keys_magic_addr to i64*
+  store i64 6557403441622859503, i64* %keys_magic_ptr
+  %keys = add i64 %keys_raw_int, 16
   %keys_addr = add i64 %map, 16
   %keys_ptr = inttoptr i64 %keys_addr to i64*
   store i64 %keys, i64* %keys_ptr
-  ; values = calloc(8 + 128) with type tag header
-  %vals_raw = call i8* @calloc(i64 1, i64 136)
+  ; values = calloc(16 + 128) with its own header
+  %vals_raw = call i8* @calloc(i64 1, i64 144)
   %vals_raw_int = ptrtoint i8* %vals_raw to i64
   %vals_tag_ptr = inttoptr i64 %vals_raw_int to i64*
   store i64 8, i64* %vals_tag_ptr
-  %vals = add i64 %vals_raw_int, 8
+  %vals_magic_addr = add i64 %vals_raw_int, 8
+  %vals_magic_ptr = inttoptr i64 %vals_magic_addr to i64*
+  store i64 6557403441622859503, i64* %vals_magic_ptr
+  %vals = add i64 %vals_raw_int, 16
   %vals_addr = add i64 %map, 24
   %vals_ptr = inttoptr i64 %vals_addr to i64*
   store i64 %vals, i64* %vals_ptr
@@ -1134,30 +1289,36 @@ entry:
 }
 
 ; __gc_stringbuilder_new: allocate a StringBuilder { len@0, cap@8, buf_ptr@16 }
-; Stores type tag 6 at offset -8 from the returned pointer.
-; Buffer also has 8-byte type tag header (type 0 = raw).
+; Stores type tag 6 and the magic in the 16-byte header before the returned
+; pointer. The buffer carries the same header (type 0 = raw).
 define i64 @__gc_stringbuilder_new() {
 entry:
-  ; Allocate 8 (tag) + 24 (sb struct) = 32 bytes
-  %raw = call i8* @calloc(i64 1, i64 32)
+  ; Allocate 16 (header) + 24 (sb struct) = 40 bytes
+  %raw = call i8* @calloc(i64 1, i64 40)
   %raw_int = ptrtoint i8* %raw to i64
   ; Store type tag = 6 (stringbuilder)
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 6, i64* %tag_ptr
-  ; User pointer at offset 8
-  %sb = add i64 %raw_int, 8
-  ; cap = 1024
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  ; User pointer after the header
+  %sb = add i64 %raw_int, 16
+  ; cap = 1024  (struct field, not a header offset)
   %cap_addr = add i64 %sb, 8
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 1024, i64* %cap_ptr
-  ; buf = calloc(8 + 1024) with type tag header
-  %buf_raw = call i8* @calloc(i64 1, i64 1032)
+  ; buf = calloc(16 + 1024) with its own header
+  %buf_raw = call i8* @calloc(i64 1, i64 1040)
   %buf_raw_int = ptrtoint i8* %buf_raw to i64
   ; Store buffer type tag = 0 (raw)
   %buf_tag_ptr = inttoptr i64 %buf_raw_int to i64*
   store i64 0, i64* %buf_tag_ptr
-  ; Buffer user pointer at offset 8
-  %buf = add i64 %buf_raw_int, 8
+  %buf_magic_addr = add i64 %buf_raw_int, 8
+  %buf_magic_ptr = inttoptr i64 %buf_magic_addr to i64*
+  store i64 6557403441622859503, i64* %buf_magic_ptr
+  ; Buffer user pointer after its header
+  %buf = add i64 %buf_raw_int, 16
   %buf_addr = add i64 %sb, 16
   %buf_ptr = inttoptr i64 %buf_addr to i64*
   store i64 %buf, i64* %buf_ptr
@@ -1167,44 +1328,53 @@ entry:
 ; __gc_alloc_safe: allocate without triggering GC (wasm32: same as __gc_alloc)
 define i64 @__gc_alloc_safe(i64 %size, i64 %type_tag) {
 entry:
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @malloc(i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
-  ; Store type tag
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 %type_tag, i64* %tag_ptr
-  %user = add i64 %raw_int, 8
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
 ; __gc_string_alloc: allocate a string buffer
-; Stores type tag 1 (string) at offset -8.
+; Stores type tag 1 (string) and the magic in the header.
 define i64 @__gc_string_alloc(i64 %size) {
 entry:
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @malloc(i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
   ; Store type tag = 1 (string)
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 1, i64* %tag_ptr
-  %user = add i64 %raw_int, 8
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
 ; __gc_closure_new: allocate a closure pair { fn_ptr@0, env_ptr@8 }
-; Stores type tag 4 at offset -8 from the returned pointer.
+; Stores type tag 4 and the magic in the 16-byte header.
 define i64 @__gc_closure_new(i64 %fn_ptr, i64 %env_ptr) {
 entry:
-  ; Allocate 8 (tag) + 16 (closure) = 24 bytes
-  %raw_p = call i8* @malloc(i64 24)
+  ; Allocate 16 (header) + 16 (closure) = 32 bytes
+  %raw_p = call i8* @malloc(i64 32)
   %raw = ptrtoint i8* %raw_p to i64
   ; Store type tag = 4 (closure)
   %tag_ptr = inttoptr i64 %raw to i64*
   store i64 4, i64* %tag_ptr
-  ; User pointer at offset 8
-  %user = add i64 %raw, 8
+  %magic_addr = add i64 %raw, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  ; User pointer after the header
+  %user = add i64 %raw, 16
   %fn_slot = inttoptr i64 %user to i64*
   store i64 %fn_ptr, i64* %fn_slot
+  ; env_ptr is a struct field at user + 8, not a header offset
   %env_addr = add i64 %user, 8
   %env_slot = inttoptr i64 %env_addr to i64*
   store i64 %env_ptr, i64* %env_slot
@@ -1212,34 +1382,38 @@ entry:
 }
 
 ; __gc_env_alloc: allocate a closure environment (zeroed)
-; Stores type tag 9 at offset -8 from the returned pointer.
+; Stores type tag 9 and the magic in the 16-byte header.
 define i64 @__gc_env_alloc(i64 %num_slots) {
 entry:
   %size = shl i64 %num_slots, 3
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @calloc(i64 1, i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
   ; Store type tag = 9 (env)
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 9, i64* %tag_ptr
-  ; User pointer at offset 8
-  %user = add i64 %raw_int, 8
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
 ; __gc_instance_alloc: allocate a class instance (zeroed)
-; Stores type tag 5 at offset -8 from the returned pointer.
+; Stores type tag 5 and the magic in the 16-byte header.
 define i64 @__gc_instance_alloc(i64 %num_fields) {
 entry:
   %size = shl i64 %num_fields, 3
-  %total = add i64 %size, 8
+  %total = add i64 %size, 16
   %raw = call i8* @calloc(i64 1, i64 %total)
   %raw_int = ptrtoint i8* %raw to i64
   ; Store type tag = 5 (instance)
   %tag_ptr = inttoptr i64 %raw_int to i64*
   store i64 5, i64* %tag_ptr
-  ; User pointer at offset 8
-  %user = add i64 %raw_int, 8
+  %magic_addr = add i64 %raw_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  store i64 6557403441622859503, i64* %magic_ptr
+  %user = add i64 %raw_int, 16
   ret i64 %user
 }
 
@@ -1275,6 +1449,16 @@ entry:
 ; Takes a NaN-boxed i64, determines its type at runtime, and returns a raw
 ; char* (as i64) pointing to the string representation.
 
+; A collection value can reach here either NaN-boxed or as a bare heap pointer,
+; depending on where it was produced -- __list_new and __map_new both return raw
+; pointers. These accept both and return 0 for anything that is not a GC-managed
+; list/map, verifying the header sentinel before trusting the type tag. Defined
+; in runtime.ll, which links after this file.
+declare i64 @__rt_as_list_ptr(i64)
+declare i64 @__list_to_string(i64)
+declare i64 @__rt_as_map_ptr(i64)
+declare i64 @__map_to_string(i64)
+
 define i64 @__any_to_string(i64 %val) {
 entry:
   ; Check nil first
@@ -1292,12 +1476,36 @@ check_false:
 
 check_int:
   %is_int = call i1 @__val_is_int(i64 %val)
-  br i1 %is_int, label %do_int, label %check_ptr
+  br i1 %is_int, label %do_int, label %check_list
 
 do_int:
   %raw_int = call i64 @__val_untag_int(i64 %val)
   %int_str = call i64 @__int_to_string(i64 %raw_int)
   ret i64 %int_str
+
+  ; Test for a list or map before the pointer/float split. An untagged
+  ; collection pointer fails __val_is_ptr (its top 16 bits are 0, not 0x7FF8)
+  ; and would otherwise fall through to do_float and be reinterpreted as a
+  ; double, printing garbage instead of the collection. Mirrors base_nanbox.ll.
+  ; This is only sound now that the wasm32 GC header carries the magic sentinel
+  ; at ptr - 8, which is what __rt_as_list_ptr/__rt_as_map_ptr check (BUGS #39).
+check_list:
+  %as_list = call i64 @__rt_as_list_ptr(i64 %val)
+  %is_list = icmp ne i64 %as_list, 0
+  br i1 %is_list, label %do_list, label %check_map
+
+do_list:
+  %list_str = call i64 @__list_to_string(i64 %as_list)
+  ret i64 %list_str
+
+check_map:
+  %as_map = call i64 @__rt_as_map_ptr(i64 %val)
+  %is_map = icmp ne i64 %as_map, 0
+  br i1 %is_map, label %do_map, label %check_ptr
+
+do_map:
+  %map_str = call i64 @__map_to_string(i64 %as_map)
+  ret i64 %map_str
 
 check_ptr:
   %is_ptr = call i1 @__val_is_ptr(i64 %val)
