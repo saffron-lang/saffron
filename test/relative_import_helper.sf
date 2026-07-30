@@ -2,4 +2,4 @@ fun greet(name: String): String {
     return "hello " + name
 }
 
-var VERSION: Number = 1
+var VERSION: Int = 1

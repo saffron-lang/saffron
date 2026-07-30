@@ -1,31 +1,31 @@
-var a: Number = 5
+var a: Int = 5
 var b: String | Number = "asd"
 var d: Atom = :asd
-var c: (Number) => Number = fun (x: Number): Number => { return x + 1; }
-var l: List<List<Number>> = [[1,2],[3,4]]
+var c: (Number) => Number = fun (x: Int): Int => { return x + 1; }
+var l: List<List<Int>> = [[1,2],[3,4]]
 IO.println(l[1])
 
 type A<T> = List<T>
-//var b: A<Number> = [1,2,3] // TODO: make this not error
+//var b: A<Int> = [1,2,3] // TODO: make this not error
 
 interface PogInterface<T> {
     fun myfunc(a: T): T
 }
 
 class PogClass {
-    fun myfunc(a: Number): Number {
+    fun myfunc(a: Int): Int {
         return a + 1
     }
 }
 
-var cls: PogInterface<Number> = PogClass()
+var cls: PogInterface<Int> = PogClass()
 
 interface MyInterface {
-    fun myfunc(a: Number, b: String)
+    fun myfunc(a: Int, b: String)
 }
 
 class MyClass {
-    fun myfunc(a: Number, b: String) {
+    fun myfunc(a: Int, b: String) {
         IO.println(a)
         IO.println(b)
     }
@@ -47,7 +47,7 @@ fun myfunc<T extends MyInterface>(a: T, b: List<T>): T {
 myfunc(my_var, [my_var])
 
 // This should fail
-var mylist: List<Number> = [1,2,3]
+var mylist: List<Int> = [1,2,3]
 var mylist2: List<Any> = mylist
 mylist2.push("String!")
 IO.println(mylist2)

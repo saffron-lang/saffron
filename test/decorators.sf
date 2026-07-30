@@ -3,7 +3,7 @@
 
 // Simple wrapper decorator
 fun logged(fn: Any): Any {
-    return fun (x: Number) => {
+    return fun (x: Int) => {
         IO.println("calling with ${x}")
         var result = fn(x)
         IO.println("returned ${result}")
@@ -12,7 +12,7 @@ fun logged(fn: Any): Any {
 }
 
 @logged
-fun double(x: Number): Number {
+fun double(x: Int): Int {
     return x * 2
 }
 
@@ -23,14 +23,14 @@ IO.println(double(5))
 //   10
 
 // Parameterized decorator (decorator factory)
-fun multiply_by(factor: Number) {
+fun multiply_by(factor: Int) {
     return fun (fn: Any) => {
-        return fun (x: Number) => fn(x) * factor
+        return fun (x: Int) => fn(x) * factor
     }
 }
 
 @multiply_by(3)
-fun add_one(x: Number): Number {
+fun add_one(x: Int): Int {
     return x + 1
 }
 

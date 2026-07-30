@@ -11,7 +11,7 @@ class Token {
 }
 
 enum Result {
-    Ok(value: Number),
+    Ok(value: Int),
     Err(msg: String)
 }
 

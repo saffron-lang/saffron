@@ -1,6 +1,6 @@
 var SLEEP = 1;
 
-fun function2(x: Number) {
+fun function2(x: Int) {
     yield [SLEEP, x];
     IO.println("Slept ", x);
     return true;

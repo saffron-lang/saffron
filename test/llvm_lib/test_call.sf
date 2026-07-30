@@ -1,14 +1,14 @@
-fun double(x: Number): Number {
+fun double(x: Int): Int {
     return x * 2
 }
 
-fun apply_twice(x: Number): Number {
-    var first: Number = double(x)
-    var second: Number = double(first)
+fun apply_twice(x: Int): Int {
+    var first: Int = double(x)
+    var second: Int = double(first)
     return second
 }
 
 fun main() {
-    var result: Number = apply_twice(3)
+    var result: Int = apply_twice(3)
     IO.println(result)
 }

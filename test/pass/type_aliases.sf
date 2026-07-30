@@ -5,7 +5,7 @@ var names: StringList = ["Alice", "Bob"]
 IO.println(names)
 
 // Test: Alias used in annotation
-type Numbers = List<Number>
+type Numbers = List<Int>
 
 var nums: Numbers = [1, 2, 3]
 IO.println(nums)

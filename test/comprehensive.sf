@@ -17,8 +17,8 @@ T.assert(true or false, "or")
 T.assert(!false, "not")
 
 T.section("Functions")
-fun add(a: Number, b: Number): Number { return a + b }
-fun fib(n: Number): Number {
+fun add(a: Int, b: Int): Int { return a + b }
+fun fib(n: Int): Int {
     if (n < 2) return n
     return fib(n - 1) + fib(n - 2)
 }
@@ -26,8 +26,8 @@ T.assert_eq(add(3, 4), 7, "function call")
 T.assert_eq(fib(10), 55, "recursion")
 
 T.section("Closures")
-fun makeAdder(base: Number): Number {
-    fun inner(x: Number): Number { return base + x }
+fun makeAdder(base: Int): Int {
+    fun inner(x: Int): Int { return base + x }
     return inner(10)
 }
 T.assert_eq(makeAdder(5), 15, "upvalue capture")
@@ -41,10 +41,10 @@ T.assert_eq(list.length(), 4, "list push")
 
 T.section("Classes")
 class Point {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) { this.x = x; this.y = y }
-    fun sum(): Number { return this.x + this.y }
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) { this.x = x; this.y = y }
+    fun sum(): Int { return this.x + this.y }
 }
 var p = Point(3, 4)
 T.assert_eq(p.x, 3, "field access")
@@ -86,8 +86,8 @@ T.assert_eq(name, "red", "enum match")
 
 T.section("Operators")
 class Vec {
-    var x: Number
-    fun init(x: Number) { this.x = x }
+    var x: Int
+    fun init(x: Int) { this.x = x }
     fun add(other: Vec): Vec { return Vec(this.x + other.x) }
 }
 var v = Vec(3) + Vec(4)
@@ -102,7 +102,7 @@ T.assert(!(42 is String), "number not String")
 
 T.section("Named Imports")
 import { map } from "@iter"
-var doubled = map([1, 2, 3], fun (x: Number): Number => x * 2)
+var doubled = map([1, 2, 3], fun (x: Int): Int => x * 2)
 T.assert_eq(doubled[0], 2, "map first")
 T.assert_eq(doubled[2], 6, "map last")
 

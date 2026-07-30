@@ -4,7 +4,7 @@
 import "@scheduler" as Scheduler
 import "@net" as Net
 
-fun sleep(duration: Number) {
+fun sleep(duration: Int) {
     yield [1, duration]
 }
 

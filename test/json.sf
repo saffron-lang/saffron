@@ -2,19 +2,19 @@ import "@json" as Json
 
 // Data class definitions
 data class Point {
-    var x: Number
-    var y: Number
+    var x: Int
+    var y: Int
 }
 
 data class User {
     var name: String
-    var age: Number
+    var age: Int
     var active: Bool
 }
 
 data class Config {
     var host: String
-    var port: Number
+    var port: Int
     var debug: Bool
 }
 

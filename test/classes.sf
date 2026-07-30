@@ -1,11 +1,11 @@
-fun my_func(a: String): Number {
+fun my_func(a: String): Int {
     IO.println(a)
     return 5 + 2
 }
 
 class Pair {
-    var first: Number
-    var second: Number
+    var first: Int
+    var second: Int
 }
 
 var pair = Pair();
@@ -38,7 +38,7 @@ class CoffeeMaker {
   var tube: (Number) => String
 
   fun init(coffee: String) {
-    this.tube = fun (a: Number) => { return "beans" }
+    this.tube = fun (a: Int) => { return "beans" }
     this.coffee = coffee;
   }
 

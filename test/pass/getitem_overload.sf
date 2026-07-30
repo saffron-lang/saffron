@@ -6,7 +6,7 @@ class Dict {
         this.items = ["first", "second", "third"]
     }
 
-    fun getItem(key: Number): String {
+    fun getItem(key: Int): String {
         return this.items[key]
     }
 }

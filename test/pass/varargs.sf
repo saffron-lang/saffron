@@ -1,7 +1,7 @@
 // Variadic arguments test
 
 // Basic varargs
-fun sum(*nums: Number): Number {
+fun sum(*nums: Int): Int {
     var total = 0
     for (n in nums) { total = total + n }
     return total
@@ -19,13 +19,13 @@ fun greet(greeting: String, *names: String): String {
 IO.println(greet("Hello", "Alice", "Bob"))
 
 // Varargs length
-fun count(*items: Any): Number {
+fun count(*items: Any): Int {
     return items.length()
 }
 IO.println(count("a", "b", "c", "d"))
 
 // Varargs with transformation
-fun double_all(*nums: Number): List<Number> {
+fun double_all(*nums: Int): List<Int> {
     var result = []
     for (n in nums) { result.push(n * 2) }
     return result

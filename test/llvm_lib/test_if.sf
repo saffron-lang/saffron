@@ -1,4 +1,4 @@
-fun max(a: Number, b: Number): Number {
+fun max(a: Int, b: Int): Int {
     if (a > b) {
         return a
     } else {
@@ -7,6 +7,6 @@ fun max(a: Number, b: Number): Number {
 }
 
 fun main() {
-    var result: Number = max(5, 10)
+    var result: Int = max(5, 10)
     IO.println(result)
 }

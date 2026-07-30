@@ -1,11 +1,11 @@
 // Test all patterns of this.field/method access
 class Widget {
-    var x: Number
-    var y: Number
+    var x: Int
+    var y: Int
     var children: List<Widget>
     var handlers: List<() => Nil>
 
-    fun init(x: Number, y: Number) {
+    fun init(x: Int, y: Int) {
         this.x = x
         this.y = y
         this.children = []
@@ -18,22 +18,22 @@ class Widget {
     }
 
     // Pattern 2: this.field.method() — field access then method
-    fun child_count(): Number {
+    fun child_count(): Int {
         return this.children.length()
     }
 
     // Pattern 3: this.field[i] — field access then index
-    fun get_child(i: Number): Widget {
+    fun get_child(i: Int): Widget {
         return this.children[i]
     }
 
     // Pattern 4: this.field[i]() — field access, index, then call (THE BUG FIX)
-    fun trigger_handler(i: Number) {
+    fun trigger_handler(i: Int) {
         this.handlers[i]()
     }
 
     // Pattern 5: this.field[i].method() — field access, index, then method
-    fun child_pos(i: Number): String {
+    fun child_pos(i: Int): String {
         return this.children[i].get_pos()
     }
 

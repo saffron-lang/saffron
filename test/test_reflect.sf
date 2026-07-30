@@ -11,9 +11,9 @@
 import "@reflect" as Reflect
 
 class Point {
-    var x: Number
-    var y: Number
-    fun init(x: Number, y: Number) {
+    var x: Int
+    var y: Int
+    fun init(x: Int, y: Int) {
         this.x = x
         this.y = y
     }
@@ -21,8 +21,8 @@ class Point {
 
 class Person {
     var name: String
-    var age: Number
-    fun init(name: String, age: Number) {
+    var age: Int
+    fun init(name: String, age: Int) {
         this.name = name
         this.age = age
     }

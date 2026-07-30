@@ -3,7 +3,7 @@
 
 import "@scheduler" as Scheduler
 
-fun sleep(duration: Number) {
+fun sleep(duration: Int) {
     yield [1, duration]
 }
 
@@ -24,7 +24,7 @@ IO.println("7^2 = " + result.to_string())
 IO.println("")
 IO.println("=== Concurrent ===")
 
-fun worker(name: String, ms: Number): String {
+fun worker(name: String, ms: Int): String {
     IO.println("  " + name + " start")
     sleep(ms)
     IO.println("  " + name + " end")

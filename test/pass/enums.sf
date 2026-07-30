@@ -11,8 +11,8 @@ var g = Color.Green
 IO.println(g)
 
 enum Shape {
-    Circle(radius: Number),
-    Rect(width: Number, height: Number)
+    Circle(radius: Int),
+    Rect(width: Int, height: Int)
 }
 
 var s = Shape.Circle(5)

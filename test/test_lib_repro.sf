@@ -37,13 +37,13 @@ fun assert_neq(actual: Any, expected: Any, msg: String) {
     }
 }
 
-fun assert_gt(actual: Number, expected: Number, msg: String) {
+fun assert_gt(actual: Int, expected: Int, msg: String) {
     total = total + 1
     if (actual > expected) { passed = passed + 1 }
     else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not > ${expected})") }
 }
 
-fun assert_lt(actual: Number, expected: Number, msg: String) {
+fun assert_lt(actual: Int, expected: Int, msg: String) {
     total = total + 1
     if (actual < expected) { passed = passed + 1 }
     else { failed = failed + 1; IO.println("    FAIL: ${msg} (${actual} not < ${expected})") }
@@ -105,7 +105,7 @@ fun mock(name: String) {
         }
     }
 
-    fun call_count(): Number {
+    fun call_count(): Int {
         return calls.length()
     }
 
@@ -144,7 +144,7 @@ fun mock(name: String) {
 
 // --- Async Testing ---
 
-fun async_test(name: String, body: Any, timeout_secs: Number) {
+fun async_test(name: String, body: Any, timeout_secs: Int) {
     total = total + 1
     var task = Task.spawn(body)
 

@@ -23,7 +23,7 @@ T.assert(counts.has("b"), "Map has 'b'")
 T.assert(!counts.has("z"), "Map !has 'z'")
 
 // --- Test 4: Map value used in arithmetic ---
-var x: Number = counts.get("b") + counts.get("c")
+var x: Int = counts.get("b") + counts.get("c")
 T.assert_eq(x, 107, "Map values used in arithmetic")
 
 // --- Test 5: Map<String, Bool> (bool stored as i64 0/1) ---

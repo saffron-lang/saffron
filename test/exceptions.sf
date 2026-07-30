@@ -37,7 +37,7 @@ try {
 }
 
 // Function that throws
-fun risky(x: Number) {
+fun risky(x: Int) {
     if (x > 5) {
         throw "too big!"
     }
