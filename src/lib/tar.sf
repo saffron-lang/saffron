@@ -196,7 +196,7 @@ fun pack(name: String, version: String, source_dir: String, exclude: List<String
 /// var size = Tar.archive_size("build/my-lib-1.0.0.tar.gz")
 /// IO.println("archive is ${size} bytes")
 /// ```
-fun archive_size(path: String): Number {
+fun archive_size(path: String): Int {
     var cmd = ""
     if (_is_macos()) {
         cmd = "stat -f '%z' '" + path + "'"

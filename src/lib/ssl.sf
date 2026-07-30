@@ -26,28 +26,28 @@ import "@process" as Process
 
 // FFI declarations for the C TLS runtime (socket_native.c)
 @extern("i64 sf_tls_ctx_new_server(i8*, i8*)")
-fun _tls_ctx_new_server(cert_path: String, key_path: String): Number {}
+fun _tls_ctx_new_server(cert_path: String, key_path: String): Int {}
 
 @extern("i64 sf_tls_ctx_new_client(i8*, i64)")
-fun _tls_ctx_new_client(ca_path: String, verify_peer: Number): Number {}
+fun _tls_ctx_new_client(ca_path: String, verify_peer: Int): Int {}
 
 @extern("i64 sf_tls_accept(i64, i64)")
-fun _tls_accept(client_fd: Number, ctx_handle: Number): Number {}
+fun _tls_accept(client_fd: Int, ctx_handle: Int): Int {}
 
 @extern("i64 sf_tls_connect_ctx(i64, i8*, i64)")
-fun _tls_connect_ctx(fd: Number, hostname: String, ctx_handle: Number): Number {}
+fun _tls_connect_ctx(fd: Int, hostname: String, ctx_handle: Int): Int {}
 
 @extern("void sf_tls_ctx_free(i64)")
-fun _tls_ctx_free(ctx_handle: Number) {}
+fun _tls_ctx_free(ctx_handle: Int) {}
 
 @extern("i64 sf_tls_read(i64, i8*, i64)")
-fun _tls_read(handle: Number, buf: String, len: Number): Number {}
+fun _tls_read(handle: Int, buf: String, len: Int): Int {}
 
 @extern("i64 sf_tls_write(i64, i8*, i64)")
-fun _tls_write(handle: Number, buf: String, len: Number): Number {}
+fun _tls_write(handle: Int, buf: String, len: Int): Int {}
 
 @extern("void sf_tls_close(i64)")
-fun _tls_close(handle: Number) {}
+fun _tls_close(handle: Int) {}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -129,10 +129,10 @@ class Context {
 /// conn.close()
 /// ```
 class TlsConnection {
-    var fd: Number
-    var tls_handle: Number
+    var fd: Int
+    var tls_handle: Int
 
-    fun init(fd: Number, tls_handle: Number) {
+    fun init(fd: Int, tls_handle: Int) {
         this.fd = fd
         this.tls_handle = tls_handle
     }
@@ -141,8 +141,8 @@ class TlsConnection {
     /// Returns the data as a string. Returns empty string on EOF.
     ///
     /// NOTE: Delegates to the Socket module's TLS read using the packed handle.
-    fun read(n: Number): String {
-        var packed: Number = this.fd | (this.tls_handle << 32)
+    fun read(n: Int): String {
+        var packed: Int = this.fd | (this.tls_handle << 32)
         // Use OS.exec to call through — in production this would use @extern TLS read
         // For now, delegate to the socket layer's tls_read via the packed handle
         return _tls_read_via_socket(packed, n)
@@ -151,14 +151,14 @@ class TlsConnection {
     /// Write data through the TLS connection. Returns the number of bytes written.
     ///
     /// NOTE: Delegates to the Socket module's TLS write using the packed handle.
-    fun write(data: String): Number {
-        var packed: Number = this.fd | (this.tls_handle << 32)
+    fun write(data: String): Int {
+        var packed: Int = this.fd | (this.tls_handle << 32)
         return _tls_write_via_socket(packed, data)
     }
 
     /// Close the TLS connection. Sends close_notify and closes the underlying socket.
     fun close() {
-        var packed: Number = this.fd | (this.tls_handle << 32)
+        var packed: Int = this.fd | (this.tls_handle << 32)
         _tls_close_via_socket(packed)
     }
 
@@ -175,39 +175,39 @@ class TlsConnection {
 // will be replaced with direct @extern calls to sf_tls_read/write/close.
 // ---------------------------------------------------------------------------
 
-@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Number, buf: Number, len: Number): Number
-@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Number, buf: Number, len: Number): Number
-@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Number)
-@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Number, hostname: Number): Number
-@extern("void* malloc(i64)") fun _ssl_malloc(size: Number): Number
-@extern("void free(void*)") fun _ssl_free(ptr: Number)
-@extern("i64 strlen(void*)") fun _ssl_strlen(s: Number): Number
+@extern("i64 sf_tls_read(i64, i8*, i64)") fun _tls_read_raw(handle: Int, buf: Int, len: Int): Int
+@extern("i64 sf_tls_write(i64, i8*, i64)") fun _tls_write_raw(handle: Int, buf: Int, len: Int): Int
+@extern("void sf_tls_close(i64)") fun _tls_close_raw(handle: Int)
+@extern("i64 sf_tls_connect(i64, i8*)") fun _tls_connect_raw(fd: Int, hostname: Int): Int
+@extern("void* malloc(i64)") fun _ssl_malloc(size: Int): Int
+@extern("void free(void*)") fun _ssl_free(ptr: Int)
+@extern("i64 strlen(void*)") fun _ssl_strlen(s: Int): Int
 
 /// Read decrypted data from a packed TLS handle.
-fun _tls_read_via_socket(packed: Number, max_bytes: Number): String {
-    var tls: Number = packed >> 32
-    var buf: Number = _ssl_malloc(max_bytes + 1)
-    var n: Number = _tls_read_raw(tls, buf, max_bytes)
+fun _tls_read_via_socket(packed: Int, max_bytes: Int): String {
+    var tls: Int = packed >> 32
+    var buf: Int = _ssl_malloc(max_bytes + 1)
+    var n: Int = _tls_read_raw(tls, buf, max_bytes)
     if (n < 0) { n = 0 }
     // Null-terminate
-    @intrinsic fun store8(addr: Number, val: Number)
+    @intrinsic fun store8(addr: Int, val: Int)
     store8(buf + n, 0)
     return buf
 }
 
 /// Write data through a packed TLS handle.
-fun _tls_write_via_socket(packed: Number, data: String): Number {
-    var tls: Number = packed >> 32
-    var ptr: Number = data
-    var len: Number = _ssl_strlen(ptr)
-    var written: Number = _tls_write_raw(tls, ptr, len)
+fun _tls_write_via_socket(packed: Int, data: String): Int {
+    var tls: Int = packed >> 32
+    var ptr: Int = data
+    var len: Int = _ssl_strlen(ptr)
+    var written: Int = _tls_write_raw(tls, ptr, len)
     if (written < 0) { written = 0 }
     return written
 }
 
 /// Close a packed TLS handle.
-fun _tls_close_via_socket(packed: Number) {
-    var tls: Number = packed >> 32
+fun _tls_close_via_socket(packed: Int) {
+    var tls: Int = packed >> 32
     _tls_close_raw(tls)
 }
 
@@ -386,9 +386,9 @@ fun client_context_default(): Context {
 /// NOTE: Custom context options (custom CA, skip-verify, mTLS) require the
 /// planned C runtime extensions. For now, all wrap_client calls use the default
 /// system TLS settings regardless of ctx configuration.
-fun wrap_client(fd: Number, hostname: String, ctx: Context): TlsConnection {
+fun wrap_client(fd: Int, hostname: String, ctx: Context): TlsConnection {
     // Delegate to existing C TLS connect (uses system defaults)
-    var tls_handle: Number = _tls_connect_raw(fd, hostname)
+    var tls_handle: Int = _tls_connect_raw(fd, hostname)
     if (tls_handle < 0) {
         throw "ssl: handshake: TLS connect failed for ${hostname}"
     }
@@ -415,7 +415,7 @@ fun wrap_client(fd: Number, hostname: String, ctx: Context): TlsConnection {
 ///
 /// For production HTTPS today, use nginx/caddy for TLS termination and proxy
 /// to your Saffron HTTP server on a local port.
-fun wrap_server(fd: Number, ctx: Context): TlsConnection {
+fun wrap_server(fd: Int, ctx: Context): TlsConnection {
     if (ctx.mode != "server") {
         throw "ssl: wrap_server requires a server context (use server_context())"
     }
@@ -424,13 +424,13 @@ fun wrap_server(fd: Number, ctx: Context): TlsConnection {
     }
 
     // Create the native server SSL_CTX
-    var ctx_handle: Number = _tls_ctx_new_server(ctx.cert_file, ctx.key_file)
+    var ctx_handle: Int = _tls_ctx_new_server(ctx.cert_file, ctx.key_file)
     if (ctx_handle < 0) {
         throw "ssl: failed to create server TLS context (check cert/key files)"
     }
 
     // Perform TLS accept handshake on the client fd
-    var tls_handle: Number = _tls_accept(fd, ctx_handle)
+    var tls_handle: Int = _tls_accept(fd, ctx_handle)
     if (tls_handle < 0) {
         _tls_ctx_free(ctx_handle)
         throw "ssl: TLS handshake failed on accept"

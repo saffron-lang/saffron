@@ -166,7 +166,7 @@ class ConcurrentMap {
     // -------------------------------------------------------------------------
 
     /// Returns the number of entries in the map.
-    fun size(): Number {
+    fun size(): Int {
         this._lock.acquire()
         var n = this._map.keys().length()
         this._lock.release()

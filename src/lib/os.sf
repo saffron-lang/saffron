@@ -55,7 +55,7 @@ fun env(name: String): String {
 }
 
 /// Exit the process with the given code.
-fun exit(code: Number) {
+fun exit(code: Int) {
     _exit(code)
 }
 

@@ -63,9 +63,9 @@ class Mutex {
 /// sem.release()   // increments permits, wakes a waiter
 /// ```
 class Semaphore {
-    var _permits: Number
+    var _permits: Int
 
-    fun init(permits: Number) {
+    fun init(permits: Int) {
         this._permits = permits
     }
 
@@ -83,7 +83,7 @@ class Semaphore {
     }
 
     /// Returns the number of currently available permits.
-    fun available(): Number {
+    fun available(): Int {
         return this._permits
     }
 }
@@ -103,14 +103,14 @@ class Semaphore {
 /// wg.wait()  // suspends until counter reaches 0
 /// ```
 class WaitGroup {
-    var _counter: Number
+    var _counter: Int
 
     fun init() {
         this._counter = 0
     }
 
     /// Add delta to the counter (typically called before spawning tasks).
-    fun add(delta: Number) {
+    fun add(delta: Int) {
         this._counter = this._counter + delta
     }
 
@@ -130,7 +130,7 @@ class WaitGroup {
     }
 
     /// Returns the current counter value.
-    fun count(): Number {
+    fun count(): Int {
         return this._counter
     }
 }
@@ -200,10 +200,10 @@ class Once {
 /// ```
 class Channel<T> {
     var _buffer: List<T>
-    var _capacity: Number
+    var _capacity: Int
     var _closed: Bool
 
-    fun init(capacity: Number) {
+    fun init(capacity: Int) {
         this._buffer = []
         this._capacity = capacity
         this._closed = false
@@ -278,12 +278,12 @@ class Channel<T> {
     }
 
     /// Returns the number of values currently buffered.
-    fun len(): Number {
+    fun len(): Int {
         return this._buffer.length()
     }
 
     /// Returns the channel's maximum capacity.
-    fun capacity(): Number {
+    fun capacity(): Int {
         return this._capacity
     }
 }

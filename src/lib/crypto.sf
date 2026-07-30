@@ -200,7 +200,7 @@ fun md5(input: String): String {
 /// import "@crypto" as Crypto
 /// var token = Crypto.random_bytes(32)  // 64 hex chars
 /// ```
-fun random_bytes(length: Number): String {
+fun random_bytes(length: Int): String {
     try {
         var raw = OS.exec("openssl rand -hex ${length} 2>/dev/null")
         return raw.trim()

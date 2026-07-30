@@ -3,7 +3,7 @@
 /// Iterator for traversing a Stack from top to bottom.
 class StackIter {
     var _items: List<Any>
-    var _pos: Number
+    var _pos: Int
 
     fun init(items: List<Any>) {
         this._items = items
@@ -57,7 +57,7 @@ class Stack {
     }
 
     /// Return the number of elements.
-    fun length(): Number {
+    fun length(): Int {
         return this._data.length()
     }
 

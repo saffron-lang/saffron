@@ -247,7 +247,7 @@ fun get_workspace(): Workspace {
 /// Escape a string value for TOML output (handles backslash and quotes).
 fun _escape_toml_string(s: String): String {
     var result = StringBuilder()
-    var i: Number = 0
+    var i: Int = 0
     while (i < s.length()) {
         var c = s.char_at(i)
         if (c == "\\") {
@@ -339,7 +339,7 @@ fun _generate_toml(proj: Project): String {
 
     if (proj.authors.length() > 0) {
         sb.append("authors = [")
-        var i: Number = 0
+        var i: Int = 0
         while (i < proj.authors.length()) {
             if (i > 0) { sb.append(", ") }
             sb.append("\"")
@@ -353,7 +353,7 @@ fun _generate_toml(proj: Project): String {
     // [dependencies] section
     if (proj._deps.length() > 0) {
         sb.append("\n[dependencies]\n")
-        var i: Number = 0
+        var i: Int = 0
         while (i < proj._deps.length()) {
             var dep: Map<String, String> = proj._deps[i]
             var dep_name: String = dep.get("name")
@@ -405,7 +405,7 @@ fun _generate_toml(proj: Project): String {
     // [dev-dependencies] section
     if (proj._dev_deps.length() > 0) {
         sb.append("\n[dev-dependencies]\n")
-        var i: Number = 0
+        var i: Int = 0
         while (i < proj._dev_deps.length()) {
             var dep: Map<String, String> = proj._dev_deps[i]
             var dep_name: String = dep.get("name")
@@ -436,7 +436,7 @@ fun _generate_toml(proj: Project): String {
     if (proj._scripts.keys().length() > 0) {
         sb.append("\n[scripts]\n")
         var keys = proj._scripts.keys()
-        var i: Number = 0
+        var i: Int = 0
         while (i < keys.length()) {
             var key: String = keys[i]
             sb.append(key)
@@ -450,7 +450,7 @@ fun _generate_toml(proj: Project): String {
     // [environments.*] sections
     if (proj._env_vars.keys().length() > 0) {
         var env_names = proj._env_vars.keys()
-        var i: Number = 0
+        var i: Int = 0
         while (i < env_names.length()) {
             var env_name: String = env_names[i]
             sb.append("\n[environments.")
@@ -458,7 +458,7 @@ fun _generate_toml(proj: Project): String {
             sb.append("]\n")
             var config: Map<String, String> = proj._env_vars.get(env_name)
             var config_keys = config.keys()
-            var j: Number = 0
+            var j: Int = 0
             while (j < config_keys.length()) {
                 var k: String = config_keys[j]
                 sb.append(k)
@@ -474,7 +474,7 @@ fun _generate_toml(proj: Project): String {
     // [features.*] sections
     if (proj._features.keys().length() > 0) {
         var feat_names = proj._features.keys()
-        var i: Number = 0
+        var i: Int = 0
         while (i < feat_names.length()) {
             var feat_name: String = feat_names[i]
             sb.append("\n[features.")
@@ -482,7 +482,7 @@ fun _generate_toml(proj: Project): String {
             sb.append("]\n")
             sb.append("deps = [")
             var deps: List<String> = proj._features.get(feat_name)
-            var j: Number = 0
+            var j: Int = 0
             while (j < deps.length()) {
                 if (j > 0) { sb.append(", ") }
                 sb.append("\"")
@@ -514,7 +514,7 @@ fun _generate_workspace_toml(ws: Workspace): String {
 
     sb.append("[workspace]\n")
     sb.append("members = [")
-    var i: Number = 0
+    var i: Int = 0
     while (i < ws._members.length()) {
         if (i > 0) { sb.append(", ") }
         sb.append("\"")

@@ -86,8 +86,8 @@ fun reduce<T, R>(iterable: List<T>, func: (R, T) => R, initial: R): R {
 /// import "@iter" as Iter
 /// Iter.sum([1, 2, 3])  // 6
 /// ```
-fun sum(iterable: List<Number>): Number {
-    return reduce(iterable, fun (a: Number, b: Number): Number => a + b, 0)
+fun sum(iterable: List<Int>): Int {
+    return reduce(iterable, fun (a: Int, b: Int): Int => a + b, 0)
 }
 
 /// Return true if any element satisfies the predicate.

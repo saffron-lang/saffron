@@ -3,7 +3,7 @@
 /// Iterator for traversing a Queue from front to back.
 class QueueIter {
     var _items: List<Any>
-    var _pos: Number
+    var _pos: Int
 
     fun init(items: List<Any>) {
         this._items = items
@@ -33,7 +33,7 @@ class QueueIter {
 /// ```
 class Queue {
     var _data: List<Any>
-    var _head: Number
+    var _head: Int
 
     fun init() {
         this._data = []
@@ -65,7 +65,7 @@ class Queue {
     }
 
     /// Return the number of elements in the queue.
-    fun length(): Number {
+    fun length(): Int {
         return this._data.length() - this._head
     }
 

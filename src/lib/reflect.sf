@@ -19,7 +19,7 @@ fun type_name(value: Any): String {
 
 /// Returns true if the value is a class instance (not a primitive/collection).
 fun is_instance(value: Any): Bool {
-    var tag: Number = __reflect_is_class(value)
+    var tag: Int = __reflect_is_class(value)
     if (tag > 0) { return true }
     return false
 }
@@ -39,6 +39,6 @@ fun construct(klass: Any, data: Map<String, Any>): Any {
 
 /// Converts a number to its string representation.
 /// Handles both integers and floats via runtime dispatch.
-fun number_to_string(value: Number): String {
+fun number_to_string(value: Any): String {
     return __reflect_number_to_string(value)
 }

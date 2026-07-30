@@ -7,7 +7,7 @@ var _alphabet = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\
 
 /// Compare two strings lexicographically.
 /// Returns -1 if a < b, 0 if a == b, 1 if a > b.
-fun _str_cmp(a: String, b: String): Number {
+fun _str_cmp(a: String, b: String): Int {
     if (a == b) { return 0 }
     var len_a = a.length()
     var len_b = b.length()
@@ -47,11 +47,11 @@ class SortedMap {
 
     /// Binary search for the insertion index of key.
     /// Returns the index where key is or would be inserted.
-    fun _binary_search(key: String): Number {
-        var lo: Number = 0
-        var hi: Number = this._keys.length()
+    fun _binary_search(key: String): Int {
+        var lo: Int = 0
+        var hi: Int = this._keys.length()
         while (lo < hi) {
-            var mid: Number = ((lo + hi) / 2).floor()
+            var mid: Int = ((lo + hi) / 2).floor()
             if (_str_cmp(this._keys[mid], key) < 0) {
                 lo = mid + 1
             } else {
@@ -138,7 +138,7 @@ class SortedMap {
     }
 
     /// Return the number of entries.
-    fun length(): Number {
+    fun length(): Int {
         return this._keys.length()
     }
 
@@ -199,7 +199,7 @@ class SortedMap {
                 sb.append(v)
                 sb.append("\"")
             } else if (v is Int or v is Float) {
-                var n: Number = v
+                var n: Int = v
                 sb.append(n.to_string())
             } else {
                 sb.append("<value>")

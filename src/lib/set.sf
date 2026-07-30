@@ -31,7 +31,7 @@ class Set {
         return this
     }
 
-    fun size(): Number {
+    fun size(): Int {
         return this._map.keys().length()
     }
 

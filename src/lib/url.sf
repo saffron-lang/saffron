@@ -21,14 +21,14 @@
 class URL {
     var scheme: String
     var host: String
-    var port: Number
+    var port: Int
     var path: String
     var query: String
     var fragment: String
     var username: String
     var password: String
 
-    fun init(scheme: String, host: String, port: Number, path: String,
+    fun init(scheme: String, host: String, port: Int, path: String,
              query: String, fragment: String, username: String, password: String) {
         this.scheme = scheme
         this.host = host
@@ -57,7 +57,7 @@ fun _is_hex(c: String): Bool {
 }
 
 /// Convert a single hex digit character to its numeric value.
-fun _hex_value(c: String): Number {
+fun _hex_value(c: String): Int {
     if (c == "0") { return 0 }
     if (c == "1") { return 1 }
     if (c == "2") { return 2 }
@@ -79,7 +79,7 @@ fun _hex_value(c: String): Number {
 }
 
 /// Convert a byte value (0-255) to a two-character uppercase hex string.
-fun _to_hex(n: Number): String {
+fun _to_hex(n: Int): String {
     var digits = "0123456789ABCDEF"
     var hi = (n / 16).floor()
     var lo = n - hi * 16
@@ -95,7 +95,7 @@ fun _is_unreserved(c: String): Bool {
 }
 
 /// Return the default port for common schemes, or 0 if unknown.
-fun _default_port(scheme: String): Number {
+fun _default_port(scheme: String): Int {
     var s = scheme.to_lower()
     if (s == "http") { return 80 }
     if (s == "https") { return 443 }
@@ -245,7 +245,7 @@ fun decode(s: String): String {
 }
 
 /// Convert an ASCII code point (0-127) to its character.
-fun _code_to_char(code: Number): String {
+fun _code_to_char(code: Int): String {
     if (code == 9) { return "\t" }
     if (code == 10) { return "\n" }
     if (code == 13) { return "\r" }
@@ -553,7 +553,7 @@ fun encode_query(params: Map<String, String>): String {
 /// var u2 = URL.parse("http://example.com:9090/")
 /// URL.effective_port(u2)  // 9090
 /// ```
-fun effective_port(url: URL): Number {
+fun effective_port(url: URL): Int {
     if (url.port > 0) { return url.port }
     return _default_port(url.scheme)
 }

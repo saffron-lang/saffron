@@ -173,7 +173,7 @@ class Row {
     /// ```saffron
     /// var count = row.get_int("n")
     /// ```
-    fun get_int(column: String): Number {
+    fun get_int(column: String): Int {
         var val = this.get(column)
         return val.to_number()
     }

@@ -18,7 +18,7 @@ import "@path" as Path
 var _ascii = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
 /// Get the ordinal position of a single character for range comparison.
-fun _char_ord(c: String): Number {
+fun _char_ord(c: String): Int {
     return _ascii.index_of(c)
 }
 
@@ -42,7 +42,7 @@ fun _is_sep(c: String): Bool {
 /// pi points to the character after '['.
 /// Returns [match_result, new_pattern_index].
 /// match_result: 1 = matched, 0 = not matched, -1 = malformed.
-fun _match_class(pattern: String, pi: Number, ch: String): List<Number> {
+fun _match_class(pattern: String, pi: Int, ch: String): List<Int> {
     var negate = false
     var i = pi
     if (i < pattern.length() and (pattern.char_at(i) == "!" or pattern.char_at(i) == "^")) {
@@ -82,7 +82,7 @@ fun _match_class(pattern: String, pi: Number, ch: String): List<Number> {
 }
 
 /// Internal recursive match implementation.
-fun _matches_from(pattern: String, pi: Number, text: String, ti: Number): Bool {
+fun _matches_from(pattern: String, pi: Int, text: String, ti: Int): Bool {
     while (pi < pattern.length()) {
         var pc = pattern.char_at(pi)
 
@@ -145,8 +145,8 @@ fun _matches_from(pattern: String, pi: Number, text: String, ti: Number): Bool {
             // Character class
             if (ti >= text.length()) { return false }
             var result = _match_class(pattern, pi + 1, text.char_at(ti))
-            var matched: Number = result[0]
-            var new_pi: Number = result[1]
+            var matched: Int = result[0]
+            var new_pi: Int = result[1]
             if (matched != 1) {
                 return false
             }
