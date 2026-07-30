@@ -445,15 +445,169 @@ exits 1 here, warns and exits **0** on the parent commit.
 
 `test/json.sf` also gets its missing `import "@json" as Json`.
 
+**Progress (2026-07-30), part 3 — the upstream causes are gone.** Fall-throughs
+across `test/*.sf` + `test/pass/*.sf` + `src/lib/*.sf` went **13 → 1** by fixing
+what fed bad types *into* the terminal rather than the terminal itself (see #43):
+globals read inside a function no longer claim `Int`, unannotated main-program
+globals are registered, and `Number` no longer enters the lattice as `Int` (#48).
+The compiler's own source was 0 throughout. The one remaining event is
+`method 'Cruller' on obj_type 'Int'` in `test/imports.sf` — a cross-module class
+constructor, i.e. a different mechanism (#22 territory), not a type-inference
+failure.
+
 **Still open:** the terminal fall-through in `gen_method_call` itself. With
 undefined variables now caught earlier, `test/json.sf`'s 7 hits are diagnosed at
 their real cause, but the terminal still returns a silent zero for any *other*
-receiver whose type inference lands on a builtin. Hardening it is now unblocked
-in principle; it needs its own measurement pass over the same four corpora
-before flipping, since a fall-through can also be reached by valid-but-unhandled
-builtin methods rather than only by bad types.
+receiver whose type inference lands on a builtin. The repro in this entry still
+reproduces verbatim:
+
+```saffron
+fun make(): Int { return 0 }
+var x = make()
+x.push(5)          // still no __list_push emitted; prints "survived"
+```
+
+Hardening it is now unblocked in principle, and with the upstream causes fixed
+the remaining fall-through population is small enough to enumerate. It still
+needs its own measurement pass over the same four corpora before flipping, since
+a fall-through can also be reached by valid-but-unhandled builtin methods rather
+than only by bad types.
 
 ## Fixed
+
+- ~~#48: `Number` entered the type lattice as an `Int`~~ — `str_to_type` mapped the
+  surface spelling `"Number"` to `IntType`, so a declared type lied in a direction
+  no care at the use sites could repair: `fun area(r: Number): Number` returning
+  `3.0 * r * r` was relabelled `Int` at the boundary, and the caller's
+  `.to_string()` untagged a double as an integer — printing garbage
+  (`37357358909038`) or `0`. Enum payloads had the same defect from the other end.
+  This is M2 in `docs/design/compiler-rewrite.md` ("`Int` is the bottom type") at
+  the exact point where surface syntax enters the lattice, so it is fixed there:
+  both `Float` and `Number` now map to `FloatType`.
+
+  Safe for `--identity-mode`, which is how the compiler compiles itself:
+  `type_to_string` collapses `Float` back to `"Int"` there, so every existing
+  `var pos: Float` / `Number` site in compiler source keeps the exact string it had
+  before, and the bootstrap is unaffected.
+
+  **A claim to the contrary was measured and is false.** A note briefly asserted
+  that the `Float` mapping regresses `pantry_config`, `test_sorted_set` and
+  `test_base64` — that stdlib code writes `Number` for values it then uses as list
+  indices and integer counters. Checked directly: `pantry_config` passes 29/29 and
+  `test_sorted_set` passes 33/33 with the `Float` mapping. `test_base64` does fail,
+  but on a non-ASCII/encoding assertion unrelated to numeric typing, and it already
+  failed before this change. Full suite: failure set byte-identical to baseline.
+
+- ~~#47: `[1, 2, 3].join(", ")` segfaulted~~ — `__list_join` did a bare
+  `__rt_untag_ptr` + `rt_strlen` on every element, which is valid only when the
+  element really is a string pointer. For a boxed *number* it untagged the value
+  and walked whatever address the mantissa happened to name. It now dispatches on
+  the NaN-box tag: pointer-shaped elements keep the original path verbatim —
+  interned and static string constants (which the compiler's own IR emission is
+  built out of) carry no GC header, so `__rt_as_string_ptr` rejects them and
+  `__any_to_string` would render the pointer as an integer — while non-pointer tags
+  route through `__rt_elem_to_string`.
+
+  The wasm32 half needed a build fix, not a codegen fix: `tools/saffron` compiled
+  the wasm32 runtime **without** `--identity-mode`, which `bootstrap.sh` has always
+  passed for the native runtime. `runtime.sf` is the layer that *implements* NaN
+  boxing, so it must see values as raw i64 bits. Without the flag, `elem >> 48`
+  went through `__val_untag_int`, which on wasm32 converts a float to its integer
+  *value* (`fptosi`): `3.0` became `3`, `3 >> 48` became `0`, and `0` is exactly the
+  "plausible bare heap pointer" case — so the float was dereferenced as a string
+  and `[3.0, 6.0].join(", ")` yielded `", "`.
+
+- ~~#46: A capturing closure returned integer `0` for `nil`~~ — `gen_lambda`
+  clears `in_function` before calling `gen_closure_function`, which is deliberate:
+  it stops `gen_function` from treating the lambda as a nested function and
+  hoisting it. But the flag is overloaded — it also means "emitted code lives
+  inside a function body", and `NilLit` is the load-bearing case, emitting the
+  literal `"0"` outside a function (correct for a module-level initialiser, where
+  no runtime call can be made) and `call i64 @__val_nil()` inside one.
+
+  Under NaN boxing `nil` is `0x7FF8000000000002`, not `0`, so every `return nil` in
+  a capturing closure returned integer `0` — neither `nil` nor a valid pointer.
+  `x == nil` was then false for a value that *was* nil, and dereferencing it
+  segfaulted. `gen_closure_function` now sets `in_function` true for the body and
+  restores the saved value at the end, rather than hard-clearing it, so the outer
+  emitter's notion of where it is survives.
+
+- ~~#45: `match` had no arm for `is`-class patterns, and Float bindings became
+  Int~~ — two defects in `gen_match`. First, `match (x) { is Dog(d) => ..., is
+  Cat(c) => ... }` over *class* patterns fell through every branch: there is no
+  payload to index into, because the binding **is** the subject. The arm is now
+  picked at compile time from the subject's static type (or a wildcard fallback),
+  the subject is stored into the binding, and the binding is registered in
+  `typed_vars` — required, since an unresolved `Variable` is a hard error as of
+  #37's hardening, so `d.bark()` would otherwise fail to resolve.
+
+  Second, `get_variant_field_type` collapsed `Float`/`Number` to `Int`, so
+  arithmetic on a match binding emitted integer ops against a NaN-boxed double and
+  `Circle(r) => 3.14159 * r * r` evaluated to `nan`. `Float` now stays `Float`;
+  identity mode still gets `Int` because `type_to_string_for_target` already
+  applies that collapse.
+
+- ~~#44: A variable initialised to `nil` was typed `Nil` for life~~ —
+  `var parsed: Any = nil` (and the inferred `var x = nil`) narrowed to `Nil`, and
+  nothing widened it on reassignment. After `parsed = JSON.parse(body)` the
+  variable still claimed to be `Nil`, and because the `== nil` comparison in
+  `gen_binary` keys off the *static* type it emitted `__val_is_nil` against the nil
+  literal rather than against the variable — an unconditionally true comparison.
+  `parsed == nil` reported nil for a live object, and the playground's
+  `/api/compile` rejected every request as "missing 'source' field".
+
+  A nil initialiser says nothing about the variable's type, so it no longer
+  narrows: the declaration widens to `Any`, the honest type here, which routes
+  through the runtime dispatch helpers that inspect the actual tag. This is I2
+  ("`Unknown` is distinct from `Any`") from `docs/design/compiler-rewrite.md`
+  applied to the one case the current tree spells unknown as a concrete type.
+
+- ~~#43: Type dishonesty in expression codegen — four silent wrong answers~~ —
+  a cluster sharing one mechanism (M1/M2: codegen re-infers types and spells
+  unknown as `Int`), fixed together in `expr_body.sf` and the two global pre-scans
+  in `codegen.sf`.
+
+  **Globals read inside a function claimed to be `Int`.** Module-level globals are
+  registered in `global_var_types` by the pre-scan, not in `typed_vars`, and the
+  `Variable` arm fell straight to `IntType` without consulting that table. So
+  `var order = "abc"` read at top level worked (`typed_vars` has it there) but
+  `fun f() { order.index_of("b") }` inferred `Int`, took no dispatch branch, and
+  returned the literal `0` (#37) — a "found at index 0" that ignored the string
+  entirely. That asymmetry is what let it survive so long. The arm now consults
+  `get_var_type_str`. Relatedly, the main-program pre-scan only ever read the
+  *annotation*, so an unannotated `var _order = "abc"` was never registered at all;
+  it now infers `List`/`Map`/`String` from the initialiser, matching what the
+  module-level copy already did (#36).
+
+  **Operator overloads with a non-variable left operand were skipped.**
+  `Vec2(1,2) + Vec2(3,4)` — a constructor call, or a `this.pos`, or a method result
+  — gave up when the left operand was not a plain variable, fell through to the
+  primitive integer path, and emitted `add i64` on two *pointers*, printing a
+  garbage address with no diagnostic. `get_expr_type` already resolves calls and
+  field accesses, so it is asked; the answer is accepted **only** if it names a
+  declared class, because letting primitives through made `a + b + c` (whose left
+  operand is itself a `Binary`) resolve to a primitive that collided with a user
+  function sharing the overload method name, rewriting the addition into a call to
+  the user's own global `add` (`'add' expects 3 arguments, got 2`).
+
+  **`x == nil` tested the wrong side.** The comparison keyed off the inferred type
+  alone, which is wrong when both sides are typed `Nil`: `check_val` picked
+  whichever side the type test happened to name, ending up testing the nil literal
+  against itself — unconditionally true regardless of what the variable held. It
+  now keys off which side is the *syntactic* `nil` literal, the only reliable
+  signal for "test the other operand".
+
+  **`Any == "str"` segfaulted in `strcmp`.** `__string_eq`/`__string_ne`
+  dereference their operands as `char*` without inspecting the tag, so an `Any`
+  operand holding nil (or an int, or a list) crashed. Static-String comparison now
+  requires *both* sides to be statically non-`Any`; an `Any` operand falls through
+  to the `__any_eq`/`__any_ne` branch, which unmasks and routes on the real tag and
+  compares string contents when both sides do turn out to be strings.
+
+  Also here: `Int`→`Float` widening at the enum payload store, so a `Float`/`Number`
+  field always holds a double and `get_variant_field_type`'s `Float` is true for
+  every construction (#28's fix applied to enum construction instead of variable
+  declaration).
 
 - ~~#42: The lexer rejected scientific-notation float literals~~ — `IO.println(1e300)`
   failed with `expected ')' but found 'ident'`: `read_number` stopped at the
