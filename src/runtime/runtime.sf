@@ -988,10 +988,29 @@ fun __list_join(list: Int, sep: Int): Int {
             __join_append(buf_p, len_p, cap_p, rs, sep_len)
         }
         var elem: Int = load64(data + i * 8)
-        var re: Int = __rt_untag_ptr(elem)
-        if (re != 0) {
-            var elem_len: Int = rt_strlen(re)
-            __join_append(buf_p, len_p, cap_p, re, elem_len)
+        // This used to be a bare __rt_untag_ptr + rt_strlen, which is only
+        // valid when the element really is a string pointer. For
+        // `[1, 2, 3].join(", ")` it untagged a boxed *number* and walked
+        // whatever address the mantissa happened to name — a segfault.
+        //
+        // Dispatch on the NaN-box tag instead. Only non-pointer tags are
+        // rerouted through __rt_elem_to_string; anything pointer-shaped keeps
+        // the original path verbatim. That distinction matters: interned and
+        // static string constants (which the compiler's own IR emission is
+        // built out of) carry no GC header, so __rt_as_string_ptr rejects them
+        // and __any_to_string would render the pointer as an integer —
+        // producing IR like `call @__list_push(105553139554416, ...)`.
+        var upper: Int = elem >> 48
+        if (upper == 32760 or upper == 0) {
+            var re: Int = __rt_untag_ptr(elem)
+            if (re != 0) {
+                __join_append(buf_p, len_p, cap_p, re, rt_strlen(re))
+            }
+        } else {
+            var elem_str: Int = __rt_elem_to_string(elem)
+            if (elem_str != 0) {
+                __join_append(buf_p, len_p, cap_p, elem_str, rt_strlen(elem_str))
+            }
         }
         i = i + 1
     }
