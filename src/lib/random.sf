@@ -21,7 +21,9 @@ fun int(min: Float, max: Float): Float {
 /// var x = Random.float()  // e.g. 0.7312...
 /// ```
 fun float(): Float {
-    return _rand() / 2147483647
+    // Divisor must be a float literal. `Int / Int` is integer division, so a
+    // bare 2147483647 truncates every result to 0 (or 1 at the very top).
+    return _rand() / 2147483647.0
 }
 
 /// Pick a random element from the list.

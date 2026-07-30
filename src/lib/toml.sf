@@ -297,8 +297,11 @@ fun parse(source: String): Map<String, Any> {
             return false
         }
 
-        // Number (integer or float)
-        if (is_digit(c) or c == "+" or c == "-") {
+        // Number (integer or float). `i` and `n` are here for unsigned `inf`
+        // and `nan`, which TOML allows; without them the inf/nan branch below
+        // was only reachable through an explicit sign. No other TOML value
+        // starts with either letter.
+        if (is_digit(c) or c == "+" or c == "-" or c == "i" or c == "n") {
             var sb = StringBuilder()
 
             if (c == "+" or c == "-") {
@@ -309,14 +312,16 @@ fun parse(source: String): Map<String, Any> {
             if (peek() == "i" and peek_at(1) == "n" and peek_at(2) == "f") {
                 pos = pos + 3
                 var sign_str = sb.to_string()
+                // Float literals, not `1 / 0` — integer division by zero raises
+                // DivisionError, so the integer spelling made `inf` unparseable.
                 if (sign_str == "-") {
-                    return 0 - (1 / 0)
+                    return 0.0 - (1.0 / 0.0)
                 }
-                return 1 / 0
+                return 1.0 / 0.0
             }
             if (peek() == "n" and peek_at(1) == "a" and peek_at(2) == "n") {
                 pos = pos + 3
-                return 0 / 0
+                return 0.0 / 0.0
             }
 
             var has_dot = false
@@ -342,7 +347,15 @@ fun parse(source: String): Map<String, Any> {
                 }
             }
 
-            return sb.to_string().to_number()
+            // Int or Float according to the spelling. `to_number` is
+            // integer-only (it calls `atol`), so sending "2.5" through it
+            // silently produced 2. `has_dot`/`has_exp` are already tracked
+            // above, so the choice needs no re-scan of the text.
+            var num_text: String = sb.to_string()
+            if (has_dot or has_exp) {
+                return num_text.to_float()
+            }
+            return num_text.to_number()
         }
 
         // Array

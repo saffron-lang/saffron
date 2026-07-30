@@ -244,7 +244,20 @@ entry:
 define i64 @__val_tag_float(double %f) {
 entry:
   %bits = bitcast double %f to i64
-  ret i64 %bits
+  ; A positive quiet NaN can be bit-identical to one of our tags: 0x7FF8 is
+  ; TAG_PTR with a null payload, 0x7FF9 is TAG_INT, 0x7FFA is TAG_SPEC. Those
+  ; are the only doubles that can reach the tag range at all (it needs an
+  ; all-ones exponent plus a set high mantissa bit), so remapping them to a
+  ; quiet NaN just outside the range leaves every finite double untouched while
+  ; making `0.0/0.0` distinguishable from a null pointer. Without this, NaN was
+  ; read back as a tagged null pointer and dereferenced.
+  %upper = lshr i64 %bits, 48
+  %ge_tag = icmp uge i64 %upper, 32760          ; 0x7FF8
+  %le_tag = icmp ule i64 %upper, 32762          ; 0x7FFA
+  %collides = and i1 %ge_tag, %le_tag
+  ; 0x7FFC000000000000 — still a quiet NaN, outside 0x7FF8..0x7FFA.
+  %safe = select i1 %collides, i64 9222246136947933184, i64 %bits
+  ret i64 %safe
 }
 
 define double @__val_untag_float(i64 %v) {

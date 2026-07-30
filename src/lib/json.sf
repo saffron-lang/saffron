@@ -67,17 +67,28 @@ fun parse(source: String): Any {
         return result
     }
 
-    fun parse_number(): Number {
+    /// Convert a JSON number literal to Int or Float depending on its spelling.
+    /// `to_number` is integer-only (it calls `atol`), so routing "3.5" through
+    /// it silently yielded 3. Anything with a fraction or an exponent has to go
+    /// through `to_float`; plain digit runs stay Int so they round-trip exactly.
+    fun _number_of(text: String): Any {
+        if (text.contains(".") or text.contains("e") or text.contains("E")) {
+            return text.to_float()
+        }
+        return text.to_number()
+    }
+
+    fun parse_number(): Any {
         var start = pos - 1
         while (pos < source.length()) {
             var c = peek()
             if (is_digit(c) or c == "." or c == "e" or c == "E" or c == "+" or c == "-") {
                 pos = pos + 1
             } else {
-                return source.slice(start, pos).to_number()
+                return _number_of(source.slice(start, pos))
             }
         }
-        return source.slice(start, pos).to_number()
+        return _number_of(source.slice(start, pos))
     }
 
     fun parse_value() {
