@@ -225,6 +225,19 @@ is what would let codegen tell the two cases apart.
 
 ## Fixed
 
+- ~~#26: `0.0 / 0.0` printed `(null)` and faulted through a Map~~ — Fixed: canonical
+  quiet NaN is `0x7FF8000000000000`, bit-identical to TAG_PTR with a null payload,
+  so `__val_is_ptr` (`upper == 0x7FF8`) read every NaN as a null pointer.
+  `__val_tag_float` now remaps the three colliding patterns (`0x7FF8`/`0x7FF9`/
+  `0x7FFA`) to `0x7FFC000000000000`, still a quiet NaN but outside the tag range.
+  Only an all-ones exponent with a set high mantissa bit can reach that range, so
+  no finite double is affected. Applied to all four runtimes (`base.ll`,
+  `base_nanbox.ll`, `wasm_base.ll`, `wasm_base_32.ll`).
+- ~~#27: comparison operators were silently dropped inside string interpolation~~ —
+  Fixed: `read_interpolation` in `src/compiler/lexer.sf` carried its own shorter
+  copy of the operator table covering only `( ) + - * / . , [ ]` and discarded
+  every other character, so `"${a != b}"` lexed as `a b`. Both lexers now call a
+  shared `lex_operator`.
 - ~~#1: Functions in imported modules can't call each other~~ — Fixed: ObjFunction now stores owning module, OP_GET_GLOBAL uses correct module context.
 - ~~#3: Type checker if-block scoping~~ — Not a bug, correct behavior.
 - ~~#4: @import path resolution~~ — Fixed: findModule call in parseFile.

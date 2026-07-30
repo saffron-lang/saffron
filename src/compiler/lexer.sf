@@ -294,16 +294,90 @@ class Lexer {
                 this.keyword_or_ident(text)
             }
             else if (tok_ch == "\"") { this.read_string() }
-            else if (tok_ch == "(") { this.emit(TokenKind.TkLParen) }
-            else if (tok_ch == ")") { this.emit(TokenKind.TkRParen) }
-            else if (tok_ch == "+") { this.emit(TokenKind.TkPlus) }
-            else if (tok_ch == "-") { this.emit(TokenKind.TkMinus) }
-            else if (tok_ch == "*") { this.emit(TokenKind.TkStar) }
-            else if (tok_ch == "/") { this.emit(TokenKind.TkSlash) }
-            else if (tok_ch == ".") { this.emit(TokenKind.TkDot) }
-            else if (tok_ch == ",") { this.emit(TokenKind.TkComma) }
-            else if (tok_ch == "[") { this.emit(TokenKind.TkLBracket) }
-            else if (tok_ch == "]") { this.emit(TokenKind.TkRBracket) }
+            else {
+                this.lex_operator(tok_ch)
+            }
+        }
+    }
+
+    /// Emit the operator or delimiter token for `ch`, which the caller has
+    /// already consumed. Unrecognized characters are dropped.
+    ///
+    /// Shared by `tokenize` and `read_interpolation` so the two cannot drift.
+    /// The interpolation lexer used to carry its own shorter copy of this list
+    /// covering only `( ) + - * / . , [ ]`, and silently discarded anything
+    /// else — so `"${a != b}"` lexed as `a b` and every comparison, `%`, `:`,
+    /// `!`, and brace inside an interpolation was a parse error or, worse, a
+    /// quietly different expression.
+    fun lex_operator(ch: String) {
+        if (ch == "(") { this.emit(TokenKind.TkLParen) }
+        else if (ch == ")") { this.emit(TokenKind.TkRParen) }
+        else if (ch == "{") { this.emit(TokenKind.TkLBrace) }
+        else if (ch == "}") { this.emit(TokenKind.TkRBrace) }
+        else if (ch == "[") { this.emit(TokenKind.TkLBracket) }
+        else if (ch == "]") { this.emit(TokenKind.TkRBracket) }
+        else if (ch == ",") { this.emit(TokenKind.TkComma) }
+        else if (ch == ".") { this.emit(TokenKind.TkDot) }
+        else if (ch == ":") { this.emit(TokenKind.TkColon) }
+        else if (ch == ";") { this.emit(TokenKind.TkSemicolon) }
+        else if (ch == "+") { this.emit(TokenKind.TkPlus) }
+        else if (ch == "-") {
+            if (this.peek() == ">") {
+                this.advance()
+                this.emit(TokenKind.TkArrow)
+            } else {
+                this.emit(TokenKind.TkMinus)
+            }
+        }
+        else if (ch == "*") { this.emit(TokenKind.TkStar) }
+        else if (ch == "/") { this.emit(TokenKind.TkSlash) }
+        else if (ch == "%") { this.emit(TokenKind.TkPercent) }
+        else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
+        else if (ch == "^") { this.emit(TokenKind.TkCaret) }
+        else if (ch == "~") { this.emit(TokenKind.TkTilde) }
+        else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
+        else if (ch == "|") { this.emit(TokenKind.TkPipe) }
+        else if (ch == "!") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkBangEq)
+            } else {
+                this.emit(TokenKind.TkBang)
+            }
+        }
+        else if (ch == "=") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkEqEq)
+            } else if (this.peek() == ">") {
+                this.advance()
+                this.emit(TokenKind.TkFatArrow)
+            } else {
+                this.emit(TokenKind.TkEq)
+            }
+        }
+        else if (ch == "?") { this.emit(TokenKind.TkQuestion) }
+        else if (ch == "<") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkLtEq)
+            } else if (this.peek() == "<") {
+                this.advance()
+                this.emit(TokenKind.TkShiftLeft)
+            } else {
+                this.emit(TokenKind.TkLt)
+            }
+        }
+        else if (ch == ">") {
+            if (this.peek() == "=") {
+                this.advance()
+                this.emit(TokenKind.TkGtEq)
+            } else if (this.peek() == ">") {
+                this.advance()
+                this.emit(TokenKind.TkShiftRight)
+            } else {
+                this.emit(TokenKind.TkGt)
+            }
         }
     }
 
@@ -397,75 +471,7 @@ class Lexer {
                 this.keyword_or_ident(text)
             }
             else if (ch == "\"") { this.read_string() }
-            else if (ch == "(") { this.emit(TokenKind.TkLParen) }
-            else if (ch == ")") { this.emit(TokenKind.TkRParen) }
-            else if (ch == "{") { this.emit(TokenKind.TkLBrace) }
-            else if (ch == "}") { this.emit(TokenKind.TkRBrace) }
-            else if (ch == "[") { this.emit(TokenKind.TkLBracket) }
-            else if (ch == "]") { this.emit(TokenKind.TkRBracket) }
-            else if (ch == ",") { this.emit(TokenKind.TkComma) }
-            else if (ch == ".") { this.emit(TokenKind.TkDot) }
-            else if (ch == ":") { this.emit(TokenKind.TkColon) }
-            else if (ch == ";") { this.emit(TokenKind.TkSemicolon) }
-            else if (ch == "+") { this.emit(TokenKind.TkPlus) }
-            else if (ch == "-") {
-                if (this.peek() == ">") {
-                    this.advance()
-                    this.emit(TokenKind.TkArrow)
-                } else {
-                    this.emit(TokenKind.TkMinus)
-                }
-            }
-            else if (ch == "*") { this.emit(TokenKind.TkStar) }
-            else if (ch == "/") { this.emit(TokenKind.TkSlash) }
-            else if (ch == "%") { this.emit(TokenKind.TkPercent) }
-            else if (ch == "&") { this.emit(TokenKind.TkAmpersand) }
-            else if (ch == "^") { this.emit(TokenKind.TkCaret) }
-            else if (ch == "~") { this.emit(TokenKind.TkTilde) }
-            else if (ch == "@") { this.tokens.push(Token.Token(TokenKind.TkIdent("@"), this.line, this.col)) }
-            else if (ch == "|") { this.emit(TokenKind.TkPipe) }
-            else if (ch == "!") {
-                if (this.peek() == "=") {
-                    this.advance()
-                    this.emit(TokenKind.TkBangEq)
-                } else {
-                    this.emit(TokenKind.TkBang)
-                }
-            }
-            else if (ch == "=") {
-                if (this.peek() == "=") {
-                    this.advance()
-                    this.emit(TokenKind.TkEqEq)
-                } else if (this.peek() == ">") {
-                    this.advance()
-                    this.emit(TokenKind.TkFatArrow)
-                } else {
-                    this.emit(TokenKind.TkEq)
-                }
-            }
-            else if (ch == "?") { this.emit(TokenKind.TkQuestion) }
-            else if (ch == "<") {
-                if (this.peek() == "=") {
-                    this.advance()
-                    this.emit(TokenKind.TkLtEq)
-                } else if (this.peek() == "<") {
-                    this.advance()
-                    this.emit(TokenKind.TkShiftLeft)
-                } else {
-                    this.emit(TokenKind.TkLt)
-                }
-            }
-            else if (ch == ">") {
-                if (this.peek() == "=") {
-                    this.advance()
-                    this.emit(TokenKind.TkGtEq)
-                } else if (this.peek() == ">") {
-                    this.advance()
-                    this.emit(TokenKind.TkShiftRight)
-                } else {
-                    this.emit(TokenKind.TkGt)
-                }
-            }
+            else { this.lex_operator(ch) }
         }
 
         this.emit(TokenKind.TkEof)

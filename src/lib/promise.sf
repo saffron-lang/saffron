@@ -34,7 +34,9 @@ fun any(tasks: List<Task>): Any {
 }
 
 /// Spawn a task that sleeps for the given number of milliseconds.
-fun delay(ms: Number): Task {
-    var secs = ms / 1000
+fun delay(ms: Float): Task {
+    // 1000.0, not 1000 — `Async.sleep` wants fractional seconds, and integer
+    // division would floor every delay under a second to 0.
+    var secs: Float = ms / 1000.0
     return Task.spawn(fun () => Async.sleep(secs))
 }
