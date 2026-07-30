@@ -22,11 +22,11 @@ class SortedSet {
     /// Binary search for the insertion index of value.
     /// Uses < operator for comparison.
     /// Returns the index where value is or would be inserted.
-    fun _bisect(value: Any): Number {
-        var lo: Number = 0
-        var hi: Number = this._items.length()
+    fun _bisect(value: Any): Int {
+        var lo: Int = 0
+        var hi: Int = this._items.length()
         while (lo < hi) {
-            var mid: Number = ((lo + hi) / 2).floor()
+            var mid: Int = ((lo + hi) / 2).floor()
             if (this._items[mid] < value) {
                 lo = mid + 1
             } else {
@@ -88,7 +88,7 @@ class SortedSet {
     }
 
     /// Return the number of elements.
-    fun length(): Number {
+    fun length(): Int {
         return this._items.length()
     }
 
@@ -132,8 +132,8 @@ class SortedSet {
                 sb.append("\"")
                 sb.append(item)
                 sb.append("\"")
-            } else if (item is Number) {
-                var n: Number = item
+            } else if (item is Int or item is Float) {
+                var n: Any = item
                 sb.append(n.to_string())
             } else {
                 sb.append("<value>")
