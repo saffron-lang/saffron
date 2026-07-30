@@ -224,6 +224,12 @@ fun __sb_to_string(sb: Int): Int {
 @extern("void* __val_untag_ptr(i64)") fun __rt_untag_ptr(val: Int): Int
 @extern("i64 __val_untag_int(i64)") fun __rt_untag_int(val: Int): Int
 
+// Runtime-dispatched value->string (defined in base*.ll). Inspects the
+// NaN-box tag to pick int/float/bool/nil/string formatting. Returns raw char*.
+@extern("i64 __any_to_string(i64)") fun __any_to_string(val: Int): Int
+// Read the GC type tag from a raw (untagged) GC pointer. TYPE_LIST == 2.
+@extern("i64 __gc_get_type_tag(i64)") fun __rt_gc_type_tag(ptr: Int): Int
+
 // NaN-boxed nil sentinel (0x7FFA000000000002 = 9221683186994511874).
 // Cannot use `nil` keyword here: identity-mode compiles nil to raw 0.
 fun __rt_nil(): Int {
@@ -381,6 +387,44 @@ fun __int_to_string(val: Int): Int {
     return buf
 }
 
+// If `v` refers to a GC-managed list, return its raw (untagged) pointer.
+// Returns 0 for anything that is not a list. Accepts both NaN-boxed pointer
+// values (0x7FF8 tag) and bare raw pointers, since list values reach the
+// runtime in both forms depending on where they were produced.
+fun __rt_as_list_ptr(v: Int): Int {
+    if (v == 0) { return 0 }
+    var upper: Int = v >> 48
+    var raw: Int = 0
+    if (upper == 32760) {
+        // NaN-boxed heap pointer (TAG_PTR)
+        raw = __rt_untag_ptr(v)
+    } else if (upper == 0 and v > 65536) {
+        // Plausible bare heap pointer (identity mode / untagged runtime value).
+        // The >65536 guard keeps small ints out of the pointer-deref path.
+        raw = v
+    } else {
+        // Int tag (0x7FF9), special tag (0x7FFA), or a float: never a list.
+        return 0
+    }
+    if (raw == 0) { return 0 }
+    // Verify the GC header magic sentinel before trusting the type tag.
+    var magic: Int = load64(raw - 8)
+    if (magic != 6557403441622859503) { return 0 }
+    if (__rt_gc_type_tag(raw) != 2) { return 0 }
+    return raw
+}
+
+// Format a single list element. Dispatches on the NaN-box tag via
+// __any_to_string (the same path that makes `IO.println(xs[0])` correct),
+// recursing for nested lists. Returns a raw char*.
+fun __rt_elem_to_string(elem: Int): Int {
+    var as_list: Int = __rt_as_list_ptr(elem)
+    if (as_list != 0) {
+        return __list_to_string(as_list)
+    }
+    return __any_to_string(elem)
+}
+
 fun __list_to_string(list: Int): Int {
     if (list == 0) {
         var nil_s: Int = __gc_alloc(3, 1)
@@ -391,29 +435,48 @@ fun __list_to_string(list: Int): Int {
     }
     var count: Int = load64(list)
     var data: Int = load64(list + 16)
-    // Estimate buffer size: each element up to 20 chars + ", " + "[]"
-    var buf_size: Int = count * 22 + 3
-    var buf: Int = __gc_alloc(buf_size, 1)
-    store8(buf, 91)
-    var pos: Int = 1
+    // Growable buffer: element strings are unbounded (strings, nested lists),
+    // so a fixed per-element estimate is not safe.
+    var buf_p: Int = rt_malloc(8)
+    var len_p: Int = rt_malloc(8)
+    var cap_p: Int = rt_malloc(8)
+    var init_buf: Int = rt_malloc(64)
+    store8(init_buf, 0)
+    store64(buf_p, init_buf)
+    store64(len_p, 0)
+    store64(cap_p, 64)
+    var open_b: Int = rt_malloc(2)
+    store8(open_b, 91)     // [
+    store8(open_b + 1, 0)
+    var close_b: Int = rt_malloc(2)
+    store8(close_b, 93)    // ]
+    store8(close_b + 1, 0)
+    var sep_b: Int = rt_malloc(3)
+    store8(sep_b, 44)      // ,
+    store8(sep_b + 1, 32)  // (space)
+    store8(sep_b + 2, 0)
+    __join_append(buf_p, len_p, cap_p, open_b, 1)
     var i: Int = 0
     while (i < count) {
         if (i > 0) {
-            store8(buf + pos, 44)
-            pos = pos + 1
-            store8(buf + pos, 32)
-            pos = pos + 1
+            __join_append(buf_p, len_p, cap_p, sep_b, 2)
         }
         var elem: Int = load64(data + i * 8)
-        var elem_str: Int = __int_to_string(elem)
-        var elen: Int = rt_strlen(elem_str)
-        rt_memcpy(buf + pos, elem_str, elen)
-        pos = pos + elen
+        var elem_str: Int = __rt_elem_to_string(elem)
+        if (elem_str != 0) {
+            __join_append(buf_p, len_p, cap_p, elem_str, rt_strlen(elem_str))
+        }
         i = i + 1
     }
-    store8(buf + pos, 93)
-    store8(buf + pos + 1, 0)
-    return buf
+    __join_append(buf_p, len_p, cap_p, close_b, 1)
+    var result: Int = load64(buf_p)
+    rt_free(open_b)
+    rt_free(close_b)
+    rt_free(sep_b)
+    rt_free(buf_p)
+    rt_free(len_p)
+    rt_free(cap_p)
+    return result
 }
 
 // =============================================================================

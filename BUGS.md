@@ -118,6 +118,110 @@ must be converted atomically or a printing bug becomes a segfault: (a) enum
 construction plus the field loads in `match_body.sf`, (b) closures plus
 `gen_indirect_call`, (c) class instances plus `gen_get_field`.
 
+**Caveat on blanket tagging:** `__gc_is_heap_ptr` (`src/runtime/gc.ll:615`)
+rejects any NaN-tagged value as a heap pointer, and nothing in `gc.ll` masks
+the tag before marking. So tagging a `__gc_alloc`'d pointer makes the GC stop
+tracing it and sweep it while live — strictly worse than the cosmetic printing
+bug. Demonstrable today: `"abcdefgh".repeat(4)` is the one function that tags a
+GC-allocated buffer, and it prints correctly with no GC pressure but garbage
+under it. The `rt_malloc`-based `join`/`replace` survive. Any tagging of
+GC-allocated returns must land together with masking the payload in
+`__gc_is_heap_ptr`. `__list_join` is safe only because it returns
+`rt_malloc`'d memory.
+
+**Related:** the `OS.*` half of this is a hardcoded tagging allowlist
+(`methods_body.sf:1154-1165`) that `__os_system` is simply missing from; #24
+proposes deleting the allowlist and routing all FFI through one path. Note that
+`OS.foo(...)` mangles straight to `@__os_foo` and never enters the body in
+`src/lib/os.sf`, so a fix must go in `src/runtime/runtime.sf`.
+
+### 24. `@extern` boxes returns but not `i64` params — a `Ptr` type would close it
+
+`gen_extern_call` (`src/compiler/codegen/intrinsics_body.sf:155`) unboxes every
+declared C parameter type *except* `i64`, which it passes through raw:
+
+```saffron
+} else {
+    // Pass i64 values directly — no untagging needed.
+    // Saffron uses identity mode for pointer-as-int values (coro handles, etc.)
+    call_args.push("i64 " + val)
+}
+```
+
+Returns, by contrast, are boxed on every path (`i8*` → tag_ptr, `i32`/`i64` →
+tag_int per the Saffron annotation, `double` → tag_float). So a NaN-boxed integer
+goes *in* and a correct integer comes *out* — the C function sees garbage:
+
+```saffron
+@extern("void* malloc(i64)") fun m_alloc(size: Int): Ptr
+var buf = m_alloc(64)   // malloc receives 0x7FF9000000000040, not 64
+```
+
+Confirmed live: `malloc(i64 %tagged)`, and `@process` is entirely non-functional
+because `sf_process_spawn` gets a tagged `flags` — `Process.run("echo hi")`
+returns `code=-1, stdout=""`. `sf_process_poll`, `_write_stdin` and every other
+`i64`-param extern in `src/lib/process.sf`, `ssl.sf`, `watch.sf` are equally
+affected. 114 of 224 extern declarations take an `i64` parameter.
+
+**Why the raw passthrough exists:** roughly 49 of those 114 params are
+pointer-as-int values (coroutine handles, `malloc` results, buffer addresses)
+that legitimately travel untagged. Blanket untagging would corrupt them; blanket
+tagging would corrupt the other 65. The signature cannot disambiguate because
+both spell themselves `i64` in C and `Int` in Saffron.
+
+**Immediate fix:** dispatch `gen_extern_call` on the Saffron parameter type, so
+`Int` + `i64` gets `emit_untag_int` exactly as `i32` already does. This alone
+makes `@process` work and is independently shippable.
+
+**Not a runtime tag test.** Sniffing the top 16 bits for `0x7FF8..0x7FFA` looks
+tempting but is unsound: a real integer whose payload happens to match, or a heap
+address above 2^48, silently takes the wrong branch, and the cost lands in every
+FFI call.
+
+**Longer term**, the 49 pointer-as-int sites move to a `Ptr<T>` class with
+auto-boxing at the FFI boundary, so the type *says* which discipline applies. Note
+that annotating alone is not enough: a class used directly as an extern return type
+segfaults on field access, because codegen relabels the bare address instead of
+constructing an instance. The compiler must box.
+
+**Do not** auto-box unconditionally in either direction: it trades a loud,
+reproducible failure for a silent memory-corruption class.
+
+Full design, including the `OS.*` allowlist removal and the `@intrinsic`
+signature gap that share this root cause:
+[docs/design/ffi-pointer-discipline.md](docs/design/ffi-pointer-discipline.md).
+
+
+### 25. Method call directly on an interpolated string literal returns garbage
+
+**Reproduction:**
+```saffron
+var n = 42
+IO.println("${n}".length())      // 105553123967040, not 2
+IO.println("x${n}y".length())    // garbage, not 4
+```
+
+**Expected:** the length of the interpolated result.
+**Actual:** a raw heap address.
+
+Binding to a variable first works, so only the direct-call form is affected:
+
+```saffron
+var s = "x${n}y"
+IO.println(s.length())           // 4 — correct
+```
+
+**Root cause:** interpolation desugars in the lexer to
+`"" + (expr).to_string() + ""`. The concatenation produces a raw `char*`;
+assigning it to a variable goes through a path that tags it, but calling a
+method on the concatenation expression directly passes the untagged pointer as
+the receiver, so `length()` reads the address as if it were a value. Same
+raw-pointer-leak class as #23, and the static `Ptr` distinction proposed in #24
+is what would let codegen tell the two cases apart.
+
+**Impact:** cosmetic but easy to hit — `"${x}".length()` and
+`"${x}".to_upper()` silently produce nonsense rather than failing.
+
 
 ## Fixed
 
