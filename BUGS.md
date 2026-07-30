@@ -312,13 +312,27 @@ whenever type inference lands on `Int` for something that isn't, the method
 silently no-ops instead of failing the compile.
 
 **Proposed fix:** make the terminal fall-through an error (`has_errors = true`)
-for builtin/unknown `obj_type` too, symmetric with the user-class arm. **Blocked
-on** the 8 remaining legitimate-looking fall-throughs — `Json.parse` /
-`parse_into` (module-namespace resolution, not a receiver method) and one
-`String.push` in `toml_test.sf` (a genuine invalid call the checker doesn't
-reject). Those must be routed or rejected earlier first, or hardening the
-terminal breaks `json.sf` / `toml_test.sf` at build time. Related to #33's
-closing note.
+for builtin/unknown `obj_type` too, symmetric with the user-class arm. Related
+to #33's closing note.
+
+**Progress (2026-07-30):** the `String.push` blocker is gone. It was *not* an
+invalid call as originally filed — `map.get()` on an unannotated receiver
+claimed `StringType` at both of its inference sites, so `toml.sf`'s
+`ensure_array_table` inferred `arr: String` from `current.get(last_key)` and its
+`arr.push(new_table)` fell through, silently discarding every array-of-tables
+entry. Fixed by returning `Any` when the receiver isn't an annotated `Map<K, V>`
+(`methods_body.sf:263` in `get_expr_type`, `:2066` in the dispatch arm).
+Annotated maps still narrow to `V`, so this only widens what was already
+unknown. `toml_test` 1 → 0; suite fall-throughs 8 → 7; regression test at
+`test/test_map_get_types.sf` (fails on the parent commit, passes after).
+
+**Still blocked on** the remaining 7, all in `test/json.sf`: that file calls
+`Json.parse` / `Json.parse_into` **with no `import` statement at all**, so
+`Json` is an undeclared name. This is a defect in the test file, not a
+namespace-resolution gap in the compiler as originally filed — but hardening the
+terminal would turn it into a build failure, so the test must be fixed (add
+`import "@json" as Json`, matching `test/test_json.sf`) or the undeclared-name
+case must be diagnosed earlier and more precisely than "no such method".
 
 ## Fixed
 
