@@ -1,0 +1,9 @@
+// Negative test: @extern without its parenthesized C signature string used to
+// SIGSEGV the compiler (exit 139), not diagnose. The `extern` decorator branch
+// in parser.sf ran `match (kind) { TkString(s) => s }` with no default arm on
+// whatever token followed — here the `fun` keyword — and crashed.
+//
+// Expected: a parse error naming the required form, and a clean non-zero exit.
+@extern fun my_abs(x: Float): Float
+
+IO.println(my_abs(-3.0).to_string())
