@@ -140,9 +140,9 @@ At compile time, these resolve to direct function references — no runtime cost
 Modules can have mutable state:
 ```saffron
 // counter.sf
-var count: Number = 0
+var count: Int = 0
 fun increment() { count = count + 1 }
-fun get(): Number { return count }
+fun get(): Int { return count }
 ```
 
 This state lives in module globals (as today), but scoped to the module object:

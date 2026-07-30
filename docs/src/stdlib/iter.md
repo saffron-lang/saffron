@@ -15,7 +15,7 @@ Functional utilities for working with iterables — lists, maps, strings, or any
 Apply a function to each element:
 
 ```saffron
-Iter.map([1, 2, 3], fun (x: Number): Number => x * 2)
+Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
 // [2, 4, 6]
 ```
 
@@ -24,7 +24,7 @@ Iter.map([1, 2, 3], fun (x: Number): Number => x * 2)
 Keep elements where the function returns true:
 
 ```saffron
-Iter.filter([1, 2, 3, 4], fun (x: Number): Bool => x % 2 == 0)
+Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0)
 // [2, 4]
 ```
 
@@ -33,7 +33,7 @@ Iter.filter([1, 2, 3, 4], fun (x: Number): Bool => x % 2 == 0)
 Map and flatten one level:
 
 ```saffron
-Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Number>): List<Number> => x)
+Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Int>): List<Int> => x)
 // [1, 2, 3, 4]
 ```
 
@@ -44,11 +44,11 @@ Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Number>): List<Number> => x)
 Fold elements into a single value:
 
 ```saffron
-Iter.reduce([1, 2, 3, 4], fun (acc: Number, x: Number): Number => acc + x, 0)
+Iter.reduce([1, 2, 3, 4], fun (acc: Int, x: Int): Int => acc + x, 0)
 // 10
 ```
 
-### `sum(iterable) -> Number`
+### `sum(iterable) -> Int`
 
 Sum all elements:
 
@@ -56,12 +56,12 @@ Sum all elements:
 Iter.sum([1, 2, 3])  // 6
 ```
 
-### `count(iterable, func) -> Number`
+### `count(iterable, func) -> Int`
 
 Count elements matching a predicate:
 
 ```saffron
-Iter.count([1, 2, 3, 4], fun (x: Number): Bool => x > 2)
+Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
 // 2
 ```
 
@@ -72,7 +72,7 @@ Iter.count([1, 2, 3, 4], fun (x: Number): Bool => x > 2)
 Return the first element matching a predicate (or nil):
 
 ```saffron
-Iter.find([1, 2, 3], fun (x: Number): Bool => x > 1)
+Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1)
 // 2
 ```
 
@@ -81,7 +81,7 @@ Iter.find([1, 2, 3], fun (x: Number): Bool => x > 1)
 True if any element matches:
 
 ```saffron
-Iter.any([1, 2, 3], fun (x: Number): Bool => x > 2)  // true
+Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
 ```
 
 ### `all(iterable, func) -> Bool`
@@ -89,7 +89,7 @@ Iter.any([1, 2, 3], fun (x: Number): Bool => x > 2)  // true
 True if all elements match:
 
 ```saffron
-Iter.all([2, 4, 6], fun (x: Number): Bool => x % 2 == 0)  // true
+Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0)  // true
 ```
 
 ## Iteration
@@ -147,7 +147,7 @@ Iter.enumerate(["a", "b", "c"])
 Sort a list by a key function:
 
 ```saffron
-Iter.sort_by(["banana", "apple", "fig"], fun (s: String): Number => s.length())
+Iter.sort_by(["banana", "apple", "fig"], fun (s: String): Int => s.length())
 // ["fig", "apple", "banana"]
 ```
 
@@ -156,7 +156,7 @@ Iter.sort_by(["banana", "apple", "fig"], fun (s: String): Number => s.length())
 Group elements by a key function:
 
 ```saffron
-Iter.group_by([1, 2, 3, 4, 5], fun (x: Number): String => if (x % 2 == 0) { "even" } else { "odd" })
+Iter.group_by([1, 2, 3, 4, 5], fun (x: Int): String => if (x % 2 == 0) { "even" } else { "odd" })
 // {"odd": [1, 3, 5], "even": [2, 4]}
 ```
 
@@ -197,7 +197,7 @@ Iter.chunk([1, 2, 3, 4, 5], 2)
 Combine two lists element-wise using a function:
 
 ```saffron
-Iter.zip_with([1, 2, 3], [10, 20, 30], fun (a: Number, b: Number): Number => a + b)
+Iter.zip_with([1, 2, 3], [10, 20, 30], fun (a: Int, b: Int): Int => a + b)
 // [11, 22, 33]
 ```
 

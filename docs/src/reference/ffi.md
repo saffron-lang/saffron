@@ -16,8 +16,8 @@ The string argument is the C function signature using LLVM IR type names:
 
 | LLVM type | Saffron equivalent |
 |-----------|-------------------|
-| `i64` | `Number` / `Int` |
-| `double` | `Number` / `Float` |
+| `i64` | `Int` |
+| `double` | `Float` |
 | `void*` | `String` (pointer to string data) |
 | `void` | (no return type) |
 
@@ -26,13 +26,13 @@ The string argument is the C function signature using LLVM IR type names:
 ### Calling C math functions
 
 ```saffron
-@extern("double sin(double)") fun sin(x: Number): Number
-@extern("double cos(double)") fun cos(x: Number): Number
-@extern("double sqrt(double)") fun sqrt(x: Number): Number
-@extern("double pow(double, double)") fun pow(x: Number, y: Number): Number
+@extern("double sin(double)") fun sin(x: Float): Float
+@extern("double cos(double)") fun cos(x: Float): Float
+@extern("double sqrt(double)") fun sqrt(x: Float): Float
+@extern("double pow(double, double)") fun pow(x: Float, y: Float): Float
 
 IO.println(sin(3.14159 / 2))  // ~1.0
-IO.println(sqrt(16))          // 4.0
+IO.println(sqrt(16.0))        // 4.0
 ```
 
 ### Calling runtime GC functions
@@ -41,8 +41,8 @@ IO.println(sqrt(16))          // 4.0
 @extern("void __gc_enable()") fun gc_enable()
 @extern("void __gc_collect()") fun gc_collect()
 @extern("void __gc_disable()") fun gc_disable()
-@extern("i64 __gc_stat_alloc_count()") fun gc_alloc_count(): Number
-@extern("i64 __gc_stat_total_bytes()") fun gc_total_bytes(): Number
+@extern("i64 __gc_stat_alloc_count()") fun gc_alloc_count(): Int
+@extern("i64 __gc_stat_total_bytes()") fun gc_total_bytes(): Int
 ```
 
 ### String arguments
@@ -50,7 +50,7 @@ IO.println(sqrt(16))          // 4.0
 Strings are passed as `void*` (null-terminated C strings):
 
 ```saffron
-@extern("i64 js_dom_create_element(void*)") fun create_element(tag: String): Number
+@extern("i64 js_dom_create_element(void*)") fun create_element(tag: String): Int
 ```
 
 ## Intrinsics
@@ -58,8 +58,8 @@ Strings are passed as `void*` (null-terminated C strings):
 The `@intrinsic` decorator marks functions that map to LLVM intrinsics or compiler-provided operations:
 
 ```saffron
-@intrinsic fun load64(addr: Number): Number
-@intrinsic fun store64(addr: Number, val: Number)
+@intrinsic fun load64(addr: Int): Int
+@intrinsic fun store64(addr: Int, val: Int)
 ```
 
 ## Notes

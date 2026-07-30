@@ -5,13 +5,13 @@ Kotlin-style `fun name(params): Type = expr` syntax as sugar for single-expressi
 ## Syntax
 
 ```saffron
-fun add(a: Number, b: Number): Number = a + b
-fun double(x: Number) = x * 2              // return type inferred
+fun add(a: Int, b: Int): Int = a + b
+fun double(x: Int) = x * 2              // return type inferred
 
 class Vec2 {
-    var x: Number
-    var y: Number
-    fun length(): Number = (this.x * this.x + this.y * this.y).sqrt()
+    var x: Float
+    var y: Float
+    fun length(): Float = (this.x * this.x + this.y * this.y).sqrt()
     fun add(other: Vec2): Vec2 = Vec2(this.x + other.x, this.y + other.y)
 }
 ```
@@ -50,14 +50,14 @@ No ambiguity: after `)` or `: Type`, `=` cannot currently appear.
 
 ## Type inference
 
-When return type is omitted (`fun f(x: Number) = x * 2`), the checker infers from the body expression. No change needed — already handles this for block bodies.
+When return type is omitted (`fun f(x: Int) = x * 2`), the checker infers from the body expression. No change needed — already handles this for block bodies.
 
 ## Multi-line expressions
 
 Works naturally — `parse_expression()` handles compound expressions:
 
 ```saffron
-fun abs(x: Number): Number = if (x >= 0) x else -x
+fun abs(x: Int): Int = if (x >= 0) x else -x
 
 fun describe(opt: Option): String = match (opt) {
     Some(v) => "has: ${v}"

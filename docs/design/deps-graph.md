@@ -221,13 +221,13 @@ class DepsCommand {
     var root_manifest: Manifest
     var lock: LockFile
     var format: String          // "tree" or "graph"
-    var max_depth: Number
+    var max_depth: Int
     var show_imports: Bool
     var filter_pkg: String?
 
     fun init(config: Config, args: List<String>) { ... }
     fun run() { ... }
-    fun build_tree(name: String, visited: List<String>, depth: Number): TreeNode { ... }
+    fun build_tree(name: String, visited: List<String>, depth: Int): TreeNode { ... }
     fun render_tree(node: TreeNode, prefix: String, is_last: Bool) { ... }
     fun render_dot(node: TreeNode): String { ... }
     fun resolve_one(name: String): ResolvedDep { ... }

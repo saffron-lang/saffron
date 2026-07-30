@@ -28,7 +28,7 @@ enum Result<T, E> {
 ```saffron
 var dir = Direction.North
 var maybe = Option.Some(42)
-var nothing: Option<Number> = Option.None
+var nothing: Option<Int> = Option.None
 ```
 
 ## Pattern matching with `match`
@@ -36,7 +36,7 @@ var nothing: Option<Number> = Option.None
 `match` destructures enum variants and binds their fields:
 
 ```saffron
-var result: Option<Number> = Option.Some(42)
+var result: Option<Int> = Option.Some(42)
 
 var message = match (result) {
     Some(v) => "Got ${v}",
@@ -65,12 +65,12 @@ Match on nested enum structures:
 
 ```saffron
 enum Expr {
-    Num(value: Number),
+    Num(value: Float),
     Add(left: Expr, right: Expr),
     Mul(left: Expr, right: Expr)
 }
 
-fun eval(expr: Expr): Number {
+fun eval(expr: Expr): Float {
     return match (expr) {
         Num(v) => v,
         Add(l, r) => eval(l) + eval(r),

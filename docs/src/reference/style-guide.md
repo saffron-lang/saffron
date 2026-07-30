@@ -52,7 +52,7 @@ import "basil/query" as Q
 Use 4 spaces. Opening brace on the same line:
 
 ```saffron
-fun fibonacci(n: Number): Number {
+fun fibonacci(n: Int): Int {
     if (n <= 1) {
         return n
     }
@@ -66,15 +66,15 @@ Prefer lines under 100 characters. Break long function calls or chains:
 
 ```saffron
 // Name intermediate steps instead of deeply nesting calls
-var big = Iter.filter(items, fun (x: Number): Bool => x > threshold)
-var scaled = Iter.map(big, fun (x: Number): Number => x * 2)
+var big = Iter.filter(items, fun (x: Int): Bool => x > threshold)
+var scaled = Iter.map(big, fun (x: Int): Int => x * 2)
 var result = Iter.sum(scaled)
 
 // Break long parameter lists
 fun create_user(
     name: String,
     email: String,
-    age: Number,
+    age: Int,
     role: Role
 ): User {
     // ...
@@ -87,7 +87,7 @@ Annotate function parameters and return types. Omit on local variables when the 
 
 ```saffron
 // Parameters and returns: always annotate
-fun distance(a: Point, b: Point): Number {
+fun distance(a: Point, b: Point): Float {
     var dx = a.x - b.x   // type obvious from context
     var dy = a.y - b.y
     return Math.sqrt(dx * dx + dy * dy)
@@ -96,6 +96,9 @@ fun distance(a: Point, b: Point): Number {
 // Annotate locals when the type isn't obvious
 var config: Map<String, String> = parse_config(text)
 ```
+
+For numbers, write `Int` or `Float` — whichever the value actually is. The older
+`Number` annotation is deprecated because it hid the difference between the two.
 
 ## Enum and match style
 
@@ -141,7 +144,7 @@ Use `///` doc-comments on public functions and classes. Skip comments for obviou
 
 ```saffron
 /// Parse a duration string like "5s", "100ms", or "2m" into seconds.
-fun parse_duration(input: String): Number {
+fun parse_duration(input: String): Float {
     // ...
 }
 
@@ -192,10 +195,10 @@ Put fields first, then `init`, then methods:
 ```saffron
 class Connection {
     var host: String
-    var port: Number
-    var timeout: Number
+    var port: Int
+    var timeout: Float
 
-    fun init(host: String, port: Number) {
+    fun init(host: String, port: Int) {
         this.host = host
         this.port = port
         this.timeout = 30.0

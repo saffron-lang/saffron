@@ -5,7 +5,7 @@
 Use `var` to declare a mutable variable:
 
 ```saffron
-var x: Number = 5
+var x: Int = 5
 var name: String = "saffron"
 ```
 
@@ -14,8 +14,8 @@ var name: String = "saffron"
 When the type is obvious from the initializer, you can omit the annotation:
 
 ```saffron
-var x = 5          // inferred as Number
-var pi = 3.14      // inferred as Number
+var x = 5          // inferred as Int
+var pi = 3.14      // inferred as Float
 var name = "hi"    // inferred as String
 var flag = true    // inferred as Bool
 ```
@@ -24,19 +24,22 @@ var flag = true    // inferred as Bool
 
 | Type | Description | Examples |
 |------|-------------|----------|
-| `Number` | 64-bit floating-point number | `42`, `3.14`, `-1`, `0` |
+| `Int` | 64-bit signed integer | `42`, `-1`, `0` |
+| `Float` | 64-bit floating-point number | `3.14`, `-0.5`, `1.0` |
 | `String` | UTF-8 text | `"hello"`, `""` |
 | `Bool` | Boolean | `true`, `false` |
 | `Nil` | Absence of value | `nil` |
 
-Saffron uses a single `Number` type for all numeric values (both integers and floating-point). The LLVM compiler backend also accepts `Int` and `Float` as type annotations, which are treated as distinct types internally for optimization, but semantically equivalent to `Number` in most code.
+Use `Int` for counters, indices, lengths, and anything you count; use `Float` for durations, measurements, ratios, and anything fractional.
+
+> **Deprecated: `Number`.** Older Saffron code annotates numeric values as `Number`, a single surface name that covered both integers and floats. Because the two have different runtime representations, one name for both was a source of bugs, so `Number` is deprecated in favour of the explicit `Int` and `Float`. It is still accepted (and behaves as `Int`) so existing code keeps compiling, but new code should not use it.
 
 ## Type checking
 
 Saffron validates types at compile time. This won't compile:
 
 ```saffron
-var x: Number = "hello"  // Error: expected Number, got String
+var x: Int = "hello"  // Error: expected Int, got String
 ```
 
 ## Methods on primitives
@@ -55,10 +58,13 @@ true.to_string() // "true"
 The `is` operator checks a value's type:
 
 ```saffron
-42 is Number      // true
+42 is Int         // true
+3.14 is Float     // true
 "hi" is String    // true
 nil is Nil        // true
 ```
+
+`42 is Number` also still works, but like the `Number` annotation it is deprecated — prefer `is Int` / `is Float`.
 
 ## Destructuring
 

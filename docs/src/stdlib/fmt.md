@@ -17,7 +17,7 @@ Fmt.format("{0} + {1} = {2}", [1, 2, 3])  // "1 + 2 = 3"
 Fmt.format("Hello, {0}!", ["world"])       // "Hello, world!"
 ```
 
-### `Fmt.pad_left(text: String, width: Number, fill: String): String`
+### `Fmt.pad_left(text: String, width: Int, fill: String): String`
 
 Pad a string on the left:
 
@@ -26,7 +26,7 @@ Fmt.pad_left("42", 5, "0")  // "00042"
 Fmt.pad_left("hi", 6, " ")  // "    hi"
 ```
 
-### `Fmt.pad_right(text: String, width: Number, fill: String): String`
+### `Fmt.pad_right(text: String, width: Int, fill: String): String`
 
 Pad a string on the right:
 
@@ -34,7 +34,7 @@ Pad a string on the right:
 Fmt.pad_right("hi", 5, ".")  // "hi..."
 ```
 
-### `Fmt.center(text: String, width: Number, fill: String): String`
+### `Fmt.center(text: String, width: Int, fill: String): String`
 
 Center a string within the given width:
 
@@ -42,7 +42,7 @@ Center a string within the given width:
 Fmt.center("hi", 8, "=")  // "===hi==="
 ```
 
-### `Fmt.repeat(text: String, n: Number): String`
+### `Fmt.repeat(text: String, n: Int): String`
 
 Repeat a string n times:
 

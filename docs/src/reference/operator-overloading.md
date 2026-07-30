@@ -19,11 +19,11 @@ Classes can define methods that are invoked when operators are used on instances
 
 ```saffron
 class Vec3 {
-    var x: Number
-    var y: Number
-    var z: Number
+    var x: Float
+    var y: Float
+    var z: Float
 
-    fun init(x: Number, y: Number, z: Number) {
+    fun init(x: Float, y: Float, z: Float) {
         this.x = x
         this.y = y
         this.z = z
@@ -37,7 +37,7 @@ class Vec3 {
         return Vec3(this.x - other.x, this.y - other.y, this.z - other.z)
     }
 
-    fun mul(scalar: Number): Vec3 {
+    fun mul(scalar: Float): Vec3 {
         return Vec3(this.x * scalar, this.y * scalar, this.z * scalar)
     }
 
@@ -49,7 +49,7 @@ class Vec3 {
         return this.length() < other.length()
     }
 
-    fun length(): Number {
+    fun length(): Float {
         return (this.x * this.x + this.y * this.y + this.z * this.z).sqrt()
     }
 }

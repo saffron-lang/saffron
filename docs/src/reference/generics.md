@@ -51,7 +51,7 @@ enum Result<T, E> {
     Err(error: E)
 }
 
-var maybe: Option<Number> = Option.Some(42)
+var maybe: Option<Int> = Option.Some(42)
 var result: Result<String, String> = Result.Ok("success")
 ```
 
@@ -60,9 +60,9 @@ var result: Result<String, String> = Result.Ok("success")
 In most cases, generic type parameters are inferred:
 
 ```saffron
-var list = [1, 2, 3]           // List<Number>
+var list = [1, 2, 3]           // List<Int>
 var pair = Pair("hi", true)    // Pair<String, Bool>
-var opt = Option.Some(3.14)    // Option<Number>
+var opt = Option.Some(3.14)    // Option<Float>
 ```
 
 ## Multiple type parameters
@@ -77,6 +77,6 @@ fun zip_with<A, B, C>(a: List<A>, b: List<B>, f: (A, B) => C): List<C> {
     return result
 }
 
-var sums = zip_with([1, 2, 3], [4, 5, 6], fun (a: Number, b: Number): Number => a + b)
+var sums = zip_with([1, 2, 3], [4, 5, 6], fun (a: Int, b: Int): Int => a + b)
 IO.println(sums)  // [5, 7, 9]
 ```

@@ -111,20 +111,20 @@ class String {
 ```
 
 ```saffron
-// src/lib/number.sf
-class Number {
+// src/lib/int.sf
+class Int {
     var _val: Int  // raw i64 value (or NaN-boxed tagged int)
 
     fun to_string(): String {
         return _int_to_string(this._val)
     }
 
-    fun abs(): Number {
-        if (this._val < 0) { return Number(0 - this._val) }
+    fun abs(): Int {
+        if (this._val < 0) { return Int(0 - this._val) }
         return this
     }
 
-    fun floor(): Number { return this }  // already integer
+    fun floor(): Int { return this }  // already integer
 
     fun to_float(): Float {
         return _sitofp(this._val)
@@ -198,7 +198,7 @@ class List<T> {
 ### Phase D: First-Class Built-in Types
 
 1. Define `src/lib/string.sf` with String class wrapping `_ptr`
-2. Define `src/lib/number.sf` with Number class wrapping `_val`
+2. Define `src/lib/int.sf` with Int class wrapping `_val` (and `src/lib/float.sf` for Float)
 3. Define `src/lib/list.sf` with List<T> class wrapping `_ptr`
 4. Define `src/lib/map.sf` with Map<K,V> class wrapping `_ptr`
 5. Define `src/lib/bool.sf` with Bool class

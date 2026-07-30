@@ -6,15 +6,15 @@ Classes group data (fields) and behavior (methods):
 
 ```saffron
 class Point {
-    var x: Number
-    var y: Number
+    var x: Float
+    var y: Float
 
-    fun init(x: Number, y: Number) {
+    fun init(x: Float, y: Float) {
         this.x = x
         this.y = y
     }
 
-    fun distance_to(other: Point): Number {
+    fun distance_to(other: Point): Float {
         var dx = this.x - other.x
         var dy = this.y - other.y
         return (dx * dx + dy * dy).sqrt()
@@ -31,11 +31,11 @@ IO.println(p.distance_to(Point(0.0, 0.0)))  // 5.0
 
 ```saffron
 class Color {
-    var r: Number
-    var g: Number
-    var b: Number
+    var r: Int
+    var g: Int
+    var b: Int
 
-    fun init(r: Number, g: Number, b: Number) {
+    fun init(r: Int, g: Int, b: Int) {
         this.r = r
         this.g = g
         this.b = b
@@ -96,10 +96,10 @@ Classes can define special methods to overload operators:
 
 ```saffron
 class Vec2 {
-    var x: Number
-    var y: Number
+    var x: Float
+    var y: Float
 
-    fun init(x: Number, y: Number) {
+    fun init(x: Float, y: Float) {
         this.x = x
         this.y = y
     }

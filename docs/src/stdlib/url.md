@@ -14,7 +14,7 @@ class URL {
     var username: String
     var password: String
     var host: String
-    var port: Number
+    var port: Int
     var path: String
     var query: String
     var fragment: String
@@ -50,7 +50,7 @@ class URL {
 |----------|---------|-------------|
 | `URL.resolve(base, relative)` | `URL` | Resolve a relative URL against a base |
 | `URL.join(base_str, path)` | `String` | Join a base URL with a relative path |
-| `URL.effective_port(url)` | `Number` | Get port (uses default if not specified) |
+| `URL.effective_port(url)` | `Int` | Get port (uses default if not specified) |
 
 ## Example
 

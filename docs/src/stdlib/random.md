@@ -8,8 +8,8 @@ import "@random" as Random
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `Random.float()` | `Number` | Random float in [0, 1) |
-| `Random.int(min, max)` | `Number` | Random integer in [min, max] |
+| `Random.float()` | `Float` | Random float in [0, 1) |
+| `Random.int(min, max)` | `Int` | Random integer in [min, max] |
 | `Random.choice(list)` | element | Random element from list |
 | `Random.shuffle(list)` | `List` | Shuffled copy |
 | `Random.sample(list, count)` | `List` | Random sample of `count` elements |

@@ -256,6 +256,6 @@ All collections follow these conventions (matching `@set`):
 
 ## Open questions
 
-1. **Generic types** — Should constructors accept a type parameter (`Queue<Number>.new()`) once generics on classes are fully stable, or stay `Any`-typed like `@set`?
+1. **Generic types** — Should constructors accept a type parameter (`Queue<Int>.new()`) once generics on classes are fully stable, or stay `Any`-typed like `@set`?
 2. **Immutable variants** — Worth providing frozen/persistent versions (returning new instances on mutation)?
 3. **Comparator defaults** — For sorted collections, should the default comparator use `<` operator or require explicit provision when element types lack natural ordering?

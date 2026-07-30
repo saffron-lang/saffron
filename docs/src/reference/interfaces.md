@@ -16,10 +16,10 @@ Use `extends` — the same keyword as class inheritance:
 
 ```saffron
 class Point extends Printable {
-    var x: Number
-    var y: Number
+    var x: Float
+    var y: Float
 
-    fun init(x: Number, y: Number) {
+    fun init(x: Float, y: Float) {
         this.x = x
         this.y = y
     }
@@ -46,8 +46,8 @@ interface Drawable {
 }
 
 class Circle extends Drawable {
-    var radius: Number
-    fun init(radius: Number) { this.radius = radius }
+    var radius: Float
+    fun init(radius: Float) { this.radius = radius }
 
     fun draw(): String {
         return "O"

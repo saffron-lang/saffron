@@ -20,7 +20,7 @@ count.get()     // 0
 count.set(5)    // notifies all subscribers
 
 // Update (read + write)
-count.update(fun (n: Number): Number => n + 1)
+count.update(fun (n: Int): Int => n + 1)
 ```
 
 ### Subscribe
@@ -59,7 +59,7 @@ Computed values can depend on other computed values:
 
 ```saffron
 var items = signal([1, 2, 3, 4, 5])
-var even = computed(fun () => items.get().filter(fun (n: Number): Bool => n % 2 == 0))
+var even = computed(fun () => items.get().filter(fun (n: Int): Bool => n % 2 == 0))
 var count = computed(fun () => even.get().length())
 
 count.get()  // 2

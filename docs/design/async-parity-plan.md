@@ -220,7 +220,7 @@ The scheduler runs in the main function after all top-level code. It's a normal 
 
 var run_queue: List<Int> = []
 var sleep_queue: List<Int> = []
-var sleep_times: List<Number> = []
+var sleep_times: List<Float> = []
 var io_read_queue: List<Int> = []
 var io_read_fds: List<Int> = []
 var io_write_queue: List<Int> = []

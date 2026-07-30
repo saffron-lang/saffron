@@ -27,7 +27,7 @@ Signal.on(Signal.SIGINT, fun () {
 Signal.trap(Signal.SIGTERM)
 
 // Block until one of the listed signals arrives (cooperative yield)
-var sig: Number = Signal.wait([Signal.SIGINT, Signal.SIGTERM])
+var sig: Int = Signal.wait([Signal.SIGINT, Signal.SIGTERM])
 
 // Ignore a signal entirely (SIG_IGN)
 Signal.ignore(Signal.SIGHUP)
@@ -69,20 +69,20 @@ The ring buffer is a fixed 64-slot atomic array — signals are rare, so overflo
 ### Saffron-side dispatch (in signal.sf)
 
 ```saffron
-var _handlers: Map<Number, Fun> = {}
-var _trapped: Map<Number, Bool> = {}
+var _handlers: Map<Int, Fun> = {}
+var _trapped: Map<Int, Bool> = {}
 
-fun on(signum: Number, handler: Fun) {
+fun on(signum: Int, handler: Fun) {
     _handlers.set(signum, handler)
     _register(signum, 0)  // 0 = use dispatch loop, not direct call
 }
 
-fun trap(signum: Number) {
+fun trap(signum: Int) {
     _trapped.set(signum, true)
     _register(signum, 0)
 }
 
-fun wait(signals: List<Number>): Number {
+fun wait(signals: List<Int>): Int {
     for (s in signals) { trap(s) }
     while (true) {
         var sig = _poll()
@@ -114,14 +114,14 @@ A tick hook (or scheduler integration) calls `_poll()` between task switches and
 Defined as module-level `var` bindings (no enum needed — signals are just integers):
 
 ```saffron
-var SIGINT: Number  = 2
-var SIGTERM: Number = 15
-var SIGHUP: Number  = 1
-var SIGUSR1: Number = 10
-var SIGUSR2: Number = 12
-var SIGPIPE: Number = 13
-var SIGALRM: Number = 14
-var SIGCHLD: Number = 17
+var SIGINT: Int  = 2
+var SIGTERM: Int = 15
+var SIGHUP: Int  = 1
+var SIGUSR1: Int = 10
+var SIGUSR2: Int = 12
+var SIGPIPE: Int = 13
+var SIGALRM: Int = 14
+var SIGCHLD: Int = 17
 ```
 
 Platform-specific values (Linux vs macOS differ for SIGUSR1/2) are resolved at compile time via `#ifdef` in the C shim, exposed through an `_sf_signal_value(name_tag)` extern if needed.
