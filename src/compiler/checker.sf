@@ -692,7 +692,12 @@ class NullChecker {
     fun register_decl(stmt: AST.Stmt) {
         match (stmt) {
             FunDecl(name, params, ret_type, body, doc) => {
-                this.env.define_func_str(name, this.type_node_to_string(ret_type))
+                // ret_type is a raw String on the AST (ast.sf FunDecl.ret_type),
+                // not an AST.Type node. type_node_to_string() matched a String
+                // against AST.Type patterns and fell through to the first arm, so
+                // every function's registered return type collapsed to Int — which
+                // silently defeated exhaustiveness on `match (some_call())`.
+                this.env.define_func_str(name, ret_type)
                 this.env.define_func_params(name, this.params_list_to_string(params))
                 // Extract generic type params from docstring: @generic:T,U:Constraint\n
                 this.extract_and_register_generics(name, doc)
@@ -745,11 +750,10 @@ class NullChecker {
                     if (method_name.length() > 0 and method_body.length() == 0) {
                         abstract_names_list.push(method_name)
                     }
-                    var method_ret_type: AST.Type = match (methods[mi]) {
+                    var method_ret: String = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mr
-                        _ => AST.Type.AnyType
+                        _ => "Any"
                     }
-                    var method_ret: String = this.type_node_to_string(method_ret_type)
                     var method_params: List<AST.Param> = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mp
                         _ => []
@@ -780,9 +784,9 @@ class NullChecker {
                                 FunDecl(mn, mp, mr, mb, md) => mp
                                 _ => []
                             }
-                            var am_ret: AST.Type = match (methods[ami]) {
+                            var am_ret: String = match (methods[ami]) {
                                 FunDecl(mn, mp, mr, mb, md) => mr
-                                _ => AST.Type.NilType
+                                _ => "Nil"
                             }
                             var api: Float = 0
                             while (api < am_params.length()) {
@@ -795,7 +799,7 @@ class NullChecker {
                                 }
                                 api = api + 1
                             }
-                            var am_ret_str: String = this.type_node_to_string(am_ret)
+                            var am_ret_str: String = am_ret
                             if (am_ret_str != "Any" and am_ret_str != "Nil" and !this.is_sendable(am_ret_str)) {
                                 this.warn("actor '" + name + "' method '" + am_name + "' returns non-Sendable type '" + am_ret_str + "'")
                             }
@@ -899,7 +903,7 @@ class NullChecker {
             }
             FunDecl(name, params, ret_type, body, doc) => {
                 // Register method with class prefix if inside a class
-                var ret_type_str: String = this.type_node_to_string(ret_type)
+                var ret_type_str: String = ret_type
                 if (this.current_class.length() > 0) {
                     this.env.define_func_str(this.current_class + "__" + name, ret_type_str)
                     this.env.define_func_params(this.current_class + "__" + name, this.params_list_to_string(params))
@@ -918,7 +922,11 @@ class NullChecker {
                     this.class_method_names.set(this.current_class, existing)
                 }
                 var old_ret: AST.Type = this.current_func_ret
-                this.current_func_ret = ret_type
+                // ret_type is a String; current_func_ret is an AST.Type node, and
+                // the Return arm feeds it to is_any_type/is_nullable_type. Parse it
+                // so those checks see a real node instead of falling through to the
+                // first match arm.
+                this.current_func_ret = this.parse_type_node(ret_type)
                 this.env.push_scope()
                 var j: Float = 0
                 while (j < params.length()) {
