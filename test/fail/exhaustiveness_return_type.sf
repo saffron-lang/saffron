@@ -1,0 +1,27 @@
+// Expected error: Non-exhaustive match: missing variant
+//
+// Same soundness hole as fail/exhaustiveness.sf, but reached through a function's
+// declared return type instead of a variable's annotation. FunDecl.ret_type is a
+// raw String on the AST, and the checker used to pass it to type_node_to_string()
+// — a helper that matches on AST.Type. Matching a String against those enum
+// patterns fell through to the first arm, so every function's registered return
+// type collapsed to Int, the enum_variants lookup missed, and check_exhaustiveness
+// silently returned without reporting anything.
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+fun pick(): Direction {
+    return Direction.North
+}
+
+// Missing East and West
+var name = match (pick()) {
+    North => "north",
+    South => "south"
+}
+IO.println(name)
