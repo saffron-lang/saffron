@@ -41,4 +41,4 @@ IO.println(Reflect.number_to_string(42))  // "42"
 
 - `Reflect.fields()` returns a `Map<String, Any>` (not a list of names), where keys are field names and values are current field values
 - The `is` operator can be used for type checks in user code: `42 is Number`, `"hi" is String`, `value is MyClass`
-- These functions are only available in the LLVM-compiled native path, not the C VM interpreter
+- These functions are implemented in the compiler's code generator, so they resolve at compile time rather than by runtime lookup

@@ -11,7 +11,7 @@ import "../utils/helpers.sf" as Helpers // relative file path
 
 ## Built-in modules (`@` prefix)
 
-All built-in modules use the `@` prefix. These are bundled with the interpreter and always available:
+All built-in modules use the `@` prefix. These ship with the compiler and are always available:
 
 | Module | Description |
 |--------|-------------|

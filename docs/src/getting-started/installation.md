@@ -1,46 +1,25 @@
 # Installation
 
-Saffron has two runtimes: a **C VM** (interpreter, REPL) and an **LLVM native compiler** (ahead-of-time compilation to native binaries).
+Saffron is a **self-hosted compiler**: the compiler is written in Saffron and compiles itself. It emits LLVM IR, which is then linked into a native binary or a WebAssembly module.
 
 ## Building from source
 
 ### Requirements
 
-- A C compiler supporting C17 (GCC 8+, Clang 5+)
-- CMake 3.16+ (for the C VM)
-- LLVM/Clang toolchain (for the native compiler backend)
+- LLVM/Clang toolchain (used to assemble and link the emitted IR)
+- A POSIX shell (the bootstrap and driver scripts are Bash)
 
-### The C VM (interpreter and REPL)
+### Bootstrap the compiler
+
+A pre-compiled gen2 compiler is checked in at `build/stage2/saffronc`. Bootstrapping uses it to compile the current compiler source into gen3:
 
 ```bash
-git clone https://github.com/henry232323/saffron.git
+git clone https://github.com/saffron-lang/saffron.git
 cd saffron
-cmake -B cvm/cmake-build-debug -S cvm
-cmake --build cvm/cmake-build-debug
-```
-
-The interpreter binary is at `cvm/cmake-build-debug/saffron`. Run a file or launch the REPL:
-
-```bash
-./cvm/cmake-build-debug/saffron              # REPL
-./cvm/cmake-build-debug/saffron program.sf   # run a file
-```
-
-### The native compiler (LLVM backend)
-
-The native compiler bootstraps itself. A pre-compiled gen2 binary is checked in at `build/stage2/saffronc`.
-
-```bash
 ./bootstrap.sh
 ```
 
-This produces `build/saffronc` (the gen3 compiler). Use the `tools/saffron` driver for a unified interface:
-
-```bash
-tools/saffron run program.sf           # compile + link + run
-tools/saffron build program.sf -o app  # compile to native binary
-tools/saffron emit-ir program.sf       # output LLVM IR
-```
+This produces `build/saffronc` — the gen3 compiler, and the one everything else uses.
 
 ### Verify
 
@@ -48,14 +27,40 @@ tools/saffron emit-ir program.sf       # output LLVM IR
 tools/saffron run test/hello_bootstrap.sf
 ```
 
-## Which runtime to use?
+You should see:
 
-| Use case | Runtime |
+```
+Hello from Saffron 0.1.0!
+Bootstrapped successfully.
+The compiler compiled itself. We're self-hosting!
+```
+
+## Using the compiler
+
+The `tools/saffron` driver wraps the compiler and the linker behind one command:
+
+```bash
+tools/saffron run program.sf                        # compile + link + run
+tools/saffron build program.sf -o app               # compile to a native binary
+tools/saffron build program.sf --target wasm32 -o app.wasm  # compile to WebAssembly
+tools/saffron emit-ir program.sf                    # print LLVM IR to stdout
+```
+
+To invoke the compiler directly and stop at LLVM IR:
+
+```bash
+build/saffronc program.sf program.ll
+```
+
+## Which command to use?
+
+| Use case | Command |
 |----------|---------|
-| Interactive exploration, REPL | C VM (`cvm/cmake-build-debug/saffron`) |
-| Running scripts quickly | C VM |
-| Building native binaries | LLVM compiler (`tools/saffron build`) |
-| WebAssembly targets | LLVM compiler with `--target wasm32` |
-| Performance-critical code | LLVM compiler (produces optimized native code) |
+| Running a script | `tools/saffron run program.sf` |
+| Shipping a standalone binary | `tools/saffron build program.sf -o app` |
+| WebAssembly targets | `tools/saffron build program.sf --target wasm32 -o app.wasm` |
+| Inspecting generated code | `tools/saffron emit-ir program.sf` |
 
-Both runtimes support the same language — the difference is execution model (interpreted bytecode vs compiled native code).
+## A note on the C VM
+
+Early versions of Saffron ran on a bytecode interpreter written in C, which also provided a REPL. That interpreter now lives in `legacy/` and is **no longer supported** — it has drifted well behind the language and rejects modern syntax such as `@` annotations, the `Int` type, and `actor` declarations. Use the self-hosted compiler for everything.
