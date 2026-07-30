@@ -59,9 +59,21 @@ never equals the sentinel, so every collection is rejected and still falls
 through to `do_float`. Applying the native fix regressed string printing
 (`IO.println("hi")` → `[]`), so it was reverted for wasm32.
 
-Real fix requires either giving the wasm32 GC header the same magic sentinel as
-native, or a sentinel-free discriminator for wasm32. See the WasmGC discussion —
-adopting reference types would eliminate this pointer/float ambiguity entirely.
+**Real fix:** give the wasm32 GC header the same magic sentinel as native, so
+`__rt_as_list_ptr`'s guard means the same thing on every target. That is the
+header-layout unification described as stage 9 of
+`docs/design/compiler-rewrite.md` (one header definition, four targets), and #39
+is the bug that stage cites as its motivation. It requires bumping the wasm32
+header from 8 to 16 bytes (sentinel + type tag) and updating `__gc_alloc`,
+`__gc_alloc_zeroed`, `__gc_realloc`, `__gc_alloc_safe`, `__gc_get_type_tag`,
+`__gc_list_new` and every hand-written `ptr - 8` offset in `wasm_base_32.ll` in
+one atomic change — a partial conversion corrupts every heap read.
+
+WasmGC is **not** the direction: it would mean abandoning LLVM for the wasm
+target (LLVM's wasm backend emits linear memory only, not reference types), and
+the existing GC is adequate. `docs/design/compiler-rewrite.md` part 5 likewise
+keeps NaN boxing — the representation is fine, only its discipline is unmanaged,
+which invariant I5 (`Val`/`Raw<T>`/`Ptr<T>`) addresses without changing targets.
 
 ### 2. Forward references in nested closures
 
