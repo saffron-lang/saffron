@@ -1,0 +1,43 @@
+// Map.keys() / Map.values() element types come from the Map<K, V> annotation.
+//
+// These used to be hardcoded to List<String> in three places (the checker, the
+// codegen Map dispatch arm, and get_expr_type). `for (v in m.values())` on a
+// Map<String,Int> therefore handed each raw Int to string-typed consumers and
+// SEGFAULTED — a silent crash with no diagnostic.
+
+import "@test" as Test
+
+// --- values() on a Map<String, Int> — the original segfault ---
+var counts: Map<String, Int> = {"one": 1, "two": 2}
+var total: Int = 0
+for (v in counts.values()) {
+    total = total + v
+}
+Test.assert_eq(total, 3, "values() of Map<String,Int> sums as numbers")
+
+// --- keys() on a Map<Int, String> — same bug on the key side ---
+var names: Map<Int, String> = {}
+names.set(10, "ten")
+var key_sum: Int = 0
+for (k in names.keys()) {
+    key_sum = key_sum + k
+}
+Test.assert_eq(key_sum, 10, "keys() of Map<Int,String> sums as numbers")
+
+// --- String keys and values still behave (regression guard) ---
+var pairs: Map<String, String> = {"a": "x", "b": "y"}
+Test.assert_eq(pairs.keys().join(","), "a,b", "keys() of Map<String,String> joins")
+Test.assert_eq(pairs.values().join(","), "x,y", "values() of Map<String,String> joins")
+Test.assert_eq(pairs.keys()[0], "a", "keys() stays indexable")
+
+// --- nested generic value type ---
+var groups: Map<String, List<Int>> = {}
+groups.set("nums", [1, 2, 3])
+for (group in groups.values()) {
+    Test.assert_eq(group.length(), 3, "values() of Map<String,List<Int>> yields lists")
+}
+
+// --- length() on the returned list ---
+Test.assert_eq(counts.keys().length(), 2, "keys() length")
+
+Test.summary()

@@ -249,10 +249,29 @@
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
         if (mc_method == "slice") {
             if (mc_obj_type.starts_with("List")) { return mc_obj_type }
-            return "String"
+            if (mc_obj_type == "String") { return "String" }
+            // Unknown receiver: don't claim String. `slice` is defined on both
+            // List and String, so on an unannotated value we cannot say which.
+            // Claiming String let a sliced list be handed to string-typed code.
+            return "Any"
         }
         if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "char_at") return "String"
-        if (mc_method == "split" or mc_method == "keys") return "List<String>"
+        if (mc_method == "split") return "List<String>"
+        // Map.keys()/values() element type comes from the Map<K, V> annotation.
+        // Hardcoding List<String> made `for (v in m.values())` on a
+        // Map<String,Int> treat every Int as a string pointer and SEGFAULT.
+        if (mc_method == "keys") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_key_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
+        if (mc_method == "values") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_value_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
             // Infer return type from Map<K, V> annotation rather than always "String"
@@ -1768,7 +1787,10 @@
             } else {
                 this.emit_indent(__mk_local + " = call i64 @__map_keys(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // The element type is K, not String. Hardcoding List<String> here
+            // made `for (k in m.keys())` on a Map<Int,String> hand each raw Int
+            // to string-typed consumers and SEGFAULT. Unannotated maps stay Any.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_key_type(__map_obj_type))])
             return __mk_local
         }
         if (__map_type_match and method == "values") {
@@ -1779,7 +1801,8 @@
             } else {
                 this.emit_indent(__mv_local + " = call i64 @__map_values(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // Element type is V — see the keys() note above.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_value_type(__map_obj_type))])
             return __mv_local
         }
     }

@@ -428,6 +428,18 @@
         return parts[1]
     }
 
+    // Extract the key type string from a Map<K, V> type annotation.
+    // e.g. "Map<String,AST.Type>" → "String"
+    //      "Map<Int,String>"      → "Int"
+    //      "Map" or unknown       → "Any"
+    fun get_map_key_type(map_type: String): String {
+        if (!map_type.starts_with("Map<")) return "Any"
+        var inner: String = map_type.slice(4, map_type.length() - 1)
+        var parts: List<String> = this.split_respecting_generics(inner, ",")
+        if (parts.length() < 1) return "Any"
+        return parts[0]
+    }
+
     // Get the type string for a variable from typed_vars (the single source of truth).
     // Returns "" if the variable is not registered.
     fun get_var_type_str(name: String): String {

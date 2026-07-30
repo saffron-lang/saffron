@@ -1651,9 +1651,20 @@ class NullChecker {
         if (method == "has") {
             return "Bool"
         }
-        // Map.keys returns List<String>
+        // Map.keys()/values() are List<K> / List<V>, not List<String>.
+        // The hardcoded List<String> let `for (v in m.values())` on a
+        // Map<String,Int> pass the checker and then segfault at runtime.
         if (method == "keys") {
-            return "List<String>"
+            if (obj_type == "Map" or obj_type.starts_with("Map<")) {
+                return "List<" + this.extract_map_key_type(obj_type) + ">"
+            }
+            return "List<Any>"
+        }
+        if (method == "values") {
+            if (obj_type == "Map" or obj_type.starts_with("Map<")) {
+                return "List<" + this.extract_map_value_type(obj_type) + ">"
+            }
+            return "List<Any>"
         }
 
         // Check: calling method on nullable object
