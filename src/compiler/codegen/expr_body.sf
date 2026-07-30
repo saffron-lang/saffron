@@ -72,7 +72,13 @@
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
                 if (!this.typed_vars.has(name) and !this.module_globals.has(this.current_prefix + name) and !this.module_globals.has(name) and !this.str_in_list(this.known_functions,name) and !this.str_in_list(this.known_functions,this.current_prefix + name) and name != "self" and name != "this" and name != "super" and name != "IO" and name != "OS" and name != "GC" and name != "Task" and !this.module_prefixes.has(name) and !this.enum_defs.has(name) and !this.class_fields.has(name)) {
-                    IO.println("[codegen] Warning: undefined variable '" + name + "'")
+                    // Error, not a warning (BUGS #37). Emitting a load from an
+                    // undeclared %name produces invalid LLVM, so the compile
+                    // fails regardless — just with "use of undefined value
+                    // '%data'" from llc instead of a source-level diagnostic.
+                    // Failing here names the variable and stops before codegen.
+                    IO.println("[codegen] Error: undefined variable '" + name + "'")
+                    this.has_errors = true
                 }
                 // Function reference as first-class value: ptrtoint (check BEFORE load)
                 // Skip for named imports — they should go through gen_call for direct dispatch
@@ -1398,9 +1404,12 @@
             } else {
                 this.last_type = AST.Type.IntType
             }
-            // Undefined variable check (warning only — false positives in multi-module context)
+            // Undefined variable check. Kept as an error (BUGS #37): the load
+            // emitted below references %name, which llc rejects anyway, so a
+            // warning only delays the same failure into an opaque IR error.
             if (!this.typed_vars.has(vname) and !this.module_globals.has(this.current_prefix + vname) and !this.module_globals.has(vname) and !this.str_in_list(this.known_functions,vname) and !this.str_in_list(this.known_functions,this.current_prefix + vname) and vname != "self" and vname != "this" and vname != "super" and vname != "IO" and vname != "OS" and vname != "GC" and vname != "Task" and !this.module_prefixes.has(vname) and !this.enum_defs.has(vname) and !this.class_fields.has(vname)) {
-                IO.println("[codegen] Warning: undefined variable '" + vname + "'")
+                IO.println("[codegen] Error: undefined variable '" + vname + "'")
+                this.has_errors = true
             }
             var local: String = this.fresh_local()
             var var_ref: String = "%" + this.sanitize_name(vname)
