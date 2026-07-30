@@ -1,6 +1,6 @@
 //! Cooperative task scheduler for native async.
 
-@extern("double sf_time_now()") fun time_now(): Number
+@extern("double sf_time_now()") fun time_now(): Float
 @extern("void __sched_coro_resume(i64)") fun coro_resume(handle: Int)
 @extern("i64 __sched_coro_done(i64)") fun coro_done(handle: Int): Int
 @extern("void __sched_coro_destroy(i64)") fun coro_destroy(handle: Int)
@@ -159,7 +159,7 @@ fun _poll_io(timeout_ms: Int) {
 }
 
 fun scheduler_tick(): Int {
-    var now: Number = time_now()
+    var now: Float = time_now()
     var i: Int = sleep_queue.length() - 1
     while (i >= 0) {
         if (sleep_times[i] <= now) {
@@ -209,7 +209,7 @@ fun scheduler_tick(): Int {
         if (reason == 0) {
             run_queue.push(hdl)
         } else if (reason == 1) {
-            var duration: Number = get_yield_arg()
+            var duration: Float = get_yield_arg()
             sleep_queue.push(hdl)
             sleep_times.push(now + duration)
         } else if (reason == 2) {
