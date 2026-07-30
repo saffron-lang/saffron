@@ -7,10 +7,12 @@ import "@json" as JSON
 class ApiResponse {
     var data: Any
     var status: Int
+    var body: String
 
     fun init(data: Any, status: Int) {
         this.data = data
         this.status = status
+        this.body = JSON.to_string(data)
     }
 }
 
@@ -18,14 +20,21 @@ class ApiResponse {
 class ApiError {
     var error: String
     var status: Int
+    var body: String
 
     fun init(message: String, status: Int) {
         this.error = message
         this.status = status
+        this.body = "{\"error\":" + JSON.escape_string(message) + "}"
     }
 }
 
-/// Wrap a value in a success response.
+/// Wrap a value in a 200 JSON success response.
+fun json(data: Any): ApiResponse {
+    return ApiResponse(data, 200)
+}
+
+/// Wrap a value in a success response. Alias for `json`.
 fun ok(data: Any): ApiResponse {
     return ApiResponse(data, 200)
 }

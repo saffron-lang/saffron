@@ -1,0 +1,100 @@
+//! Bundled example programs, served to the frontend as JSON.
+//!
+//! These are read from playground/examples/*.sf at request time so they can be
+//! edited without rebuilding the service. Each file's first line is a `//!` doc
+//! comment used as the display title.
+
+import "@json" as JSON
+
+var EXAMPLES_DIR: String = "examples"
+
+/// Fixed display order. Anything in examples/ not listed here is appended
+/// alphabetically, so dropping in a new file still surfaces it.
+var ORDER: List<String> = [
+    "hello.sf",
+    "fizzbuzz.sf",
+    "enums_match.sf",
+    "classes.sf",
+    "closures.sf",
+    "async.sf"
+]
+
+class Example {
+    var name: String
+    var title: String
+    var source: String
+
+    fun init(name: String, title: String, source: String) {
+        this.name = name
+        this.title = title
+        this.source = source
+    }
+}
+
+/// Extract the display title from a leading `//!` comment, falling back to the
+/// bare filename.
+fun _title_of(name: String, source: String): String {
+    var lines: List<String> = source.split("\n")
+    if (lines.length() > 0) {
+        var first: String = lines[0].trim()
+        if (first.starts_with("//!")) {
+            return first.slice(3, first.length()).trim()
+        }
+    }
+    return name.replace(".sf", "")
+}
+
+fun load_all(): List<Example> {
+    var out: List<Example> = []
+    var seen: Map<String, Bool> = {}
+
+    if (!IO.file_exists(EXAMPLES_DIR)) {
+        return out
+    }
+
+    // Preferred order first.
+    var i: Int = 0
+    while (i < ORDER.length()) {
+        var name: String = ORDER[i]
+        var path: String = EXAMPLES_DIR + "/" + name
+        if (IO.file_exists(path)) {
+            var source: String = IO.read_file(path)
+            out.push(Example(name, _title_of(name, source), source))
+            seen.set(name, true)
+        }
+        i = i + 1
+    }
+
+    // Then anything else present on disk.
+    var entries: List<String> = IO.list_dir(EXAMPLES_DIR)
+    var j: Int = 0
+    while (j < entries.length()) {
+        var entry: String = entries[j]
+        if (entry.ends_with(".sf") and !seen.has(entry)) {
+            var epath: String = EXAMPLES_DIR + "/" + entry
+            var esource: String = IO.read_file(epath)
+            out.push(Example(entry, _title_of(entry, esource), esource))
+        }
+        j = j + 1
+    }
+
+    return out
+}
+
+fun as_json(): String {
+    var examples: List<Example> = load_all()
+    var items: List<Any> = []
+    var i: Int = 0
+    while (i < examples.length()) {
+        var ex: Example = examples[i]
+        var entry: Map<String, Any> = {}
+        entry.set("name", ex.name)
+        entry.set("title", ex.title)
+        entry.set("source", ex.source)
+        items.push(entry)
+        i = i + 1
+    }
+    var payload: Map<String, Any> = {}
+    payload.set("examples", items)
+    return JSON.to_string(payload)
+}

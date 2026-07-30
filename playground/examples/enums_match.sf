@@ -1,0 +1,23 @@
+//! Enums and pattern matching
+enum Shape {
+    Circle(radius: Float),
+    Rect(w: Float, h: Float),
+    Point
+}
+
+fun area(s: Shape): Float {
+    return match (s) {
+        Circle(r) => 3.14159 * r * r
+        Rect(w, h) => w * h
+        Point => 0
+    }
+}
+
+var shapes: List<Shape> = [Shape.Circle(2), Shape.Rect(3, 4), Shape.Point]
+for (s in shapes) {
+    IO.println(area(s).to_string())
+}
+
+// Destructuring works outside match too
+let Shape.Circle(radius) = Shape.Circle(10)
+IO.println("radius = ${radius}")

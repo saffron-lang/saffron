@@ -31,6 +31,11 @@ var io_modes: List<Int> = []  // 0=read, 1=write
 var actor_wait_handles: List<Int> = []
 var actor_wait_targets: List<Int> = []
 
+// Set to 1 when the scheduler stopped because the only work left was tasks
+// parked on an actor that can never become idle. See the idle check in
+// `scheduler_tick()` for why that state is unrecoverable rather than transient.
+var deadlock_detected: Int = 0
+
 fun get_result(handle: Int): Int {
     var i: Int = 0
     while (i < result_handles.length()) {
@@ -46,13 +51,70 @@ fun enqueue(handle: Int) {
     run_queue.push(handle)
 }
 
-fun _has_pending(): Int {
-    if (run_queue.length() > 0) { return 1 }
+/// True (1) when a task is parked on a condition that fires *on its own*: a
+/// timer expiring, an fd becoming ready, or an awaited task finishing. These
+/// justify another tick even with an empty run queue, because the outside world
+/// (or a task the scheduler itself will resume) will eventually revive them.
+///
+/// This is the single source of truth for that list. `_has_parked_work()` and
+/// `scheduler_tick()`'s idle check both delegate here so they cannot drift
+/// apart; a new self-reviving park reason is added here and nowhere else.
+fun _has_self_reviving_work(): Int {
     if (sleep_queue.length() > 0) { return 1 }
     if (await_waiters.length() > 0) { return 1 }
     if (io_handles.length() > 0) { return 1 }
+    return 0
+}
+
+/// True (1) when at least one task is parked in any wait queue, including tasks
+/// parked on a busy actor. Actor waiters count as pending work — they are owed a
+/// resume — but unlike the queues above they cannot revive themselves, which is
+/// why `scheduler_tick()` treats an actor-only queue as a deadlock rather than a
+/// reason to keep spinning.
+fun _has_parked_work(): Int {
+    if (_has_self_reviving_work() == 1) { return 1 }
     if (actor_wait_handles.length() > 0) { return 1 }
     return 0
+}
+
+/// True (1) when the scheduler still has work: something runnable now, or
+/// something parked that may become runnable later.
+fun _has_pending(): Int {
+    if (run_queue.length() > 0) { return 1 }
+    return _has_parked_work()
+}
+
+/// Park `handle` as if it had suspended with yield reason 5 (waiting on the
+/// actor at `actor_ptr`). `scheduler_tick()` does this itself for real
+/// coroutines; this is exposed so the scheduler's own liveness tests can build
+/// the "only actor waiters remain" state directly instead of trying to race two
+/// coroutines into contention.
+fun _park_on_actor(handle: Int, actor_ptr: Int) {
+    actor_wait_handles.push(handle)
+    actor_wait_targets.push(actor_ptr)
+}
+
+/// 1 if the scheduler ever stopped with tasks still parked on a busy actor.
+fun deadlock_flag(): Int {
+    return deadlock_detected
+}
+
+/// Clear all scheduler state. Test-only: lets the liveness tests return the
+/// scheduler to a known-empty state between cases without depending on
+/// `List.remove()`, which is currently a no-op (see the note in
+/// `wake_actor_waiters`).
+fun _reset_for_test() {
+    run_queue = []
+    sleep_queue = []
+    sleep_times = []
+    await_targets = []
+    await_waiters = []
+    io_handles = []
+    io_fds = []
+    io_modes = []
+    actor_wait_handles = []
+    actor_wait_targets = []
+    deadlock_detected = 0
 }
 
 fun _wake_waiters(finished_handle: Int) {
@@ -114,9 +176,19 @@ fun scheduler_tick(): Int {
     }
 
     if (run_queue.length() == 0) {
-        if (sleep_queue.length() > 0) { return 1 }
-        if (await_waiters.length() > 0) { return 1 }
-        if (io_handles.length() > 0) { return 1 }
+        // Delegate to the shared list rather than re-listing the queues here —
+        // that duplication is what let `actor_wait_handles` be silently dropped.
+        if (_has_self_reviving_work() == 1) { return 1 }
+
+        // Only actor waiters left. A busy actor is released by a *runnable*
+        // task, and there is none: the run queue is empty and no timer, fd or
+        // awaited task can produce one. No future tick can change this state, so
+        // returning 1 would spin hot forever. Report the deadlock and stop
+        // instead of dropping the parked tasks on the floor.
+        if (actor_wait_handles.length() > 0) {
+            deadlock_detected = 1
+            IO.println("saffron: deadlock — " + actor_wait_handles.length().to_string() + " task(s) parked on a busy actor with no runnable task left to release it")
+        }
         return 0
     }
 
@@ -178,6 +250,16 @@ fun scheduler_run() {
     while (scheduler_tick() == 1) {}
 }
 
+// WARNING: the `.remove(i)` calls below are currently no-ops. The codegen for
+// `List.remove` passes a NaN-boxed index to the runtime's `__list_remove`, which
+// expects a raw i64, so the bounds check rejects it and returns nil without
+// shifting or shrinking the list (src/compiler/codegen/methods_body.sf:1661
+// omits the `emit_untag_int` that the index-get path at :418 performs). Every
+// queue-draining loop in this file is affected: woken tasks are pushed to
+// `run_queue` but never removed from their wait queue, so they are resumed
+// repeatedly and the wait queues grow without bound. This is a pre-existing
+// codegen bug — identical IR is produced by the checked-in gen2 — and fixing it
+// is out of scope here (src/compiler/** is owned elsewhere right now).
 fun wake_actor_waiters(actor_ptr: Int) {
     var i: Int = actor_wait_handles.length() - 1
     while (i >= 0) {

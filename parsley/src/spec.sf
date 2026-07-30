@@ -12,7 +12,7 @@ fun to_manifest(endpoints: List<Map<String, String>>): String {
     var sb = StringBuilder()
     sb.append("# Auto-generated API spec\n")
     sb.append("# Source: parsley router\n\n")
-    var i: Float = 0
+    var i: Int = 0
     while (i < endpoints.length()) {
         var ep: Map<String, String> = endpoints[i]
         sb.append("[[endpoint]]\n")

@@ -414,13 +414,50 @@ fun __rt_as_list_ptr(v: Int): Int {
     return raw
 }
 
-// Format a single list element. Dispatches on the NaN-box tag via
+// If `v` refers to a GC-managed string, return its raw (untagged) pointer.
+// Returns 0 for anything else. Same shape as __rt_as_list_ptr/__rt_as_map_ptr.
+//
+// Only GC-allocated strings are recognised: the header sentinel is what makes
+// this safe to attempt on a bare integer at all. A plain malloc'd char* has no
+// header to check, so it cannot be told apart from a float bit pattern here and
+// is deliberately not claimed.
+fun __rt_as_string_ptr(v: Int): Int {
+    if (v == 0) { return 0 }
+    var upper: Int = v >> 48
+    var raw: Int = 0
+    if (upper == 32760) {
+        raw = __rt_untag_ptr(v)
+    } else if (upper == 0 and v > 65536) {
+        raw = v
+    } else {
+        return 0
+    }
+    if (raw == 0) { return 0 }
+    var magic: Int = load64(raw - 8)
+    if (magic != 6557403441622859503) { return 0 }
+    if (__rt_gc_type_tag(raw) != 1) { return 0 }
+    return raw
+}
+
+// Format a single collection element. Dispatches on the NaN-box tag via
 // __any_to_string (the same path that makes `IO.println(xs[0])` correct),
-// recursing for nested lists. Returns a raw char*.
+// recursing for nested lists and maps. Returns a raw char*.
+//
+// __any_to_string handles lists itself now, but the explicit check stays: it
+// keeps the recursion local and avoids depending on which base*.ll the program
+// happens to link against — base.ll's identity-mode stub does no dispatch.
 fun __rt_elem_to_string(elem: Int): Int {
     var as_list: Int = __rt_as_list_ptr(elem)
     if (as_list != 0) {
         return __list_to_string(as_list)
+    }
+    var as_map: Int = __rt_as_map_ptr(elem)
+    if (as_map != 0) {
+        return __map_to_string(as_map)
+    }
+    var as_str: Int = __rt_as_string_ptr(elem)
+    if (as_str != 0) {
+        return as_str
     }
     return __any_to_string(elem)
 }
@@ -473,6 +510,100 @@ fun __list_to_string(list: Int): Int {
     rt_free(open_b)
     rt_free(close_b)
     rt_free(sep_b)
+    rt_free(buf_p)
+    rt_free(len_p)
+    rt_free(cap_p)
+    return result
+}
+
+// If `v` refers to a GC-managed map, return its raw (untagged) pointer.
+// Returns 0 for anything that is not a map. Mirrors __rt_as_list_ptr: map
+// values also reach the runtime both NaN-boxed and bare, since __map_new
+// returns a raw pointer.
+fun __rt_as_map_ptr(v: Int): Int {
+    if (v == 0) { return 0 }
+    var upper: Int = v >> 48
+    var raw: Int = 0
+    if (upper == 32760) {
+        raw = __rt_untag_ptr(v)
+    } else if (upper == 0 and v > 65536) {
+        // Plausible bare heap pointer. The >65536 guard keeps small ints out
+        // of the pointer-deref path.
+        raw = v
+    } else {
+        return 0
+    }
+    if (raw == 0) { return 0 }
+    // Verify the GC header magic sentinel before trusting the type tag.
+    var magic: Int = load64(raw - 8)
+    if (magic != 6557403441622859503) { return 0 }
+    if (__rt_gc_type_tag(raw) != 3) { return 0 }
+    return raw
+}
+
+// Format a map as {key: value, ...}. Keys are always strings; values go
+// through __rt_elem_to_string so nested lists and maps render properly.
+fun __map_to_string(map: Int): Int {
+    if (map == 0) {
+        var nil_s: Int = __gc_alloc(3, 1)
+        store8(nil_s, 123)     // {
+        store8(nil_s + 1, 125) // }
+        store8(nil_s + 2, 0)
+        return nil_s
+    }
+    var count: Int = load64(map)
+    var keys: Int = load64(map + 16)
+    var vals: Int = load64(map + 24)
+    var buf_p: Int = rt_malloc(8)
+    var len_p: Int = rt_malloc(8)
+    var cap_p: Int = rt_malloc(8)
+    var init_buf: Int = rt_malloc(64)
+    store8(init_buf, 0)
+    store64(buf_p, init_buf)
+    store64(len_p, 0)
+    store64(cap_p, 64)
+    var open_b: Int = rt_malloc(2)
+    store8(open_b, 123)    // {
+    store8(open_b + 1, 0)
+    var close_b: Int = rt_malloc(2)
+    store8(close_b, 125)   // }
+    store8(close_b + 1, 0)
+    var sep_b: Int = rt_malloc(3)
+    store8(sep_b, 44)      // ,
+    store8(sep_b + 1, 32)  // (space)
+    store8(sep_b + 2, 0)
+    var colon_b: Int = rt_malloc(3)
+    store8(colon_b, 58)    // :
+    store8(colon_b + 1, 32) // (space)
+    store8(colon_b + 2, 0)
+    __join_append(buf_p, len_p, cap_p, open_b, 1)
+    var i: Int = 0
+    while (i < count) {
+        if (i > 0) {
+            __join_append(buf_p, len_p, cap_p, sep_b, 2)
+        }
+        // Keys are stored untagged, as __map_keys' __rt_tag_ptr call attests.
+        // Tag before dispatching so a bare string pointer is not mistaken for
+        // a float bit pattern.
+        var key: Int = __rt_tag_ptr(load64(keys + i * 8))
+        var key_str: Int = __rt_elem_to_string(key)
+        if (key_str != 0) {
+            __join_append(buf_p, len_p, cap_p, key_str, rt_strlen(key_str))
+        }
+        __join_append(buf_p, len_p, cap_p, colon_b, 2)
+        var val: Int = load64(vals + i * 8)
+        var val_str: Int = __rt_elem_to_string(val)
+        if (val_str != 0) {
+            __join_append(buf_p, len_p, cap_p, val_str, rt_strlen(val_str))
+        }
+        i = i + 1
+    }
+    __join_append(buf_p, len_p, cap_p, close_b, 1)
+    var result: Int = load64(buf_p)
+    rt_free(open_b)
+    rt_free(close_b)
+    rt_free(sep_b)
+    rt_free(colon_b)
     rt_free(buf_p)
     rt_free(len_p)
     rt_free(cap_p)

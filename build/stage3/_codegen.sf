@@ -30,6 +30,9 @@ class Codegen {
     var class_field_list: Map<String, List<String>>
     var class_struct_names: Map<String, String>
     var class_methods: Map<String, List<String>>
+    // Methods declared with an empty body. Only these are requirements on a
+    // subclass; a parent method WITH a body is simply inherited.
+    var class_abstract_methods: Map<String, List<String>>
     var current_class: String
     var current_parent: String
     var current_function_name: String
@@ -96,6 +99,7 @@ class Codegen {
         this.class_field_list = {}
         this.class_struct_names = {}
         this.class_methods = {}
+        this.class_abstract_methods = {}
         this.current_class = ""
         this.current_parent = ""
         this.current_function_name = ""
@@ -5328,7 +5332,32 @@ class Codegen {
             var i: Int = 0
             while (i < parent_methods.length()) {
                 var mname: String = parent_methods[i]
-                if (!this.str_in_list(child_methods,mname) and mname != "init") {
+                var forward_method: Bool = !this.str_in_list(child_methods,mname)
+                if (mname == "init") {
+                    // `init` used to be excluded here, which meant a child that
+                    // declares no constructor of its own got no Child__init at
+                    // all. The call site in gen_call only emits the __init call
+                    // when it is a known function, so `Child("Rex")` compiled to
+                    // a bare `call @Child()` with every argument silently
+                    // dropped; the fields stayed zero and the first field read
+                    // through an inherited method segfaulted.
+                    //
+                    // Forwarding is safe because the parent's fields are
+                    // prepended to the child's, so parent field index i is also
+                    // child field index i and all fields are i64. The one case
+                    // where that does not hold is an actor inheriting from a
+                    // non-actor: the actor gets two hidden fields prepended,
+                    // shifting every inherited index by two.
+                    if (this.actor_classes.has(name) and !this.actor_classes.has(parent)) {
+                        forward_method = false
+                    }
+                    // Without a known arity we cannot emit matching parameters,
+                    // and a forwarder with the wrong arity is worse than none.
+                    if (!this.called_function_arity.has(this.current_prefix + parent + "__init")) {
+                        forward_method = false
+                    }
+                }
+                if (forward_method) {
                     // Register parent method as callable on child
                     child_methods.push(mname)
                     // Map ChildClass__method to ParentClass__method
@@ -5362,13 +5391,19 @@ class Codegen {
                 }
                 i = i + 1
             }
-            // Interface conformance: if parent has no fields, check all methods are implemented
-            var parent_fields_str: String = this.class_fields.get(parent)
-            if (parent_fields_str.length() == 0) {
-                // This is an interface — check conformance
+            // Conformance: only the parent's ABSTRACT (bodyless) methods are
+            // requirements. Previously this keyed off "parent has no fields" as a
+            // proxy for "parent is an interface", then demanded every parent method
+            // be redeclared — which rejected legitimate inheritance from a
+            // fieldless base class and forced implementors to copy interface
+            // default-method bodies. Note child_methods has already had inherited
+            // names pushed into it above, so a method inherited from a grandparent
+            // correctly counts as satisfying the requirement.
+            if (this.class_abstract_methods.has(parent)) {
+                var required_methods: List = this.class_abstract_methods.get(parent)
                 var pi: Int = 0
-                while (pi < parent_methods.length()) {
-                    var required: String = parent_methods[pi]
+                while (pi < required_methods.length()) {
+                    var required: String = required_methods[pi]
                     if (required != "init" and !this.str_in_list(child_methods,required)) {
                         IO.println("Error: class " + name + " does not implement " + parent + "." + required + "()")
                     }
@@ -5426,12 +5461,19 @@ class Codegen {
 
         // Register method names
         var method_names: List<String> = []
+        var abstract_method_names: List<String> = []
         i = 0
         while (i < methods.length()) {
-            method_names.push(this.get_fun_name(methods[i]))
+            var reg_mname: String = this.get_fun_name(methods[i])
+            method_names.push(reg_mname)
+            // Bodyless == abstract == a requirement on subclasses.
+            if (this.get_fun_body(methods[i]).length() == 0) {
+                abstract_method_names.push(reg_mname)
+            }
             i = i + 1
         }
         this.class_methods.set(name, method_names)
+        this.class_abstract_methods.set(name, abstract_method_names)
 
         // Pre-register all method return types so forward references resolve correctly
         i = 0
@@ -6729,11 +6771,30 @@ class Codegen {
         this.start_block(rhs_label)
         var rhs_raw: String = this.gen_arg_value(right)
         var rhs: String = this.to_i1(rhs_raw)
-        this.emit_terminator("br label %" + end_label)
+        // The phi predecessor must be the block control actually leaves from, not
+        // rhs_label. When `right` is itself a logical op (or anything else that
+        // opens new blocks — a match, a nested short-circuit), gen_arg_value above
+        // has already left rhs_label behind, so naming rhs_label in the phi
+        // produced "PHI node entries do not match predecessors". Funnel every
+        // path through one join block whose identity is known here; -O2 folds it
+        // away.
+        var rhs_reaches_end: Bool = !this.block_terminated
+        var rhs_exit: String = this.fresh_label("rhs.exit")
+        if (rhs_reaches_end) {
+            this.emit_terminator("br label %" + rhs_exit)
+            this.start_block(rhs_exit)
+            this.emit_terminator("br label %" + end_label)
+        }
 
         this.start_block(end_label)
         var phi_result: String = this.fresh_local()
-        this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_label + "]")
+        if (rhs_reaches_end) {
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "], [" + rhs + ", %" + rhs_exit + "]")
+        } else {
+            // The RHS ended in its own terminator (e.g. a throw), so end_label has
+            // exactly one predecessor. A single-entry phi is still valid IR.
+            this.emit_indent(phi_result + " = phi i1 [" + lhs + ", %" + current_block + "]")
+        }
         // Extend back to i64 for uniform value type
         var raw: String = this.fresh_local()
         this.emit_indent(raw + " = zext i1 " + phi_result + " to i64")
@@ -11230,12 +11291,13 @@ class Codegen {
             this.last_type = AST.Type.StringType
             return tagged
         } else if (obj_type.starts_with("Map")) {
-            var const_name: String = this.add_string_constant("[Map]")
-            var gep: String = this.fresh_local()
-            this.emit_indent(gep + " = getelementptr [6 x i8], [6 x i8]* " + const_name + ", i64 0, i64 0")
-            var local: String = this.emit_tag_ptr(gep)
+            this.called_functions.push("__map_to_string")
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = call i64 @__map_to_string(i64 " + obj + ")")
+            var tagged: String = this.fresh_local()
+            this.emit_indent(tagged + " = call i64 @__rt_tag_ptr(i64 " + local + ")")
             this.last_type = AST.Type.StringType
-            return local
+            return tagged
         } else if (obj_type == "Any") {
             // Unknown type at compile time: dispatch via __any_to_string which
             // does runtime NaN-box tag inspection to choose the right converter.

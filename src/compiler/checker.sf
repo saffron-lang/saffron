@@ -161,6 +161,11 @@ class NullChecker {
     var current_class: String
     var class_parents: Map<String, String>
     var class_method_names: Map<String, String>
+    // Only methods declared with an empty body are abstract, i.e. actually require
+    // an implementation in a subclass. A parent method that HAS a body is inherited,
+    // so demanding the child redeclare it is wrong. Keyed by class name, value is a
+    // comma-joined method-name list, matching class_method_names' encoding.
+    var class_abstract_methods: Map<String, String>
     var receiver_params: Map<String, String>
     var actor_classes: Map<String, Bool>
 
@@ -172,6 +177,7 @@ class NullChecker {
         this.current_class = ""
         this.class_parents = {}
         this.class_method_names = {}
+        this.class_abstract_methods = {}
         this.receiver_params = {}
         this.actor_classes = {}
     }
@@ -612,26 +618,32 @@ class NullChecker {
     }
 
     fun check_conformance() {
-        // For each class with a parent, verify it implements parent's methods
+        // For each class with a parent, verify it implements the parent's ABSTRACT
+        // methods. Methods the parent defines with a body are inherited, so requiring
+        // the child to redeclare them defeats the point of inheritance — that older
+        // behaviour made `class Dog extends Animal {}` an error whenever Animal had
+        // any concrete method, and forced interface implementors to copy every
+        // default method body.
         var classes: List<String> = this.class_parents.keys()
         var i: Float = 0
         while (i < classes.length()) {
             var child_name: String = classes[i]
             var parent_name: String = this.class_parents.get(child_name)
-            // Get parent's methods
-            if (this.class_method_names.has(parent_name)) {
-                var parent_methods_str: String = this.class_method_names.get(parent_name)
-                var parent_methods: List<String> = parent_methods_str.split(",")
-                // Check each parent method exists on child
-                var child_methods_str: String = ""
+            if (this.class_abstract_methods.has(parent_name)) {
+                var required_str: String = this.class_abstract_methods.get(parent_name)
+                var required_methods: List<String> = required_str.split(",")
+                var child_methods: List<String> = []
                 if (this.class_method_names.has(child_name)) {
-                    child_methods_str = this.class_method_names.get(child_name)
+                    child_methods = this.class_method_names.get(child_name).split(",")
                 }
                 var j: Float = 0
-                while (j < parent_methods.length()) {
-                    var method_name: String = parent_methods[j]
+                while (j < required_methods.length()) {
+                    var method_name: String = required_methods[j]
                     if (method_name != "init" and method_name.length() > 0) {
-                        if (!child_methods_str.contains(method_name)) {
+                        // Exact name comparison, not substring: `.contains()` on the
+                        // joined list meant a child method named `draw_border` would
+                        // wrongly satisfy a required `draw`.
+                        if (!this.list_has_string(child_methods, method_name)) {
                             this.error(child_name + " does not implement " + parent_name + "." + method_name + "()")
                         }
                     }
@@ -640,6 +652,15 @@ class NullChecker {
             }
             i = i + 1
         }
+    }
+
+    fun list_has_string(haystack: List<String>, needle: String): Bool {
+        var i: Float = 0
+        while (i < haystack.length()) {
+            if (haystack[i] == needle) { return true }
+            i = i + 1
+        }
+        return false
     }
 
     fun register_decl(stmt: AST.Stmt) {
@@ -682,11 +703,21 @@ class NullChecker {
                 // Register methods with their return types and param types
                 // Also populate class_method_names for receiver closure desugaring
                 var method_names_list: List<String> = []
+                var abstract_names_list: List<String> = []
                 var mi: Float = 0
                 while (mi < methods.length()) {
                     var method_name: String = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mn
                         _ => ""
+                    }
+                    // A bodyless method is abstract: it is a requirement on
+                    // subclasses. A method with a body is inherited as-is.
+                    var method_body: List<AST.Stmt> = match (methods[mi]) {
+                        FunDecl(mn, mp, mr, mb, md) => mb
+                        _ => []
+                    }
+                    if (method_name.length() > 0 and method_body.length() == 0) {
+                        abstract_names_list.push(method_name)
                     }
                     var method_ret_type: AST.Type = match (methods[mi]) {
                         FunDecl(mn, mp, mr, mb, md) => mr
@@ -706,6 +737,9 @@ class NullChecker {
                 }
                 if (method_names_list.length() > 0) {
                     this.class_method_names.set(name, method_names_list.join(","))
+                }
+                if (abstract_names_list.length() > 0) {
+                    this.class_abstract_methods.set(name, abstract_names_list.join(","))
                 }
                 // Actor Sendable enforcement: check method params and return types
                 if (this.actor_classes.has(name)) {

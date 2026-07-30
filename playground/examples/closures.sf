@@ -1,0 +1,26 @@
+//! Closures, lambdas and higher-order functions
+fun make_counter(): () => Float {
+    var count: Float = 0
+    return fun (): Float => {
+        count = count + 1
+        return count
+    }
+}
+
+var next = make_counter()
+IO.println(next().to_string())
+IO.println(next().to_string())
+IO.println(next().to_string())
+
+// Lambdas as arguments
+fun apply_twice(f: (Float) => Float, x: Float): Float {
+    return f(f(x))
+}
+IO.println(apply_twice(fun (n: Float) => n * 3, 2).to_string())
+
+// Building a list with a closure
+var doubled: List<Float> = []
+for (n in [1, 2, 3, 4]) {
+    doubled.push(n * 2)
+}
+IO.println(doubled.join(", "))

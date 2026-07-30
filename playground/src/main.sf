@@ -1,0 +1,94 @@
+//! Saffron Playground — compile service.
+//!
+//! Serves the Turmeric/wasm32 frontend out of static/ and exposes one API endpoint:
+//!
+//!   POST /api/compile   { "source": "<saffron source>" }
+//!     -> { "ok": true,  "wasm": "<base64>", "diagnostics": "..." }
+//!     -> { "ok": false, "diagnostics": "<compiler errors>" }
+//!
+//! The browser instantiates the returned module itself, so *user code never runs on
+//! the host* — it runs in the browser's wasm sandbox, with only the imports the
+//! loader chooses to provide. The host's job is strictly compilation.
+//!
+//! See playground/README.md for the sandboxing threat model: what is and is not
+//! contained, and what to add before exposing this to untrusted traffic.
+
+import "@http/server" as Http
+import "@json" as JSON
+import "@os" as OS
+import "./compile.sf" as Compile
+import "./examples.sf" as Examples
+
+fun read_port(): Int {
+    var port_str: String = OS.env("PLAYGROUND_PORT")
+    if (port_str.length() > 0) {
+        return port_str.to_number()
+    }
+    return 8080
+}
+
+/// POST /api/compile — compile a program, hand back the module as base64.
+fun handle_compile(req: Http.Request): Http.Response {
+    var body: String = req.body
+    var source: String = ""
+
+    // The body is JSON: {"source": "..."}. Pull the field out, tolerating a body
+    // that is not valid JSON at all rather than 500ing.
+    var parsed: Any = nil
+    try {
+        parsed = JSON.parse(body)
+    } catch (e) {
+        return Http.json("{\"ok\":false,\"diagnostics\":\"malformed request body\"}")
+            .status_code(400)
+    }
+    if (parsed == nil or !parsed.has("source")) {
+        return Http.json("{\"ok\":false,\"diagnostics\":\"missing 'source' field\"}")
+            .status_code(400)
+    }
+    source = parsed.get("source")
+
+    var result = Compile.compile_to_wasm(source)
+
+    var payload: Map<String, Any> = {}
+    payload.set("ok", result.ok)
+    payload.set("wasm", result.wasm_base64)
+    payload.set("diagnostics", result.diagnostics)
+    return Http.json(JSON.to_string(payload))
+}
+
+/// GET /api/examples — the bundled example programs, for the "load example" buttons.
+fun handle_examples(req: Http.Request): Http.Response {
+    return Http.json(Examples.as_json())
+}
+
+/// GET /api/health — liveness probe, also reports whether the wasm toolchain is
+/// actually present. Useful because a missing Homebrew LLVM is the single most
+/// common reason the playground silently fails to compile anything.
+fun handle_health(req: Http.Request): Http.Response {
+    var payload: Map<String, Any> = {}
+    payload.set("ok", true)
+    payload.set("wasm_toolchain", Compile.toolchain_status())
+    return Http.json(JSON.to_string(payload))
+}
+
+fun main() {
+    var port: Int = read_port()
+    var app = Http.server(port)
+
+    app.use(Http.cors())
+    app.after(Http.cors_headers())
+
+    app.post("/api/compile", handle_compile)
+    app.get("/api/examples", handle_examples)
+    app.get("/api/health", handle_health)
+
+    // Static frontend last, so it never shadows the API routes.
+    app.use(Http.static_files("/", "static"))
+
+    IO.println("Saffron Playground")
+    IO.println("  toolchain: " + Compile.toolchain_status())
+    IO.println("  http://localhost:" + port.to_string())
+    app.serve()
+}
+
+main()

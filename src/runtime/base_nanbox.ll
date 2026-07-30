@@ -1124,6 +1124,15 @@ entry:
 
 declare i64 @__int_to_string(i64)
 
+; A collection value can reach here either NaN-boxed or as a bare heap pointer,
+; depending on where it was produced — __list_new and __map_new both return raw
+; pointers. These accept both and return 0 for anything that is not a GC-managed
+; list/map, verifying the header sentinel before trusting the type tag.
+declare i64 @__rt_as_list_ptr(i64)
+declare i64 @__list_to_string(i64)
+declare i64 @__rt_as_map_ptr(i64)
+declare i64 @__map_to_string(i64)
+
 define i64 @__any_to_string(i64 %val) {
 entry:
   ; Check nil first
@@ -1141,12 +1150,34 @@ check_false:
 
 check_int:
   %is_int = call i1 @__val_is_int(i64 %val)
-  br i1 %is_int, label %do_int, label %check_ptr
+  br i1 %is_int, label %do_int, label %check_list
 
 do_int:
   %raw_int = call i64 @__val_untag_int(i64 %val)
   %int_str = call i64 @__int_to_string(i64 %raw_int)
   ret i64 %int_str
+
+  ; Test for a list or map before the pointer/float split. An untagged
+  ; collection pointer fails __val_is_ptr (its top 16 bits are 0, not 0x7FF8)
+  ; and would otherwise fall through to do_float and be reinterpreted as a
+  ; double, printing garbage like 2.45357e-314 instead of the collection.
+check_list:
+  %as_list = call i64 @__rt_as_list_ptr(i64 %val)
+  %is_list = icmp ne i64 %as_list, 0
+  br i1 %is_list, label %do_list, label %check_map
+
+do_list:
+  %list_str = call i64 @__list_to_string(i64 %as_list)
+  ret i64 %list_str
+
+check_map:
+  %as_map = call i64 @__rt_as_map_ptr(i64 %val)
+  %is_map = icmp ne i64 %as_map, 0
+  br i1 %is_map, label %do_map, label %check_ptr
+
+do_map:
+  %map_str = call i64 @__map_to_string(i64 %as_map)
+  ret i64 %map_str
 
 check_ptr:
   %is_ptr = call i1 @__val_is_ptr(i64 %val)
