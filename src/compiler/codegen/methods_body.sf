@@ -260,7 +260,12 @@
             if (mc_map_type.starts_with("Map<")) {
                 return this.get_map_value_type(mc_map_type)
             }
-            return "String"
+            // Unannotated map: Any, not String (BUGS #37). Claiming String made
+            // `var arr = m.get(k)` then `arr.push(x)` fall through to a silent
+            // return "0" emitting no call. See the matching site in the runtime
+            // dispatch arm of gen_method_call. Annotated Map<K, V> still narrows
+            // to V above, so this only widens what was already unknown.
+            return "Any"
         }
         if (mc_method == "pop") {
             // Infer return type from List<T> element type
@@ -2059,7 +2064,13 @@
             var val_type_str: String = this.get_map_value_type(obj_type_for_get)
             this.last_type = this.str_to_type(val_type_str)
         } else {
-            this.last_type = AST.Type.StringType
+            // Unknown value type, so Any — not String (BUGS #37). An untyped or
+            // Any-typed map tells us nothing about what get() returns; claiming
+            // String made `arr = m.get(k)` followed by `arr.push(x)` fall through
+            // to a silent return "0" that emits no call at all. Any routes such
+            // values through the runtime-dispatching helpers instead. Annotated
+            // Map<K, V> still narrows to V above.
+            this.last_type = AST.Type.AnyType
         }
         return local
     }

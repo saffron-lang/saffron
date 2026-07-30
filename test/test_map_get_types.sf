@@ -1,0 +1,61 @@
+// Regression test for BUGS #37: map.get() type inference.
+//
+// An annotated Map<K, V> must still narrow get() to V — widening it to Any
+// would lose real type information. An *unannotated* map must yield Any, not
+// String: claiming String sent the result down the String method table, where
+// list methods like push() matched no branch and hit a silent `return "0"`
+// that emitted no call, discarding the operation.
+
+import "@test" as Test
+
+// --- Annotated maps keep narrowing (the type system must not regress) ---
+
+var ints: Map<String, Int> = {"a": 7}
+var iv = ints.get("a")
+Test.assert_eq(iv + 1, 8, "Map<String, Int> get narrows to Int")
+
+var strs: Map<String, String> = {"k": "hi"}
+var sv = strs.get("k")
+Test.assert_eq(sv.to_upper(), "HI", "Map<String, String> get narrows to String")
+
+var lists: Map<String, List<Int>> = {"xs": [1, 2]}
+var lv = lists.get("xs")
+Test.assert_eq(lv.length(), 2, "Map<String, List<Int>> get narrows to List<Int>")
+
+// --- Unannotated maps yield Any and dispatch at runtime ---
+
+var untyped = Map()
+untyped.set("items", [])
+var arr = untyped.get("items")
+arr.push(1)
+arr.push(2)
+Test.assert_eq(arr.length(), 2, "unannotated map get -> Any still dispatches push")
+
+untyped.set("name", "saffron")
+var name = untyped.get("name")
+Test.assert_eq(name.length(), 7, "unannotated map get -> Any still dispatches length on a String")
+
+// --- Nested navigation: the toml.sf ensure_array_table shape that caught this ---
+
+fun append_table(root: Any, key: String): Any {
+    if (!root.has(key)) {
+        root.set(key, [])
+    }
+    var bucket = root.get(key)
+    var entry = Map()
+    bucket.push(entry)
+    return entry
+}
+
+var doc = Map()
+var first = append_table(doc, "deps")
+first.set("name", "foo")
+var second = append_table(doc, "deps")
+second.set("name", "bar")
+
+var deps = doc.get("deps")
+Test.assert_eq(deps.length(), 2, "array-of-tables append through an Any receiver")
+Test.assert_eq(deps[0].get("name"), "foo", "first appended table survives")
+Test.assert_eq(deps[1].get("name"), "bar", "second appended table survives")
+
+Test.summary()
