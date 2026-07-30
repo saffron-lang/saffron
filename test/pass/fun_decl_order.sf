@@ -1,0 +1,30 @@
+// Regression test: a call compiled BEFORE the callee's declaration must still
+// know the callee's return type. The main-program pre-scan used to omit
+// func_ret_types entirely, so `s` inferred Int, and `s.to_upper()` fell through
+// gen_method_call's terminal arm emitting no call at all (BUGS #33 + #37).
+// Prints "0" on the parent commit, "ABC" here.
+import "@test" as Test
+
+fun caller_above(): String {
+    var s = callee_below()
+    return s.to_upper()
+}
+
+fun callee_below(): String { return "abc" }
+
+// Same shape, but for a class method's return type.
+class Box {
+    var v: String
+    fun init(v: String) { this.v = v }
+    fun get(): String { return this.v }
+}
+
+fun uses_box(): String {
+    var b = Box("xyz")
+    return b.get().to_upper()
+}
+
+Test.assert_eq(caller_above(), "ABC", "callee declared below caller")
+Test.assert_eq(callee_below().to_upper(), "ABC", "callee declared above use")
+Test.assert_eq(uses_box(), "XYZ", "method return type known at earlier call site")
+Test.summary()
