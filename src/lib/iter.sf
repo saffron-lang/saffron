@@ -1,4 +1,37 @@
-//! Iterator utilities — higher-order functions over any Iterable<T>.
+//! Iterator utilities — higher-order functions over lists.
+//!
+//! Every function here traverses with `for (x in iterable)`. This module used to
+//! drive an explicit cursor — `iterable.iter()` then `while (iter.next?())` —
+//! which was doubly broken: `next?()` is dead syntax (a trailing `?` is no
+//! longer part of an identifier), and even spelled `has_next()` it could not
+//! work, because neither `iter()` nor `has_next()` exists for builtin
+//! collections. The whole module failed to compile as a result.
+//!
+//! The element types are `List<T>` rather than `Iterable<T>` because there is no
+//! `Iterable` type in the compiler — the old annotation only ever type-checked
+//! by accident of never being compiled. Widening these back out needs two things
+//! first: an `Iterable` interface the checker knows about, and a `for-in` that
+//! reaches non-list receivers through a statically unknown type. Today an
+//! `Any`-typed `for-in` yields raw pointers for Maps and segfaults on user
+//! classes, so `List<T>` is the honest bound.
+
+/// Materialize a list into a new list (a shallow copy).
+///
+/// `zip` needs random access rather than a single forward cursor, so it goes
+/// through here. Kept public since it is the natural landing spot once the
+/// parameter types widen beyond `List<T>`.
+///
+/// ```saffron
+/// import "@iter" as Iter
+/// Iter.to_list([1, 2, 3])  // [1, 2, 3]
+/// ```
+fun to_list<T>(iterable: List<T>): List<T> {
+    var result: List<T> = []
+    for (item in iterable) {
+        result.push(item)
+    }
+    return result
+}
 
 /// Apply a function to each element and return a new list of results.
 ///
@@ -7,11 +40,10 @@
 /// Iter.map([1, 2, 3], fun (x: Int): Int => x * 2)
 /// // [2, 4, 6]
 /// ```
-fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
+fun map<T, R>(iterable: List<T>, func: (T) => R): List<R> {
     var result: List<R> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        result.push(func(iter.next()))
+    for (item in iterable) {
+        result.push(func(item))
     }
     return result
 }
@@ -23,11 +55,9 @@ fun map<T, R>(iterable: Iterable<T>, func: (T) => R): List<R> {
 /// Iter.filter([1, 2, 3, 4], fun (x: Int): Bool => x % 2 == 0)
 /// // [2, 4]
 /// ```
-fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
+fun filter<T>(iterable: List<T>, func: (T) => Bool): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var item = iter.next()
+    for (item in iterable) {
         if (func(item)) {
             result.push(item)
         }
@@ -42,22 +72,21 @@ fun filter<T>(iterable: Iterable<T>, func: (T) => Bool): List<T> {
 /// Iter.reduce([1, 2, 3, 4], fun (acc: Int, x: Int): Int => acc + x, 0)
 /// // 10
 /// ```
-fun reduce<T, R>(iterable: Iterable<T>, func: (R, T) => R, initial: R): R {
+fun reduce<T, R>(iterable: List<T>, func: (R, T) => R, initial: R): R {
     var acc: R = initial
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        acc = func(acc, iter.next())
+    for (item in iterable) {
+        acc = func(acc, item)
     }
     return acc
 }
 
-/// Sum all numeric elements in the iterable.
+/// Sum all numeric elements in the list.
 ///
 /// ```saffron
 /// import "@iter" as Iter
 /// Iter.sum([1, 2, 3])  // 6
 /// ```
-fun sum(iterable: Iterable<Number>): Number {
+fun sum(iterable: List<Number>): Number {
     return reduce(iterable, fun (a: Number, b: Number): Number => a + b, 0)
 }
 
@@ -67,10 +96,9 @@ fun sum(iterable: Iterable<Number>): Number {
 /// import "@iter" as Iter
 /// Iter.any([1, 2, 3], fun (x: Int): Bool => x > 2)  // true
 /// ```
-fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (func(iter.next())) { return true }
+fun any<T>(iterable: List<T>, func: (T) => Bool): Bool {
+    for (item in iterable) {
+        if (func(item)) { return true }
     }
     return false
 }
@@ -81,10 +109,9 @@ fun any<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
 /// import "@iter" as Iter
 /// Iter.all([2, 4, 6], fun (x: Int): Bool => x % 2 == 0)  // true
 /// ```
-fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (!func(iter.next())) { return false }
+fun all<T>(iterable: List<T>, func: (T) => Bool): Bool {
+    for (item in iterable) {
+        if (!func(item)) { return false }
     }
     return true
 }
@@ -95,10 +122,9 @@ fun all<T>(iterable: Iterable<T>, func: (T) => Bool): Bool {
 /// import "@iter" as Iter
 /// Iter.each(["a", "b", "c"], IO.println)
 /// ```
-fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        func(iter.next())
+fun each<T>(iterable: List<T>, func: (T) => Nil): Nil {
+    for (item in iterable) {
+        func(item)
     }
 }
 
@@ -109,11 +135,10 @@ fun each<T>(iterable: Iterable<T>, func: (T) => Nil): Nil {
 /// Iter.count([1, 2, 3, 4], fun (x: Int): Bool => x > 2)
 /// // 2
 /// ```
-fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
-    var n = 0
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        if (func(iter.next())) { n = n + 1 }
+fun count<T>(iterable: List<T>, func: (T) => Bool): Int {
+    var n: Int = 0
+    for (item in iterable) {
+        if (func(item)) { n = n + 1 }
     }
     return n
 }
@@ -125,48 +150,49 @@ fun count<T>(iterable: Iterable<T>, func: (T) => Bool): Number {
 /// Iter.find([1, 2, 3], fun (x: Int): Bool => x > 1)
 /// // 2
 /// ```
-fun find<T>(iterable: Iterable<T>, func: (T) => Bool): T {
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var item = iter.next()
+fun find<T>(iterable: List<T>, func: (T) => Bool): T {
+    for (item in iterable) {
         if (func(item)) { return item }
     }
     return nil
 }
 
-/// Map each element to an iterable and flatten the results into a single list.
+/// Map each element to a list and flatten the results into a single list.
 ///
 /// ```saffron
 /// import "@iter" as Iter
 /// Iter.flat_map([[1, 2], [3, 4]], fun (x: List<Int>): List<Int> => x)
 /// // [1, 2, 3, 4]
 /// ```
-fun flat_map<T, R>(iterable: Iterable<T>, func: (T) => Iterable<R>): List<R> {
+fun flat_map<T, R>(iterable: List<T>, func: (T) => List<R>): List<R> {
     var result: List<R> = []
-    var iter = iterable.iter()
-    while (iter.next?()) {
-        var items = func(iter.next())
-        var inner = items.iter()
-        while (inner.next?()) {
-            result.push(inner.next())
+    for (item in iterable) {
+        for (inner in func(item)) {
+            result.push(inner)
         }
     }
     return result
 }
 
-/// Combine two iterables into a list of [a, b] pairs, stopping at the shorter one.
+/// Combine two lists into a list of [a, b] pairs, stopping at the shorter one.
 ///
 /// ```saffron
 /// import "@iter" as Iter
 /// Iter.zip([1, 2, 3], ["a", "b", "c"])
 /// // [[1, "a"], [2, "b"], [3, "c"]]
 /// ```
-fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
+fun zip<A, B>(a: List<A>, b: List<B>): List<List<Any>> {
+    // Two cursors have to advance in lockstep, which `for-in` can't express on
+    // its own — so materialize both sides and index them.
+    var la: List<A> = to_list(a)
+    var lb: List<B> = to_list(b)
+    var n: Int = la.length()
+    if (lb.length() < n) { n = lb.length() }
     var result: List<List<Any>> = []
-    var iter_a = a.iter()
-    var iter_b = b.iter()
-    while (iter_a.next?() and iter_b.next?()) {
-        result.push([iter_a.next(), iter_b.next()])
+    var i: Int = 0
+    while (i < n) {
+        result.push([la[i], lb[i]])
+        i = i + 1
     }
     return result
 }
@@ -178,29 +204,28 @@ fun zip<A, B>(a: Iterable<A>, b: Iterable<B>): List<List<Any>> {
 /// Iter.enumerate(["a", "b", "c"])
 /// // [[0, "a"], [1, "b"], [2, "c"]]
 /// ```
-fun enumerate<T>(iterable: Iterable<T>): List<List<Any>> {
+fun enumerate<T>(iterable: List<T>): List<List<Any>> {
     var result: List<List<Any>> = []
-    var iter = iterable.iter()
-    var i = 0
-    while (iter.next?()) {
-        result.push([i, iter.next()])
+    var i: Int = 0
+    for (item in iterable) {
+        result.push([i, item])
         i = i + 1
     }
     return result
 }
 
-/// Take the first n elements from the iterable.
+/// Take the first n elements.
 ///
 /// ```saffron
 /// import "@iter" as Iter
 /// Iter.take([1, 2, 3, 4, 5], 3)  // [1, 2, 3]
 /// ```
-fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
+fun take<T>(iterable: List<T>, n: Int): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
-    var i = 0
-    while (i < n and iter.next?()) {
-        result.push(iter.next())
+    var i: Int = 0
+    for (item in iterable) {
+        if (i >= n) { break }
+        result.push(item)
         i = i + 1
     }
     return result
@@ -212,12 +237,10 @@ fun take<T>(iterable: Iterable<T>, n: Number): List<T> {
 /// import "@iter" as Iter
 /// Iter.skip([1, 2, 3, 4, 5], 2)  // [3, 4, 5]
 /// ```
-fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
+fun skip<T>(iterable: List<T>, n: Int): List<T> {
     var result: List<T> = []
-    var iter = iterable.iter()
-    var i = 0
-    while (iter.next?()) {
-        var item = iter.next()
+    var i: Int = 0
+    for (item in iterable) {
         if (i >= n) { result.push(item) }
         i = i + 1
     }
@@ -226,11 +249,11 @@ fun skip<T>(iterable: Iterable<T>, n: Number): List<T> {
 
 // --- Additional utilities ---
 
-fun drop(list: List, n: Number): List {
+fun drop(list: List, n: Int): List {
     return skip(list, n)
 }
 
-fun chunk(list: List, size: Number): List {
+fun chunk(list: List, size: Int): List {
     var result: List = []
     var current: List = []
     var i = 0
