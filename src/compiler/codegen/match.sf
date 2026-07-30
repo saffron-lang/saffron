@@ -2,6 +2,7 @@
 
 extend fun Codegen.gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
         var subj: String = this.gen_arg_value(subject)
+        var subj_type: String = this.type_to_string(this.last_type)
         var result_ptr: String = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
@@ -81,6 +82,45 @@ extend fun Codegen.gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): Strin
             // Unknown enum — extract bindings from subject
             var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
                 _ => []
+            }
+            // Class patterns (`is Dog(d) => ...`), not enum variants: the
+            // binding IS the subject, there is no payload to unpack. The arm is
+            // chosen from the subject's static type, and the binding must land
+            // in typed_vars or `d.bark()` cannot resolve — an unresolved
+            // Variable is a hard codegen error since BUGS #37.
+            if (this.class_fields.has(first_variant)) {
+                var chosen: Float = -1
+                var ci: Float = 0
+                while (ci < arms.length()) {
+                    var cname: String = match (this.get_arm_pattern(arms[ci])) { VariantPattern(v, b) => v
+                        _ => ""
+                    }
+                    if (chosen < 0) {
+                        if (cname == subj_type) {
+                            chosen = ci
+                        } else if (cname == "_") {
+                            chosen = ci
+                        }
+                    }
+                    ci = ci + 1
+                }
+                if (chosen < 0) { chosen = 0 }
+                var cls_pat: AST.Pattern = this.get_arm_pattern(arms[chosen.floor()])
+                var cls_binds: List<String> = this.get_pattern_bindings(cls_pat)
+                var cls_name: String = match (cls_pat) { VariantPattern(v, b) => v
+                    _ => ""
+                }
+                if (cls_binds.length() >= 1) {
+                    this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cls_binds[0]))
+                    this.typed_vars.set(cls_binds[0], this.str_to_type(cls_name))
+                }
+                var cls_val: String = this.gen_arg_value(this.get_arm_body(arms[chosen.floor()]))
+                var cls_type: AST.Type = this.last_type
+                this.emit_indent("store i64 " + cls_val + ", i64* " + result_ptr)
+                var cls_result: String = this.fresh_local()
+                this.emit_indent(cls_result + " = load i64, i64* " + result_ptr)
+                this.last_type = cls_type
+                return cls_result
             }
             if (first_bindings.length() == 1) {
                 // Single-field variant: value = subj & 0x00FFFFFFFFFFFFFF
@@ -260,7 +300,11 @@ extend fun Codegen.get_variant_field_type(enum_name: String, variant_name: Strin
         if (name_type.length() < 2) return "Int"
         var ftype: String = name_type[1]
         if (ftype == "String") return "String"
-        if (ftype == "Float" or ftype == "Number") return "Int"
+        // Float must stay Float. Collapsing it to Int made arithmetic on a
+        // match binding emit integer ops against a NaN-boxed double, so
+        // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
+        // wants Int, and type_to_string_for_target already applies that.
+        if (ftype == "Float" or ftype == "Number") return "Float"
         if (ftype == "Bool") return "Int"
         if (ftype.starts_with("List")) return "List<String>"
         return "Int"

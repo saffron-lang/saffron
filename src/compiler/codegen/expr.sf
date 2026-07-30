@@ -254,6 +254,19 @@ extend fun Codegen.gen_binary(left: AST.Expr, op: String, right: AST.Expr): Stri
             var left_class: String = ""
             if (left_name.length() > 0) {
                 left_class = this.get_var_type_str(left_name)
+            } else {
+                // The left operand is not a plain variable. It used to be given
+                // up on here, so `Vec2(1,2) + Vec2(3,4)` — a constructor call,
+                // `this.pos`, a method result — skipped overload dispatch
+                // entirely and fell through to the primitive integer path,
+                // emitting `add i64` on two *pointers*. get_expr_type resolves
+                // calls and field accesses; accept it only when it names a
+                // declared class, since primitives ("Int", "Any") can collide
+                // with a user function sharing the overload method name.
+                var inferred_class: String = this.get_expr_type(left)
+                if (this.class_fields.has(inferred_class)) {
+                    left_class = inferred_class
+                }
             }
             if (left_class.length() > 0) {
                 if (this.class_methods.has(left_class)) {
@@ -1545,6 +1558,19 @@ extend fun Codegen.gen_enum_construct(enum_name: String, variant: String, args: 
         var i: Float = 0
         while (i < args.length()) {
             var val: String = this.gen_arg_value(args[i])
+            // Int -> Float widening at the payload store, the same fix as BUGS #28
+            // applied to enum construction instead of variable declaration. A
+            // `Number` field otherwise stored whatever representation the argument
+            // happened to have, so the declared type did not describe the bits and
+            // no static type for the extracted binding could be right. See the
+            // fuller note in codegen/expr_body.sf.
+            if (!this.identity_mode) {
+                var decl_type: String = this.get_variant_field_type(enum_name, variant, i)
+                if (decl_type == "Float" and this.type_to_string(this.last_type) == "Int") {
+                    var widened: String = this.emit_untag_float(val)
+                    val = this.emit_tag_float(widened)
+                }
+            }
             var field_idx: Float = i + 1
             var field_slot: String = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())

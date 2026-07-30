@@ -133,6 +133,22 @@ extend fun Codegen.gen_var_decl_with_name(name: String, type_ann: String, init: 
                 vtype = post_type
             }
         }
+        // A nil initialiser says nothing about the variable's type, so do not let it
+        // narrow to "Nil".
+        //
+        // `var parsed: Any = nil` (and the inferred `var x = nil`) used to type the
+        // variable as Nil for the rest of its life. Nothing widened it on
+        // reassignment, so after `parsed = JSON.parse(body)` the variable still
+        // claimed to be Nil — and the `== nil` comparison in gen_binary keys off the
+        // *static* type, emitting `__val_is_nil` against the nil literal rather than
+        // against the variable. The result was a comparison that was unconditionally
+        // true: `parsed == nil` reported nil for a live object.
+        //
+        // "Any" is the honest type here — it routes through the runtime dispatch
+        // helpers, which inspect the actual tag.
+        if (vtype == "Nil") {
+            vtype = "Any"
+        }
         this.typed_vars.set(name, this.str_to_type(vtype))
         if (vtype == "String") {
             this.string_vars.push(name)
