@@ -1175,5 +1175,112 @@
         return arg_str
     }
 
+    /// Pre-register one function declaration's signature: defaults, param count,
+    /// param names and RETURN TYPE.
+    ///
+    /// This is the single implementation of the declaration pre-scan. It used to
+    /// be copy-pasted into `generate_with_modules` and both `..._flat_opts`
+    /// variants, plus a fourth, *divergent* copy for the main program's own
+    /// declarations. BUGS #33 and #36 each had to be applied to every copy, and
+    /// #33's first attempt got two of them wrong — the build caught it. Worse,
+    /// the main-program copy never registered `func_ret_types` at all, so #33
+    /// was still live for top-level functions: a caller declared above its
+    /// callee inferred `Int` for the result and every method on it silently
+    /// fell through (#37).
+    ///
+    /// `prefix` is "" for the main program and the module prefix otherwise.
+    fun prescan_fun_decl(stmt: AST.Stmt, prefix: String) {
+        var name: String = this.get_fun_name(stmt)
+        if (name.length() == 0) return nil
+        var doc: String = this.get_fun_doc(stmt)
+        // @intrinsic / @extern declarations are dispatched by other machinery and
+        // must not be registered as ordinary callables.
+        if (doc.starts_with("@intrinsic") or doc.starts_with("@extern:")) return nil
+
+        var emit_name: String = prefix + name
+        var params: List<AST.Param> = this.get_fun_params(stmt)
+        var defaults: List<AST.Expr> = []
+        var pnames: List<String> = []
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p: AST.Param = params[pi]
+            defaults.push(match (p) { Param(n, t, d) => d })
+            pnames.push(match (p) { Param(n, t, d) => n })
+            pi = pi + 1
+        }
+        this.func_defaults.set(emit_name, defaults)
+        this.func_param_count.set(emit_name, params.length())
+        this.func_param_names.set(emit_name, pnames)
+
+        // Return type too, or a call compiled before the callee's own
+        // gen_function runs falls back to Int and misdispatches every method on
+        // the result (BUGS #33). gen_function still sets this, but only when it
+        // reaches the declaration — too late for a caller appearing earlier.
+        var ret: String = this.get_fun_ret(stmt)
+        if (ret.length() > 0) {
+            this.func_ret_types.set(emit_name, this.str_to_type(ret))
+            if (prefix.length() > 0) {
+                this.func_ret_types.set(name, this.str_to_type(ret))
+            }
+        }
+    }
+
+    /// Pre-register every method of a class declaration. Methods take an implicit
+    /// leading `self`, registered under both the bare `Class__method` name and
+    /// the prefixed one.
+    fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
+        var cname: String = match (stmt) { ClassDecl(n, p, f, m, d) => n
+            _ => ""
+        }
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, p, f, m, d) => m
+            _ => []
+        }
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var mname: String = this.get_fun_name(methods[mi])
+            if (mname.length() > 0) {
+                var mparams: List<AST.Param> = this.get_fun_params(methods[mi])
+                var mdefs: List<AST.Expr> = []
+                var mpnames: List<String> = []
+                mpnames.push("self")
+                mdefs.push(AST.Expr.NilLit)
+                var mpi: Float = 0
+                while (mpi < mparams.length()) {
+                    var mp: AST.Param = mparams[mpi]
+                    mdefs.push(match (mp) { Param(n, t, d) => d })
+                    mpnames.push(match (mp) { Param(n, t, d) => n })
+                    mpi = mpi + 1
+                }
+                var full: String = cname + "__" + mname
+                this.func_defaults.set(full, mdefs)
+                this.func_param_count.set(full, mpnames.length())
+                this.func_param_names.set(full, mpnames)
+                if (prefix.length() > 0) {
+                    var pfull: String = prefix + full
+                    this.func_defaults.set(pfull, mdefs)
+                    this.func_param_count.set(pfull, mpnames.length())
+                    this.func_param_names.set(pfull, mpnames)
+                }
+            }
+            mi = mi + 1
+        }
+    }
+
+    /// Pre-scan a contiguous run of statements, registering every function and
+    /// class declaration. One call site per corpus — modules and main program
+    /// alike — so the four copies cannot drift again.
+    fun prescan_decls(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var si: Float = start
+        while (si < end) {
+            var kind: String = this.classify_stmt(stmts[si])
+            if (kind == "fun") {
+                this.prescan_fun_decl(stmts[si], prefix)
+            } else if (kind == "class") {
+                this.prescan_class_decl(stmts[si], prefix)
+            }
+            si = si + 1
+        }
+    }
+
     // --- Statement codegen ---
 
