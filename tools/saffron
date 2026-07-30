@@ -186,6 +186,51 @@ compile_to_ir() {
     "$SAFFRONC" --stdlib "$STDLIB" $flags "$input" "$output"
 }
 
+# --- IR verification gate ---
+#
+# Always-on gate #1 from docs/design/compiler-rewrite.md: never hand malformed
+# IR to the linker. Codegen bugs used to surface as an opaque failure from clang
+# deep in the link line — "use of undefined value '%super'" with no indication
+# that the *compiler* produced it, or worse, as a segfault at runtime. Running
+# the verifier immediately after codegen attributes the failure to the compiler,
+# at a file:line:col in the emitted IR, before anything else can obscure it.
+#
+# `opt` ships with Homebrew LLVM but not with Apple's toolchain, so this is a
+# best-effort gate: if no opt is found, it is skipped rather than failing the
+# build. That means it hardens the development loop without becoming a new
+# install requirement. SAFFRON_SKIP_VERIFY=1 opts out (useful when bisecting a
+# known-bad IR bug and you want to see how far the link gets).
+find_opt() {
+    if [[ -n "${SAFFRON_OPT:-}" ]]; then
+        echo "$SAFFRON_OPT"
+    elif [[ -x /opt/homebrew/opt/llvm/bin/opt ]]; then
+        echo /opt/homebrew/opt/llvm/bin/opt
+    elif command -v opt &>/dev/null; then
+        command -v opt
+    fi
+}
+
+verify_ir() {
+    local ll="$1"
+    local source="$2"
+
+    [[ "${SAFFRON_SKIP_VERIFY:-}" == "1" ]] && return 0
+
+    local optbin
+    optbin=$(find_opt)
+    [[ -z "$optbin" ]] && return 0
+
+    local verrs
+    if ! verrs=$("$optbin" -passes=verify -disable-output "$ll" 2>&1); then
+        echo "saffron: the compiler emitted invalid LLVM IR for $source" >&2
+        echo "saffron: this is a compiler bug, not an error in your program." >&2
+        echo "$verrs" | sed 's/^/  /' >&2
+        echo "saffron: IR kept at $ll" >&2
+        return 1
+    fi
+    return 0
+}
+
 # Recursively discover all .sf files imported (via relative paths) from an entry file.
 # Outputs one absolute path per line, in dependency order (leaves first).
 discover_sources() {
@@ -245,6 +290,15 @@ build_project() {
         echo "saffron: compilation failed: $entry" >&2
         exit 1
     }
+
+    # Reject malformed IR here rather than letting the linker report it. The
+    # temp dir is removed by the EXIT trap, so copy the IR out first — the
+    # message points at it and it is the only artifact worth having.
+    if ! verify_ir "$ll_path" "$entry"; then
+        cp "$ll_path" "$TMPDIR/../saffron_invalid_ir.ll" 2>/dev/null \
+            && echo "saffron: (copied to /tmp/saffron_invalid_ir.ll)" >&2
+        exit 1
+    fi
 
     [[ "$VERBOSE" == true ]] && echo "  link: $entry -> $output"
     if [[ "$TARGET" == "wasm" || "$TARGET" == "wasm64" ]]; then
