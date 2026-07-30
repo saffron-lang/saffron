@@ -30,7 +30,7 @@ fun _is_truthy(value: Any): Bool {
 fun _to_str(value: Any): String {
     if (value == nil) { return "" }
     if (value is String) { return value }
-    if (value is Number) { return value.to_string() }
+    if (value is Int or value is Float) { return value.to_string() }
     if (value is Bool) { return value.to_string() }
     return "${value}"
 }

@@ -51,7 +51,7 @@ class Set {
                 sb.append("\"")
                 sb.append(k)
                 sb.append("\"")
-            } else if (k is Number) {
+            } else if (k is Int or k is Float) {
                 sb.append(k.to_string())
             } else {
                 sb.append("<value>")

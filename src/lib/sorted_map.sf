@@ -198,7 +198,7 @@ class SortedMap {
                 sb.append("\"")
                 sb.append(v)
                 sb.append("\"")
-            } else if (v is Number) {
+            } else if (v is Int or v is Float) {
                 var n: Number = v
                 sb.append(n.to_string())
             } else {

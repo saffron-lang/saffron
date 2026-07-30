@@ -29,7 +29,7 @@ fun format(template: String, values: List<Any>): String {
                     sb.append("true")
                 } else if (val == false) {
                     sb.append("false")
-                } else if (val is Number) {
+                } else if (val is Int or val is Float) {
                     sb.append(val.to_string())
                 } else if (val is String) {
                     sb.append(val)
