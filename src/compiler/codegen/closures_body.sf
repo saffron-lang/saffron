@@ -212,6 +212,26 @@
 
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
         this.known_functions.push(name)
+        // We are about to emit a function body, so `in_function` must be true for
+        // the duration.
+        //
+        // gen_lambda sets it to *false* before calling us — that is deliberate, and
+        // is what stops gen_function from treating the lambda as a nested function
+        // and hoisting it. But `in_function` is overloaded: it also means "emitted
+        // code lives inside a function body", and several expression cases branch
+        // on it. NilLit is the load-bearing one: outside a function it emits the
+        // literal "0" (correct for a module-level initialiser, where no runtime
+        // call can be made), and inside one it emits `call i64 @__val_nil()`.
+        //
+        // Under NaN boxing nil is 0x7FF8000000000002, not 0, so leaving the flag
+        // false made every `return nil` in a capturing closure return integer 0 —
+        // which is neither nil nor a valid pointer. `x == nil` was then false for a
+        // value that *was* nil, and dereferencing it segfaulted.
+        //
+        // Restored at the end rather than hard-cleared, so the outer emitter's
+        // notion of where it is survives.
+        var saved_in_function: Bool = this.in_function
+        this.in_function = true
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}
         var oci: Float = 0
@@ -361,6 +381,7 @@
         this.emit("}")
         this.block_terminated = false
         this.is_coroutine = false
+        this.in_function = saved_in_function
     }
 
 
