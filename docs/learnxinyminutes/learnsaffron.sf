@@ -152,16 +152,20 @@ nums.sort()
 var copy = nums.copy()
 
 // Maps are written with braces. Keys and values are both typed.
-var ages: Map<String, Number> = {"ada": 36, "alan": 41}
+var ages: Map<String, Int> = {"ada": 36, "alan": 41}
 ages.set("grace", 45)
 IO.println(ages.get("ada"))   // 36
 IO.println(ages.has("alan"))  // true
 IO.println(ages.keys())       // ["ada", "alan", "grace"]
 IO.println(ages.values())     // [36, 41, 45]
 
-// Iterating a map yields [key, value] pairs.
-for (entry in ages) {
-    IO.println("${entry[0]} is ${entry[1]}")
+// `for (entry in ages)` segfaults — for-in is index-based and a Map has no
+// integer indexing. keys() and values() are consistently ordered, so pair them
+// up by index instead.
+var who: List<String> = ages.keys()
+var how_old: List<Int> = ages.values()
+for (i = 0; i < who.length(); i = i + 1) {
+    IO.println("${who[i]} is ${how_old[i]}")
 }
 
 ////////////////////////////////////////////////
@@ -401,29 +405,27 @@ fun name_of(shape: Drawable): String {
 IO.println(name_of(Square()))   // square
 
 ////////////////////////////////////////////////
-// 11. Custom iterators
+// 11. Custom sequences
 ////////////////////////////////////////////////
 
-// Give a type an .iter() returning an object with .has_next() and .next()
-// and for-in works on it.
+// There is no iterator protocol yet. `for-in` desugars to length() + [i], so
+// it walks Lists and Strings only: a custom type is a compile error, and a Map
+// segfaults. Expose a List and iterate that.
 class Countdown {
-    var from: Number
-    fun init(from: Number) { this.from = from }
-    fun iter(): CountdownIter { return CountdownIter(this.from) }
-}
-
-class CountdownIter {
-    var current: Number
-    fun init(current: Number) { this.current = current }
-    fun has_next(): Bool { return this.current > 0 }
-    fun next(): Number {
-        var value = this.current
-        this.current = this.current - 1
-        return value
+    var from: Int
+    fun init(from: Int) { this.from = from }
+    fun to_list(): List<Int> {
+        var out: List<Int> = []
+        var i: Int = this.from
+        while (i > 0) {
+            out.push(i)
+            i = i - 1
+        }
+        return out
     }
 }
 
-for (t in Countdown(3)) {
+for (t in Countdown(3).to_list()) {
     IO.println(t)   // 3, 2, 1
 }
 

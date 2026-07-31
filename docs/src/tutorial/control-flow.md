@@ -34,7 +34,7 @@ for (var i = 0; i < 5; i = i + 1) {
 
 ## For-in loops
 
-Iterate over anything iterable — an `.iter()` method returning an object with `has_next()` and `next()`:
+`for-in` walks a collection by index, so it works over lists and strings:
 
 ```saffron
 // Lists
@@ -46,14 +46,21 @@ for (item in [10, 20, 30]) {
 for (ch in "abc") {
     IO.println(ch)  // a, b, c
 }
+```
 
-// Maps — yields [key, value] pairs
-for (entry in {"a": 1, "b": 2}) {
-    IO.println("${entry[0]} = ${entry[1]}")
+Maps do **not** work — `for-in` over a Map segfaults (BUGS #62). Iterate
+`keys()` instead:
+
+```saffron
+var m: Map<String, Int> = {"a": 1, "b": 2}
+var ks: List<String> = m.keys()
+for (k in ks) {
+    IO.println(k)
 }
 ```
 
-Custom types can join in too — see [Iterators](./iterators.md).
+Custom types cannot join in yet — see [Iterators](./iterators.md) for why and
+for the workaround.
 
 ## Break and continue
 

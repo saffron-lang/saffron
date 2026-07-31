@@ -1,8 +1,50 @@
 # Iterators
 
-## The iterator protocol
+## For-in loops
 
-Iteration is built on two interfaces declared in the prelude:
+`for-in` walks a collection by index. It is not built on a protocol — the parser
+rewrites it into a `while` loop over `length()` and `[i]`:
+
+```saffron
+for (item in [10, 20, 30]) {
+    IO.println(item)
+}
+```
+
+That means it works on exactly the receivers that support `length()` and integer
+indexing:
+
+```saffron
+// Lists — element by element
+for (n in [1, 2, 3]) {
+    IO.println(n)
+}
+
+// Strings — character by character
+for (ch in "abc") {
+    IO.println(ch)  // a, b, c
+}
+```
+
+### Maps do not work yet
+
+`for-in` over a Map **segfaults** (BUGS #62), with or without a type annotation,
+because a Map has no integer indexing for the desugaring to use. Go through
+`keys()` instead:
+
+```saffron
+var ages: Map<String, Int> = {"ada": 36, "alan": 41}
+var names: List<String> = ages.keys()
+for (name in names) {
+    IO.println(name)
+}
+```
+
+`ages.get(name)` returns `Int|Nil`, so nil-check it before using it as an `Int`.
+
+## The iterator protocol is not implemented
+
+The prelude declares two interfaces:
 
 ```saffron
 interface Iterator<T> {
@@ -15,51 +57,27 @@ interface Iterable<T> {
 }
 ```
 
-An **iterable** exposes `.iter()`, which returns an **iterator**. An iterator answers
-`has_next()` to say whether another element is available, and `next()` to produce it.
-
-Lists, strings, and maps are all iterable out of the box.
-
-## Manual iteration
+Nothing implements them. `iter()` does not exist on any builtin collection, and
+`for-in` does not call it. Both ways of reaching the protocol fail, and they fail
+differently (BUGS #62):
 
 ```saffron
+// A manual cursor loop compiles, exits 0, and prints NOTHING.
 var list = [10, 20, 30]
 var iter = list.iter()
-
 while (iter.has_next()) {
-    IO.println(iter.next())
+    IO.println(iter.next())   // never runs
 }
 ```
-
-## For-in loops
-
-`for-in` is syntactic sugar for the protocol above — it calls `.iter()` once, then loops
-while `has_next()` is true, binding each `next()` to the loop variable:
 
 ```saffron
-for (item in [10, 20, 30]) {
-    IO.println(item)
-}
+// for-in over a class that implements the protocol is a compile error:
+// [codegen] Error: type 'IntRange' has no method 'length'
+for (i in IntRange(0, 5)) { ... }
 ```
 
-It works over anything iterable:
-
-```saffron
-// Lists — element by element
-for (n in [1, 2, 3]) {
-    IO.println(n)
-}
-
-// Strings — character by character
-for (ch in "abc") {
-    IO.println(ch)  // a, b, c
-}
-
-// Maps — [key, value] pairs
-for (entry in {"a": 1, "b": 2}) {
-    IO.println("${entry[0]} = ${entry[1]}")
-}
-```
+Use `for-in` over a List or String, or a plain `while` loop with your own index,
+until the protocol is implemented.
 
 ## The `@iter` module
 
@@ -113,10 +131,14 @@ var scaled = map(evens, fun (x: Int): Int => x * 10)
 IO.println(scaled)  // [20, 40]
 ```
 
-## Writing iterable classes
+## Making your own type iterable
 
-Make your own type work with `for-in` by implementing the protocol — an `iter()` method
-returning an object with `has_next()` and `next()`:
+You cannot, yet. Implementing `iter()` does not help, because `for-in` never
+calls it. Implementing `length()` and `getItem()` does not help either: indexing
+has no dispatch path for user classes, so `obj[i]` runs the list accessor against
+your object and segfaults (BUGS #62).
+
+Expose a `List` and iterate that:
 
 ```saffron
 class IntRange {
@@ -128,41 +150,26 @@ class IntRange {
         this.end = end
     }
 
-    fun iter(): RangeIterator {
-        return RangeIterator(this.start, this.end)
+    fun to_list(): List<Int> {
+        var out: List<Int> = []
+        var i: Int = this.start
+        while (i < this.end) {
+            out.push(i)
+            i = i + 1
+        }
+        return out
     }
 }
 
-class RangeIterator {
-    var current: Int
-    var end: Int
-
-    fun init(start: Int, end: Int) {
-        this.current = start
-        this.end = end
-    }
-
-    fun has_next(): Bool {
-        return this.current < this.end
-    }
-
-    fun next(): Int {
-        var value = this.current
-        this.current = this.current + 1
-        return value
-    }
-}
-
-for (i in IntRange(0, 5)) {
+for (i in IntRange(0, 5).to_list()) {
     IO.println(i)  // 0, 1, 2, 3, 4
 }
 ```
 
-Because `IntRange` is iterable, it also works with everything in `@iter`:
+This materializes eagerly, so it is unsuitable for a large or infinite sequence —
+write those as an explicit `while` loop over your own cursor.
 
-```saffron
-import "@iter" as Iter
-
-var squares = Iter.map(IntRange(1, 5), fun (n: Int): Int => n * n)
-// [1, 4, 9, 16]
-```
+`@iter`'s functions take `List<T>` rather than `Iterable<T>` for the same reason.
+`src/lib/iter.sf` explains the constraint in its module doc: widening those
+signatures needs an `Iterable` interface the checker understands, plus a `for-in`
+that can reach non-list receivers.
