@@ -2882,6 +2882,35 @@ class Codegen {
                 this.last_type = this.str_to_type(this.get_field_type(fb_resolved, m_field))
                 return result
             }
+            // Nothing above could establish a class for the receiver, so the
+            // field's offset is unknown — and this path answers with the integer
+            // zero, emitting no GEP and no load at all.
+            //
+            // That is how `f(1).v` read 0 (BUGS #56): `Fun` carries no return
+            // type, so an indirect call's result has no recoverable class, and
+            // codegen handed back a plausible-looking constant rather than
+            // admitting it did not know. The object was constructed correctly
+            // the whole time; only this fallback was wrong.
+            //
+            // Report it — but only for that shape. This same fallback is the
+            // normal, working route for several unrelated things (a module
+            // constant like `Math.PI`, reflective field reads), which either
+            // return 0 here legitimately or get resolved by a later stage.
+            // Erroring unconditionally traded one silent wrong answer for a
+            // batch of false rejections, so the diagnostic is narrowed to a
+            // receiver that really is a call — the case that is genuinely
+            // unknowable here rather than merely unresolved.
+            //
+            // The proper fix is a return type on `Fun`, a language change beyond
+            // this repair; M2 in docs/design/compiler-rewrite.md ("unknown is
+            // never spelled as something concrete") is why this reports instead
+            // of guessing an offset.
+            var fb_obj_kind: String = this.classify_expr(m_obj)
+            if (fb_obj_kind == "call") {
+                IO.println("[codegen] Error: cannot determine the type of the receiver of '." + m_field + "': an indirect call through 'Fun' has no known return type, so the field's offset is unknown. Annotate the result first, e.g. 'var x: T = f(...)' then use 'x." + m_field + "'.")
+                this.has_errors = true
+            }
+            this.last_type = AST.Type.AnyType
             return "0"
         }
 
@@ -3910,6 +3939,31 @@ class Codegen {
             var ic_res: LLVMTypes.Value = this.llvm_block_builder.call("__indirect_call", LLVMTypes.Type.I64, [])
             this.llvm_values.set(local, ic_res)
         }
+        // The result type of an indirect call is genuinely unknown: `Fun` carries
+        // no return type, so there is nothing here to derive one from. Say so.
+        //
+        // This function used to leave `last_type` holding whatever the last
+        // sub-expression happened to set — usually the type of the final
+        // *argument*, or of the callee itself. Callers read that stale value as
+        // if it described the result, which is how a field access on a call
+        // result silently resolved to offset 0 (BUGS #56): `f(1).v` looked up
+        // field `v` on a class inferred from leftover state, and get_field_index
+        // answered 0 for a name it could not find. The same staleness made a
+        // Float returned through a closure read as an Int and print 0 (the float
+        // half of BUGS #51) — `to_string` keys off `last_type`, so it untagged a
+        // double as an integer.
+        //
+        // AnyType is the honest answer, and is already the "unknown" spelling the
+        // rest of codegen understands: it routes through the runtime dispatch
+        // helpers, which inspect the actual tag instead of trusting a static
+        // guess. That turns both silent wrong answers into correct behaviour for
+        // to_string/arithmetic, and turns the field case into a diagnostic rather
+        // than a wrong offset. (I2/M1 in docs/design/compiler-rewrite.md:
+        // unknown is distinct, and codegen must not re-derive a type it lacks.)
+        //
+        // Annotating the binding (`var x: Box = f(1)`) remains the way to supply
+        // the type; the real fix is a return type on `Fun`, a language change.
+        this.last_type = AST.Type.AnyType
         return local
     }
 
