@@ -9,6 +9,72 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 78. An absolute import path silently resolves to a nonexistent stdlib file
+
+`import "/abs/path/m.sf" as M` does not import anything. `resolve_import_path`
+(`src/compiler/main.sf:109`) tests for `@`, `./`, `../`, and bare paths with and
+without a slash — there is **no branch for a path starting with `/`**. An
+absolute path contains a slash, so it takes the "package submodule" branch,
+fails to find anything, and falls through to `_find_in_lib_paths`, whose last
+line is an unconditional
+
+```saffron
+return stdlib_dir + "/" + name + ".sf"
+```
+
+That path does not exist, and nothing downstream checks: `collect_modules` is
+called with it regardless (`main.sf:591`). The module's declarations are never
+registered, so every reference through the alias breaks — in three different
+ways depending on what you touch.
+
+**Reproduction.** Identical file, identical code, only the import spelling
+differs:
+
+```saffron
+// /tmp/mtC/m.sf
+enum S { Return(value: Int), Other }
+```
+
+```saffron
+import "./m.sf" as M            // works, prints 5
+import "/tmp/mtC/m.sf" as M     // fails
+fun f(s: M.S): Int { return match (s) { Return(v) => v, _ => 0 } }
+IO.println(f(M.S.Return(5)))
+```
+
+Three distinct symptoms from the same cause, none of which names the import:
+
+| construct | symptom under an absolute import |
+|---|---|
+| `match` binding a variant field | `[codegen] Error: undefined variable 'v'` |
+| reading a module global | invalid IR: `load i64, i64* %M` |
+| calling a module function | `linker command failed` (undefined symbol) |
+
+The `undefined variable 'v'` case is the nastiest: the name it reports is the
+*pattern binding*, which is not the problem and is not even a variable the user
+declared. Nothing points at the import.
+
+**Why this cost me time, and why it is worth filing rather than shrugging at.**
+Absolute paths are what you reach for when driving a compiler pass from a
+scratch file outside the tree, which is exactly what testing a new pass looks
+like. The failure presents as "my new AST variant broke variant bindings" — I
+bisected `ast.sf` by truncation before noticing the truncated file worked fine
+under a *relative* import, at which point the file was exonerated entirely.
+
+**Fix.** Two independent parts, and the second matters more than the first:
+
+1. Add an `import_path.starts_with("/")` branch to `resolve_import_path` that
+   returns the path unchanged.
+2. Make an unresolvable import a hard error. `_find_in_lib_paths` returning a
+   guessed path that no one stats is the actual defect — with `/` handled, the
+   next unsupported spelling fails exactly as opaquely. Check
+   `OS.file_exists(full_path)` at the `collect_modules` call sites and report the
+   import path and the spelling that was tried.
+
+Part 2 is the same shape as several entries here: a resolution helper that
+cannot fail, so it returns a plausible wrong answer instead. Compare #22 and
+#40, where a lookup that should have said "not found" said "assume it's a
+local."
 ### 77. On wasm32 only, `true.to_string()` returns `"false"` — `__bool_to_string` untags a value codegen already untagged
 
 Branching on the same value is correct, which is what makes this so misleading: an
