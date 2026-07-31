@@ -1,0 +1,16 @@
+// The checker must reject a variable initializer whose type is a concrete
+// scalar incompatible with the declared annotation. Before the VarDecl
+// assignability check, the annotation was stored and the initializer's type
+// was never consulted, so every one of these type-checked clean.
+//
+// Int->Float widening and anything involving Any/Nil are deliberately allowed
+// and are covered by pass-side tests, not here.
+
+fun main() {
+    var s: String = 1        // Int into String — error
+    var i: Int = "x"         // String into Int — error
+    var j: Int = 3.5         // Float into Int (no narrowing) — error
+    var b: Bool = 1          // Int into Bool — error
+    IO.println("${s} ${i} ${j} ${b}")
+}
+main()
