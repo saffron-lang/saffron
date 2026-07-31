@@ -161,7 +161,12 @@ entry:
 
 define i64 @__float_to_string(i64 %v) {
 entry:
-  %f = bitcast i64 %v to double
+  ; A bare bitcast is wrong for an int-tagged input: 0x7FF9... is a NaN, so
+  ; `[10, 20, 30][1].to_string()` printed "nan". Codegen picks this helper from
+  ; the *static* type (Float), but list literals of whole numbers are int-tagged
+  ; at runtime, so both shapes arrive here. __val_untag_float already converts
+  ; either one, so route through it instead of reinterpreting the bits.
+  %f = call double @__val_untag_float(i64 %v)
   %buf = call i8* @__sf_malloc(i64 32)
   %fmt = getelementptr [3 x i8], [3 x i8]* @.fmt.float, i64 0, i64 0
   call i32 (i8*, i64, i8*, ...) @snprintf(i8* %buf, i64 32, i8* %fmt, double %f)
@@ -220,10 +225,50 @@ entry:
 
 define i64 @__val_untag_int(i64 %v) {
 entry:
+  ; Three input shapes reach here, and the old version handled only the first:
+  ;   1) a NaN-boxed value (top 16 bits in 0x7FF8..0x7FFF) — extract the payload
+  ;   2) a raw i64 emitted directly by codegen (`add i64 0, 0`) — pass through
+  ;   3) a float-tagged double from arithmetic or a `Float`-annotated variable
+  ;      — convert numerically
+  ; Masking a double to 48 bits gives garbage: 0.0, 1.0 and 2.0 all have an
+  ; all-zero low 48 bits, so every list index computed through a `Float` counter
+  ; collapsed to 0 and `list[i]` silently returned element 0 forever. This is the
+  ; same logic wasm_base_32.ll already had; native was the odd one out.
+  %tag_bits = lshr i64 %v, 48
+  %ge_min = icmp uge i64 %tag_bits, 32760          ; 0x7FF8
+  %le_max = icmp ule i64 %tag_bits, 32767          ; 0x7FFF
+  %is_tagged = and i1 %ge_min, %le_max
+  br i1 %is_tagged, label %extract_int, label %check_raw
+extract_int:
+  ; NaN-boxed: sign-extend the low 48-bit payload.
   %payload = and i64 %v, 281474976710655
   %shift_left = shl i64 %payload, 16
   %sign_ext = ashr i64 %shift_left, 16
   ret i64 %sign_ext
+check_raw:
+  ; Raw ints occupy only the low 32 bits — either zero-extended (non-negative)
+  ; or sign-extended (negative). Both must pass through untouched; bitcasting a
+  ; sign-extended -1 to double yields NaN and would return 0.
+  %high_bits = lshr i64 %v, 32
+  %is_small_pos = icmp eq i64 %high_bits, 0
+  %is_small_neg = icmp eq i64 %high_bits, 4294967295
+  %is_raw = or i1 %is_small_pos, %is_small_neg
+  br i1 %is_raw, label %raw_int, label %from_float
+raw_int:
+  ret i64 %v
+from_float:
+  ; A double. Guard NaN/Inf (exponent all ones) before fptosi, which is
+  ; undefined for them.
+  %exp_bits = lshr i64 %v, 52
+  %exp_masked = and i64 %exp_bits, 2047
+  %is_special = icmp eq i64 %exp_masked, 2047
+  br i1 %is_special, label %ret_zero, label %safe_convert
+safe_convert:
+  %f = bitcast i64 %v to double
+  %as_int = fptosi double %f to i64
+  ret i64 %as_int
+ret_zero:
+  ret i64 0
 }
 
 define i64 @__val_tag_ptr(i8* %ptr) {
