@@ -303,6 +303,17 @@ class Lexer {
                 if (this.pos < this.source.length()) {
                     if (this.peek() == "{") {
                         this.advance() // consume {
+                        // Wrap the whole interpolated string in one paren group,
+                        // opened at the first ${. Without it, a trailing method
+                        // call binds only to the final "" segment because `.`
+                        // outranks `+`: `"${n}".length()` desugared to
+                        // `"" + (n).to_string() + "".length()`, i.e. string +
+                        // string + 0, and the 0 reached strlen as an address —
+                        // a raw-pointer garbage read (BUGS #25). The matching
+                        // close paren is emitted after the trailing segment below.
+                        if (!has_interp) {
+                            this.emit(TokenKind.TkLParen)
+                        }
                         // Emit prefix string + plus
                         this.emit(TokenKind.TkString(result.to_string()))
                         this.emit(TokenKind.TkPlus)
@@ -330,6 +341,11 @@ class Lexer {
         }
         this.advance() // closing quote
         this.emit(TokenKind.TkString(result.to_string()))
+        // Close the paren group opened at the first ${ (BUGS #25). Only emitted
+        // when the string actually interpolated — a plain "abc" opens no group.
+        if (has_interp) {
+            this.emit(TokenKind.TkRParen)
+        }
     }
 
     fun read_interpolation() {

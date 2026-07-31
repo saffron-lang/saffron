@@ -1,0 +1,30 @@
+// BUGS #25 — a method called directly on an interpolated string literal used to
+// return a raw heap address. Interpolation desugars in the lexer to
+// `"" + (expr).to_string() + ""`, and `.` binds tighter than `+`, so the method
+// bound only to the trailing "" segment: `"${n}".length()` became
+// `"" + (n).to_string() + "".length()`, i.e. string + string + 0, and the 0
+// reached strlen as an address. The lexer now wraps the whole interpolation in
+// one paren group.
+import "@test" as Test
+
+var n = 42
+var name = "world"
+
+Test.assert_eq("${n}".length(), 2, "length() directly on a bare interpolation")
+Test.assert_eq("x${n}y".length(), 4, "length() with surrounding literal text")
+Test.assert_eq("${name}".to_upper(), "WORLD", "to_upper() on an interpolation")
+Test.assert_eq("a${n}b${name}c".length(), 10, "two interpolations in one string")
+
+// The variable-bound form always worked; keep it here so a fix that breaks the
+// ordinary path cannot pass this test.
+var bound = "x${n}y"
+Test.assert_eq(bound.length(), 4, "interpolation bound to a variable first")
+
+// Interpolation itself must still produce the right text, not just the right
+// length — the paren group must not swallow or reorder a segment.
+Test.assert_eq("${n}", "42", "bare interpolation text")
+Test.assert_eq("hello ${name}!", "hello world!", "trailing literal preserved")
+Test.assert_eq("${1 + 2} is three", "3 is three", "expression interpolation")
+Test.assert_eq("a${n}b${name}c", "a42bworldc", "two interpolations text")
+
+Test.summary()
