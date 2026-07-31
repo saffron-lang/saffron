@@ -1,13 +1,14 @@
 //! FizzBuzz — loops and conditionals
-fun fizzbuzz(n: Float): String {
+// `Int` is the whole-number type; `Float` is the fractional one.
+fun fizzbuzz(n: Int): String {
     if (n % 15 == 0) { return "FizzBuzz" }
     if (n % 3 == 0)  { return "Fizz" }
     if (n % 5 == 0)  { return "Buzz" }
     return n.to_string()
 }
 
-var i: Float = 1
-while (i <= 20) {
+// A C-style for loop. The loop variable needs its type spelled out —
+// see BUGS.md #60 for why `for (var i = 1; ...)` is rejected.
+for (i: Int = 1; i <= 20; i = i + 1) {
     IO.println(fizzbuzz(i))
-    i = i + 1
 }

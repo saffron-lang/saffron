@@ -1,0 +1,12 @@
+[package]
+name = "playground-frontend"
+version = "0.1.0"
+description = "Saffron Playground UI — written in Turmeric, compiled to wasm32"
+entry = "src/main.sf"
+target = "wasm32"
+
+[dependencies]
+turmeric = { path = "../../turmeric" }
+
+[scripts]
+build = "saffron build --target wasm32 --lib-path .pantry/packages src/main.sf -o ../static/app.wasm"

@@ -1,9 +1,9 @@
-//! Classes, inheritance and operator overloading
+//! Classes, interfaces and operator overloading
+// A subclass inherits its parent's fields and methods, and can override them.
 class Animal {
     var name: String
     fun init(name: String) { this.name = name }
     fun speak(): String { return "..." }
-    fun describe(): String { return "${this.name} says ${this.speak()}" }
 }
 
 class Dog extends Animal {
@@ -14,10 +14,28 @@ class Cat extends Animal {
     fun speak(): String { return "Meow" }
 }
 
-var pets: List<Animal> = [Dog("Rex"), Cat("Mia")]
-for (p in pets) {
-    IO.println(p.describe())
+var rex = Dog("Rex")
+var mia = Cat("Mia")
+// `name` comes from Animal; `speak` is the subclass's own.
+// Each is called on its concrete type: a `List<Animal>` would not dispatch to
+// the override yet — see BUGS.md #50.
+IO.println("${rex.name} says ${rex.speak()}")
+IO.println("${mia.name} says ${mia.speak()}")
+
+// An interface declares methods an implementor must provide.
+// (Interfaces may also carry default method bodies, but a default that calls
+// back into an abstract method reads 0 today — BUGS.md #50.)
+interface Shape {
+    fun area(): Float
 }
+
+class Square extends Shape {
+    var side: Float
+    fun init(side: Float) { this.side = side }
+    fun area(): Float { return this.side * this.side }
+}
+
+IO.println(Square(3.0).area())
 
 // Operator overloading: define `add` to make `+` work
 class Vec2 {
@@ -28,5 +46,5 @@ class Vec2 {
     fun to_string(): String { return "(${this.x}, ${this.y})" }
 }
 
-var sum = Vec2(1, 2) + Vec2(3, 4)
+var sum = Vec2(1.0, 2.0) + Vec2(3.0, 4.0)
 IO.println(sum.to_string())

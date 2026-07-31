@@ -1,0 +1,39 @@
+//! Lists, maps and destructuring
+// Named imports pull individual helpers out of a module.
+import { map, filter } from "@iter"
+
+// Lists are generic and grow on demand.
+var nums: List<Int> = [5, 3, 8, 1]
+nums.push(9)
+IO.println(nums.length())
+IO.println(nums.sort().join(", "))
+IO.println(nums[0])
+IO.println(nums[-1])          // negative indices count from the end
+
+// for-in walks any list.
+var doubled: List<Int> = []
+for (n in nums) { doubled.push(n * 2) }
+IO.println(doubled.join(", "))
+
+// Destructuring, including a rest binding.
+let [first, second, *rest] = nums
+IO.println("first=${first} second=${second} rest=${rest.join(",")}")
+
+// Maps are keyed collections.
+var counts: Map<String, Int> = {"apples": 3, "pears": 7}
+counts.set("plums", 2)
+IO.println(counts.get("pears"))
+IO.println(counts.has("figs"))
+IO.println(counts.keys().join(", "))
+
+// Summing the values. `for (entry in counts)` is the natural spelling, but it
+// currently mis-lowers to a list index loop and crashes — see Bug 32 — so walk
+// the keys instead.
+var total = 0
+for (key in counts.keys()) {
+    total = total + counts.get(key)
+}
+IO.println("total ${total}")
+
+var evens = filter(nums, fun (n: Int): Bool => n % 2 == 0)
+IO.println(map(evens, fun (n: Int): Int => n * 10).join(", "))

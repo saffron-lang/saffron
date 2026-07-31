@@ -37,7 +37,19 @@ if (IO.file_exists("pantry.toml")) {
 
 // --- Step 1: Compile ---
 IO.println("[1/3] Compiling " + entry + " → WASM...")
-var compile_cmd: String = "saffron build --target wasm32 --lib-path .pantry/packages " + entry + " -o " + build_dir + "/app.wasm"
+// The lib path must be ABSOLUTE. With the relative ".pantry/packages" the
+// compiler's module-dedup map — which is keyed on the path *string*
+// (src/compiler/main.sf:547) — records the auto-imported package prelude under
+// the relative spelling, while the explicit `import ... from "turmeric/prelude"`
+// resolves to the symlink's absolute realpath. Two keys, one file, so the prelude
+// is emitted twice and the build dies in `opt`:
+//
+//   error: redefinition of global '@__g_turmeric_prelude__tc_event'
+//
+// This is a workaround, not the fix: the compiler should canonicalise paths before
+// using them as identities. See BUGS.md #57.
+var pkg_dir: String = Process.run("pwd").stdout.trim() + "/.pantry/packages"
+var compile_cmd: String = "saffron build --target wasm32 --lib-path " + pkg_dir + " " + entry + " -o " + build_dir + "/app.wasm"
 var compile_result = Process.run(compile_cmd)
 if (!compile_result.success) {
     IO.println("Error: Compilation failed")
@@ -82,10 +94,25 @@ if (IO.file_exists(html_path)) {
     IO.write_file(html_path, out.to_string())
 }
 
-// Generate app.js
-IO.println("[3/3] Generating app.js...")
-var app_js: String = IO.read_file(".pantry/packages/turmeric/runtime/app_template.js")
-IO.write_file(build_dir + "/app.js", app_js)
+// Generate app.js — but never clobber an app's own loader.
+//
+// Step 2 copies public/ into build/, so an app that ships its own public/app.js
+// has already put it in place. Unconditionally writing the generic template over
+// it silently discarded that file: the playground's loader supplies imports the
+// template does not have (js_run_wasm, js_get_hash_source) and instantiates the
+// user's compiled module in a second isolated wasm instance. Overwriting it
+// produced a build that looked fine and then failed at instantiation with a
+// missing-import error.
+//
+// An app opting out of the generated loader is the normal case once it needs any
+// host FFI of its own, so the app's file wins.
+if (IO.file_exists(public_dir + "/app.js")) {
+    IO.println("[3/3] Keeping app-provided app.js (public/app.js)")
+} else {
+    IO.println("[3/3] Generating app.js...")
+    var app_js: String = IO.read_file(pkg_dir + "/turmeric/runtime/app_template.js")
+    IO.write_file(build_dir + "/app.js", app_js)
+}
 
 // --- Done ---
 IO.println("")
@@ -94,7 +121,11 @@ if (IO.file_exists(build_dir + "/app.wasm")) {
     IO.println("  app.wasm  — WASM binary")
 }
 IO.println("  index.html — entry page")
-IO.println("  app.js     — loader (auto-generated)")
+if (IO.file_exists(public_dir + "/app.js")) {
+    IO.println("  app.js     — loader (from public/, app-provided)")
+} else {
+    IO.println("  app.js     — loader (auto-generated)")
+}
 
 // --- Dev server ---
 if (is_dev) {

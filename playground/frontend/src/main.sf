@@ -1,0 +1,354 @@
+//! Saffron Playground — the UI, written in Turmeric and compiled to wasm32.
+//!
+//! Layout: a header, an example picker, an editor pane and an output pane.
+//! Pressing Run POSTs the editor contents to /api/compile, gets a wasm32 module
+//! back as base64, and hands it to the JS loader to instantiate and run. Anything
+//! the program prints is captured and shown in the output pane.
+//!
+//! The editor is a plain <textarea>. It is deliberately not a syntax-highlighting
+//! editor: that would mean either pulling in a JS editor component (defeating the
+//! point of writing the UI in Turmeric) or reimplementing overlay-based
+//! highlighting, which needs per-character DOM measurement Turmeric has no
+//! bindings for. A textarea is honest and works.
+
+import { signal } from "turmeric/signal"
+import { div, span, pre, h1, header, main, section, button, text, textarea, mount, reactive, render_into, Event } from "turmeric/prelude"
+import "./api.sf" as Api
+
+// --- Direct DOM property FFI ---
+//
+// Declared up here, before first use: an @extern referenced *earlier* in the file
+// than its declaration is silently compiled as a call to the Saffron-level name
+// (@_set_property) instead of the extern target, and the string argument is
+// dropped to 0. It fails at link time, not compile time.
+@extern("void js_dom_set_property(i64, void*, void*)")
+fun _set_property(handle: Float, prop: String, value: String)
+
+@extern("void js_dom_set_bool_property(i64, void*, i64)")
+fun _set_bool_property(handle: Float, prop: String, value: Bool)
+
+
+// =============================================================================
+// State
+// =============================================================================
+
+var DEFAULT_SOURCE: String = "// Welcome to the Saffron playground.\n" +
+    "// Edit this, then press Run (or Cmd/Ctrl+Enter).\n" +
+    "\n" +
+    "fun greet(name: String): String {\n" +
+    "    return \"hello, \" + name + \"!\"\n" +
+    "}\n" +
+    "\n" +
+    "IO.println(greet(\"world\"))\n" +
+    "\n" +
+    "var squares = []\n" +
+    "for (n in [1, 2, 3, 4, 5]) {\n" +
+    "    squares.push(n * n)\n" +
+    "}\n" +
+    "IO.println(\"squares: \" + squares.to_string())\n"
+
+var source = signal("")
+var output = signal("")
+var status = signal("ready")
+var is_running = signal(false)
+var has_error = signal(false)
+
+/// Examples, as parallel lists rather than a List of class instances.
+///
+/// A `List<Example>` would be the obvious modelling choice, but the frontend has
+/// to parse them out of a JSON response by hand (no @json on wasm32), and holding
+/// three parallel lists avoids depending on generic-instance field layout in the
+/// wasm GC — which has known divergences from native. Boring, but it works.
+var example_names: List<String> = []
+var example_titles: List<String> = []
+var example_sources: List<String> = []
+var examples_loaded = signal(false)
+
+// Element handles for the panes we re-render imperatively.
+var _output_el: Float = 0
+var _examples_el: Float = 0
+var _run_btn_el: Float = 0
+
+// =============================================================================
+// Actions
+// =============================================================================
+
+/// Keep the Run button's enabled state in step with `is_running`.
+fun sync_run_button() {
+    if (_run_btn_el != 0) {
+        _set_bool_property(_run_btn_el, "disabled", is_running.get())
+    }
+}
+
+fun set_running(running: Bool) {
+    is_running.set(running)
+    sync_run_button()
+}
+
+fun set_output(body: String, error: Bool) {
+    output.set(body)
+    has_error.set(error)
+    render_output()
+}
+
+fun run_program() {
+    if (is_running.get()) { return }
+    var src: String = source.get()
+    if (src.trim().length() == 0) {
+        set_output("nothing to run", true)
+        return
+    }
+    set_running(true)
+    status.set("compiling...")
+    set_output("", false)
+
+    Api.compile(src, fun (response: String) => {
+        var ok: String = Api.json_field(response, "ok")
+        var diagnostics: String = Api.json_field(response, "diagnostics")
+
+        if (ok != "true") {
+            set_running(false)
+            status.set("compile error")
+            var message: String = diagnostics
+            if (message.length() == 0) { message = "compilation failed" }
+            set_output(message, true)
+            return
+        }
+
+        var wasm_b64: String = Api.json_field(response, "wasm")
+        if (wasm_b64.length() == 0) {
+            set_running(false)
+            status.set("compile error")
+            set_output("service returned an empty module", true)
+            return
+        }
+
+        status.set("running...")
+        Api.run(wasm_b64, fun (program_output: String) => {
+            set_running(false)
+            // The loader prefixes a trap/error report with "!!" so we can colour
+            // it without a second channel.
+            if (program_output.starts_with("!!")) {
+                status.set("runtime error")
+                set_output(program_output.slice(2, program_output.length()), true)
+            } else {
+                status.set("done")
+                var shown: String = program_output
+                if (shown.trim().length() == 0) {
+                    shown = "(program produced no output)"
+                }
+                set_output(shown, false)
+            }
+        })
+    })
+}
+
+fun load_example(index: Int) {
+    if (index < 0 or index >= example_sources.length()) { return }
+    source.set(example_sources[index])
+    status.set("loaded " + example_names[index])
+    set_output("", false)
+    // The textarea is not re-rendered by the signal (see render_editor), so push
+    // the new text in directly.
+    sync_editor_text()
+}
+
+fun share_link() {
+    Api.share(source.get())
+    status.set("link copied to the address bar")
+}
+
+// =============================================================================
+// Editor
+// =============================================================================
+
+var _editor_el: Float = 0
+
+/// Push `source` into the textarea's value.
+///
+/// Not done reactively: re-rendering a <textarea> while the user is typing in it
+/// destroys the caret position and the undo stack. So the textarea owns its text
+/// during editing and we only write into it on an explicit load.
+fun sync_editor_text() {
+    if (_editor_el != 0) {
+        _set_property(_editor_el, "value", source.get())
+    }
+}
+
+fun render_editor() {
+    _editor_el = textarea(
+        cls = "editor",
+        id = "editor",
+        placeholder = "Write some Saffron...",
+        value = source.get(),
+        on_input = fun (e: Event) => {
+            source.set(e.target_value())
+        }
+    )
+}
+
+// =============================================================================
+// Examples row
+// =============================================================================
+
+fun render_examples() {
+    if (_examples_el == 0) { return }
+    render_into(_examples_el, fun () => {
+        if (example_names.length() == 0) {
+            span(cls = "examples-empty", block = fun () => {
+                text("no examples available")
+            })
+            return
+        }
+        span(cls = "examples-label", block = fun () => { text("examples:") })
+        var i: Int = 0
+        while (i < example_titles.length()) {
+            // `i` is captured by value into the closure below via a fresh local;
+            // capturing the loop variable itself would give every button the
+            // final value (BUGS.md #10 — mutable capture).
+            var index: Int = i
+            button(
+                cls = "example-btn",
+                on_click = fun (e: Event) => { load_example(index) },
+                block = fun () => { text(example_titles[index]) }
+            )
+            i = i + 1
+        }
+    })
+}
+
+fun fetch_examples() {
+    Api.examples(fun (response: String) => {
+        parse_examples(response)
+        examples_loaded.set(true)
+        render_examples()
+    })
+}
+
+/// Pull the examples array out of the response by hand.
+///
+/// The response shape is {"examples":[{"name":..,"title":..,"source":..}, ...]}.
+/// We split on the `"name":` key, which cannot appear inside an example's source
+/// without being backslash-escaped, and read the three fields out of each chunk.
+fun parse_examples(response: String) {
+    example_names = []
+    example_titles = []
+    example_sources = []
+
+    var chunks: List<String> = response.split("{\"name\"")
+    var i: Int = 1
+    while (i < chunks.length()) {
+        var chunk: String = "{\"name\"" + chunks[i]
+        var name: String = Api.json_field(chunk, "name")
+        var title: String = Api.json_field(chunk, "title")
+        var src: String = Api.json_field(chunk, "source")
+        if (name.length() > 0 and src.length() > 0) {
+            example_names.push(name)
+            example_titles.push(title)
+            example_sources.push(src)
+        }
+        i = i + 1
+    }
+}
+
+// =============================================================================
+// Output pane
+// =============================================================================
+
+fun render_output() {
+    if (_output_el == 0) { return }
+    render_into(_output_el, fun () => {
+        var body: String = output.get()
+        if (body.length() == 0) {
+            span(cls = "output-idle", block = fun () => {
+                text("Output appears here.")
+            })
+            return
+        }
+        var cls: String = "output-body"
+        if (has_error.get()) { cls = "output-body output-error" }
+        pre(cls = cls, block = fun () => { text(body) })
+    })
+}
+
+// =============================================================================
+// App
+// =============================================================================
+
+fun App() {
+    header(cls = "topbar", block = fun () => {
+        h1(cls = "title", block = fun () => { text("Saffron Playground") })
+        span(cls = "subtitle", block = fun () => {
+            text("this UI is written in Saffron, compiled to WebAssembly")
+        })
+    })
+
+    main(cls = "layout", block = fun () => {
+        section(cls = "pane pane-editor", block = fun () => {
+            div(cls = "pane-header", block = fun () => {
+                span(cls = "pane-title", block = fun () => { text("program") })
+                _examples_el = div(cls = "examples")
+            })
+            render_editor()
+            div(cls = "toolbar", block = fun () => {
+                var run_btn: Float = button(
+                    cls = "btn btn-run",
+                    on_click = fun (e: Event) => { run_program() },
+                    block = fun () => { text("Run") }
+                )
+                // Disable the button while a compile is in flight, so a user
+                // cannot queue up requests by mashing it.
+                //
+                // Set as a *property*, not an attribute: `disabled=""` is still
+                // disabled in HTML, so reactive_attr can never re-enable the
+                // button. The bool property is the only thing that toggles.
+                _run_btn_el = run_btn
+                sync_run_button()
+                button(
+                    cls = "btn btn-ghost",
+                    on_click = fun (e: Event) => { share_link() },
+                    block = fun () => { text("Share") }
+                )
+                span(cls = "status", block = fun () => {
+                    reactive(fun () => status.get())
+                })
+            })
+        })
+
+        section(cls = "pane pane-output", block = fun () => {
+            div(cls = "pane-header", block = fun () => {
+                span(cls = "pane-title", block = fun () => { text("output") })
+            })
+            _output_el = div(cls = "output")
+        })
+    })
+
+    // The output pane is rendered imperatively rather than through `reactive`,
+    // because `reactive` binds a text node and the output needs a <pre> with an
+    // error class. Re-render on each change instead.
+    render_output()
+    render_examples()
+}
+
+fun main() {
+    var initial: String = Api.initial_source()
+    if (initial.length() > 0) {
+        source.set(initial)
+    } else {
+        source.set(DEFAULT_SOURCE)
+    }
+
+    mount("#app", fun () => { App() })
+    sync_editor_text()
+    fetch_examples()
+}
+
+main()
+
+/// Re-render the output pane whenever the output signal changes.
+///
+/// Exported for the loader: `output`/`has_error`/`status` are plain signals, and
+/// the panes that depend on them are imperative, so something has to poke them.
+fun __on_output_changed() {
+    render_output()
+}

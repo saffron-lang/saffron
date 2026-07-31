@@ -6,22 +6,31 @@ Status legend: **FIXED** (patched in repo) / **WORKED AROUND** / **OPEN** (still
 
 **Status of this document (2026-07-30).** Every `OPEN` entry was re-verified
 against `build/saffronc` and the ones that still reproduce were filed in
-`BUGS.md` as #50–#57 with the mapping below. This file is kept for the
+`BUGS.md` as #50–#57 with the mapping below. A later pass the same day added
+entries 31–34, revised Bug 28 with its actual root cause (the GC, not the request
+parser), added entry 35, and filed the newly reproducing ones as #60–#64. This file is kept for the
 narrative — the repros, the measurements, the workarounds each bug forced on the
 playground, and the debugging notes — but `BUGS.md` is the tracker of record.
 The numbering here is local to this log and does not match `BUGS.md`.
 
 | here | `BUGS.md` | note |
 |---|---|---|
+| Bug 2 | #66 | NUL truncation — filed as the general defect after it resurfaced serving `/app.wasm` |
 | Bug 9 | #54 | Int literal in a `Float` position → `nan` |
 | Bug 10 | #51 | mutable capture lost |
 | Bug 12 | #50 | no virtual dispatch from an inherited method |
 | Bug 16 | #52 | `list[float_var]` reads index 0 |
-| Bug 17 | #53 | `UUID.v4()` constant |
+| Bug 17 | #53 | `UUID.v4()` constant — **fixed** in `b75689b` |
 | Bug 18 | #55 | `@extern` used before declaration |
 | Bug 19 | #57 | repeated `--lib-path` duplicates globals |
 | Bug 23 | #56 | field access on an indirect call's result reads 0 |
 | Bug 26, 27 | #49 | superseded — see the correction note below |
+| Bug 28 | #63 | **root cause found after the migration** — GC vs coroutine frames, not the request parser |
+| Bug 31 | #60 | `for (var i = 1; ...)` is a parse error |
+| Bug 32 | #62 | `for (entry in map)` segfaults; iterator protocol never used |
+| Bug 33 | #50 | same bug as Bug 12 — inherited `this.foo()` binds to the base |
+| Bug 34 | #61 | `x is SomeClass` folded to `false` when the static type is `Any` |
+| Bug 35 | #64 | >35 KB body kills the server; the source size cap is unreachable |
 
 Bugs 26 and 27 are **stale as written**: they describe the `Number` → `FloatType`
 mapping as committed and actively regressing `@http/server` route dispatch. That
@@ -33,9 +42,11 @@ since is to deprecate `Number` outright in favour of the explicit `Int` and
 `Float`; the entries below are kept as written, so they still spell `Number` where
 the original repros did.
 
-Bugs 24, 28, 29 and 30 are not in `BUGS.md` yet: 24 needs a fresh repro (the
-colliding stdlib name may have moved), and 28–30 are playground/turmeric build
-issues rather than compiler bugs.
+Bugs 24, 29 and 30 are not in `BUGS.md` yet: 24 needs a fresh repro (the
+colliding stdlib name may have moved), and 29–30 are playground/turmeric build
+issues rather than compiler bugs. Bug 28 *was* in that group until it was
+root-caused — it turned out to be a GC bug, not a request-parser bug, and is now
+filed as #63.
 
 ---
 
@@ -1344,5 +1355,497 @@ until this is fixed.** The service can be driven directly in the meantime:
 curl -s -X POST -H 'Content-Type: application/json' \
   -d '{"source":"IO.println(\"hi\")"}' http://127.0.0.1:8080/api/compile
 ```
+
+---
+
+## Bug 31 — `for (var i = 1; ...)` is a parse error; a C-style loop variable cannot be inferred — **OPEN** (paper cut)
+
+Every other binding form in the language accepts `var x = expr` and infers the
+type. The C-style `for` header is the one place that does not: it demands an
+explicit annotation *and* rejects the `var` keyword entirely.
+
+Minimal repro:
+
+```saffron
+for (var i = 1; i <= 3; i = i + 1) { IO.println(i) }
+```
+
+```
+[line 1, col 13] Error: expected ':' but found '='
+  1 | for (var i = 1; i <= 3; i = i + 1) {
+                  ^
+```
+
+The only accepted spelling drops `var` and annotates:
+
+```saffron
+for (i: Int = 1; i <= 3; i = i + 1) { IO.println(i) }   // works
+```
+
+Traced to `src/compiler/parser.sf:2151-2156`. After the loop variable's
+identifier is consumed, the parser hard-`consume(":")`s:
+
+```saffron
+// C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
+this.consume(":")
+var vtype: String = this.parse_type()
+this.consume("=")
+```
+
+There is no branch for `var`, and no branch for a missing annotation. Note the
+comment already calls this "for without var keyword" — the `var` form was never
+implemented, so the *natural* spelling is the unsupported one. Two small changes
+fix it: accept and skip an optional leading `var`, and make the `":" type` part
+optional, falling back to the same inference `Stmt.VarDecl` already performs for
+`var x = expr` (pass `""` as the type, as the for-in desugaring does at
+`parser.sf:2197`).
+
+**Worked around** in `playground/examples/fizzbuzz.sf` by writing
+`for (i: Int = 1; ...)` with a comment pointing here. Low severity, high
+visibility: it is the first loop anyone writes.
+
+---
+
+## Bug 32 — `for (entry in someMap)` compiles to a *list* index loop and segfaults — **OPEN** (pre-existing, documented-feature-does-not-work)
+
+`CLAUDE.md` documents map iteration as a supported feature:
+
+```saffron
+// Iteration yields [key, value] pairs
+for (entry in m) {
+    IO.println("${entry[0]} = ${entry[1]}")
+}
+```
+
+That program crashes.
+
+Minimal repro:
+
+```saffron
+var m: Map<String, Int> = {"one": 1}
+for (e in m) { IO.println(e[0]) }
+```
+
+```
+Segmentation fault: 11
+```
+
+Reproduced identically against the pre-session baseline compiler at
+`/tmp/ovbase`, so this is **pre-existing, not a regression**.
+
+Root cause: `for-in` is desugared in the parser with no knowledge of the
+collection's type. `Parser.desugar_for_in` (`src/compiler/parser.sf:2193-2211`)
+unconditionally emits an index-driven while loop:
+
+```saffron
+var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
+var cond: AST.Expr = ... MethodCall(Variable(list_var), "length", []) ...
+var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any",
+    AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
+```
+
+The temporary is typed `"Any"`, so by the time codegen sees `src[i]` it has lost
+the fact that `src` is a Map. Two things then go wrong in the emitted IR
+(confirmed by reading the generated `.ll`):
+
+1. `src.length()` on a Map dispatches to `@__list_length` — it reads a map
+   header as a list header.
+2. `src[i]` dispatches to `@__map_get(map, i)` — because
+   `gen_index_get` (`src/compiler/codegen/methods_body.sf:418`) *does* have a Map
+   branch, but it is gated on `this.typed_vars` knowing the object is a Map.
+   Here the variable is `Any`, so the Map branch is skipped for the *outer*
+   lookup, and the integer cursor is used as a **map key**. `__map_get` returns
+   nil/garbage, and `e[0]` then indexes that as a list.
+
+So the loop is doubly wrong: it treats a Map as a List for the bound, and uses
+the index as a key for the element. The crash is the `e[0]` list-read of a
+non-list.
+
+The same mechanism explains the companion symptom that the desugaring
+*never* uses the documented iterator protocol at all:
+
+```saffron
+class Countdown {
+    fun iter(): Countdown { return this }
+    fun has_next(): Bool { ... }
+    fun next(): Int { ... }
+}
+for (x in Countdown(3)) { IO.println(x) }
+```
+```
+[codegen] Error: type 'Countdown' has no method 'length'
+```
+
+`CLAUDE.md` states for-in "uses iterator protocol: `.iter()` -> object with
+`.has_next()`, `.next()`" and that it "works over Lists, Strings (char by char),
+Maps ([key, value] pairs), and custom types". **None of that is true** — the
+desugaring only ever emits `length()` + `[i]`. Lists and Strings work because
+those two happen to be implementable by index; Maps and custom types do not
+work at all.
+
+Real fix: desugar to the protocol the docs promise —
+`var it = coll.iter(); while (it.has_next()) { var item = it.next(); ... }` —
+and give List/String/Map runtime `iter()` methods. `Map.iter()` already exists
+and works when driven by hand:
+
+```saffron
+var iter = m.iter()
+while (iter.has_next()) { var e: List<Any> = iter.next(); IO.println(e[0]) }   // works
+```
+
+That makes the desugaring type-agnostic (which is what the parser needs, since
+it has no types) *and* correct for every collection, and it removes the
+`length()`/`[i]` special-casing from codegen. It cannot be done in the parser
+alone if `iter()` must be resolved statically, but as a dynamic method dispatch
+it can.
+
+**Worked around** in `playground/examples/collections.sf` by iterating
+`counts.keys()` and calling `.get(key)`, with a comment pointing here.
+
+---
+
+## Bug 33 — an inherited method's `this.foo()` call binds to the *base* implementation, so interface default methods and `List<Base>` polymorphism both read the base — **OPEN** (pre-existing; same root cause as the virtual-dispatch gap)
+
+Three symptoms, one cause. Method calls resolve against the *static* type of the
+receiver, so any call that should reach an override does not.
+
+Symptom A — an interface default method calling an abstract method:
+
+```saffron
+interface Shape {
+    fun area(): Float
+    fun describe(): String { return "area ${this.area()}" }
+}
+class Square extends Shape {
+    var side: Float
+    fun init(side: Float) { this.side = side }
+    fun area(): Float { return this.side * this.side }
+}
+var sq = Square(4.0)
+IO.println(sq.area())        // 16   <- correct
+IO.println(sq.describe())    // area 0   <- WRONG, should be "area 16"
+```
+
+`CLAUDE.md` advertises exactly this shape ("Default methods are inherited") under
+"Interface Conformance", so the documented example is the broken one. The
+inherited `describe` body was generated once against `Shape`, where `area()` is
+abstract, and `this.area()` was bound there.
+
+Symptom B — identical with a plain base class, so it is not interface-specific:
+
+```saffron
+class Base {
+    fun area(): Float { return 0.0 }
+    fun describe(): String { return "area ${this.area()}" }
+}
+class Sq extends Base { ... fun area(): Float { return this.side * this.side } }
+IO.println(Sq(4.0).describe())   // area 0   <- WRONG
+```
+
+Symptom C — the already-known polymorphism gap, restated as the same bug:
+
+```saffron
+var pets: List<Animal> = [Dog("Rex"), Cat("Mia")]
+for (p in pets) { IO.println("${p.name} says ${p.speak()}") }
+```
+```
+Rex says ...
+Mia says ...
+```
+
+Fixed on the virtual-dispatch branch (worktree `agent-aeeefba0cc72b6129`), which
+produces `Rex says Woof` / `Mia says Meow`; **still broken on `main`** as of this
+session — re-verified today.
+
+**Worked around** in `playground/examples/classes.sf`: `speak()` is called on the
+concrete `Dog`/`Cat` values rather than through a `List<Animal>`, and the
+interface example declares only the abstract `area()` with no default method.
+Both carry comments pointing here. Once the virtual-dispatch branch lands, both
+workarounds should be reverted to the natural form — that is the single best
+readability win available to these examples.
+
+---
+
+## Bug 34 — `x is SomeClass` is compiled to a constant `false` whenever the static type is `Any` — **OPEN** (pre-existing; silently wrong, no diagnostic)
+
+A type test against a user-defined class is **silently constant-folded to
+`false`** if the value's static type is `Any`. This is the worst failure mode of
+the set: no error, no warning, just a wrong answer.
+
+Minimal repro:
+
+```saffron
+class Dog { fun init() {} }
+class Cat { fun init() {} }
+fun check(a: Any): Bool { return a is Dog }
+IO.println(check(Dog()))   // false   <- WRONG, should be true
+IO.println(check(Cat()))   // false   <- correct by accident
+```
+
+It works when the compiler can see the concrete type at the check site:
+
+```saffron
+var d: Any = Dog()
+IO.println(d is Dog)   // true    <- the *declared* Any is refined by the initialiser
+```
+
+so the failure is specific to a value whose type is genuinely opaque — most
+importantly a function parameter, which is exactly where a type test is useful.
+
+Traced to `Codegen.gen_is_check`, `src/compiler/codegen/expr_body.sf:400-427`.
+The `Any` path maps a fixed list of *builtin* names to runtime predicates
+(`__val_is_int`, `__val_is_string`, `__val_is_list`, …) and then gives up:
+
+```saffron
+// Unknown class type with Any — cannot resolve at runtime yet, return false
+var local: String = this.fresh_local()
+this.emit_indent(local + " = add i64 0, 0")
+return this.emit_tag_bool(local)
+```
+
+The comment concedes it. But the machinery it says is missing **already exists
+and is already used**: the statically-typed path a few lines below emits a class
+comparison via `@__gc_get_type_tag`, which is a purely runtime query. Compare the
+IR for the two spellings of the same test:
+
+```
+$ build/saffronc /tmp/probe/s1.sf /tmp/probe/s1.ll   # `a is Dog`, a: Any
+  %t3 = add i64 0, 0          <- folded to false
+
+$ build/saffronc /tmp/probe/s2.sf /tmp/probe/s2.ll   # `d is Dog`, d refined to Dog
+  %t1 = call i64 @__gc_get_type_tag(i64 %val)
+  %t2 = icmp eq i64 %klass, %t1
+```
+
+Fix: in the `Any` branch, when `type_name` is not a builtin, fall through to the
+same `__gc_get_type_tag` comparison the static path emits, resolving the class
+tag by name. Nothing new is needed at runtime. Failing that, it should at
+minimum emit a diagnostic instead of a silent `false` — "cannot test `Any`
+against class X" would have saved the debugging time this cost.
+
+Knock-on effect: `is`-pattern matching inherits it. `CLAUDE.md` documents
+
+```saffron
+var sound = match (animal) {
+    is Dog(d) => d.bark(),
+    is Cat(c) => c.meow()
+}
+```
+
+and with `animal: Any` every arm tests false, so the first arm wins by default —
+`sound(Cat())` returns `"Woof"`. (On the `/tmp/ovbase` baseline the same program
+failed to compile at all with `undefined variable 'd'`, so the is-pattern path
+has moved from "rejected" to "silently wrong", which is worse.)
+
+---
+## Bug 28 (revised) — root cause found: the GC collects live objects out of a spawned task's coroutine frame
+
+My original entry described this as "segfaults on a large request body that
+arrives after a large response". That characterisation was wrong — it described
+one instance of a much broader and much more serious bug. **Every** Saffron HTTP
+server dies after a fixed amount of served traffic, regardless of request size,
+and the cause is the garbage collector, not the request parser.
+
+### The bug in ten lines
+
+```saffron
+import "@http/server" as HttpServer
+
+var app = HttpServer.server(8098)
+app.get("/small", fun (req: Any): Any {
+    return HttpServer.Response(200, "0123456789")
+})
+app.serve()
+```
+
+```
+DIED at req 85, cumulative body bytes=840: Remote end closed connection without response
+```
+
+Eighty-four successful 10-byte responses, then the process is gone. No panic, no
+stderr output, no log line — the last thing in the log is still `Listening on
+http://0.0.0.0:8098`. It exits silently.
+
+### It is the GC
+
+Adding one line makes the bug vanish:
+
+```saffron
+@extern("i64 __gc_disable()") fun gc_disable(): Int
+gc_disable()
+```
+
+```
+GC-DISABLED: 399 requests all ok
+```
+
+399 requests versus 84 — with the *only* difference being whether automatic
+collection runs. That is conclusive.
+
+The RSS trace shows the collection happening right before the crash:
+
+```
+req  76 fds=10 rss=5376KB
+req  77 fds=10 rss=5392KB
+req  78 fds=10 rss=5408KB     <- peak
+req  79 fds=10 rss=5168KB     <- GC ran, heap shrank
+req  80 fds=10 rss=5136KB
+...
+req  84 fds=10 rss=4896KB
+DIED at req 85
+```
+
+`@__gc_threshold` defaults to 65536 bytes (`src/runtime/gc.ll:985`), so the first
+automatic collection lands a few requests before the death — the crash is not the
+collection itself but the first use of something the collection freed.
+
+The file-descriptor count is flat at 10 for the whole run, so this is **not** an
+fd leak, and RSS is under 6 MB, so it is not exhaustion. The earlier
+"cumulative bytes" pattern I measured on the playground (dying at ~77-95 KB of
+response body) is just the allocation threshold being reached sooner when each
+response is bigger:
+
+```
+20000B responses -> died on request 4    (cumulative 60000)
+10B    responses -> died on request 85   (cumulative 840)
+```
+
+Same collection, reached at different request counts. And critically, requests
+that produce a *tiny* response never trip it — 29 consecutive
+compile-error responses through the playground, all fine, because little is
+allocated.
+
+### Why spawned tasks are implicated
+
+The GC is not broken in general. A pure allocation loop survives 200,000
+iterations, allocating and dropping a fresh string each time:
+
+```saffron
+var total: Int = 0
+for (i: Int = 0; i < 200000; i = i + 1) {
+    var s: String = "chunk-" + i.to_string()
+    total = total + s.length()
+}
+IO.println("survived: ${total}")     // survived: 2288890
+```
+
+So straight-line code roots correctly. The distinguishing feature of the server
+is that every connection is handled in a **spawned task** —
+`src/lib/http/server.sf:379-383`:
+
+```saffron
+while (true) {
+    var conn: Net.TcpConnection = listener.accept()
+    var app = this
+    Task.spawn(fun () => app._handle(conn))
+}
+```
+
+`_handle` allocates heavily (the request string, the parsed `Request`, the route
+table walk, the `Response`, the serialised output) and it does so **inside a
+coroutine frame**, not on the machine stack. The GC's shadow stack
+(`__gc_push_root` / `__gc_pop_roots`, visible in every generated function
+prologue) roots locals by taking the address of a stack `alloca`. When the
+function is a coroutine, those allocas live in the coroutine frame on the heap,
+and after a suspend/resume the frame can be at a different address than the one
+that was pushed — so the collector either scans a stale address or never sees the
+live object at all. Either way it frees something still in use, and the next
+touch of it kills the process.
+
+That is consistent with everything measured: straight-line code fine, coroutine
+code fatal, GC-disabled fine, timing set by the allocation threshold rather than
+by request count or size.
+
+I could not get the smaller repro to fail on demand — 4000 spawn/await round
+trips each allocating a string survive:
+
+```saffron
+for (i: Int = 0; i < 4000; i = i + 1) {
+    var t = Task.spawn(fun (): Int { ... })
+    total = total + t.await()
+}
+```
+
+so the trigger needs the specific mix `_handle` produces (probably a task that
+actually *suspends* on I/O, which `accept`/`read`/`write` do and a pure
+computation does not). The server repro above is small enough to debug directly
+and fails every time at the same request number, so it is the better starting
+point.
+
+### Impact
+
+This is a hard blocker on writing any real server in Saffron, and the most
+serious bug in this log:
+
+- Every server built on `@http/server` dies within a couple of minutes of
+  moderate traffic. The playground itself does — it died mid-way through
+  compiling its own six bundled examples, which is how I found it.
+- The failure is silent, so from the outside it looks like a network fault, not a
+  crash. I initially misdiagnosed it as a request-parser bug for exactly this
+  reason.
+- It is trivially remotely triggerable: ~85 unauthenticated GETs of a 10-byte
+  response. Any Saffron-served endpoint can be taken down by a browser refresh
+  held down for a few seconds.
+
+### Workaround
+
+`__gc_disable()` at startup, as above, trades the crash for unbounded heap
+growth. That is acceptable for a short-lived local dev server (the playground's
+actual use) and unacceptable for anything long-running. I have **not** applied it
+to `playground/src/main.sf` — it is a papering-over of a runtime bug and the fix
+belongs in the shadow-stack/coroutine interaction, not in every server's
+startup. Restart the playground if it goes quiet.
+
+Suggested fix direction: make the shadow stack coroutine-aware — either re-push
+roots on resume, or root coroutine-frame locals via the frame pointer rather than
+a captured `alloca` address, or have `llvm.coro` frames themselves be traced
+objects the collector walks.
+
+---
+
+## Bug 35 — a request body over ~35 KB silently kills the server, and that makes the playground's own size cap unreachable — **OPEN** (filed as `BUGS.md` #64)
+
+Found while doing the final verification pass on the sandbox controls. I set out
+to confirm that `MAX_SOURCE_BYTES = 64000` rejects an oversized submission, and
+discovered the check can never run.
+
+```
+body   8532B  ok
+body  16014B  ok
+body  32014B  ok
+body  40014B  server gone; every later request gets ECONNREFUSED
+```
+
+`_handle` reads the request in one fixed-size call and never checks how much came
+back (`src/lib/http/server.sf:400-405`):
+
+```saffron
+var raw: String = ""
+if (tls_conn != nil) {
+    raw = tls_conn.read(8192)
+} else {
+    raw = conn.read(8192)
+}
+```
+
+No drain loop, no `Content-Length`, and `raw.length() == 0` is the only guard
+(`server.sf:407`) — a *short* read is indistinguishable from a complete request.
+Bodies in the 8–32 KB range survive only because a loopback read happens to
+return more than 8192 bytes in practice; past ~35 KB it does not, the parser gets
+a truncated request, and the process exits silently in the same way as Bug 28.
+
+The security consequence is the one that matters for the deliverable: **a
+size cap enforced in the handler is not a size cap.** The playground checks 64000
+bytes in `src/compile.sf` before spawning anything, which is the right place for
+it in principle, but the server is already dead by ~35 KB, so the guard is
+decorative. I have corrected the README's "What is contained" section — it
+previously listed the source size cap as an in-place control, which was wrong.
+
+Distinct from Bug 28 in mechanism and in cost to exploit: Bug 28 needs ~85
+requests to reach a GC cycle, this needs one 40 KB POST.
+
+A correct fix is a read loop: read until the headers are complete, parse
+`Content-Length`, refuse anything over a server-level maximum *before* reading the
+body, then read exactly that many bytes.
 
 ---

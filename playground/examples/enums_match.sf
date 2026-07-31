@@ -9,15 +9,31 @@ fun area(s: Shape): Float {
     return match (s) {
         Circle(r) => 3.14159 * r * r
         Rect(w, h) => w * h
-        Point => 0
+        Point => 0.0
     }
 }
 
-var shapes: List<Shape> = [Shape.Circle(2), Shape.Rect(3, 4), Shape.Point]
+var shapes: List<Shape> = [Shape.Circle(2.0), Shape.Rect(3.0, 4.0), Shape.Point]
 for (s in shapes) {
-    IO.println(area(s).to_string())
+    IO.println(area(s))
 }
 
 // Destructuring works outside match too
-let Shape.Circle(radius) = Shape.Circle(10)
+let Shape.Circle(radius) = Shape.Circle(10.0)
 IO.println("radius = ${radius}")
+
+// Generic enums: the classic Option, with a fallback for the empty case.
+enum Option<T> {
+    Some(value: T),
+    None
+}
+
+fun describe(o: Option<Int>): String {
+    return match (o) {
+        Some(v) => "got ${v}"
+        None => "got nothing"
+    }
+}
+
+IO.println(describe(Option.Some(7)))
+IO.println(describe(Option.None))
