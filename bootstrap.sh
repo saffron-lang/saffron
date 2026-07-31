@@ -12,7 +12,9 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 COMPILER_DIR="$ROOT/src/compiler"
 RUNTIME_SRC="$ROOT/src/runtime/runtime.sf"
 RUNTIME_BASE="$ROOT/src/runtime/base.ll"
-RUNTIME_GC="$ROOT/src/runtime/gc.ll"
+# Overridable so you can bootstrap against a known-good gc.ll while someone
+# else has the working copy mid-edit. tools/saffron already honors this.
+RUNTIME_GC="${SAFFRON_RUNTIME_GC:-$ROOT/src/runtime/gc.ll}"
 BUILD_DIR="$ROOT/build"
 GEN2="$BUILD_DIR/stage2/saffronc"
 

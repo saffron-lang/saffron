@@ -171,6 +171,35 @@ class Lexer {
                 while (this.pos < this.source.length() and this.peek() != "\n") {
                     this.advance()
                 }
+            } else if (ch == "/" and this.peek_next() == "*") {
+                // Block comment. These nest, so `/* outer /* inner */ outer */`
+                // is one comment — that makes commenting out a region that
+                // already contains a block comment work. Newlines inside still
+                // have to bump this.line or every diagnostic after the comment
+                // reports the wrong line.
+                this.advance() // consume '/'
+                this.advance() // consume '*'
+                var depth: Float = 1
+                while (depth > 0 and this.pos < this.source.length()) {
+                    var c: String = this.peek()
+                    if (c == "/" and this.peek_next() == "*") {
+                        this.advance()
+                        this.advance()
+                        depth = depth + 1
+                    } else if (c == "*" and this.peek_next() == "/") {
+                        this.advance()
+                        this.advance()
+                        depth = depth - 1
+                    } else if (c == "\n") {
+                        this.line = this.line + 1
+                        this.col = 1
+                        this.pos = this.pos + 1
+                    } else {
+                        this.advance()
+                    }
+                }
+                // An unterminated comment runs to EOF. There is no diagnostic
+                // channel in the lexer, so the parser sees EOF and reports it.
             } else {
                 break
             }

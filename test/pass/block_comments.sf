@@ -1,0 +1,30 @@
+/* The lexer had no `/* */` handling at all: skip_whitespace only knew about
+   `//`, so a block comment lexed as the `/` and `*` operators followed by
+   whatever words were inside it. `/* Block comments */` at the top of a file
+   produced "undefined variable 'Block'". The docs claimed the syntax worked,
+   which is how it went unnoticed. */
+
+/* Comments nest, so this line is inside /* two levels */ and still a comment. */
+
+/* single line */ fun helper(): Int { return 7 }
+
+fun main() {
+    var out: String = ""
+
+    out = out + "${helper()}"
+
+    // A comment may sit mid-expression.
+    var x: Int = 1 /* trailing */ + 2
+    out = out + " ${x}"
+
+    /* A comment body is not lexed, so // and "quotes" and stray * and /
+       characters inside one are all inert. */
+
+    // `/*` inside a string literal must NOT open a comment — the string
+    // scanner runs before skip_whitespace ever sees those bytes.
+    out = out + " " + "not /* a comment */ here"
+    out = out + " " + "glob */*.sf"
+
+    IO.println(out)
+}
+main()
