@@ -2008,6 +2008,32 @@ line 26 hints at ("capture POINTERS") but the code does not do.
 **`CLAUDE.md` shows a mutable-counter closure as a supported pattern, so the
 documentation is wrong here too.**
 
+**Partial resolution (2026-07-31): defect A (the Float half) is fixed; defect B
+remains.** The `Float`-capture breakage was the same float tag/untag confusion as
+#52/#54, and the accumulated float fixes (the annotated-decl widening at
+`stmts_body.sf` gen_var_decl_with_name, plus #52's index conversion) removed it.
+Measured now, a `Float` capture behaves identically to an `Int` one: the closure
+sees its own writes (`1`, `2`) and the enclosing frame does not (`count = 0`) —
+i.e. only defect B is left, in both types.
+
+Defect B (write-back to an enclosing *function's* frame) is the real heap-boxing
+work and is **not yet done**. Diagnosis mapped it precisely: the env stores a
+`load i64` snapshot of each capture (`closures_body.sf` gen_lambda, the
+capture-store loop ~103-111), and inside the closure `%<cap>` aliases the env
+slot via GEP (gen_closure_function ~316-329) — so mutations persist across calls
+of one closure instance but never reach the enclosing frame, which keeps its own
+alloca. A fix must box a captured-AND-mutated local into a heap cell at its
+`VarDecl`, route the enclosing frame's own reads/writes (`stmts_body.sf`
+gen_var_decl, `expr_body.sf` Variable read and `Assign`) through the cell, and
+store the cell *pointer* in the env instead of the value. That touches the
+hottest path in codegen (every variable access) and — per the identity-mode
+blind spot — the bootstrap cannot exercise it (the compiler self-hosts in
+identity mode, where there is no boxing), so it needs a dedicated user-program
+test matrix rather than a green bootstrap. Left as its own change for that
+reason. Containment that keeps it tractable: box *only* locals that are both
+captured by a nested lambda and assigned, leaving every other variable on the
+current alloca path.
+
 ### 52. FIXED — indexing a list with a `Float`-typed value silently read element 0
 
 **Reproduction:**
