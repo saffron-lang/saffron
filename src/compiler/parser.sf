@@ -175,11 +175,31 @@ class Parser {
 
     fun parse_type(): String {
         var name: String = this.parse_single_type()
-        // Nullable shorthand: String? is preserved as-is (not desugared to String|Nil)
-        // The codegen/checker interprets ? suffix as nullable when needed.
+        // Nullable shorthand: desugar `T?` to `T|Nil` right here, so that the
+        // nullable has exactly ONE representation downstream.
+        //
+        // This used to claim the `?` was "preserved as-is" for the checker and
+        // codegen to interpret — but parse_type never consumed the token at all,
+        // so a `?` was left for whatever came next to trip over. In a return
+        // annotation that desynchronized the parser and the function's own
+        // parameters came out undefined at codegen (BUGS #72); in a var
+        // annotation it surfaced as "expected '=' but found '?'". And the claim
+        // was only ever half true: the checker had two ends_with("?") special
+        // cases, codegen had none, and parse_type_ast would have turned `Int?`
+        // into ClassType("Int?").
+        //
+        // Desugaring at the parser means every consumer sees the union form it
+        // already handles, rather than each one needing its own `?` case.
+        if (this.match_kind("?")) {
+            name = name + "|Nil"
+        }
         // Union types: String | Nil, Int | String | Nil
         while (this.match_kind("|")) {
             var next: String = this.parse_single_type()
+            // `T?|U` and a trailing `?` on a union member both mean nullable.
+            if (this.match_kind("?")) {
+                next = next + "|Nil"
+            }
             name = name + "|" + next
         }
         return name

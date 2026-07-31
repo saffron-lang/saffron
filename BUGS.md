@@ -129,6 +129,16 @@ instances. These three are **not** filed as GC defects and want separate
 diagnosis. They are also a live contributor to the suite's failure count, so they
 should not be attributed to GC work.
 
+**Also nondeterministic: `test/gc_deep_test.sf`.** It segfaults intermittently
+rather than every run — measured 1/25 on one tree and 4/25 on another built from
+the same commit. Like `tuple_test` before #73, that makes it a phantom in any
+baseline failure-set diff: it appears on one side and not the other and reads as
+caused by whatever is under test. The check that settles it is comparing the
+*generated IR*, not the run: two trees whose `saffronc` differ only in the parser
+and checker emit byte-identical IR for this file, so a crash difference cannot be
+attributable to that change. Discount it in failure-set diffs the same way, and
+prefer an IR diff over re-running when a segfault flips.
+
 The harness is the reusable artifact from the GC dive, because it converts these
 latent hazards into deterministic crashes. Reproduce the split above with it
 directly — a 4KB nursery collects almost continuously, a 1GB one never collects at
@@ -333,6 +343,23 @@ and it is the same "measure first" situation as stage 1 of
 `docs/design/compiler-rewrite.md`, which should probably absorb this. Do not
 land the recursion and the resulting fixes in one commit.
 
+**Measured.** The recursion itself is four lines — `current_class` (declared at
+`checker.sf:162`, never assigned anywhere) set around a `check_stmts(methods)`,
+since the `FunDecl` arm already handles a method correctly once `current_class`
+is set, and `this.field` resolves via `class_fields` rather than lexical scope so
+no extra scope work is needed. Applied experimentally, gen3 then **rejects the
+compiler's own source**: 28 errors in `parser.sf`, 35 in `checker.sf`, 40 in the
+assembled `codegen.sf`, plus `main.sf`. Nearly all are non-exhaustive matches of
+the one-armed form `match (expr) { Variable(n) => n }` (e.g.
+`checker.sf:2210`) — no `_`, so every other variant yields an indeterminate
+value. That is precisely the mechanism of #73, sitting in ~100 places.
+
+Note also that `bootstrap.sh` does **not** verify gen3 can compile itself, contra
+CLAUDE.md's promotion criteria: its TEST stage compiles only
+`test/hello_bootstrap.sf`. Stage 1 uses gen2, so a gen3 that rejects the compiler
+source still gives a green bootstrap. Landing the recursion needs that check
+added too, or the regression is invisible.
+
 Note the related shape: the `match (stmt)` at `checker.sf:837-848` and
 `check_stmt` itself both cover 14 of `Stmt`'s 15 variants — `TypeAlias` has no
 arm in either — and this does not fail the build, because exhaustiveness
@@ -528,7 +555,7 @@ wrong values instead of right ones by accident.
 runtime constructor and do not go through this path, so they are unaffected. Only
 the `GC.set_max_memory()` / `GC.set_threshold()` Saffron-level setters are.
 
-### 73. `tuple_test` compiles or fails at random — the same binary on the same source disagrees with itself run to run
+### 73. `tuple_test` compiles or fails at random — the same binary on the same source disagrees with itself run to run — FIXED
 
 Found while diffing a baseline failure set for #69, where it presented as a
 phantom regression. `test/tuple_test.sf` either compiles and runs, or fails in
@@ -560,7 +587,28 @@ whatever change is under test. Anyone measuring against the suite has to know to
 discount it. Either fix it or quarantine the test, but it should not stay as
 silent noise in the suite.
 
-### 72. An `Int?` return annotation makes the function's own parameters undefined at codegen
+**Fixed.** Not uninitialized memory in `parse_type_node` after all — the guess
+above was wrong. `infer_type`'s match over `AST.Expr` (`checker.sf:1281`) simply
+had **no arm for `TupleLit`**, and none for `Yield` either. Saffron's `match` does
+not trap on an unmatched variant; it yields whatever is in the result slot. So
+`return (b, a)` got a leftover value as its type, which `is_nullable_type` then
+read as nullable on about half of all runs. Nothing varied about the source; what
+varied was the contents of that unwritten result slot, which is why a second build
+of identical source gave a different failure rate.
+
+The fix adds both arms. `TupleLit` infers each element and returns
+`GenericType("Tuple", elem_types)`, mirroring the `Tuple<A,B>` spelling the parser
+already produces in `parse_single_type`; `Yield` infers its operand and answers
+`AnyType`, since a `yield`'s own value is not usable. `tuple_test` now passes
+20/20.
+
+The generalizable part is the failure mode, not the two arms: **a non-exhaustive
+match in Saffron is a silent indeterminate value, not an error.** That is why #76
+matters so much — the checker's exhaustiveness diagnostic is the only thing
+standing between this class of bug and a nondeterministic compiler, and #76 means
+it never ran on any method body, including these.
+
+### 72. An `Int?` return annotation makes the function's own parameters undefined at codegen — FIXED
 
 `Int?` and `Int|Nil` are meant to be the same type, but only one of them keeps
 the parameter list intact:
@@ -593,6 +641,31 @@ Note that `Int?` is also rejected outright in some other positions
 (`var v: Int? = 5` is a parse error, "expected '=' but found '?'"), so the
 nullable shorthand is only partly wired up; this entry is specifically the
 codegen scope loss, which is the surprising half.
+
+**Fixed.** The two symptoms are one cause, and it is not in codegen: **`parse_type`
+never consumed the `?` token at all.** It left the `?` for whatever came next to
+trip over. In a return annotation that desynchronized the parser, and the
+function's own parameters came out undefined by the time codegen ran; in a `var`
+annotation the same unconsumed token surfaced immediately as "expected '=' but
+found '?'".
+
+`parse_type`'s comment claimed the `?` was "preserved as-is" for the checker and
+codegen to interpret, which was only ever half true: the checker had exactly two
+`ends_with("?")` special cases, codegen had none, and `parse_type_ast` would have
+built `ClassType("Int?")`. `NullableType` is declared at `ast.sf:13` and
+**constructed nowhere**. So a nullable had no single representation.
+
+Rather than add a `?` case to each consumer, `parse_type` now desugars `T?` to
+`T|Nil` on the spot — including on union members, so `T?|U` and a trailing `?`
+after a member both work. Downstream there is exactly one spelling of a nullable,
+and it is the union form every consumer already handled. This is the same
+whitelist-versus-one-representation lesson as #69: the bug was N places each
+needing to know about a special form.
+
+`var v: Int? = 5` now compiles too, as a side effect rather than a separate fix.
+One consequence worth noting: `Int?` being genuinely `Int|Nil` means it now
+correctly *requires* a nil check, so `IO.println("${v}")` on an `Int?` is a
+diagnostic where the old broken spelling would have been a crash.
 
 ### 71. A module-level `fun main` in an imported file collides with the entry point's `main`, and the program silently never runs
 
