@@ -1,0 +1,490 @@
+// Name resolution pass for Saffron.
+//
+// Sits between parse and check. Walks the program with a real scope chain and
+// decides, for every `Variable(name)` reference, which binding it names —
+// writing that decision into the AST as `Ref(kind, name, slot)` so no later
+// pass has to re-derive it from a pile of side tables.
+//
+// This is stage 2 of docs/design/compiler-rewrite.md (invariant I4). The bug it
+// exists to kill is BUGS #40: codegen's three variable-resolution sites each
+// consult `module_globals` *before* locals, so a function parameter whose name
+// collides with a user global loads the global instead. That is not a bug you
+// fix by reordering two `if`s — the previous attempt did exactly that and was
+// reverted, because codegen has no reliable notion of "am I inside this
+// function's body" to reorder against (see BUGS #40's post-mortem). Scope is
+// only knowable to a pass that walks the tree with a scope stack, which is what
+// this is.
+//
+// Kinds, matching the `DefId` sketch in the design doc:
+//
+//   "local"   a let/var binding or pattern binding in an enclosing block
+//   "param"   a parameter of the function currently being walked
+//   "global"  a module-level var; `slot` carries the module prefix ("" if none)
+//   "func"    a named function; `slot` carries the prefix it resolved under
+//   "self"    this / self / super — receiver-ish, codegen handles specially
+//   "type"    a class, enum, or module alias used in value position
+//   "unknown" resolution failed; left for the checker to report with a span
+//
+// `slot` is deliberately a String prefix rather than an integer index. An
+// integer slot needs a per-function frame layout, and that belongs to the
+// lowering pass (stage 6), not here. Carrying the prefix is enough to kill #40
+// and #22 while leaving the backend's mangling scheme untouched, which is the
+// property that makes this stage independently shippable.
+
+import "./ast.sf" as AST
+
+class ResolveScope {
+    var names: Map<String, String>   // name -> kind ("local" | "param")
+
+    fun init() {
+        this.names = {}
+    }
+}
+
+class Resolver {
+    var scopes: List<ResolveScope>
+    var globals: Map<String, String>       // bare name -> module prefix ("" for main)
+    var funcs: Map<String, String>         // bare name -> module prefix
+    var types: Map<String, Bool>           // class / enum / module-alias names
+    var errors: List<String>
+    var current_prefix: String
+
+    fun init() {
+        this.scopes = []
+        this.globals = {}
+        this.funcs = {}
+        this.types = {}
+        this.errors = []
+        this.current_prefix = ""
+    }
+
+    fun push_scope() {
+        this.scopes.push(ResolveScope())
+    }
+
+    fun pop_scope() {
+        this.scopes.pop()
+    }
+
+    fun declare(name: String, kind: String) {
+        if (this.scopes.length() == 0) { return nil }
+        var scope: ResolveScope = this.scopes[this.scopes.length() - 1]
+        scope.names.set(name, kind)
+    }
+
+    // Innermost-out lookup. This ordering IS the fix for #40: a param or local
+    // found here wins over anything in `globals`, unconditionally, because the
+    // scope stack knows what is in scope and a flat map cannot.
+    fun lookup_local(name: String): String {
+        var i: Float = this.scopes.length() - 1
+        while (i >= 0) {
+            var scope: ResolveScope = this.scopes[i]
+            if (scope.names.has(name)) {
+                return scope.names.get(name)
+            }
+            i = i - 1
+        }
+        return ""
+    }
+
+    fun is_receiver(name: String): Bool {
+        return name == "this" or name == "self" or name == "super"
+    }
+
+    // Builtin namespaces. These are registered here rather than checked
+    // ad-hoc at each use site, per I4: a builtin is resolvable in all
+    // positions or none. #30 was a name registered for calls but not for
+    // value position, which this makes inexpressible.
+    fun register_builtins() {
+        this.types.set("IO", true)
+        this.types.set("OS", true)
+        this.types.set("GC", true)
+        this.types.set("Task", true)
+        this.types.set("Math", true)
+        this.types.set("Time", true)
+        this.types.set("Net", true)
+        this.types.set("Process", true)
+    }
+
+    // ---- Pre-scan -----------------------------------------------------------
+    //
+    // Collect every module-level declaration before resolving any body. This is
+    // what makes declaration order irrelevant (design doc, "Why a separate
+    // resolve pass": #33's caller-above-callee ordering problem disappears
+    // because resolve has seen every declaration before typing begins).
+
+    fun prescan(stmts: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            this.prescan_stmt(stmts[i])
+            i = i + 1
+        }
+    }
+
+    fun prescan_stmt(stmt: AST.Stmt) {
+        match (stmt) {
+            VarDecl(name, type_ann, init, doc) => {
+                this.globals.set(name, this.current_prefix)
+            }
+            FunDecl(name, params, ret_type, body, doc) => {
+                this.funcs.set(name, this.current_prefix)
+            }
+            ClassDecl(name, parent, fields, methods, doc) => {
+                this.types.set(name, true)
+            }
+            EnumDecl(name, variants, doc) => {
+                this.types.set(name, true)
+            }
+            TypeAlias(name, target) => {
+                this.types.set(name, true)
+            }
+            ExprStmt(e) => {}
+            Return(v) => {}
+            If(c, t, e) => {}
+            While(c, b) => {}
+            Block(s) => {}
+            Break => {}
+            Continue => {}
+            TryCatch(tb, cn, cb, fb) => {}
+            Throw(v) => {}
+            LetPattern(p, v) => {}
+        }
+    }
+
+    // ---- Statement walk -----------------------------------------------------
+
+    fun resolve_stmts(stmts: List<AST.Stmt>): List<AST.Stmt> {
+        var out: List<AST.Stmt> = []
+        var i: Float = 0
+        while (i < stmts.length()) {
+            out.push(this.resolve_stmt(stmts[i]))
+            i = i + 1
+        }
+        return out
+    }
+
+    fun resolve_stmt(stmt: AST.Stmt): AST.Stmt {
+        return match (stmt) {
+            VarDecl(name, type_ann, init, doc) => {
+                // Resolve the initializer BEFORE declaring the name, so
+                // `var x = x` sees the outer x rather than itself.
+                var new_init: AST.Expr = this.resolve_expr(init)
+                if (this.scopes.length() > 0) {
+                    this.declare(name, "local")
+                }
+                AST.Stmt.VarDecl(name, type_ann, new_init, doc)
+            }
+            FunDecl(name, params, ret_type, body, doc) => {
+                this.funcs.set(name, this.current_prefix)
+                this.push_scope()
+                var pi: Float = 0
+                while (pi < params.length()) {
+                    var p: AST.Param = params[pi]
+                    var pname: String = match (p) { Param(n, t, d) => n }
+                    this.declare(pname, "param")
+                    pi = pi + 1
+                }
+                var new_body: List<AST.Stmt> = this.resolve_stmts(body)
+                this.pop_scope()
+                AST.Stmt.FunDecl(name, params, ret_type, new_body, doc)
+            }
+            ClassDecl(name, parent, fields, methods, doc) => {
+                // Methods get a scope holding the receiver plus the field
+                // names, so `name` inside a method resolves to the field and
+                // not to a like-named module global. Note the checker does not
+                // walk method bodies at all (BUGS #76) — this pass does.
+                this.types.set(name, true)
+                var new_methods: List<AST.Stmt> = []
+                var mi: Float = 0
+                while (mi < methods.length()) {
+                    this.push_scope()
+                    this.declare("this", "self")
+                    this.declare("self", "self")
+                    this.declare("super", "self")
+                    var fi: Float = 0
+                    while (fi < fields.length()) {
+                        var f: AST.Param = fields[fi]
+                        var fname: String = match (f) { Param(n, t, d) => n }
+                        this.declare(fname, "local")
+                        fi = fi + 1
+                    }
+                    new_methods.push(this.resolve_stmt(methods[mi]))
+                    this.pop_scope()
+                    mi = mi + 1
+                }
+                AST.Stmt.ClassDecl(name, parent, fields, new_methods, doc)
+            }
+            ExprStmt(expr) => {
+                AST.Stmt.ExprStmt(this.resolve_expr(expr))
+            }
+            Return(value) => {
+                AST.Stmt.Return(this.resolve_expr(value))
+            }
+            If(cond, then_branch, else_branch) => {
+                var new_cond: AST.Expr = this.resolve_expr(cond)
+                this.push_scope()
+                var new_then: List<AST.Stmt> = this.resolve_stmts(then_branch)
+                this.pop_scope()
+                this.push_scope()
+                var new_else: List<AST.Stmt> = this.resolve_stmts(else_branch)
+                this.pop_scope()
+                AST.Stmt.If(new_cond, new_then, new_else)
+            }
+            While(cond, body) => {
+                var new_cond: AST.Expr = this.resolve_expr(cond)
+                this.push_scope()
+                var new_body: List<AST.Stmt> = this.resolve_stmts(body)
+                this.pop_scope()
+                AST.Stmt.While(new_cond, new_body)
+            }
+            Block(stmts2) => {
+                this.push_scope()
+                var new_stmts: List<AST.Stmt> = this.resolve_stmts(stmts2)
+                this.pop_scope()
+                AST.Stmt.Block(new_stmts)
+            }
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
+                this.push_scope()
+                var new_try: List<AST.Stmt> = this.resolve_stmts(try_body)
+                this.pop_scope()
+                this.push_scope()
+                this.declare(catch_name, "local")
+                var new_catch: List<AST.Stmt> = this.resolve_stmts(catch_body)
+                this.pop_scope()
+                this.push_scope()
+                var new_finally: List<AST.Stmt> = this.resolve_stmts(finally_body)
+                this.pop_scope()
+                AST.Stmt.TryCatch(new_try, catch_name, new_catch, new_finally)
+            }
+            Throw(value) => {
+                AST.Stmt.Throw(this.resolve_expr(value))
+            }
+            LetPattern(pattern, value) => {
+                var new_value: AST.Expr = this.resolve_expr(value)
+                this.declare_pattern(pattern)
+                AST.Stmt.LetPattern(pattern, new_value)
+            }
+            EnumDecl(name, variants, doc) => {
+                this.types.set(name, true)
+                AST.Stmt.EnumDecl(name, variants, doc)
+            }
+            TypeAlias(name, target) => {
+                this.types.set(name, true)
+                AST.Stmt.TypeAlias(name, target)
+            }
+            Break => { AST.Stmt.Break }
+            Continue => { AST.Stmt.Continue }
+        }
+    }
+
+    // Pattern bindings become locals in the enclosing scope.
+    fun declare_pattern(pattern: AST.Pattern) {
+        match (pattern) {
+            VariantPattern(variant, bindings) => {
+                var i: Float = 0
+                while (i < bindings.length()) {
+                    this.declare(bindings[i], "local")
+                    i = i + 1
+                }
+            }
+            ArrayPattern(elements, rest) => {
+                var j: Float = 0
+                while (j < elements.length()) {
+                    this.declare(elements[j], "local")
+                    j = j + 1
+                }
+                if (rest.length() > 0) {
+                    this.declare(rest, "local")
+                }
+            }
+            NamedWildcard(name) => {
+                this.declare(name, "local")
+            }
+            WildcardPattern => {}
+            LiteralPattern(value) => {}
+        }
+    }
+
+    // ---- Expression walk ----------------------------------------------------
+    //
+    // The one decision that matters is in the `Variable` arm. Everything else
+    // is a structural rebuild so the rewritten children propagate upward.
+
+    fun resolve_expr(expr: AST.Expr): AST.Expr {
+        return match (expr) {
+            Variable(name) => {
+                this.resolve_variable(name)
+            }
+            Binary(left, op, right) => {
+                AST.Expr.Binary(this.resolve_expr(left), op, this.resolve_expr(right))
+            }
+            Unary(op, right) => {
+                AST.Expr.Unary(op, this.resolve_expr(right))
+            }
+            Logical(left, op, right) => {
+                AST.Expr.Logical(this.resolve_expr(left), op, this.resolve_expr(right))
+            }
+            Call(callee, args) => {
+                AST.Expr.Call(this.resolve_expr(callee), this.resolve_exprs(args))
+            }
+            Assign(name, value) => {
+                // The target keeps its name: codegen's Assign arm resolves the
+                // store destination itself, and rewriting it to a Ref here
+                // would change that arm's shape for no gain at this stage.
+                AST.Expr.Assign(name, this.resolve_expr(value))
+            }
+            MemberAccess(object, field) => {
+                AST.Expr.MemberAccess(this.resolve_expr(object), field)
+            }
+            Match(subject, arms) => {
+                AST.Expr.Match(this.resolve_expr(subject), this.resolve_arms(arms))
+            }
+            EnumConstruct(enum_name, variant, args) => {
+                AST.Expr.EnumConstruct(enum_name, variant, this.resolve_exprs(args))
+            }
+            Lambda(params, ret_type, body) => {
+                this.push_scope()
+                var pi: Float = 0
+                while (pi < params.length()) {
+                    var p: AST.Param = params[pi]
+                    var pname: String = match (p) { Param(n, t, d) => n }
+                    this.declare(pname, "param")
+                    pi = pi + 1
+                }
+                var new_body: List<AST.Stmt> = this.resolve_stmts(body)
+                this.pop_scope()
+                AST.Expr.Lambda(params, ret_type, new_body)
+            }
+            GetField(object, field) => {
+                AST.Expr.GetField(this.resolve_expr(object), field)
+            }
+            SetField(object, field, value) => {
+                AST.Expr.SetField(this.resolve_expr(object), field, this.resolve_expr(value))
+            }
+            ListLit(elements) => {
+                AST.Expr.ListLit(this.resolve_exprs(elements))
+            }
+            IndexGet(object, index) => {
+                AST.Expr.IndexGet(this.resolve_expr(object), this.resolve_expr(index))
+            }
+            IndexSet(object, index, value) => {
+                AST.Expr.IndexSet(this.resolve_expr(object), this.resolve_expr(index), this.resolve_expr(value))
+            }
+            MethodCall(object, method, args) => {
+                AST.Expr.MethodCall(this.resolve_expr(object), method, this.resolve_exprs(args))
+            }
+            BlockExpr(stmts, value) => {
+                this.push_scope()
+                var new_stmts: List<AST.Stmt> = this.resolve_stmts(stmts)
+                var new_value: AST.Expr = this.resolve_expr(value)
+                this.pop_scope()
+                AST.Expr.BlockExpr(new_stmts, new_value)
+            }
+            IsCheck(value, type_name) => {
+                AST.Expr.IsCheck(this.resolve_expr(value), type_name)
+            }
+            IfExpr(cond, then_stmts, then_val, else_stmts, else_val) => {
+                var new_cond: AST.Expr = this.resolve_expr(cond)
+                this.push_scope()
+                var new_then_stmts: List<AST.Stmt> = this.resolve_stmts(then_stmts)
+                var new_then_val: AST.Expr = this.resolve_expr(then_val)
+                this.pop_scope()
+                this.push_scope()
+                var new_else_stmts: List<AST.Stmt> = this.resolve_stmts(else_stmts)
+                var new_else_val: AST.Expr = this.resolve_expr(else_val)
+                this.pop_scope()
+                AST.Expr.IfExpr(new_cond, new_then_stmts, new_then_val, new_else_stmts, new_else_val)
+            }
+            TryExpr(try_stmts, try_val, catch_name, catch_stmts, catch_val) => {
+                this.push_scope()
+                var new_try_stmts: List<AST.Stmt> = this.resolve_stmts(try_stmts)
+                var new_try_val: AST.Expr = this.resolve_expr(try_val)
+                this.pop_scope()
+                this.push_scope()
+                this.declare(catch_name, "local")
+                var new_catch_stmts: List<AST.Stmt> = this.resolve_stmts(catch_stmts)
+                var new_catch_val: AST.Expr = this.resolve_expr(catch_val)
+                this.pop_scope()
+                AST.Expr.TryExpr(new_try_stmts, new_try_val, catch_name, new_catch_stmts, new_catch_val)
+            }
+            Yield(value) => {
+                AST.Expr.Yield(this.resolve_expr(value))
+            }
+            TupleLit(elements) => {
+                AST.Expr.TupleLit(this.resolve_exprs(elements))
+            }
+            Ref(kind, name, slot) => {
+                // Already resolved. Idempotent so the pass can run twice
+                // (e.g. main program then an imported module) without harm.
+                AST.Expr.Ref(kind, name, slot)
+            }
+            IntLit(v) => { AST.Expr.IntLit(v) }
+            FloatLit(v) => { AST.Expr.FloatLit(v) }
+            BoolLit(v) => { AST.Expr.BoolLit(v) }
+            StringLit(v) => { AST.Expr.StringLit(v) }
+            NilLit => { AST.Expr.NilLit }
+            This => { AST.Expr.This }
+            MapLit => { AST.Expr.MapLit }
+        }
+    }
+
+    fun resolve_exprs(exprs: List<AST.Expr>): List<AST.Expr> {
+        var out: List<AST.Expr> = []
+        var i: Float = 0
+        while (i < exprs.length()) {
+            out.push(this.resolve_expr(exprs[i]))
+            i = i + 1
+        }
+        return out
+    }
+
+    fun resolve_arms(arms: List<AST.MatchArm>): List<AST.MatchArm> {
+        var out: List<AST.MatchArm> = []
+        var i: Float = 0
+        while (i < arms.length()) {
+            var arm: AST.MatchArm = arms[i]
+            var pat: AST.Pattern = match (arm) { Arm(p, b) => p }
+            var body: AST.Expr = match (arm) { Arm(p, b) => b }
+            this.push_scope()
+            this.declare_pattern(pat)
+            var new_body: AST.Expr = this.resolve_expr(body)
+            this.pop_scope()
+            out.push(AST.MatchArm.Arm(pat, new_body))
+            i = i + 1
+        }
+        return out
+    }
+
+    // The whole point of the pass. Order is: locals/params first, then
+    // module-level names. #40 exists because codegen does the opposite.
+    fun resolve_variable(name: String): AST.Expr {
+        var local_kind: String = this.lookup_local(name)
+        if (local_kind.length() > 0) {
+            return AST.Expr.Ref(local_kind, name, "")
+        }
+        if (this.is_receiver(name)) {
+            return AST.Expr.Ref("self", name, "")
+        }
+        if (this.globals.has(name)) {
+            return AST.Expr.Ref("global", name, this.globals.get(name))
+        }
+        if (this.funcs.has(name)) {
+            return AST.Expr.Ref("func", name, this.funcs.get(name))
+        }
+        if (this.types.has(name)) {
+            return AST.Expr.Ref("type", name, "")
+        }
+        // Unresolved. Reported by the consumer, which has the span; this pass
+        // records the fact rather than printing, so it stays reusable.
+        return AST.Expr.Ref("unknown", name, "")
+    }
+}
+
+// Entry point. Pre-scans module-level declarations, then walks bodies.
+fun resolve_program(program: List<AST.Stmt>): List<AST.Stmt> {
+    var r: Resolver = Resolver()
+    r.register_builtins()
+    r.prescan(program)
+    return r.resolve_stmts(program)
+}
+
