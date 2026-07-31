@@ -440,12 +440,15 @@ try {
     IO.println("finally always runs")
 }
 
-// Runtime errors are catchable too.
-try {
-    var short = [1, 2, 3]
-    IO.println(short[99])
-} catch (e) {
-    IO.println("caught: ${e}")   // caught: IndexError: index 99 out of bounds
+// Runtime errors are NOT catchable -- they are fatal. An out-of-bounds index,
+// a division by zero, or a null-pointer error prints to stderr and exits 1
+// without running any catch or finally block. So guard instead of recovering:
+var short = [1, 2, 3]
+var want: Int = 99
+if (want >= 0 and want < short.length()) {
+    IO.println(short[want])
+} else {
+    IO.println("index ${want} out of range")
 }
 
 // For failures you expect, prefer a Result enum over exceptions. This

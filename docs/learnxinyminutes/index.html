@@ -554,12 +554,15 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
     <span class="t">IO</span>.println(<span class="s">"finally always runs"</span>)
 }
 
-<span class="c">// Runtime errors are catchable too.</span>
-<span class="k">try</span> {
-    <span class="k">var</span> short = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
-    <span class="t">IO</span>.println(short[<span class="n">99</span>])
-} <span class="k">catch</span> (e) {
-    <span class="t">IO</span>.println(<span class="s">"caught: </span><span class="i">${e}</span><span class="s">"</span>)   <span class="c">// caught: IndexError: index 99 out of bounds</span>
+<span class="c">// Runtime errors are NOT catchable -- they are fatal. An out-of-bounds index,</span>
+<span class="c">// a division by zero, or a null-pointer error prints to stderr and exits 1</span>
+<span class="c">// without running any catch or finally block. So guard instead of recovering:</span>
+<span class="k">var</span> short = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
+<span class="k">var</span> want: <span class="t">Int</span> = <span class="n">99</span>
+<span class="k">if</span> (want &gt;= <span class="n">0</span> <span class="k">and</span> want &lt; short.length()) {
+    <span class="t">IO</span>.println(short[want])
+} <span class="k">else</span> {
+    <span class="t">IO</span>.println(<span class="s">"index </span><span class="i">${want}</span><span class="s"> out of range"</span>)
 }
 
 <span class="c">// For failures you expect, prefer a Result enum over exceptions. This</span>

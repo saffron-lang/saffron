@@ -24,18 +24,37 @@ throw 404
 throw {"code": 500, "message": "internal error"}
 ```
 
-## Catching runtime errors
+## Runtime errors are not catchable
 
-Runtime errors (index out of bounds, nil access, etc.) are catchable:
+`try`/`catch` handles values you `throw`. It does **not** handle runtime faults:
+index-out-of-bounds, division by zero, and null-pointer errors are **fatal**.
+They print to standard error and exit with status 1, without running any
+`catch` or `finally` block.
 
 ```saffron
 try {
     var list = [1, 2, 3]
     list[99]
 } catch (e) {
-    IO.println("caught: ${e}")  // caught: Index 99 out of bounds...
+    IO.println("caught: ${e}")  // never runs
+}
+// Output: Runtime Error: IndexError: index 99 out of bounds (length 3)
+// Exit status: 1
+```
+
+To handle a potentially out-of-range index, check before indexing rather than
+trying to recover afterwards:
+
+```saffron
+if (i >= 0 and i < list.length()) {
+    IO.println(list[i])
+} else {
+    IO.println("index ${i} out of range")
 }
 ```
+
+Nil misuse is usually caught earlier still — the type checker rejects calling a
+method on a nullable value, so it never becomes a runtime error at all.
 
 ## Discriminating error types
 
