@@ -21,9 +21,10 @@ Three known defects currently limit this (all in "Known issues" below, with
 detail). The blocking one: **the UI does not load in a browser at all**, because
 `/app.wasm` is served as 0 bytes (`BUGS.md` #66). Beyond that, **the server dies
 after roughly 85 requests** because of a garbage collector bug, so expect to
-restart it; and the UI's Run button could not reach the service even once loaded.
-Routing itself works — the earlier 404s on `/` and `/api/examples` were fixed
-upstream by retiring the `Number` type annotation.
+restart it. The Run button's dead `js_fetch_post` / `js_run_wasm` imports are
+**fixed** (#71) — that was a `main` symbol collision, not the export-list problem
+this file used to claim. Routing works too; the earlier 404s on `/` and
+`/api/examples` were fixed upstream by retiring the `Number` type annotation.
 
 The **compile service works end-to-end** and can be driven directly:
 
@@ -206,12 +207,17 @@ now, worst first:
   are in the bug log. `__gc_disable()` at startup makes it go away (399 requests
   clean instead of 84), but that trades the crash for an unbounded heap, so it is
   deliberately *not* applied here. **Just restart the server when it goes quiet.**
-- **The UI's Run button cannot reach the service** (log Bug 30). The frontend links,
-  loads and renders, but the wasm32 link drops `js_fetch_post` / `js_run_wasm`:
-  they are reachable only from JS-invoked `__on_*` callbacks, and those are added
-  as exports *after* `-O2` has already stripped the chain as dead. No diagnostic
-  is produced — the feature is simply inert. The compile service itself is fully
-  working and can be driven with `curl` (see above).
+- ~~**The UI's Run button cannot reach the service**~~ — **fixed** (`BUGS.md` #71).
+  The dropped `js_fetch_post` / `js_run_wasm` imports were a *symptom*, and the
+  original diagnosis here (the wasm32 export list being applied after `-O2` had
+  stripped callback-reachable externs) was wrong. The real cause: codegen renamed
+  every function named `main` to `__saffron_main` regardless of module, so the
+  frontend's `main` collided with Turmeric's `<main>` element builder
+  (`turmeric/src/prelude.sf`). The entry point silently called the *library's*
+  function with the wrong arity, the user's `main` became unreachable, and `-O2`
+  then stripped everything only it reached — including those two imports (7
+  instead of 16). With the rename scoped to the entry module, the linked module
+  carries all 16 imports again.
 - **The frontend build needs an absolute `--lib-path`** (`BUGS.md` #57). A relative one
   makes the Turmeric prelude compile twice (`redefinition of global
   '@__g_turmeric_prelude__tc_event'`) because the compiler's module-dedup map is

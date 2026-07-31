@@ -9,6 +9,42 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 71. A module-level `fun main` in an imported file collides with the entry point's `main`, and the program silently never runs
+
+Codegen renamed *every* function called `main` to `__saffron_main`, regardless of
+which module it came from (`src/compiler/codegen/output_body.sf:3`), and the call
+site rewrote *any* call spelled `main(...)` to `__saffron_main` based on the
+pre-resolution name (`src/compiler/codegen/expr_body.sf:2091`). So when an
+imported module defines `main` — as `turmeric/src/prelude.sf:1125` does, where
+`main` is the `<main>` element builder — the two collapsed onto one symbol.
+
+The failure is entirely silent. No diagnostic, exit code 0. The generated entry
+point called the *library's* `main` with the wrong arity, and the user's `main`
+was emitted but never referenced:
+
+```
+define i64 @__saffron_main(i64 %label.arg) {   ; the LIBRARY's main
+...
+  %t1 = call i64 @__saffron_main()             ; entry calls it with 0 args
+```
+
+Because the user's `main` was unreachable, `-O2` then stripped everything it
+alone reached — which for the playground frontend meant the `js_fetch_post` and
+`js_run_wasm` imports vanished from the linked module (7 imports instead of 16).
+That surfaced as "the Run button does nothing", and I originally misdiagnosed it
+as the wasm32 export list being applied after `-O2` stripped callback-reachable
+externs. It is not an export-list problem at all.
+
+**Fixed** in both places: the rename now applies only when `current_prefix` is
+empty (i.e. only the entry module's `main`), and the call-site redirect now
+tests `resolved_callee == "main"` rather than the unresolved `callee_name`.
+Verified: the frontend's entry point now calls its own function, and the linked
+wasm32 module carries all 16 expected imports.
+
+One related case is still open: with a *named* import (`import { main } from
+"./lib.sf"`) plus a local `fun main`, the program segfaults. That is the general
+named-import-shadows-a-local problem, not this rename bug, and is not fixed here.
+
 ### 70. `super` is completely broken — every use emits `load i64, i64* %super` and the module fails to verify
 
 `super` does not work at all. Not an edge case, not a deep-inheritance problem:
@@ -103,7 +139,7 @@ re-deriving it inline at each of a dozen call sites.
 
 ### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead
 
-Found while writing the Map-iteration workaround for #68. On a value whose
+Found while writing the Map-iteration workaround for #62. On a value whose
 declared type is a union, **both** arms of an `is` test are false:
 
 ```saffron
@@ -730,9 +766,27 @@ value, so the double's bit pattern is *reinterpreted* as an integer rather than
 converted; for small values the low bits are zero, which lands on index 0.
 `.floor()` is the workaround and nothing tells you that you need it.
 
-Same underlying confusion as the identity-mode float bug, but on the native
-target and reachable from ordinary user code, which makes it more dangerous. #53
-is a live instance of it in the shipped stdlib.
+Same underlying confusion as the identity-mode float bug (see the
+`--identity-mode` comment at `tools/saffron:354-367`), but on the native target
+and reachable from ordinary user code, which makes it more dangerous. #53 is a
+live instance of it in the shipped stdlib.
+
+**Severity is higher than it first looks**, and a second instance was found later
+in `turmeric/tools/build.sf:74-93`, whose `while (li < lines.length())` loop used
+`var li: Float = 0`. The effect was that the bundler rewrote every app's
+`index.html` into N copies of its first line. It presented as
+"`StringBuilder.append` repeats its first argument", and only narrowing the
+StringBuilder away showed the index was at fault — the failure mode (every element
+reads as the first) looks exactly like a loop-variable capture bug, so it
+misdirects debugging.
+
+Note a *literal* `list[1]` is correct and inferred (`var i = 0`) indexes
+correctly, so this only shows up in the shape you get from hand-writing a counted
+loop with the older `Float` spelling — which is why the `Number` retirement
+(#49) keeps turning it up.
+
+Pre-existing, not a regression: reproduced on a clean baseline worktree at commit
+`11c9638` with its own committed `build/saffronc`.
 
 ### 54. An `Int` literal in a `Float` position yields `nan`
 
