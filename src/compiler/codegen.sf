@@ -55,6 +55,12 @@ class Codegen {
     var global_var_types: Map<String, String>
     var register_only: Bool
     var in_function: Bool
+    // Names bound by `var`/`let` in the body of the function currently being
+    // emitted. A name in here is a local, no matter that module_globals holds a
+    // same-named module global (BUGS #59): the alloca and store sites consult
+    // this before falling back to module_globals. Empty at top level / module
+    // init, where a `var` really is a global.
+    var current_fn_locals: Map<String, Bool>
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
@@ -122,6 +128,7 @@ class Codegen {
         this.global_var_types = {}
         this.register_only = false
         this.in_function = false
+        this.current_fn_locals = {}
         this.intrinsic_funcs = []
         this.extern_sigs = {}
         this.defined_funcs = []

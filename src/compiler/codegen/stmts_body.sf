@@ -220,7 +220,9 @@
         // module. `var p: Project = Project()` inside pantry_config's project()
         // then stored to the main program's @__g_p while output_body.sf still
         // allocated %p, and the local was written to an unrelated global.
-        if (this.module_globals.has(this.current_prefix + name)) {
+        // A local shadowing a module global is a local (BUGS #59):
+        // current_fn_locals wins, matching the alloca emitted in gen_function.
+        if (!this.current_fn_locals.has(name) and this.module_globals.has(this.current_prefix + name)) {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)

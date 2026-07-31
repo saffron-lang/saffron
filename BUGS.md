@@ -1574,15 +1574,24 @@ for-in desugaring already does at `parser.sf:2197`.
 
 Low severity, high visibility: it is the first loop anyone writes.
 
-### 59. A function's local variable writes into a like-named module global
+### 59. FIXED — a function's local variable wrote into a like-named module global
 
-**Reproduction:**
+Fixed alongside the resolve pass. `gen_function` now records the body's own
+`var`/`let` names (from `collect_vars`) in a `current_fn_locals` set, and the
+three declaration sites — the alloca in `gen_function`, the GC-root push, and the
+store in `gen_var_decl_with_name` — prefer that set over `module_globals`. A name
+the current body declares is a local, so it gets its own slot and its store
+targets that slot. The set is empty at top level / module init, where a `var`
+really is a global; it is saved/restored around nested function bodies. Both the
+example below and the nested-closure variant now print `5`.
+
+**Reproduction (now correct):**
 
 ```saffron
 var i: Int = 5
 fun f() { var i: Int = 99 }
 f()
-IO.println(i)          // 99 — the local declaration overwrote the global
+IO.println(i)          // was 99 (local overwrote the global); now 5
 ```
 
 No loop required, no aliasing on the call, no shared name passed anywhere. A
