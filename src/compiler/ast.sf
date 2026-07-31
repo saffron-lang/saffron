@@ -42,7 +42,13 @@ enum Expr {
     IfExpr(cond: Expr, then_stmts: List<Stmt>, then_val: Expr, else_stmts: List<Stmt>, else_val: Expr),
     TryExpr(try_stmts: List<Stmt>, try_val: Expr, catch_name: String, catch_stmts: List<Stmt>, catch_val: Expr),
     Yield(value: Expr),
-    TupleLit(elements: List<Expr>)
+    TupleLit(elements: List<Expr>),
+    // Produced by resolve.sf from Variable(name), once, with a scope chain in
+    // hand. `kind` is one of local/param/global/func/self/type/unknown; `slot`
+    // carries the module prefix for global/func and is "" otherwise. Consumers
+    // must read `kind` rather than re-deriving scope from side tables — that
+    // re-derivation is BUGS #40.
+    Ref(kind: String, name: String, slot: String)
 }
 
 enum MatchArm {
