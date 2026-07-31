@@ -401,14 +401,27 @@
                     var fwd_params_def: String = "i64 %self"
                     var fwd_params_call: String = "i64 %self"
                     var arity_key: String = this.current_prefix + parent_full
+                    var fwd_arity: Float = 1
                     if (this.called_function_arity.has(arity_key)) {
                         var arity: Float = this.called_function_arity.get(arity_key)
+                        fwd_arity = arity
                         var pi2: Float = 1
                         while (pi2 < arity) {
                             fwd_params_def = fwd_params_def + ", i64 %p" + pi2.floor().to_string()
                             fwd_params_call = fwd_params_call + ", i64 %p" + pi2.floor().to_string()
                             pi2 = pi2 + 1
                         }
+                    }
+                    // Register the forwarder's own arity, or a grandchild that
+                    // inherits through it gets none: the init-forwarding guard
+                    // (line 384) checks called_function_arity for the immediate
+                    // parent, and a two-level chain (Puppy -> Dog -> Animal)
+                    // would break at the second level, dropping constructor
+                    // arguments and leaving fields zero (BUGS #87). Set both the
+                    // bare and prefixed keys, matching gen_class_method.
+                    this.called_function_arity.set(child_full, fwd_arity)
+                    if (this.current_prefix.length() > 0) {
+                        this.called_function_arity.set(this.current_prefix + child_full, fwd_arity)
                     }
                     this.emit("")
                     this.emit("define i64 @" + child_full + "(" + fwd_params_def + ") {")

@@ -9,6 +9,48 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 87. FIXED — a grandchild that declares no `init` called a zero-arg constructor and dropped its arguments
+
+**Reproduction:**
+
+```saffron
+class Animal { var name: String
+    fun init(name: String) { this.name = name }
+    fun describe(): String { return this.name } }
+class Dog extends Animal { fun speak(): String { return "Woof" } }
+class Puppy extends Dog { fun speak(): String { return "Yip" } }
+
+IO.println(Puppy("Max").describe())   // segfaults — this.name is 0
+```
+
+`Dog` inherits `Animal.init` via the forwarder at `stmts_body.sf:388-418`, which
+emits `@Dog__init` as a thin call to `@Animal__init`. But that forwarder never
+calls `called_function_arity.set` for `Dog__init`. So when `Puppy` is lowered
+and the `init`-forwarding guard at `stmts_body.sf:384` asks
+`called_function_arity.has(<prefix>Dog__init)`, the answer is false and `Puppy`
+gets no `init` forwarder at all. `Puppy("Max")` then compiles to a bare
+`@Puppy()` with the argument silently dropped (the same shape as the one-level
+case #50's forwarder comment describes), the fields stay 0, and the first field
+read through an inherited method segfaults.
+
+One level of inheritance works because `Animal__init` is a real definition that
+registers its arity; the break is specifically at the *second* level, where the
+parent's `init` is itself a forwarder. Found while verifying #50's `List<Animal>`
+case with a `Puppy extends Dog extends Animal` chain.
+
+**Workaround:** give every level an explicit `init`. **Fix:** have the `init`
+forwarder register `called_function_arity` (and the prefixed key) for the
+`Child__init` it emits, so the next level down sees it. Independent of virtual
+dispatch — the dispatch itself is correct once the object is constructed.
+
+**Resolution (2026-07-31).** The forwarder (`stmts_body.sf`) already computed
+the parent's arity to build its parameter list; it now also writes that arity to
+`called_function_arity` for both the bare and prefixed `Child__init` keys, the
+way `gen_class_method` does for real methods. A two-level chain then sees the
+immediate parent's `init` arity and forwards correctly. Verified: `Puppy("Max")`
+with `init` only on `Animal` constructs and prints `Max: Yip`; the `List<Animal>`
+polymorphism test runs end to end. Zero regressions.
+
 ### 86. A block-syntax parameter (`{ x => ... }`) gets no type, so every field read on it silently returns 0 or `""`
 
 ```saffron
