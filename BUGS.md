@@ -197,6 +197,11 @@ named-import-shadows-a-local problem, not this rename bug, and is not fixed here
 
 ### 70. `super` is completely broken — every use emits `load i64, i64* %super` and the module fails to verify
 
+**FIXED for calls** (`super.method(args)`) by hoisting the `super` arm above the
+builtin-dispatch preamble, as the "Fix" section below prescribes. **Still broken
+for `super` in value position** (`IO.println(super.f)` — a bare field/method
+reference with no call); see the addendum at the end of this entry.
+
 `super` does not work at all. Not an edge case, not a deep-inheritance problem:
 every spelling fails, and the failure is at LLVM verification, so nothing runs.
 
@@ -286,6 +291,45 @@ handle differently. Emitting side-effecting IR before the dispatch decision is
 made is the underlying hazard, and it argues for resolving receiver kind in a
 separate pass (`docs/design/compiler-rewrite.md`, stage 2) rather than
 re-deriving it inline at each of a dozen call sites.
+
+**Addendum — fixed for calls, still open for `super` in value position.**
+The arm was moved from `:2520` to immediately after the `this` arm (now
+`methods_body.sf:883`), above the `:1640` preamble. Locals were renamed
+(`super_self`, `super_args`, …) to avoid colliding with the enclosing scope at
+the new location. All three forms in the repro now run correctly, plus a
+three-level chain `C extends B extends A` returning `ABC`:
+
+```
+super.f() + 1        → 2
+super.init(n)        → 5
+two-level speak()    → Woof!!
+three-level f()      → ABC / AB / A
+```
+
+`docs/learnxinyminutes/learnsaffron.sf` now compiles (rc=0, warnings only). It
+still segfaults at runtime, on something unrelated to `super` — not yet
+diagnosed. Full suite: 100 passed / 44 failed, zero regressions against the
+45-failure baseline.
+
+What is *not* fixed is `super` used as a value rather than a callee:
+
+```saffron
+class B extends A {
+    fun g() { IO.println(super.f) }   // no call parens
+}
+```
+
+still emits `%t1 = load i64, i64* %super` and fails verification. That path
+never reaches `gen_method_call` at all — it goes through field/property access,
+which has its own unconditional receiver evaluation and no `super` arm to hoist.
+`test/inheritance.sf:20` contains exactly this line, which is why that test is
+still red — though note its *first* error is unrelated (`var b` is declared
+twice at top level, so the module has a duplicate `@__g_b` global).
+
+Whether bare `super.f` should even be legal is a language-design question: it
+would have to mean a parent-bound method value, and Saffron has no other way to
+spell one. Rejecting it in the checker with a clear diagnostic is likely better
+than making it work.
 
 ### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead — FIXED
 
