@@ -1230,9 +1230,28 @@
         var name: String = this.get_fun_name(stmt)
         if (name.length() == 0) return nil
         var doc: String = this.get_fun_doc(stmt)
-        // @intrinsic / @extern declarations are dispatched by other machinery and
-        // must not be registered as ordinary callables.
-        if (doc.starts_with("@intrinsic") or doc.starts_with("@extern:")) return nil
+        // @intrinsic declarations are dispatched by other machinery and must not
+        // be registered as ordinary callables.
+        if (doc.starts_with("@intrinsic")) return nil
+        // An @extern, however, MUST be pre-registered here, or a call compiled
+        // before the extern's own decl is lowered finds extern_sigs empty, falls
+        // through to the generic call branch, and emits `call i64 @<name>` — an
+        // i64 signature against a C function that is really `declare double
+        // @sqrt(double)`, which the linker or the IR verifier then rejects
+        // (BUGS #55). The lowering-time writes at stmts_body.sf:64-69 are
+        // idempotent with these — same key, same value. Registered here rather
+        // than in gen_function's pass because Codegen.generate never calls a
+        // separate extern pre-scan; this prescan is the only one the single-file
+        // path runs.
+        if (doc.starts_with("@extern:")) {
+            var c_sig: String = doc.slice(8, doc.length())
+            var xemit: String = prefix + name
+            this.known_functions.push(xemit)
+            this.extern_sigs.set(xemit, c_sig)
+            var xret: String = this.get_fun_ret(stmt)
+            if (xret.length() > 0) { this.func_ret_types.set(xemit, this.str_to_type(xret)) }
+            return nil
+        }
 
         var emit_name: String = prefix + name
         var params: List<AST.Param> = this.get_fun_params(stmt)

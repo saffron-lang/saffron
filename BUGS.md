@@ -1968,7 +1968,7 @@ including constructor and method params, a `Float` field both from outside and v
 direction. `test/fail/float_to_int_narrowing.sf` guards the other half of the rule
 — the hazard with any coercion is that it silently becomes bidirectional.
 
-### 55. An `@extern` used before its declaration links against the wrong symbol
+### 55. FIXED — an `@extern` used before its declaration links against the wrong symbol
 
 **Reproduction:**
 
@@ -1989,6 +1989,24 @@ pointers.
 Declaration order does not matter for an ordinary top-level `fun`, so this is an
 ordering dependency specific to `@extern` resolution. Workaround: declare externs
 above first use. Related to the `@extern` rework in flight (see #24).
+
+**Resolution (2026-07-31).** `extern_sigs` was populated lazily in source order
+(`stmts_body.sf:64-69`), so a call compiled before the extern decl was reached
+found the map empty, fell through to the generic call branch, and emitted `call
+i64 @later`. Both pre-registration passes now register externs up front:
+`prescan_fun_decl` (`utils_body.sf`) no longer opts externs out — it writes
+`extern_sigs` + `func_ret_types` and returns — and the `generate()`
+pre-registration pass's `FunDecl` arm (`output_body.sf`) does the same, because
+`Codegen.generate` runs that pass rather than `prescan_fun_decl` and the
+single-file repro takes exactly that path. Both writes are idempotent with the
+lowering-time ones. Verified: the repro emits `%t3 = call double @sqrt(double
+%t2)` and runs (`sqrt(1.0)` → `1`); no `@later` reference remains. Zero test
+regressions.
+
+Still open, filed separately by the diagnosis: `gen_arg_value`'s
+function-reference branch emits a trampoline calling `@later` for an extern in
+*value* position (not call position), which is broken independently of
+declaration order.
 
 ### 56. A field access on the result of an indirect call reads 0
 

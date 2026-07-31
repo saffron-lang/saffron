@@ -8493,9 +8493,28 @@ class Codegen {
         var name: String = this.get_fun_name(stmt)
         if (name.length() == 0) return nil
         var doc: String = this.get_fun_doc(stmt)
-        // @intrinsic / @extern declarations are dispatched by other machinery and
-        // must not be registered as ordinary callables.
-        if (doc.starts_with("@intrinsic") or doc.starts_with("@extern:")) return nil
+        // @intrinsic declarations are dispatched by other machinery and must not
+        // be registered as ordinary callables.
+        if (doc.starts_with("@intrinsic")) return nil
+        // An @extern, however, MUST be pre-registered here, or a call compiled
+        // before the extern's own decl is lowered finds extern_sigs empty, falls
+        // through to the generic call branch, and emits `call i64 @<name>` — an
+        // i64 signature against a C function that is really `declare double
+        // @sqrt(double)`, which the linker or the IR verifier then rejects
+        // (BUGS #55). The lowering-time writes at stmts_body.sf:64-69 are
+        // idempotent with these — same key, same value. Registered here rather
+        // than in gen_function's pass because Codegen.generate never calls a
+        // separate extern pre-scan; this prescan is the only one the single-file
+        // path runs.
+        if (doc.starts_with("@extern:")) {
+            var c_sig: String = doc.slice(8, doc.length())
+            var xemit: String = prefix + name
+            this.known_functions.push(xemit)
+            this.extern_sigs.set(xemit, c_sig)
+            var xret: String = this.get_fun_ret(stmt)
+            if (xret.length() > 0) { this.func_ret_types.set(xemit, this.str_to_type(xret)) }
+            return nil
+        }
 
         var emit_name: String = prefix + name
         var params: List<AST.Param> = this.get_fun_params(stmt)
@@ -9257,6 +9276,20 @@ class Codegen {
                         }
                         if (this.current_prefix.length() > 0 and !this.str_in_list(this.known_functions,pr_name)) {
                             this.known_functions.push(pr_name)
+                        }
+                        // An @extern must have its C signature registered here,
+                        // not only when its own decl is lowered below. A call
+                        // reached earlier in the body pass finds extern_sigs empty
+                        // otherwise and emits an i64 call against, e.g., `declare
+                        // double @sqrt(double)` — the BUGS #55 symbol mismatch.
+                        // Codegen.generate runs this pass, not prescan_fun_decl,
+                        // so the single-file path depends on this write. Idempotent
+                        // with stmts_body.sf:64-69: same key, same value.
+                        if (pr_doc.starts_with("@extern:")) {
+                            this.extern_sigs.set(pr_emit, pr_doc.slice(8, pr_doc.length()))
+                            if (pr_ret.length() > 0) {
+                                this.func_ret_types.set(pr_emit, this.str_to_type(pr_ret))
+                            }
                         }
                     }
                 }
