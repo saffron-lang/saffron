@@ -120,7 +120,7 @@ entry:
 
 init:
   ; Allocate shadow stack struct (24 bytes)
-  %ss_raw = call i8* @malloc(i64 24)
+  %ss_raw = call i8* @__sf_malloc_nogc(i64 24)
   %ss = ptrtoint i8* %ss_raw to i64
   ; count = 0
   %ss_ptr = inttoptr i64 %ss to i64*
@@ -130,7 +130,7 @@ init:
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 256, i64* %cap_ptr
   ; data = malloc(256 * 8 = 2048)
-  %data_raw = call i8* @malloc(i64 2048)
+  %data_raw = call i8* @__sf_malloc_nogc(i64 2048)
   %data = ptrtoint i8* %data_raw to i64
   %data_addr = add i64 %ss, 16
   %data_ptr = inttoptr i64 %data_addr to i64*
@@ -176,7 +176,7 @@ grow:
   %data_ptr_g = inttoptr i64 %data_addr_g to i64*
   %old_data_g = load i64, i64* %data_ptr_g
   %old_data_raw = inttoptr i64 %old_data_g to i8*
-  %new_data_raw = call i8* @realloc(i8* %old_data_raw, i64 %new_bytes)
+  %new_data_raw = call i8* @__sf_realloc_nogc(i8* %old_data_raw, i64 %new_bytes)
   %new_data = ptrtoint i8* %new_data_raw to i64
   %is_null = icmp eq i64 %new_data, 0
   br i1 %is_null, label %store, label %update_cap
@@ -353,7 +353,7 @@ grow_thresh:
 do_old_gen_alloc:
   ; Old generation allocation (malloc-based, linked list tracked)
   %alloc_size = add i64 %size, 24
-  %raw_ptr = call i8* @malloc(i64 %alloc_size)
+  %raw_ptr = call i8* @__sf_malloc(i64 %alloc_size)
   %raw = ptrtoint i8* %raw_ptr to i64
   %is_null = icmp eq i64 %raw, 0
   br i1 %is_null, label %fail, label %init_header
@@ -396,7 +396,7 @@ fail:
 define i64 @__gc_alloc_safe(i64 %size, i64 %type_tag) {
 entry:
   %alloc_size = add i64 %size, 24
-  %raw_ptr = call i8* @malloc(i64 %alloc_size)
+  %raw_ptr = call i8* @__sf_malloc_nogc(i64 %alloc_size)
   %raw = ptrtoint i8* %raw_ptr to i64
   %is_null = icmp eq i64 %raw, 0
   br i1 %is_null, label %fail, label %init_header
@@ -460,11 +460,19 @@ done:
 }
 
 ; Reallocate: allocate new, copy old data, return new (old will be swept)
+;
+; A failed allocation used to fall through to `ret_old`, handing back the OLD
+; pointer as though the resize had succeeded. Every caller (__list_push,
+; __sb_append, __map_set) treats a non-zero return as success and stores the
+; GROWN capacity next to the un-grown buffer, so the next write ran off the end
+; of the block — a silent heap corruption instead of an error. Under a hard
+; memory cap that path would be reached routinely, converting a cap breach into
+; data corruption, so it must report instead.
 define i64 @__gc_realloc(i64 %old_user_ptr, i64 %new_size, i64 %type_tag) {
 entry:
   %new_ptr = call i64 @__gc_alloc(i64 %new_size, i64 %type_tag)
   %new_null = icmp eq i64 %new_ptr, 0
-  br i1 %new_null, label %ret_old, label %check_old
+  br i1 %new_null, label %alloc_failed, label %check_old
 
 check_old:
   %old_null = icmp eq i64 %old_user_ptr, 0
@@ -501,8 +509,9 @@ copy_body:
 ret_new:
   ret i64 %new_ptr
 
-ret_old:
-  ret i64 %old_user_ptr
+alloc_failed:
+  call void @__mem_oom_fail()
+  unreachable
 }
 
 ; =============================================================================
@@ -530,7 +539,7 @@ do_init:
   ; Start with 4096 entries (32KB)
   %init_cap = add i64 4096, 0
   %bytes = shl i64 %init_cap, 3
-  %raw = call i8* @malloc(i64 %bytes)
+  %raw = call i8* @__sf_malloc_nogc(i64 %bytes)
   %ptr = ptrtoint i8* %raw to i64
   store i64 %ptr, i64* @__gc_mark_stack
   store i64 0, i64* @__gc_mark_stack_count
@@ -563,7 +572,7 @@ grow:
   %new_bytes = shl i64 %new_cap, 3
   %old_ptr = load i64, i64* @__gc_mark_stack
   %old_raw = inttoptr i64 %old_ptr to i8*
-  %new_raw = call i8* @realloc(i8* %old_raw, i64 %new_bytes)
+  %new_raw = call i8* @__sf_realloc_nogc(i8* %old_raw, i64 %new_bytes)
   %new_ptr = ptrtoint i8* %new_raw to i64
   %realloc_ok = icmp ne i64 %new_ptr, 0
   br i1 %realloc_ok, label %update_cap, label %do_push
@@ -941,7 +950,7 @@ do_free:
   store i64 %fb_new, i64* @__gc_freed_bytes
   ; Free the memory
   %free_ptr = inttoptr i64 %current to i8*
-  call void @free(i8* %free_ptr)
+  call void @__sf_free(i8* %free_ptr)
   ; Advance (prev stays the same)
   store i64 %next, i64* %curr_alloca
   br label %loop
@@ -1281,7 +1290,7 @@ entry:
 
 do_init:
   %nsize = load i64, i64* @__gc_nursery_size
-  %arena_raw = call i8* @malloc(i64 %nsize)
+  %arena_raw = call i8* @__sf_malloc_nogc(i64 %nsize)
   %arena = ptrtoint i8* %arena_raw to i64
   %is_null = icmp eq i64 %arena, 0
   br i1 %is_null, label %done, label %store_arena
@@ -1309,7 +1318,7 @@ entry:
 
 do_init:
   ; Allocate struct: { count: i64, capacity: i64, data_ptr: i64 }
-  %rs_raw = call i8* @malloc(i64 24)
+  %rs_raw = call i8* @__sf_malloc_nogc(i64 24)
   %rs = ptrtoint i8* %rs_raw to i64
   %is_null = icmp eq i64 %rs, 0
   br i1 %is_null, label %done, label %init_struct
@@ -1323,7 +1332,7 @@ init_struct:
   %cap_ptr = inttoptr i64 %cap_addr to i64*
   store i64 256, i64* %cap_ptr
   ; data = malloc(256 * 8)
-  %data_raw = call i8* @malloc(i64 2048)
+  %data_raw = call i8* @__sf_malloc_nogc(i64 2048)
   %data = ptrtoint i8* %data_raw to i64
   %data_addr = add i64 %rs, 16
   %data_ptr = inttoptr i64 %data_addr to i64*
@@ -1409,7 +1418,7 @@ grow:
   %data_ptr_g = inttoptr i64 %data_addr_g to i64*
   %old_data = load i64, i64* %data_ptr_g
   %old_data_raw = inttoptr i64 %old_data to i8*
-  %new_data_raw = call i8* @realloc(i8* %old_data_raw, i64 %new_bytes)
+  %new_data_raw = call i8* @__sf_realloc_nogc(i8* %old_data_raw, i64 %new_bytes)
   %new_data = ptrtoint i8* %new_data_raw to i64
   %realloc_failed = icmp eq i64 %new_data, 0
   br i1 %realloc_failed, label %done, label %update_cap
@@ -1719,7 +1728,7 @@ read_obj:
 promote:
   ; Allocate directly in old gen (bypass nursery)
   %old_alloc_size = add i64 %size, 24
-  %old_raw_ptr = call i8* @malloc(i64 %old_alloc_size)
+  %old_raw_ptr = call i8* @__sf_malloc_nogc(i64 %old_alloc_size)
   %old_raw = ptrtoint i8* %old_raw_ptr to i64
   %is_null = icmp eq i64 %old_raw, 0
   br i1 %is_null, label %advance, label %do_promote
@@ -1993,9 +2002,9 @@ reinit:
   ; Free old arena
   %old_start = load i64, i64* @__gc_nursery_start
   %old_ptr = inttoptr i64 %old_start to i8*
-  call void @free(i8* %old_ptr)
+  call void @__sf_free(i8* %old_ptr)
   ; Allocate new arena
-  %arena_raw = call i8* @malloc(i64 %bytes)
+  %arena_raw = call i8* @__sf_malloc_nogc(i64 %bytes)
   %arena = ptrtoint i8* %arena_raw to i64
   %is_null = icmp eq i64 %arena, 0
   br i1 %is_null, label %disable_nursery, label %update_arena
@@ -2046,4 +2055,493 @@ entry:
   %v = load i64, i64* @__gc_nursery_size
   ret i64 %v
 }
+
+; =============================================================================
+; Memory Cap (--max-memory / SAFFRON_MAX_MEMORY)
+; =============================================================================
+;
+; Every allocation in the native runtime funnels through @__sf_malloc /
+; @__sf_realloc / @__sf_free instead of malloc/realloc/free. When
+; @__mem_limit_bytes is 0 (the default) these are pass-throughs and cost a
+; single load + branch. When a limit is set, they maintain @__mem_live_bytes
+; and enforce the cap.
+;
+; Why our own counter and not @__gc_total_bytes:
+;   - @__gc_total_bytes only sees GC-tracked allocation. String concatenation
+;     (emitted by codegen as a bare malloc) bypasses it entirely, so a runaway
+;     concat loop could reach hundreds of MB with gc_total_bytes still reading
+;     tens of bytes.
+;   - @__gc_alloc adds the 8-byte-ALIGNED size while __gc_minor_promote
+;     subtracts the UNALIGNED size, so it drifts upward over time and would
+;     become a slow false-positive source for a hard cap.
+;
+; On breach: attempt ONE collection, re-check, and if still over the cap write
+; a static message to fd 2 and exit(3) (the code the JVM uses for
+; -XX:+ExitOnOutOfMemoryError). The error path must not allocate — the runtime's
+; own __runtime_error builds its message with rt_malloc, which would recurse
+; under a hard cap — so this reports via a static global + write(2, ...),
+; following the allocation-free __print_debug_location pattern.
+;
+; The breach is deliberately FATAL and NOT a catchable Saffron exception:
+; the allocator is mid-object when it fires, so a longjmp would leave a
+; half-initialized object and a shadow stack the try/catch codegen only
+; partially repairs, and setjmp/longjmp are no-ops on wasm. This matches every
+; other runtime error, which is fatal via __runtime_error_fatal -> exit.
+
+@__mem_limit_bytes = global i64 0     ; hard cap in bytes (0 = unlimited)
+@__mem_live_total = global i64 0      ; live bytes handed out by __sf_malloc
+@__mem_in_gc = global i64 0           ; re-entrancy guard: 1 while collecting
+
+declare void @exit(i32)
+declare i8* @getenv(i8*)
+declare i8* @calloc(i64, i64)
+
+; Recovering a freed block's size for the decrement.
+;
+; Three options were considered:
+;   1. A per-block size header. Rejected: __val_type_id (base_nanbox.ll) decides
+;      "GC-managed object" vs "plain malloc'd buffer = string" by probing for the
+;      GC magic sentinel at ptr-8. Putting a size word in front of every plain
+;      malloc would land in that same slot and break string type discrimination
+;      throughout the runtime.
+;   2. An increment-only high-water counter. Rejected as the primary mechanism:
+;      it would make the cap fire on cumulative churn rather than live size, so
+;      a long-running program that allocates and frees steadily would eventually
+;      trip a cap it never actually exceeded.
+;   3. Ask the allocator. Chosen. malloc_size() is exactly this, and this file
+;      already hardcodes `target triple = "arm64-apple-macosx14.0.0"` — it is a
+;      Darwin-only file, so the Darwin-only API costs no portability that gc.ll
+;      has today. A port would swap in malloc_usable_size() (glibc) here.
+;
+; Note: extern_weak was tried first so a missing symbol would degrade to
+; increment-only, but Darwin's linker still emits an undefined-symbol error for
+; a weak reference without -Wl,-U, so this is a plain declaration.
+declare i64 @malloc_size(i8*)
+
+@.mem.msg_cap = private unnamed_addr constant [64 x i8] c"saffron: out of memory: allocation exceeded --max-memory limit\0A\00"
+@.mem.msg_fail = private unnamed_addr constant [43 x i8] c"saffron: out of memory: allocation failed\0A\00"
+@.mem.msg_badenv = private unnamed_addr constant [72 x i8] c"saffron: invalid SAFFRON_MAX_MEMORY value (use e.g. 512m, 2g, 1048576)\0A\00"
+@.mem.envname = private unnamed_addr constant [19 x i8] c"SAFFRON_MAX_MEMORY\00"
+
+; Report a cap breach and die. Allocates nothing.
+define private void @__mem_oom_cap() noinline {
+entry:
+  %msg = getelementptr [64 x i8], [64 x i8]* @.mem.msg_cap, i64 0, i64 0
+  call i64 @write(i32 2, i8* %msg, i64 63)
+  call void @exit(i32 3)
+  unreachable
+}
+
+; Report a genuine allocator failure (malloc returned null) and die.
+define private void @__mem_oom_fail() noinline {
+entry:
+  %msg = getelementptr [43 x i8], [43 x i8]* @.mem.msg_fail, i64 0, i64 0
+  call i64 @write(i32 2, i8* %msg, i64 42)
+  call void @exit(i32 3)
+  unreachable
+}
+
+; Recover the usable size of a heap block. Must only ever be called on a base
+; pointer returned by malloc: malloc_size() returns 0 for an interior pointer
+; (verified: a 100-byte block reports 112, and p+24 reports 0), which would
+; silently under-count rather than fail loudly.
+define private i64 @__sf_usable_size(i8* %p) {
+entry:
+  %r = call i64 @malloc_size(i8* %p)
+  ret i64 %r
+}
+
+; Add to the live-bytes counter (limit is known to be non-zero here).
+define private void @__mem_account_add(i8* %p) {
+entry:
+  %usable = call i64 @__sf_usable_size(i8* %p)
+  %live = load i64, i64* @__mem_live_total
+  %new = add i64 %live, %usable
+  store i64 %new, i64* @__mem_live_total
+  ret void
+}
+
+; Subtract from the live-bytes counter, saturating at 0. Saturation matters:
+; a block allocated before a limit was installed was never counted, so freeing
+; it after GC.set_max_memory() would otherwise underflow to a huge value.
+define private void @__mem_account_sub(i8* %p) {
+entry:
+  %usable = call i64 @__sf_usable_size(i8* %p)
+  %live = load i64, i64* @__mem_live_total
+  %under = icmp ult i64 %live, %usable
+  br i1 %under, label %zero, label %sub
+
+sub:
+  %new = sub i64 %live, %usable
+  store i64 %new, i64* @__mem_live_total
+  ret void
+
+zero:
+  store i64 0, i64* @__mem_live_total
+  ret void
+}
+
+; Reserve %size bytes against the cap. Dies on breach. No-op when unlimited.
+;
+; %may_collect controls whether one collection is attempted before declaring a
+; breach. It must be 0 for callers that cannot survive a collection at that
+; point: __gc_alloc_safe exists precisely because its callers hold GC pointers
+; in locals that are NOT registered as shadow-stack roots, so collecting there
+; would free live objects; and the GC's own internals (mark stack, remembered
+; set, promotion) are mid-collection already. Those sites still enforce the cap,
+; they just do not get the second chance. The paths that dominate allocation
+; volume — __gc_alloc's old gen, codegen-emitted mallocs and rt_malloc — do get
+; it, so a breach almost always surfaces on a collecting path first.
+define private void @__mem_reserve(i64 %size, i64 %may_collect) {
+entry:
+  %limit = load i64, i64* @__mem_limit_bytes
+  %unlimited = icmp eq i64 %limit, 0
+  br i1 %unlimited, label %ok, label %check_reent
+
+check_reent:
+  ; While collecting, the GC's own bookkeeping allocations must not recurse
+  ; back into a collection.
+  %reent = load i64, i64* @__mem_in_gc
+  %is_reent = icmp ne i64 %reent, 0
+  br i1 %is_reent, label %ok, label %precheck
+
+precheck:
+  %live = load i64, i64* @__mem_live_total
+  %after = add i64 %live, %size
+  %over = icmp ugt i64 %after, %limit
+  br i1 %over, label %maybe_collect, label %ok
+
+maybe_collect:
+  ; Only collect if the GC is actually enabled. With it disabled — which is the
+  ; case for --identity-mode builds like the compiler itself, and for programs
+  ; written purely as `fun main()` (see the has_top_level gate in
+  ; codegen/output_body.sf) — shadow-stack roots are not reliably maintained, so
+  ; running a mark-and-sweep here would free live objects. A cap breach with no
+  ; GC to relieve it is simply fatal.
+  %gc_on = load i64, i64* @__gc_enabled
+  %gc_is_on = icmp ne i64 %gc_on, 0
+  %want = icmp ne i64 %may_collect, 0
+  %can = and i1 %gc_is_on, %want
+  br i1 %can, label %try_collect, label %breach
+
+try_collect:
+  store i64 1, i64* @__mem_in_gc
+  call i64 @__gc_collect()
+  store i64 0, i64* @__mem_in_gc
+  %live2 = load i64, i64* @__mem_live_total
+  %after2 = add i64 %live2, %size
+  %still = icmp ugt i64 %after2, %limit
+  br i1 %still, label %breach, label %ok
+
+breach:
+  call void @__mem_oom_cap()
+  unreachable
+
+ok:
+  ret void
+}
+
+; Cap-aware malloc. Never returns null: a failed allocation is fatal, because
+; every caller in the runtime either ignores the null or stores a grown
+; capacity alongside the old buffer, which turns the failure into silent heap
+; corruption rather than an error.
+define i8* @__sf_malloc(i64 %size) {
+entry:
+  %p = call i8* @__sf_malloc_gc(i64 %size, i64 1)
+  ret i8* %p
+}
+
+; As __sf_malloc, but enforces the cap without ever running a collection. For
+; GC-internal and __gc_alloc_safe call sites — see __mem_reserve.
+define i8* @__sf_malloc_nogc(i64 %size) {
+entry:
+  %p = call i8* @__sf_malloc_gc(i64 %size, i64 0)
+  ret i8* %p
+}
+
+define private i8* @__sf_malloc_gc(i64 %size, i64 %may_collect) {
+entry:
+  %limit = load i64, i64* @__mem_limit_bytes
+  %unlimited = icmp eq i64 %limit, 0
+  br i1 %unlimited, label %plain, label %guarded
+
+plain:
+  ; Fast path for unlimited runs: one load + branch, then straight to malloc.
+  %p0 = call i8* @malloc(i64 %size)
+  %n0 = icmp eq i8* %p0, null
+  br i1 %n0, label %fail, label %ret0
+
+ret0:
+  ret i8* %p0
+
+guarded:
+  call void @__mem_reserve(i64 %size, i64 %may_collect)
+  %p1 = call i8* @malloc(i64 %size)
+  %n1 = icmp eq i8* %p1, null
+  br i1 %n1, label %fail, label %acct
+
+acct:
+  call void @__mem_account_add(i8* %p1)
+  ret i8* %p1
+
+fail:
+  call void @__mem_oom_fail()
+  unreachable
+}
+
+; Cap-aware realloc. Never returns null (see __sf_malloc).
+define i8* @__sf_realloc(i8* %old, i64 %size) {
+entry:
+  %p = call i8* @__sf_realloc_gc(i8* %old, i64 %size, i64 1)
+  ret i8* %p
+}
+
+; As __sf_realloc, but never collects. For GC-internal growth (shadow stack,
+; mark stack, remembered set) where a collection mid-resize is not safe.
+define i8* @__sf_realloc_nogc(i8* %old, i64 %size) {
+entry:
+  %p = call i8* @__sf_realloc_gc(i8* %old, i64 %size, i64 0)
+  ret i8* %p
+}
+
+define private i8* @__sf_realloc_gc(i8* %old, i64 %size, i64 %may_collect) {
+entry:
+  %limit = load i64, i64* @__mem_limit_bytes
+  %unlimited = icmp eq i64 %limit, 0
+  br i1 %unlimited, label %plain, label %guarded
+
+plain:
+  %p0 = call i8* @realloc(i8* %old, i64 %size)
+  %n0 = icmp eq i8* %p0, null
+  br i1 %n0, label %fail, label %ret0
+
+ret0:
+  ret i8* %p0
+
+guarded:
+  ; Drop the old block from the counter first so growing a buffer is charged
+  ; only for its delta rather than its full new size.
+  %is_null_old = icmp eq i8* %old, null
+  br i1 %is_null_old, label %reserve, label %drop_old
+
+drop_old:
+  call void @__mem_account_sub(i8* %old)
+  br label %reserve
+
+reserve:
+  call void @__mem_reserve(i64 %size, i64 %may_collect)
+  %p1 = call i8* @realloc(i8* %old, i64 %size)
+  %n1 = icmp eq i8* %p1, null
+  br i1 %n1, label %fail, label %acct
+
+acct:
+  call void @__mem_account_add(i8* %p1)
+  ret i8* %p1
+
+fail:
+  call void @__mem_oom_fail()
+  unreachable
+}
+
+; Cap-aware calloc.
+define i8* @__sf_calloc(i64 %n, i64 %size) {
+entry:
+  %total = mul i64 %n, %size
+  %limit = load i64, i64* @__mem_limit_bytes
+  %unlimited = icmp eq i64 %limit, 0
+  br i1 %unlimited, label %plain, label %guarded
+
+plain:
+  %p0 = call i8* @calloc(i64 %n, i64 %size)
+  %n0 = icmp eq i8* %p0, null
+  br i1 %n0, label %fail, label %ret0
+
+ret0:
+  ret i8* %p0
+
+guarded:
+  call void @__mem_reserve(i64 %total, i64 1)
+  %p1 = call i8* @calloc(i64 %n, i64 %size)
+  %n1 = icmp eq i8* %p1, null
+  br i1 %n1, label %fail, label %acct
+
+acct:
+  call void @__mem_account_add(i8* %p1)
+  ret i8* %p1
+
+fail:
+  call void @__mem_oom_fail()
+  unreachable
+}
+
+; Cap-aware free.
+define void @__sf_free(i8* %p) {
+entry:
+  %is_null = icmp eq i8* %p, null
+  br i1 %is_null, label %done, label %check
+
+check:
+  %limit = load i64, i64* @__mem_limit_bytes
+  %unlimited = icmp eq i64 %limit, 0
+  br i1 %unlimited, label %just_free, label %acct
+
+acct:
+  call void @__mem_account_sub(i8* %p)
+  br label %just_free
+
+just_free:
+  call void @free(i8* %p)
+  br label %done
+
+done:
+  ret void
+}
+
+; Install a hard memory cap. 0 disables it.
+define void @__mem_set_limit(i64 %bytes) {
+entry:
+  store i64 %bytes, i64* @__mem_limit_bytes
+  ret void
+}
+
+define i64 @__mem_get_limit() {
+entry:
+  %v = load i64, i64* @__mem_limit_bytes
+  ret i64 %v
+}
+
+; Live bytes as tracked by the wrapper. Reads 0 on unlimited runs, which do no
+; accounting at all so that the fast path stays a load + branch.
+define i64 @__mem_live_bytes() {
+entry:
+  %v = load i64, i64* @__mem_live_total
+  ret i64 %v
+}
+
+; Parse a Java -Xmx-style size: decimal digits with an optional k/K/m/M/g/G
+; suffix. Returns the byte count, or -1 for a malformed string.
+define private i64 @__mem_parse_size(i8* %s) {
+entry:
+  %c0 = load i8, i8* %s
+  %empty = icmp eq i8 %c0, 0
+  br i1 %empty, label %bad, label %loop
+
+loop:
+  %i = phi i64 [0, %entry], [%i_next, %digit_ok]
+  %acc = phi i64 [0, %entry], [%acc_next, %digit_ok]
+  %ndig = phi i64 [0, %entry], [%ndig_next, %digit_ok]
+  %cp = getelementptr i8, i8* %s, i64 %i
+  %c = load i8, i8* %cp
+  %is_end = icmp eq i8 %c, 0
+  br i1 %is_end, label %finish_bare, label %classify
+
+classify:
+  %ge0 = icmp uge i8 %c, 48
+  %le9 = icmp ule i8 %c, 57
+  %is_digit = and i1 %ge0, %le9
+  br i1 %is_digit, label %digit, label %suffix
+
+digit:
+  %d = zext i8 %c to i64
+  %dv = sub i64 %d, 48
+  %m10 = mul i64 %acc, 10
+  %acc_next = add i64 %m10, %dv
+  ; Reject anything that would overflow into nonsense (> ~9.2 EB).
+  %of = icmp ugt i64 %acc_next, 4611686018427387904
+  br i1 %of, label %bad, label %digit_ok
+
+digit_ok:
+  %i_next = add i64 %i, 1
+  %ndig_next = add i64 %ndig, 1
+  br label %loop
+
+finish_bare:
+  %had_digits = icmp ne i64 %ndig, 0
+  br i1 %had_digits, label %ret_acc, label %bad
+
+ret_acc:
+  ret i64 %acc
+
+suffix:
+  ; A suffix is only valid as the final character, and only after some digits.
+  %sp = getelementptr i8, i8* %s, i64 %i
+  %s_next_addr = getelementptr i8, i8* %sp, i64 1
+  %s_next = load i8, i8* %s_next_addr
+  %is_last = icmp eq i8 %s_next, 0
+  %has_digits = icmp ne i64 %ndig, 0
+  %suffix_ok = and i1 %is_last, %has_digits
+  br i1 %suffix_ok, label %apply_suffix, label %bad
+
+apply_suffix:
+  %is_k = icmp eq i8 %c, 107   ; 'k'
+  %is_K = icmp eq i8 %c, 75    ; 'K'
+  %any_k = or i1 %is_k, %is_K
+  br i1 %any_k, label %mul_k, label %check_m
+
+mul_k:
+  %vk = mul i64 %acc, 1024
+  ret i64 %vk
+
+check_m:
+  %is_m = icmp eq i8 %c, 109   ; 'm'
+  %is_M = icmp eq i8 %c, 77    ; 'M'
+  %any_m = or i1 %is_m, %is_M
+  br i1 %any_m, label %mul_m, label %check_g
+
+mul_m:
+  %vm = mul i64 %acc, 1048576
+  ret i64 %vm
+
+check_g:
+  %is_g = icmp eq i8 %c, 103   ; 'g'
+  %is_G = icmp eq i8 %c, 71    ; 'G'
+  %any_g = or i1 %is_g, %is_G
+  br i1 %any_g, label %mul_g, label %bad
+
+mul_g:
+  %vg = mul i64 %acc, 1073741824
+  ret i64 %vg
+
+bad:
+  ret i64 -1
+}
+
+; Read SAFFRON_MAX_MEMORY at process start. A constructor rather than code in
+; the codegen-emitted main() wrapper so that EVERY native binary honours it,
+; including ones produced by `saffron build`, which does not thread
+; per-invocation compiler flags the way `saffron run` does.
+define void @__mem_init_from_env() {
+entry:
+  %name = getelementptr [19 x i8], [19 x i8]* @.mem.envname, i64 0, i64 0
+  %val = call i8* @getenv(i8* %name)
+  %is_null = icmp eq i8* %val, null
+  br i1 %is_null, label %done, label %check_empty
+
+check_empty:
+  %c0 = load i8, i8* %val
+  %is_empty = icmp eq i8 %c0, 0
+  br i1 %is_empty, label %done, label %parse
+
+parse:
+  %n = call i64 @__mem_parse_size(i8* %val)
+  %bad = icmp eq i64 %n, -1
+  br i1 %bad, label %report_bad, label %install
+
+install:
+  store i64 %n, i64* @__mem_limit_bytes
+  br label %done
+
+report_bad:
+  ; A malformed configuration value is a usage error, not an OOM: report it
+  ; distinctly and exit 1 rather than silently running unlimited.
+  %msg = getelementptr [72 x i8], [72 x i8]* @.mem.msg_badenv, i64 0, i64 0
+  call i64 @write(i32 2, i8* %msg, i64 71)
+  call void @exit(i32 1)
+  unreachable
+
+done:
+  ret void
+}
+
+@llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }] [{ i32, void ()*, i8* } { i32 65535, void ()* @__mem_init_from_env, i8* null }]
 

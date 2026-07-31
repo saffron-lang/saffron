@@ -95,7 +95,7 @@
             var env_size: Float = captures.length()
             var env_bytes: Float = env_size * 8
             var env_raw: String = this.fresh_local()
-            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            this.emit_indent(env_raw + " = call i8* @__sf_malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
             // Store VALUES of captured variables in env (copy semantics).
@@ -111,7 +111,7 @@
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
             var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             // Store fn ptr
@@ -181,7 +181,7 @@
 
         // Heap-allocate closure pair: [fn_ptr, 0]
         var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
@@ -290,7 +290,7 @@
         if (is_coro) {
             this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
             this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
             this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
         }
 

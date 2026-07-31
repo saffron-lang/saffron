@@ -963,6 +963,12 @@
                 else if (__mp_func.ends_with("_alloc_count")) { __mp_func = "__gc_stat_alloc_count" }
                 else if (__mp_func.ends_with("_total_bytes")) { __mp_func = "__gc_stat_total_bytes" }
                 else if (__mp_func.ends_with("_threshold") and !__mp_func.ends_with("_set_threshold")) { __mp_func = "__gc_stat_threshold" }
+                // Memory cap lives in the __mem_ namespace, not __gc_.
+                // Check _set_max_memory before _max_memory: the former also
+                // ends with the latter.
+                else if (__mp_func.ends_with("_set_max_memory")) { __mp_func = "__mem_set_limit" }
+                else if (__mp_func.ends_with("_max_memory")) { __mp_func = "__mem_get_limit" }
+                else if (__mp_func.ends_with("_live_bytes")) { __mp_func = "__mem_live_bytes" }
             }
             this.called_functions.push(__mp_func)
 
@@ -2138,7 +2144,7 @@
         var char_ptr: String = this.fresh_local()
         this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 2)")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(i64 2)")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + char_ptr)
         this.emit_indent("store i8 " + ch + ", i8* " + buf)
@@ -2213,7 +2219,7 @@
         var buf_size: String = this.fresh_local()
         this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(i64 " + buf_size + ")")
         var src: String = this.fresh_local()
         this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
         this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")

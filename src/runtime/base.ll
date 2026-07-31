@@ -331,7 +331,7 @@ found_free:
   ; Found an existing string with the same content.
   ; Free the new duplicate and return the canonical one.
   %dup_ptr = inttoptr i64 %str to i8*
-  call void @free(i8* %dup_ptr)
+  call void @__sf_free(i8* %dup_ptr)
   br label %found
 
 found:
@@ -340,7 +340,7 @@ found:
 
 not_found:
   ; Not in table — add it. Allocate a node (16 bytes: str_ptr + next)
-  %new_node_raw = call i8* @malloc(i64 16)
+  %new_node_raw = call i8* @__sf_malloc(i64 16)
   %new_node = ptrtoint i8* %new_node_raw to i64
   %new_node_str = inttoptr i64 %new_node to i64*
   store i64 %str, i64* %new_node_str
@@ -376,7 +376,7 @@ entry:
   store i64 %new_count, i64* @__intern_bucket_count
 
   ; Allocate new bucket array (zeroed)
-  %new_buckets_raw = call i8* @calloc(i64 %new_count, i64 8)
+  %new_buckets_raw = call i8* @__sf_calloc(i64 %new_count, i64 8)
   %new_buckets = bitcast i8* %new_buckets_raw to i64*
 
   ; Walk old buckets and re-insert each node
@@ -425,7 +425,7 @@ bucket_done:
 
 finish:
   ; Free old bucket array, install new one
-  call void @free(i8* %old_buckets_raw)
+  call void @__sf_free(i8* %old_buckets_raw)
   %new_buckets_i8 = bitcast i64* %new_buckets to i8*
   store i8* %new_buckets_i8, i8** @__intern_buckets
   ret void
@@ -436,7 +436,7 @@ finish:
 define i64 @__float_to_string(i64 %v) {
 entry:
   %f = bitcast i64 %v to double
-  %buf = call i8* @malloc(i64 32)
+  %buf = call i8* @__sf_malloc(i64 32)
   %fmt = getelementptr [3 x i8], [3 x i8]* @.fmt.float, i64 0, i64 0
   call i32 (i8*, i64, i8*, ...) @snprintf(i8* %buf, i64 32, i8* %fmt, double %f)
   %r = ptrtoint i8* %buf to i64
@@ -665,6 +665,49 @@ no:
 declare i8* @calloc(i64, i64)
 declare i8* @realloc(i8*, i64)
 declare void @free(i8*)
+
+; Memory-cap wrappers. The real, cap-enforcing versions live in gc.ll; these
+; weak pass-throughs keep this file linkable on its own (bootstrap_test.sh links
+; a base without gc.ll). Without a limit installed the strong versions behave
+; identically, so nothing depends on which one wins.
+define weak i8* @__sf_malloc(i64 %size) {
+entry:
+  %p = call i8* @malloc(i64 %size)
+  ret i8* %p
+}
+
+define weak i8* @__sf_realloc(i8* %old, i64 %size) {
+entry:
+  %p = call i8* @realloc(i8* %old, i64 %size)
+  ret i8* %p
+}
+
+define weak i8* @__sf_calloc(i64 %n, i64 %size) {
+entry:
+  %p = call i8* @calloc(i64 %n, i64 %size)
+  ret i8* %p
+}
+
+define weak void @__sf_free(i8* %p) {
+entry:
+  call void @free(i8* %p)
+  ret void
+}
+
+define weak void @__mem_set_limit(i64 %bytes) {
+entry:
+  ret void
+}
+
+define weak i64 @__mem_get_limit() {
+entry:
+  ret i64 0
+}
+
+define weak i64 @__mem_live_bytes() {
+entry:
+  ret i64 0
+}
 
 ; __gc_alloc: allocate size bytes, return user pointer.
 ; Weak fallback just calls malloc (no header, no tracking).

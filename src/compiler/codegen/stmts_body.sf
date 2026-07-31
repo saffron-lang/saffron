@@ -629,7 +629,7 @@
         var class_tag: Float = this.class_type_ids.get(type_name)
         var raw: String = this.fresh_local()
         if (this.identity_mode) {
-            this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 " + struct_size.floor().to_string() + ")")
         } else {
             this.emit_indent(raw + " = call i64 @__gc_alloc(i64 " + struct_size.floor().to_string() + ", i64 " + class_tag.floor().to_string() + ")")
         }
@@ -920,7 +920,7 @@
             var num_slots: Float = num_fields + 1
             var arr_bytes: Float = num_slots * 8
             var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
             var arr: String = this.fresh_local()
             this.emit_indent(arr + " = bitcast i8* " + raw + " to [" + num_slots.floor().to_string() + " x i64]*")
             // Store tag

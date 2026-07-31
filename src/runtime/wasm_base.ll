@@ -103,6 +103,48 @@ entry:
   ret void
 }
 
+; --- Memory cap shims ---
+;
+; runtime.sf binds rt_malloc/rt_realloc/rt_free to __sf_malloc/__sf_realloc/
+; __sf_free so that --max-memory covers the native runtime. Those wrappers live
+; in gc.ll, which is not linked for wasm, so provide pass-throughs here purely
+; for link compatibility.
+;
+; The cap itself is NOT enforced on wasm and is out of scope: this bump
+; allocator has no bound check at all (see @malloc above).
+
+define i8* @__sf_malloc(i64 %size) {
+entry:
+  %p = call i8* @malloc(i64 %size)
+  ret i8* %p
+}
+
+define i8* @__sf_realloc(i8* %old, i64 %size) {
+entry:
+  %p = call i8* @realloc(i8* %old, i64 %size)
+  ret i8* %p
+}
+
+define void @__sf_free(i8* %p) {
+entry:
+  ret void
+}
+
+define void @__mem_set_limit(i64 %bytes) {
+entry:
+  ret void
+}
+
+define i64 @__mem_get_limit() {
+entry:
+  ret i64 0
+}
+
+define i64 @__mem_live_bytes() {
+entry:
+  ret i64 0
+}
+
 ; --- String Operations ---
 
 define i64 @strlen(i8* %s) {
