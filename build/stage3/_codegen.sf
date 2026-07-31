@@ -493,6 +493,15 @@ class Codegen {
     fun str_to_type(s: String): AST.Type {
         if (!(s is String)) return AST.Type.AnyType
         if (s == "String") return AST.Type.StringType
+        // `Number` is deprecated: it is one surface name for two representations,
+        // so no mapping of it can be right. `fun area(): Number` returning 12.0 is
+        // relabelled Int and the caller's `.to_string()` untags a double as an
+        // integer and prints 0; mapping it to Float instead breaks every `Number`
+        // used as a list index. Int is kept because it is the integer-ish reading
+        // that user code overwhelmingly means, and because src/lib no longer writes
+        // `Number` at all — the remaining users are user programs and test/.
+        // Retire the spelling rather than re-tune this line. See BUGS.md #49 and
+        // M2 in docs/design/compiler-rewrite.md ("Int is the bottom type").
         if (s == "Int" or s == "Number") return AST.Type.IntType
         if (s == "Float") return AST.Type.FloatType
         if (s == "Bool") return AST.Type.BoolType
@@ -856,6 +865,28 @@ class Codegen {
         }
     }
 
+    // True when the type admits more than one runtime representation, so no
+    // compile-time answer about a value's actual type is available. Every
+    // is_*_type predicate answers `false` for these, which makes a whitelist
+    // of "is it Any?" silently wrong: both arms of `x is Int` / `x is Nil` on
+    // an `Int|Nil` compiled to a literal false. See BUGS #69.
+    fun is_undecidable_type(t: AST.Type): Bool {
+        return match (t) {
+            AnyType => true
+            UnionType(types) => true
+            NullableType(inner) => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            FuncType(p, r) => false
+        }
+    }
+
     fun is_class_type(t: AST.Type, name: String): Bool {
         return match (t) {
             ClassType(n) => n == name
@@ -885,6 +916,59 @@ class Codegen {
         var parts: List<String> = this.split_respecting_generics(inner, ",")
         if (parts.length() < 2) return "Any"
         return parts[1]
+    }
+
+    // Extract the key type string from a Map<K, V> type annotation.
+    // e.g. "Map<String,AST.Type>" → "String"
+    //      "Map<Int,String>"      → "Int"
+    //      "Map" or unknown       → "Any"
+    fun get_map_key_type(map_type: String): String {
+        if (!map_type.starts_with("Map<")) return "Any"
+        var inner: String = map_type.slice(4, map_type.length() - 1)
+        var parts: List<String> = this.split_respecting_generics(inner, ",")
+        if (parts.length() < 1) return "Any"
+        return parts[0]
+    }
+
+    // Fold one map-literal entry's key/value types into the receiver's Map type.
+    //
+    // Called once per desugared .set() of a map literal. Each call merges the
+    // new entry against what the earlier entries established: agreement keeps
+    // the precise type, disagreement widens that side to Any. A side already
+    // widened to Any stays there.
+    //
+    // Restricted to the parser's map-literal temporary. That is exactly the
+    // scope of the bug, and it means an explicit `var m: Map<String, Any> = ...`
+    // is never touched: a user-named variable keeps the type its annotation
+    // gave it, rather than being silently narrowed by its own initializer.
+    fun refine_map_entry_type(name: String, key_type: String, val_type: String) {
+        if (!name.starts_with("__map")) { return }
+        var current: String = this.get_var_type_str(name)
+        if (current.length() == 0) { return }
+        if (!(current == "Map" or current.starts_with("Map<"))) { return }
+        var known_k: String = this.get_map_key_type(current)
+        var known_v: String = this.get_map_value_type(current)
+        // Seed from nothing on the first entry. A bare "Map" annotation resolves
+        // through str_to_type to Map<String, Any>, so treating that String as an
+        // observation would make {1: "x"} merge Int against String and widen the
+        // key back to Any — learning nothing. The literal's own entries are the
+        // only evidence here, so start both sides unknown.
+        if (current == "Map") {
+            known_k = "Any"
+            known_v = "Any"
+        }
+        var next_k: String = this.merge_entry_type(known_k, key_type)
+        var next_v: String = this.merge_entry_type(known_v, val_type)
+        this.typed_vars.set(name, this.make_generic_type("Map", [this.str_to_type(next_k), this.str_to_type(next_v)]))
+    }
+
+    // Merge one entry's observed type into the accumulated type for that side.
+    // "Any" on either side is the unknown/widened state, so it absorbs.
+    fun merge_entry_type(known: String, observed: String): String {
+        if (observed.length() == 0 or observed == "Any" or observed == "Nil") { return "Any" }
+        if (known == "Any") { return observed }
+        if (known == observed) { return known }
+        return "Any"
     }
 
     // Get the type string for a variable from typed_vars (the single source of truth).
@@ -1120,7 +1204,24 @@ class Codegen {
                 if (this.typed_vars.has(name)) {
                     this.last_type = this.typed_vars.get(name)
                 } else {
-                    this.last_type = AST.Type.IntType
+                    // Module-level globals are registered in global_var_types by the
+                    // pre-scan, not in typed_vars. This arm used to fall straight to
+                    // IntType without consulting that table, so a global read from
+                    // inside any function claimed to be an Int — the dishonest
+                    // "unknown means Int" fallback of BUGS #32/#33. Method dispatch
+                    // then took no branch and returned a literal "0" (#37):
+                    //
+                    //   var _order = "abc"          // module level
+                    //   fun f() { _order.index_of("b") }   // was 0, ignoring the string
+                    //
+                    // Reading the same global at top level worked, because typed_vars
+                    // has it there. That asymmetry is what made this survive so long.
+                    var gv_type: String = this.get_var_type_str(name)
+                    if (gv_type.length() > 0) {
+                        this.last_type = this.str_to_type(gv_type)
+                    } else {
+                        this.last_type = AST.Type.IntType
+                    }
                 }
                 // Error check: undefined variable
                 // Skip check for module aliases and enum names (they are valid in expressions)
@@ -1281,6 +1382,14 @@ class Codegen {
                             var mg_local: String = this.fresh_local()
                             var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
                             this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                            // Publish the type so a method call on this receiver
+                            // dispatches. Without it last_type is stale/unknown and
+                            // `Flag.items.push(1)` hit the silent `return "0"` in the
+                            // method dispatcher: the load was emitted, the call was
+                            // discarded, and the program compiled clean but did nothing.
+                            if (this.global_var_types.has(mp_resolved)) {
+                                this.last_type = this.str_to_type(this.global_var_types.get(mp_resolved))
+                            }
                             return mg_local
                         }
                     }
@@ -1432,9 +1541,15 @@ class Codegen {
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        // When the compile-time type is Any, emit a runtime NaN-boxing tag check
+        // A type that admits several runtime representations — Any, a union, a
+        // nullable — cannot be decided at compile time, so emit a runtime
+        // NaN-boxing tag check. This condition used to be `val_type_str ==
+        // "Any"`, a whitelist that silently mis-answered everything it forgot:
+        // an `Int|Nil` reached the compile-time path below, where every
+        // is_*_type predicate answers false for a union, so BOTH `x is Int` and
+        // `x is Nil` compiled to a literal false. See BUGS #69.
         var val_type_str: String = this.type_to_string(val_type)
-        if (val_type_str == "Any") {
+        if (this.is_undecidable_type(val_type)) {
             var rt_func: String = ""
             if (type_name == "Int" or type_name == "Number") {
                 rt_func = "__val_is_int"
@@ -1458,7 +1573,11 @@ class Codegen {
                 this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
                 return this.emit_tag_bool(raw_bool)
             }
-            // Unknown class type with Any — cannot resolve at runtime yet, return false
+            // A class or enum name: there is no runtime class tag to test
+            // against (values carry only a NaN-box tag), so this still answers
+            // false. Warn rather than answering silently — a dead `is` branch
+            // is invisible at runtime and this is the one case left.
+            IO.println("[codegen] Warning: `is " + type_name + "` on a value of type " + val_type_str + " always answers false — class identity is not checked at runtime")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
             return this.emit_tag_bool(local)
@@ -1631,6 +1750,26 @@ class Codegen {
             var left_class: String = ""
             if (left_name.length() > 0) {
                 left_class = this.get_var_type_str(left_name)
+            } else {
+                // The left operand is not a plain variable. It used to be given
+                // up on here, so `Vec2(1,2) + Vec2(3,4)` — a constructor call,
+                // `this.pos`, a method result — skipped overload dispatch
+                // entirely and fell through to the primitive integer path,
+                // emitting `add i64` on two *pointers* and printing a garbage
+                // address. Silent wrong answer, no diagnostic. get_expr_type
+                // already resolves calls and field accesses, so just ask it.
+                //
+                // Accept the answer ONLY if it names a declared class.
+                // get_expr_type also returns primitives ("Int", "Number",
+                // "Any"), and letting those through made `a + b + c` — whose
+                // left operand is itself a Binary — resolve to a primitive that
+                // collided with a user function sharing the overload method
+                // name, rewriting the addition into a call to the user's own
+                // global `add`: "'add' expects 3 arguments, got 2".
+                var inferred_class: String = this.get_expr_type(left)
+                if (this.class_fields.has(inferred_class)) {
+                    left_class = inferred_class
+                }
             }
             if (left_class.length() > 0) {
                 if (this.class_methods.has(left_class)) {
@@ -1672,12 +1811,34 @@ class Codegen {
             // Must come before string comparison to handle cases like:
             // map.get("missing") == nil where get returns "String" type but actual value is nil
             if (!this.identity_mode) {
+                // Which side is the *literal* nil, syntactically. This is the only
+                // reliable signal for "test the other operand for nil".
+                //
+                // Keying off the inferred type alone is wrong when both sides are typed
+                // Nil, which happens for `var x: Any = nil; ...; x == nil`: the
+                // declaration used to narrow x to Nil (now fixed in gen_var_decl, but
+                // any other Nil-typed expression reaches here too), and then
+                // `check_val` picked whichever side the type test happened to name —
+                // ending up testing the nil literal against itself, which is
+                // unconditionally true regardless of what the variable holds.
+                var left_is_literal_nil: Bool = this.is_nil_expr(left)
+                var right_is_literal_nil: Bool = this.is_nil_expr(right)
+
                 var is_nil_cmp: Bool = false
                 if (left_type == "Nil") { is_nil_cmp = true }
                 if (right_type == "Nil") { is_nil_cmp = true }
+                if (left_is_literal_nil or right_is_literal_nil) { is_nil_cmp = true }
                 if (is_nil_cmp) {
+                    // Prefer the syntactic literal: check the side that is NOT `nil`.
                     var check_val: String = lhs
-                    if (left_type == "Nil") { check_val = rhs }
+                    if (left_is_literal_nil and !right_is_literal_nil) {
+                        check_val = rhs
+                    } else if (right_is_literal_nil) {
+                        check_val = lhs
+                    } else if (left_type == "Nil") {
+                        // Neither side is a literal; fall back to the type test.
+                        check_val = rhs
+                    }
                     var is_nil_raw: String = this.fresh_local()
                     this.emit_indent(is_nil_raw + " = call i1 @__val_is_nil(i64 " + check_val + ")")
                     var nil_bool: String = is_nil_raw
@@ -1693,7 +1854,16 @@ class Codegen {
                 }
             }
 
-            if (left_type == "String" or right_type == "String") {
+            // Static-String comparison. Requires BOTH sides to be statically known
+            // non-Any: __string_eq / __string_ne dereference their operands as char*
+            // without inspecting the tag, so an Any operand holding nil (or an int,
+            // or a list) segfaults inside strcmp.
+            //
+            // An `Any` operand must therefore fall through to the __any_eq/__any_ne
+            // branch below, which unmasks and routes on the real tag and compares
+            // string *contents* when both sides do turn out to be strings. Before
+            // this ordering fix, `var x: Any = nil; x != "something"` crashed.
+            if ((left_type == "String" or right_type == "String") and left_type != "Any" and right_type != "Any") {
                 var raw_bool: String = this.fresh_local()
                 if (op == "==") {
                     this.emit_indent(raw_bool + " = call i64 @__string_eq(i64 " + lhs + ", i64 " + rhs + ")")
@@ -1781,7 +1951,7 @@ class Codegen {
                 var total1: String = this.fresh_local()
                 this.emit_indent(total1 + " = add i64 " + total + ", 1")
                 var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
+                this.emit_indent(buf + " = call i8* @__sf_malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
                 var raw_result: String = this.ptr_to_val(buf)
@@ -2152,7 +2322,7 @@ class Codegen {
             // Allocate environment: array of i64, one slot per capture
             var env_bytes: Float = num_caps * 8
             var env_raw: String = this.fresh_local()
-            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            this.emit_indent(env_raw + " = call i8* @__sf_malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + num_caps.floor().to_string() + " x i64]*")
 
@@ -2230,7 +2400,7 @@ class Codegen {
             fn_type_str = fn_type_str + ")*"
 
             var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
@@ -2291,7 +2461,7 @@ class Codegen {
         fn_type_str = fn_type_str + ")*"
 
         var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
@@ -2555,6 +2725,11 @@ class Codegen {
                     var mg_local: String = this.fresh_local()
                     var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
                     this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                    // Publish the type so a method call on this receiver dispatches
+                    // (see the matching comment in the MemberAccess handler above).
+                    if (this.global_var_types.has(mp_resolved)) {
+                        this.last_type = this.str_to_type(this.global_var_types.get(mp_resolved))
+                    }
                     return mg_local
                 }
             }
@@ -2668,7 +2843,7 @@ class Codegen {
         this.emit_indent(total1 + " = add i64 " + total + ", 1")
         // Malloc
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
@@ -3060,7 +3235,13 @@ class Codegen {
         if (this.str_in_list(this.known_functions,resolved_callee) and !this.typed_vars.has(callee_name)) {
             // Direct call to known function (only when callee is NOT a local variable/param)
             var call_target: String = resolved_callee
-            if (callee_name == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
+            // Redirect `main()` to the entry point's emitted name, but ONLY when the
+            // callee actually resolved to the unprefixed `main`. Testing callee_name
+            // meant a call that resolved to some OTHER module's `main` (e.g.
+            // turmeric_prelude_main, the <main> element builder) was rewritten to
+            // __saffron_main as well, so the call landed on the wrong function --
+            // with the wrong arity, and no diagnostic.
+            if (resolved_callee == "main" and this.str_in_list(this.defined_funcs,"__saffron_main")) {
                 call_target = "__saffron_main"
             }
             this.called_functions.push(resolved_callee)
@@ -3792,7 +3973,7 @@ class Codegen {
         if (args.length() == 0) {
             // No-field variant in a multi-field enum: heap-allocate to outlive function
             var arr_raw: String = this.fresh_local()
-            this.emit_indent(arr_raw + " = call i8* @malloc(i64 8)")
+            this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 8)")
             var arr_ptr: String = this.fresh_local()
             this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [1 x i64]*")
             var tag_slot: String = this.fresh_local()
@@ -3807,7 +3988,7 @@ class Codegen {
         var num_slots: Float = args.length() + 1
         var arr_bytes: Float = num_slots * 8
         var arr_raw: String = this.fresh_local()
-        this.emit_indent(arr_raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+        this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
         var arr_ptr: String = this.fresh_local()
         this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [" + num_slots.to_string() + " x i64]*")
         // Store tag at index 0
@@ -3818,6 +3999,31 @@ class Codegen {
         var i: Float = 0
         while (i < args.length()) {
             var val: String = this.gen_arg_value(args[i])
+            // Int -> Float widening at the payload store, the same fix as BUGS #28
+            // applied to enum construction instead of variable declaration.
+            //
+            // A `Number` field stores whatever representation the argument happened
+            // to have: `Some(7)` stored a TAG_INT, `Some(7.5)` a double. The
+            // declared field type therefore did not describe the bits, so a binding
+            // extracted by `let Some(v) = ...` was unreadable either way — typing it
+            // Float made `Some(7)` print nan, and typing it Int made
+            // `Circle(2.0)` arithmetic produce nan. Neither static choice can be
+            // right while construction is inconsistent.
+            //
+            // Normalising here makes the declared type true: a Float/Number field
+            // always holds a double, so get_variant_field_type's "Float" is correct
+            // for every construction. Reuses the untag/tag round trip so the sitofp
+            // lives in one place.
+            //
+            // Gated on !identity_mode for the reason given at the declaration site:
+            // identity mode has no tags and Float *is* Int there.
+            if (!this.identity_mode) {
+                var decl_type: String = this.get_variant_field_type(enum_name, variant, i)
+                if (decl_type == "Float" and this.type_to_string(this.last_type) == "Int") {
+                    var widened: String = this.emit_untag_float(val)
+                    val = this.emit_tag_float(widened)
+                }
+            }
             var field_idx: Float = i + 1
             var field_slot: String = this.fresh_local()
             this.emit_indent(field_slot + " = getelementptr [" + num_slots.to_string() + " x i64], [" + num_slots.to_string() + " x i64]* " + arr_ptr + ", i64 0, i64 " + field_idx.to_string())
@@ -3832,6 +4038,7 @@ class Codegen {
     // @codegen-split: match
     fun gen_match(subject: AST.Expr, arms: List<AST.MatchArm>): String {
         var subj: String = this.gen_arg_value(subject)
+        var subj_type: String = this.type_to_string(this.last_type)
         var result_ptr: String = this.fresh_local()
         this.emit_indent(result_ptr + " = alloca i64")
 
@@ -3916,6 +4123,55 @@ class Codegen {
             // Unknown enum — extract bindings from subject using array encoding
             var first_bindings: List<String> = match (first_pattern) { VariantPattern(v, b) => b
                 _ => []
+            }
+            // `match (x) { is Dog(d) => ..., is Cat(c) => ... }` — class
+            // patterns, not enum variants. There is no payload to index into:
+            // the binding IS the subject. The arm is picked at compile time
+            // from the subject's static type, since that is all the checker
+            // knows; the binding must also be registered in typed_vars or
+            // `d.bark()` cannot resolve, and since BUGS #37 an unresolved
+            // Variable is a hard error rather than a silent bad load.
+            if (this.class_fields.has(first_variant)) {
+                var chosen: Float = -1
+                var ci: Float = 0
+                while (ci < arms.length()) {
+                    var cpat: AST.Pattern = this.get_arm_pattern(arms[ci])
+                    var cname: String = match (cpat) { VariantPattern(v, b) => v
+                        _ => ""
+                    }
+                    if (chosen < 0) {
+                        // A wildcard arm is the fallback; a name equal to the
+                        // subject's static type wins outright.
+                        if (cname == subj_type) {
+                            chosen = ci
+                        } else if (cname == "_") {
+                            chosen = ci
+                        }
+                    }
+                    ci = ci + 1
+                }
+                if (chosen < 0) { chosen = 0 }
+                var cls_pat: AST.Pattern = this.get_arm_pattern(arms[chosen.floor()])
+                var cls_binds: List<String> = this.get_pattern_bindings(cls_pat)
+                var cls_name: String = match (cls_pat) { VariantPattern(v, b) => v
+                    _ => ""
+                }
+                if (cls_binds.length() >= 1) {
+                    this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cls_binds[0]))
+                    this.typed_vars.set(cls_binds[0], this.str_to_type(cls_name))
+                }
+                var cls_body: AST.Expr = this.get_arm_body(arms[chosen.floor()])
+                var cls_val: String = this.gen_arg_value(cls_body)
+                var cls_type: AST.Type = this.last_type
+                this.emit_indent("store i64 " + cls_val + ", i64* " + result_ptr)
+                var cls_result: String = this.fresh_local()
+                this.emit_indent(cls_result + " = load i64, i64* " + result_ptr)
+                this.last_type = cls_type
+                if (!this.identity_mode) {
+                    var cmr: LLVMTypes.Value = this.llvm_block_builder.call("__match_result", LLVMTypes.Type.I64, [])
+                    this.llvm_values.set(cls_result, cmr)
+                }
+                return cls_result
             }
             if (first_bindings.length() >= 1) {
                 // Array encoding: inttoptr → GEP for each binding
@@ -4089,7 +4345,11 @@ class Codegen {
         if (name_type.length() < 2) return "Int"
         var ftype: String = name_type[1]
         if (ftype == "String") return "String"
-        if (ftype == "Float" or ftype == "Number") return "Int"
+        // Float must stay Float. Collapsing it to Int made arithmetic on a
+        // match binding emit integer ops against a NaN-boxed double, so
+        // `Circle(r) => 3.14159 * r * r` evaluated to nan. Identity mode still
+        // wants Int, and type_to_string_for_target already applies that.
+        if (ftype == "Float" or ftype == "Number") return "Float"
         if (ftype == "Bool") return "Int"
         if (ftype.starts_with("List")) return "List<String>"
         return "Int"
@@ -4218,7 +4478,7 @@ class Codegen {
             var env_size: Float = captures.length()
             var env_bytes: Float = env_size * 8
             var env_raw: String = this.fresh_local()
-            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            this.emit_indent(env_raw + " = call i8* @__sf_malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + env_size.floor().to_string() + " x i64]*")
             // Store VALUES of captured variables in env (copy semantics).
@@ -4234,7 +4494,7 @@ class Codegen {
             }
             // Heap-allocate closure pair: [fn_ptr, env_ptr]
             var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             // Store fn ptr
@@ -4304,7 +4564,7 @@ class Codegen {
 
         // Heap-allocate closure pair: [fn_ptr, 0]
         var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var num_total_params: Float = param_names.length() + 1
@@ -4335,6 +4595,26 @@ class Codegen {
 
     fun gen_closure_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>, captures: List<String>) {
         this.known_functions.push(name)
+        // We are about to emit a function body, so `in_function` must be true for
+        // the duration.
+        //
+        // gen_lambda sets it to *false* before calling us — that is deliberate, and
+        // is what stops gen_function from treating the lambda as a nested function
+        // and hoisting it. But `in_function` is overloaded: it also means "emitted
+        // code lives inside a function body", and several expression cases branch
+        // on it. NilLit is the load-bearing one: outside a function it emits the
+        // literal "0" (correct for a module-level initialiser, where no runtime
+        // call can be made), and inside one it emits `call i64 @__val_nil()`.
+        //
+        // Under NaN boxing nil is 0x7FF8000000000002, not 0, so leaving the flag
+        // false made every `return nil` in a capturing closure return integer 0 —
+        // which is neither nil nor a valid pointer. `x == nil` was then false for a
+        // value that *was* nil, and dereferencing it segfaulted.
+        //
+        // Restored at the end rather than hard-cleared, so the outer emitter's
+        // notion of where it is survives.
+        var saved_in_function: Bool = this.in_function
+        this.in_function = true
         // Save outer-scope types for captured variables before resetting
         var outer_typed_vars: Map<String, AST.Type> = {}
         var oci: Float = 0
@@ -4393,7 +4673,7 @@ class Codegen {
         if (is_coro) {
             this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
             this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
             this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
         }
 
@@ -4484,6 +4764,7 @@ class Codegen {
         this.emit("}")
         this.block_terminated = false
         this.is_coroutine = false
+        this.in_function = saved_in_function
     }
 
 
@@ -5165,6 +5446,25 @@ class Codegen {
                 vtype = post_type
             }
         }
+        // A nil initialiser says nothing about the variable's type, so do not let it
+        // narrow to "Nil".
+        //
+        // `var parsed: Any = nil` (and the inferred `var x = nil`) used to type the
+        // variable as Nil for the rest of its life. Nothing widened it on
+        // reassignment, so after `parsed = JSON.parse(body)` the variable still
+        // claimed to be Nil — and the `== nil` comparison in gen_binary keys off the
+        // *static* type, emitting `__val_is_nil` against the nil literal rather than
+        // against the variable. The result was a comparison that was unconditionally
+        // true: `parsed == nil` reported nil for a live object, and the playground's
+        // /api/compile rejected every request as "missing 'source' field".
+        //
+        // "Any" is the honest type here — it routes through the runtime dispatch
+        // helpers, which inspect the actual tag. This is I2 in
+        // docs/design/compiler-rewrite.md ("Unknown is distinct"), applied to the one
+        // case where the current tree spells unknown as a concrete type.
+        if (vtype == "Nil") {
+            vtype = "Any"
+        }
         // Resolve generic type parameters from lambda argument return types.
         // e.g. var x = computed(fun (): String => ...) infers Computed<String> not Computed<T>
         if (vtype.contains("<") and vtype.contains(">")) {
@@ -5621,7 +5921,7 @@ class Codegen {
         var class_tag: Float = this.class_type_ids.get(type_name)
         var raw: String = this.fresh_local()
         if (this.identity_mode) {
-            this.emit_indent(raw + " = call i8* @malloc(i64 " + struct_size.floor().to_string() + ")")
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 " + struct_size.floor().to_string() + ")")
         } else {
             this.emit_indent(raw + " = call i64 @__gc_alloc(i64 " + struct_size.floor().to_string() + ", i64 " + class_tag.floor().to_string() + ")")
         }
@@ -5912,7 +6212,7 @@ class Codegen {
             var num_slots: Float = num_fields + 1
             var arr_bytes: Float = num_slots * 8
             var raw: String = this.fresh_local()
-            this.emit_indent(raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+            this.emit_indent(raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
             var arr: String = this.fresh_local()
             this.emit_indent(arr + " = bitcast i8* " + raw + " to [" + num_slots.floor().to_string() + " x i64]*")
             // Store tag
@@ -6659,6 +6959,11 @@ class Codegen {
         rt.append("declare i64 @__gc_env_alloc(i64)\n")
         rt.append("declare i64 @__gc_instance_alloc(i64)\n")
         rt.append("declare i64 @__gc_get_type_tag(i64)\n")
+        // Memory-cap-aware malloc. Codegen emits @__sf_malloc rather than
+        // @malloc so --max-memory / SAFFRON_MAX_MEMORY also covers the
+        // allocations codegen makes directly (string concat, closure envs,
+        // enum payloads, coroutine frames).
+        rt.append("declare i8* @__sf_malloc(i64)\n")
         // Scheduler extern functions (always needed when @async or @scheduler imported)
         rt.append("\n; --- Scheduler runtime ---\n")
         rt.append("declare double @sf_time_now()\n")
@@ -7784,12 +8089,125 @@ class Codegen {
         return arg_str
     }
 
+    /// Pre-register one function declaration's signature: defaults, param count,
+    /// param names and RETURN TYPE.
+    ///
+    /// This is the single implementation of the declaration pre-scan. It used to
+    /// be copy-pasted into `generate_with_modules` and both `..._flat_opts`
+    /// variants, plus a fourth, *divergent* copy for the main program's own
+    /// declarations. BUGS #33 and #36 each had to be applied to every copy, and
+    /// #33's first attempt got two of them wrong — the build caught it. Worse,
+    /// the main-program copy never registered `func_ret_types` at all, so #33
+    /// was still live for top-level functions: a caller declared above its
+    /// callee inferred `Int` for the result and every method on it silently
+    /// fell through (#37).
+    ///
+    /// `prefix` is "" for the main program and the module prefix otherwise.
+    fun prescan_fun_decl(stmt: AST.Stmt, prefix: String) {
+        var name: String = this.get_fun_name(stmt)
+        if (name.length() == 0) return nil
+        var doc: String = this.get_fun_doc(stmt)
+        // @intrinsic / @extern declarations are dispatched by other machinery and
+        // must not be registered as ordinary callables.
+        if (doc.starts_with("@intrinsic") or doc.starts_with("@extern:")) return nil
+
+        var emit_name: String = prefix + name
+        var params: List<AST.Param> = this.get_fun_params(stmt)
+        var defaults: List<AST.Expr> = []
+        var pnames: List<String> = []
+        var pi: Float = 0
+        while (pi < params.length()) {
+            var p: AST.Param = params[pi]
+            defaults.push(match (p) { Param(n, t, d) => d })
+            pnames.push(match (p) { Param(n, t, d) => n })
+            pi = pi + 1
+        }
+        this.func_defaults.set(emit_name, defaults)
+        this.func_param_count.set(emit_name, params.length())
+        this.func_param_names.set(emit_name, pnames)
+
+        // Return type too, or a call compiled before the callee's own
+        // gen_function runs falls back to Int and misdispatches every method on
+        // the result (BUGS #33). gen_function still sets this, but only when it
+        // reaches the declaration — too late for a caller appearing earlier.
+        var ret: String = this.get_fun_ret(stmt)
+        if (ret.length() > 0) {
+            this.func_ret_types.set(emit_name, this.str_to_type(ret))
+            if (prefix.length() > 0) {
+                this.func_ret_types.set(name, this.str_to_type(ret))
+            }
+        }
+    }
+
+    /// Pre-register every method of a class declaration. Methods take an implicit
+    /// leading `self`, registered under both the bare `Class__method` name and
+    /// the prefixed one.
+    fun prescan_class_decl(stmt: AST.Stmt, prefix: String) {
+        var cname: String = match (stmt) { ClassDecl(n, p, f, m, d) => n
+            _ => ""
+        }
+        var methods: List<AST.Stmt> = match (stmt) { ClassDecl(n, p, f, m, d) => m
+            _ => []
+        }
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var mname: String = this.get_fun_name(methods[mi])
+            if (mname.length() > 0) {
+                var mparams: List<AST.Param> = this.get_fun_params(methods[mi])
+                var mdefs: List<AST.Expr> = []
+                var mpnames: List<String> = []
+                mpnames.push("self")
+                mdefs.push(AST.Expr.NilLit)
+                var mpi: Float = 0
+                while (mpi < mparams.length()) {
+                    var mp: AST.Param = mparams[mpi]
+                    mdefs.push(match (mp) { Param(n, t, d) => d })
+                    mpnames.push(match (mp) { Param(n, t, d) => n })
+                    mpi = mpi + 1
+                }
+                var full: String = cname + "__" + mname
+                this.func_defaults.set(full, mdefs)
+                this.func_param_count.set(full, mpnames.length())
+                this.func_param_names.set(full, mpnames)
+                if (prefix.length() > 0) {
+                    var pfull: String = prefix + full
+                    this.func_defaults.set(pfull, mdefs)
+                    this.func_param_count.set(pfull, mpnames.length())
+                    this.func_param_names.set(pfull, mpnames)
+                }
+            }
+            mi = mi + 1
+        }
+    }
+
+    /// Pre-scan a contiguous run of statements, registering every function and
+    /// class declaration. One call site per corpus — modules and main program
+    /// alike — so the four copies cannot drift again.
+    fun prescan_decls(stmts: List<AST.Stmt>, start: Float, end: Float, prefix: String) {
+        var si: Float = start
+        while (si < end) {
+            var kind: String = this.classify_stmt(stmts[si])
+            if (kind == "fun") {
+                this.prescan_fun_decl(stmts[si], prefix)
+            } else if (kind == "class") {
+                this.prescan_class_decl(stmts[si], prefix)
+            }
+            si = si + 1
+        }
+    }
+
     // --- Statement codegen ---
 
     // @codegen-split: output
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
         var emit_name: String = this.current_prefix + name
-        if (name == "main") {
+        // Only the ENTRY module's `main` becomes __saffron_main. An imported
+        // module is free to define a function called `main` (turmeric/prelude.sf
+        // does — it is the <main> element builder), and renaming that one too
+        // made both collapse onto the same symbol: the entry point silently
+        // called the library's `main` instead of the user's, with no diagnostic.
+        // current_prefix is empty only for the module being compiled.
+        if (name == "main" and this.current_prefix.length() == 0) {
             emit_name = "__saffron_main"
             this.known_functions.push("main")
         } else if (name.contains("__lambda")) {
@@ -8069,7 +8487,7 @@ class Codegen {
         if (is_coro) {
             this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
             this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
             this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
         }
 
@@ -8120,6 +8538,18 @@ class Codegen {
         // Only emit when not in identity mode (bootstrap doesn't need GC)
         var gc_root_count: Float = 0
         if (!this.identity_mode) {
+            // Coroutines tear down at __coro_final, by which time other tasks may
+            // have pushed roots on top of ours — the shadow stack is a single
+            // global LIFO but coroutine lifetimes are not nested. Record the depth
+            // *before* pushing this frame's roots so the epilogue can tell whether
+            // our roots are still the top of the stack and therefore safe to pop.
+            // Placed after llvm.coro.begin so CoroSplit promotes it into the frame,
+            // which is what lets it survive an arbitrary number of suspends.
+            if (is_coro) {
+                this.emit_indent("%__coro_ss_base = alloca i64")
+                this.emit_indent("%__coro_ss_base_v = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("store i64 %__coro_ss_base_v, i64* %__coro_ss_base")
+            }
             // Track params that are heap types
             i = 0
             while (i < param_list.length()) {
@@ -8201,6 +8631,32 @@ class Codegen {
 
             this.emit("__coro_final:")
             this.block_terminated = false
+            // Release this frame's GC roots. Every coroutine return path funnels
+            // through __coro_final (gen_return branches here rather than popping
+            // itself), and the final suspend never resumes back into the body —
+            // resume traps, destroy goes to __coro_cleanup — so this runs exactly
+            // once per frame no matter how many times the coroutine suspended.
+            //
+            // The pop is guarded because the shadow stack is one global LIFO while
+            // coroutine lifetimes are not nested: a task that started later can
+            // still be live, with its roots stacked above ours, when we finish.
+            // Popping a fixed count there would discard *its* roots and collect
+            // objects that are still in use. So pop only when our region is
+            // provably still the top of the stack; otherwise leave it, since
+            // leaking a root is recoverable and freeing a live one is not.
+            if (gc_root_count > 0) {
+                this.emit_indent("%__coro_ss_now = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("%__coro_ss_b = load i64, i64* %__coro_ss_base")
+                this.emit_indent("%__coro_ss_exp = add i64 %__coro_ss_b, " + gc_root_count.floor().to_string())
+                this.emit_indent("%__coro_ss_is_top = icmp eq i64 %__coro_ss_now, %__coro_ss_exp")
+                this.emit_terminator("br i1 %__coro_ss_is_top, label %__coro_ss_pop, label %__coro_ss_done")
+                this.emit("__coro_ss_pop:")
+                this.block_terminated = false
+                this.emit_indent("call void @__gc_pop_roots(i64 " + gc_root_count.floor().to_string() + ")")
+                this.emit_terminator("br label %__coro_ss_done")
+                this.emit("__coro_ss_done:")
+                this.block_terminated = false
+            }
             this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
             this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
             this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")
@@ -8549,7 +9005,7 @@ class Codegen {
             if (entry_is_coro) {
                 this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
                 this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-                this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+                this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
                 this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
             }
             var vi: Float = 0
@@ -9174,10 +9630,29 @@ class Codegen {
         if (mc_method == "length" or mc_method == "index_of" or mc_method == "to_number") return "Int"
         if (mc_method == "slice") {
             if (mc_obj_type.starts_with("List")) { return mc_obj_type }
-            return "String"
+            if (mc_obj_type == "String") { return "String" }
+            // Unknown receiver: don't claim String. `slice` is defined on both
+            // List and String, so on an unannotated value we cannot say which.
+            // Claiming String let a sliced list be handed to string-typed code.
+            return "Any"
         }
         if (mc_method == "to_string" or mc_method == "join" or mc_method == "trim" or mc_method == "to_upper" or mc_method == "to_lower" or mc_method == "repeat" or mc_method == "replace" or mc_method == "char_at") return "String"
-        if (mc_method == "split" or mc_method == "keys") return "List<String>"
+        if (mc_method == "split") return "List<String>"
+        // Map.keys()/values() element type comes from the Map<K, V> annotation.
+        // Hardcoding List<String> made `for (v in m.values())` on a
+        // Map<String,Int> treat every Int as a string pointer and SEGFAULT.
+        if (mc_method == "keys") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_key_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
+        if (mc_method == "values") {
+            if (mc_obj_type.starts_with("Map<")) {
+                return "List<" + this.get_map_value_type(mc_obj_type) + ">"
+            }
+            return "List<Any>"
+        }
         if (mc_method == "has" or mc_method == "contains" or mc_method == "starts_with" or mc_method == "ends_with" or mc_method == "is_upper" or mc_method == "is_lower") return "Bool"
         if (mc_method == "get") {
             // Infer return type from Map<K, V> annotation rather than always "String"
@@ -9326,10 +9801,10 @@ class Codegen {
         var ig_otype: String = this.type_to_string(this.typed_vars.get(obj_name))
         if (ig_otype.starts_with("Map")) {
             var map_obj: String = this.gen_arg_value(object)
-            var key_val: String = this.gen_arg_value(index)
-            var key_ptr: String = this.emit_untag_ptr(key_val)
-            var key_raw: String = this.fresh_local()
-            this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+            // Key passed through NaN-boxed, NOT untagged — see Map.set. The
+            // runtime's __map_key_cmp reads the tag to tell string keys from
+            // numeric ones; untagging here destroyed that discriminator.
+            var key_raw: String = this.gen_arg_value(index)
             var local: String = this.fresh_local()
             this.emit_indent(local + " = call i64 @__map_get(i64 " + map_obj + ", i64 " + key_raw + ")")
             if (ig_otype.starts_with("Map<")) {
@@ -9787,6 +10262,39 @@ class Codegen {
         return this.gen_namespace_call(this.current_class, method, self_val, args, true)
     }
 
+    // super.method(args) — must be decided HERE, above the builtin-dispatch
+    // preamble further down, which does an unconditional gen_arg_value(object).
+    // `super` parses as an ordinary Variable node (parser.sf), so that preamble
+    // emits `load i64, i64* %super` for a slot no prologue allocates, and the
+    // module fails LLVM verification even though the call below is correct
+    // (BUGS #70). Same reason the `this` receiver is handled just above.
+    if (obj_name == "super" and this.current_parent.length() > 0) {
+        var super_self: String = this.fresh_local()
+        this.emit_indent(super_self + " = load i64, i64* %self")
+        var super_args: List<String> = []
+        super_args.push("i64 " + super_self)
+        var super_i: Float = 0
+        while (super_i < args.length()) {
+            var super_arg: String = this.gen_arg_value(args[super_i])
+            super_args.push("i64 " + super_arg)
+            super_i = super_i + 1
+        }
+        var parent_method: String = this.current_parent + "__" + method
+        this.called_functions.push(parent_method)
+        var super_result: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(super_result, "i64", parent_method, super_args.join(", ")))
+        } else {
+            this.emit_indent(super_result + " = call i64 @" + parent_method + "(" + super_args.join(", ") + ")")
+        }
+        if (this.func_ret_types.has(parent_method)) {
+            this.last_type = this.func_ret_types.get(parent_method)
+        } else {
+            this.last_type = AST.Type.StringType
+        }
+        return super_result
+    }
+
     // Actor fire-and-forget: actor.send("method_name", args...)
     if (method == "send" and args.length() >= 1 and obj_name.length() > 0) {
         var send_obj_type: String = this.get_var_type_str(obj_name)
@@ -9869,6 +10377,12 @@ class Codegen {
                 else if (__mp_func.ends_with("_alloc_count")) { __mp_func = "__gc_stat_alloc_count" }
                 else if (__mp_func.ends_with("_total_bytes")) { __mp_func = "__gc_stat_total_bytes" }
                 else if (__mp_func.ends_with("_threshold") and !__mp_func.ends_with("_set_threshold")) { __mp_func = "__gc_stat_threshold" }
+                // Memory cap lives in the __mem_ namespace, not __gc_.
+                // Check _set_max_memory before _max_memory: the former also
+                // ends with the latter.
+                else if (__mp_func.ends_with("_set_max_memory")) { __mp_func = "__mem_set_limit" }
+                else if (__mp_func.ends_with("_max_memory")) { __mp_func = "__mem_get_limit" }
+                else if (__mp_func.ends_with("_live_bytes")) { __mp_func = "__mem_live_bytes" }
             }
             this.called_functions.push(__mp_func)
 
@@ -10693,7 +11207,10 @@ class Codegen {
             } else {
                 this.emit_indent(__mk_local + " = call i64 @__map_keys(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // The element type is K, not String. Hardcoding List<String> here
+            // made `for (k in m.keys())` on a Map<Int,String> hand each raw Int
+            // to string-typed consumers and SEGFAULT. Unannotated maps stay Any.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_key_type(__map_obj_type))])
             return __mk_local
         }
         if (__map_type_match and method == "values") {
@@ -10704,7 +11221,8 @@ class Codegen {
             } else {
                 this.emit_indent(__mv_local + " = call i64 @__map_values(i64 " + obj + ")")
             }
-            this.last_type = this.make_list_str_type()
+            // Element type is V — see the keys() note above.
+            this.last_type = this.make_generic_type("List", [this.str_to_type(this.get_map_value_type(__map_obj_type))])
             return __mv_local
         }
     }
@@ -10916,17 +11434,36 @@ class Codegen {
             this.last_type = AST.Type.NilType
             return "0"
         }
-        // Map.set(key, value) -> __map_set (untag key for runtime)
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_s: String = this.emit_untag_ptr(key_val)
-        var key_raw_s: String = this.fresh_local()
-        this.emit_indent(key_raw_s + " = ptrtoint i8* " + key_ptr_s + " to i64")
+        // Map.set(key, value) -> __map_set
+        //
+        // The key is passed through NaN-boxed, NOT untagged. Untagging threw
+        // away the only thing that distinguishes a string key from a numeric
+        // one, and the runtime then compared every stored key with strcmp — so
+        // a second `set()` on a Map<Int, _> dereferenced the number itself and
+        // segfaulted. __map_key_cmp reads the tag; it needs the tag intact.
+        var key_raw_s: String = this.gen_arg_value(args[0])
+        var key_entry_type: String = this.type_to_string(this.last_type)
         var val: String = this.gen_arg_value(args[1])
+        var val_entry_type: String = this.type_to_string(this.last_type)
         var discard: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val))
         } else {
             this.emit_indent(discard + " = call i64 @__map_set(i64 " + obj + ", i64 " + key_raw_s + ", i64 " + val + ")")
+        }
+        // Recover the K and V of a map *literal* from the entries themselves.
+        //
+        // The parser desugars {"a": 1} into a VarDecl of a temporary annotated
+        // just "Map", plus one .set() per entry. Nothing ever looked at the
+        // entries, so every literal came out Map<String, Any> — the value type
+        // erased to Any even when every entry agreed. gen_var_decl_with_name
+        // re-reads last_type after the initializer runs, so tightening
+        // typed_vars here is what reaches the enclosing `var`.
+        //
+        // Widen to Any on disagreement rather than guessing from entry 0 (the
+        // mistake gen_list_lit still makes).
+        if (obj_name.length() > 0) {
+            this.refine_map_entry_type(obj_name, key_entry_type, val_entry_type)
         }
         this.last_type = AST.Type.NilType
         return "0"
@@ -10940,11 +11477,10 @@ class Codegen {
         if (has_obj_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'has' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        // Untag string key for runtime (expects raw pointer)
-        var key_ptr: String = this.emit_untag_ptr(key_val)
-        var key_raw: String = this.fresh_local()
-        this.emit_indent(key_raw + " = ptrtoint i8* " + key_ptr + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_has
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw: String = this.gen_arg_value(args[0])
         var raw: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(raw, "i64", "__map_has", "i64 " + obj + ", i64 " + key_raw))
@@ -10964,10 +11500,10 @@ class Codegen {
         if (get_recv_type == "Any") {
             IO.println("[codegen] Warning: dispatching 'get' on untyped value (type inference failed)")
         }
-        var key_val: String = this.gen_arg_value(args[0])
-        var key_ptr_g: String = this.emit_untag_ptr(key_val)
-        var key_raw_g: String = this.fresh_local()
-        this.emit_indent(key_raw_g + " = ptrtoint i8* " + key_ptr_g + " to i64")
+        // Key passed through NaN-boxed, NOT untagged — see Map.set. __map_get
+        // now calls __map_key_cmp, which reads the tag to distinguish string
+        // keys from numeric ones; untagging here destroyed that discriminator.
+        var key_raw_g: String = this.gen_arg_value(args[0])
         var local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(local, "i64", "__map_get", "i64 " + obj + ", i64 " + key_raw_g))
@@ -11022,7 +11558,7 @@ class Codegen {
         var char_ptr: String = this.fresh_local()
         this.emit_indent(char_ptr + " = getelementptr i8, i8* " + str_ptr + ", i64 " + idx)
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 2)")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(i64 2)")
         var ch: String = this.fresh_local()
         this.emit_indent(ch + " = load i8, i8* " + char_ptr)
         this.emit_indent("store i8 " + ch + ", i8* " + buf)
@@ -11097,7 +11633,7 @@ class Codegen {
         var buf_size: String = this.fresh_local()
         this.emit_indent(buf_size + " = add i64 " + slice_len + ", 1")
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(i64 " + buf_size + ")")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(i64 " + buf_size + ")")
         var src: String = this.fresh_local()
         this.emit_indent(src + " = getelementptr i8, i8* " + str_ptr + ", i64 " + start)
         this.emit_indent("call void @llvm.memcpy.p0i8.p0i8.i64(i8* " + buf + ", i8* " + src + ", i64 " + slice_len + ", i1 false)")
@@ -11392,34 +11928,6 @@ class Codegen {
         }
         this.last_type = AST.Type.IntType
         return obj
-    }
-
-    // Check for super.method() calls
-    if (obj_name == "super" and this.current_parent.length() > 0) {
-        var self_val: String = this.fresh_local()
-        this.emit_indent(self_val + " = load i64, i64* %self")
-        var arg_strs: List<String> = []
-        arg_strs.push("i64 " + self_val)
-        var ai: Float = 0
-        while (ai < args.length()) {
-            var val: String = this.gen_arg_value(args[ai])
-            arg_strs.push("i64 " + val)
-            ai = ai + 1
-        }
-        var parent_method: String = this.current_parent + "__" + method
-        this.called_functions.push(parent_method)
-        var local: String = this.fresh_local()
-        if (this.use_llvm_lib) {
-            this.emit_indent(this.lib_call(local, "i64", parent_method, arg_strs.join(", ")))
-        } else {
-            this.emit_indent(local + " = call i64 @" + parent_method + "(" + arg_strs.join(", ") + ")")
-        }
-        if (this.func_ret_types.has(parent_method)) {
-            this.last_type = this.func_ret_types.get(parent_method)
-        } else {
-            this.last_type = AST.Type.StringType
-        }
-        return local
     }
 
     // (enum check moved above builtin dispatch)
@@ -12406,88 +12914,14 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation, so a call compiled before
+    // its callee's declaration still resolves. One shared implementation —
+    // see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
     var df_mi: Float = 0
     while (df_mi < module_stmts.length()) {
         var df_stmts: List<AST.Stmt> = module_stmts[df_mi]
-        var df_prefix: String = module_prefixes_list[df_mi]
-        var df_si: Float = 0
-        while (df_si < df_stmts.length()) {
-            var df_kind: String = gen.classify_stmt(df_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(df_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(df_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(df_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(df_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (df_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
+        gen.prescan_decls(df_stmts, 0, df_stmts.length(), module_prefixes_list[df_mi])
         df_mi = df_mi + 1
     }
 
@@ -12818,6 +13252,16 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
                 gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
+                // Infer from the initializer when unannotated, exactly as the
+                // module-level pre-scan does (BUGS #36). This copy only ever read
+                // the annotation, so `var _order = "abc"` in the main program
+                // stayed untyped and every method on it misdispatched (#37).
+                if (gvtype.length() == 0 or gvtype == "Any") {
+                    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+                    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+                        gvtype = gvinit
+                    }
+                }
                 if (gvtype.length() > 0 and gvtype != "Any") {
                     gen.global_var_types.set(gvname, gvtype)
                 }
@@ -13064,150 +13508,19 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
-    mi = 0
-    while (mi < prefixes.length()) {
-        var df_prefix: String = prefixes[mi]
-        var df_start: Float = boundaries[mi]
-        var df_end: Float = boundaries[mi + 1]
-        var df_si: Float = df_start
-        while (df_si < df_end) {
-            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(all_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
-        mi = mi + 1
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation. One shared implementation
+    // — see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
+    var pre_mi: Float = 0
+    while (pre_mi < prefixes.length()) {
+        gen.prescan_decls(all_stmts, boundaries[pre_mi], boundaries[pre_mi + 1], prefixes[pre_mi])
+        pre_mi = pre_mi + 1
     }
-    // Also pre-scan main program's function defaults
-    var df_pi2: Float = 0
-    while (df_pi2 < program.length()) {
-        var df_pk: String = gen.classify_stmt(program[df_pi2])
-        if (df_pk == "fun") {
-            var df_name2: String = gen.get_fun_name(program[df_pi2])
-            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
-            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
-                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
-                var df_defaults2: List<AST.Expr> = []
-                var df_pnames2: List<String> = []
-                var df_pi3: Float = 0
-                while (df_pi3 < df_params2.length()) {
-                    var df_p2: AST.Param = df_params2[df_pi3]
-                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
-                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
-                    df_defaults2.push(df_dval2)
-                    df_pnames2.push(df_pn2)
-                    df_pi3 = df_pi3 + 1
-                }
-                gen.func_defaults.set(df_name2, df_defaults2)
-                gen.func_param_count.set(df_name2, df_params2.length())
-                gen.func_param_names.set(df_name2, df_pnames2)
-            }
-        } else if (df_pk == "class") {
-            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
-                _ => ""
-            }
-            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
-                _ => []
-            }
-            var df_mi3: Float = 0
-            while (df_mi3 < df_methods2.length()) {
-                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
-                if (df_mname2.length() > 0) {
-                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
-                    var df_mdefs2: List<AST.Expr> = []
-                    var df_mpnames2: List<String> = []
-                    df_mpnames2.push("self")
-                    df_mdefs2.push(AST.Expr.NilLit)
-                    var df_mpi2: Float = 0
-                    while (df_mpi2 < df_mparams2.length()) {
-                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
-                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
-                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
-                        df_mdefs2.push(df_mdval2)
-                        df_mpnames2.push(df_mpn2)
-                        df_mpi2 = df_mpi2 + 1
-                    }
-                    var df_full2: String = df_cname2 + "__" + df_mname2
-                    gen.func_defaults.set(df_full2, df_mdefs2)
-                    gen.func_param_count.set(df_full2, df_mpnames2.length())
-                    gen.func_param_names.set(df_full2, df_mpnames2)
-                }
-                df_mi3 = df_mi3 + 1
-            }
-        }
-        df_pi2 = df_pi2 + 1
-    }
+    // Pre-scan the main program's own declarations through the same path.
+    // This copy previously omitted func_ret_types entirely, leaving BUGS #33
+    // live for top-level functions: a caller declared above its callee inferred
+    // Int for the result and every method on it silently fell through (#37).
+    gen.prescan_decls(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []
@@ -13546,6 +13859,16 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
                 gen.globals.push("@__g_" + gen.sanitize_name(gvname) + " = global i64 0\n")
                 // Pre-register global variable type for method dispatch
                 var gvtype: String = gen.get_var_type(program[gvi])
+                // Infer from the initializer when unannotated, exactly as the
+                // module-level pre-scan does (BUGS #36). This copy only ever read
+                // the annotation, so `var _order = "abc"` in the main program
+                // stayed untyped and every method on it misdispatched (#37).
+                if (gvtype.length() == 0 or gvtype == "Any") {
+                    var gvinit: String = gen.get_expr_type(gen.get_var_init(program[gvi]))
+                    if (gvinit.starts_with("List") or gvinit.starts_with("Map") or gvinit == "String") {
+                        gvtype = gvinit
+                    }
+                }
                 if (gvtype.length() > 0 and gvtype != "Any") {
                     gen.global_var_types.set(gvname, gvtype)
                 }
@@ -13767,150 +14090,19 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
         pr_pi = pr_pi + 1
     }
 
-    // Pre-scan: register func_defaults and func_param_names for ALL functions
-    // from all modules BEFORE any IR generation. This ensures named argument
-    // default filling works regardless of module compilation order.
-    mi = 0
-    while (mi < prefixes.length()) {
-        var df_prefix: String = prefixes[mi]
-        var df_start: Float = boundaries[mi]
-        var df_end: Float = boundaries[mi + 1]
-        var df_si: Float = df_start
-        while (df_si < df_end) {
-            var df_kind: String = gen.classify_stmt(all_stmts[df_si])
-            if (df_kind == "fun") {
-                var df_name: String = gen.get_fun_name(all_stmts[df_si])
-                var df_doc: String = gen.get_fun_doc(all_stmts[df_si])
-                if (df_name.length() > 0 and !df_doc.starts_with("@intrinsic") and !df_doc.starts_with("@extern:")) {
-                    var df_emit: String = df_prefix + df_name
-                    var df_params: List<AST.Param> = gen.get_fun_params(all_stmts[df_si])
-                    var df_defaults: List<AST.Expr> = []
-                    var df_pnames: List<String> = []
-                    var df_pi: Float = 0
-                    while (df_pi < df_params.length()) {
-                        var df_p: AST.Param = df_params[df_pi]
-                        var df_dval: AST.Expr = match (df_p) { Param(n, t, d) => d }
-                        var df_pn: String = match (df_p) { Param(n, t, d) => n }
-                        df_defaults.push(df_dval)
-                        df_pnames.push(df_pn)
-                        df_pi = df_pi + 1
-                    }
-                    gen.func_defaults.set(df_emit, df_defaults)
-                    gen.func_param_count.set(df_emit, df_params.length())
-                    gen.func_param_names.set(df_emit, df_pnames)
-                    // Return type too, or a call compiled before the callee's own
-                    // gen_function runs falls back to Int and misdispatches every
-                    // method on the result (BUGS #33). gen_function still sets this,
-                    // but only when it reaches the declaration — too late for a
-                    // caller that appears earlier in the same module.
-                    var df_ret: String = gen.get_fun_ret(all_stmts[df_si])
-                    if (df_ret.length() > 0) {
-                        gen.func_ret_types.set(df_emit, gen.str_to_type(df_ret))
-                        if (df_prefix.length() > 0) {
-                            gen.func_ret_types.set(df_name, gen.str_to_type(df_ret))
-                        }
-                    }
-                }
-            } else if (df_kind == "class") {
-                var df_cname: String = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => n
-                    _ => ""
-                }
-                var df_methods: List<AST.Stmt> = match (all_stmts[df_si]) { ClassDecl(n, p, f, m, d) => m
-                    _ => []
-                }
-                var df_mi2: Float = 0
-                while (df_mi2 < df_methods.length()) {
-                    var df_mname: String = gen.get_fun_name(df_methods[df_mi2])
-                    if (df_mname.length() > 0) {
-                        var df_mparams: List<AST.Param> = gen.get_fun_params(df_methods[df_mi2])
-                        var df_mdefs: List<AST.Expr> = []
-                        var df_mpnames: List<String> = []
-                        df_mpnames.push("self")
-                        df_mdefs.push(AST.Expr.NilLit)
-                        var df_mpi: Float = 0
-                        while (df_mpi < df_mparams.length()) {
-                            var df_mp: AST.Param = df_mparams[df_mpi]
-                            var df_mdval: AST.Expr = match (df_mp) { Param(n, t, d) => d }
-                            var df_mpn: String = match (df_mp) { Param(n, t, d) => n }
-                            df_mdefs.push(df_mdval)
-                            df_mpnames.push(df_mpn)
-                            df_mpi = df_mpi + 1
-                        }
-                        var df_full: String = df_cname + "__" + df_mname
-                        var df_pfull: String = df_prefix + df_full
-                        gen.func_defaults.set(df_pfull, df_mdefs)
-                        gen.func_param_count.set(df_pfull, df_mpnames.length())
-                        gen.func_param_names.set(df_pfull, df_mpnames)
-                        gen.func_defaults.set(df_full, df_mdefs)
-                        gen.func_param_count.set(df_full, df_mpnames.length())
-                        gen.func_param_names.set(df_full, df_mpnames)
-                    }
-                    df_mi2 = df_mi2 + 1
-                }
-            }
-            df_si = df_si + 1
-        }
-        mi = mi + 1
+    // Pre-scan: register every module declaration's signature (defaults, param
+    // names AND return type) BEFORE any IR generation. One shared implementation
+    // — see Codegen.prescan_decls (BUGS #33/#36 had to patch four copies).
+    var pre_mi: Float = 0
+    while (pre_mi < prefixes.length()) {
+        gen.prescan_decls(all_stmts, boundaries[pre_mi], boundaries[pre_mi + 1], prefixes[pre_mi])
+        pre_mi = pre_mi + 1
     }
-    // Also pre-scan main program's function defaults
-    var df_pi2: Float = 0
-    while (df_pi2 < program.length()) {
-        var df_pk: String = gen.classify_stmt(program[df_pi2])
-        if (df_pk == "fun") {
-            var df_name2: String = gen.get_fun_name(program[df_pi2])
-            var df_doc2: String = gen.get_fun_doc(program[df_pi2])
-            if (df_name2.length() > 0 and !df_doc2.starts_with("@intrinsic") and !df_doc2.starts_with("@extern:")) {
-                var df_params2: List<AST.Param> = gen.get_fun_params(program[df_pi2])
-                var df_defaults2: List<AST.Expr> = []
-                var df_pnames2: List<String> = []
-                var df_pi3: Float = 0
-                while (df_pi3 < df_params2.length()) {
-                    var df_p2: AST.Param = df_params2[df_pi3]
-                    var df_dval2: AST.Expr = match (df_p2) { Param(n, t, d) => d }
-                    var df_pn2: String = match (df_p2) { Param(n, t, d) => n }
-                    df_defaults2.push(df_dval2)
-                    df_pnames2.push(df_pn2)
-                    df_pi3 = df_pi3 + 1
-                }
-                gen.func_defaults.set(df_name2, df_defaults2)
-                gen.func_param_count.set(df_name2, df_params2.length())
-                gen.func_param_names.set(df_name2, df_pnames2)
-            }
-        } else if (df_pk == "class") {
-            var df_cname2: String = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => n
-                _ => ""
-            }
-            var df_methods2: List<AST.Stmt> = match (program[df_pi2]) { ClassDecl(n, p, f, m, d) => m
-                _ => []
-            }
-            var df_mi3: Float = 0
-            while (df_mi3 < df_methods2.length()) {
-                var df_mname2: String = gen.get_fun_name(df_methods2[df_mi3])
-                if (df_mname2.length() > 0) {
-                    var df_mparams2: List<AST.Param> = gen.get_fun_params(df_methods2[df_mi3])
-                    var df_mdefs2: List<AST.Expr> = []
-                    var df_mpnames2: List<String> = []
-                    df_mpnames2.push("self")
-                    df_mdefs2.push(AST.Expr.NilLit)
-                    var df_mpi2: Float = 0
-                    while (df_mpi2 < df_mparams2.length()) {
-                        var df_mp2: AST.Param = df_mparams2[df_mpi2]
-                        var df_mdval2: AST.Expr = match (df_mp2) { Param(n, t, d) => d }
-                        var df_mpn2: String = match (df_mp2) { Param(n, t, d) => n }
-                        df_mdefs2.push(df_mdval2)
-                        df_mpnames2.push(df_mpn2)
-                        df_mpi2 = df_mpi2 + 1
-                    }
-                    var df_full2: String = df_cname2 + "__" + df_mname2
-                    gen.func_defaults.set(df_full2, df_mdefs2)
-                    gen.func_param_count.set(df_full2, df_mpnames2.length())
-                    gen.func_param_names.set(df_full2, df_mpnames2)
-                }
-                df_mi3 = df_mi3 + 1
-            }
-        }
-        df_pi2 = df_pi2 + 1
-    }
+    // Pre-scan the main program's own declarations through the same path.
+    // This copy previously omitted func_ret_types entirely, leaving BUGS #33
+    // live for top-level functions: a caller declared above its callee inferred
+    // Int for the result and every method on it silently fell through (#37).
+    gen.prescan_decls(program, 0, program.length(), "")
 
     // Compile each module's declarations
     var module_init_names: List<String> = []

@@ -1,0 +1,42 @@
+import "@async" as Async
+
+@extern("void __gc_collect()") fun gc_collect()
+
+// The coroutine returns a freshly allocated List. Its alloca root is popped at
+// __coro_final, and @__task_result is NOT a GC root, so if the pop unroots the
+// return value there is a window (scheduler stores the result, which itself
+// allocates) where a collection could free it. Check the contents survive.
+fun make(n: Int): List<Int> {
+    var out: List<Int> = []
+    var i: Int = 0
+    while (i < 20) {
+        out.push(n * 1000 + i)
+        i = i + 1
+    }
+    Async.sleep(0.0)
+    return out
+}
+
+var bad: Int = 0
+var r: Int = 0
+while (r < 200) {
+    var t = Task.spawn(fun () => make(r))
+    var got: List<Int> = t.await()
+    gc_collect()
+    if (got.length() != 20) {
+        bad = bad + 1
+        IO.println("BAD length round " + r.to_string() + " = " + got.length().to_string())
+    } else {
+        var k: Int = 0
+        while (k < 20) {
+            if (got[k] != r * 1000 + k) {
+                bad = bad + 1
+                IO.println("BAD value round " + r.to_string() + " idx " + k.to_string() + " = " + got[k].to_string())
+                k = 20
+            }
+            k = k + 1
+        }
+    }
+    r = r + 1
+}
+IO.println("retval check done, bad = " + bad.to_string())

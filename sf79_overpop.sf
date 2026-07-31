@@ -1,0 +1,66 @@
+import "@async" as Async
+
+@extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
+@extern("void __gc_collect()") fun gc_collect()
+
+// Sensitivity test for an over-pop.
+//
+// `held` and `witness` are top-level (entry-function) GC roots. Each spawn/await
+// round runs a coroutine whose epilogue pops. If the epilogue pops even one slot
+// too many, it eats the ENTRY function's roots -- `held` and `witness` stop being
+// reachable. The forced collection then frees them while they are still live, and
+// reading them back afterwards shows the damage.
+//
+// This is the check that `sf79_retval.sf` could not make: the return value is
+// reachable from the caller's own fresh root, so it survives an over-pop. A
+// long-lived root belonging to a frame BELOW the coroutine does not.
+var held: List<Int> = []
+var i: Int = 0
+while (i < 40) {
+    held.push(90000 + i)
+    i = i + 1
+}
+var witness: String = "witness-intact"
+
+fun worker(n: Int): Int {
+    var a: List<Int> = [n, n + 1]
+    var b: String = "w"
+    Async.sleep(0.0)
+    return n
+}
+
+var bad: Int = 0
+var r: Int = 0
+while (r < 60) {
+    var t = Task.spawn(fun () => worker(r))
+    var got = t.await()
+    gc_collect()
+    // Churn: if the collection above freed `held` while it was still live, these
+    // allocations reuse its memory and the reads below see foreign data rather
+    // than merely-freed-but-still-mapped bytes.
+    var churn: Int = 0
+    while (churn < 40) {
+        var filler: List<Int> = [777, 778, 779, 780, 781, 782, 783, 784]
+        filler.push(785)
+        churn = churn + 1
+    }
+    if (held.length() != 40) {
+        IO.println("CORRUPT round " + r.to_string() + ": held.length = " + held.length().to_string())
+        bad = bad + 1
+        r = 60
+    } else {
+        if (held[0] != 90000 or held[39] != 90039) {
+            IO.println("CORRUPT round " + r.to_string() + ": held[0]=" + held[0].to_string() + " held[39]=" + held[39].to_string())
+            bad = bad + 1
+            r = 60
+        }
+    }
+    if (witness != "witness-intact") {
+        IO.println("CORRUPT round " + r.to_string() + ": witness = " + witness)
+        bad = bad + 1
+        r = 60
+    }
+    r = r + 1
+}
+IO.println("over-pop check bad = " + bad.to_string())
+IO.println("final depth = " + ss_depth().to_string())
