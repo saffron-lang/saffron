@@ -542,6 +542,32 @@ class NullChecker {
         return typ + "|Nil"
     }
 
+    // True only when `annotated` and `actual` are two DIFFERENT concrete scalars
+    // that no coercion bridges — the cases we can reject without false positives.
+    // Everything uncertain returns false (allow): Any on either side (the
+    // inferrer's "don't know" answer), Nil (handled by the nullable check),
+    // Int->Float widening, and any non-scalar (class/enum/generic/union), whose
+    // real subtype relationships aren't decidable from these two strings alone.
+    fun scalar_mismatch(annotated: String, actual: String): Bool {
+        if (annotated == actual) return false
+        if (annotated == "Any" or actual == "Any") return false
+        if (annotated == "Nil" or actual == "Nil") return false
+        // Int literal / Int expression assigned to a Float binding is a widening,
+        // not an error. (The reverse, Float into Int, IS a mismatch and is caught
+        // below because neither is Any/Nil and they differ.)
+        if (annotated == "Float" and actual == "Int") return false
+        if (!this.is_scalar_name(annotated) or !this.is_scalar_name(actual)) return false
+        return true
+    }
+
+    fun is_scalar_name(s: String): Bool {
+        if (s == "Int") return true
+        if (s == "Float") return true
+        if (s == "Bool") return true
+        if (s == "String") return true
+        return false
+    }
+
     fun is_subtype(child: String, parent: String): Bool {
         if (child == parent) return true
         if (parent == "Any") return true
@@ -890,6 +916,18 @@ class NullChecker {
                     // an implementation artifact, not a real assignment, so skip it.
                     if (doc != "@type_alias" and !this.is_nullable_type(type_ann_node) and this.is_nil_init(init)) {
                         this.error(name + ": cannot assign nil to non-nullable " + type_ann_str)
+                    }
+                    // Provable-scalar-mismatch check. The old code stored the
+                    // annotation and never looked at the initializer's type, so
+                    // `var s: String = 1` type-checked. We only flag pairs we can
+                    // prove wrong: two distinct concrete scalars, with Int->Float
+                    // widening and anything touching Any/Nil deliberately allowed.
+                    // Generics and class types are left alone here because the
+                    // inferrer widens list/map literals to `<Any>` (so a strict
+                    // subtype test would reject `var xs: List<Int> = [1,2,3]`);
+                    // tightening those is a separate, measured step.
+                    if (doc != "@type_alias" and this.scalar_mismatch(type_ann_str, init_type)) {
+                        this.error(name + ": cannot assign " + init_type + " to " + type_ann_str)
                     }
                     this.env.define_var(name, type_ann_node)
                 } else if (init_type != "Any") {
