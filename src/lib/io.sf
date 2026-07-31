@@ -30,8 +30,146 @@
 @intrinsic fun load8(addr: Int): Int
 @intrinsic fun store8(addr: Int, val: Int)
 
+// --- Byte-path stdio bindings ---
+//
+// Deliberately declared with an `i64` FILE* instead of `void*`, unlike the
+// `_fopen`/`_fclose`/... group above. A `void*`-returning extern has its result
+// NaN-box *pointer*-tagged, so the returned handle can never compare equal to
+// the integer literal 0: `if (fp == 0)` compares TAG_PTR|0 against TAG_INT|0 and
+// is unconditionally false, silently taking the success branch on a failed open.
+// (`IO.open` has exactly that latent defect — see BUGS.) An `i64` return is
+// tagged as an integer, so a genuine NULL compares equal to 0 as written.
+@extern("i64 fopen(void*, void*)") fun _b_fopen(path: Int, mode: Int): Int
+@extern("i64 fclose(i64)") fun _b_fclose(fp: Int): Int
+@extern("i64 fseek(i64, i64, i64)") fun _b_fseek(fp: Int, offset: Int, whence: Int): Int
+@extern("i64 ftell(i64)") fun _b_ftell(fp: Int): Int
+@extern("i64 fread(void*, i64, i64, i64)") fun _b_fread(buf: Int, size: Int, count: Int, fp: Int): Int
+@extern("i64 fwrite(void*, i64, i64, i64)") fun _b_fwrite(buf: Int, size: Int, count: Int, fp: Int): Int
+
 // Seek whence constants (inlined to avoid duplicate globals when runtime imports io):
 // 0 = 0, SEEK_CUR = 1, 2 = 2
+
+// =============================================================================
+// Bytes — a length-carrying raw byte range
+// =============================================================================
+
+/// A raw byte range: a heap pointer plus an explicit byte count.
+///
+/// This exists because a Saffron `String` is a NUL-terminated C string, so
+/// `String.length()` is a `strlen` that stops at the first embedded NUL. Any
+/// content with a 0 byte in it (a wasm module starts with `\0asm`, every PNG,
+/// every gzip stream) is therefore unrepresentable as a `String` — the bytes are
+/// in memory but the length is wrong. `Bytes` carries the length out of band so
+/// the full range stays addressable.
+///
+/// The buffer is always allocated with one extra trailing NUL, so `ptr()` may
+/// still be passed where a C string is expected — it will simply appear
+/// truncated at the first interior 0 byte. Use `ptr()` together with `length()`
+/// for anything that must see every byte (e.g. a socket write).
+///
+/// ```saffron
+/// import "@io" as FileIO
+///
+/// var b = FileIO.read_file_bytes("app.wasm")
+/// b.length()      // 19569 — the true size on disk
+/// b.get(0)        // 0     — the leading NUL of the wasm magic
+/// ```
+class Bytes {
+    var _ptr: Int
+    var _len: Int
+
+    /// Wrap an existing heap pointer and byte count. Takes ownership: the
+    /// pointer must remain valid for the lifetime of this object and must have
+    /// at least `len + 1` bytes allocated.
+    fun init(ptr: Int, len: Int) {
+        this._ptr = ptr
+        this._len = len
+    }
+
+    /// Number of bytes in this range. Unlike `String.length()` this is exact
+    /// even when the content contains interior NUL bytes.
+    fun length(): Int {
+        return this._len
+    }
+
+    /// Raw heap pointer to the first byte. Pair with `length()`.
+    fun ptr(): Int {
+        return this._ptr
+    }
+
+    /// Read the byte at `index` (0-255). Negative indices count from the end.
+    fun get(index: Int): Int {
+        var idx: Int = index
+        if (idx < 0) { idx = idx + this._len }
+        if (idx < 0 or idx >= this._len) {
+            throw "IO.Bytes: index out of bounds"
+        }
+        // The `& 255` is load-bearing, not just a range clamp: the `load8`
+        // intrinsic yields a raw untagged i64, and returning it directly leaks an
+        // untagged value into NaN-boxed code, where it reads back as a denormal
+        // double. Masking forces the result through integer arithmetic, which
+        // re-tags it as an Int.
+        return load8(this._ptr + idx) & 255
+    }
+
+    /// Overwrite the byte at `index`. Negative indices count from the end.
+    fun set(index: Int, value: Int) {
+        var idx: Int = index
+        if (idx < 0) { idx = idx + this._len }
+        if (idx < 0 or idx >= this._len) {
+            throw "IO.Bytes: index out of bounds"
+        }
+        store8(this._ptr + idx, value & 255)
+    }
+
+    /// True when there are no bytes.
+    fun is_empty(): Bool {
+        return this._len == 0
+    }
+
+    /// Reinterpret the range as a String. Lossy whenever the content has an
+    /// interior NUL — the result strlen-truncates there. Provided for text
+    /// content that merely arrived through a byte path.
+    fun to_string(): String {
+        return this._ptr
+    }
+
+    /// Copy the bytes into a `List<Int>`. O(n) and allocation-heavy; intended
+    /// for small ranges and for tests, not for whole files.
+    fun to_list(): List<Int> {
+        var out: List<Int> = []
+        var i: Int = 0
+        while (i < this._len) {
+            // `& 255` re-tags the raw intrinsic result — see get().
+            out.push(load8(this._ptr + i) & 255)
+            i = i + 1
+        }
+        return out
+    }
+}
+
+/// Allocate a zero-filled `Bytes` of the given size.
+fun bytes_alloc(size: Int): Bytes {
+    var n: Int = size
+    if (n < 0) { n = 0 }
+    var buf: Int = _io_malloc(n + 1)
+    var i: Int = 0
+    while (i < n) {
+        store8(buf + i, 0)
+        i = i + 1
+    }
+    store8(buf + n, 0)
+    return Bytes(buf, n)
+}
+
+/// Copy a String's bytes (up to its NUL terminator) into a `Bytes`.
+fun bytes_from_string(s: String): Bytes {
+    var n: Int = _io_strlen(s)
+    var buf: Int = _io_malloc(n + 1)
+    _io_memcpy(buf, s, n)
+    store8(buf + n, 0)
+    return Bytes(buf, n)
+}
 
 // =============================================================================
 // File class — wraps a C FILE* for incremental I/O
@@ -247,8 +385,57 @@ fun print(value: String) {
 }
 
 /// Read the entire contents of a file as a string.
+///
+/// WARNING: lossy for binary content. A String is NUL-terminated, so the
+/// returned value's `length()` strlen-stops at the first 0 byte in the file —
+/// a wasm module (magic `\0asm`) reads back as `""`. Use `read_file_bytes` for
+/// anything that is not known to be NUL-free text.
 fun read_file(path: String): String {
     return __io_read_file(path)
+}
+
+/// Read the entire contents of a file as raw bytes, NUL-safe.
+///
+/// Returns a `Bytes` whose `length()` is the true size on disk. This is the
+/// byte-correct counterpart to `read_file`: it sizes the file first, then reads
+/// exactly that many bytes, and carries the count out of band instead of
+/// relying on a NUL terminator. Returns an empty `Bytes` if the file cannot be
+/// opened.
+///
+/// Implemented on the `_b_*` stdio externs rather than on the runtime's
+/// `__io_file_size` / `__io_read_binary`: those two are absent from codegen's
+/// known-function table, so calling them from inside this module gets them
+/// module-prefix-mangled to `@io___io_file_size` and they fail to link.
+fun read_file_bytes(path: String): Bytes {
+    var n: Int = 0
+    var buf: Int = _io_malloc(1)
+    store8(buf, 0)
+    var fp: Int = _b_fopen(path, "rb")
+    if (fp != 0) {
+        _b_fseek(fp, 0, 2)
+        var size: Int = _b_ftell(fp)
+        _b_fseek(fp, 0, 0)
+        if (size > 0) {
+            buf = _io_malloc(size + 1)
+            n = _b_fread(buf, 1, size, fp)
+            if (n < 0) { n = 0 }
+            store8(buf + n, 0)
+        }
+        _b_fclose(fp)
+    }
+    return Bytes(buf, n)
+}
+
+/// Write raw bytes to a file, creating or overwriting it. NUL-safe.
+fun write_file_bytes(path: String, data: Bytes) {
+    var fp: Int = _b_fopen(path, "wb")
+    if (fp == 0) {
+        throw "IO: cannot open file '${path}' for writing"
+    }
+    if (data.length() > 0) {
+        _b_fwrite(data.ptr(), 1, data.length(), fp)
+    }
+    _b_fclose(fp)
 }
 
 /// Get the size of a file in bytes. Returns 0 if the file doesn't exist.
