@@ -144,6 +144,17 @@
             var var_names2: List<String> = []
             var var_types2: List<String> = []
             this.collect_vars(body, var_names2, var_types2)
+            // Same as the non-nested path: a nested body's own locals shadow a
+            // like-named module global at the store site (BUGS #59). The alloca
+            // below is already unconditional, so without this the store would
+            // target @__g_ while the load reads the local slot.
+            var saved_fn_locals2: Map<String, Bool> = this.current_fn_locals
+            this.current_fn_locals = {}
+            var cfl2_i: Float = 0
+            while (cfl2_i < var_names2.length()) {
+                this.current_fn_locals.set(var_names2[cfl2_i], true)
+                cfl2_i = cfl2_i + 1
+            }
             // Track which names already have allocas (from params above)
             var allocated: List<String> = []
             var aai: Float = 0
@@ -178,6 +189,7 @@
             this.local_counter = saved_counter2
             this.typed_vars = saved_typed_vars2
             this.gc_root_count = saved_gc_root_count2
+            this.current_fn_locals = saved_fn_locals2
             this.globals.push(nested_ir)
             return
         }
@@ -295,6 +307,19 @@
         var var_types: List<String> = []
         this.collect_vars(body, var_names, var_types)
 
+        // Record this body's locals so the alloca and store sites below treat a
+        // name as local even when a module global shares it (BUGS #59).
+        // collect_vars does not descend into nested FunDecls, so this set is
+        // exactly the current function's own bindings. Saved/restored around the
+        // body since gen_function is re-entrant for nested functions.
+        var saved_fn_locals: Map<String, Bool> = this.current_fn_locals
+        this.current_fn_locals = {}
+        var cfl_i: Float = 0
+        while (cfl_i < var_names.length()) {
+            this.current_fn_locals.set(var_names[cfl_i], true)
+            cfl_i = cfl_i + 1
+        }
+
         // Emit all allocas in entry block (params + locals)
         i = 0
         while (i < param_list.length()) {
@@ -307,7 +332,10 @@
         i = 0
         while (i < var_names.length()) {
             var vn: String = var_names[i]
-            if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
+            // A local shadowing a module global still needs its own alloca
+            // (BUGS #59). current_fn_locals holds this body's own bindings, so
+            // prefer it over module_globals here.
+            if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self") {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
                 // Zero-initialize allocas for heap-typed locals before they become GC roots.
                 // This prevents the GC from reading uninitialized memory if it triggers
@@ -367,7 +395,9 @@
             while (i < var_names.length()) {
                 var vn: String = var_names[i]
                 var vt: String = var_types[i]
-                if (!this.module_globals.has(this.current_prefix + vn) and vn != "self" and this.is_gc_root_type(vt)) {
+                // Mirror the alloca guard above: a shadowing local has its own
+                // slot and must be rooted like any other local (BUGS #59).
+                if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self" and this.is_gc_root_type(vt)) {
                     var loc_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(vn), "i64*")
                     this.emit_indent("call void @__gc_push_root(i64 " + loc_as_int + ")")
                     gc_root_count = gc_root_count + 1
@@ -480,6 +510,7 @@
         this.block_terminated = false
         this.typed_vars = saved_tv
         this.in_function = false
+        this.current_fn_locals = saved_fn_locals
         this.is_coroutine = saved_is_coro
     }
 

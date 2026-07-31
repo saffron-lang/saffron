@@ -55,6 +55,12 @@ class Codegen {
     var global_var_types: Map<String, String>
     var register_only: Bool
     var in_function: Bool
+    // Names bound by `var`/`let` in the body of the function currently being
+    // emitted. A name in here is a local, no matter that module_globals holds a
+    // same-named module global (BUGS #59): the alloca and store sites consult
+    // this before falling back to module_globals. Empty at top level / module
+    // init, where a `var` really is a global.
+    var current_fn_locals: Map<String, Bool>
     var intrinsic_funcs: List<String>
     var extern_sigs: Map<String, String>
     var defined_funcs: List<String>
@@ -122,6 +128,7 @@ class Codegen {
         this.global_var_types = {}
         this.register_only = false
         this.in_function = false
+        this.current_fn_locals = {}
         this.intrinsic_funcs = []
         this.extern_sigs = {}
         this.defined_funcs = []
@@ -5607,7 +5614,9 @@ class Codegen {
         // module. `var p: Project = Project()` inside pantry_config's project()
         // then stored to the main program's @__g_p while output_body.sf still
         // allocated %p, and the local was written to an unrelated global.
-        if (this.module_globals.has(this.current_prefix + name)) {
+        // A local shadowing a module global is a local (BUGS #59):
+        // current_fn_locals wins, matching the alloca emitted in gen_function.
+        if (!this.current_fn_locals.has(name) and this.module_globals.has(this.current_prefix + name)) {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)
@@ -8447,6 +8456,17 @@ class Codegen {
             var var_names2: List<String> = []
             var var_types2: List<String> = []
             this.collect_vars(body, var_names2, var_types2)
+            // Same as the non-nested path: a nested body's own locals shadow a
+            // like-named module global at the store site (BUGS #59). The alloca
+            // below is already unconditional, so without this the store would
+            // target @__g_ while the load reads the local slot.
+            var saved_fn_locals2: Map<String, Bool> = this.current_fn_locals
+            this.current_fn_locals = {}
+            var cfl2_i: Float = 0
+            while (cfl2_i < var_names2.length()) {
+                this.current_fn_locals.set(var_names2[cfl2_i], true)
+                cfl2_i = cfl2_i + 1
+            }
             // Track which names already have allocas (from params above)
             var allocated: List<String> = []
             var aai: Float = 0
@@ -8481,6 +8501,7 @@ class Codegen {
             this.local_counter = saved_counter2
             this.typed_vars = saved_typed_vars2
             this.gc_root_count = saved_gc_root_count2
+            this.current_fn_locals = saved_fn_locals2
             this.globals.push(nested_ir)
             return
         }
@@ -8598,6 +8619,19 @@ class Codegen {
         var var_types: List<String> = []
         this.collect_vars(body, var_names, var_types)
 
+        // Record this body's locals so the alloca and store sites below treat a
+        // name as local even when a module global shares it (BUGS #59).
+        // collect_vars does not descend into nested FunDecls, so this set is
+        // exactly the current function's own bindings. Saved/restored around the
+        // body since gen_function is re-entrant for nested functions.
+        var saved_fn_locals: Map<String, Bool> = this.current_fn_locals
+        this.current_fn_locals = {}
+        var cfl_i: Float = 0
+        while (cfl_i < var_names.length()) {
+            this.current_fn_locals.set(var_names[cfl_i], true)
+            cfl_i = cfl_i + 1
+        }
+
         // Emit all allocas in entry block (params + locals)
         i = 0
         while (i < param_list.length()) {
@@ -8610,7 +8644,10 @@ class Codegen {
         i = 0
         while (i < var_names.length()) {
             var vn: String = var_names[i]
-            if (!this.module_globals.has(this.current_prefix + vn) and vn != "self") {
+            // A local shadowing a module global still needs its own alloca
+            // (BUGS #59). current_fn_locals holds this body's own bindings, so
+            // prefer it over module_globals here.
+            if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self") {
                 this.emit_indent("%" + this.sanitize_name(vn) + " = alloca " + this.llvm_type(var_types[i]))
                 // Zero-initialize allocas for heap-typed locals before they become GC roots.
                 // This prevents the GC from reading uninitialized memory if it triggers
@@ -8640,6 +8677,18 @@ class Codegen {
         // Only emit when not in identity mode (bootstrap doesn't need GC)
         var gc_root_count: Float = 0
         if (!this.identity_mode) {
+            // Coroutines tear down at __coro_final, by which time other tasks may
+            // have pushed roots on top of ours — the shadow stack is a single
+            // global LIFO but coroutine lifetimes are not nested. Record the depth
+            // *before* pushing this frame's roots so the epilogue can tell whether
+            // our roots are still the top of the stack and therefore safe to pop.
+            // Placed after llvm.coro.begin so CoroSplit promotes it into the frame,
+            // which is what lets it survive an arbitrary number of suspends.
+            if (is_coro) {
+                this.emit_indent("%__coro_ss_base = alloca i64")
+                this.emit_indent("%__coro_ss_base_v = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("store i64 %__coro_ss_base_v, i64* %__coro_ss_base")
+            }
             // Track params that are heap types
             i = 0
             while (i < param_list.length()) {
@@ -8658,7 +8707,9 @@ class Codegen {
             while (i < var_names.length()) {
                 var vn: String = var_names[i]
                 var vt: String = var_types[i]
-                if (!this.module_globals.has(this.current_prefix + vn) and vn != "self" and this.is_gc_root_type(vt)) {
+                // Mirror the alloca guard above: a shadowing local has its own
+                // slot and must be rooted like any other local (BUGS #59).
+                if ((this.current_fn_locals.has(vn) or !this.module_globals.has(this.current_prefix + vn)) and vn != "self" and this.is_gc_root_type(vt)) {
                     var loc_as_int: String = this.typed_ptr_to_val("%" + this.sanitize_name(vn), "i64*")
                     this.emit_indent("call void @__gc_push_root(i64 " + loc_as_int + ")")
                     gc_root_count = gc_root_count + 1
@@ -8721,6 +8772,32 @@ class Codegen {
 
             this.emit("__coro_final:")
             this.block_terminated = false
+            // Release this frame's GC roots. Every coroutine return path funnels
+            // through __coro_final (gen_return branches here rather than popping
+            // itself), and the final suspend never resumes back into the body —
+            // resume traps, destroy goes to __coro_cleanup — so this runs exactly
+            // once per frame no matter how many times the coroutine suspended.
+            //
+            // The pop is guarded because the shadow stack is one global LIFO while
+            // coroutine lifetimes are not nested: a task that started later can
+            // still be live, with its roots stacked above ours, when we finish.
+            // Popping a fixed count there would discard *its* roots and collect
+            // objects that are still in use. So pop only when our region is
+            // provably still the top of the stack; otherwise leave it, since
+            // leaking a root is recoverable and freeing a live one is not.
+            if (gc_root_count > 0) {
+                this.emit_indent("%__coro_ss_now = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("%__coro_ss_b = load i64, i64* %__coro_ss_base")
+                this.emit_indent("%__coro_ss_exp = add i64 %__coro_ss_b, " + gc_root_count.floor().to_string())
+                this.emit_indent("%__coro_ss_is_top = icmp eq i64 %__coro_ss_now, %__coro_ss_exp")
+                this.emit_terminator("br i1 %__coro_ss_is_top, label %__coro_ss_pop, label %__coro_ss_done")
+                this.emit("__coro_ss_pop:")
+                this.block_terminated = false
+                this.emit_indent("call void @__gc_pop_roots(i64 " + gc_root_count.floor().to_string() + ")")
+                this.emit_terminator("br label %__coro_ss_done")
+                this.emit("__coro_ss_done:")
+                this.block_terminated = false
+            }
             this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
             this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
             this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")
@@ -8745,6 +8822,7 @@ class Codegen {
         this.block_terminated = false
         this.typed_vars = saved_tv
         this.in_function = false
+        this.current_fn_locals = saved_fn_locals
         this.is_coroutine = saved_is_coro
     }
 
@@ -12699,7 +12777,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             if (!gen.is_decl(stmts[si2])) {
                 var stmt_kind: String = gen.classify_stmt(stmts[si2])
                 if (stmt_kind == "var") {
-                    var vname: String = match (stmts[si2]) { VarDecl(n, t, i, d) => n }
+                    var vname: String = gen.get_var_name(stmts[si2])
                     var vdoc2: String = gen.get_var_doc(stmts[si2])
                     if (!vdoc2.starts_with("@import:")) {
                         gen.module_globals.set(prefix + vname, true)
