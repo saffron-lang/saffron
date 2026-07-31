@@ -1459,10 +1459,19 @@ entry:
 begin:
   ; Phase 1: Mark nursery objects reachable from roots
   call void @__gc_minor_mark_roots()
+  ; Phase 1b: ...and from the old generation. The remembered set that phase 1
+  ; consults is never populated (no write barrier is ever emitted), so without
+  ; this an old-gen -> nursery edge is missed entirely. See BUGS #81 and the
+  ; commentary on __gc_minor_scan_old_gen. mode 0 = mark.
+  call void @__gc_minor_scan_old_gen(i64 0)
   ; Phase 2: Promote marked nursery objects, install forwarding pointers
   call void @__gc_minor_promote()
   ; Phase 3: Update all references to point to new old-gen locations
   call void @__gc_minor_update_refs()
+  ; Phase 3b: Forward old-gen slots that pointed into the nursery. Must run
+  ; while the forwarding pointers are still readable, i.e. before phase 4
+  ; resets the bump pointer. mode 1 = forward.
+  call void @__gc_minor_scan_old_gen(i64 1)
   ; Phase 4: Reset nursery bump pointer
   %start = load i64, i64* @__gc_nursery_start
   store i64 %start, i64* @__gc_nursery_ptr
@@ -1555,11 +1564,42 @@ done:
 }
 
 ; Mark a nursery object as live (recursive for children)
+;
+; The range check alone is NOT sufficient to conclude that %val is an object.
+; Nursery memory is recycled without being zeroed — `__gc_minor_collect` just
+; resets the bump pointer — so a slot that has never been written since its block
+; was reused holds stale bytes from a previous generation, and those bytes
+; frequently do fall inside the nursery's address range. `__list_new` shows how
+; such a slot is reached: it takes its 24-byte struct from __gc_alloc, stores
+; count and capacity, and only THEN allocates the data array — and that second
+; allocation can trigger this very collection, so the list is observed with a
+; stale `data_ptr`. Tracing that stale value read a garbage `info` word, which
+; yielded a garbage tag and count, and a tag-2 reading with count > 0 alongside
+; data == 0 then loaded from address 0.
+;
+; Measured, not theorised: a probe on the trace_list entry fired
+; "data=0 but count>0" on test/gc_deep_test.sf under a 4KB nursery.
+;
+; So validate the header magic too, which stale bytes do not carry. This matters
+; more now than it used to: the BUGS #81 old-gen scan reaches far more objects
+; per collection, including half-initialized ones the reachability-driven walk
+; never used to see.
 define private void @__gc_minor_mark_value(i64 %val) optnone noinline {
 entry:
   %in_nursery = call i64 @__gc_is_nursery_ptr(i64 %val)
   %not_nursery = icmp eq i64 %in_nursery, 0
-  br i1 %not_nursery, label %done, label %check_marked
+  br i1 %not_nursery, label %done, label %check_magic
+
+check_magic:
+  %m_header = sub i64 %val, 24
+  %m_magic_addr = add i64 %m_header, 16
+  %m_magic_ptr = inttoptr i64 %m_magic_addr to i64*
+  %m_magic = load i64, i64* %m_magic_ptr
+  ; 0x5AFFC0DEDEADBEEF — a live, not-yet-promoted nursery object. Promotion
+  ; overwrites this with the forwarding sentinel, but promotion happens in phase
+  ; 2, strictly after all marking, so every object reached here still has it.
+  %m_is_obj = icmp eq i64 %m_magic, 6557403441622859503
+  br i1 %m_is_obj, label %check_marked, label %done
 
 check_marked:
   %header = sub i64 %val, 24
@@ -1600,7 +1640,16 @@ trace_list:
   %list_data = load i64, i64* %list_data_ptr
   call void @__gc_minor_mark_value(i64 %list_data)
   %list_count_ptr = inttoptr i64 %val to i64*
-  %list_count = load i64, i64* %list_count_ptr
+  %list_count_raw = load i64, i64* %list_count_ptr
+  ; Bound the element walk by the data array's OWN header size, never by `count`
+  ; alone. `__list_new` stores count and capacity and only then allocates the
+  ; data array, so a collection triggered by that second allocation observes the
+  ; list with a null-or-stale `data_ptr`; walking `count` elements from it read
+  ; from address 0. __gc_minor_array_slots returns 0 for anything that is not a
+  ; validated GC object, which makes the loop body unreachable in that case.
+  %list_cap = call i64 @__gc_minor_array_slots(i64 %list_data)
+  %list_over = icmp ugt i64 %list_count_raw, %list_cap
+  %list_count = select i1 %list_over, i64 %list_cap, i64 %list_count_raw
   br label %list_loop
 
 list_loop:
@@ -1627,7 +1676,16 @@ trace_map:
   call void @__gc_minor_mark_value(i64 %map_keys)
   call void @__gc_minor_mark_value(i64 %map_vals)
   %map_count_ptr = inttoptr i64 %val to i64*
-  %map_count = load i64, i64* %map_count_ptr
+  %map_count_raw = load i64, i64* %map_count_ptr
+  ; Same half-initialized hazard as trace_list, doubled: `__map_new` allocates
+  ; its keys and values arrays one after the other, so either can be null or
+  ; stale when a collection lands between them. Bound by the smaller.
+  %mk_cap = call i64 @__gc_minor_array_slots(i64 %map_keys)
+  %mv_cap = call i64 @__gc_minor_array_slots(i64 %map_vals)
+  %mk_smaller = icmp ult i64 %mk_cap, %mv_cap
+  %map_cap = select i1 %mk_smaller, i64 %mk_cap, i64 %mv_cap
+  %map_over = icmp ugt i64 %map_count_raw, %map_cap
+  %map_count = select i1 %map_over, i64 %map_cap, i64 %map_count_raw
   br label %map_loop
 
 map_loop:
@@ -1827,6 +1885,263 @@ get_new:
 
 not_fwd:
   ret i64 0
+}
+
+; =============================================================================
+; Minor GC — full old-generation scan (BUGS #81)
+; =============================================================================
+;
+; The remembered set above is the textbook mechanism for finding old -> young
+; edges, and it is correct, but nothing ever fills it: `__gc_write_barrier` has
+; no caller anywhere in the tree. Codegen emits no barrier at field-set,
+; `list.push` or `map.set`, and `runtime.sf` is compiled in --identity-mode so it
+; cannot grow one without a codegen change either. The result was that any
+; nursery object reachable ONLY through an old-generation object was invisible to
+; a minor collection: it was left unmarked, so `__gc_minor_promote` skipped it
+; and `__gc_minor_collect` reset the bump pointer over it, while the old-gen slot
+; still pointed at the abandoned address. The filed symptom was an old-gen list
+; holding a nursery child reading back `len=49` with garbage elements after one
+; forced `__gc_minor_collect()`.
+;
+; This is BUGS #81 fix option 2: instead of trusting the remembered set, scan the
+; WHOLE old generation on every minor collection. `@__gc_head` already threads
+; every old-gen object, so the walk is straightforward, and because it visits all
+; old-gen objects unconditionally it has no ordering dependency — an old -> young
+; edge is found no matter which object was reached first.
+;
+; Cost: O(live old-gen objects) per minor collection, where the remembered set
+; would have been O(barrier'd slots). That is a real slowdown on allocation-heavy
+; workloads and is the deliberate trade — correctness now, option 1 (emit the
+; barrier from codegen) later, at which point this scan can be dropped and the
+; remembered set becomes load-bearing again. The remembered set code is left
+; intact and still consulted; it is simply redundant while it stays empty.
+;
+; Slot selection mirrors `__gc_minor_mark_value` / `__gc_mark_drain` exactly
+; rather than scanning every object word: a tag-1 string's payload is character
+; data, and tag 7/8 arrays are scanned through their owning list/map using the
+; owner's `count` so that stale slots past the end are never touched. Both are
+; things a blind word-by-word scan would misread.
+;
+; %mode selects the pass: 0 = mark reachable nursery objects (phase 1),
+; 1 = forward slots that point at promoted objects (phase 3).
+
+; Visit one candidate pointer slot in an old-gen object.
+define private void @__gc_minor_visit_slot(i64 %slot_addr, i64 %mode) optnone noinline {
+entry:
+  %sp = inttoptr i64 %slot_addr to i64*
+  %val = load i64, i64* %sp
+  %is_mark = icmp eq i64 %mode, 0
+  br i1 %is_mark, label %do_mark, label %do_fwd
+
+do_mark:
+  ; __gc_is_heap_ptr first, not just the nursery range check that
+  ; __gc_minor_mark_value does on its own. An old-gen object can legitimately be
+  ; reached here half-initialized: `__list_new` gets its 24-byte struct from
+  ; __sf_malloc (uninitialized) and only then allocates the data array, and that
+  ; second allocation can itself trigger the collection. Validating alignment,
+  ; bounds and the header magic means such a slot's garbage cannot be traced as
+  ; though it were an object.
+  %is_heap = call i64 @__gc_is_heap_ptr(i64 %val)
+  %not_heap = icmp eq i64 %is_heap, 0
+  br i1 %not_heap, label %done, label %mark_it
+
+mark_it:
+  call void @__gc_minor_mark_value(i64 %val)
+  br label %done
+
+do_fwd:
+  ; __gc_get_forwarded requires both a nursery-range hit AND the forwarding
+  ; sentinel in the header, so a small integer (a count or capacity that shares
+  ; a struct with a real pointer) cannot be mistaken for a forwarded object.
+  %fwd = call i64 @__gc_get_forwarded(i64 %val)
+  %has_fwd = icmp ne i64 %fwd, 0
+  br i1 %has_fwd, label %store_fwd, label %done
+
+store_fwd:
+  store i64 %fwd, i64* %sp
+  br label %done
+
+done:
+  ret void
+}
+
+; How many i64 slots an inner array pointer can safely be indexed for.
+;
+; Returns 0 unless %arr is a validated GC object, in which case its header's own
+; size field gives the bound. This exists because the full old-gen walk reaches
+; objects the reachability-driven collectors never see: `__list_new` takes its
+; 24-byte struct from an uninitialized `__sf_malloc` and only then allocates the
+; data array, and THAT allocation can trigger this very collection — so a list
+; can be observed with a garbage `count` next to a null `data_ptr`. Bounding the
+; element walk by the array's real size means such a count cannot walk off the
+; end of the block.
+define private i64 @__gc_minor_array_slots(i64 %arr) optnone noinline {
+entry:
+  %is_heap = call i64 @__gc_is_heap_ptr(i64 %arr)
+  %not_heap = icmp eq i64 %is_heap, 0
+  br i1 %not_heap, label %none, label %get_size
+
+get_size:
+  %header = sub i64 %arr, 24
+  %info_addr = add i64 %header, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
+  %size = call i64 @__gc_info_size(i64 %info)
+  %slots = lshr i64 %size, 3
+  ret i64 %slots
+
+none:
+  ret i64 0
+}
+
+; Visit every pointer-bearing slot of one old-gen object, dispatched by type tag.
+define private void @__gc_minor_scan_old_object(i64 %user_ptr, i64 %mode) optnone noinline {
+entry:
+  %header = sub i64 %user_ptr, 24
+  %info_addr = add i64 %header, 8
+  %info_ptr = inttoptr i64 %info_addr to i64*
+  %info = load i64, i64* %info_ptr
+  %tag = call i64 @__gc_info_tag(i64 %info)
+  %size = call i64 @__gc_info_size(i64 %info)
+  switch i64 %tag, label %check_class_tag [
+    i64 0, label %done          ; raw — no inner pointers
+    i64 1, label %done          ; string — payload is bytes, never scan it
+    i64 2, label %scan_list
+    i64 3, label %scan_map
+    i64 4, label %scan_closure
+    i64 5, label %scan_slots
+    i64 6, label %scan_sb
+    i64 7, label %done          ; data array — scanned via its owning list
+    i64 8, label %done          ; kv array — scanned via its owning map
+    i64 9, label %scan_slots    ; env
+  ]
+
+check_class_tag:
+  ; Tags >= 10 are per-class instance tags — scan all fields like tag 5
+  %is_class_inst = icmp uge i64 %tag, 10
+  br i1 %is_class_inst, label %scan_slots, label %done
+
+scan_list:
+  ; List: { count@0, capacity@8, data_ptr@16 }
+  ; Visit data_ptr FIRST so that in forwarding mode the element walk below reads
+  ; the already-updated array address rather than the abandoned nursery one.
+  %l_data_slot = add i64 %user_ptr, 16
+  call void @__gc_minor_visit_slot(i64 %l_data_slot, i64 %mode)
+  %l_data_ptr = inttoptr i64 %l_data_slot to i64*
+  %l_data = load i64, i64* %l_data_ptr
+  %l_count_ptr = inttoptr i64 %user_ptr to i64*
+  %l_count_raw = load i64, i64* %l_count_ptr
+  ; Bound the walk by the data array's own header size, not just by `count`.
+  %l_cap = call i64 @__gc_minor_array_slots(i64 %l_data)
+  %l_over = icmp ugt i64 %l_count_raw, %l_cap
+  %l_count = select i1 %l_over, i64 %l_cap, i64 %l_count_raw
+  br label %l_loop
+
+l_loop:
+  %li = phi i64 [0, %scan_list], [%li_next, %l_body]
+  %l_at_end = icmp uge i64 %li, %l_count
+  br i1 %l_at_end, label %done, label %l_body
+
+l_body:
+  %l_off = shl i64 %li, 3
+  %l_elem_slot = add i64 %l_data, %l_off
+  call void @__gc_minor_visit_slot(i64 %l_elem_slot, i64 %mode)
+  %li_next = add i64 %li, 1
+  br label %l_loop
+
+scan_map:
+  ; Map: { count@0, capacity@8, keys_ptr@16, values_ptr@24 }
+  %m_keys_slot = add i64 %user_ptr, 16
+  call void @__gc_minor_visit_slot(i64 %m_keys_slot, i64 %mode)
+  %m_vals_slot = add i64 %user_ptr, 24
+  call void @__gc_minor_visit_slot(i64 %m_vals_slot, i64 %mode)
+  %m_keys_ptr = inttoptr i64 %m_keys_slot to i64*
+  %m_keys = load i64, i64* %m_keys_ptr
+  %m_vals_ptr = inttoptr i64 %m_vals_slot to i64*
+  %m_vals = load i64, i64* %m_vals_ptr
+  %m_count_ptr = inttoptr i64 %user_ptr to i64*
+  %m_count_raw = load i64, i64* %m_count_ptr
+  ; Bound by the SMALLER of the two arrays' header sizes — same half-initialized
+  ; hazard as the list case, doubled because a map has two inner arrays and
+  ; `__map_new` allocates them one after the other.
+  %m_k_cap = call i64 @__gc_minor_array_slots(i64 %m_keys)
+  %m_v_cap = call i64 @__gc_minor_array_slots(i64 %m_vals)
+  %k_smaller = icmp ult i64 %m_k_cap, %m_v_cap
+  %m_cap = select i1 %k_smaller, i64 %m_k_cap, i64 %m_v_cap
+  %m_over = icmp ugt i64 %m_count_raw, %m_cap
+  %m_count = select i1 %m_over, i64 %m_cap, i64 %m_count_raw
+  br label %m_loop
+
+m_loop:
+  %mi = phi i64 [0, %scan_map], [%mi_next, %m_body]
+  %m_at_end = icmp uge i64 %mi, %m_count
+  br i1 %m_at_end, label %done, label %m_body
+
+m_body:
+  %m_off = shl i64 %mi, 3
+  %m_k_slot = add i64 %m_keys, %m_off
+  call void @__gc_minor_visit_slot(i64 %m_k_slot, i64 %mode)
+  %m_v_slot = add i64 %m_vals, %m_off
+  call void @__gc_minor_visit_slot(i64 %m_v_slot, i64 %mode)
+  %mi_next = add i64 %mi, 1
+  br label %m_loop
+
+scan_closure:
+  ; Closure: { fn_ptr@0, env_ptr@8 } — fn_ptr is code, skip it
+  %c_env_slot = add i64 %user_ptr, 8
+  call void @__gc_minor_visit_slot(i64 %c_env_slot, i64 %mode)
+  br label %done
+
+scan_sb:
+  ; StringBuilder: { len@0, cap@8, buf_ptr@16 }
+  %sb_buf_slot = add i64 %user_ptr, 16
+  call void @__gc_minor_visit_slot(i64 %sb_buf_slot, i64 %mode)
+  br label %done
+
+scan_slots:
+  ; Class instance / env: every one of size/8 slots is a candidate pointer
+  %n_slots = lshr i64 %size, 3
+  br label %s_loop
+
+s_loop:
+  %si = phi i64 [0, %scan_slots], [%si_next, %s_body]
+  %s_at_end = icmp uge i64 %si, %n_slots
+  br i1 %s_at_end, label %done, label %s_body
+
+s_body:
+  %s_off = shl i64 %si, 3
+  %s_slot = add i64 %user_ptr, %s_off
+  call void @__gc_minor_visit_slot(i64 %s_slot, i64 %mode)
+  %si_next = add i64 %si, 1
+  br label %s_loop
+
+done:
+  ret void
+}
+
+; Walk the whole old generation via @__gc_head and scan each object.
+; Neither mode mutates the allocation list, so the next pointer is read once up
+; front and the walk is stable even though promotion prepends to @__gc_head
+; between the two passes.
+define private void @__gc_minor_scan_old_gen(i64 %mode) optnone noinline {
+entry:
+  %head = load i64, i64* @__gc_head
+  br label %loop
+
+loop:
+  %curr = phi i64 [%head, %entry], [%next, %body]
+  %at_end = icmp eq i64 %curr, 0
+  br i1 %at_end, label %done, label %body
+
+body:
+  %next_ptr = inttoptr i64 %curr to i64*
+  %next = load i64, i64* %next_ptr
+  %user = add i64 %curr, 24
+  call void @__gc_minor_scan_old_object(i64 %user, i64 %mode)
+  br label %loop
+
+done:
+  ret void
 }
 
 ; Update all references that point to forwarded nursery objects
@@ -2544,4 +2859,3 @@ done:
 }
 
 @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }] [{ i32, void ()*, i8* } { i32 65535, void ()* @__mem_init_from_env, i8* null }]
-
