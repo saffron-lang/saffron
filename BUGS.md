@@ -9,6 +9,89 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 85. `__io_file_size` and `__io_read_binary` are missing from the known-function tables, so calling them from a stdlib module emits a bad symbol
+
+```
+[codegen] Warning: calling undefined function '__io_file_size'
+[codegen] Warning: calling undefined function '__io_read_binary'
+```
+
+Both runtime functions exist (`src/runtime/runtime.sf:1103-1134`) and both work.
+They are absent from the table at `src/compiler/codegen/utils_body.sf:5-6`, so a
+call from inside a module gets the module prefix applied — `@io___io_file_size` —
+and fails to link. The warning is printed for *any* program that imports `@io`,
+including ones that never call either function, which is why it reads as noise
+rather than as a real defect.
+
+This is the working binary read path: `IO.file_size` + `IO.read_binary`
+(`src/lib/io.sf:255-263`) return the correct byte count where `IO.read_file`
+truncates at the first NUL (#66). So the two functions that route around the
+binary-data problem are the two that cannot be called normally.
+
+**Fix:** add both names to the known-function list. One line, no risk.
+
+### 84. A `void*`-returning `@extern` has its result pointer-tagged, so a NULL check is unconditionally false — `IO.open` does not throw on a missing file
+
+The single highest-impact instance is in the stdlib and is user-visible today:
+
+```saffron
+import "@io" as FileIO
+var f = FileIO.open("/tmp/definitely_missing_file", "r")   // does NOT throw
+```
+
+`io.sf:221-227` looks correct — it declares `@extern("void* fopen(void*, void*)")`
+(`io.sf:16`), assigns to `var fp: Int`, and guards `if (fp == 0) { throw ... }`.
+The guard never fires. `FileIO.open` hands back a `File` wrapping a NULL `FILE*`,
+and the failure surfaces later as a garbage read or a crash, at a site with no
+connection to the missing file.
+
+**Mechanism, from the emitted IR.** A `void*` return is tagged on the way out, and
+the literal `0` it is compared against is tagged as an *int*:
+
+```llvm
+%t7  = call i8* @fopen(i8* %t4, i8* %t6)
+%t8  = call i64 @__val_tag_ptr(i8* %t7)     ; NULL -> TAG_PTR|0
+store i64 %t8, i64* %fp
+%t9  = load i64, i64* %fp
+%t10 = add i64 0, 0
+%t11 = call i64 @__val_tag_int(i64 %t10)   ; 0    -> TAG_INT|0
+%t12 = icmp eq i64 %t9, %t11               ; 0x7FF8.. vs 0x7FF9..  -> always false
+```
+
+`__val_tag_ptr` (`base_nanbox.ll:274`) masks to 48 bits and ORs in `TAG_PTR`, so a
+NULL pointer becomes `0x7FF8000000000000`, not `0`. The comparison is between two
+different tags and can never be true — for *any* NULL-returning `void*` extern,
+not just `fopen`.
+
+**Why it is easy to write and impossible to spot.** The declaration, the
+annotation, and the guard are each individually right, and the C convention being
+followed (NULL means failure) is the correct one. Nothing warns. The only way to
+see it is to read the IR or to notice that the error path never runs.
+
+**Workaround:** declare the extern as returning `i64` instead of `void*`
+(`@extern("i64 fopen(void*, void*)")`). The value is then an untagged machine
+integer and `== 0` works. This is what the `@http/server` binary-body work used
+throughout, and it is why that code deliberately avoids `IO.open`.
+
+**Fix.** Two candidates, and the choice is a real decision:
+
+1. Compare against the untagged value: make a `== 0` test on a value of pointer
+   provenance untag first. Narrow, but it needs codegen to track provenance,
+   which it does not do.
+2. Stop tagging `void*` extern returns and treat them as raw `Int` like every
+   other extern result. This matches the existing rule that **all `extern`
+   parameters must be untagged** (`CLAUDE.md`) — the return side is simply
+   inconsistent with it. Then a NULL is `0` and every C-convention guard works.
+   Audit needed: anything currently relying on a tagged `void*` return being a
+   usable pointer value.
+
+Option 2 is the systematic one and is consistent with the documented FFI
+discipline; see `docs/design/ffi-pointer-discipline.md`.
+
+Related in-family: `load8` returns a raw untagged i64 that reads back as a
+denormal double unless laundered through integer arithmetic (`& 255`). Same root
+theme — the extern boundary does not have one consistent tagging rule.
+
 ### 83. FIXED — `__float_to_string` bitcast an int-tagged value, so `.to_string()` on a whole-number Float printed `nan`
 
 ```saffron
