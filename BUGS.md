@@ -1818,7 +1818,7 @@ to have a global of that name — it fails as a hang or as silent state
 corruption rather than a wrong-looking number, and the affected code is
 correct-by-inspection in both files.
 
-### 50. An overridden method is not dispatched from an inherited method
+### 50. FIXED — an overridden method is now dispatched on the receiver's runtime class
 
 **Reproduction:**
 
@@ -1870,6 +1870,41 @@ design limitation rather than being handed to a fix pass.
 
 **`CLAUDE.md` currently advertises polymorphic `speak()` overriding as supported,
 so the documentation oversells this.**
+
+**Resolution (2026-07-31).** Both blockers named above were removed by the #61
+foundation (a real parent map in codegen, and per-class tags assigned in the
+`generate()` pre-registration pass — so emission order no longer matters). The
+fix is the tag-switch route, not vtables. At a method call that binds
+statically to `<ns>__<method>`, `gen_virtual_dispatch` (`methods_body.sf`)
+switches on `__val_class_tag(receiver)` with one arm per descendant of `ns`
+whose *effective* implementation of the method differs from `ns`'s, calling that
+subclass's own symbol; the default arm is the static symbol. Correct by
+construction: every class in the subtree already has a `C__method` symbol (a
+real override, or the forwarder `gen_class_decl_with_parent` emits), so an arm
+per overriding descendant covers every receiver. It returns `""` when nothing
+overrides (the common case pays nothing) and in identity mode (the bootstrap
+keeps static behaviour). Two new pre-scan tables back it: `class_own_methods`
+(methods a class declares with a body, before forwarder mixing) and
+`class_bare_of` (struct name → bare name), both keyed by struct name like
+`class_parent_of`. The hook sits after the coroutine/actor dispatch guards and
+operates on the already-evaluated receiver, so it does not re-enter the receiver
+expression — the #70 preamble hazard is avoided.
+
+Verified: `d.describe()` → `Rex says Woof`; a `Cat` in an `Animal`-typed slot
+dispatches `Meow` (the `List<Animal>` case the entry said needed a separate
+step); a two-level `Puppy extends Dog extends Animal` chain gives `Max: Yip`;
+`describe()` (not itself overridden) picks up the override through its inner
+`this.speak()`, which is itself dispatched. Every method call site changed;
+zero test regressions.
+
+Uncovered while testing, filed as #49-adjacent: a grandchild that declares no
+`init` (`Puppy` with only `Dog` and `Animal` defining `init`) compiles
+`Puppy("Max")` to a bare `@Puppy()` with the argument dropped, so its fields
+stay 0 and the first field read segfaults. The `init` forwarder
+(`stmts_body.sf:384`) gates on `called_function_arity` for the *immediate*
+parent, which a forwarded `Dog__init` never registers, so the chain breaks at
+the second level. Independent of dispatch — reproduces by giving each level an
+explicit `init`, which works.
 
 ### 51. Mutation of a captured variable is lost — captures are by value
 

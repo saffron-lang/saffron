@@ -87,6 +87,16 @@ class Codegen {
     // __class_is_a answer `d is Animal` for a Dog, which no amount of
     // compile-time folding can (BUGS #61, #50).
     var class_parent_of: Map<String, String>
+    // Methods a class declares *itself* (real symbols, not inherited forwarders),
+    // and the bare (unprefixed) name for each struct name. Both keyed by struct
+    // name and populated in the generate() pre-registration pass, before the
+    // forwarder logic in gen_class_decl_with_parent pushes inherited names into
+    // class_methods — that mixing is why class_methods can't answer "does this
+    // class override the method" on its own. gen_virtual_dispatch (BUGS #50)
+    // needs exactly that: to switch a call on the receiver's runtime tag it must
+    // know which descendants change the method's behaviour.
+    var class_own_methods: Map<String, List<String>>
+    var class_bare_of: Map<String, String>
     var llvm_module: LLVMMod.Module
     var llvm_func_builder: LLVMFunc.FunctionBuilder
     var llvm_block_builder: LLVMBlock.BlockBuilder
@@ -156,6 +166,8 @@ class Codegen {
         this.class_type_ids = {}
         this.next_class_type_id = 10
         this.class_parent_of = {}
+        this.class_own_methods = {}
+        this.class_bare_of = {}
         this.actor_classes = {}
         this.force_next_lambda_coro = false
         this.check_spawn_sendable = false
