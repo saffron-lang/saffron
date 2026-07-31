@@ -33,6 +33,11 @@ usage() {
     echo "  -o <path>    Output binary path (for build)"
     echo "  --opt, -O    Optimization level (default: -O2)"
     echo "  --verbose    Show compilation steps"
+    echo "  --max-memory <size>"
+    echo "               Cap heap memory for 'run' (e.g. 512m, 2g, 1048576)."
+    echo "               Suffixes k/m/g, case-insensitive; bare number = bytes."
+    echo "               Exceeding the cap prints a diagnostic and exits 3."
+    echo "               Equivalent to setting SAFFRON_MAX_MEMORY."
     exit 0
 }
 
@@ -51,6 +56,8 @@ TARGET=""
 VERBOSE=false
 LIB_PATHS=()
 EXTRA_SAFFRONC_FLAGS=""
+MAX_MEMORY=""
+MAX_MEMORY_SET=false
 
 if [[ $# -eq 0 ]]; then
     usage
@@ -100,6 +107,15 @@ while [[ $# -gt 0 ]]; do
             shift
             LIB_PATHS+=("$1")
             ;;
+        --max-memory)
+            shift
+            MAX_MEMORY="$1"
+            MAX_MEMORY_SET=true
+            ;;
+        --max-memory=*)
+            MAX_MEMORY="${1#*=}"
+            MAX_MEMORY_SET=true
+            ;;
         *.sf)
             INPUT="$1"
             ;;
@@ -117,6 +133,21 @@ fi
 
 if [[ ! -f "$INPUT" ]]; then
     error "file not found: $INPUT"
+fi
+
+# --max-memory is validated here as well as in the runtime, so a typo fails
+# before we spend time compiling. The runtime does the authoritative parse.
+#
+# Keyed off MAX_MEMORY_SET rather than a non-empty MAX_MEMORY: `--max-memory ''`
+# would otherwise skip validation entirely and run unlimited, which is the one
+# outcome a memory cap must never silently produce.
+if [[ "$MAX_MEMORY_SET" == true ]]; then
+    if [[ ! "$MAX_MEMORY" =~ ^[0-9]+[kKmMgG]?$ ]]; then
+        error "invalid --max-memory value '$MAX_MEMORY' (expected a byte count with an optional k/m/g suffix, e.g. 512m)"
+    fi
+    if [[ "$COMMAND" != "run" ]]; then
+        error "--max-memory applies to 'saffron run'; for a built binary set SAFFRON_MAX_MEMORY in its environment instead"
+    fi
 fi
 
 # --- Dependency discovery ---
@@ -416,6 +447,13 @@ case "$COMMAND" in
         TMPBIN="$TMPDIR/program"
         build_project "$INPUT" "$TMPBIN"
         chmod +x "$TMPBIN"
-        "$TMPBIN" "$@"
+        # The cap is read by the runtime's startup constructor from the
+        # environment, so an explicit --max-memory just sets SAFFRON_MAX_MEMORY
+        # for the child. It intentionally overrides an inherited value.
+        if [[ -n "$MAX_MEMORY" ]]; then
+            SAFFRON_MAX_MEMORY="$MAX_MEMORY" "$TMPBIN" "$@"
+        else
+            "$TMPBIN" "$@"
+        fi
         ;;
 esac

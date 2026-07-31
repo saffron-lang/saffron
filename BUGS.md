@@ -9,6 +9,90 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 74. Builtin-namespace calls (`GC.*`) pass NaN-boxed arguments straight into `@extern` functions, and the matching getter re-masks the corruption so it reads back correct
+
+Found while wiring `GC.set_max_memory()` for the `--max-memory` work. It is not
+specific to the new function — `GC.set_threshold()` has always had it — and it is
+a *dispatch-path* bug, so the same `@extern` declaration behaves differently
+depending only on what the module was aliased to at the import site.
+
+`IO`, `OS` and `GC` are registered with an *empty* module prefix
+(`src/compiler/codegen.sf:519-521`), so `GC.foo(x)` does not go through the
+universal module dispatch in `src/compiler/codegen/methods_body.sf:955`. It falls
+through to a hardcoded block that rewrites the callee to the underlying runtime
+symbol (`_set_threshold` → `@__gc_set_threshold`) and emits the argument
+**still NaN-boxed**:
+
+```llvm
+  %t1 = add i64 0, 4096
+  %t2 = call i64 @__val_tag_int(i64 %t1)      ; tag it
+  %t3 = call i64 @__gc_set_threshold(i64 %t2) ; ...and pass the tagged value
+```
+
+`4096` arrives at the runtime as `9221401712017805312` (≈9.2 EB). The
+`stdlib_gc_set_threshold` wrapper that `src/lib/gc.sf` actually declares — which
+*does* untag correctly — is emitted into the module but never called:
+
+```llvm
+define linkonce_odr i64 @stdlib_gc_set_threshold(i64 %bytes.arg) {
+  %t2 = call i64 @__val_untag_int(i64 %t1)   ; the correct untag
+  call void @__gc_set_threshold(i64 %t2)     ; nothing calls this wrapper
+}
+```
+
+**Why it has gone unnoticed: the getter conceals it.** Both directions are
+consistently wrong, so a set/get round-trip returns the original value.
+`__gc_stat_threshold` returns the corrupted global raw, and the interpolation path
+then applies `__val_untag_int`, which masks off exactly the 16 tag bits that
+`__val_tag_int` had OR-ed in. The value that was never stored correctly is
+reconstructed on the way out:
+
+```saffron
+GC.set_threshold(4096)
+IO.println(GC.threshold())   // prints 4096 — but the global holds 9.2e18
+```
+
+Any consumer that reads the global *without* that round-trip sees the real value.
+`@__gc_alloc`'s `icmp uge i64 %total, %thresh` (`src/runtime/gc.ll:335`) is such a
+consumer, so `GC.set_threshold()` silently does nothing to auto-collection: the
+threshold is effectively infinite and the compare never fires.
+
+**Reproduction** — the alias is the only difference:
+
+```saffron
+import "@gc" as GC        // hits the hardcoded path: BROKEN
+import "@gc" as Memory    // hits universal module dispatch: CORRECT
+```
+
+With `--max-memory` the divergence is directly observable, because the cap has a
+consumer that is not a getter:
+
+| program | result |
+|---|---|
+| `import "@gc" as GC` + `GC.set_max_memory(16m)` then overflow | `rc=0`, cap never enforced |
+| `import "@gc" as Memory` + `Memory.set_max_memory(16m)` then overflow | `rc=3`, cap enforced |
+
+There is also a return-type mismatch on the same emission path: the callee is
+declared `declare void @__gc_set_threshold(i64)` but called as
+`%t3 = call i64 @__gc_set_threshold(...)`. `llvm-as` accepts the module, so this
+is latent rather than fatal today.
+
+**Related but distinct from #24.** #24 is about `gen_extern_call` passing `i64`
+params through raw in the *normal* extern path. This is the builtin-namespace
+dispatch path bypassing the generated `stdlib_*` wrapper altogether, which is why
+aliasing the same module to a different name fixes it. Fixing #24 does not fix
+this.
+
+**Fix direction:** make the empty-prefix builtin path route through the generated
+`stdlib_gc_*` wrapper like every other module, rather than rewriting the callee to
+the raw runtime symbol. Failing that, untag arguments at the rewrite site — but
+then the getters must stop double-masking, or the round-trip starts reporting
+wrong values instead of right ones by accident.
+
+**Not fixed here.** `--max-memory` and `SAFFRON_MAX_MEMORY` set the cap from the
+runtime constructor and do not go through this path, so they are unaffected. Only
+the `GC.set_max_memory()` / `GC.set_threshold()` Saffron-level setters are.
+
 ### 73. `tuple_test` compiles or fails at random — the same binary on the same source disagrees with itself run to run
 
 Found while diffing a baseline failure set for #69, where it presented as a

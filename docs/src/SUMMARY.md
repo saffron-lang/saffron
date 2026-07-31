@@ -80,3 +80,4 @@
 - [Destructuring](./reference/destructuring.md)
 - [Trailing Closures](./reference/trailing-closures.md)
 - [FFI (@extern)](./reference/ffi.md)
+- [Memory Limits](./reference/memory-limits.md)

@@ -814,7 +814,7 @@
                 var total1: String = this.fresh_local()
                 this.emit_indent(total1 + " = add i64 " + total + ", 1")
                 var buf: String = this.fresh_local()
-                this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
+                this.emit_indent(buf + " = call i8* @__sf_malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
                 this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
                 this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
                 var raw_result: String = this.ptr_to_val(buf)
@@ -1185,7 +1185,7 @@
             // Allocate environment: array of i64, one slot per capture
             var env_bytes: Float = num_caps * 8
             var env_raw: String = this.fresh_local()
-            this.emit_indent(env_raw + " = call i8* @malloc(i64 " + env_bytes.floor().to_string() + ")")
+            this.emit_indent(env_raw + " = call i8* @__sf_malloc(i64 " + env_bytes.floor().to_string() + ")")
             var env_ptr: String = this.fresh_local()
             this.emit_indent(env_ptr + " = bitcast i8* " + env_raw + " to [" + num_caps.floor().to_string() + " x i64]*")
 
@@ -1263,7 +1263,7 @@
             fn_type_str = fn_type_str + ")*"
 
             var closure_raw: String = this.fresh_local()
-            this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+            this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
             var closure_ptr: String = this.fresh_local()
             this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
             var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
@@ -1324,7 +1324,7 @@
         fn_type_str = fn_type_str + ")*"
 
         var closure_raw: String = this.fresh_local()
-        this.emit_indent(closure_raw + " = call i8* @malloc(i64 16)")
+        this.emit_indent(closure_raw + " = call i8* @__sf_malloc(i64 16)")
         var closure_ptr: String = this.fresh_local()
         this.emit_indent(closure_ptr + " = bitcast i8* " + closure_raw + " to [2 x i64]*")
         var fn_as_int: String = this.fn_ptr_to_val(fn_type_str, "@" + wrap_name)
@@ -1706,7 +1706,7 @@
         this.emit_indent(total1 + " = add i64 " + total + ", 1")
         // Malloc
         var buf: String = this.fresh_local()
-        this.emit_indent(buf + " = call i8* @malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
+        this.emit_indent(buf + " = call i8* @__sf_malloc(" + this.malloc_size_type() + " " + this.malloc_size_arg(total1) + ")")
         // strcpy + strcat
         this.emit_indent("call i8* @strcpy(i8* " + buf + ", i8* " + lptr + ")")
         this.emit_indent("call i8* @strcat(i8* " + buf + ", i8* " + rptr + ")")
@@ -2830,7 +2830,7 @@
         if (args.length() == 0) {
             // No-field variant in a multi-field enum: heap-allocate to outlive function
             var arr_raw: String = this.fresh_local()
-            this.emit_indent(arr_raw + " = call i8* @malloc(i64 8)")
+            this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 8)")
             var arr_ptr: String = this.fresh_local()
             this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [1 x i64]*")
             var tag_slot: String = this.fresh_local()
@@ -2845,7 +2845,7 @@
         var num_slots: Float = args.length() + 1
         var arr_bytes: Float = num_slots * 8
         var arr_raw: String = this.fresh_local()
-        this.emit_indent(arr_raw + " = call i8* @malloc(i64 " + arr_bytes.floor().to_string() + ")")
+        this.emit_indent(arr_raw + " = call i8* @__sf_malloc(i64 " + arr_bytes.floor().to_string() + ")")
         var arr_ptr: String = this.fresh_local()
         this.emit_indent(arr_ptr + " = bitcast i8* " + arr_raw + " to [" + num_slots.to_string() + " x i64]*")
         // Store tag at index 0

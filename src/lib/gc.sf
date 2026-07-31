@@ -9,6 +9,9 @@
 @extern("i64 __gc_stat_total_bytes()") fun _total_bytes(): Int
 @extern("i64 __gc_stat_threshold()") fun _threshold(): Int
 @extern("void __gc_set_threshold(i64)") fun _set_threshold(bytes: Int)
+@extern("void __mem_set_limit(i64)") fun _set_max_memory(bytes: Int)
+@extern("i64 __mem_get_limit()") fun _max_memory(): Int
+@extern("i64 __mem_live_bytes()") fun _live_bytes(): Int
 
 /// Run a full garbage collection cycle.
 fun collect() {
@@ -48,4 +51,32 @@ fun threshold(): Int {
 /// Set the auto-collection threshold in bytes.
 fun set_threshold(bytes: Int) {
     _set_threshold(bytes)
+}
+
+/// Cap total heap memory at `bytes`. Pass 0 for unlimited.
+///
+/// An allocation that would exceed the cap triggers one collection attempt; if
+/// the program is still over the cap afterwards it prints a diagnostic to
+/// stderr and exits with status 3. This is deliberately fatal and cannot be
+/// caught: the allocator is mid-object at that point, so unwinding would leave
+/// a half-initialized value reachable.
+///
+/// This overrides --max-memory and SAFFRON_MAX_MEMORY. Native target only —
+/// on wasm the bump allocator cannot enforce a cap and this is a no-op.
+fun set_max_memory(bytes: Int) {
+    _set_max_memory(bytes)
+}
+
+/// Return the current memory cap in bytes, or 0 if unlimited.
+fun max_memory(): Int {
+    return _max_memory()
+}
+
+/// Return the bytes currently live against the cap.
+///
+/// This counts what the allocator reports as usable for each outstanding block,
+/// so it runs slightly above the sum of requested sizes. It is only maintained
+/// while a cap is installed; with no cap it stays at 0.
+fun live_bytes(): Int {
+    return _live_bytes()
 }

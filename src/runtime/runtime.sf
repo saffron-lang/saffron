@@ -4,9 +4,13 @@
 
 // --- C Library Bindings ---
 
-@extern("void* malloc(i64)") fun rt_malloc(size: Int): Int
-@extern("void* realloc(void*, i64)") fun rt_realloc(ptr: Int, size: Int): Int
-@extern("void free(void*)") fun rt_free(ptr: Int)
+// rt_malloc/rt_realloc/rt_free bind to the cap-aware wrappers in gc.ll rather
+// than libc directly, so that --max-memory / SAFFRON_MAX_MEMORY covers all ~60
+// rt_malloc sites in this file. The wrappers are pass-throughs (one load and a
+// branch) when no limit is set. See the "Memory Cap" section of gc.ll.
+@extern("void* __sf_malloc(i64)") fun rt_malloc(size: Int): Int
+@extern("void* __sf_realloc(void*, i64)") fun rt_realloc(ptr: Int, size: Int): Int
+@extern("void __sf_free(void*)") fun rt_free(ptr: Int)
 @extern("i64 strlen(void*)") fun rt_strlen(s: Int): Int
 @extern("void* strcpy(void*, void*)") fun rt_strcpy(dst: Int, src: Int): Int
 @extern("void* strcat(void*, void*)") fun rt_strcat(dst: Int, src: Int): Int

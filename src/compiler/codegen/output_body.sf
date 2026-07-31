@@ -280,7 +280,7 @@
         if (is_coro) {
             this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
             this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-            this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+            this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
             this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
         }
 
@@ -760,7 +760,7 @@
             if (entry_is_coro) {
                 this.emit_indent("%__coro_id = call token @llvm.coro.id(i32 0, ptr null, ptr null, ptr null)")
                 this.emit_indent("%__coro_size = call i64 @llvm.coro.size.i64()")
-                this.emit_indent("%__coro_mem = call ptr @malloc(i64 %__coro_size)")
+                this.emit_indent("%__coro_mem = call ptr @__sf_malloc(i64 %__coro_size)")
                 this.emit_indent("%__coro_hdl = call ptr @llvm.coro.begin(token %__coro_id, ptr %__coro_mem)")
             }
             var vi: Float = 0

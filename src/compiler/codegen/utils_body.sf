@@ -50,6 +50,11 @@
         rt.append("declare i64 @__gc_env_alloc(i64)\n")
         rt.append("declare i64 @__gc_instance_alloc(i64)\n")
         rt.append("declare i64 @__gc_get_type_tag(i64)\n")
+        // Memory-cap-aware malloc. Codegen emits @__sf_malloc rather than
+        // @malloc so --max-memory / SAFFRON_MAX_MEMORY also covers the
+        // allocations codegen makes directly (string concat, closure envs,
+        // enum payloads, coroutine frames).
+        rt.append("declare i8* @__sf_malloc(i64)\n")
         // Scheduler extern functions (always needed when @async or @scheduler imported)
         rt.append("\n; --- Scheduler runtime ---\n")
         rt.append("declare double @sf_time_now()\n")
