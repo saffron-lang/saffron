@@ -1297,7 +1297,7 @@ builtins, which does work, plus the `keys()`/`values()` workaround for Maps.
 `src/lib/iter.sf`'s module doc already said the protocol was missing and was
 right all along.
 
-### 61. `x is SomeClass` is compiled to a constant `false` whenever the static type is `Any`
+### 61. `is` on a class name is *never* a runtime check — it is folded at compile time, so it silently answers false wherever the static type is not exactly that class
 
 **Reproduction:**
 
@@ -1309,40 +1309,69 @@ IO.println(check(Dog()))   // false — wrong
 IO.println(check(Cat()))   // false — correct by accident
 ```
 
-No error, no warning. It works when the concrete type is visible at the check
-site (`var d: Any = Dog(); d is Dog` is `true`, because the initialiser refines
-the declared `Any`), so the failure is specific to a genuinely opaque value —
-most importantly a function parameter, which is where a type test is useful.
+`Codegen.gen_is_check` (`src/compiler/codegen/expr_body.sf:445`) maps a fixed list
+of *builtin* names to runtime predicates. For anything else — a class or enum
+name — it gives up and emits a literal false. That path now at least warns
+(`expr_body.sf:486`), which is how the two shapes below were caught.
 
-`Codegen.gen_is_check` (`src/compiler/codegen/expr_body.sf:400-427`) maps a fixed
-list of *builtin* names to runtime predicates and then gives up:
+**This entry originally claimed the machinery already existed and the fix was to
+"fall through to the same `__gc_get_type_tag` comparison" used by the statically
+typed path, and it showed IR to prove it. That IR does not exist and the claim was
+wrong.** The static path only ever emits `add i64 0, <0-or-1>`
+(`expr_body.sf:509-510`). The `true` that made `d is Dog` look like it worked is a
+**compile-time constant from `is_class_type`**, not a runtime query. The only
+`__gc_get_type_tag` calls anywhere in a compiled module are inside the three
+`__reflect_*` helpers (`stmts_body.sf:1435`, `:1476`, `:1509`) — nothing `is`
+emits reaches it. Verified in the IR: `d is Dog` is `%t8 = add i64 0, 1`.
+
+So the real defect is broader than "specific to a genuinely opaque value": **class
+identity is never tested at runtime at all**, and every spelling where the static
+type is not exactly the class folds to a constant.
+
+Because the fold is also **flow-insensitive**, a local the checker cannot infer
+answers wrong too — a case this entry used to miss entirely:
 
 ```saffron
-// Unknown class type with Any — cannot resolve at runtime yet, return false
-var local: String = this.fresh_local()
-this.emit_indent(local + " = add i64 0, 0")
-return this.emit_tag_bool(local)
+fun pick(b: Bool): Any { if (b) { return Dog() } return Cat() }
+var d: Any = Dog()
+IO.println(d is Dog)        // true  — but only because the initialiser refines it
+var z: Any = pick(true)
+IO.println(z is Dog)        // false — WRONG, z holds a Dog
 ```
 
-But the machinery it claims is missing already exists and is already used: the
-statically-typed path below it emits a class comparison via `@__gc_get_type_tag`,
-a purely runtime query. Compare the two spellings:
-
-```
-`a is Dog`, a: Any        ->  %t3 = add i64 0, 0            (folded to false)
-`d is Dog`, d refined     ->  %t1 = call i64 @__gc_get_type_tag(i64 %val)
-                              %t2 = icmp eq i64 %klass, %t1
-```
-
-Fix: in the `Any` branch, fall through to the same `__gc_get_type_tag` comparison
-when `type_name` is not a builtin. Nothing new is needed at runtime. Failing that
-it should emit a diagnostic rather than a silent `false`.
+`z` gets `[checker] Warning: z: cannot infer type`, so `is_class_type` answers
+false and the check folds away. Same silent-wrong-answer class as the parameter
+case.
 
 Knock-on: `is`-pattern matching inherits it, so the `match (animal) { is Dog(d)
-=> ..., is Cat(c) => ... }` form `CLAUDE.md` documents has every arm test false
-and the first arm wins — `sound(Cat())` returns `"Woof"`. On the baseline
-compiler that program failed to compile at all (`undefined variable 'd'`), so
-this path has moved from "rejected" to "silently wrong".
+=> ..., is Cat(c) => ... }` form `CLAUDE.md` documents is broken. **Correcting a
+second claim in this entry:** it said every arm tests false so "the first arm wins
+— `sound(Cat())` returns `"Woof"`". It does not. *Both* calls fall through to the
+`_` arm and return `"?"`; with no `_` arm the match has no viable arm at all.
+Measured:
+
+```
+d is Dog: true      sound(Dog): ?
+z is Dog: false     sound(Cat): ?
+```
+
+Wrong answer either way, but not by the mechanism described. On the baseline
+compiler this program failed to compile (`undefined variable 'd'`), so the path
+has moved from "rejected" to "silently wrong".
+
+**Fix.** Emit a real runtime check in *both* branches — the undecidable one at
+`expr_body.sf:486-489` and the static class fold at `:508` — comparing
+`@__gc_get_type_tag(val)` against the `class_type_ids` entry for `type_name`. The
+tags are already assigned per class in `gen_class_constructor`
+(`stmts_body.sf:613-616`) and already baked into each `__gc_alloc` call
+(`:629-633`), so **no runtime work is needed** — that part of the original entry
+was right. Removing the static fold is what fixes the `z` case, and it is the
+reason this is not just a one-line patch to the `Any` branch.
+
+Note that a correct `is` for a *subclass* additionally needs the parent chain,
+which codegen does not have (see #50) — `class_parents` lives only in
+`checker.sf:163`. Exact-class identity is fixable now; `d is Animal` for a `Dog`
+is not.
 
 ### 60. `for (var i = 1; ...)` is a parse error; a C-style loop variable cannot be inferred
 
@@ -1462,6 +1491,27 @@ Method calls lower to `<StaticType>__<method>` — there is no vtable and no run
 dispatch on the object's class tag. This is a design limitation, not a patch:
 fixing it means either re-emitting inherited method bodies per subclass (covers
 the static-type case only) or real vtables (covers both, much larger).
+
+**Re-verified 2026-07-30, and it is structural for two independent reasons.** The
+forwarder is emitted at `src/compiler/codegen/stmts_body.sf:368-399` and is
+exactly a tail-call: `Dog__intro` is `%r = call i64 @Animal__intro`, and
+`Animal__intro` calls `@Animal__speak` by static name. Two-level chains and an
+`Animal`-typed variable holding a `Dog` all print the base version.
+
+What blocks the cheap fix:
+
+1. **Codegen has no parent map at all.** `class_parents` exists only in
+   `checker.sf:163`; there is no equivalent on `Codegen`, and `grep -rn
+   'vtable\|virtual' src/compiler/` returns nothing. `class_methods`
+   (`codegen.sf:32`) stores method *name strings*, not ASTs, so the parent method
+   bodies needed for per-subclass re-emission have already been discarded by the
+   time a subclass is lowered.
+2. **Emission order.** `Animal__intro` is emitted before `Dog__speak` (IR lines
+   202 and 234 in the repro), so when the parent body is lowered the compiler does
+   not yet know which subclasses override what.
+
+So neither of the two routes is a local change, which is why this stays filed as a
+design limitation rather than being handed to a fix pass.
 
 **`CLAUDE.md` currently advertises polymorphic `speak()` overriding as supported,
 so the documentation oversells this.**
