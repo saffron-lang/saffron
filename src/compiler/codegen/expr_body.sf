@@ -245,6 +245,14 @@
                             var mg_local: String = this.fresh_local()
                             var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
                             this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                            // Publish the type so a method call on this receiver
+                            // dispatches. Without it last_type is stale/unknown and
+                            // `Flag.items.push(1)` hit the silent `return "0"` in the
+                            // method dispatcher: the load was emitted, the call was
+                            // discarded, and the program compiled clean but did nothing.
+                            if (this.global_var_types.has(mp_resolved)) {
+                                this.last_type = this.str_to_type(this.global_var_types.get(mp_resolved))
+                            }
                             return mg_local
                         }
                     }
@@ -1570,6 +1578,11 @@
                     var mg_local: String = this.fresh_local()
                     var mg_ref: String = "@__g_" + this.sanitize_name(mp_resolved)
                     this.emit_indent(mg_local + " = load i64, i64* " + mg_ref)
+                    // Publish the type so a method call on this receiver dispatches
+                    // (see the matching comment in the MemberAccess handler above).
+                    if (this.global_var_types.has(mp_resolved)) {
+                        this.last_type = this.str_to_type(this.global_var_types.get(mp_resolved))
+                    }
                     return mg_local
                 }
             }
