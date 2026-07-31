@@ -1,6 +1,12 @@
     fun gen_function(name: String, params: String, ret_type: String, body: List<AST.Stmt>) {
         var emit_name: String = this.current_prefix + name
-        if (name == "main") {
+        // Only the ENTRY module's `main` becomes __saffron_main. An imported
+        // module is free to define a function called `main` (turmeric/prelude.sf
+        // does — it is the <main> element builder), and renaming that one too
+        // made both collapse onto the same symbol: the entry point silently
+        // called the library's `main` instead of the user's, with no diagnostic.
+        // current_prefix is empty only for the module being compiled.
+        if (name == "main" and this.current_prefix.length() == 0) {
             emit_name = "__saffron_main"
             this.known_functions.push("main")
         } else if (name.contains("__lambda")) {
