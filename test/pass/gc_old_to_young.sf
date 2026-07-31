@@ -1,0 +1,70 @@
+// A nursery object reachable ONLY through an old-generation object must survive
+// a minor collection, and the old-gen slot pointing at it must be forwarded.
+//
+// The remembered set that __gc_minor_mark_roots consults is maintained solely by
+// __gc_write_barrier, and codegen never emitted a single call to that barrier, so
+// the set was permanently empty (BUGS #81). An old->young edge was therefore
+// invisible to a minor collection: the child was abandoned in the nursery while
+// the parent's slot kept pointing at the now-dead address. Reading it back gave
+// garbage lengths and values, or segfaulted outright.
+//
+// Minor GC now scans the whole old generation for nursery references instead of
+// trusting the remembered set. The shape below is what exercises that: allocate
+// enough to promote the parent, attach a fresh nursery child, then allocate hard
+// enough to force a minor collection before reading the child back.
+
+import "@test" as Test
+
+// --- list child held by a promoted list parent ---
+var parent: List<List<Int>> = []
+var i = 0
+while (i < 3000) {
+    parent.push([i, i + 1])
+    i = i + 1
+}
+var child: List<Int> = [7, 8, 9]
+parent.push(child)
+var j = 0
+while (j < 5000) {
+    var junk: List<Int> = [j]
+    j = j + 1
+}
+var back: List<Int> = parent[parent.length() - 1]
+Test.assert_eq(back.length(), 3, "an old-gen list's nursery child keeps its length")
+Test.assert_eq(back.to_string(), "[7, 8, 9]", "and its contents are not garbage")
+
+// --- string child, so the fix is not list-specific ---
+var strs: List<String> = []
+var k = 0
+while (k < 3000) {
+    strs.push("filler")
+    k = k + 1
+}
+strs.push("survivor")
+var m = 0
+while (m < 5000) {
+    var junk2: List<Int> = [m]
+    m = m + 1
+}
+Test.assert_eq(strs[strs.length() - 1], "survivor", "an old-gen list's nursery string survives")
+
+// --- map value reached through a promoted map ---
+var holder: Map<String, List<Int>> = {}
+var n = 0
+while (n < 2000) {
+    holder.set("k" + n.to_string(), [n])
+    n = n + 1
+}
+holder.set("target", [11, 22])
+var p = 0
+while (p < 5000) {
+    var junk3: List<Int> = [p]
+    p = p + 1
+}
+var found = holder.get("target")
+Test.assert(found != nil, "the map still has the entry")
+if (found != nil) {
+    Test.assert_eq(found.to_string(), "[11, 22]", "a map's nursery value is forwarded correctly")
+}
+
+Test.summary()

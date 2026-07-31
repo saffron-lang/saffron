@@ -197,6 +197,37 @@ reused, so it is not the stale-SSA-temp bug wearing a different hat.
    cause together and leaves the shadow stack as the sole root mechanism, which
    is the only thing codegen actually maintains.
 
+**FIXED** (option 2, `60ee39f` → `gc.ll`). `__gc_minor_collect` now walks the
+whole old generation twice per minor collection: phase 1b (after `mark_roots`)
+marks nursery objects referenced from any live old-gen slot, phase 3b (after
+`update_refs`) rewrites those slots to the forwarded address. New helpers
+`__gc_minor_scan_old_gen`, `__gc_minor_scan_old_object`, `__gc_minor_visit_slot`,
+`__gc_minor_array_slots`; per-tag slot selection mirrors `__gc_mark_drain`
+exactly, and lists visit `data_ptr` first so the forwarding pass reads the
+already-updated array address. The write barrier and remembered set are left
+intact — still correct, merely redundant while unpopulated.
+
+Also fixed a pre-existing latent crash in `__gc_minor_mark_value` that the new
+scan exposed. Nursery memory is recycled without zeroing (the bump pointer is
+just reset), so a half-initialized object is observable with a nonzero count next
+to a stale or null `data_ptr` — `__list_new` stores count/capacity, then calls
+`__gc_alloc` for the data pointer, and that second allocation can trigger the
+collection. `mark_value` validated only the nursery address range, so it
+dereferenced that garbage; it now also checks the header magic sentinel, and the
+`trace_list`/`trace_map` element walks are bounded by the target array's own
+header size.
+
+Regression test: `test/pass/gc_old_to_young.sf` (list child, string child, map
+value). It segfaults against the pre-fix `gc.ll` and passes after — verified both
+directions via `SAFFRON_RUNTIME_GC`.
+
+**This is a real slowdown**, O(live old-gen objects) per minor collection, with
+no fixed overhead — the entire cost is the old-gen size term. Forced-collection
+worst case (2010 old-gen objects × 2000 minor collections, no old→young edges):
+0.00–0.01s → 0.19–0.23s. A 400k push loop: roughly 2×. A transient-allocation
+loop with a small old gen is unchanged. Option 3 remains the better end state and
+would remove this cost along with #63.
+
 ### 80. Three tests in `test/` segfault with the garbage collector fully disabled — non-GC codegen faults hiding behind the GC bugs
 
 `test/comprehensive.sf`, `test/functions.sf` and `test/nullable_narrowing.sf` all
