@@ -1,0 +1,41 @@
+import "@scheduler" as Scheduler
+
+@extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
+
+var seq: Int = 0
+fun mark(label: String) {
+    seq = seq + 1
+    IO.println(seq.to_string() + ": " + label + " depth=" + ss_depth().to_string())
+}
+
+fun sleepy(duration: Int) {
+    yield [1, duration]
+}
+
+fun workerA(name: String): String {
+    var buf: List<Int> = [1, 2, 3]
+    var tag: String = name + "A"
+    mark("A-1")
+    sleepy(0.03)
+    mark("A-2")
+    return tag
+}
+
+fun workerB(name: String): String {
+    var b1: List<Int> = [1]
+    var b2: List<Int> = [2]
+    var b3: String = name + "B"
+    mark("  B-1")
+    sleepy(0.01)
+    mark("  B-2")
+    return b3
+}
+
+mark("entry")
+var ta = Task.spawn(fun () => workerA("x"))
+var tb = Task.spawn(fun () => workerB("y"))
+mark("both spawned")
+var ra = ta.await()
+mark("awaited A")
+var rb = tb.await()
+mark("awaited B")

@@ -337,6 +337,18 @@
         // Only emit when not in identity mode (bootstrap doesn't need GC)
         var gc_root_count: Float = 0
         if (!this.identity_mode) {
+            // Coroutines tear down at __coro_final, by which time other tasks may
+            // have pushed roots on top of ours — the shadow stack is a single
+            // global LIFO but coroutine lifetimes are not nested. Record the depth
+            // *before* pushing this frame's roots so the epilogue can tell whether
+            // our roots are still the top of the stack and therefore safe to pop.
+            // Placed after llvm.coro.begin so CoroSplit promotes it into the frame,
+            // which is what lets it survive an arbitrary number of suspends.
+            if (is_coro) {
+                this.emit_indent("%__coro_ss_base = alloca i64")
+                this.emit_indent("%__coro_ss_base_v = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("store i64 %__coro_ss_base_v, i64* %__coro_ss_base")
+            }
             // Track params that are heap types
             i = 0
             while (i < param_list.length()) {
@@ -418,6 +430,32 @@
 
             this.emit("__coro_final:")
             this.block_terminated = false
+            // Release this frame's GC roots. Every coroutine return path funnels
+            // through __coro_final (gen_return branches here rather than popping
+            // itself), and the final suspend never resumes back into the body —
+            // resume traps, destroy goes to __coro_cleanup — so this runs exactly
+            // once per frame no matter how many times the coroutine suspended.
+            //
+            // The pop is guarded because the shadow stack is one global LIFO while
+            // coroutine lifetimes are not nested: a task that started later can
+            // still be live, with its roots stacked above ours, when we finish.
+            // Popping a fixed count there would discard *its* roots and collect
+            // objects that are still in use. So pop only when our region is
+            // provably still the top of the stack; otherwise leave it, since
+            // leaking a root is recoverable and freeing a live one is not.
+            if (gc_root_count > 0) {
+                this.emit_indent("%__coro_ss_now = call i64 @__gc_shadow_stack_depth()")
+                this.emit_indent("%__coro_ss_b = load i64, i64* %__coro_ss_base")
+                this.emit_indent("%__coro_ss_exp = add i64 %__coro_ss_b, " + gc_root_count.floor().to_string())
+                this.emit_indent("%__coro_ss_is_top = icmp eq i64 %__coro_ss_now, %__coro_ss_exp")
+                this.emit_terminator("br i1 %__coro_ss_is_top, label %__coro_ss_pop, label %__coro_ss_done")
+                this.emit("__coro_ss_pop:")
+                this.block_terminated = false
+                this.emit_indent("call void @__gc_pop_roots(i64 " + gc_root_count.floor().to_string() + ")")
+                this.emit_terminator("br label %__coro_ss_done")
+                this.emit("__coro_ss_done:")
+                this.block_terminated = false
+            }
             this.emit_indent("%__coro_fs_tok = call token @llvm.coro.save(ptr %__coro_hdl)")
             this.emit_indent("%__coro_fs = call i8 @llvm.coro.suspend(token %__coro_fs_tok, i1 true)")
             this.emit_indent("switch i8 %__coro_fs, label %__coro_suspend [i8 0, label %__coro_trap i8 1, label %__coro_cleanup]")

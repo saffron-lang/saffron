@@ -1,0 +1,22 @@
+import "@async" as Async
+
+@extern("i64 __gc_shadow_stack_depth()") fun ss_depth(): Int
+
+fun worker(name: String): String {
+    var buf: List<Int> = [1, 2, 3]
+    var tag: String = name + "!"
+    Async.sleep(0.0)
+    return tag
+}
+
+IO.println("depth before any spawn = " + ss_depth().to_string())
+
+var i: Int = 0
+while (i < 200) {
+    var t = Task.spawn(fun () => worker("w"))
+    var r = t.await()
+    i = i + 1
+    if (i == 50) { IO.println("after 50 rounds  = " + ss_depth().to_string()) }
+    if (i == 150) { IO.println("after 150 rounds = " + ss_depth().to_string()) }
+    if (i == 200) { IO.println("after 200 rounds = " + ss_depth().to_string()) }
+}
