@@ -806,6 +806,33 @@ Belongs in the type checker's coercion rules rather than a codegen patch. Note
 implicit Int→Float widening is the agreed direction for the language, so this is
 the missing half of that rule rather than a new feature.
 
+**FIXED** in `src/compiler/checker.sf`. `scalar_mismatch()` already granted the
+*permission* half of the rule (it declined to reject `Float` ← `Int`), but nothing
+performed the conversion, so a TAG_INT box was stored where every reader expects a
+raw double. The checker now materialises the widening as an AST rewrite: an Int
+expression in a `Float` position becomes `0.0 + expr`, which codegen already
+lowers through `__val_untag_float`'s int-tagged path — a `sitofp`. This reuses the
+one existing conversion instead of adding a second, and introduces no new tagging.
+
+Five positions were broken and are all fixed: a `Float` return, a `Float`
+parameter at a call site (including constructor and method params), a `Float`
+class field assignment (both `obj.f = 1` and `this.f = 1` inside a method), a
+`Float` element of a `List<Float>` literal, and returns/stores nested inside
+`if`/`while`/`try` blocks. A `Float`-annotated scalar *variable* initializer
+(`var f: Float = 1`) was already correct — codegen converts it at the store
+(#28) — and is deliberately left there so the conversion stays in one place.
+Float→Int narrowing remains an error (`test/fail/float_to_int_narrowing.sf`).
+
+Regression test: `test/pass/int_to_float_widening.sf`.
+
+**Interacts with #52.** Widening now makes `fun at(idx: Float)` receive a genuine
+double when called as `at(2)`, and #52 then reinterprets that double's bits as an
+integer and reads element 0. `test/test_generics.sf`'s `get_at<T>(idx: Float)`
+regressed for exactly this reason — the widening is correct per the agreed rule,
+and #52 is the defect. A direct `chars[f]` with `var f: Float = 2.0` misreads
+identically, with no widening involved. Fixing #52 fixes this; the `Float`-typed
+index parameter should arguably also become `Int` as part of #49.
+
 ### 55. An `@extern` used before its declaration links against the wrong symbol
 
 **Reproduction:**

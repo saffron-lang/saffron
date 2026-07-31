@@ -1,0 +1,126 @@
+// Int -> Float implicit widening (BUGS #54).
+//
+// The language's numeric rule is: Int->Float widens implicitly, Float->Int
+// narrowing is an error. The checker already granted the *permission* half —
+// scalar_mismatch() declined to reject `Float` <- `Int` — but nothing performed
+// the conversion. So an Int-tagged NaN box (TAG_INT 0x7FF9) was stored into a
+// slot that every reader treats as a raw double, and `__float_to_string`
+// formatted those tag bits as "nan":
+//
+//     fun f(): Float { return 0 }
+//     IO.println(f().to_string())      // "nan", want "0"
+//
+// `return 0.0` worked, so this was a silent wrong answer with no diagnostic —
+// and a numeric literal in a Float position is extremely common.
+//
+// The fix materialises the conversion in the checker as an AST rewrite: an Int
+// expression in a Float position becomes `0.0 + expr`. Codegen's `+` already
+// routes a mixed operand pair through __val_untag_float, whose int-tagged path
+// IS a sitofp, so the widening reuses the one existing lowering rather than
+// introducing a second one. No new tagging is added anywhere.
+//
+// Float->Int narrowing must still be rejected — see test/fail/float_to_int_narrowing.sf.
+
+import "@test" as Test
+
+// --- A Float-typed return, the original repro ---
+fun ret_zero(): Float { return 0 }
+fun ret_seven(): Float { return 7 }
+fun ret_negative(): Float { return -5 }
+
+Test.assert_eq(ret_zero().to_string(), "0", "Int literal 0 returned from a Float function")
+Test.assert_eq(ret_seven().to_string(), "7", "Int literal 7 returned from a Float function")
+Test.assert_eq(ret_negative().to_string(), "-5", "negative Int literal returned from a Float function")
+
+// A returned Int *expression*, not just a literal.
+fun ret_int_expr(): Float {
+    var n: Int = 4
+    return n
+}
+Test.assert_eq(ret_int_expr().to_string(), "4", "Int variable returned from a Float function")
+
+// Widening must reach returns inside nested blocks, not only the top level.
+fun ret_nested(flag: Bool): Float {
+    if (flag) {
+        return 1
+    } else {
+        return 3
+    }
+}
+Test.assert_eq(ret_nested(true).to_string(), "1", "Int literal returned from a Float function's if-branch")
+Test.assert_eq(ret_nested(false).to_string(), "3", "Int literal returned from a Float function's else-branch")
+
+// --- A Float-annotated variable initializer ---
+var annotated_lit: Float = 3
+Test.assert_eq(annotated_lit.to_string(), "3", "Int literal in a Float-annotated declaration")
+
+var source_int: Int = 4
+var annotated_expr: Float = source_int
+Test.assert_eq(annotated_expr.to_string(), "4", "Int variable in a Float-annotated declaration")
+
+// --- A Float parameter at a call site ---
+fun identity(x: Float): Float { return x }
+Test.assert_eq(identity(5).to_string(), "5", "Int literal passed to a Float parameter")
+Test.assert_eq(identity(source_int).to_string(), "4", "Int variable passed to a Float parameter")
+
+// The widened argument must be a real double, so float arithmetic on it is exact
+// rather than reinterpreted tag bits.
+fun halve(x: Float): Float { return x / 2.0 }
+Test.assert_eq(halve(7).to_string(), "3.5", "widened Float parameter divides as a double")
+
+// --- A Float class field assignment ---
+class Holder {
+    var value: Float
+    fun init(seed: Float) { this.value = seed }
+    fun set_to_literal() { this.value = 6 }
+    fun get(): Float { return this.value }
+}
+
+// Constructor parameter is a Float position too.
+var holder = Holder(2)
+Test.assert_eq(holder.get().to_string(), "2", "Int literal passed to a Float constructor parameter")
+
+// Assignment from outside the class.
+holder.value = 8
+Test.assert_eq(holder.get().to_string(), "8", "Int literal assigned to a Float field from outside")
+
+// Assignment to this.field from inside a method body.
+holder.set_to_literal()
+Test.assert_eq(holder.get().to_string(), "6", "Int literal assigned to this.field inside a method")
+
+// A Float method parameter.
+class Scaler {
+    fun init() {}
+    fun scale(factor: Float): Float { return factor * 1.5 }
+}
+var scaler = Scaler()
+Test.assert_eq(scaler.scale(2).to_string(), "3", "Int literal passed to a Float method parameter")
+
+// --- A Float element in a typed list ---
+var floats: List<Float> = [1, 2.5, 3]
+Test.assert_eq(floats[0].to_string(), "1", "Int literal as the first element of a List<Float>")
+Test.assert_eq(floats[1].to_string(), "2.5", "Float literal element of a List<Float> is untouched")
+Test.assert_eq(floats[2].to_string(), "3", "Int literal as the last element of a List<Float>")
+
+// Widened list elements must behave as doubles in arithmetic.
+var elem_sum: Float = floats[0] + floats[1] + floats[2]
+Test.assert_eq(elem_sum.to_string(), "6.5", "widened List<Float> elements sum as doubles")
+
+// --- Regression guards: values that were already correct must stay correct ---
+var real_float: Float = 7.25
+Test.assert_eq(real_float.to_string(), "7.25", "a genuine Float literal is unchanged")
+
+fun ret_float_lit(): Float { return 0.5 }
+Test.assert_eq(ret_float_lit().to_string(), "0.5", "a Float literal return is unchanged")
+
+// Int positions must NOT be widened — an Int stays an Int.
+fun ret_int(): Int { return 9 }
+Test.assert_eq(ret_int(), 9, "an Int-typed return keeps its Int representation")
+
+var plain_int: Int = 3
+Test.assert_eq(plain_int, 3, "an Int-annotated declaration keeps its Int representation")
+
+// Mixed arithmetic, which already worked via __val_untag_float, still does.
+Test.assert_eq((0.0 + source_int).to_string(), "4", "mixed Int/Float arithmetic still widens")
+
+Test.summary()

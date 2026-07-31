@@ -169,6 +169,11 @@ class NullChecker {
     var class_abstract_methods: Map<String, String>
     var receiver_params: Map<String, String>
     var actor_classes: Map<String, Bool>
+    // Set while the Int->Float widening pass re-infers an expression it has
+    // already inferred once. Inference is not side-effect free — it pushes
+    // errors and warnings — so re-running it to answer "is this an Int?" would
+    // report every diagnostic inside the expression twice.
+    var quiet: Bool
 
     fun init() {
         this.env = TypeEnv()
@@ -181,13 +186,16 @@ class NullChecker {
         this.class_abstract_methods = {}
         this.receiver_params = {}
         this.actor_classes = {}
+        this.quiet = false
     }
 
     fun error(msg: String) {
+        if (this.quiet) return nil
         this.errors.push(msg)
     }
 
     fun warn(msg: String) {
+        if (this.quiet) return nil
         this.warnings.push(msg)
     }
 
@@ -560,6 +568,103 @@ class NullChecker {
         return true
     }
 
+    // --- Int -> Float implicit widening (BUGS #54) ---
+    //
+    // The language's agreed numeric rule is: Int->Float widening is implicit,
+    // Float->Int narrowing is an error. scalar_mismatch() already implements the
+    // *permission* half — it declines to reject `Float` <- `Int`. But permitting
+    // the assignment was all it did: nothing converted the value, so an
+    // Int-tagged NaN box (TAG_INT 0x7FF9) was stored into a slot every reader
+    // treats as a raw double. `__float_to_string` then formatted those tag bits
+    // and printed "nan". `fun f(): Float { return 0 }` returned nan; `return 0.0`
+    // worked. That is a silent wrong answer, with no diagnostic anywhere.
+    //
+    // The missing half is materialising the conversion. Rather than emit a
+    // sitofp from the checker — the checker has no IR — the widening is done as
+    // an AST rewrite: the Int expression E becomes `Binary(FloatLit("0.0"), "+", E)`.
+    // Codegen's `+` already handles a mixed operand pair by routing both sides
+    // through `__val_untag_float`, whose int-tagged path *is* a sitofp
+    // (codegen/expr_body.sf:824 "if (left_type == Float or right_type == Float)").
+    // So the conversion reuses the one existing lowering instead of adding a
+    // second one, and `0.0 + x` is exact for every Int a double can hold.
+    //
+    // Rewriting the AST from the checker is an established channel here:
+    // desugar_receiver_closure() already writes back through `args[i] = ...` and
+    // `body[i] = ...`, and codegen sees those edits.
+    //
+    // NaN-boxing discipline is preserved: no tagging is introduced anywhere. The
+    // rewrite emits ordinary Saffron AST, and all tag/untag still happens in the
+    // single place codegen already does it for arithmetic.
+    fun widen_expr(expr: AST.Expr): AST.Expr {
+        return AST.Expr.Binary(AST.Expr.FloatLit("0.0"), "+", expr)
+    }
+
+    // True when `expr` is an Int-typed expression sitting in a position declared
+    // `Float`, i.e. exactly the case that needs widening.
+    //
+    // `declared` is the annotation as written. "Number" is deliberately NOT
+    // treated as a Float position: it is the legacy one-surface-name-for-two-
+    // representations type (#49) that Int/Float are replacing, the compiler's own
+    // sources use it for integers in 455 places, and widening it would change
+    // the representation under all of them.
+    fun needs_float_widening(declared: String, expr: AST.Expr): Bool {
+        if (declared != "Float") return false
+        // Already a float literal — nothing to convert.
+        if (this.is_float_lit(expr)) return false
+        var was_quiet: Bool = this.quiet
+        this.quiet = true
+        var actual: String = this.infer_expr(expr)
+        this.quiet = was_quiet
+        return actual == "Int"
+    }
+
+    fun is_float_lit(expr: AST.Expr): Bool {
+        return match (expr) {
+            FloatLit(v) => true
+            _ => false
+        }
+    }
+
+    // Widen each element of a `List<Float>` literal that is an Int expression.
+    // Mutates the element list in place, which is how the AST edits made here
+    // reach codegen.
+    fun widen_list_elements(declared: String, expr: AST.Expr) {
+        if (!declared.starts_with("List<")) return nil
+        var elem_type: String = this.extract_list_element_type(declared)
+        if (elem_type != "Float") return nil
+        var elements: List<AST.Expr> = match (expr) {
+            ListLit(e) => e
+            _ => []
+        }
+        var i: Float = 0
+        while (i < elements.length()) {
+            if (this.needs_float_widening("Float", elements[i])) {
+                elements[i] = this.widen_expr(elements[i])
+            }
+            i = i + 1
+        }
+    }
+
+    // Widen Int arguments passed to Float-declared parameters. `params_str` is
+    // the "name:Type,name:Type" encoding produced by params_list_to_string().
+    // Mutates `args` in place.
+    fun widen_call_args(params_str: String, args: List<AST.Expr>) {
+        if (params_str.length() == 0) return nil
+        var entries: List<String> = this.split_type_args(params_str)
+        var i: Float = 0
+        while (i < entries.length() and i < args.length()) {
+            var entry: String = entries[i]
+            var colon_pos: Float = entry.index_of(":")
+            if (colon_pos >= 0) {
+                var ptype: String = entry.slice(colon_pos + 1, entry.length())
+                if (this.needs_float_widening(ptype, args[i])) {
+                    args[i] = this.widen_expr(args[i])
+                }
+            }
+            i = i + 1
+        }
+    }
+
     fun is_scalar_name(s: String): Bool {
         if (s == "Int") return true
         if (s == "Float") return true
@@ -653,6 +758,9 @@ class NullChecker {
         i = 0
         while (i < stmts.length()) {
             this.check_stmt(stmts[i])
+            // Top-level statements go through the same Int->Float widening as
+            // nested ones (check_stmts does this for every other block).
+            stmts[i] = this.widen_stmt(stmts[i])
             i = i + 1
         }
         // Third pass: check interface conformance
@@ -1026,6 +1134,17 @@ class NullChecker {
                     this.env.define_var(name + "__parent", this.parse_type_node(parent))
                     this.class_parents.set(name, parent)
                 }
+                // Method bodies are deliberately NOT run through check_stmt: this
+                // arm has never checked them, and turning that on would newly
+                // surface every null-safety error and unused-variable warning
+                // inside every method in every program at once. That is a much
+                // larger change than a numeric coercion fix.
+                //
+                // The Int->Float widening does have to reach into them, though —
+                // `fun set(x: Float) { this.v = 6 }` is the same silent nan as at
+                // top level. So methods get a widening-only walk, which reports
+                // no diagnostics of its own.
+                this.widen_class_methods(name, methods)
             }
             EnumDecl(n, v, d) => {}
             Break => {}
@@ -1058,8 +1177,185 @@ class NullChecker {
         var i: Float = 0
         while (i < stmts.length()) {
             this.check_stmt(stmts[i])
+            // Int->Float widening runs immediately after the statement is
+            // checked, while the surrounding context the rewrite depends on
+            // (current_func_ret for a Return, the declared class for a field
+            // store) is still the one that applies to this statement.
+            stmts[i] = this.widen_stmt(stmts[i])
             i = i + 1
         }
+    }
+
+    // Returns `stmt` with any Int expression in a Float position wrapped in the
+    // widening conversion. Statements are immutable value types here, so the
+    // affected ones are rebuilt; the caller stores the result back into the list,
+    // which is what makes the edit visible to codegen.
+    fun widen_stmt(stmt: AST.Stmt): AST.Stmt {
+        var kind: String = this.classify_widen_stmt(stmt)
+        if (kind == "return") {
+            var value: AST.Expr = match (stmt) {
+                Return(v) => v
+                _ => AST.Expr.NilLit
+            }
+            var ret_str: String = this.type_to_str(this.current_func_ret)
+            if (this.needs_float_widening(ret_str, value)) {
+                return AST.Stmt.Return(this.widen_expr(value))
+            }
+            return stmt
+        }
+        if (kind == "var_decl") {
+            // The scalar `var f: Float = 1` case is already converted in codegen
+            // (BUGS #28) at the store, so it is deliberately not re-done here —
+            // one conversion, in one place. What codegen does NOT reach is the
+            // element positions of a `List<Float>` literal, which stays a list of
+            // whatever representation each element happened to have.
+            var type_ann: String = match (stmt) {
+                VarDecl(n, t, i, d) => t
+                _ => ""
+            }
+            var init: AST.Expr = match (stmt) {
+                VarDecl(n, t, i, d) => i
+                _ => AST.Expr.NilLit
+            }
+            this.widen_list_elements(type_ann, init)
+            return stmt
+        }
+        if (kind == "set_field") {
+            var expr: AST.Expr = match (stmt) {
+                ExprStmt(e) => e
+                _ => AST.Expr.NilLit
+            }
+            var obj: AST.Expr = match (expr) {
+                SetField(o, f, v) => o
+                _ => AST.Expr.NilLit
+            }
+            var field: String = match (expr) {
+                SetField(o, f, v) => f
+                _ => ""
+            }
+            var value: AST.Expr = match (expr) {
+                SetField(o, f, v) => v
+                _ => AST.Expr.NilLit
+            }
+            var owner: String = this.field_owner_class(obj)
+            if (owner.length() > 0) {
+                var ftype: String = this.get_class_field_type(owner, field)
+                if (this.needs_float_widening(ftype, value)) {
+                    return AST.Stmt.ExprStmt(AST.Expr.SetField(obj, field, this.widen_expr(value)))
+                }
+            }
+            return stmt
+        }
+        return stmt
+    }
+
+    // Apply Int->Float widening inside every method body of a class, without
+    // running the diagnostic-producing checks. `current_class` and
+    // `current_func_ret` are established per method so that `this.field = 1` and
+    // `return 1` resolve against the right declarations, and the parameters are
+    // defined in a scope so an Int-typed param reads as Int.
+    fun widen_class_methods(class_name: String, methods: List<AST.Stmt>) {
+        var old_class: String = this.current_class
+        var old_ret: AST.Type = this.current_func_ret
+        var was_quiet: Bool = this.quiet
+        this.current_class = class_name
+        this.quiet = true
+        var mi: Float = 0
+        while (mi < methods.length()) {
+            var mbody: List<AST.Stmt> = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md) => mb
+                _ => []
+            }
+            var mret: String = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md) => mr
+                _ => "Any"
+            }
+            var mparams: List<AST.Param> = match (methods[mi]) {
+                FunDecl(mn, mp, mr, mb, md) => mp
+                _ => []
+            }
+            this.current_func_ret = this.parse_type_node(mret)
+            this.env.push_scope()
+            var pi: Float = 0
+            while (pi < mparams.length()) {
+                var p: AST.Param = mparams[pi]
+                var pname: String = match (p) { Param(n, t, d) => n }
+                var pt: AST.Type = match (p) { Param(n, t, d) => t }
+                this.env.define_var(pname, pt)
+                pi = pi + 1
+            }
+            this.widen_stmts(mbody)
+            this.env.pop_scope()
+            mi = mi + 1
+        }
+        this.current_class = old_class
+        this.current_func_ret = old_ret
+        this.quiet = was_quiet
+    }
+
+    // Widening-only recursive walk. Mirrors the block structure check_stmts
+    // covers, but performs no checks and emits no diagnostics.
+    fun widen_stmts(stmts: List<AST.Stmt>) {
+        var i: Float = 0
+        while (i < stmts.length()) {
+            stmts[i] = this.widen_stmt(stmts[i])
+            this.widen_nested_blocks(stmts[i])
+            i = i + 1
+        }
+    }
+
+    fun widen_nested_blocks(stmt: AST.Stmt) {
+        match (stmt) {
+            If(cond, then_branch, else_branch) => {
+                this.widen_stmts(then_branch)
+                this.widen_stmts(else_branch)
+            }
+            While(cond, body) => {
+                this.widen_stmts(body)
+            }
+            Block(inner) => {
+                this.widen_stmts(inner)
+            }
+            TryCatch(try_body, catch_name, catch_body, finally_body) => {
+                this.widen_stmts(try_body)
+                this.widen_stmts(catch_body)
+                this.widen_stmts(finally_body)
+            }
+            _ => {}
+        }
+    }
+
+    fun classify_widen_stmt(stmt: AST.Stmt): String {
+        return match (stmt) {
+            Return(v) => "return"
+            VarDecl(n, t, i, d) => "var_decl"
+            ExprStmt(e) => {
+                var inner: String = match (e) {
+                    SetField(o, f, v) => "set_field"
+                    _ => "other"
+                }
+                inner
+            }
+            _ => "other"
+        }
+    }
+
+    // The class whose field table describes `obj.field`, or "" when unknown.
+    fun field_owner_class(obj: AST.Expr): String {
+        var is_this: Bool = match (obj) {
+            This => true
+            _ => false
+        }
+        if (is_this) {
+            if (this.current_class.length() > 0) return this.current_class
+            return ""
+        }
+        var was_quiet: Bool = this.quiet
+        this.quiet = true
+        var obj_type: String = this.infer_expr(obj)
+        this.quiet = was_quiet
+        if (this.env.class_fields.has(obj_type)) return obj_type
+        return ""
     }
 
     fun apply_narrowing(cond: AST.Expr) {
@@ -1634,6 +1930,18 @@ class NullChecker {
             this.infer_expr(args[ai])
             ai = ai + 1
         }
+        // Int->Float widening at Float-declared parameters.
+        if (name.length() > 0) {
+            var wparams: String = this.env.get_func_params(name)
+            // A constructor call `Box(2)` names the class, not a function.
+            // register_decl registers the class name as a function (so the call
+            // types as Box) but records no params under it — init's signature is
+            // filed under "Box__init". Fall back to that.
+            if (wparams.length() == 0 and this.env.class_fields.has(name)) {
+                wparams = this.env.get_func_params(name + "__init")
+            }
+            this.widen_call_args(wparams, args)
+        }
         // Look up declared return type
         if (name.length() > 0) {
             // Check generic constraints if this is a generic function
@@ -1715,6 +2023,14 @@ class NullChecker {
         while (ai < args.length()) {
             this.infer_expr(args[ai])
             ai = ai + 1
+        }
+
+        // Int->Float widening at a method's Float-declared parameters. Methods
+        // are registered as "Class__method" (register_decl), so the receiver's
+        // type supplies the lookup key. Only a known user class is consulted;
+        // builtin methods have no registered signature and are left alone.
+        if (this.env.class_fields.has(obj_type)) {
+            this.widen_call_args(this.env.get_func_params(obj_type + "__" + method), args)
         }
 
         // Enum variant construction: Shape.Circle(5) → type is "Shape"
