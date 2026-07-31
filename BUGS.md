@@ -1950,13 +1950,21 @@ but its blast radius is shrinking:
 lexer/parser/checker/codegen — which is a breaking change for user programs and
 wants its own decision.
 
-### 41. A nested map literal overwrites its parent — silent wrong answer
+### 41. FIXED — a nested map literal overwrote its parent (silent wrong answer)
 
-**Reproduction:**
+Fixed by giving each desugared map literal a unique temporary. The parser has a
+`next_map_uid()` counter (mirroring the existing `next_for_uid()` for `for-in`);
+each of the two desugaring sites now names its temporary `__map` + uid, bound
+*before* the recursive `parse_expr` so the outer literal keeps the lower id and
+each nested literal gets its own. Distinct names also give each literal its own
+alloca and GC root, which fixes the use-after-free that made the multi-entry
+nested case segfault. `types_body.sf`'s `starts_with("__map")` gate still matches.
+
+**Reproduction (now correct):**
 
 ```saffron
 var nest = {"outer": {"inner": 5}}
-IO.println(nest.to_string())   // prints {inner: 5}, should be {outer: {inner: 5}}
+IO.println(nest.to_string())   // was {inner: 5}; now {outer: {inner: 5}}
 ```
 
 The parser desugars a map literal into a `BlockExpr` holding a `VarDecl` of a
