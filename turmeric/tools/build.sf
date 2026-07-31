@@ -73,16 +73,20 @@ if (IO.file_exists(html_path)) {
     // Replace src="...*.sf" with src="./app.js"
     var lines: List<String> = html.split("\n")
     var out: StringBuilder = StringBuilder()
-    var li: Float = 0
+    // `li` MUST be Int, not Float. Indexing a list with a Float-typed variable
+    // silently reads element 0 every time (BUGS.md #72), so with `var li: Float`
+    // this loop rewrote every app's index.html into N copies of its first line —
+    // i.e. a bare `<!DOCTYPE html>` repeated, and a blank page.
+    var li: Int = 0
     while (li < lines.length()) {
         var line: String = lines[li]
         if (line.contains(".sf\"")) {
             // Rewrite script src
-            var start: Float = line.index_of("src=\"")
+            var start: Int = line.index_of("src=\"")
             if (start >= 0) {
                 var before: String = line.slice(0, start)
                 var after_src: String = line.slice(start + 5, line.length())
-                var end_quote: Float = after_src.index_of("\"")
+                var end_quote: Int = after_src.index_of("\"")
                 var after: String = after_src.slice(end_quote, after_src.length())
                 line = before + "src=\"./app.js" + after
             }

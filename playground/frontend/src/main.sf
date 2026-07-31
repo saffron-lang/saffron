@@ -330,7 +330,14 @@ fun App() {
     render_examples()
 }
 
-fun main() {
+/// Entry point.
+///
+/// Deliberately NOT called `main`: this file imports `main` from turmeric/prelude
+/// (the <main> element builder, used in App above). A local `fun main` would
+/// collide with that import, and the collision is resolved in favour of the
+/// import — so `main()` down here called the element builder and the app never
+/// started, silently. See BUGS.md #71.
+fun start() {
     var initial: String = Api.initial_source()
     if (initial.length() > 0) {
         source.set(initial)
@@ -343,7 +350,7 @@ fun main() {
     fetch_examples()
 }
 
-main()
+start()
 
 /// Re-render the output pane whenever the output signal changes.
 ///

@@ -35,30 +35,48 @@ fun _set_hash_source(source: String)
 @extern("i64 js_get_hash_source()")
 fun _get_hash_source(): String
 
-var _next_id: Float = 0
-var _callbacks: Map<Float, (String) => Nil> = {}
+/// Pending callbacks, indexed by position.
+///
+/// A `Map<Float, ...>` is the obvious choice and it does not work. Callback ids
+/// make a round trip out to JS and back in through an exported wasm function,
+/// and a value arriving that way is a **bare machine integer**, not a NaN-boxed
+/// one: JS hands wasm `1n`, whereas the id the module stored was the f64 bit
+/// pattern of 1.0 (`0x3FF0000000000000`). `__map_key_cmp`
+/// (src/runtime/runtime.sf:287) compares non-string keys by exact bit pattern,
+/// so `_callbacks.has(id)` was false for every id and every completion handler
+/// was silently dropped — the Run button POSTed, the response came back, and
+/// nothing happened. See BUGS.md #73.
+///
+/// A List sidesteps it entirely: an index only has to compare numerically, which
+/// survives the representation change. This is also why Turmeric's own
+/// `__dispatch_event` (turmeric/src/prelude/03_callbacks.sf:27) is List-based.
+/// Slots are never reused, so ids stay unique for the page's lifetime.
+var _callbacks: List<(String) => Nil> = []
 
 fun _register(callback: (String) => Nil): Float {
-    _next_id = _next_id + 1
-    var id: Float = _next_id
-    _callbacks.set(id, callback)
-    return id
+    _callbacks.push(callback)
+    return _callbacks.length() - 1
 }
 
 fun _resolve(id: Float, payload: String) {
-    if (_callbacks.has(id)) {
-        var callback = _callbacks.get(id)
-        // Drop the entry before invoking: a handler that starts another request
-        // must not be able to see its own stale slot.
-        _callbacks.set(id, nil)
+    if (id >= 0 and id < _callbacks.length()) {
+        var callback: (String) => Nil = _callbacks[id]
         callback(payload)
     }
 }
 
 /// POST source to the compile service. `callback` receives the raw JSON body.
-fun compile(source: String, callback: (String) => Nil) {
-    var body: String = "{\"source\":" + json_quote(source) + "}"
-    _fetch_post("/api/compile", body, _register(callback))
+///
+/// The parameter is `program_text`, not `source`, and that is load-bearing: a
+/// function parameter whose name collides with ANY module-level global anywhere
+/// in the program silently reads the global instead (BUGS.md #40). main.sf has a
+/// `var source = signal("")`, so a parameter called `source` here compiled to
+/// `load i64, i64* @__g_source` — the Signal object — and the editor contents
+/// never reached the request. The symptom was a Run button that POSTed
+/// `{"source":"<3 bytes of garbage>"}` with no error anywhere.
+fun compile(program_text: String, callback: (String) => Nil) {
+    var payload: String = "{\"source\":" + json_quote(program_text) + "}"
+    _fetch_post("/api/compile", payload, _register(callback))
 }
 
 /// GET the bundled examples. `callback` receives the raw JSON body.
@@ -71,8 +89,10 @@ fun run(wasm_base64: String, callback: (String) => Nil) {
     _run_wasm(wasm_base64, _register(callback))
 }
 
-fun share(source: String) {
-    _set_hash_source(source)
+// Same shadowing hazard as `compile` above (BUGS.md #40): `source` collides
+// with main.sf's global signal.
+fun share(program_text: String) {
+    _set_hash_source(program_text)
 }
 
 fun initial_source(): String {
@@ -85,8 +105,10 @@ fun __on_fetch_complete(id: Float, response: String) {
 }
 
 /// Exported to JS: resolution for `js_run_wasm`.
-fun __on_run_complete(id: Float, output: String) {
-    _resolve(id, output)
+fun __on_run_complete(id: Float, captured: String) {
+    // `captured`, not `output`: main.sf has a global `var output = signal("")`
+    // and a parameter of that name would read the Signal instead (BUGS.md #40).
+    _resolve(id, captured)
 }
 
 /// Minimal JSON string escaping.
@@ -157,12 +179,49 @@ fun json_field(body: String, key: String): String {
         return bare.trim()
     }
     i = i + 1
-    var out: String = ""
-    while (i < body.length()) {
+    var start: Int = i
+
+    // Locate the closing quote WITHOUT accumulating, then take one slice.
+    //
+    // The obvious `out = out + ch` per character is quadratic in allocation:
+    // Saffron strings are immutable, so each `+` mallocs a fresh copy of
+    // everything so far. The `wasm` field is an 11 KB base64 blob, which made
+    // that ~11000 allocations averaging 5.5 KB — about 60 MB of garbage — and it
+    // died with "memory access out of bounds" inside strcpy on wasm32, where
+    // linear memory does not grow to meet that. Scanning for the end index and
+    // slicing once is a single allocation.
+    var has_escape: Bool = false
+    var scanning_value: Bool = true
+    while (scanning_value and i < body.length()) {
         var ch: String = body.char_at(i)
         if (ch == "\\") {
+            has_escape = true
+            i = i + 2
+        } else if (ch == "\"") {
+            scanning_value = false
+        } else {
+            i = i + 1
+        }
+    }
+    var raw: String = body.slice(start, i)
+    if (!has_escape) { return raw }
+    return json_unescape(raw)
+}
+
+/// Expand backslash escapes in an already-extracted JSON string body.
+///
+/// Only called for fields that actually contain a backslash, which in practice
+/// means `diagnostics` (compiler output, with newlines) — never the base64
+/// `wasm` payload, whose alphabet has no escapable characters. So the quadratic
+/// concatenation here is bounded by a diagnostic message rather than a module.
+fun json_unescape(raw: String): String {
+    var out: String = ""
+    var i: Int = 0
+    while (i < raw.length()) {
+        var ch: String = raw.char_at(i)
+        if (ch == "\\") {
             var next: String = ""
-            if (i + 1 < body.length()) { next = body.char_at(i + 1) }
+            if (i + 1 < raw.length()) { next = raw.char_at(i + 1) }
             if (next == "n") { out = out + "\n" }
             else if (next == "t") { out = out + "\t" }
             else if (next == "r") { out = out + "\r" }
@@ -170,8 +229,6 @@ fun json_field(body: String, key: String): String {
             else if (next == "\\") { out = out + "\\" }
             else { out = out + next }
             i = i + 2
-        } else if (ch == "\"") {
-            return out
         } else {
             out = out + ch
             i = i + 1

@@ -159,17 +159,11 @@ fun compile_to_wasm(source: String): CompileResult {
         return CompileResult(false, "", _clean_diagnostics(diagnostics, work_dir))
     }
 
-    // Deliberately NOT `Base64.encode(IO.read_file(out_path))`: IO.read_file stops
-    // at the first NUL byte, and a wasm module's magic number is literally "\0asm",
-    // so that path yields the empty string for every module. See bug 2 in
-    // /tmp/playground_bugs.md. Shelling out to base64(1) keeps the bytes out of
-    // Saffron strings entirely — its stdout is pure ASCII, which round-trips fine.
-    var enc_result = Process.run("base64 -i " + out_path + " | tr -d '\\n'")
-    if (!enc_result.success) {
+    var encoded: String = encode_file_base64(out_path)
+    if (encoded.length() == 0) {
         _cleanup(work_dir)
-        return CompileResult(false, "", "failed to encode module: " + enc_result.stderr)
+        return CompileResult(false, "", "failed to encode the compiled module")
     }
-    var encoded: String = enc_result.stdout.trim()
     _cleanup(work_dir)
 
     if (encoded.length() == 0) {
@@ -177,6 +171,29 @@ fun compile_to_wasm(source: String): CompileResult {
     }
 
     return CompileResult(true, encoded, _clean_diagnostics(diagnostics, work_dir))
+}
+
+/// Base64-encode a file on disk, via `base64(1)`.
+///
+/// Deliberately NOT `Base64.encode(IO.read_file(path))`. `IO.read_file` hands back
+/// a NUL-terminated Saffron string, and a wasm module's magic number is literally
+/// `\0asm` — the first byte terminates it, so `length()` is 0 and every module
+/// reads as empty (BUGS.md #66). Shelling out keeps the bytes out of Saffron
+/// strings entirely: base64's output alphabet is pure ASCII, which round-trips
+/// fine.
+///
+/// Returns "" if the file is missing or the encode fails, so callers can decide
+/// what that means in their context.
+fun encode_file_base64(path: String): String {
+    if (!IO.file_exists(path)) { return "" }
+    var enc_result = Process.run("base64 -i " + _shell_quote(path) + " | tr -d '\\n'")
+    if (!enc_result.success) { return "" }
+    return enc_result.stdout.trim()
+}
+
+/// Single-quote a path for the shell, escaping any embedded single quotes.
+fun _shell_quote(path: String): String {
+    return "'" + path.replace("'", "'\\''") + "'"
 }
 
 /// Remove the per-request working directory. Best effort: a failure here must not
