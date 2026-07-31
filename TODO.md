@@ -17,9 +17,16 @@
 - [ ] Fix gen2 promotion crash (signal 137 when new gen3 used as gen2)
 
 ## Codegen Split (blocked on imports)
-- [ ] Split gen_method_call into codegen/methods.sf via extend fun
-- [ ] Split expr codegen into codegen/expr.sf
-- [ ] Split stmt codegen into codegen/stmt.sf
+The `extend fun` mirror files (codegen/{expr,methods,utils,...}.sf) were deleted:
+all 136 functions they shared with the active `*_body.sf` files had drifted, none
+was still identical, and no function existed only in a mirror. Recover them from
+git history (before the deletion commit) if this work resumes — but re-splitting
+from the current `*_body.sf` files is likely cheaper than reviving 6.5k stale
+lines. Real prerequisite is still the import system, per compiler-rewrite.md I11.
+- [ ] Split gen_method_call out of codegen.sf via extend fun (needs working imports)
+- [ ] Split expr codegen out via extend fun
+- [ ] Split stmt codegen out via extend fun
+- [ ] Then delete the sed assembly in bootstrap.sh (compiler-rewrite.md I11)
 
 ## Type System
 - [ ] Disallow bare generics: `List`, `Map` must be `List<T>`, `Map<K,V>`
