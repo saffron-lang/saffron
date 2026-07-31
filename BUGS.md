@@ -9,6 +9,101 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 81. `__gc_write_barrier` is defined but never called anywhere, so the remembered set is permanently empty
+
+`__gc_write_barrier` (`src/runtime/gc.ll:1378`) maintains the remembered set that
+`__gc_minor_mark_roots` (`gc.ll:1520-1546`) depends on. It has exactly one
+occurrence in the whole tree — its own definition:
+
+```
+grep -rn "__gc_write_barrier" src/   ->   src/runtime/gc.ll:1378 only
+grep -rn "__gc_write_barrier" src/compiler/   ->   no matches
+```
+
+Codegen never emits it. (`runtime.sf` is compiled `--identity-mode`,
+`bootstrap.sh:144`, and `build/stage3/runtime.ll` carries only a `declare` of
+`__gc_push_root` with zero calls.) So any nursery object reachable *only* through
+an old-generation object is invisible to a minor collection.
+
+Reproduced: an old-gen list holding a nursery child, after one
+`__gc_minor_collect()`, reads back `len=49` where 3 was stored, with garbage
+values. A second repro isolates it as a **forwarding** failure specifically —
+the shadow-stack root for the inner list is forwarded correctly, while the
+`outer.data[0]` slot still points into the abandoned nursery:
+
+```
+root 'inner':       5637177368 -> [7, 8, 9]   (forwarded: true)
+outer.data[0] slot: 5637177368 -> 5637177368  (forwarded: false)
+```
+
+Independent of #63: it still corrupts in a build where nursery space is never
+reused, so it is not the stale-SSA-temp bug wearing a different hat.
+
+**Fix**, three options in increasing order of appeal:
+1. Emit `__gc_write_barrier` at every store of a pointer into a heap object
+   (field-set, `list.push`, `map.set`) — broad codegen + `runtime.sf` change,
+   medium-high risk.
+2. Make minor GC scan the whole old generation for nursery references instead of
+   relying on the remembered set — small and safe, but slower.
+3. Retire the nursery, or make it non-moving. This removes #81 and #63's root
+   cause together and leaves the shadow stack as the sole root mechanism, which
+   is the only thing codegen actually maintains.
+
+### 80. Three tests in `test/` segfault with the garbage collector fully disabled — non-GC codegen faults hiding behind the GC bugs
+
+`test/comprehensive.sf`, `test/functions.sf` and `test/nullable_narrowing.sf` all
+exit 139 under `tools/saffron run`, and they still exit 139 when linked against a
+GC whose collector is a no-op. The control that makes this conclusive: `#63`'s
+three-line repro (`m1.sf`) prints `len=20000` correctly in that same
+GC-disabled build, so the harness does suppress real GC faults — these three are
+something else.
+
+Found by sweeping the suite with a tiny-nursery stress harness, now checked in as
+`tools/gc_stress.sh`. It flagged five files; the other two were genuine #63
+instances. These three are **not** filed as GC defects and want separate
+diagnosis. They are also a live contributor to the suite's failure count, so they
+should not be attributed to GC work.
+
+The harness is the reusable artifact from the GC dive, because it converts these
+latent hazards into deterministic crashes. Reproduce the split above with it
+directly — a 4KB nursery collects almost continuously, a 1GB one never collects at
+all, so a failure that survives both is not a GC failure:
+
+```bash
+tools/gc_stress.sh test/comprehensive.sf                  # rc=139
+NURSERY=1073741824 tools/gc_stress.sh test/comprehensive.sf   # rc=139 -- not the GC
+tools/gc_stress.sh m1.sf                  # len=19999  -- one element lost
+NURSERY=1073741824 tools/gc_stress.sh m1.sf   # len=20000  -- clean, so it IS the GC
+```
+
+### 79. Coroutines never pop their GC roots — the shadow stack grows without bound and its top slots dangle into freed frames
+
+`gen_fun`'s coroutine epilogue (`src/compiler/codegen/output_body.sf:413-438`) emits
+`llvm.coro.free` + `llvm.coro.end` but no `__gc_pop_roots`, and `gen_return` skips
+the pop on its `is_coroutine` branch (`src/compiler/codegen/stmts_body.sf:279-282`)
+where the non-coroutine branches at `:286` and `:293` do pop.
+
+Measured unbounded growth over spawn/await rounds:
+
+```
+depth before any spawn = 14
+after 50 rounds  = 116
+after 150 rounds = 316
+after 200 rounds = 414
+```
+
+A second repro shows a leaked top slot pointing into a `__sf_malloc`'d coroutine
+frame that `llvm.coro.free` has already released, so mark dereferences freed memory
+on every subsequent collection.
+
+**Not demonstrated as a crash**: 400 rounds with a forced `__gc_collect()` each
+survived, because the freed frame tends to stay mapped. So this is a confirmed
+unbounded leak plus a real read-after-free, but unproven as a fault — ranked below
+#63 and #81 for that reason.
+
+**Fix.** Emit `__gc_pop_roots(n)` in `__coro_final` before `coro.end`, and on the
+coroutine return path. Small and low-risk.
+
 ### 78. An absolute import path silently resolves to a nonexistent stdlib file
 
 `import "/abs/path/m.sf" as M` does not import anything. `resolve_import_path`
@@ -75,6 +170,7 @@ Part 2 is the same shape as several entries here: a resolution helper that
 cannot fail, so it returns a plausible wrong answer instead. Compare #22 and
 #40, where a lookup that should have said "not found" said "assume it's a
 local."
+
 ### 77. On wasm32 only, `true.to_string()` returns `"false"` — `__bool_to_string` untags a value codegen already untagged
 
 Branching on the same value is correct, which is what makes this so misleading: an
@@ -889,7 +985,83 @@ Also a trivial remote denial-of-service: one 40 KB POST, no authentication
 needed, and it is a different mechanism from #63 (that one needs ~85 requests to
 reach a GC cycle; this one needs a single large one).
 
-### 63. The GC frees live objects out of a spawned task's coroutine frame — every HTTP server dies after ~85 requests
+### 63. The moving minor GC invalidates receiver pointers held in SSA temps — a three-line program segfaults, and it is not async-specific
+
+**The mechanism this entry originally described was wrong.** It said the GC's
+shadow stack roots locals by the address of a stack `alloca`, that a coroutine's
+locals move to a heap frame across a suspend, and that the collector therefore
+scans a stale address. That was measured and **disproved**: root slot addresses
+are byte-identical before and after `Async.sleep` across three concurrent tasks,
+and shadow-stack depth is unchanged (`coro_addr.sf`). LLVM allocates the coroutine
+frame once at `coro.begin` and it does not move. The original suggested fixes
+("re-push roots on resume", "make `llvm.coro` frames traced objects") were aimed
+at the wrong layer and would not have fixed anything.
+
+The coroutine is **incidental**. The real defect needs no async, no server, and no
+coroutine — this segfaults deterministically:
+
+```saffron
+var xs: List<String> = []
+for (i: Int = 0; i < 20000; i = i + 1) { xs.push("v" + i.to_string()) }
+IO.println("len=${xs.length()}")
+```
+
+**Cause: codegen loads the receiver, then allocates, then uses the stale pointer.**
+The minor GC is a *moving* collector — `__gc_minor_promote` (`src/runtime/gc.ll:1707`)
+copies live nursery objects to old gen and `__gc_minor_collect` resets the bump
+pointer (`gc.ll:1467-1468`). `__gc_minor_update_refs` (`gc.ll:1833`) forwards
+shadow-stack roots, but codegen emits the receiver load *before* the argument's
+allocation, so the in-flight receiver lives only in an LLVM SSA temp — which is not
+a root and never gets forwarded:
+
+```llvm
+%t3  = load i64, i64* @__g_xs                    ; receiver captured here
+...
+%t14 = call i8* @__sf_malloc(...)                ; allocates -> can run a minor GC
+%t19 = call i64 @__list_push(i64 %t3, i64 %t18)  ; %t3 is now STALE
+```
+
+`__int_to_string` (`src/runtime/runtime.sf:443-444`) calls `__gc_alloc` directly, so
+the extremely common `"v" + i.to_string()` form allocates on exactly this path.
+
+**It corrupts silently as well as crashing**, which is worse: 300 pushes yield
+`len=299`, with the loss landing precisely on a minor collection. A separate repro
+shows 143 of 400 values mismatched.
+
+**Controls that pin the cause** (each re-verified independently):
+
+| control | result |
+|---|---|
+| default (256KB nursery) | segfault |
+| `__gc_disable()` | clean |
+| 256MB nursery (never fills) | clean |
+| `__gc_set_threshold(1e9)` — major GC only | **still crashes** |
+| nursery bypassed in `gc.ll` | clean |
+| promote but never reset the bump pointer | clean |
+
+The fourth row is the decisive one: suppressing the *major* GC does not help, while
+a nursery that never fills does. So this is the **minor** collector. The last row
+shows it is a stale pointer *after a move*, not a use-after-free.
+
+**Scope is much wider than "every HTTP server."** It hits lists, maps, closures and
+plain read-back loops. The HTTP server is simply a reliable way to allocate in a
+loop: same server and 10-byte payload died at request 86, while the identical
+binary with a 1GB nursery served 800 requests clean.
+
+**Fix.** Reload the receiver from its root slot *after* argument evaluation,
+immediately before the call — i.e. sink the receiver load below all allocating
+argument code in the arg-emission path (`src/compiler/codegen/methods_body.sf` /
+`expr_body.sf`). Medium size, low risk, directly testable with the repros above.
+Interim mitigation with real value: make the nursery much larger or opt-in
+(`@__gc_nursery_size`, `gc.ll:55`), which empirically eliminates every repro
+including the server. Note the deeper point — **values in SSA temps are not roots,
+so no moving collector can be correct against this codegen**; making the young
+generation non-moving (or removing the nursery) fixes this and #81 together.
+
+The original server reproduction and the payload-size analysis follow, and remain
+accurate — only the *explanation* was wrong.
+
+**Original reproduction (still valid):**
 
 **Reproduction:**
 
