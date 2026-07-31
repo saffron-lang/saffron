@@ -2082,8 +2082,14 @@ class Parser {
         if (this.match_kind_check("var")) {
             this.advance() // consume var
             var name: String = this.expect_ident()
-            this.consume(":")
-            var vtype: String = this.parse_type()
+            // The annotation is optional: `for (var i = 0; ...)` infers from the
+            // initializer, like every other binding form. "Any" is the inference
+            // sentinel parse_var_decl_with_doc uses (parser.sf:1493) — the
+            // checker's VarDecl arm reads it as "infer from the initializer".
+            var vtype: String = "Any"
+            if (this.match_kind(":")) {
+                vtype = this.parse_type()
+            }
             this.consume("=")
             var init_expr: AST.Expr = this.parse_expr()
             var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
@@ -2149,8 +2155,11 @@ class Parser {
             return this.parse_for_in(name)
         }
         // C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
-        this.consume(":")
-        var vtype: String = this.parse_type()
+        // The annotation is optional here too, so `for (i = 0; ...)` infers.
+        var vtype: String = "Any"
+        if (this.match_kind(":")) {
+            vtype = this.parse_type()
+        }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
         var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")

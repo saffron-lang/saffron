@@ -1,0 +1,29 @@
+// BUGS #60: the C-style `for` header was the only binding form that demanded a
+// type annotation, so `for (var i = 0; ...)` was a parse error. The annotation
+// is now optional in both header shapes and infers from the initializer, using
+// the same "Any" sentinel every other binding form uses.
+
+fun main() {
+    var out: String = ""
+
+    // with `var`, no annotation — the form that used to fail
+    for (var i = 1; i <= 3; i = i + 1) {
+        out = out + "a${i}"
+    }
+
+    // without `var`, no annotation
+    for (j = 0; j < 2; j = j + 1) {
+        out = out + "b${j}"
+    }
+
+    // annotated forms must still parse exactly as before
+    for (var k: Int = 0; k < 2; k = k + 1) {
+        out = out + "c${k}"
+    }
+    for (m: Float = 0; m < 2; m = m + 1) {
+        out = out + "d${m}"
+    }
+
+    IO.println(out)
+}
+main()
