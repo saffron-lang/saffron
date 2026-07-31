@@ -1,0 +1,47 @@
+// BUGS #69: `is` on a union-typed value compiled to a literal false in BOTH
+// arms. The runtime tag check was gated on the operand's type being exactly
+// "Any", so a union fell through to the compile-time path, where every
+// is_*_type predicate answers false for a union.
+//
+// The nil-check idiom this breaks is the reason it matters: `if (v is Nil)`
+// was silently dead code.
+
+import "@test" as Test
+
+// --- Int|Nil, holding an Int ---
+var v: Int|Nil = 5
+Test.assert(v is Int, "Int|Nil holding an Int is Int")
+Test.assert(!(v is Nil), "Int|Nil holding an Int is not Nil")
+
+// --- Int|Nil, holding nil: the discriminating case ---
+var c: Int|Nil = nil
+Test.assert(c is Nil, "Int|Nil holding nil is Nil")
+Test.assert(!(c is Int), "Int|Nil holding nil is not Int")
+
+// --- A non-Int payload, to show the fix is not Int-specific ---
+var s: String|Nil = "hi"
+Test.assert(s is String, "String|Nil holding a String is String")
+Test.assert(!(s is Nil), "String|Nil holding a String is not Nil")
+
+var e: String|Nil = nil
+Test.assert(e is Nil, "String|Nil holding nil is Nil")
+Test.assert(!(e is String), "String|Nil holding nil is not a String")
+
+// --- `is` agrees with the != nil comparison it is meant to replace ---
+Test.assert_eq(v is Nil, v == nil, "is Nil agrees with == nil (present)")
+Test.assert_eq(c is Nil, c == nil, "is Nil agrees with == nil (absent)")
+
+// --- Any still resolves at runtime (this path always worked; guard it) ---
+var a: Any = 42
+Test.assert(a is Int, "Any holding an Int is Int")
+Test.assert(!(a is Nil), "Any holding an Int is not Nil")
+
+var lst: Any = [1, 2]
+Test.assert(lst is List, "Any holding a List is List")
+
+// --- A statically known type still resolves at compile time ---
+var known: Int = 7
+Test.assert(known is Int, "a plain Int is Int")
+Test.assert(!(known is String), "a plain Int is not a String")
+
+Test.summary()

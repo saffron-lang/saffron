@@ -406,6 +406,28 @@
         }
     }
 
+    // True when the type admits more than one runtime representation, so no
+    // compile-time answer about a value's actual type is available. Every
+    // is_*_type predicate answers `false` for these, which makes a whitelist
+    // of "is it Any?" silently wrong: both arms of `x is Int` / `x is Nil` on
+    // an `Int|Nil` compiled to a literal false. See BUGS #69.
+    fun is_undecidable_type(t: AST.Type): Bool {
+        return match (t) {
+            AnyType => true
+            UnionType(types) => true
+            NullableType(inner) => true
+            IntType => false
+            FloatType => false
+            BoolType => false
+            StringType => false
+            NilType => false
+            ClassType(n) => false
+            EnumType(n) => false
+            GenericType(base, args) => false
+            FuncType(p, r) => false
+        }
+    }
+
     fun is_class_type(t: AST.Type, name: String): Bool {
         return match (t) {
             ClassType(n) => n == name

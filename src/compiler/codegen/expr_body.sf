@@ -404,9 +404,15 @@
         var val_type: AST.Type = this.last_type
         this.last_type = AST.Type.BoolType
 
-        // When the compile-time type is Any, emit a runtime NaN-boxing tag check
+        // A type that admits several runtime representations — Any, a union, a
+        // nullable — cannot be decided at compile time, so emit a runtime
+        // NaN-boxing tag check. This condition used to be `val_type_str ==
+        // "Any"`, a whitelist that silently mis-answered everything it forgot:
+        // an `Int|Nil` reached the compile-time path below, where every
+        // is_*_type predicate answers false for a union, so BOTH `x is Int` and
+        // `x is Nil` compiled to a literal false. See BUGS #69.
         var val_type_str: String = this.type_to_string(val_type)
-        if (val_type_str == "Any") {
+        if (this.is_undecidable_type(val_type)) {
             var rt_func: String = ""
             if (type_name == "Int" or type_name == "Number") {
                 rt_func = "__val_is_int"
@@ -430,7 +436,11 @@
                 this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
                 return this.emit_tag_bool(raw_bool)
             }
-            // Unknown class type with Any — cannot resolve at runtime yet, return false
+            // A class or enum name: there is no runtime class tag to test
+            // against (values carry only a NaN-box tag), so this still answers
+            // false. Warn rather than answering silently — a dead `is` branch
+            // is invisible at runtime and this is the one case left.
+            IO.println("[codegen] Warning: `is " + type_name + "` on a value of type " + val_type_str + " always answers false — class identity is not checked at runtime")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
             return this.emit_tag_bool(local)
