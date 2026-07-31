@@ -1176,6 +1176,22 @@ class Codegen {
         return local
     }
 
+    // Untag a value used as an integer index, given its static type. A
+    // Float-tagged value must be *converted* (untag to double, fptosi), not
+    // untagged as an int — emit_untag_int reinterprets the double's bit pattern,
+    // which for small values lands on index 0 with no warning (BUGS #52). The
+    // caller passes the type it saw in this.last_type right after evaluating the
+    // index. Non-Float types keep the plain int untag.
+    fun emit_untag_index(val: String, idx_type: AST.Type): String {
+        if (this.type_to_string(idx_type) == "Float") {
+            var as_double: String = this.emit_untag_float(val)
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = fptosi double " + as_double + " to i64")
+            return as_int
+        }
+        return this.emit_untag_int(val)
+    }
+
     // @codegen-split: expr
     fun gen_expr(expr: AST.Expr): String {
         return match (expr) {
@@ -10369,7 +10385,7 @@ class Codegen {
     // below is skipped entirely.
     if (this.type_to_string(obj_type) == "String") {
         var sg_idx_tagged: String = this.gen_arg_value(index)
-        var sg_idx: String = this.emit_untag_int(sg_idx_tagged)
+        var sg_idx: String = this.emit_untag_index(sg_idx_tagged, this.last_type)
         var sg_local: String = this.fresh_local()
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_call(sg_local, "i64", "__str_get", "i64 " + obj + ", i64 " + sg_idx))
@@ -10381,8 +10397,9 @@ class Codegen {
         return sg_local
     }
     var idx_tagged: String = this.gen_arg_value(index)
-    // Untag the index for arithmetic and runtime call
-    var idx: String = this.emit_untag_int(idx_tagged)
+    // Untag the index for arithmetic and runtime call. A Float index is
+    // converted, not bit-reinterpreted (BUGS #52).
+    var idx: String = this.emit_untag_index(idx_tagged, this.last_type)
     // Negative indexing: if idx < 0, use length + idx
     var is_neg: String = this.fresh_local()
     this.emit_indent(is_neg + " = icmp slt i64 " + idx + ", 0")
@@ -10450,7 +10467,8 @@ class Codegen {
     fun gen_index_set(object: AST.Expr, index: AST.Expr, value: AST.Expr): String {
     var obj: String = this.gen_arg_value(object)
     var idx_tagged: String = this.gen_arg_value(index)
-    var idx: String = this.emit_untag_int(idx_tagged)
+    // A Float index is converted, not bit-reinterpreted (BUGS #52).
+    var idx: String = this.emit_untag_index(idx_tagged, this.last_type)
     var val: String = this.gen_arg_value(value)
     var discard_ls: String = this.fresh_local()
     if (this.use_llvm_lib) {

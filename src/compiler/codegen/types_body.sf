@@ -690,3 +690,19 @@
         return local
     }
 
+    // Untag a value used as an integer index, given its static type. A
+    // Float-tagged value must be *converted* (untag to double, fptosi), not
+    // untagged as an int — emit_untag_int reinterprets the double's bit pattern,
+    // which for small values lands on index 0 with no warning (BUGS #52). The
+    // caller passes the type it saw in this.last_type right after evaluating the
+    // index. Non-Float types keep the plain int untag.
+    fun emit_untag_index(val: String, idx_type: AST.Type): String {
+        if (this.type_to_string(idx_type) == "Float") {
+            var as_double: String = this.emit_untag_float(val)
+            var as_int: String = this.fresh_local()
+            this.emit_indent(as_int + " = fptosi double " + as_double + " to i64")
+            return as_int
+        }
+        return this.emit_untag_int(val)
+    }
+
