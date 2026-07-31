@@ -9,6 +9,44 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 86. A block-syntax parameter (`{ x => ... }`) gets no type, so every field read on it silently returns 0 or `""`
+
+```saffron
+class Box {
+    var v: Int
+    var name: String
+    fun init(v: Int, name: String) { this.v = v; this.name = name }
+}
+fun apply_block(b: Box, f: Fun): String { return f(b) }
+var box = Box(42, "hello")
+
+// block syntax — the parameter is untyped
+apply_block(box) { x => "v=" + x.v.to_string() + " n=" + x.name }
+//   -> "v=0 n="
+
+// the same lambda, annotated
+apply_block(box, fun (x: Box): String => "v=" + x.v.to_string() + " n=" + x.name)
+//   -> "v=42 n=hello"
+```
+
+The object is fine — as the annotated call on the identical `box` shows. `x` simply
+has no type, so field-offset resolution falls through and answers 0, the same
+failure #56 has with an indirect call's result. Every warning it emits is a
+`dispatching '...' on untyped value` line, which is easy to scroll past.
+
+Found while verifying #64 against a live server: the handler was written
+`app.post("/echo") { req => ... }`, which is the form every example in
+`examples/http_server.sf` and the `@http/server` docstrings uses, and `req.body`,
+`req.method` and `req.path` were **all** empty. That first read as the #64 fix not
+working. It has nothing to do with HTTP — the repro above needs no server — but it
+means the documented, idiomatic way to write a handler cannot read the request at
+all, and there is no error.
+
+Fixing this needs the parameter's type to be inferred from the `Fun` parameter it
+is being passed to, which `Fun` cannot express (#56, same root). Until then a block
+parameter is only safe when the body does not touch a field. Workaround: use an
+annotated `fun (x: T): R =>` lambda.
+
 ### 85. `__io_file_size` and `__io_read_binary` are missing from the known-function tables, so calling them from a stdlib module emits a bad symbol
 
 ```
@@ -1152,6 +1190,32 @@ That does not fix the general case — any Saffron program serving a binary asse
 still hits this — so the byte-length-carrying body type described above is still
 the work that needs doing.
 
+**FIXED** (`e6b0735`). `IO.Bytes` is that body type: an explicit (pointer, length)
+pair, so length is carried rather than recomputed by scanning for a NUL, plus
+`read_file_bytes` / `write_file_bytes`. `Response` carries an optional
+`_body_bytes` which takes precedence for `Content-Length`, and `_write_response`
+writes the body straight from its pointer via `sf_tcp_write`/`sf_tls_write`
+instead of through a `String`. `static_files` reads byte-exactly. Fixing the read
+alone would not have been enough — the response path was `String`-typed end to
+end, so `Content-Length` was a strlen and the payload went through a
+`StringBuilder`.
+
+Built on `_b_*` C stdio externs rather than the runtime's `__io_file_size` /
+`__io_read_binary`, because those two are absent from codegen's known-function
+table: calling them from inside a module gets them module-prefix-mangled to
+`@io___io_file_size` and they fail to link.
+
+Those externs declare `FILE*` as `i64`, not `void*`, deliberately. **A
+`void*`-returning extern has its result pointer-tagged, so `fp == 0` compares
+`TAG_PTR|0` against `TAG_INT|0` and is never true** — a failed `fopen` would take
+the success branch and read through a NULL `FILE*`. `IO.open` has exactly this
+latent defect and does not throw on a missing file; that is unfixed and worth its
+own entry.
+
+Tests: `test/pass/binary_file_bytes.sf`, `test/pass/http_binary_response.sf`.
+Still uncovered: the TLS byte-write path is implemented but untested, and
+Stream/SSE remains String-only.
+
 ### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
 
 `try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
@@ -1249,6 +1313,22 @@ reading, not by the handler afterwards.
 Also a trivial remote denial-of-service: one 40 KB POST, no authentication
 needed, and it is a different mechanism from #63 (that one needs ~85 requests to
 reach a GC cycle; this one needs a single large one).
+
+**FIXED** (`e6b0735`). Both defects. `_read_request` now drains until the header
+terminator is in hand, then reads exactly `Content-Length` further bytes,
+detecting short reads explicitly and enforcing the size cap *while* reading — so a
+request-size limit is now actually enforceable, which it could not be before.
+Short reads and unterminated headers answer 400 instead of truncating silently,
+and oversize bodies answer 413.
+
+The root cause is one level down and remains as-is: `Net._raw_read` breaks after
+its first successful `recv`, so one call yields at most one TCP segment regardless
+of the size requested. The old code's single retry covered a body spanning exactly
+two segments and no more, which is why ~8–32 KB worked on loopback.
+
+A/B measured against a live server with only `server.sf` differing — before, 200 KB
+gets no response at all and 2 MB is truncated to exactly 65536 bytes; after, 5 B
+through 4 MB all arrive byte-exact.
 
 ### 63. The moving minor GC invalidates receiver pointers held in SSA temps — a three-line program segfaults, and it is not async-specific
 
@@ -1842,6 +1922,22 @@ Belongs in the type checker's coercion rules rather than a codegen patch. Note
 implicit Int→Float widening is the agreed direction for the language, so this is
 the missing half of that rule rather than a new feature.
 
+**FIXED** in codegen at the store, by `f758f42` (which filed it as #28), reusing
+`__val_untag_float` — whose int-tagged path is already a `sitofp` — rather than
+adding a second conversion. The parenthetical guess above was right: `Float` params
+and fields were broken too, and both are fixed.
+
+A checker-side AST rewrite (`0.0 + expr`) was also written for this and **dropped
+as redundant** — all 24 assertions of its test already passed on unmodified HEAD,
+and it added 316 lines to `checker.sf` including a widening-only walk over class
+method bodies. Keeping the conversion in one place is the reason not to add a
+second mechanism. Its tests were kept (`a8d9366`) for coverage breadth:
+`test/pass/int_to_float_widening.sf` pins a `Float` return, a `Float` param
+including constructor and method params, a `Float` field both from outside and via
+`this.`, a `List<Float>` element, each nested inside if/while, and the negative
+direction. `test/fail/float_to_int_narrowing.sf` guards the other half of the rule
+— the hazard with any coercion is that it silently becomes bidirectional.
+
 ### 55. An `@extern` used before its declaration links against the wrong symbol
 
 **Reproduction:**
@@ -1890,6 +1986,30 @@ M1/M2 from `docs/design/compiler-rewrite.md`: codegen re-deriving a type it does
 not have, and spelling "unknown" as something concrete. The real fix is to give
 `Fun` a return type in the type system, which is a language change. Workaround:
 always annotate a variable holding the result of an indirect call.
+
+**FIXED as a diagnostic** (`ebc0b9f`), not as a working field read — the language
+change is still what would make `f(1).v` compile. Two parts:
+
+`gen_indirect_call` was leaving `last_type` holding whatever the last
+sub-expression happened to set, usually the type of the final *argument* or of the
+callee. Callers read that stale value as if it described the result, so
+`get_field_index` looked up the field on a class inferred from leftover state and
+answered 0 for a name it could not find. **The same staleness made a `Float`
+returned through a closure read as an `Int` and print 0** — the float half of #51
+— because `to_string` keys off `last_type`. It now sets `AnyType`, which routes
+through the runtime dispatch helpers that inspect the actual tag, so both of those
+become correct rather than merely diagnosed.
+
+The `MemberAccess` fallback then reports instead of answering with the constant 0.
+The diagnostic is narrowed to a receiver that really is a call: **this same
+fallback is the normal working route for a module constant like `Math.PI` and for
+reflective field reads**, which either return 0 here legitimately or get resolved
+later, so erroring unconditionally broke `pass/math` and `test_reflect` — one
+silent wrong answer traded for a batch of false rejections.
+
+Tests: `test/fail/indirect_call_field.sf` (the direct access, must be rejected),
+`test/pass/indirect_call_field.sf` (the annotated form, plus a direct call whose
+declared return type needs no annotation).
 
 ### 57. A repeated `--lib-path` duplicates every global in the output IR
 
