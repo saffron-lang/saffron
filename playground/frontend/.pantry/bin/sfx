@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+saffron run /Users/willemhs/personal/saffron/turmeric/tools/sfx_transform.sf "$@"

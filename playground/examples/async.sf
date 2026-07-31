@@ -11,6 +11,8 @@ fun worker(name: String, delay: Float): String {
 var a = Task.spawn(fun () => worker("task-A", 0.05))
 var b = Task.spawn(fun () => worker("task-B", 0.01))
 
-IO.println(Async.await(b))
-IO.println(Async.await(a))
+// task-B sleeps for less time, so it finishes first even though it was
+// spawned second — the two tasks really are interleaved, not sequential.
+IO.println(b.await())
+IO.println(a.await())
 IO.println("both done")

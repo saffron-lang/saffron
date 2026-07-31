@@ -9,6 +9,365 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 66. Binary files cannot be read or served — `IO.read_file` truncates at the first NUL, so `static_files` serves any wasm module as 0 bytes
+
+Found while verifying the playground before committing it. `GET /app.wasm` returns
+`200` with `Content-Length: 0` even though `playground/static/app.wasm` is 19569
+bytes on disk. The playground frontend therefore cannot load in a browser at all.
+
+**Reproduction** — no server needed:
+
+```saffron
+import "io" as IO
+
+// 13 bytes on disk, starting with the wasm magic \0asm
+var leading: String = IO.read_file("/tmp/nul_test.bin")
+IO.println(leading.length())   // 0
+
+// "abc\0def", 7 bytes on disk
+var mid: String = IO.read_file("/tmp/nul_mid.bin")
+IO.println(mid.length())       // 3
+```
+
+Create the fixtures with `printf '\0asm\x01\x00\x00\x00hello' > /tmp/nul_test.bin`
+and `printf 'abc\0def' > /tmp/nul_mid.bin`.
+
+**Cause.** `__io_read_file` (`src/runtime/runtime.sf:1096-1098`) is *not* the
+problem — it `rt_fread`s the full size and returns the whole buffer. The loss is
+in the representation: a Saffron `String` is a NUL-terminated C string, so
+`length()` is a `strlen` that stops at the first embedded NUL. Every byte after it
+is still in memory but unreachable. A wasm module's magic number is `\0asm`, so the
+very first byte terminates the string and the read yields `""`.
+
+**This is wider than the read.** The `@http/server` response path is String-typed
+end to end, so a binary body is unrepresentable even given a correct read:
+
+- `src/lib/http/server.sf:655` — `static_files` reads with
+  `var content: String = IO.read_file(full_path)`
+- `:168` — `Response.body` is declared `String`
+- `:251-252` — `Content-Length` is emitted from `resp.body.length()`, i.e. strlen
+- `:269` — the body is appended to a `StringBuilder`
+
+So fixing only `read_file` would still emit a truncated `Content-Length` and a
+truncated body. Serving binary assets needs a byte-length-carrying body type
+(`@bytes` `Buffer`, or a `String` that stores an explicit length) threaded through
+`Response` and the writer.
+
+**A working read path already exists** and is the basis for any fix:
+`IO.file_size` + `IO.read_binary` (`src/lib/io.sf:255-263`, runtime
+`:1103-1134`) return the correct 13 for the fixture above. Note they currently
+emit `[codegen] Warning: calling undefined function '__io_file_size'` /
+`'__io_read_binary'` — the functions exist in `runtime.sf` and link fine, but
+they are missing from the codegen known-function tables in
+`src/compiler/codegen/utils_body.sf:5-6`, so every call warns.
+
+**Relationship to the log.** This is the same underlying defect as Bug 2 in
+`docs/design/playground-bug-log.md`, which was only ever *worked around* inside the
+playground's compile endpoint and never filed in the tracker. This is a second,
+independent instance of it, so it is filed here as the general defect.
+
+**Note on the playground handoff**: the completing agent's report listed
+`/app.wasm` among "All 6 routes correct". That claim does not hold — the route
+returns 200 with an empty body.
+
+### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
+
+`try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
+`IndexError`, `DivisionError` and `NullError` all route through
+`__runtime_error_fatal` (`src/runtime/runtime.sf:713`), which writes to fd 2 and
+calls `rt_exit(1)`. No `catch` or `finally` block runs.
+
+Repro — the exact example `CLAUDE.md` used to carry:
+
+```saffron
+fun main() {
+    try {
+        var list = [1, 2, 3]
+        IO.println(list[99])
+    } catch (e) {
+        IO.println("caught: ${e}")
+    }
+    IO.println("still alive")
+}
+main()
+```
+
+Actual: prints `Runtime Error: IndexError: index 99 out of bounds (length 3)`,
+exits 1. Neither `caught:` nor `still alive` is reached. Division by zero behaves
+identically. An explicit `throw` in the same shape is caught and returns 0, which
+is what made the wrong claim plausible for so long.
+
+The fatal call sites are `runtime.sf:777` (`__index_error`), `:815`
+(`__division_error`) and `:857` (`__null_pointer_error`).
+
+Nil misuse mostly never gets this far: the checker rejects calling a method on a
+nullable value at compile time.
+
+**Docs fixed** (2026-07-30): `CLAUDE.md`, `docs/src/tutorial/error-handling.md`,
+`docs/learnxinyminutes/learnsaffron.sf` and its `index.html` all claimed runtime
+errors were catchable and showed output that never occurs. They now document the
+fatal behaviour and show a guard-before-indexing pattern instead.
+
+**Still open**: whether the *behaviour* should change. Making these catchable is
+not a small fix — the error path itself allocates (`__runtime_error` calls
+`rt_malloc`), and `setjmp`/`longjmp` are no-ops on both wasm bases
+(`wasm_base_32.ll:592-597`, `wasm_base.ll:503-508`), so `try`/`catch` cannot work
+on wasm at all. Decide whether fatal-by-design is the intended semantics before
+investing there.
+
+### 64. A request body over ~35 KB silently kills the server; `@http/server` reads only 8192 bytes and never checks for a short read
+
+**Reproduction** — against any Saffron HTTP server (this is the playground's, but
+the server code is `@http/server`, not the playground's):
+
+```
+body   8532B  ok
+body  16014B  ok
+body  32014B  ok
+body  40014B  server gone, no further request answered
+```
+
+The process exits silently, exactly as in #63, and every subsequent request gets
+`ECONNREFUSED`.
+
+`_handle` reads the request with a single fixed-size call and never looks at how
+much it got (`src/lib/http/server.sf:400-405`):
+
+```saffron
+var raw: String = ""
+if (tls_conn != nil) {
+    raw = tls_conn.read(8192)
+} else {
+    raw = conn.read(8192)
+}
+```
+
+There is no loop to drain the socket and no `Content-Length` check, so for any
+body larger than the buffer the parser is handed a **truncated** request: headers
+possibly intact, body cut mid-way, and — because the read is a single syscall on a
+non-blocking socket — sometimes cut mid-*headers*. Nothing downstream is prepared
+for that. Bodies in the 8–32 KB range happen to survive because the read returns
+more than 8192 in practice on loopback; past ~35 KB it does not, and the
+truncated-parse path takes the process down.
+
+Two independent defects:
+
+1. **The read is not a loop.** A correct HTTP server reads until it has the
+   headers, parses `Content-Length`, then reads exactly that many more bytes.
+2. **A short read is not detected.** `raw.length() == 0` is checked
+   (`server.sf:407`), but not `raw.length() < expected`, so truncation is
+   indistinguishable from a complete request.
+
+Consequence for anything trying to enforce a request-size limit: it cannot. The
+playground sets `MAX_SOURCE_BYTES = 64000` and checks it in application code, but
+**the check is unreachable** — the server dies at ~35 KB, well below the limit, so
+the cap can never fire. A size limit has to be enforced by the server while
+reading, not by the handler afterwards.
+
+Also a trivial remote denial-of-service: one 40 KB POST, no authentication
+needed, and it is a different mechanism from #63 (that one needs ~85 requests to
+reach a GC cycle; this one needs a single large one).
+
+### 63. The GC frees live objects out of a spawned task's coroutine frame — every HTTP server dies after ~85 requests
+
+**Reproduction:**
+
+```saffron
+import "@http/server" as HttpServer
+
+var app = HttpServer.server(8098)
+app.get("/small", fun (req: Any): Any {
+    return HttpServer.Response(200, "0123456789")
+})
+app.serve()
+```
+
+```
+DIED at req 85, cumulative body bytes=840: Remote end closed connection without response
+```
+
+Eighty-four successful 10-byte responses, then the process is gone. No panic, no
+stderr, no log line — the last thing in the log is still `Listening on ...`, so
+from the client side it looks like a network fault rather than a crash.
+
+It is the collector. Adding one line makes it vanish:
+
+```saffron
+@extern("i64 __gc_disable()") fun gc_disable(): Int
+gc_disable()
+```
+
+399 requests clean, versus 84, with nothing else changed. The RSS trace shows the
+collection immediately before the death — heap peaks at req 78, shrinks at req 79,
+process dies at 85 — so the crash is the first *use* of something the collection
+freed, not the collection itself. File descriptors are flat at 10 throughout and
+RSS never exceeds 6 MB, so it is neither an fd leak nor exhaustion.
+
+Response size only sets the timing, by reaching `@__gc_threshold` (65536 bytes,
+`src/runtime/gc.ll:985`) sooner:
+
+```
+20000B responses -> died on request 4    (cumulative 60000)
+10B    responses -> died on request 85   (cumulative 840)
+```
+
+The GC is not broken in general — straight-line allocation is fine:
+
+```saffron
+var total: Int = 0
+for (i: Int = 0; i < 200000; i = i + 1) {
+    var s: String = "chunk-" + i.to_string()
+    total = total + s.length()
+}
+IO.println("survived: ${total}")     // survived: 2288890
+```
+
+The distinguishing feature of the server is that every connection is handled in a
+spawned task (`src/lib/http/server.sf:379-383`), so `_handle`'s heavy allocation
+happens inside a **coroutine frame**. `__gc_push_root` roots a local by taking the
+address of a stack `alloca`; in a coroutine those allocas live in a heap frame
+that can move across a suspend, so the collector scans a stale address and never
+sees the live object. 4000 spawn/await round trips that only compute do *not*
+fail, which fits — the trigger needs a task that actually suspends on I/O, as
+`accept`/`read`/`write` do.
+
+Impact: a hard blocker on writing any real server in Saffron, and remotely
+triggerable with ~85 unauthenticated GETs. `__gc_disable()` trades the crash for
+an unbounded heap; the fix belongs in making the shadow stack coroutine-aware
+(re-push roots on resume, root via the frame pointer, or make `llvm.coro` frames
+traced objects).
+
+### 62. `for (entry in someMap)` compiles to a list index loop and segfaults; the documented iterator protocol is never used
+
+**Reproduction:**
+
+```saffron
+var m: Map<String, Int> = {"one": 1}
+for (e in m) { IO.println(e[0]) }   // Segmentation fault: 11
+```
+
+`CLAUDE.md` documents map iteration as supported ("Iteration yields [key, value]
+pairs") and that program crashes.
+
+`Parser.desugar_for_in` (`src/compiler/parser.sf:2193-2211`) has no type
+information, so it unconditionally emits an index-driven while loop with the
+source typed `"Any"`:
+
+```saffron
+var init_list: AST.Stmt = AST.Stmt.VarDecl(list_var, "Any", iter_expr, "")
+var cond: AST.Expr = ... MethodCall(Variable(list_var), "length", []) ...
+var item_init: AST.Stmt = AST.Stmt.VarDecl(item_name, "Any",
+    AST.Expr.IndexGet(AST.Expr.Variable(list_var), AST.Expr.Variable(idx_var)), "")
+```
+
+Two things then go wrong in the IR: `src.length()` on a Map dispatches to
+`@__list_length`, reading a map header as a list header; and `src[i]` reaches
+`gen_index_get`'s Map branch check (`src/compiler/codegen/methods_body.sf:418`),
+which is gated on `typed_vars` knowing the object is a Map — it is `Any` here, so
+the branch is skipped and the integer cursor is passed to `__map_get` as a **key**.
+The crash is the `e[0]` list-read of the resulting garbage.
+
+The same mechanism means the protocol `CLAUDE.md` promises ("uses iterator
+protocol: `.iter()` -> object with `.has_next()`, `.next()` ... works over Lists,
+Strings, Maps, and custom types") is never used at all:
+
+```saffron
+class Countdown {
+    fun iter(): Countdown { return this }
+    fun has_next(): Bool { ... }
+    fun next(): Int { ... }
+}
+for (x in Countdown(3)) { ... }   // [codegen] Error: type 'Countdown' has no method 'length'
+```
+
+Lists and Strings work only because they happen to be indexable. `Map.iter()`
+already exists and is correct when driven by hand, so the fix is to desugar to
+the promised protocol — `var it = coll.iter(); while (it.has_next()) { var item =
+it.next(); ... }` — which is type-agnostic (what the parser needs) and removes the
+`length()`/`[i]` special-casing from codegen.
+
+Pre-existing, not a regression: reproduces identically on the pre-session
+baseline compiler.
+
+### 61. `x is SomeClass` is compiled to a constant `false` whenever the static type is `Any`
+
+**Reproduction:**
+
+```saffron
+class Dog { fun init() {} }
+class Cat { fun init() {} }
+fun check(a: Any): Bool { return a is Dog }
+IO.println(check(Dog()))   // false — wrong
+IO.println(check(Cat()))   // false — correct by accident
+```
+
+No error, no warning. It works when the concrete type is visible at the check
+site (`var d: Any = Dog(); d is Dog` is `true`, because the initialiser refines
+the declared `Any`), so the failure is specific to a genuinely opaque value —
+most importantly a function parameter, which is where a type test is useful.
+
+`Codegen.gen_is_check` (`src/compiler/codegen/expr_body.sf:400-427`) maps a fixed
+list of *builtin* names to runtime predicates and then gives up:
+
+```saffron
+// Unknown class type with Any — cannot resolve at runtime yet, return false
+var local: String = this.fresh_local()
+this.emit_indent(local + " = add i64 0, 0")
+return this.emit_tag_bool(local)
+```
+
+But the machinery it claims is missing already exists and is already used: the
+statically-typed path below it emits a class comparison via `@__gc_get_type_tag`,
+a purely runtime query. Compare the two spellings:
+
+```
+`a is Dog`, a: Any        ->  %t3 = add i64 0, 0            (folded to false)
+`d is Dog`, d refined     ->  %t1 = call i64 @__gc_get_type_tag(i64 %val)
+                              %t2 = icmp eq i64 %klass, %t1
+```
+
+Fix: in the `Any` branch, fall through to the same `__gc_get_type_tag` comparison
+when `type_name` is not a builtin. Nothing new is needed at runtime. Failing that
+it should emit a diagnostic rather than a silent `false`.
+
+Knock-on: `is`-pattern matching inherits it, so the `match (animal) { is Dog(d)
+=> ..., is Cat(c) => ... }` form `CLAUDE.md` documents has every arm test false
+and the first arm wins — `sound(Cat())` returns `"Woof"`. On the baseline
+compiler that program failed to compile at all (`undefined variable 'd'`), so
+this path has moved from "rejected" to "silently wrong".
+
+### 60. `for (var i = 1; ...)` is a parse error; a C-style loop variable cannot be inferred
+
+**Reproduction:**
+
+```saffron
+for (var i = 1; i <= 3; i = i + 1) { IO.println(i) }
+```
+
+```
+[line 1, col 13] Error: expected ':' but found '='
+```
+
+Every other binding form accepts `var x = expr` and infers. The C-style `for`
+header is the one place that both rejects `var` and demands an annotation; the
+only accepted spelling is `for (i: Int = 1; ...)`.
+
+`src/compiler/parser.sf:2151-2156` hard-`consume(":")`s after the identifier:
+
+```saffron
+// C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
+this.consume(":")
+var vtype: String = this.parse_type()
+this.consume("=")
+```
+
+The comment already concedes it — the `var` form was never implemented, so the
+natural spelling is the unsupported one. Fix: accept and skip an optional leading
+`var`, and make the `":" type` optional, passing `""` for inference as the
+for-in desugaring already does at `parser.sf:2197`.
+
+Low severity, high visibility: it is the first loop anyone writes.
+
 ### 59. A function's local variable writes into a like-named module global
 
 **Reproduction:**
@@ -151,28 +510,6 @@ converted; for small values the low bits are zero, which lands on index 0.
 Same underlying confusion as the identity-mode float bug, but on the native
 target and reachable from ordinary user code, which makes it more dangerous. #53
 is a live instance of it in the shipped stdlib.
-
-### 53. `UUID.v4()` always returns the all-zero UUID
-
-**Reproduction:**
-
-```saffron
-import "@uuid" as UUID
-IO.println(UUID.v4())   // 00000000-0000-4000-8000-000000000000, every time
-```
-
-`src/lib/uuid.sf` builds the string with `_to_hex(Random.int(0, 15))`, and
-`_to_hex` indexes a 16-element list of hex digits. `Random.int` is declared to
-return `Float` (`src/lib/random.sf:13`), so every one of those indexes hits #52
-and returns `"0"`. Calling `Random.int(0, 15)` directly returns properly random
-values — the corruption is entirely in the list-index step.
-
-Beyond the obvious: any code trusting `UUID.v4()` for uniqueness — request IDs,
-temp file names, database keys — is silently getting a constant. `Random.choice`
-and `Random.shuffle` index by `Float` the same way and are presumably affected.
-
-Fixing #52 fixes this; declaring `Random.int` as `Int` would also work and is the
-honest signature.
 
 ### 54. An `Int` literal in a `Float` position yields `nan`
 
@@ -803,6 +1140,24 @@ a fall-through can also be reached by valid-but-unhandled builtin methods rather
 than only by bad types.
 
 ## Fixed
+
+- ~~#53: `UUID.v4()` always returned the all-zero UUID~~ — `src/lib/uuid.sf`
+  builds its string from `_to_hex(Random.int(0, 15))`, and `_to_hex` indexes a
+  16-element list of hex digits. `random.sf` declared its whole surface `Float`,
+  including `_rand()` (whose C signature is `i32 rand()`) and `int(min, max)`,
+  whose results are used as list indices. Indexing with a `Float`-typed value
+  reinterprets the double's bits as an integer instead of converting it (#52), and
+  for small values the low bits are zero — so every index landed on element 0 and
+  `UUID.v4()` returned `00000000-0000-4000-8000-000000000000` on every call, a
+  constant where callers expect uniqueness (request IDs, temp file names, database
+  keys). Fixed in `b75689b` by declaring the integer-valued surface as `Int`
+  (`_rand`, `_srand`, `seed`, `int`, and the index/count locals in `choice`,
+  `shuffle`, `sample`); `float()` stays `Float` since it genuinely returns a
+  fraction. `test_uuid` passes, and `choice`/`shuffle`/`sample` were verified.
+
+  This is a symptom fix at the honest-signature level. **#52 — the `Float`-index
+  reinterpretation itself — remains open and is the real defect;** any other
+  stdlib or user code that indexes with a `Float` still reads element 0 silently.
 
 - ~~#58: `is Float` was true for every Map, List, and instance; `is Number` was
   false for every float~~ — two halves of one defect. `__val_is_float` in

@@ -1,26 +1,32 @@
 //! Closures, lambdas and higher-order functions
-fun make_counter(): () => Float {
-    var count: Float = 0
-    return fun (): Float => {
-        count = count + 1
-        return count
-    }
-}
+// A lambda captures the variables it reads from the enclosing scope.
+var factor = 3
+var scale = fun (n: Int): Int => n * factor
+IO.println(scale(5))
 
-var next = make_counter()
-IO.println(next().to_string())
-IO.println(next().to_string())
-IO.println(next().to_string())
-
-// Lambdas as arguments
-fun apply_twice(f: (Float) => Float, x: Float): Float {
+// Functions are values: they can be passed as arguments...
+fun apply_twice(f: (Int) => Int, x: Int): Int {
     return f(f(x))
 }
-IO.println(apply_twice(fun (n: Float) => n * 3, 2).to_string())
+IO.println(apply_twice(scale, 2))
+IO.println(apply_twice(fun (n: Int) => n + 10, 1))
 
-// Building a list with a closure
-var doubled: List<Float> = []
-for (n in [1, 2, 3, 4]) {
-    doubled.push(n * 2)
+// ...and returned from other functions.
+fun adder(amount: Int): (Int) => Int {
+    return fun (n: Int): Int => n + amount
 }
-IO.println(doubled.join(", "))
+var add7 = adder(7)
+IO.println(add7(35))
+
+// Rolling your own map over a list
+fun map_list(xs: List<Int>, f: (Int) => Int): List<Int> {
+    var out: List<Int> = []
+    for (x in xs) {
+        out.push(f(x))
+    }
+    return out
+}
+
+var nums: List<Int> = [1, 2, 3, 4]
+IO.println(map_list(nums, scale).join(", "))
+IO.println(map_list(nums, fun (n: Int) => n * n).join(", "))

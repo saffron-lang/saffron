@@ -1,0 +1,181 @@
+//! Host FFI for the playground frontend.
+//!
+//! Two things the UI cannot do from inside Saffron:
+//!
+//!   1. Talk to the compile service (browser `fetch`).
+//!   2. Instantiate and run the *returned* wasm module.
+//!
+//! (2) is the interesting one. The compiled user program is a second, independent
+//! wasm module. We cannot instantiate it from inside this module — the JS loader
+//! has to do it, in its own import environment, with `js_log_*` rerouted into a
+//! buffer instead of the console. That keeps the user's program strictly separate
+//! from the UI's own memory: it gets a fresh linear memory and only the imports
+//! the loader hands it.
+
+// --- Compile service ---
+
+@extern("void js_fetch_post(void*, void*, i64)")
+fun _fetch_post(url: String, body: String, callback_id: Float)
+
+@extern("void js_fetch_json(void*, i64)")
+fun _fetch_get(url: String, callback_id: Float)
+
+// --- Run a compiled module, base64-encoded ---
+//
+// Asynchronous because instantiation is async in the browser and because the
+// program may suspend on the scheduler; the loader pumps it and only then reports.
+@extern("void js_run_wasm(void*, i64)")
+fun _run_wasm(wasm_base64: String, callback_id: Float)
+
+// --- Clipboard / permalink helpers ---
+
+@extern("void js_set_hash_source(void*)")
+fun _set_hash_source(source: String)
+
+@extern("i64 js_get_hash_source()")
+fun _get_hash_source(): String
+
+var _next_id: Float = 0
+var _callbacks: Map<Float, (String) => Nil> = {}
+
+fun _register(callback: (String) => Nil): Float {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _callbacks.set(id, callback)
+    return id
+}
+
+fun _resolve(id: Float, payload: String) {
+    if (_callbacks.has(id)) {
+        var callback = _callbacks.get(id)
+        // Drop the entry before invoking: a handler that starts another request
+        // must not be able to see its own stale slot.
+        _callbacks.set(id, nil)
+        callback(payload)
+    }
+}
+
+/// POST source to the compile service. `callback` receives the raw JSON body.
+fun compile(source: String, callback: (String) => Nil) {
+    var body: String = "{\"source\":" + json_quote(source) + "}"
+    _fetch_post("/api/compile", body, _register(callback))
+}
+
+/// GET the bundled examples. `callback` receives the raw JSON body.
+fun examples(callback: (String) => Nil) {
+    _fetch_get("/api/examples", _register(callback))
+}
+
+/// Instantiate and run a base64 module. `callback` receives the captured output.
+fun run(wasm_base64: String, callback: (String) => Nil) {
+    _run_wasm(wasm_base64, _register(callback))
+}
+
+fun share(source: String) {
+    _set_hash_source(source)
+}
+
+fun initial_source(): String {
+    return _get_hash_source()
+}
+
+/// Exported to JS: resolution for both fetch helpers.
+fun __on_fetch_complete(id: Float, response: String) {
+    _resolve(id, response)
+}
+
+/// Exported to JS: resolution for `js_run_wasm`.
+fun __on_run_complete(id: Float, output: String) {
+    _resolve(id, output)
+}
+
+/// Minimal JSON string escaping.
+///
+/// Hand-rolled rather than using @json, because @json is a native module that is
+/// not available on wasm32 — it has no wasm implementation, so importing it here
+/// fails to link. Program source is exactly the payload most likely to contain
+/// quotes, backslashes and newlines, so getting this right matters.
+fun json_quote(value: String): String {
+    var out: String = "\""
+    var i: Int = 0
+    while (i < value.length()) {
+        var ch: String = value.char_at(i)
+        if (ch == "\"") {
+            out = out + "\\\""
+        } else if (ch == "\\") {
+            out = out + "\\\\"
+        } else if (ch == "\n") {
+            out = out + "\\n"
+        } else if (ch == "\r") {
+            out = out + "\\r"
+        } else if (ch == "\t") {
+            out = out + "\\t"
+        } else {
+            out = out + ch
+        }
+        i = i + 1
+    }
+    return out + "\""
+}
+
+/// Pull one string field out of a flat JSON object.
+///
+/// Deliberately not a real parser: the only responses we consume are produced by
+/// our own service, and the `wasm` field is a multi-megabyte base64 blob that a
+/// naive character-at-a-time Saffron parser would be very slow over. This scans
+/// for `"key":"` and reads to the closing quote, honouring backslash escapes.
+fun json_field(body: String, key: String): String {
+    var needle: String = "\"" + key + "\""
+    var at: Int = body.index_of(needle)
+    if (at < 0) { return "" }
+    var i: Int = at + needle.length()
+    // Skip whitespace and the colon. Saffron has no `break` (BUGS.md #6), so the
+    // loops here carry an explicit `scanning` flag rather than jumping out.
+    var scanning: Bool = true
+    while (scanning and i < body.length()) {
+        var c: String = body.char_at(i)
+        if (c == ":" or c == " " or c == "\n" or c == "\t" or c == "\r") {
+            i = i + 1
+        } else {
+            scanning = false
+        }
+    }
+    if (i >= body.length()) { return "" }
+    if (body.char_at(i) != "\"") {
+        // Not a string value — read the bare token (true/false/number).
+        var bare: String = ""
+        var reading: Bool = true
+        while (reading and i < body.length()) {
+            var bc: String = body.char_at(i)
+            if (bc == "," or bc == "}") {
+                reading = false
+            } else {
+                bare = bare + bc
+                i = i + 1
+            }
+        }
+        return bare.trim()
+    }
+    i = i + 1
+    var out: String = ""
+    while (i < body.length()) {
+        var ch: String = body.char_at(i)
+        if (ch == "\\") {
+            var next: String = ""
+            if (i + 1 < body.length()) { next = body.char_at(i + 1) }
+            if (next == "n") { out = out + "\n" }
+            else if (next == "t") { out = out + "\t" }
+            else if (next == "r") { out = out + "\r" }
+            else if (next == "\"") { out = out + "\"" }
+            else if (next == "\\") { out = out + "\\" }
+            else { out = out + next }
+            i = i + 2
+        } else if (ch == "\"") {
+            return out
+        } else {
+            out = out + ch
+            i = i + 1
+        }
+    }
+    return out
+}
