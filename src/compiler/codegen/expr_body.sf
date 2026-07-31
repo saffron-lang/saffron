@@ -483,10 +483,17 @@
                 this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
                 return this.emit_tag_bool(raw_bool)
             }
-            // A class or enum name: there is no runtime class tag to test
-            // against (values carry only a NaN-box tag), so this still answers
-            // false. Warn rather than answering silently — a dead `is` branch
-            // is invisible at runtime and this is the one case left.
+            // A class name: dispatch on the object's actual GC type tag. This
+            // used to emit a literal 0 plus a warning, because codegen was
+            // believed to have no runtime model of the hierarchy; it now emits
+            // one (see emit_class_hierarchy_helpers). __class_is_a walks the
+            // parent chain, so `d is Animal` for a Dog answers true — something
+            // the old path could not express at all, warning or not.
+            var cls_check: String = this.gen_class_tag_check(val, type_name)
+            if (cls_check.length() > 0) { return cls_check }
+            // Not a known class (an enum name, a generic parameter, an
+            // interface with no instances): still undecidable. Warn rather than
+            // answering silently — a dead `is` branch is invisible at runtime.
             IO.println("[codegen] Warning: `is " + type_name + "` on a value of type " + val_type_str + " always answers false — class identity is not checked at runtime")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
@@ -508,11 +515,55 @@
         } else if (type_name == "Map") {
             if (this.is_map_type(val_type)) { matches = "1" }
         } else {
+            // A class name. Folding via is_class_type is only correct when the
+            // static type is *exactly* type_name and cannot be a subclass —
+            // is_class_type answers `n == name`, so it says false for a Dog
+            // tested against Animal and for anything the checker could not
+            // infer precisely. That was the other half of BUGS #61, and a fix
+            // confined to the undecidable branch above would have looked
+            // complete while leaving it. Emit the runtime check and let LLVM
+            // fold the cases it can prove.
+            var cls_check2: String = this.gen_class_tag_check(val, type_name)
+            if (cls_check2.length() > 0) { return cls_check2 }
             if (this.is_class_type(val_type, type_name)) { matches = "1" }
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
         return this.emit_tag_bool(local)
+    }
+
+    // Emit `__class_is_a(__val_class_tag(val), <tag of type_name>)` as a tagged
+    // Saffron Bool, or "" when type_name is not a class this program declares —
+    // an enum name, a generic parameter, an interface with no instances. The
+    // empty string is the "I don't know" the callers need: gen_is_check falls
+    // back rather than emitting a check against a tag that does not exist.
+    // Returning a plausible `false` instead is the exact shape of failure that
+    // made BUGS #61, #69 and #22 all silent.
+    fun gen_class_tag_check(val: String, type_name: String): String {
+        var hit: String = this.gen_class_tag_check_i1(val, type_name)
+        if (hit.length() == 0) { return "" }
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = zext i1 " + hit + " to i64")
+        return this.emit_tag_bool(raw)
+    }
+
+    // The raw i1 behind gen_class_tag_check, for callers that want to branch on
+    // it rather than produce a value — gen_match's class-pattern chain does,
+    // and re-truncating a freshly tagged Bool just to test it would be silly.
+    // Same "" contract: not a class this program declares.
+    fun gen_class_tag_check_i1(val: String, type_name: String): String {
+        // Identity mode has no GC headers and no hierarchy helpers, so there is
+        // no tag to read; the caller keeps its compile-time answer.
+        if (this.identity_mode) { return "" }
+        var struct_name: String = type_name
+        if (this.class_struct_names.has(type_name)) { struct_name = this.class_struct_names.get(type_name) }
+        if (!this.class_type_ids.has(struct_name)) { return "" }
+        var target: Float = this.class_type_ids.get(struct_name)
+        var tag_reg: String = this.fresh_local()
+        this.emit_indent(tag_reg + " = call i64 @__val_class_tag(i64 " + val + ")")
+        var hit: String = this.fresh_local()
+        this.emit_indent(hit + " = call i1 @__class_is_a(i64 " + tag_reg + ", i64 " + target.floor().to_string() + ")")
+        return hit
     }
 
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {

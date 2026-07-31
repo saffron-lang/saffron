@@ -679,6 +679,28 @@
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
+                    // Assign the type tag and record the parent here, not only in
+                    // gen_class_constructor / gen_class_decl_with_parent. Bodies
+                    // are lowered in the pass below, in source order, so `x is Dog`
+                    // inside a function declared above `class Dog` would otherwise
+                    // find no tag and fall back to the always-false warning —
+                    // exactly the ordering hazard that produced BUGS #33/#36/#37.
+                    // Both writes are idempotent with the lowering-time ones: same
+                    // key, same value.
+                    if (!this.class_type_ids.has(pr_type_name)) {
+                        this.class_type_ids.set(pr_type_name, this.next_class_type_id)
+                        this.next_class_type_id = this.next_class_type_id + 1
+                    }
+                    if (pr_parent.length() > 0) {
+                        // The parent's own struct name is known if it was already
+                        // lowered (an imported base class); otherwise it is in this
+                        // module and carries this module's prefix.
+                        var pr_pstruct: String = this.current_prefix + pr_parent
+                        if (this.class_struct_names.has(pr_parent)) {
+                            pr_pstruct = this.class_struct_names.get(pr_parent)
+                        }
+                        this.class_parent_of.set(pr_type_name, pr_pstruct)
+                    }
                     if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)
                     }
@@ -760,6 +782,13 @@
         // Emit reflect helper functions (only in non-identity mode)
         if (!this.identity_mode) {
             this.emit_reflect_helpers()
+            // Same guard, same reason: identity mode allocates instances with
+            // __sf_malloc and no GC header, so there is no tag to read and
+            // __gc_get_type_tag is not even linked. gen_is_check keeps the
+            // compile-time fold there. Consequence worth naming: the bootstrap
+            // never exercises the runtime path, so this must be tested with a
+            // user program compiled by gen3, not by ./bootstrap.sh passing.
+            this.emit_class_hierarchy_helpers()
         }
 
         // Second pass: wrap top-level statements in __saffron_entry

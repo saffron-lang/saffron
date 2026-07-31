@@ -139,6 +139,7 @@ declare i1 @__val_is_bool(i64)
 declare i1 @__val_is_nil(i64)
 declare i1 @__val_is_list(i64)
 declare i1 @__val_is_map(i64)
+declare i64 @__val_class_tag(i64)
 
 ; --- GC runtime ---
 declare void @__gc_enable()
@@ -183,6 +184,33 @@ declare i64 @__sched_get_stored_result(i64)
 declare i64 @__sched_has_stored_result(i64)
 @__g_name = global i64 0
 @__g_version = global i64 0
+
+define i64 @__class_parent_tag(i64 %tag) {
+entry:
+  ret i64 0
+}
+
+define i1 @__class_is_a(i64 %tag, i64 %target) {
+entry:
+  %cur = alloca i64
+  store i64 %tag, i64* %cur
+  br label %cia.loop
+cia.loop:
+  %c = load i64, i64* %cur
+  %z = icmp eq i64 %c, 0
+  br i1 %z, label %cia.no, label %cia.test
+cia.test:
+  %hit = icmp eq i64 %c, %target
+  br i1 %hit, label %cia.yes, label %cia.step
+cia.step:
+  %p = call i64 @__class_parent_tag(i64 %c)
+  store i64 %p, i64* %cur
+  br label %cia.loop
+cia.yes:
+  ret i1 1
+cia.no:
+  ret i1 0
+}
 
 define i64 @__saffron_entry() {
 entry:

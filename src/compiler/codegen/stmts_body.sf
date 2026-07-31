@@ -339,6 +339,20 @@
         this.current_parent = parent
         this.gen_class_decl(name, all_fields, methods)
         this.current_parent = ""
+        // Record the hierarchy, keyed the same way class_type_ids is (by struct
+        // name, i.e. module-prefixed) so __class_is_a can join the two tables.
+        // The parent was always available here — it drove field and method
+        // inheritance above and was then dropped, which is why `is` on a class
+        // could never see a subclass relation (BUGS #61) and dispatch had no
+        // hierarchy to switch on (BUGS #50). class_struct_names resolves the
+        // parent's own prefix, so a base class in another module still joins.
+        if (parent.length() > 0) {
+            var child_struct: String = name
+            if (this.class_struct_names.has(name)) { child_struct = this.class_struct_names.get(name) }
+            var parent_struct: String = parent
+            if (this.class_struct_names.has(parent)) { parent_struct = this.class_struct_names.get(parent) }
+            this.class_parent_of.set(child_struct, parent_struct)
+        }
         // Register inherited methods: if child doesn't define a method, map it to parent's
         if (parent.length() > 0 and this.class_methods.has(parent)) {
             var parent_methods: List = this.class_methods.get(parent)
@@ -1427,6 +1441,92 @@
         this.loop_continue_label = saved_continue
 
         this.start_block(end_label)
+    }
+
+    // Emit the two helpers that give the class hierarchy a runtime existence:
+    // __class_parent_tag (one switch arm per class that has a parent) and
+    // __class_is_a (walk the chain, comparing against a target tag).
+    //
+    // Emitted for *every* target and both modes, unlike emit_reflect_helpers
+    // which is skipped in identity mode. gen_is_check calls __class_is_a
+    // unconditionally, so skipping the definition here would leave an undefined
+    // symbol whenever the compiler compiles itself.
+    //
+    // A flattened tag -> ancestor-set table would be O(1) instead of O(depth);
+    // the walk is emitted because hierarchies are shallow and this is far easier
+    // to read in the IR when something goes wrong.
+    fun emit_class_hierarchy_helpers() {
+        var child_names: List<String> = this.class_parent_of.keys()
+        this.emit("")
+        this.emit("define i64 @__class_parent_tag(i64 %tag) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        var arms: String = ""
+        var arm_lbls: List<String> = []
+        var arm_parents: List<String> = []
+        var hi: Float = 0
+        while (hi < child_names.length()) {
+            var child: String = child_names[hi]
+            var par: String = this.class_parent_of.get(child)
+            // An interface or a base declared but never constructed has no type
+            // id, so there is no tag to walk to; skip rather than emit an arm
+            // pointing at 0, which __class_is_a reads as "chain ended".
+            if (this.class_type_ids.has(child) and this.class_type_ids.has(par)) {
+                var ctag: Float = this.class_type_ids.get(child)
+                var ptag: Float = this.class_type_ids.get(par)
+                var lbl: String = this.fresh_label("cpt.a")
+                arm_lbls.push(lbl)
+                arm_parents.push(ptag.floor().to_string())
+                arms = arms + " i64 " + ctag.floor().to_string() + ", label %" + lbl
+            }
+            hi = hi + 1
+        }
+        if (arm_lbls.length() == 0) {
+            this.emit_terminator("ret i64 0")
+            this.emit("}")
+            this.block_terminated = false
+        } else {
+            this.emit_indent("switch i64 %tag, label %cpt.none [" + arms + " ]")
+            this.block_terminated = true
+            var ai: Float = 0
+            while (ai < arm_lbls.length()) {
+                this.start_block(arm_lbls[ai])
+                this.emit_terminator("ret i64 " + arm_parents[ai])
+                ai = ai + 1
+            }
+            this.start_block("cpt.none")
+            this.emit_terminator("ret i64 0")
+            this.emit("}")
+            this.block_terminated = false
+        }
+
+        // __class_is_a(tag, target): does `tag` name `target` or a descendant of
+        // it? The zero test comes before the equality test so a target of 0 (a
+        // non-class value, whose __gc_get_type_tag is 0) answers false rather
+        // than matching the end-of-chain sentinel.
+        this.emit("")
+        this.emit("define i1 @__class_is_a(i64 %tag, i64 %target) {")
+        this.emit("entry:")
+        this.emit("  %cur = alloca i64")
+        this.emit("  store i64 %tag, i64* %cur")
+        this.emit("  br label %cia.loop")
+        this.emit("cia.loop:")
+        this.emit("  %c = load i64, i64* %cur")
+        this.emit("  %z = icmp eq i64 %c, 0")
+        this.emit("  br i1 %z, label %cia.no, label %cia.test")
+        this.emit("cia.test:")
+        this.emit("  %hit = icmp eq i64 %c, %target")
+        this.emit("  br i1 %hit, label %cia.yes, label %cia.step")
+        this.emit("cia.step:")
+        this.emit("  %p = call i64 @__class_parent_tag(i64 %c)")
+        this.emit("  store i64 %p, i64* %cur")
+        this.emit("  br label %cia.loop")
+        this.emit("cia.yes:")
+        this.emit("  ret i1 1")
+        this.emit("cia.no:")
+        this.emit("  ret i1 0")
+        this.emit("}")
+        this.block_terminated = false
     }
 
     fun emit_reflect_helpers() {

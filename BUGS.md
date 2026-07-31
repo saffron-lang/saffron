@@ -1577,7 +1577,7 @@ builtins, which does work, plus the `keys()`/`values()` workaround for Maps.
 `src/lib/iter.sf`'s module doc already said the protocol was missing and was
 right all along.
 
-### 61. `is` on a class name is *never* a runtime check — it is folded at compile time, so it silently answers false wherever the static type is not exactly that class
+### 61. FIXED — `is` on a class name is now a real runtime check, including subclasses and `is`-pattern `match`
 
 **Reproduction:**
 
@@ -1652,6 +1652,36 @@ Note that a correct `is` for a *subclass* additionally needs the parent chain,
 which codegen does not have (see #50) — `class_parents` lives only in
 `checker.sf:163`. Exact-class identity is fixable now; `d is Animal` for a `Dog`
 is not.
+
+**Resolution (2026-07-31).** Both halves are fixed, plus the subclass gap the
+last paragraph called out of scope. Codegen now records the hierarchy it was
+already handed: `gen_class_decl_with_parent` writes `class_parent_of`
+(`codegen.sf`, keyed by struct name so a base class in another module still
+joins), and the `generate()` pre-registration pass writes it too so a forward
+`x is Dog` resolves (`output_body.sf`, the BUGS #33/#36/#37 ordering hazard).
+Two emitted helpers back it: `__class_parent_tag` (a switch, one arm per class
+with a parent) and `__class_is_a` (walks the parent chain, zero-test before
+equality so a target tag of 0 answers false) — see `emit_class_hierarchy_helpers`
+in `stmts_body.sf`. `__val_class_tag` (`base_nanbox.ll`, `wasm_base_32.ll`; a
+`ret 0` stub on wasm64 which has no GC header) reads the tag with
+`__gc_is_heap_ptr`-style guards, and crucially accepts *both* the TAG_PTR and the
+bare-untagged-pointer representations, because a fresh constructor result is
+untagged. `gen_is_check` now calls `gen_class_tag_check` in both the undecidable
+branch and the static-fold `else`; `gen_match`'s class-pattern branch emits an
+`__class_is_a` if/else chain instead of picking one arm at compile time
+(`match_body.sf`). Both new helpers return `""` / false for a non-class name so
+the "I don't know" channel is preserved (a dead `is` branch stays visible).
+
+Verified: `d is Dog` true, `d is Animal` true (needs the parent chain), the
+`z: Any = pick(...)` case true, and `match (a) { is Dog(d) => ..., is Cat(c) =>
+..., _ => ... }` returns `Woof / Meow / ???`. Bootstrap passes to the gen4 fixed
+point; test suite has zero regressions and `comprehensive` newly passes.
+
+**What this does *not* fix:** wasm64 (`wasm_base.ll`) still has no per-class tag
+(its `__gc_alloc` discards the tag), so `x is SomeClass` there is still
+unanswerable — `__val_class_tag` returns 0 honestly rather than reading garbage.
+A generic parameter `T` and interface conformance are still not runtime-testable.
+Virtual dispatch (#50) is a separate step on the same foundation.
 
 ### 60. `for (var i = 1; ...)` is a parse error; a C-style loop variable cannot be inferred
 

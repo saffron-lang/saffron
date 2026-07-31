@@ -88,44 +88,77 @@
             }
             // `match (x) { is Dog(d) => ..., is Cat(c) => ... }` — class
             // patterns, not enum variants. There is no payload to index into:
-            // the binding IS the subject. The arm is picked at compile time
-            // from the subject's static type, since that is all the checker
-            // knows; the binding must also be registered in typed_vars or
-            // `d.bark()` cannot resolve, and since BUGS #37 an unresolved
-            // Variable is a hard error rather than a silent bad load.
+            // the binding IS the subject.
+            //
+            // This used to pick ONE arm at compile time by comparing each arm's
+            // name against the subject's static type, because codegen had no
+            // runtime class identity. With an `Any` subject — the only shape
+            // where a class match is useful — no name matched, so every arm fell
+            // through to `_` (measured behaviour in BUGS #61: not "the first arm
+            // wins", but "all of them lose"). It now emits an if/else chain of
+            // __class_is_a tests, the same shape as the string-literal match
+            // above, so the arm is chosen by the object's actual class.
+            //
+            // Bindings still have to be registered in typed_vars or `d.bark()`
+            // cannot resolve, and since BUGS #37 an unresolved Variable is a
+            // hard error rather than a silent bad load.
             if (this.class_fields.has(first_variant)) {
-                var chosen: Float = -1
+                var cls_end: String = this.fresh_label("match.end")
+                var cls_type: AST.Type = AST.Type.AnyType
+                var cls_wild: Float = -1
                 var ci: Float = 0
                 while (ci < arms.length()) {
                     var cpat: AST.Pattern = this.get_arm_pattern(arms[ci])
                     var cname: String = match (cpat) { VariantPattern(v, b) => v
                         _ => ""
                     }
-                    if (chosen < 0) {
-                        // A wildcard arm is the fallback; a name equal to the
-                        // subject's static type wins outright.
-                        if (cname == subj_type) {
-                            chosen = ci
-                        } else if (cname == "_") {
-                            chosen = ci
+                    var cbinds: List<String> = this.get_pattern_bindings(cpat)
+                    var cbody: AST.Expr = this.get_arm_body(arms[ci])
+                    if (cname == "_") {
+                        // Emit the wildcard last, after every test has failed —
+                        // its position in the source does not make it a guard.
+                        cls_wild = ci
+                    } else {
+                        var ctest: String = this.gen_class_tag_check_i1(subj, cname)
+                        if (ctest.length() == 0) {
+                            // Not a class we can test for. Skipping the arm
+                            // silently is what made #61 invisible, so say so.
+                            IO.println("[codegen] Warning: match arm `is " + cname + "` cannot be tested at runtime and is skipped")
+                        } else {
+                            var cthen: String = this.fresh_label("match.arm")
+                            var cnext: String = this.fresh_label("match.next")
+                            this.emit_terminator("br i1 " + ctest + ", label %" + cthen + ", label %" + cnext)
+                            this.start_block(cthen)
+                            if (cbinds.length() >= 1) {
+                                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cbinds[0]))
+                                this.typed_vars.set(cbinds[0], this.str_to_type(cname))
+                            }
+                            var cval: String = this.gen_arg_value(cbody)
+                            if (ci == 0) { cls_type = this.last_type }
+                            this.emit_indent("store i64 " + cval + ", i64* " + result_ptr)
+                            this.emit_terminator("br label %" + cls_end)
+                            this.start_block(cnext)
                         }
                     }
                     ci = ci + 1
                 }
-                if (chosen < 0) { chosen = 0 }
-                var cls_pat: AST.Pattern = this.get_arm_pattern(arms[chosen.floor()])
-                var cls_binds: List<String> = this.get_pattern_bindings(cls_pat)
-                var cls_name: String = match (cls_pat) { VariantPattern(v, b) => v
-                    _ => ""
+                if (cls_wild >= 0) {
+                    var wpat: AST.Pattern = this.get_arm_pattern(arms[cls_wild.floor()])
+                    var wbinds: List<String> = this.get_pattern_bindings(wpat)
+                    if (wbinds.length() >= 1) {
+                        this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(wbinds[0]))
+                    }
+                    var wval: String = this.gen_arg_value(this.get_arm_body(arms[cls_wild.floor()]))
+                    if (cls_wild == 0) { cls_type = this.last_type }
+                    this.emit_indent("store i64 " + wval + ", i64* " + result_ptr)
+                } else {
+                    // No wildcard and nothing matched. Storing nil keeps this an
+                    // indeterminate value rather than a fault — the same gap as
+                    // the string match above and BUGS #37's general case.
+                    this.emit_indent("store i64 0, i64* " + result_ptr)
                 }
-                if (cls_binds.length() >= 1) {
-                    this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cls_binds[0]))
-                    this.typed_vars.set(cls_binds[0], this.str_to_type(cls_name))
-                }
-                var cls_body: AST.Expr = this.get_arm_body(arms[chosen.floor()])
-                var cls_val: String = this.gen_arg_value(cls_body)
-                var cls_type: AST.Type = this.last_type
-                this.emit_indent("store i64 " + cls_val + ", i64* " + result_ptr)
+                this.emit_terminator("br label %" + cls_end)
+                this.start_block(cls_end)
                 var cls_result: String = this.fresh_local()
                 this.emit_indent(cls_result + " = load i64, i64* " + result_ptr)
                 this.last_type = cls_type
