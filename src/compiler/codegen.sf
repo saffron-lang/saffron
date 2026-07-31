@@ -1,7 +1,6 @@
 // LLVM IR code generator for Saffron-mini
 
 import "./ast.sf" as AST
-import "./codegen/methods.sf" as Methods
 import "llvm/types" as LLVMTypes
 import "llvm/instructions" as LLVMInst
 import "llvm/module" as LLVMMod

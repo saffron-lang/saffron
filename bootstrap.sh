@@ -95,7 +95,17 @@ sed -e "/@codegen-split: types/r $COMPILER_DIR/codegen/types_body.sf" \
     -e "/@codegen-split: output/r $COMPILER_DIR/codegen/output_body.sf" \
     -e "/@codegen-split: methods/r $COMPILER_DIR/codegen/methods_body.sf" \
     "$COMPILER_DIR/codegen.sf" > "$BUILD_DIR/stage3/_codegen.sf"
-sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_codegen.sf"
+
+# Guard: the assembly must consume every *_body.sf that exists. A body file with
+# no matching -e above would be silently dropped from the compiler — the exact
+# failure mode the deleted mirror files used to cause.
+for body in "$COMPILER_DIR"/codegen/*_body.sf; do
+    part="$(basename "$body" _body.sf)"
+    grep -q "@codegen-split: $part\b" "$COMPILER_DIR/codegen.sf" \
+        || fail "ASSEMBLE" "codegen/${part}_body.sf has no '@codegen-split: $part' marker in codegen.sf"
+    grep -q "codegen/${part}_body.sf" "$0" \
+        || fail "ASSEMBLE" "codegen/${part}_body.sf is not read by the sed assembly above"
+done
 
 # Try gen2 first; if it fails (e.g. AST has new variants gen2 doesn't know),
 # fall back to linking from checked-in .ll artifacts compiled by gen3.
@@ -122,9 +132,8 @@ if [[ "$GEN2_OK" == true ]]; then
     cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
-    # Rewrite the codegen import to use the assembled file and strip methods import
+    # Rewrite the codegen import to use the assembled file
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
-    sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
     timeout 180 "$GEN2" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
         || GEN2_OK=false
 fi
@@ -165,7 +174,6 @@ if [[ "$GEN2_OK" == false ]]; then
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
-    sed -i '' '/^import "\.\/codegen\/methods\.sf"/d' "$BUILD_DIR/stage3/_main.sf"
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
     timeout 120 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" "$BUILD_DIR/stage3/_main.sf" "$BUILD_DIR/stage3/main.ll" \
         || fail "STAGE 1" "gen3 failed to compile main.sf"
