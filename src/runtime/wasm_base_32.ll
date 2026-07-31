@@ -732,6 +732,17 @@ entry:
   ret i64 %tagged
 }
 
+; See base_nanbox.ll: map a NULL void* extern return to int-tagged 0 so the
+; `== 0` guard C-convention code writes actually fires (BUGS #84).
+define i64 @__val_tag_ptr_nullable(i8* %ptr) {
+entry:
+  %int_ptr = ptrtoint i8* %ptr to i64
+  %isnull = icmp eq i64 %int_ptr, 0
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  %r = select i1 %isnull, i64 9221401712017801216, i64 %tagged
+  ret i64 %r
+}
+
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
   ; Mask off the tag bits to get the raw pointer value

@@ -279,6 +279,24 @@ entry:
   ret i64 %tagged
 }
 
+; Tag a pointer returned by a `void*` @extern, mapping a NULL to int-tagged 0
+; rather than to TAG_PTR|0. A C function that returns NULL on failure (fopen,
+; fgets, strstr, ...) is guarded in Saffron with `== 0`, which lowers to a raw
+; icmp against __val_tag_int(0) = 9221401712017801216. Plain __val_tag_ptr(NULL)
+; is 0x7FF8000000000000 (TAG_PTR|0), a value that is not equal to that, passes
+; __val_is_ptr, and is then dereferenced far from the call — BUGS #84. A
+; non-NULL pointer keeps its normal TAG_PTR representation, so the ~50 other
+; emit_tag_ptr sites and the String-returning void* stdlib wrappers are
+; untouched; only the NULL case changes.
+define i64 @__val_tag_ptr_nullable(i8* %ptr) {
+entry:
+  %int_ptr = ptrtoint i8* %ptr to i64
+  %isnull = icmp eq i64 %int_ptr, 0
+  %tagged = call i64 @__val_tag_ptr(i8* %ptr)
+  %r = select i1 %isnull, i64 9221401712017801216, i64 %tagged
+  ret i64 %r
+}
+
 define i8* @__val_untag_ptr(i64 %v) {
 entry:
   %ptr_int = and i64 %v, 281474976710655

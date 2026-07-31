@@ -639,6 +639,21 @@
         return local
     }
 
+    // Tag a void* extern return, but map NULL to int-tagged 0 so a `== 0` guard
+    // fires (BUGS #84). In identity mode ptrtoint already turns NULL into 0, so
+    // plain emit_tag_ptr is correct there and the _nullable runtime symbol is
+    // never referenced during the (identity-mode) bootstrap.
+    fun emit_tag_ptr_nullable(ptr: String): String {
+        if (this.identity_mode) {
+            var local: String = this.fresh_local()
+            this.emit_indent(local + " = ptrtoint i8* " + ptr + " to i64")
+            return local
+        }
+        var local: String = this.fresh_local()
+        this.emit_indent(local + " = call i64 @__val_tag_ptr_nullable(i8* " + ptr + ")")
+        return local
+    }
+
     fun emit_tag_bool(val: String): String {
         if (this.identity_mode) { return val }
         var local: String = this.fresh_local()
