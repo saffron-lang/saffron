@@ -1,0 +1,57 @@
+// BUGS #72: `parse_type` never consumed the `?` token, so the nullable
+// shorthand was broken everywhere it appeared. In a return annotation the
+// leftover token desynchronized the parser and the function's own parameters
+// came out undefined at codegen; in a var annotation it surfaced immediately as
+// "expected '=' but found '?'".
+//
+// `T?` now desugars to `T|Nil` in the parser, so a nullable has exactly one
+// representation downstream. These assertions cover both positions and check
+// that the desugared type really behaves as the union, not merely that it parses.
+import "@test" as Test
+
+// The original repro: a `?` return annotation with a parameter in scope.
+fun maybe_pos(x: Int): Int? {
+    if (x > 0) { return x }
+    return nil
+}
+
+Test.assert(maybe_pos(7) != nil, "Int? return: param stays in scope, returns value")
+Test.assert(maybe_pos(-1) == nil, "Int? return: nil branch")
+
+var got: Int? = maybe_pos(7)
+if (got != nil) {
+    Test.assert_eq(got, 7, "Int? return: value survives the round trip")
+}
+
+// A `?` var annotation — previously a hard parse error.
+var v: Int? = 5
+Test.assert(v != nil, "Int? var annotation accepts a value")
+var n: Int? = nil
+Test.assert(n == nil, "Int? var annotation accepts nil")
+
+// Not Int-specific.
+var s: String? = "hi"
+Test.assert(s != nil, "String? var annotation")
+var s2: String? = nil
+Test.assert(s2 == nil, "String? var annotation, nil")
+
+// `T?` must be the same type as `T|Nil`, not a lookalike: assigning across the
+// two spellings has to type-check in both directions.
+fun as_union(x: Int): Int|Nil { return maybe_pos(x) }
+fun as_shorthand(x: Int): Int? { return as_union(x) }
+Test.assert(as_shorthand(3) != nil, "Int? and Int|Nil are interchangeable")
+
+var from_union: Int? = as_union(4)
+Test.assert(from_union != nil, "Int|Nil value assigns to an Int? annotation")
+var from_short: Int|Nil = maybe_pos(4)
+Test.assert(from_short != nil, "Int? value assigns to an Int|Nil annotation")
+
+// A `?` on a union member, and a nullable parameter.
+fun first_present(a: Int?, b: Int?): Int? {
+    if (a != nil) { return a }
+    return b
+}
+Test.assert(first_present(nil, 9) != nil, "Int? parameters")
+Test.assert(first_present(nil, nil) == nil, "Int? parameters, both nil")
+
+Test.summary()

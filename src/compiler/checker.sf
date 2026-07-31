@@ -1301,6 +1301,26 @@ class NullChecker {
                 this.infer_expr(value)
                 AST.Type.BoolType
             }
+            // TupleLit and Yield had no arm here at all. An unmatched variant
+            // yields an indeterminate value rather than a diagnostic, which is
+            // why `return (b, a)` in test/tuple_test.sf was reported as a
+            // "nullable Int" on roughly half of all runs of the same binary on
+            // the same source — BUGS #73. The parser encodes a tuple type as
+            // "Tuple<A,B>" (see parse_single_type), so mirror that spelling.
+            TupleLit(elements) => {
+                var elem_types: List<AST.Type> = []
+                var ei: Float = 0
+                while (ei < elements.length()) {
+                    elem_types.push(this.infer_type(elements[ei]))
+                    ei = ei + 1
+                }
+                AST.Type.GenericType("Tuple", elem_types)
+            }
+            // `yield x` evaluates x and suspends; its own value is not usable.
+            Yield(value) => {
+                this.infer_expr(value)
+                AST.Type.AnyType
+            }
             IfExpr(cond, then_body, then_val, else_body, else_val) => {
                 this.infer_expr(cond)
                 this.check_stmts(then_body)
