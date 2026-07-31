@@ -2652,7 +2652,7 @@ signature gap that share this root cause:
 [docs/design/ffi-pointer-discipline.md](docs/design/ffi-pointer-discipline.md).
 
 
-### 25. Method call directly on an interpolated string literal returns garbage
+### 25. FIXED — a method called directly on an interpolated string literal returned garbage
 
 **Reproduction:**
 ```saffron
@@ -2671,16 +2671,45 @@ var s = "x${n}y"
 IO.println(s.length())           // 4 — correct
 ```
 
-**Root cause:** interpolation desugars in the lexer to
-`"" + (expr).to_string() + ""`. The concatenation produces a raw `char*`;
-assigning it to a variable goes through a path that tags it, but calling a
-method on the concatenation expression directly passes the untagged pointer as
-the receiver, so `length()` reads the address as if it were a value. Same
-raw-pointer-leak class as #23, and the static `Ptr` distinction proposed in #24
-is what would let codegen tell the two cases apart.
+**Root cause as filed** (wrong, corrected below): interpolation desugars in the
+lexer to `"" + (expr).to_string() + ""`; the concatenation produces a raw
+`char*`, assigning it to a variable goes through a path that tags it, but calling
+a method on the concatenation expression directly passes the untagged pointer as
+the receiver. That put it in the same raw-pointer-leak class as #23, with #24's
+static `Ptr` distinction as the fix.
 
-**Impact:** cosmetic but easy to hit — `"${x}".length()` and
-`"${x}".to_upper()` silently produce nonsense rather than failing.
+**Actual root cause: operator precedence in the desugaring, not tagging.** The
+lexer's desugaring is correct as far as it goes, but it emits the token sequence
+unparenthesised, and `.` binds tighter than `+`. So `"${n}".length()` parsed as
+
+```
+"" + (n).to_string() + "".length()
+```
+
+— the method attached only to the *trailing* `""` segment. `"".length()` is `0`,
+so the expression is `string + string + 0`, and that int `0` reached `strlen` as
+an address. Nothing was mis-tagged; the receiver of `length()` was never the
+concatenation at all. This also explains cleanly why the variable-bound form
+worked (`.` has nothing adjacent to bind to) and why the garbage looked like a
+heap address (it was the result of the *string* concatenation, printed as the
+value of the whole expression).
+
+**Resolution (2026-07-31).** `src/compiler/lexer.sf` now wraps the entire
+interpolated string in one paren group: `TkLParen` emitted at the first `${`
+(guarded on `!has_interp` so it happens once), `TkRParen` after the trailing
+segment (guarded on `has_interp`, so a plain `"abc"` opens no group). A trailing
+method then binds to the group rather than to the last `""`. Two lines of tokens,
+no codegen or checker change, and #24's static `Ptr` distinction is *not* needed
+for this bug — it stands or falls on its own merits.
+
+Verified: `"${n}".length()` → 2, `"x${n}y".length()` → 4,
+`"${name}".to_upper()` → `WORLD`, and the plain-interpolation text paths
+(`"${n}"`, `"hello ${name}!"`, `"${1 + 2} is three"`, `"a${n}b${name}c"`) all
+unchanged. Regression test at `test/pass/interp_method_call.sf`, which covers
+both the method-call forms and the plain text forms so a fix that breaks ordinary
+interpolation cannot pass it. Full bootstrap green including the gen4 fixed
+point; test-suite failure set identical to before the change (38, no test
+previously exercised this).
 
 
 ### 34. `bootstrap.sh` never builds a gen4, contradicting the promotion criteria
