@@ -213,13 +213,17 @@
             val = this.emit_tag_float(widened)
         }
         var var_ref: String = "%" + this.sanitize_name(name)
+        // Only the *prefixed* key is consulted. A bare-name fallback used to
+        // follow, and it could never help: when current_prefix is "" the two
+        // keys are the same string, so the fallback only ever fired with a
+        // non-empty prefix — i.e. it matched a global belonging to some other
+        // module. `var p: Project = Project()` inside pantry_config's project()
+        // then stored to the main program's @__g_p while output_body.sf still
+        // allocated %p, and the local was written to an unrelated global.
         if (this.module_globals.has(this.current_prefix + name)) {
             var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
             this.global_var_types.set(name, vtype)
             this.global_var_types.set(this.current_prefix + name, vtype)
-        } else if (this.module_globals.has(name)) {
-            var_ref = "@__g_" + this.sanitize_name(name)
-            this.global_var_types.set(name, vtype)
         }
         if (this.use_llvm_lib) {
             this.emit_indent(this.lib_store(val, "i64", var_ref))

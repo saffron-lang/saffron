@@ -131,6 +131,7 @@ if [[ "$GEN2_OK" == true ]]; then
     cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
     cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
+    cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage3/resolve.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     # Rewrite the codegen import to use the assembled file
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
@@ -172,6 +173,7 @@ if [[ "$GEN2_OK" == false ]]; then
     cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage3/lexer.sf"
     cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage3/parser.sf"
     cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage3/checker.sf"
+    cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage3/resolve.sf"
     cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage3/ast.sf"
     sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage3/_main.sf"
     [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"

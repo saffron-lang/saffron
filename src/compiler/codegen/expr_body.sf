@@ -136,6 +136,49 @@
                 }
                 local
             }
+            Ref(rkind, rname, rslot) => {
+                // Resolved by resolve.sf with a scope chain in hand, so the
+                // local-vs-global question is already answered. The Variable arm
+                // above has to re-derive it from module_globals, and gets it
+                // wrong whenever a module global shares a name with a parameter
+                // (BUGS #40): the global branch wins because it is tested first,
+                // and the parameter becomes unreachable. Here `rkind` decides,
+                // and no side table is consulted at all.
+                if (this.typed_vars.has(rname)) {
+                    this.last_type = this.typed_vars.get(rname)
+                } else {
+                    var rgv_type: String = this.get_var_type_str(rname)
+                    if (rgv_type.length() > 0) {
+                        this.last_type = this.str_to_type(rgv_type)
+                    } else {
+                        this.last_type = AST.Type.IntType
+                    }
+                }
+                if (rkind == "unknown") {
+                    IO.println("[codegen] Error: undefined variable '" + rname + "'")
+                    this.has_errors = true
+                }
+                if (rkind == "func") {
+                    if (!this.named_imports.has(rname)) {
+                        return this.gen_func_ref(rslot + rname)
+                    }
+                }
+                var rlocal: String = this.fresh_local()
+                var rvar_ref: String = "%" + this.sanitize_name(rname)
+                if (rkind == "global") {
+                    rvar_ref = "@__g_" + rslot + this.sanitize_name(rname)
+                }
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_load(rlocal, "i64", rvar_ref))
+                    if (!this.identity_mode and this.llvm_values.has(rvar_ref)) {
+                        this.llvm_values.set(rlocal, this.llvm_values.get(rvar_ref))
+                    }
+                } else {
+                    this.emit_indent(rlocal + " = load i64, i64* " + rvar_ref)
+                    this.verify_load(rlocal, "i64", rvar_ref)
+                }
+                rlocal
+            }
             Binary(left, op, right) => {
                 this.gen_binary(left, op, right)
             }
@@ -147,12 +190,16 @@
             }
             Assign(name, value) => {
                 var val: String = this.gen_arg_value(value)
-                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name) or this.module_globals.has(name)) {
+                // Prefixed key only — see the note in stmts_body.sf's
+                // gen_var_decl_with_name. The bare-name fallback could only
+                // ever fire across a module boundary, so `i = i - 1` inside
+                // @random's shuffle() stored to the main program's @__g_i while
+                // every read used %i: the loop counter never decremented and
+                // shuffle() spun forever.
+                if (this.typed_vars.has(name) or this.module_globals.has(this.current_prefix + name)) {
                     var var_ref: String = "%" + this.sanitize_name(name)
                     if (this.module_globals.has(this.current_prefix + name)) {
                         var_ref = "@__g_" + this.current_prefix + this.sanitize_name(name)
-                    } else if (this.module_globals.has(name)) {
-                        var_ref = "@__g_" + this.sanitize_name(name)
                     }
                     if (this.use_llvm_lib) {
                         this.emit_indent(this.lib_store(val, "i64", var_ref))
@@ -1343,6 +1390,7 @@
         var expr_kind: String = this.classify_expr(expr)
         if (expr_kind == "variable") {
             var __vn: String = match (expr) { Variable(n) => n
+                Ref(rk, rn, rs) => rn
                 _ => ""
             }
             if (this.str_in_list(this.known_functions,__vn)) {
@@ -1478,7 +1526,39 @@
             return this.gen_binary(b_left, b_op, b_right)
         }
         if (expr_kind == "variable") {
+            // A resolved Ref already knows local-vs-global, so take it at its
+            // word instead of re-deriving from module_globals below. That
+            // re-derivation tests the global branch first, so a module global
+            // beat a like-named parameter and the parameter became unreachable
+            // — BUGS #40, whose repro is `var x` in the main program silently
+            // capturing math.sf's `sqrt(x)` parameter.
+            var ref_kind: String = match (expr) { Ref(rk, rn, rs) => rk
+                _ => ""
+            }
+            if (ref_kind == "local" or ref_kind == "param") {
+                var pname: String = match (expr) { Ref(rk, rn, rs) => rn
+                    _ => ""
+                }
+                if (this.typed_vars.has(pname)) {
+                    this.last_type = this.typed_vars.get(pname)
+                } else {
+                    this.last_type = AST.Type.IntType
+                }
+                var plocal: String = this.fresh_local()
+                var pref: String = "%" + this.sanitize_name(pname)
+                if (this.use_llvm_lib) {
+                    this.emit_indent(this.lib_load(plocal, "i64", pref))
+                    if (!this.identity_mode and this.llvm_values.has(pref)) {
+                        this.llvm_values.set(plocal, this.llvm_values.get(pref))
+                    }
+                } else {
+                    this.emit_indent(plocal + " = load i64, i64* " + pref)
+                    this.verify_load(plocal, "i64", pref)
+                }
+                return plocal
+            }
             var vname: String = match (expr) { Variable(n) => n
+                Ref(rk, rn, rs) => rn
                 _ => ""
             }
             if (this.typed_vars.has(vname)) {
@@ -2703,6 +2783,7 @@
             FloatLit(v) => "no"
             BoolLit(v) => "no"
             Variable(n) => "no"
+            Ref(rk, rn, rs) => "no"
             Unary(o, r) => "no"
             Call(c, a) => "no"
             Assign(n, v) => "no"
@@ -2728,6 +2809,7 @@
     fun is_string_variable(expr: AST.Expr): Bool {
         var name: Any = match (expr) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             GetField(o, f) => f
             IntLit(v) => ""
             FloatLit(v) => ""
@@ -2781,6 +2863,7 @@
             FloatLit(v) => "float"
             BoolLit(v) => "bool"
             Variable(n) => "var"
+            Ref(rk, rn, rs) => "var"
             Unary(o, r) => "unary"
             Call(c, a) => "call"
             Assign(n, v) => "assign"

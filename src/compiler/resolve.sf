@@ -488,3 +488,68 @@ fun resolve_program(program: List<AST.Stmt>): List<AST.Stmt> {
     return r.resolve_stmts(program)
 }
 
+// Imported-module variant. main.sf flattens every imported module into one list
+// with boundary indices and a "|"-joined prefix string; this walks that layout
+// so each module's declarations are prescanned under its own prefix.
+//
+// Modules must be resolved in the SAME Resolver as the main program, or nothing
+// is gained: BUGS #40's repro is a global `x` in the main program shadowing the
+// parameter `x` of `sqrt` in src/lib/math.sf. The shadowing crosses the module
+// boundary, so a per-file resolver would still get it wrong. Returns the
+// flattened list rebuilt in place, and leaves the resolver ready for the main
+// program via resolve_main.
+fun resolve_imports(r: Resolver, stmts: List<AST.Stmt>, boundaries: List<Float>, prefixes_joined: String): List<AST.Stmt> {
+    var prefixes: List<String> = prefixes_joined.split("|")
+    // Prescan every module first, so a module importing another module's
+    // function sees it regardless of the order they were flattened in.
+    var bi: Float = 0
+    while (bi + 1 < boundaries.length()) {
+        var start: Float = boundaries[bi]
+        var end: Float = boundaries[bi + 1]
+        if (bi < prefixes.length()) {
+            r.current_prefix = prefixes[bi]
+        } else {
+            r.current_prefix = ""
+        }
+        var si: Float = start
+        while (si < end) {
+            r.prescan_stmt(stmts[si])
+            si = si + 1
+        }
+        bi = bi + 1
+    }
+    // Then resolve bodies, module by module, restoring each prefix.
+    var out: List<AST.Stmt> = []
+    var bj: Float = 0
+    while (bj + 1 < boundaries.length()) {
+        var bstart: Float = boundaries[bj]
+        var bend: Float = boundaries[bj + 1]
+        if (bj < prefixes.length()) {
+            r.current_prefix = prefixes[bj]
+        } else {
+            r.current_prefix = ""
+        }
+        var sj: Float = bstart
+        while (sj < bend) {
+            out.push(r.resolve_stmt(stmts[sj]))
+            sj = sj + 1
+        }
+        bj = bj + 1
+    }
+    r.current_prefix = ""
+    return out
+}
+
+// The main program, resolved in a resolver that already knows the modules.
+fun resolve_main(r: Resolver, program: List<AST.Stmt>): List<AST.Stmt> {
+    r.current_prefix = ""
+    r.prescan(program)
+    return r.resolve_stmts(program)
+}
+
+fun new_resolver(): Resolver {
+    var r: Resolver = Resolver()
+    r.register_builtins()
+    return r
+}
+

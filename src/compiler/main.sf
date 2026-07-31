@@ -7,6 +7,7 @@ import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
+import "./resolve.sf" as Resolve
 import "./codegen.sf" as Codegen
 
 @extern("void exit(i32)")
@@ -631,12 +632,19 @@ fun main(): Int {
     var identity_mode: Bool = false
     var use_llvm_lib: Bool = true
     var emit_llvm_lib: Bool = false
+    // Stage 2 of docs/design/compiler-rewrite.md. On by default; --no-resolve
+    // turns it off so a suspected regression can be attributed to the pass
+    // itself rather than to whatever else changed.
+    var run_resolve: Bool = true
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg == "--no-check") {
             run_checker = false
+        }
+        if (arg == "--no-resolve") {
+            run_resolve = false
         }
         if (arg == "--check") {
             run_checker = true
@@ -1025,6 +1033,22 @@ fun main(): Int {
             named_imports.set(pe_key, package_exports.get(pe_key))
         }
         peki = peki + 1
+    }
+
+    // Resolve pass — every Variable(name) becomes a Ref(kind, name, slot), so
+    // the checker and codegen read what a name denotes instead of re-deriving
+    // it from side tables at each of a dozen sites (invariant I4 of
+    // docs/design/compiler-rewrite.md; the re-derivation is BUGS #40).
+    // Runs before the checker so both later passes see the same resolution.
+    // Imported modules go through the same resolver as the main program: #40's
+    // repro shadows math.sf's `sqrt(x)` parameter with a main-program global
+    // `x`, so the two must be resolved together or the shadowing is missed.
+    if (run_resolve) {
+        var resolver: Resolve.Resolver = Resolve.new_resolver()
+        if (all_import_stmts.length() > 0) {
+            all_import_stmts = Resolve.resolve_imports(resolver, all_import_stmts, module_boundaries, prefixes_joined)
+        }
+        program = Resolve.resolve_main(resolver, program)
     }
 
     // Run type checker (blocking by default)

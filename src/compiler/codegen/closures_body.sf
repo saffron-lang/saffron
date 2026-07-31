@@ -449,6 +449,17 @@
                     }
                 }
             }
+            Ref(rkind, rname, rslot) => {
+                // A capture is exactly a local/param that no enclosing binder
+                // provides. `rkind` says which it is, so none of the Variable
+                // arm's is_known guessing (uppercase-first-letter heuristics
+                // included) is needed here.
+                if (this.str_in_list(bound,rname) or this.str_in_list(free,rname)) {
+                    // Already accounted for
+                } else if (rkind == "local" or rkind == "param") {
+                    free.push(rname)
+                }
+            }
             Binary(l, o, r) => {
                 this.find_free_vars_expr(l, bound, free)
                 this.find_free_vars_expr(r, bound, free)
@@ -463,6 +474,7 @@
                 }
                 // If calling a closure function, add its captures to our free vars
                 var call_name: String = match (c) { Variable(n) => n
+                    Ref(rk, rn, rs) => rn
                     _ => ""
                 }
                 if (call_name.length() > 0) {
