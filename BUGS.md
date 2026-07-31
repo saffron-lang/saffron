@@ -437,11 +437,24 @@ the one-armed form `match (expr) { Variable(n) => n }` (e.g.
 `checker.sf:2210`) — no `_`, so every other variant yields an indeterminate
 value. That is precisely the mechanism of #73, sitting in ~100 places.
 
-Note also that `bootstrap.sh` does **not** verify gen3 can compile itself, contra
-CLAUDE.md's promotion criteria: its TEST stage compiles only
-`test/hello_bootstrap.sf`. Stage 1 uses gen2, so a gen3 that rejects the compiler
-source still gives a green bootstrap. Landing the recursion needs that check
-added too, or the regression is invisible.
+The measurement was only possible by hand because `bootstrap.sh` did **not**
+verify gen3 can compile itself, contra CLAUDE.md's promotion criteria: its TEST
+stage compiled only `test/hello_bootstrap.sf`, and stage 1 uses gen2, so a gen3
+that rejects the compiler source still gave a green bootstrap.
+
+**Fixed as of 2026-07-31**: `bootstrap.sh` gained a stage 2 that compiles the
+compiler's own source with gen3, links gen4, and checks gen4 can compile a
+program. It found one real defect immediately — `codegen.sf:574` was a one-armed
+`match (stmts[si2]) { VarDecl(n, t, i, d) => n }` in a *free function*, so gen3
+already rejected it today, with no relation to the #76 recursion. Replaced with
+the existing `gen.get_var_name()` helper, which has the `_ => ""` fallback (the
+line below it already used `gen.get_var_doc()`). With that, gen3 → gen4 → probe
+passes clean.
+
+So the ~103 count above splits: **one** site blocks gen4 today, and the other
+~102 are inside class method bodies, invisible until the recursion lands. Stage 2
+will now catch each one as it is uncovered, instead of the whole pile arriving at
+once with no way to tell a real regression from a pre-existing hole.
 
 Note the related shape: the `match (stmt)` at `checker.sf:837-848` and
 `check_stmt` itself both cover 14 of `Stmt`'s 15 variants — `TypeAlias` has no

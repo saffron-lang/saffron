@@ -418,9 +418,19 @@ Only after promoting gen3 to gen2 (see below) can you use the new syntax in the 
 Promotion copies a working gen3 into `build/stage2/saffronc`, enabling new syntax in compiler source.
 
 **Criteria** — ALL must pass:
-- `./bootstrap.sh` completes (gen2 → gen3 builds and links)
+- `./bootstrap.sh` completes. Stage 1 is gen2 → gen3; **stage 2** is gen3 → gen4,
+  which compiles the compiler's own source with gen3, links the result, and checks
+  that gen4 can compile a program. That fixed-point check is the one that matters
+  — stage 1 only proves *gen2* accepts the source, and gen2 is not the compiler
+  anyone runs. `SKIP_GEN4=1` skips stage 2 (it roughly doubles bootstrap time,
+  1m52 → 3m42); don't skip it when deciding on a promotion.
 - Gen3 compiles test programs correctly: `tools/saffron run test/hello_bootstrap.sf`
-- Gen3 can compile itself (bootstrap a gen4 from gen3): the test stage in bootstrap.sh verifies this
+
+Stage 2 was added on 2026-07-31. Before that this section claimed the test stage
+verified gen3 could compile itself, and it did not — it compiled
+`test/hello_bootstrap.sf`, five lines of `IO.println`. A gen3 that rejected the
+compiler's own source gave a fully green bootstrap, which is how ~100 latent
+non-exhaustive matches (BUGS #76) stayed invisible.
 
 **Ceremony:**
 
@@ -449,7 +459,9 @@ The previous gen2 had several NaN-boxing and struct-layout bugs (arithmetic in l
 build/
 ├── stage2/saffronc    ← gen2 (checked in, used to compile source)
 ├── saffronc           ← gen3 (built by bootstrap, the "current" compiler)
-└── stage3/            ← intermediate .ll files from compilation
+├── stage3/            ← intermediate .ll files from compilation
+└── stage4/            ← gen4: gen3's own output, the fixed-point check (not
+                         checked in, not used for anything but verification)
 src/compiler/
 ├── codegen.sf         ← main class (assembled from codegen/ by bootstrap)
 ├── codegen/*_body.sf  ← actual compilation input (sed-assembled into codegen.sf)

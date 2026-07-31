@@ -2,3 +2,8 @@ cmake-build-debug/
 /cmake-build-debug
 /cmake-build-debug/
 .DS_STORE.saffron/
+
+# gen4 is bootstrap.sh's fixed-point check: gen3 recompiling its own source.
+# Nothing consumes it — it exists so that a gen3 which rejects the compiler
+# source fails the build. Unlike stage3/, it is never checked in.
+build/stage4/
