@@ -63,22 +63,33 @@ m.length()       // number of entries
 
 ### Iteration
 
-Maps are iterable and yield `[key, value]` pairs. The idiomatic form is a for-in loop:
+`for-in` over a Map **segfaults** (BUGS #62) — with or without a type
+annotation. `keys()` and `values()` are ordered consistently, so walk them
+together by index:
 
 ```saffron
-var m = {"a": 1, "b": 2}
+var m: Map<String, Int> = {"a": 1, "b": 2}
+var ks: List<String> = m.keys()
+var vs: List<Int> = m.values()
 
-for (entry in m) {
-    IO.println("${entry[0]} = ${entry[1]}")
+for (i = 0; i < ks.length(); i = i + 1) {
+    IO.println("${ks[i]} = ${vs[i]}")   // a = 1, b = 2
 }
 ```
 
-Or drive the iterator by hand with `.iter()`, `has_next()`, and `next()`:
+Going through `m.get(k)` instead is more awkward than it looks, because it
+returns `Int|Nil` and nil-narrowing does not work on it: both `if (v is Nil) {
+continue }` and `if (!(v is Nil)) { ... }` still fail to compile with "cannot
+call .to_string() on nullable 'v'". Prefer the `values()` form above when you
+need the values.
+
+For keys alone, `for-in` over `keys()` is fine:
 
 ```saffron
-var iter = m.iter()
-while (iter.has_next()) {
-    var entry = iter.next()
-    IO.println("${entry[0]} = ${entry[1]}")
+for (k in ks) {
+    IO.println(k)
 }
 ```
+
+The `.iter()` / `has_next()` / `next()` form some documentation showed does not
+work — nothing implements it, and the loop silently does nothing (BUGS #62).

@@ -9,6 +9,186 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 70. `super` is completely broken — every use emits `load i64, i64* %super` and the module fails to verify
+
+`super` does not work at all. Not an edge case, not a deep-inheritance problem:
+every spelling fails, and the failure is at LLVM verification, so nothing runs.
+
+```saffron
+class A {
+    var n: Int
+    fun init(n: Int) { this.n = n }
+    fun f(): Int { return this.n }
+}
+class B extends A {
+    fun f(): Int { return super.f() + 1 }
+}
+IO.println(B(1).f())
+```
+
+```
+saffron: the compiler emitted invalid LLVM IR
+saffron: this is a compiler bug, not an error in your program.
+  opt: output.ll:227:24: error: use of undefined value '%super'
+    %t1 = load i64, i64* %super
+```
+
+Verified identical for all three forms: an overriding method calling
+`super.f()`, `super.init(n)` in a subclass constructor, and a two-level chain
+(`LoudDog extends Dog extends Animal`). This is why
+`docs/learnxinyminutes/learnsaffron.sf` still does not compile after its parse
+errors were fixed — §9 uses `super.speak()`.
+
+Pre-existing, not a regression: reproduces identically on a compiler built from
+`11c9638` (this session's starting commit).
+
+**Cause — a dead load emitted 880 lines before the code that handles `super`.**
+The `super` path itself is *correct*. `gen_method_call` has a dedicated arm at
+`src/compiler/codegen/methods_body.sf:2520` that loads `%self` and calls the
+parent's mangled symbol directly:
+
+```saffron
+if (obj_name == "super" and this.current_parent.length() > 0) {
+    var self_val: String = this.fresh_local()
+    this.emit_indent(self_val + " = load i64, i64* %self")
+    ...
+    var parent_method: String = this.current_parent + "__" + method
+```
+
+And it does run — the emitted IR contains the right call:
+
+```llvm
+define i64 @B__f(i64 %self.arg) {
+entry:
+  %self = alloca i64
+  store i64 %self.arg, i64* %self
+  %t1 = load i64, i64* %super      ; <-- garbage, nothing defines %super
+  %t2 = load i64, i64* %self
+  %t3 = call i64 @A__f(i64 %t2)    ; <-- correct super dispatch
+```
+
+The problem is the *builtin dispatch* preamble at
+`src/compiler/codegen/methods_body.sf:1640`, which unconditionally evaluates the
+receiver on the way to deciding what kind of call this is:
+
+```saffron
+// --- Builtin dispatch (only for non-class objects) ---
+var obj: String = this.gen_arg_value(object)
+```
+
+`object` here is `AST.Expr.Variable("super")` (`src/compiler/parser.sf:595-597`
+parses `super` into an ordinary `Variable` node). `gen_arg_value` has no idea
+`super` is special, so it emits the load for a variable slot that no function
+prologue ever allocates. Execution then falls through to `:2520`, which emits the
+correct call — leaving both in the output. The dead load is unused, so this is
+purely a verifier failure, not a miscompile: `%t1` is never read.
+
+Note the guard at `:2520` is `obj_name == "super" and this.current_parent.length()
+> 0`, and `current_parent` is evidently non-empty here since the correct call is
+emitted. So `current_parent` tracking is fine; only the ordering is wrong.
+
+**Fix.** Hoist the `super` arm above the builtin-dispatch preamble, so it is
+reached before anything evaluates the receiver. The `this`-receiver case at
+`:877-881` is already handled this way — `classify_expr(object) == "this"` is
+tested at the very top of `gen_method_call`, precisely so `%self` is loaded
+deliberately rather than by falling into generic variable codegen. `super`
+deserves the same treatment and does not have it.
+
+More generally this is the same shape as several entries here: an unconditional
+`gen_arg_value` in a dispatch chain emits IR for a case a later arm was going to
+handle differently. Emitting side-effecting IR before the dispatch decision is
+made is the underlying hazard, and it argues for resolving receiver kind in a
+separate pass (`docs/design/compiler-rewrite.md`, stage 2) rather than
+re-deriving it inline at each of a dozen call sites.
+
+### 69. `is` always returns false on a union-typed value, so every nil-check branch on `T|Nil` is silently dead
+
+Found while writing the Map-iteration workaround for #68. On a value whose
+declared type is a union, **both** arms of an `is` test are false:
+
+```saffron
+var v: Int|Nil = 5
+IO.println(v is Int)   // false   <-- wrong
+IO.println(v is Nil)   // false
+IO.println(v != nil)   // true    <-- correct
+
+var c: Int|Nil = nil
+IO.println(c is Nil)   // false   <-- wrong
+```
+
+`is` is correct on non-union declarations, so this is specific to unions:
+
+```saffron
+var a: Int = 5
+IO.println(a is Int)   // true
+var b: Any = 5
+IO.println(b is Int)   // true
+```
+
+**Why this is worse than a wrong answer.** The idiomatic nil check compiles
+cleanly and its body never runs:
+
+```saffron
+var v: Int|Nil = m.get("a")
+if (v is Int) {
+    IO.println("${v}")     // never reached; program prints nothing, exits 0
+}
+```
+
+There is no diagnostic. A program that looks like it handles the present case
+silently handles neither.
+
+**Three different behaviours for the same intent**, which is how this stayed
+hidden — only one of the three is both accepted and correct:
+
+| Guard | Result |
+|---|---|
+| `if (v != nil) { IO.println("${v}") }` | works, prints 5 |
+| `if (!(v is Nil)) { IO.println(v) }` | works, prints 5 |
+| `if (!(v is Nil)) { IO.println("${v}") }` | **compile error**: "cannot call .to_string() on nullable 'v'" |
+| `if (v is Int) { ... }` | **silently dead** — guard is false |
+
+So `!(v is Nil)` narrows for a direct `IO.println` but not through string
+interpolation, while `v is Int` does not narrow *and* evaluates false. Use
+`v != nil`, which is the only form that both narrows and evaluates correctly.
+
+**Cause.** `gen_is_check` (`src/compiler/codegen/expr_body.sf:402`) has two
+paths, and the union falls into the wrong one. It emits a *runtime* NaN-box tag
+check only when the static type is the exact string `"Any"`:
+
+```saffron
+var val_type_str: String = this.type_to_string(val_type)
+if (val_type_str == "Any") {
+    // ... __val_is_int / __val_is_nil / etc.
+```
+
+`Int|Nil` is not `"Any"`, so control reaches the compile-time branch below
+(`:439`):
+
+```saffron
+var matches: String = "0"
+if (type_name == "Int" or type_name == "Number" or type_name == "Float") {
+    if (this.is_int_type(val_type)) { matches = "1" }
+```
+
+`is_int_type(Int|Nil)` is false and `is_nil_type(Int|Nil)` is likewise false, so
+`matches` stays `"0"` and a literal constant `false` is compiled in. That is why
+both arms are dead and why there is no diagnostic — from codegen's point of view
+it statically proved the test.
+
+**Suggested fix.** A union operand is exactly the case that needs the runtime
+check, so the `val_type_str == "Any"` gate should also admit unions — any type
+that is not a single concrete type cannot be decided at compile time. Better
+still, invert the condition: take the compile-time path only when the operand's
+type is a single concrete type, and emit the runtime check otherwise. The
+`"Any"`-only spelling is a whitelist that silently mis-answers everything it
+forgot.
+
+**Relationship to the old #11.** `#11` ("Flow narrowing for primitives in
+unions") is listed under Fixed, and that fix was real — it addressed the checker
+reading `Expr.type` instead of `Expr.self.type`. This is a separate defect in
+codegen rather than the checker, hence a new entry rather than a reopen.
+
 ### 66. Binary files cannot be read or served — `IO.read_file` truncates at the first NUL, so `static_files` serves any wasm module as 0 bytes
 
 Found while verifying the playground before committing it. `GET /app.wasm` returns
@@ -280,14 +460,57 @@ class Countdown {
 for (x in Countdown(3)) { ... }   // [codegen] Error: type 'Countdown' has no method 'length'
 ```
 
-Lists and Strings work only because they happen to be indexable. `Map.iter()`
-already exists and is correct when driven by hand, so the fix is to desugar to
+Lists and Strings work only because they happen to be indexable. Desugaring to
 the promised protocol — `var it = coll.iter(); while (it.has_next()) { var item =
-it.next(); ... }` — which is type-agnostic (what the parser needs) and removes the
-`length()`/`[i]` special-casing from codegen.
+it.next(); ... }` — is the right shape, since it is type-agnostic (what the parser
+needs) and removes the `length()`/`[i]` special-casing from codegen. But it
+cannot be done as written today; see the addendum.
 
 Pre-existing, not a regression: reproduces identically on the pre-session
 baseline compiler.
+
+**Addendum (2026-07-30), re-verified while correcting the docs.** Three
+corrections to the above.
+
+**`Map.iter()` does not exist.** This entry claimed it "already exists and is
+correct when driven by hand". It does not exist anywhere — `grep -rn '"iter"'
+src/compiler/ src/runtime/runtime.sf` returns nothing. So the suggested fix has a
+prerequisite: builtin collections need real `iter()` methods before `for-in` can
+be desugared to call one.
+
+**The manual protocol form is a *silent* no-op**, which makes it worse than the
+`for-in` case rather than a working alternative to it:
+
+```saffron
+var xs: List<Int> = [1, 2, 3]
+var it = xs.iter()
+while (it.has_next()) { IO.println(it.next()) }
+// compiles; exit 0; NO output. Only hint is
+// "[checker] Warning: it: cannot infer type, add explicit annotation"
+```
+
+`for (x in xs)` over the same list correctly prints 1/2/3, so this is specific to
+the `.iter()` path. The call dispatches dynamically on an `Any`-typed receiver,
+resolves to nothing, and yields something whose `has_next()` is immediately
+false. A `MethodCall` on an `Any` receiver that resolves to no known method must
+become a diagnostic — that is the general dynamic-dispatch hole and belongs with
+the resolve pass (`docs/design/compiler-rewrite.md`, stage 2), not a spot fix
+here.
+
+**The Map crash is not an inference problem.** All four spellings segfault
+identically — map literal directly in the loop header, a `var` with an explicit
+`Map<String, Int>` annotation, and an inferred `var`. The annotated form crashes
+too, because the desugaring never consults the receiver's type at all. A narrow
+stopgap that would at least stop the crash: have the desugaring recognise a
+statically-known Map receiver and emit the `keys()` form.
+
+Six documents asserted the protocol works — `CLAUDE.md`,
+`docs/src/tutorial/iterators.md` (an entire page), `docs/src/introduction.md`,
+`docs/src/tutorial/lists-and-maps.md`, `docs/src/tutorial/control-flow.md`, and
+`docs/src/stdlib/iter.md`. All six are now corrected to describe `for-in` over
+builtins, which does work, plus the `keys()`/`values()` workaround for Maps.
+`src/lib/iter.sf`'s module doc already said the protocol was missing and was
+right all along.
 
 ### 61. `x is SomeClass` is compiled to a constant `false` whenever the static type is `Any`
 

@@ -134,8 +134,9 @@ let Some(value) = Option.Some(42)
 ### Control Flow
 
 ```saffron
-// For-in (uses iterator protocol: .iter() -> object with .has_next(), .next())
-// Works over Lists, Strings (char by char), Maps ([key, value] pairs), and custom types
+// For-in is index-based (desugars to length() + [i]), NOT protocol-based.
+// Works over Lists and Strings (char by char). Maps SEGFAULT (BUGS #62) and
+// custom types are a compile error (BUGS #62) — there is no iterator protocol.
 for (item in [1, 2, 3]) {
     if (item == 2) continue
     IO.println(item)
@@ -259,24 +260,25 @@ The `@` prefix resolves to `src/lib/<name>.sf` relative to the executable.
 ### Maps
 
 ```saffron
-var m: Map<String, Number> = {"a": 1, "b": 2}
+var m: Map<String, Int> = {"a": 1, "b": 2}
 m.set("c", 3)
-m.get("a")       // 1
+m.get("a")       // 1  (typed Int|Nil — see the `is` caveat below)
 m.has("b")       // true
 m.keys()         // ["a", "b", "c"]
 m.values()       // [1, 2, 3]
 
-// Iteration yields [key, value] pairs
-for (entry in m) {
-    IO.println("${entry[0]} = ${entry[1]}")
-}
-
-// Or drive the iterator manually
-var iter = m.iter()
-while (iter.has_next()) {
-    IO.println(iter.next())  // [key, value]
+// Iteration: `for (entry in m)` SEGFAULTS (BUGS #62). Walk keys()/values()
+// together by index — they are consistently ordered.
+var ks: List<String> = m.keys()
+var vs: List<Int> = m.values()
+for (i = 0; i < ks.length(); i = i + 1) {
+    IO.println("${ks[i]} = ${vs[i]}")
 }
 ```
+
+`m.get(k)` returns `Int|Nil`, and `is` is broken on union types: `v is Int` and
+`v is Nil` both evaluate false, so those branches are silently dead (BUGS #69).
+Use `v != nil`, the one guard that both narrows and evaluates correctly.
 
 ### Lists
 
