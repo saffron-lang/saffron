@@ -7,6 +7,7 @@ import "os" as OS
 import "./lexer.sf" as Lexer
 import "./parser.sf" as Parser
 import "./checker.sf" as Checker
+import "./resolve.sf" as Resolve
 import "./_codegen.sf" as Codegen
 
 @extern("void exit(i32)")
@@ -631,12 +632,19 @@ fun main(): Int {
     var identity_mode: Bool = false
     var use_llvm_lib: Bool = true
     var emit_llvm_lib: Bool = false
+    // Stage 2 of docs/design/compiler-rewrite.md. On by default; --no-resolve
+    // turns it off so a suspected regression can be attributed to the pass
+    // itself rather than to whatever else changed.
+    var run_resolve: Bool = true
     var lib_path_args: List<String> = []
     var i: Float = 0
     while (i < args.length()) {
         var arg: String = args[i]
         if (arg == "--no-check") {
             run_checker = false
+        }
+        if (arg == "--no-resolve") {
+            run_resolve = false
         }
         if (arg == "--check") {
             run_checker = true
@@ -858,6 +866,45 @@ fun main(): Int {
                     module_stmts.push(dep_program)
                     module_prefixes_list.push(dep_prefix)
                     visited.set(pkg_prelude, true)
+
+                    // A dependency prelude is a normal module: it may import
+                    // other modules of its own package. Register its aliases
+                    // and pull in what it imports, exactly as collect_modules
+                    // does for an ordinary import. Without this, an alias used
+                    // in the prelude is an undefined variable at codegen, which
+                    // is why turmeric's prelude hand-wrote mangled symbols
+                    // (turmeric_signal_effect) instead of importing signal.sf.
+                    var dp_aliases: Map<String, String> = extract_import_aliases(dep_src)
+                    var dp_keys: List<String> = dp_aliases.keys()
+                    var dpi: Float = 0
+                    while (dpi < dp_keys.length()) {
+                        var dp_alias: String = dp_keys[dpi]
+                        var dp_path: String = dp_aliases.get(dp_alias)
+                        if (!is_builtin_module(dp_path)) {
+                            var dp_full: String = resolve_import_path(pkg_prelude, dp_path, stdlib_dir)
+                            if (!path_to_prefix.has(dp_full)) {
+                                path_to_prefix.set(dp_full, path_based_prefix(dp_path, dp_full, stdlib_dir))
+                            }
+                            if (!resolved_aliases.has(dp_alias)) {
+                                resolved_aliases.set(dp_alias, path_to_prefix.get(dp_full))
+                            }
+                        }
+                        dpi = dpi + 1
+                    }
+
+                    var dp_imports: List<String> = extract_imports(dep_src)
+                    var dpj: Float = 0
+                    while (dpj < dp_imports.length()) {
+                        var dp_imp: String = dp_imports[dpj]
+                        if (!is_builtin_module(dp_imp)) {
+                            var dp_imp_full: String = resolve_import_path(pkg_prelude, dp_imp, stdlib_dir)
+                            if (!path_to_prefix.has(dp_imp_full)) {
+                                path_to_prefix.set(dp_imp_full, path_based_prefix(dp_imp, dp_imp_full, stdlib_dir))
+                            }
+                            collect_modules(dp_imp_full, stdlib_dir, visited, module_stmts, module_prefixes_list, resolved_aliases, path_to_prefix)
+                        }
+                        dpj = dpj + 1
+                    }
                 }
             }
             di = di + 1
@@ -986,6 +1033,22 @@ fun main(): Int {
             named_imports.set(pe_key, package_exports.get(pe_key))
         }
         peki = peki + 1
+    }
+
+    // Resolve pass — every Variable(name) becomes a Ref(kind, name, slot), so
+    // the checker and codegen read what a name denotes instead of re-deriving
+    // it from side tables at each of a dozen sites (invariant I4 of
+    // docs/design/compiler-rewrite.md; the re-derivation is BUGS #40).
+    // Runs before the checker so both later passes see the same resolution.
+    // Imported modules go through the same resolver as the main program: #40's
+    // repro shadows math.sf's `sqrt(x)` parameter with a main-program global
+    // `x`, so the two must be resolved together or the shadowing is missed.
+    if (run_resolve) {
+        var resolver: Resolve.Resolver = Resolve.new_resolver()
+        if (all_import_stmts.length() > 0) {
+            all_import_stmts = Resolve.resolve_imports(resolver, all_import_stmts, module_boundaries, prefixes_joined)
+        }
+        program = Resolve.resolve_main(resolver, program)
     }
 
     // Run type checker (blocking by default)

@@ -66,6 +66,35 @@ class Parser {
         }
     }
 
+    // Can the current token begin a map-literal key?
+    //
+    // Numeric keys used to be missing here, so `{1: "one"}` was not recognised
+    // as a map literal at all. It fell through to the block-expression path,
+    // where `1:` was discarded and the block's value became "one" — so the
+    // variable silently held a *string*, and calling a Map method on it
+    // segfaulted. Map<Int, V> literals were simply unconstructible.
+    fun is_map_key_start(): Bool {
+        if (this.match_kind_check("string")) { return true }
+        if (this.match_kind_check("ident")) { return true }
+        if (this.match_kind_check("int")) { return true }
+        if (this.match_kind_check("float")) { return true }
+        return false
+    }
+
+    // Parse one key of a map literal: {"a": 1} or {a: 1}.
+    //
+    // An ident key is shorthand for the string of the same name, so it must
+    // become a StringLit here. Routing it through parse_primary() instead made
+    // `{a: 1}` compile the key as a *variable reference* — which emitted
+    // `call i64 @a()` and failed to link, or silently read an unrelated
+    // in-scope `a`. Both desugaring sites call this.
+    fun parse_map_key(): AST.Expr {
+        if (this.match_kind_check("ident")) {
+            return AST.Expr.StringLit(this.expect_ident())
+        }
+        return this.parse_primary()
+    }
+
     fun match_kind(expected: String): Bool {
         if (this.match_kind_check(expected)) {
             this.advance()
@@ -146,11 +175,31 @@ class Parser {
 
     fun parse_type(): String {
         var name: String = this.parse_single_type()
-        // Nullable shorthand: String? is preserved as-is (not desugared to String|Nil)
-        // The codegen/checker interprets ? suffix as nullable when needed.
+        // Nullable shorthand: desugar `T?` to `T|Nil` right here, so that the
+        // nullable has exactly ONE representation downstream.
+        //
+        // This used to claim the `?` was "preserved as-is" for the checker and
+        // codegen to interpret — but parse_type never consumed the token at all,
+        // so a `?` was left for whatever came next to trip over. In a return
+        // annotation that desynchronized the parser and the function's own
+        // parameters came out undefined at codegen (BUGS #72); in a var
+        // annotation it surfaced as "expected '=' but found '?'". And the claim
+        // was only ever half true: the checker had two ends_with("?") special
+        // cases, codegen had none, and parse_type_ast would have turned `Int?`
+        // into ClassType("Int?").
+        //
+        // Desugaring at the parser means every consumer sees the union form it
+        // already handles, rather than each one needing its own `?` case.
+        if (this.match_kind("?")) {
+            name = name + "|Nil"
+        }
         // Union types: String | Nil, Int | String | Nil
         while (this.match_kind("|")) {
             var next: String = this.parse_single_type()
+            // `T?|U` and a trailing `?` on a union member both mean nullable.
+            if (this.match_kind("?")) {
+                next = next + "|Nil"
+            }
             name = name + "|" + next
         }
         return name
@@ -642,18 +691,18 @@ class Parser {
                 }
             }
             // Check for map literal: { "key": value, ... } or { ident: value, ... }
-            if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
+            if (this.is_map_key_start() and this.peek_is(":")) {
                 // Parse as map literal — desugar to BlockExpr that builds the map
                 var map_stmts: List<AST.Stmt> = []
                 map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
                 // First entry
-                var key: AST.Expr = this.parse_primary()
+                var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
                 map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
-                    var k: AST.Expr = this.parse_primary()
+                    var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
                     map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
@@ -1426,6 +1475,26 @@ class Parser {
             return this.parse_tuple_destructure()
         }
         var name: String = this.expect_ident()
+        // Qualified variant pattern: `let Shape.Circle(r) = ...`. Unqualified
+        // `let Circle(r) = ...` already worked, but writing the enum name — the
+        // natural thing to do, and how the value itself is constructed — was a
+        // parse error ("expected '=' but found '.'"). Only the variant name is
+        // kept: patterns resolve by variant, and gen_match /
+        // find_enum_for_variant recover the enum from it.
+        // A loop, not a single step, so a module-qualified enum
+        // (`let Shapes.Shape.Circle(r) = ...`) also parses.
+        var was_qualified: Bool = false
+        while (this.match_kind_check(".")) {
+            this.advance()
+            name = this.expect_ident()
+            was_qualified = true
+        }
+        // A dotted name is only meaningful as a variant pattern. Anything else
+        // (`var x.y = 5`) is malformed, and saying so beats silently declaring
+        // `y`.
+        if (was_qualified and !this.match_kind_check("(")) {
+            this.parse_error("qualified name is only valid in a destructuring pattern, e.g. let Shape.Circle(r) = ...")
+        }
         // Variant pattern: let Some(x) = expr
         if (this.match_kind_check("(")) {
             this.advance()
@@ -2033,8 +2102,14 @@ class Parser {
         if (this.match_kind_check("var")) {
             this.advance() // consume var
             var name: String = this.expect_ident()
-            this.consume(":")
-            var vtype: String = this.parse_type()
+            // The annotation is optional: `for (var i = 0; ...)` infers from the
+            // initializer, like every other binding form. "Any" is the inference
+            // sentinel parse_var_decl_with_doc uses (parser.sf:1493) — the
+            // checker's VarDecl arm reads it as "infer from the initializer".
+            var vtype: String = "Any"
+            if (this.match_kind(":")) {
+                vtype = this.parse_type()
+            }
             this.consume("=")
             var init_expr: AST.Expr = this.parse_expr()
             var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
@@ -2100,8 +2175,11 @@ class Parser {
             return this.parse_for_in(name)
         }
         // C-style for without var keyword: for (i: Float = 0; i < 10; i = i + 1)
-        this.consume(":")
-        var vtype: String = this.parse_type()
+        // The annotation is optional here too, so `for (i = 0; ...)` infers.
+        var vtype: String = "Any"
+        if (this.match_kind(":")) {
+            vtype = this.parse_type()
+        }
         this.consume("=")
         var init_expr: AST.Expr = this.parse_expr()
         var init: AST.Stmt = AST.Stmt.VarDecl(name, vtype, init_expr, "")
@@ -2465,17 +2543,17 @@ class Parser {
                 }
             }
             // Check for map literal: {"key": val, ...} or {ident: val, ...}
-            if ((this.match_kind_check("string") or this.match_kind_check("ident")) and this.peek_is(":")) {
+            if (this.is_map_key_start() and this.peek_is(":")) {
                 var map_stmts: List<AST.Stmt> = []
                 map_stmts.push(AST.Stmt.VarDecl("__map", "Map", AST.Expr.MapLit, ""))
                 // First entry
-                var key: AST.Expr = this.parse_primary()
+                var key: AST.Expr = this.parse_map_key()
                 this.consume(":")
                 var value: AST.Expr = this.parse_expr()
                 map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [key, value])))
                 while (this.match_kind(",")) {
                     if (this.match_kind_check("}")) { break }
-                    var k: AST.Expr = this.parse_primary()
+                    var k: AST.Expr = this.parse_map_key()
                     this.consume(":")
                     var v: AST.Expr = this.parse_expr()
                     map_stmts.push(AST.Stmt.ExprStmt(AST.Expr.MethodCall(AST.Expr.Variable("__map"), "set", [k, v])))
