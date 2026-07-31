@@ -901,6 +901,47 @@ entry:
   ret i64 %type_id
 }
 
+; __val_class_tag: the per-class GC type tag of a value, or 0 if it has none.
+; Class tags start at 10, so 0 is an unambiguous "not a class instance".
+;
+; See the base_nanbox.ll copy for the reasoning; both accept an instance in
+; either representation (a constructor returns a bare untagged pointer, a value
+; that has been through a collection carries TAG_PTR) and both guard the magic
+; load, since this is called on Any-typed values that may be boxed Ints.
+;
+; The 4 GB lower bound is deliberately NOT applied here: wasm32 linear memory
+; starts near zero, so it would reject every real pointer. Alignment plus the
+; magic sentinel carry the check, and a stray load cannot fault outside the
+; sandbox — the worst case is reading a wrong tag, not a crash.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
+  %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
+  %ptr_like = or i1 %is_tagged, %is_raw
+  br i1 %ptr_like, label %check_align, label %not_a_class
+check_align:
+  %ptr_int = and i64 %v, 281474976710655       ; mask off any tag
+  %align_bits = and i64 %ptr_int, 7
+  %aligned = icmp eq i64 %align_bits, 0
+  br i1 %aligned, label %check_low, label %not_a_class
+check_low:
+  ; The header is 16 bytes, so a real user pointer is at least 16.
+  %too_low = icmp ult i64 %ptr_int, 16
+  br i1 %too_low, label %not_a_class, label %check_gc
+check_gc:
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %not_a_class
+read_tag:
+  %tag = call i64 @__gc_get_type_tag(i64 %ptr_int)
+  ret i64 %tag
+not_a_class:
+  ret i64 0
+}
+
 ; =============================================================================
 ; to_string Helpers
 ; =============================================================================

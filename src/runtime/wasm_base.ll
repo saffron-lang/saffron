@@ -698,6 +698,17 @@ entry:
   ret i1 false
 }
 
+; __val_class_tag: 0 means "no per-class tag available", and on wasm64 that is
+; always the truth: this base's __gc_alloc is a bare malloc that *discards*
+; %type_tag, so there is no header to read it back from. Returning 0 makes
+; __class_is_a answer false rather than loading garbage; `x is SomeClass` is
+; therefore still unanswerable on wasm64 until this base grows real headers, the
+; way wasm_base_32.ll already has.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  ret i64 0
+}
+
 ; =============================================================================
 ; to_string Helpers
 ; =============================================================================

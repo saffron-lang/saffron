@@ -80,6 +80,13 @@ class Codegen {
     var gc_root_count: Float
     var class_type_ids: Map<String, Float>
     var next_class_type_id: Float
+    // Parent of each class that has one. gen_class_decl_with_parent is *handed*
+    // the parent name and used to discard it after inheriting fields and
+    // methods, which made the hierarchy look unavailable to codegen (it is not
+    // — only checker.sf recorded it). Writing it down here is what lets
+    // __class_is_a answer `d is Animal` for a Dog, which no amount of
+    // compile-time folding can (BUGS #61, #50).
+    var class_parent_of: Map<String, String>
     var llvm_module: LLVMMod.Module
     var llvm_func_builder: LLVMFunc.FunctionBuilder
     var llvm_block_builder: LLVMBlock.BlockBuilder
@@ -148,6 +155,7 @@ class Codegen {
         this.gc_root_count = 0
         this.class_type_ids = {}
         this.next_class_type_id = 10
+        this.class_parent_of = {}
         this.actor_classes = {}
         this.force_next_lambda_coro = false
         this.check_spawn_sendable = false
@@ -1627,10 +1635,17 @@ class Codegen {
                 this.emit_indent(raw_bool + " = zext i1 " + check_result + " to i64")
                 return this.emit_tag_bool(raw_bool)
             }
-            // A class or enum name: there is no runtime class tag to test
-            // against (values carry only a NaN-box tag), so this still answers
-            // false. Warn rather than answering silently — a dead `is` branch
-            // is invisible at runtime and this is the one case left.
+            // A class name: dispatch on the object's actual GC type tag. This
+            // used to emit a literal 0 plus a warning, because codegen was
+            // believed to have no runtime model of the hierarchy; it now emits
+            // one (see emit_class_hierarchy_helpers). __class_is_a walks the
+            // parent chain, so `d is Animal` for a Dog answers true — something
+            // the old path could not express at all, warning or not.
+            var cls_check: String = this.gen_class_tag_check(val, type_name)
+            if (cls_check.length() > 0) { return cls_check }
+            // Not a known class (an enum name, a generic parameter, an
+            // interface with no instances): still undecidable. Warn rather than
+            // answering silently — a dead `is` branch is invisible at runtime.
             IO.println("[codegen] Warning: `is " + type_name + "` on a value of type " + val_type_str + " always answers false — class identity is not checked at runtime")
             var local: String = this.fresh_local()
             this.emit_indent(local + " = add i64 0, 0")
@@ -1652,11 +1667,55 @@ class Codegen {
         } else if (type_name == "Map") {
             if (this.is_map_type(val_type)) { matches = "1" }
         } else {
+            // A class name. Folding via is_class_type is only correct when the
+            // static type is *exactly* type_name and cannot be a subclass —
+            // is_class_type answers `n == name`, so it says false for a Dog
+            // tested against Animal and for anything the checker could not
+            // infer precisely. That was the other half of BUGS #61, and a fix
+            // confined to the undecidable branch above would have looked
+            // complete while leaving it. Emit the runtime check and let LLVM
+            // fold the cases it can prove.
+            var cls_check2: String = this.gen_class_tag_check(val, type_name)
+            if (cls_check2.length() > 0) { return cls_check2 }
             if (this.is_class_type(val_type, type_name)) { matches = "1" }
         }
         var local: String = this.fresh_local()
         this.emit_indent(local + " = add i64 0, " + matches)
         return this.emit_tag_bool(local)
+    }
+
+    // Emit `__class_is_a(__val_class_tag(val), <tag of type_name>)` as a tagged
+    // Saffron Bool, or "" when type_name is not a class this program declares —
+    // an enum name, a generic parameter, an interface with no instances. The
+    // empty string is the "I don't know" the callers need: gen_is_check falls
+    // back rather than emitting a check against a tag that does not exist.
+    // Returning a plausible `false` instead is the exact shape of failure that
+    // made BUGS #61, #69 and #22 all silent.
+    fun gen_class_tag_check(val: String, type_name: String): String {
+        var hit: String = this.gen_class_tag_check_i1(val, type_name)
+        if (hit.length() == 0) { return "" }
+        var raw: String = this.fresh_local()
+        this.emit_indent(raw + " = zext i1 " + hit + " to i64")
+        return this.emit_tag_bool(raw)
+    }
+
+    // The raw i1 behind gen_class_tag_check, for callers that want to branch on
+    // it rather than produce a value — gen_match's class-pattern chain does,
+    // and re-truncating a freshly tagged Bool just to test it would be silly.
+    // Same "" contract: not a class this program declares.
+    fun gen_class_tag_check_i1(val: String, type_name: String): String {
+        // Identity mode has no GC headers and no hierarchy helpers, so there is
+        // no tag to read; the caller keeps its compile-time answer.
+        if (this.identity_mode) { return "" }
+        var struct_name: String = type_name
+        if (this.class_struct_names.has(type_name)) { struct_name = this.class_struct_names.get(type_name) }
+        if (!this.class_type_ids.has(struct_name)) { return "" }
+        var target: Float = this.class_type_ids.get(struct_name)
+        var tag_reg: String = this.fresh_local()
+        this.emit_indent(tag_reg + " = call i64 @__val_class_tag(i64 " + val + ")")
+        var hit: String = this.fresh_local()
+        this.emit_indent(hit + " = call i1 @__class_is_a(i64 " + tag_reg + ", i64 " + target.floor().to_string() + ")")
+        return hit
     }
 
     fun gen_if_expr(cond: AST.Expr, then_stmts: List<AST.Stmt>, then_val: AST.Expr, else_stmts: List<AST.Stmt>, else_val: AST.Expr): String {
@@ -4270,44 +4329,77 @@ class Codegen {
             }
             // `match (x) { is Dog(d) => ..., is Cat(c) => ... }` — class
             // patterns, not enum variants. There is no payload to index into:
-            // the binding IS the subject. The arm is picked at compile time
-            // from the subject's static type, since that is all the checker
-            // knows; the binding must also be registered in typed_vars or
-            // `d.bark()` cannot resolve, and since BUGS #37 an unresolved
-            // Variable is a hard error rather than a silent bad load.
+            // the binding IS the subject.
+            //
+            // This used to pick ONE arm at compile time by comparing each arm's
+            // name against the subject's static type, because codegen had no
+            // runtime class identity. With an `Any` subject — the only shape
+            // where a class match is useful — no name matched, so every arm fell
+            // through to `_` (measured behaviour in BUGS #61: not "the first arm
+            // wins", but "all of them lose"). It now emits an if/else chain of
+            // __class_is_a tests, the same shape as the string-literal match
+            // above, so the arm is chosen by the object's actual class.
+            //
+            // Bindings still have to be registered in typed_vars or `d.bark()`
+            // cannot resolve, and since BUGS #37 an unresolved Variable is a
+            // hard error rather than a silent bad load.
             if (this.class_fields.has(first_variant)) {
-                var chosen: Float = -1
+                var cls_end: String = this.fresh_label("match.end")
+                var cls_type: AST.Type = AST.Type.AnyType
+                var cls_wild: Float = -1
                 var ci: Float = 0
                 while (ci < arms.length()) {
                     var cpat: AST.Pattern = this.get_arm_pattern(arms[ci])
                     var cname: String = match (cpat) { VariantPattern(v, b) => v
                         _ => ""
                     }
-                    if (chosen < 0) {
-                        // A wildcard arm is the fallback; a name equal to the
-                        // subject's static type wins outright.
-                        if (cname == subj_type) {
-                            chosen = ci
-                        } else if (cname == "_") {
-                            chosen = ci
+                    var cbinds: List<String> = this.get_pattern_bindings(cpat)
+                    var cbody: AST.Expr = this.get_arm_body(arms[ci])
+                    if (cname == "_") {
+                        // Emit the wildcard last, after every test has failed —
+                        // its position in the source does not make it a guard.
+                        cls_wild = ci
+                    } else {
+                        var ctest: String = this.gen_class_tag_check_i1(subj, cname)
+                        if (ctest.length() == 0) {
+                            // Not a class we can test for. Skipping the arm
+                            // silently is what made #61 invisible, so say so.
+                            IO.println("[codegen] Warning: match arm `is " + cname + "` cannot be tested at runtime and is skipped")
+                        } else {
+                            var cthen: String = this.fresh_label("match.arm")
+                            var cnext: String = this.fresh_label("match.next")
+                            this.emit_terminator("br i1 " + ctest + ", label %" + cthen + ", label %" + cnext)
+                            this.start_block(cthen)
+                            if (cbinds.length() >= 1) {
+                                this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cbinds[0]))
+                                this.typed_vars.set(cbinds[0], this.str_to_type(cname))
+                            }
+                            var cval: String = this.gen_arg_value(cbody)
+                            if (ci == 0) { cls_type = this.last_type }
+                            this.emit_indent("store i64 " + cval + ", i64* " + result_ptr)
+                            this.emit_terminator("br label %" + cls_end)
+                            this.start_block(cnext)
                         }
                     }
                     ci = ci + 1
                 }
-                if (chosen < 0) { chosen = 0 }
-                var cls_pat: AST.Pattern = this.get_arm_pattern(arms[chosen.floor()])
-                var cls_binds: List<String> = this.get_pattern_bindings(cls_pat)
-                var cls_name: String = match (cls_pat) { VariantPattern(v, b) => v
-                    _ => ""
+                if (cls_wild >= 0) {
+                    var wpat: AST.Pattern = this.get_arm_pattern(arms[cls_wild.floor()])
+                    var wbinds: List<String> = this.get_pattern_bindings(wpat)
+                    if (wbinds.length() >= 1) {
+                        this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(wbinds[0]))
+                    }
+                    var wval: String = this.gen_arg_value(this.get_arm_body(arms[cls_wild.floor()]))
+                    if (cls_wild == 0) { cls_type = this.last_type }
+                    this.emit_indent("store i64 " + wval + ", i64* " + result_ptr)
+                } else {
+                    // No wildcard and nothing matched. Storing nil keeps this an
+                    // indeterminate value rather than a fault — the same gap as
+                    // the string match above and BUGS #37's general case.
+                    this.emit_indent("store i64 0, i64* " + result_ptr)
                 }
-                if (cls_binds.length() >= 1) {
-                    this.emit_indent("store i64 " + subj + ", i64* %" + this.sanitize_name(cls_binds[0]))
-                    this.typed_vars.set(cls_binds[0], this.str_to_type(cls_name))
-                }
-                var cls_body: AST.Expr = this.get_arm_body(arms[chosen.floor()])
-                var cls_val: String = this.gen_arg_value(cls_body)
-                var cls_type: AST.Type = this.last_type
-                this.emit_indent("store i64 " + cls_val + ", i64* " + result_ptr)
+                this.emit_terminator("br label %" + cls_end)
+                this.start_block(cls_end)
                 var cls_result: String = this.fresh_local()
                 this.emit_indent(cls_result + " = load i64, i64* " + result_ptr)
                 this.last_type = cls_type
@@ -5787,6 +5879,20 @@ class Codegen {
         this.current_parent = parent
         this.gen_class_decl(name, all_fields, methods)
         this.current_parent = ""
+        // Record the hierarchy, keyed the same way class_type_ids is (by struct
+        // name, i.e. module-prefixed) so __class_is_a can join the two tables.
+        // The parent was always available here — it drove field and method
+        // inheritance above and was then dropped, which is why `is` on a class
+        // could never see a subclass relation (BUGS #61) and dispatch had no
+        // hierarchy to switch on (BUGS #50). class_struct_names resolves the
+        // parent's own prefix, so a base class in another module still joins.
+        if (parent.length() > 0) {
+            var child_struct: String = name
+            if (this.class_struct_names.has(name)) { child_struct = this.class_struct_names.get(name) }
+            var parent_struct: String = parent
+            if (this.class_struct_names.has(parent)) { parent_struct = this.class_struct_names.get(parent) }
+            this.class_parent_of.set(child_struct, parent_struct)
+        }
         // Register inherited methods: if child doesn't define a method, map it to parent's
         if (parent.length() > 0 and this.class_methods.has(parent)) {
             var parent_methods: List = this.class_methods.get(parent)
@@ -6877,6 +6983,92 @@ class Codegen {
         this.start_block(end_label)
     }
 
+    // Emit the two helpers that give the class hierarchy a runtime existence:
+    // __class_parent_tag (one switch arm per class that has a parent) and
+    // __class_is_a (walk the chain, comparing against a target tag).
+    //
+    // Emitted for *every* target and both modes, unlike emit_reflect_helpers
+    // which is skipped in identity mode. gen_is_check calls __class_is_a
+    // unconditionally, so skipping the definition here would leave an undefined
+    // symbol whenever the compiler compiles itself.
+    //
+    // A flattened tag -> ancestor-set table would be O(1) instead of O(depth);
+    // the walk is emitted because hierarchies are shallow and this is far easier
+    // to read in the IR when something goes wrong.
+    fun emit_class_hierarchy_helpers() {
+        var child_names: List<String> = this.class_parent_of.keys()
+        this.emit("")
+        this.emit("define i64 @__class_parent_tag(i64 %tag) {")
+        this.emit("entry:")
+        this.block_terminated = false
+        var arms: String = ""
+        var arm_lbls: List<String> = []
+        var arm_parents: List<String> = []
+        var hi: Float = 0
+        while (hi < child_names.length()) {
+            var child: String = child_names[hi]
+            var par: String = this.class_parent_of.get(child)
+            // An interface or a base declared but never constructed has no type
+            // id, so there is no tag to walk to; skip rather than emit an arm
+            // pointing at 0, which __class_is_a reads as "chain ended".
+            if (this.class_type_ids.has(child) and this.class_type_ids.has(par)) {
+                var ctag: Float = this.class_type_ids.get(child)
+                var ptag: Float = this.class_type_ids.get(par)
+                var lbl: String = this.fresh_label("cpt.a")
+                arm_lbls.push(lbl)
+                arm_parents.push(ptag.floor().to_string())
+                arms = arms + " i64 " + ctag.floor().to_string() + ", label %" + lbl
+            }
+            hi = hi + 1
+        }
+        if (arm_lbls.length() == 0) {
+            this.emit_terminator("ret i64 0")
+            this.emit("}")
+            this.block_terminated = false
+        } else {
+            this.emit_indent("switch i64 %tag, label %cpt.none [" + arms + " ]")
+            this.block_terminated = true
+            var ai: Float = 0
+            while (ai < arm_lbls.length()) {
+                this.start_block(arm_lbls[ai])
+                this.emit_terminator("ret i64 " + arm_parents[ai])
+                ai = ai + 1
+            }
+            this.start_block("cpt.none")
+            this.emit_terminator("ret i64 0")
+            this.emit("}")
+            this.block_terminated = false
+        }
+
+        // __class_is_a(tag, target): does `tag` name `target` or a descendant of
+        // it? The zero test comes before the equality test so a target of 0 (a
+        // non-class value, whose __gc_get_type_tag is 0) answers false rather
+        // than matching the end-of-chain sentinel.
+        this.emit("")
+        this.emit("define i1 @__class_is_a(i64 %tag, i64 %target) {")
+        this.emit("entry:")
+        this.emit("  %cur = alloca i64")
+        this.emit("  store i64 %tag, i64* %cur")
+        this.emit("  br label %cia.loop")
+        this.emit("cia.loop:")
+        this.emit("  %c = load i64, i64* %cur")
+        this.emit("  %z = icmp eq i64 %c, 0")
+        this.emit("  br i1 %z, label %cia.no, label %cia.test")
+        this.emit("cia.test:")
+        this.emit("  %hit = icmp eq i64 %c, %target")
+        this.emit("  br i1 %hit, label %cia.yes, label %cia.step")
+        this.emit("cia.step:")
+        this.emit("  %p = call i64 @__class_parent_tag(i64 %c)")
+        this.emit("  store i64 %p, i64* %cur")
+        this.emit("  br label %cia.loop")
+        this.emit("cia.yes:")
+        this.emit("  ret i1 1")
+        this.emit("cia.no:")
+        this.emit("  ret i1 0")
+        this.emit("}")
+        this.block_terminated = false
+    }
+
     fun emit_reflect_helpers() {
         var class_names: List<String> = this.class_type_ids.keys()
         if (class_names.length() == 0) { return }
@@ -7094,6 +7286,10 @@ class Codegen {
         rt.append("declare i1 @__val_is_nil(i64)\n")
         rt.append("declare i1 @__val_is_list(i64)\n")
         rt.append("declare i1 @__val_is_map(i64)\n")
+        // Per-class GC tag of a value, 0 if it has none. __class_is_a is *defined*
+        // in the emitted module (it switches over this program's classes), so it
+        // needs no declare; this one lives in the runtime base.
+        rt.append("declare i64 @__val_class_tag(i64)\n")
         // GC runtime declarations
         rt.append("\n; --- GC runtime ---\n")
         rt.append("declare void @__gc_enable()\n")
@@ -9070,6 +9266,28 @@ class Codegen {
                     if (this.current_prefix.length() > 0) {
                         pr_type_name = this.current_prefix + pr_cname
                     }
+                    // Assign the type tag and record the parent here, not only in
+                    // gen_class_constructor / gen_class_decl_with_parent. Bodies
+                    // are lowered in the pass below, in source order, so `x is Dog`
+                    // inside a function declared above `class Dog` would otherwise
+                    // find no tag and fall back to the always-false warning —
+                    // exactly the ordering hazard that produced BUGS #33/#36/#37.
+                    // Both writes are idempotent with the lowering-time ones: same
+                    // key, same value.
+                    if (!this.class_type_ids.has(pr_type_name)) {
+                        this.class_type_ids.set(pr_type_name, this.next_class_type_id)
+                        this.next_class_type_id = this.next_class_type_id + 1
+                    }
+                    if (pr_parent.length() > 0) {
+                        // The parent's own struct name is known if it was already
+                        // lowered (an imported base class); otherwise it is in this
+                        // module and carries this module's prefix.
+                        var pr_pstruct: String = this.current_prefix + pr_parent
+                        if (this.class_struct_names.has(pr_parent)) {
+                            pr_pstruct = this.class_struct_names.get(pr_parent)
+                        }
+                        this.class_parent_of.set(pr_type_name, pr_pstruct)
+                    }
                     if (!this.str_in_list(this.known_functions,pr_type_name)) {
                         this.known_functions.push(pr_type_name)
                     }
@@ -9151,6 +9369,13 @@ class Codegen {
         // Emit reflect helper functions (only in non-identity mode)
         if (!this.identity_mode) {
             this.emit_reflect_helpers()
+            // Same guard, same reason: identity mode allocates instances with
+            // __sf_malloc and no GC header, so there is no tag to read and
+            // __gc_get_type_tag is not even linked. gen_is_check keeps the
+            // compile-time fold there. Consequence worth naming: the bootstrap
+            // never exercises the runtime path, so this must be tested with a
+            // user program compiled by gen3, not by ./bootstrap.sh passing.
+            this.emit_class_hierarchy_helpers()
         }
 
         // Second pass: wrap top-level statements in __saffron_entry

@@ -23,6 +23,10 @@
         rt.append("declare i1 @__val_is_nil(i64)\n")
         rt.append("declare i1 @__val_is_list(i64)\n")
         rt.append("declare i1 @__val_is_map(i64)\n")
+        // Per-class GC tag of a value, 0 if it has none. __class_is_a is *defined*
+        // in the emitted module (it switches over this program's classes), so it
+        // needs no declare; this one lives in the runtime base.
+        rt.append("declare i64 @__val_class_tag(i64)\n")
         // GC runtime declarations
         rt.append("\n; --- GC runtime ---\n")
         rt.append("declare void @__gc_enable()\n")

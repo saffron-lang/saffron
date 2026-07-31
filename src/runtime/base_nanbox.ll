@@ -443,6 +443,55 @@ is_string:
   ret i64 1
 }
 
+; __val_class_tag: the per-class GC type tag of a value, or 0 if it does not
+; have one. Class tags start at 10, so 0 is an unambiguous "not a class
+; instance" and every caller can treat it as "I don't know" rather than
+; guessing a plausible answer.
+;
+; Accepts a class instance in *either* representation. Codegen's class
+; constructors return a bare `ptrtoint` — an untagged pointer, upper 16 bits
+; zero — while a value that has been through a Map, a list, or an interpolation
+; carries TAG_PTR. Only accepting TAG_PTR made every `is` on a freshly
+; constructed object answer false, which is indistinguishable from the bug this
+; helper exists to fix. __rt_tag_ptr in runtime.sf treats upper == 0 the same
+; way, for the same reason.
+;
+; The guards before the magic load are the ones __gc_is_heap_ptr uses, and they
+; are not optional: this is called on values of static type Any, so %v may be a
+; boxed Int or a small enum tag, and loading ptr-8 off one of those is a wild
+; read. Reject NUL, misalignment, and anything below 4 GB (all Darwin heap
+; allocations are above it), then the magic sentinel decides.
+;
+; Codegen calls this rather than reading the header itself, so the header layout
+; stays a runtime detail — the four IR bases do not agree on it.
+define i64 @__val_class_tag(i64 %v) {
+entry:
+  %upper = lshr i64 %v, 48
+  %is_tagged = icmp eq i64 %upper, 32760       ; TAG_PTR
+  %is_raw = icmp eq i64 %upper, 0              ; untagged pointer from a ctor
+  %ptr_like = or i1 %is_tagged, %is_raw
+  br i1 %ptr_like, label %check_align, label %not_a_class
+check_align:
+  %ptr_int = and i64 %v, 281474976710655       ; mask off any tag
+  %align_bits = and i64 %ptr_int, 7
+  %aligned = icmp eq i64 %align_bits, 0
+  br i1 %aligned, label %check_bounds, label %not_a_class
+check_bounds:
+  %too_low = icmp ult i64 %ptr_int, 4294967296 ; 4 GB
+  br i1 %too_low, label %not_a_class, label %check_gc
+check_gc:
+  %magic_addr = sub i64 %ptr_int, 8
+  %magic_ptr = inttoptr i64 %magic_addr to i64*
+  %magic = load i64, i64* %magic_ptr
+  %has_gc = icmp eq i64 %magic, 6557403441622859503
+  br i1 %has_gc, label %read_tag, label %not_a_class
+read_tag:
+  %tag = call i64 @__gc_get_type_tag(i64 %ptr_int)
+  ret i64 %tag
+not_a_class:
+  ret i64 0
+}
+
 define i1 @__val_is_string(i64 %v) {
 entry:
   %upper = lshr i64 %v, 48
