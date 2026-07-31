@@ -47,7 +47,7 @@ is being passed to, which `Fun` cannot express (#56, same root). Until then a bl
 parameter is only safe when the body does not touch a field. Workaround: use an
 annotated `fun (x: T): R =>` lambda.
 
-### 85. `__io_file_size` and `__io_read_binary` are missing from the known-function tables, so calling them from a stdlib module emits a bad symbol
+### 85. FIXED — `__io_file_size` and `__io_read_binary` were missing from the known-function tables, so calling them from a stdlib module emitted a bad symbol
 
 ```
 [codegen] Warning: calling undefined function '__io_file_size'
@@ -67,6 +67,21 @@ truncates at the first NUL (#66). So the two functions that route around the
 binary-data problem are the two that cannot be called normally.
 
 **Fix:** add both names to the known-function list. One line, no risk.
+
+**Resolution (2026-07-31).** Slightly more than one line, because
+`known_functions` membership *also* suppresses the auto-generated `declare`
+(`output_body.sf:1114`). So both names were added to every `known_functions`
+block (`codegen.sf` ×3, `output_body.sf`) to stop the module-prefix mangling,
+*and* to the `runtime_declares()` name/sig tables (`utils_body.sf:5-6`,
+`i64 @__io_file_size(i64)` / `i64 @__io_read_binary(i64, i64, i64)`) to restore
+the `declare`. Verified: `IO.file_size` returns the correct byte count
+(`size=11` for `"hello world"`); zero test regressions.
+
+The diagnosis also surfaced, out of scope here: `IO.is_dir` / `IO.rename` /
+`IO.delete_file` (`test/stdlib_io.sf`) have no runtime *or* stdlib
+implementation at all and reach the linker with no warning, because the
+namespace-dispatch path (`methods_body.sf:990-1008`) has no `known_functions`
+guard. That missing guard is why this whole class went undetected.
 
 ### 84. A `void*`-returning `@extern` has its result pointer-tagged, so a NULL check is unconditionally false — `IO.open` does not throw on a missing file
 

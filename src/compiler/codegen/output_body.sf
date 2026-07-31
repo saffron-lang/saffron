@@ -591,6 +591,10 @@
         this.known_functions.push("__io_mkdir")
         this.known_functions.push("__io_walk_dir")
         this.known_functions.push("__io_append_file")
+        // See codegen.sf: these two are runtime-defined but absent from the
+        // known-function set, so the bare-call path mangled them (BUGS #85).
+        this.known_functions.push("__io_file_size")
+        this.known_functions.push("__io_read_binary")
         this.known_functions.push("__os_exec")
         this.known_functions.push("__os_args")
         this.known_functions.push("__os_cwd")

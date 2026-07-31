@@ -7265,8 +7265,8 @@ class Codegen {
         var rt: StringBuilder = StringBuilder()
         rt.append("; --- Runtime declarations ---\n")
         rt.append("%SB = type { i64, i64, i8* }\n\n")
-        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__io_read_stdin", "__io_readline", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env", "__str_get", "__io_println", "__io_print"]
-        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__io_read_stdin(i64)", "i64 @__io_readline()", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)", "i64 @__str_get(i64, i64)", "i64 @__io_println(i64)", "i64 @__io_print(i64)"]
+        var names: List<String> = ["__list_new", "__list_push", "__list_get", "__list_set", "__list_length", "__list_pop", "__list_remove", "__list_slice", "StringBuilder", "__sb_append", "__sb_to_string", "__safe_strcmp", "__map_new", "__map_set", "__map_get", "__map_has", "__map_keys", "__str_ends_with", "__str_split", "__str_replace", "__int_to_string", "__list_join", "__join_append", "__list_contains", "__io_read_file", "__io_write_file", "__io_file_exists", "__io_mkdir", "__io_walk_dir", "__io_append_file", "__io_file_size", "__io_read_binary", "__io_read_stdin", "__io_readline", "__os_exec", "__os_args", "__os_cwd", "__os_path_sep", "__os_platform", "__os_env", "__str_get", "__io_println", "__io_print"]
+        var sigs: List<String> = ["i64 @__list_new()", "i64 @__list_push(i64, i64)", "i64 @__list_get(i64, i64)", "i64 @__list_set(i64, i64, i64)", "i64 @__list_length(i64)", "i64 @__list_pop(i64)", "i64 @__list_remove(i64, i64)", "i64 @__list_slice(i64, i64, i64)", "i64 @StringBuilder()", "i64 @__sb_append(i64, i64)", "i64 @__sb_to_string(i64)", "i64 @__safe_strcmp(i64, i64)", "i64 @__map_new()", "i64 @__map_set(i64, i64, i64)", "i64 @__map_get(i64, i64)", "i64 @__map_has(i64, i64)", "i64 @__map_keys(i64)", "i64 @__str_ends_with(i64, i64)", "i64 @__str_split(i64, i64)", "i64 @__str_replace(i64, i64, i64)", "i64 @__int_to_string(i64)", "i64 @__list_join(i64, i64)", "i64 @__join_append(i64, i64, i64, i64, i64)", "i64 @__list_contains(i64, i64)", "i64 @__io_read_file(i64)", "i64 @__io_write_file(i64, i64)", "i64 @__io_file_exists(i64)", "i64 @__io_mkdir(i64)", "i64 @__io_walk_dir(i64)", "i64 @__io_append_file(i64, i64)", "i64 @__io_file_size(i64)", "i64 @__io_read_binary(i64, i64, i64)", "i64 @__io_read_stdin(i64)", "i64 @__io_readline()", "i64 @__os_exec(i64)", "i64 @__os_args()", "i64 @__os_cwd()", "i64 @__os_path_sep()", "i64 @__os_platform()", "i64 @__os_env(i64)", "i64 @__str_get(i64, i64)", "i64 @__io_println(i64)", "i64 @__io_print(i64)"]
         var di: Float = 0
         while (di < names.length()) {
             if (!this.str_in_list(this.defined_funcs,names[di])) {
@@ -9197,6 +9197,10 @@ class Codegen {
         this.known_functions.push("__io_mkdir")
         this.known_functions.push("__io_walk_dir")
         this.known_functions.push("__io_append_file")
+        // See codegen.sf: these two are runtime-defined but absent from the
+        // known-function set, so the bare-call path mangled them (BUGS #85).
+        this.known_functions.push("__io_file_size")
+        this.known_functions.push("__io_read_binary")
         this.known_functions.push("__os_exec")
         this.known_functions.push("__os_args")
         this.known_functions.push("__os_cwd")
@@ -13094,6 +13098,12 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
     gen.known_functions.push("__io_mkdir")
     gen.known_functions.push("__io_walk_dir")
     gen.known_functions.push("__io_append_file")
+    // Without these two the bare-call path prefixes them with the module name
+    // (stdlib_io___io_file_size), so the stdlib wrappers in src/lib/io.sf that
+    // call them link against an undefined symbol. Both are defined in the
+    // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
+    gen.known_functions.push("__io_file_size")
+    gen.known_functions.push("__io_read_binary")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
@@ -13586,6 +13596,12 @@ fun generate_with_modules_flat_opts(program: List<AST.Stmt>, all_stmts: List<AST
     gen.known_functions.push("__io_mkdir")
     gen.known_functions.push("__io_walk_dir")
     gen.known_functions.push("__io_append_file")
+    // Without these two the bare-call path prefixes them with the module name
+    // (stdlib_io___io_file_size), so the stdlib wrappers in src/lib/io.sf that
+    // call them link against an undefined symbol. Both are defined in the
+    // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
+    gen.known_functions.push("__io_file_size")
+    gen.known_functions.push("__io_read_binary")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
@@ -14198,6 +14214,12 @@ fun generate_with_modules_flat_opts3(program: List<AST.Stmt>, all_stmts: List<AS
     gen.known_functions.push("__io_mkdir")
     gen.known_functions.push("__io_walk_dir")
     gen.known_functions.push("__io_append_file")
+    // Without these two the bare-call path prefixes them with the module name
+    // (stdlib_io___io_file_size), so the stdlib wrappers in src/lib/io.sf that
+    // call them link against an undefined symbol. Both are defined in the
+    // runtime (runtime.sf __io_file_size / __io_read_binary) — BUGS #85.
+    gen.known_functions.push("__io_file_size")
+    gen.known_functions.push("__io_read_binary")
     gen.known_functions.push("__io_read_stdin")
     gen.known_functions.push("__io_readline")
     gen.known_functions.push("__os_exec")
