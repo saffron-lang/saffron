@@ -197,6 +197,93 @@ pass "STAGE 1" "gen3 saffronc built: $BUILD_DIR/saffronc"
 echo ""
 
 # =============================================================================
+# Stage 2: gen3 → gen4 (the fixed point)
+# =============================================================================
+#
+# Stage 1 proves gen2 accepts the source. It says nothing about gen3, which is
+# the compiler everyone actually runs. Without this stage a gen3 that rejects the
+# compiler's own source still gives a green bootstrap, because stage 1 never asks
+# it: CLAUDE.md listed "gen3 can compile itself" among the gen2-promotion criteria
+# and claimed the test stage verified it, but the test stage only ever compiled
+# test/hello_bootstrap.sf — five lines of IO.println.
+#
+# That gap hid real defects. A checker fix that made ~100 latent non-exhaustive
+# matches in the compiler visible (BUGS #76) produced 103 errors here while
+# bootstrap.sh still reported success end to end. Adding this stage immediately
+# found one that needed no checker change at all: codegen.sf:574 was a one-armed
+# `match (stmts[si2]) { VarDecl(...) => n }` in a free function, which gen3 has
+# been rejecting all along with nobody looking.
+#
+# The GEN2_OK=false fallback above already does a gen3→gen3' pass, so this is the
+# same work on the path that normally runs, not new machinery.
+#
+# Skip with SKIP_GEN4=1 when you only need a gen3 to test with — it roughly
+# doubles bootstrap time (measured 1m52 → 3m42). Don't skip it when deciding on a
+# gen2 promotion; that is the one decision it exists for.
+
+if [[ "${SKIP_GEN4:-0}" == "1" ]]; then
+    info "STAGE 2" "SKIP_GEN4=1 — not verifying gen3 compiles itself"
+    echo ""
+else
+    info "STAGE 2" "Verifying gen3 compiles its own source (gen4)..."
+    GEN3="$BUILD_DIR/saffronc"
+    mkdir -p "$BUILD_DIR/stage4"
+
+    for src in "${SOURCES[@]}"; do
+        [[ "$VERBOSE" == true ]] && echo "  compile (gen3): $src.sf"
+        timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+            "$COMPILER_DIR/$src.sf" "$BUILD_DIR/stage4/${src}.ll" \
+            || fail "STAGE 2" "gen3 rejects $src.sf — it cannot compile itself. Diagnostics go to stdout, so run it directly: $GEN3 --identity-mode --stdlib $ROOT/src/lib $COMPILER_DIR/$src.sf /tmp/out.ll"
+    done
+
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): codegen.sf (assembled)"
+    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+        "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/codegen.ll" \
+        || fail "STAGE 2" "gen3 rejects the assembled codegen.sf — it cannot compile itself"
+
+    # Same set of sibling modules main.sf imports as stage 1 above. If you add a
+    # compiler module there, add it here too, or gen4 links against a stale copy.
+    cp "$COMPILER_DIR/main.sf" "$BUILD_DIR/stage4/_main.sf"
+    cp "$COMPILER_DIR/lexer.sf" "$BUILD_DIR/stage4/lexer.sf"
+    cp "$COMPILER_DIR/parser.sf" "$BUILD_DIR/stage4/parser.sf"
+    cp "$COMPILER_DIR/checker.sf" "$BUILD_DIR/stage4/checker.sf"
+    cp "$COMPILER_DIR/resolve.sf" "$BUILD_DIR/stage4/resolve.sf"
+    cp "$COMPILER_DIR/ast.sf" "$BUILD_DIR/stage4/ast.sf"
+    cp "$BUILD_DIR/stage3/_codegen.sf" "$BUILD_DIR/stage4/_codegen.sf"
+    sed -i '' 's|import "./codegen.sf" as Codegen|import "./_codegen.sf" as Codegen|' "$BUILD_DIR/stage4/_main.sf"
+
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): main.sf"
+    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+        "$BUILD_DIR/stage4/_main.sf" "$BUILD_DIR/stage4/main.ll" \
+        || fail "STAGE 2" "gen3 rejects main.sf — it cannot compile itself"
+
+    [[ "$VERBOSE" == true ]] && echo "  compile (gen3): runtime.sf"
+    timeout 180 "$GEN3" --identity-mode --stdlib "$ROOT/src/lib" \
+        "$RUNTIME_SRC" "$BUILD_DIR/stage4/runtime.ll" \
+        || fail "STAGE 2" "gen3 rejects runtime.sf"
+
+    # Accepting the source is not the same as emitting IR that links.
+    [[ "$VERBOSE" == true ]] && echo "  linking gen4..."
+    clang -O2 -w -Wl,-stack_size,0x10000000 -o "$BUILD_DIR/stage4/saffronc" \
+        "$BUILD_DIR/stage4/main.ll" \
+        "$BUILD_DIR/stage4/runtime.ll" \
+        "$RUNTIME_BASE" \
+        "$RUNTIME_GC" \
+        || fail "STAGE 2" "gen4 IR does not link — gen3 accepted the source but emitted bad IR"
+
+    # And gen4 has to be a working compiler, not merely a binary that exists.
+    cat > "$BUILD_DIR/stage4/probe.sf" << 'EOF'
+var xs = [1, 2, 3]
+IO.println("gen4 works: ${xs.length()}")
+EOF
+    timeout 120 "$BUILD_DIR/stage4/saffronc" "$BUILD_DIR/stage4/probe.sf" "$BUILD_DIR/stage4/probe.ll" \
+        || fail "STAGE 2" "gen4 links but cannot compile a program"
+
+    pass "STAGE 2" "gen3 compiles itself; gen4 links and compiles: $BUILD_DIR/stage4/saffronc"
+    echo ""
+fi
+
+# =============================================================================
 # Test: Compile and run an example program with gen3
 # =============================================================================
 

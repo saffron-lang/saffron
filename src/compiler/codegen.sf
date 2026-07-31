@@ -571,7 +571,7 @@ fun generate_with_modules(program: List<AST.Stmt>, module_stmts: List<List<AST.S
             if (!gen.is_decl(stmts[si2])) {
                 var stmt_kind: String = gen.classify_stmt(stmts[si2])
                 if (stmt_kind == "var") {
-                    var vname: String = match (stmts[si2]) { VarDecl(n, t, i, d) => n }
+                    var vname: String = gen.get_var_name(stmts[si2])
                     var vdoc2: String = gen.get_var_doc(stmts[si2])
                     if (!vdoc2.starts_with("@import:")) {
                         gen.module_globals.set(prefix + vname, true)
