@@ -165,6 +165,18 @@ fun join(parts: List<String>): String {
 }
 ```
 
+`/* */` block comments also work, and they nest, so you can comment out a region
+that already contains one:
+
+```saffron
+/* Commenting out this whole block,
+   /* including the comment already inside it. */
+   Both closing delimiters are needed. */
+```
+
+Prefer `//` for ordinary comments; `/* */` is mainly useful for temporarily
+disabling a region of code.
+
 ## Error handling
 
 Prefer `Result` for expected failures. Reserve `throw` for unexpected/unrecoverable errors:
