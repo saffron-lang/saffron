@@ -1949,14 +1949,17 @@ in codegen) rather than the fixed name. Note the two desugaring sites are
 copies of each other, so both need it — an instance of the duplicated-logic
 mechanism (M5) described in `docs/design/compiler-rewrite.md`.
 
-### 40. A module global shadows a like-named parameter — silent wrong answer
+### 40. FIXED — a module global shadowed a like-named parameter (silent wrong answer)
 
-**Reproduction:**
+Fixed by the resolve pass (stage 2 of `docs/design/compiler-rewrite.md`).
+`Math.sqrt(16)` now returns `4`.
+
+**Reproduction (now correct):**
 
 ```saffron
 import "math" as Math
 var x = 42
-IO.println(Math.sqrt(16))   // prints 6.48074 (= sqrt(42)), should be 4
+IO.println(Math.sqrt(16))   // printed 6.48074 (= sqrt(42)); now prints 4
 ```
 
 Remove `var x` and it prints `4`. The input IR is correct — `16` is passed — but
@@ -1986,12 +1989,32 @@ never sets it at all, and neither restores it — so at the top level it still
 points at a previously-compiled lambda whose parameter happens to be named `p`.
 The whole attempt was reverted rather than shipped fragile.
 
-**Real fix:** track the parameters of the function currently being *emitted*
-explicitly — e.g. a `current_params` set pushed where param allocas are created
-and popped at function end — instead of inferring scope from
-`current_function_name`. Then have the three resolution sites prefer a local
-parameter over a global. Was previously noted as the "global-shadows-param"
-work item (task #4 area).
+**The fix that landed.** Not `current_params` — a real resolve pass
+(`src/compiler/resolve.sf`), run before the checker over the main program *and*
+every imported module in one shared `Resolver`. It maintains a scope chain and
+rewrites each `Variable(name)` into `Ref(kind, name, slot)` once, where `kind` is
+`local`/`param`/`global`/`func`/`self`/`type`/`unknown`. The three resolution
+sites now read `kind` and never consult `module_globals`, so there is no ordering
+to get wrong. Resolving modules in the *same* resolver is load-bearing: this
+repro's shadowing crosses the module boundary (a main-program global `x` over
+`math.sf`'s `sqrt(x)` parameter), so a per-file resolver would still miss it.
+
+**Two latent bugs it exposed.** Both were pre-existing and had been masked
+because the wrong read and the wrong write cancelled out. `module_globals` was
+consulted with a bare-name *fallback* after the prefixed key, in
+`stmts_body.sf`'s `gen_var_decl_with_name` and in `expr_body.sf`'s `Assign` arm.
+That fallback can never fire usefully — when `current_prefix` is `""` the two
+keys are the same string — so it only ever matched a global belonging to a
+*different* module:
+
+- `var p: Project = Project()` inside `@pantry_config`'s `project()` stored to
+  the main program's `@__g_p` while `output_body.sf` still allocated `%p`.
+  Segfault as soon as the reads were corrected.
+- `i = i - 1` inside `@random`'s `shuffle()` stored to the main program's
+  `@__g_i` while every read used `%i`, so the loop counter never decremented and
+  `shuffle()` spun forever.
+
+Both fallbacks are removed; only the prefixed key is consulted.
 
 ### 2. Forward references in nested closures
 

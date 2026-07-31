@@ -1101,6 +1101,12 @@ class NullChecker {
                     this.env.narrow(n, this.strip_nil_from_node(var_type_node))
                 }
             }
+            Ref(rk, rn, rs) => {
+                var ref_type_node: AST.Type = this.env.get_var_type(rn)
+                if (this.is_nullable_type(ref_type_node)) {
+                    this.env.narrow(rn, this.strip_nil_from_node(ref_type_node))
+                }
+            }
             IsCheck(val, typ) => {
                 // if (x is Type) → narrow x to Type
                 var is_var: String = this.get_variable_name_from_expr(val)
@@ -1186,6 +1192,7 @@ class NullChecker {
     fun get_variable_name_from_expr(expr: AST.Expr): String {
         return match (expr) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             _ => ""
         }
     }
@@ -1272,6 +1279,10 @@ class NullChecker {
                 this.env.mark_used(name)
                 this.env.get_var_type(name)
             }
+            Ref(rkind, rname, rslot) => {
+                this.env.mark_used(rname)
+                this.env.get_var_type(rname)
+            }
             Binary(left, op, right) => this.parse_type_node(this.infer_binary(left, op, right))
             Unary(op, right) => this.infer_type(right)
             Call(callee, args) => this.parse_type_node(this.infer_call(callee, args))
@@ -1300,26 +1311,6 @@ class NullChecker {
             IsCheck(value, type_name) => {
                 this.infer_expr(value)
                 AST.Type.BoolType
-            }
-            // TupleLit and Yield had no arm here at all. An unmatched variant
-            // yields an indeterminate value rather than a diagnostic, which is
-            // why `return (b, a)` in test/tuple_test.sf was reported as a
-            // "nullable Int" on roughly half of all runs of the same binary on
-            // the same source — BUGS #73. The parser encodes a tuple type as
-            // "Tuple<A,B>" (see parse_single_type), so mirror that spelling.
-            TupleLit(elements) => {
-                var elem_types: List<AST.Type> = []
-                var ei: Float = 0
-                while (ei < elements.length()) {
-                    elem_types.push(this.infer_type(elements[ei]))
-                    ei = ei + 1
-                }
-                AST.Type.GenericType("Tuple", elem_types)
-            }
-            // `yield x` evaluates x and suspends; its own value is not usable.
-            Yield(value) => {
-                this.infer_expr(value)
-                AST.Type.AnyType
             }
             IfExpr(cond, then_body, then_val, else_body, else_val) => {
                 this.infer_expr(cond)
@@ -1383,6 +1374,7 @@ class NullChecker {
             // Module-qualified access: IO.println, OS.args, etc.
             var obj_name: String = match (obj) {
                 Variable(n) => n
+                Ref(rk, rn, rs) => rn
                 IntLit(v) => ""
                 FloatLit(v) => ""
                 BoolLit(v) => ""
@@ -1634,6 +1626,7 @@ class NullChecker {
     fun infer_call(callee: AST.Expr, args: List<AST.Expr>): String {
         var name: String = match (callee) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             MemberAccess(o, f) => f
         }
         // Desugar receiver closures: if a Lambda arg matches a receiver-typed param
@@ -1712,6 +1705,7 @@ class NullChecker {
         // Check both "ClassName__method:idx" and "method:idx" patterns
         var obj_name: String = match (obj) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             _ => ""
         }
         var mdi: Float = 0
@@ -1741,6 +1735,7 @@ class NullChecker {
         if (obj_type == "Any") {
             var obj_name: String = match (obj) {
                 Variable(n) => n
+                Ref(rk, rn, rs) => rn
                 _ => ""
             }
             if (obj_name.length() > 0 and this.env.enum_variants.has(obj_name)) {
@@ -2166,6 +2161,7 @@ class NullChecker {
         return match (expr) {
             Assign(n, v) => "assign"
             Variable(n) => "variable"
+            Ref(rk, rn, rs) => "variable"
             Call(c, a) => "call"
             Binary(l, o, r) => "binary"
             Unary(o, r) => "unary"
@@ -2191,7 +2187,7 @@ class NullChecker {
     }
 
     fun rewrite_recv_variable(expr: AST.Expr, fields: List<String>, methods: List<String>): AST.Expr {
-        var name: String = match (expr) { Variable(n) => n }
+        var name: String = match (expr) { Variable(n) => n   Ref(rk, rn, rs) => rn   _ => "" }
         if (fields.contains(name)) {
             return AST.Expr.GetField(AST.Expr.This, name)
         }
@@ -2203,6 +2199,7 @@ class NullChecker {
         var args: List<AST.Expr> = match (expr) { Call(c, a) => a }
         var callee_name: String = match (callee) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             _ => ""
         }
         var name_ok: Bool = callee_name.length() > 0

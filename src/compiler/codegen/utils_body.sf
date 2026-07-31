@@ -142,6 +142,7 @@
     fun resolve_callee(expr: AST.Expr): String {
         return match (expr) {
             Variable(n) => n
+            Ref(rk, rn, rs) => rn
             MemberAccess(obj, field) => this.resolve_callee(obj) + "." + field
             x => ""
         }
@@ -367,6 +368,7 @@
             StringLit(s) => {}
             NilLit => {}
             Variable(n) => {}
+            Ref(rk, rn, rs) => {}
             This => {}
             MapLit => {}
             ListLit(e) => {}
@@ -430,6 +432,7 @@
             StringLit(s) => "other"
             NilLit => "other"
             Variable(n) => "other"
+            Ref(rk, rn, rs) => "other"
             Binary(l, o, r) => "other"
             Unary(o, r) => "other"
             Call(c, a) => "other"
