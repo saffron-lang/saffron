@@ -1,0 +1,45 @@
+// The supported way to read a field off an indirect call's result: annotate the
+// binding, which supplies the type that `Fun` cannot carry.
+//
+// This is the other half of test/fail/indirect_call_field.sf. A field access
+// written directly on the call (`f(1).v`) used to read 0 silently, because the
+// MemberAccess fallback answered an unknown field offset with the constant 0
+// instead of reporting it. The object itself was always fine — as the assertions
+// below show, the identical value read through an annotated variable is correct.
+// It is now a compile error rather than a wrong answer.
+
+import "@test" as Test
+
+class Box {
+    var v: Int
+    fun init(v: Int) { this.v = v }
+}
+
+fun mk(): Fun { return fun (x: Int): Box { return Box(7) } }
+
+var f: Fun = mk()
+
+// The annotated binding recovers the type, so the field offset resolves.
+var typed: Box = f(1)
+Test.assert_eq(typed.v, 7, "field read through an annotated binding is correct")
+Test.assert_eq(typed.v.to_string(), "7", "and formats correctly")
+
+// The object is constructed correctly however it is reached — the bug was only
+// ever in offset resolution, never in construction.
+var again: Box = f(2)
+Test.assert_eq(again.v, 7, "a second call constructs an equally good object")
+
+// A direct (non-indirect) call has a declared return type, so the field access
+// needs no annotation.
+fun mk_box(): Box { return Box(5) }
+Test.assert_eq(mk_box().v, 5, "field on a direct call's result still works")
+
+// A Float returned through an indirect call, bound with an annotation, must
+// convert rather than be reinterpreted — the same last_type staleness that made
+// the field read 0 also made a Float print 0.
+fun mk_f(): Fun { return fun (): Float => 2.5 }
+var g: Fun = mk_f()
+var got: Float = g()
+Test.assert_eq(got.to_string(), "2.5", "Float through an indirect call is not reinterpreted")
+
+Test.summary()

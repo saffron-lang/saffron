@@ -588,10 +588,69 @@
         return local
     }
 
+    // Convert a NaN-boxed value to a machine integer.
+    //
+    // `__val_untag_int` masks the low 48 bits and sign-extends, which is only
+    // correct for a TAG_INT value. Handed a *float*-tagged value it
+    // reinterprets the double's bit pattern instead of converting it: 2.0 is
+    // 0x4000000000000000, whose low 48 bits are all zero, so `list[f]` with
+    // `var f: Float = 2.0` silently read element 0 (BUGS #52). Every small
+    // float has zero low bits, so the whole family of hand-written counted
+    // loops using the older `Float` spelling read element 0 forever — it
+    // presented as "StringBuilder repeats its first argument" in
+    // turmeric/tools/build.sf and as a loop-variable capture bug elsewhere.
+    //
+    // Genuine doubles now route through `__val_untag_float` (which already
+    // sitofp's an int-tagged operand) and `fptosi`, i.e. they are *converted*
+    // rather than reinterpreted. TAG_PTR and TAG_SPEC values keep the exact
+    // old masking path, so this changes behaviour only for the case that was
+    // unambiguously wrong. The `fptosi` on a non-float is computed but never
+    // selected, and an unselected `select` operand may be poison safely.
+    //
+    // This is codegen defence-in-depth, not the primary fix: under the agreed
+    // language direction (implicit Int->Float widening, Float->Int narrowing an
+    // error) a Float index should be *rejected by the type checker*. Truncating
+    // is merely the honest lowering if one gets this far.
     fun emit_untag_int(val: String): String {
         if (this.identity_mode) { return val }
+        var as_int: String = this.fresh_local()
+        this.emit_indent(as_int + " = call i64 @__val_untag_int(i64 " + val + ")")
+        // Classify the tag inline — no new runtime symbol is required.
+        var upper: String = this.fresh_local()
+        this.emit_indent(upper + " = lshr i64 " + val + ", 48")
+        var is_ptr: String = this.fresh_local()
+        this.emit_indent(is_ptr + " = icmp eq i64 " + upper + ", 32760")
+        var is_int: String = this.fresh_local()
+        this.emit_indent(is_int + " = icmp eq i64 " + upper + ", 32761")
+        var is_spec: String = this.fresh_local()
+        this.emit_indent(is_spec + " = icmp eq i64 " + upper + ", 32762")
+        var any_tag_a: String = this.fresh_local()
+        this.emit_indent(any_tag_a + " = or i1 " + is_ptr + ", " + is_int)
+        var any_tag: String = this.fresh_local()
+        this.emit_indent(any_tag + " = or i1 " + any_tag_a + ", " + is_spec)
+        var no_tag: String = this.fresh_local()
+        this.emit_indent(no_tag + " = xor i1 " + any_tag + ", true")
+        // Ruling out the three tags is NOT enough to call something a double.
+        // A raw (untagged) small integer and a raw GC pointer both have their
+        // top 16 bits clear, and either can reach this path through an `Any`
+        // binding — `__val_is_float` documents exactly this hazard. Converting
+        // those would turn a perfectly good raw `5` into `fptosi(5e-323)` = 0,
+        // i.e. trade one silent wrong answer for a worse one.
+        //
+        // A genuine normalized double always has a non-zero exponent in the top
+        // 16 bits, so requiring `upper != 0` keeps every raw value on the exact
+        // masking path it used before. (+0.0 has upper == 0 and masks to 0,
+        // which is already the right answer.) Only true doubles change.
+        var hi_set: String = this.fresh_local()
+        this.emit_indent(hi_set + " = icmp ne i64 " + upper + ", 0")
+        var is_double: String = this.fresh_local()
+        this.emit_indent(is_double + " = and i1 " + no_tag + ", " + hi_set)
+        var as_double: String = this.fresh_local()
+        this.emit_indent(as_double + " = call double @__val_untag_float(i64 " + val + ")")
+        var truncated: String = this.fresh_local()
+        this.emit_indent(truncated + " = fptosi double " + as_double + " to i64")
         var local: String = this.fresh_local()
-        this.emit_indent(local + " = call i64 @__val_untag_int(i64 " + val + ")")
+        this.emit_indent(local + " = select i1 " + is_double + ", i64 " + truncated + ", i64 " + as_int)
         return local
     }
 

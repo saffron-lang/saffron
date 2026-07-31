@@ -324,8 +324,7 @@
                 local
             }
             BlockExpr(stmts, value) => {
-                this.gen_stmts(stmts)
-                this.gen_arg_value(value)
+                this.gen_block_expr(stmts, value)
             }
             IsCheck(value, type_name) => {
                 this.gen_is_check(value, type_name)
@@ -354,6 +353,101 @@
                 result
             }
         }
+    }
+
+    // A block expression. Ordinarily: run the statements, then evaluate the
+    // trailing value.
+    //
+    // One shape needs special handling. The parser desugars a map literal into
+    // exactly this node: a VarDecl of a temporary plus one `.set()` per entry,
+    // with the temporary as the trailing value — and that temporary is always
+    // spelled `__map`. Allocas are hoisted per *function*, not per block, so a
+    // literal nested inside another literal declares a second `__map` that
+    // aliases the first: the inner map's construction overwrites the outer's
+    // slot, and `{"outer": {"inner": 1}}` came back with the inner map's keys
+    // (BUGS #41). The outer key was silently discarded.
+    //
+    // Rather than rename the temporary — which would mean touching the two
+    // duplicated desugaring sites in parser.sf and the alloca hoisting in
+    // output_body.sf — recognise the shape and emit it with no named storage at
+    // all. The map handle stays in an SSA temporary, so nesting cannot alias:
+    // each literal gets a fresh `%tN` by construction, at any depth.
+    fun gen_block_expr(stmts: List<AST.Stmt>, value: AST.Expr): String {
+        if (this.is_map_literal_block(stmts, value)) {
+            return this.gen_map_literal_block(stmts)
+        }
+        this.gen_stmts(stmts)
+        return this.gen_arg_value(value)
+    }
+
+    // Recognise the parser's map-literal desugaring precisely, so that an
+    // ordinary user block that happens to hold a variable named `__map` is not
+    // rewritten. Every clause must match: a leading `var __map: Map = MapLit`,
+    // then nothing but `__map.set(k, v)` calls, then `__map` as the value.
+    fun is_map_literal_block(stmts: List<AST.Stmt>, value: AST.Expr): Bool {
+        if (stmts.length() == 0) { return false }
+        if (this.get_variable_name(value) != "__map") { return false }
+        if (this.classify_stmt(stmts[0]) != "var") { return false }
+        if (this.get_var_name(stmts[0]) != "__map") { return false }
+        if (this.classify_expr(this.get_var_init(stmts[0])) != "map_lit") { return false }
+        var i: Float = 1
+        while (i < stmts.length()) {
+            if (this.classify_stmt(stmts[i]) != "expr") { return false }
+            var e: AST.Expr = match (stmts[i]) { ExprStmt(x) => x   _ => AST.Expr.NilLit }
+            if (this.classify_expr(e) != "method_call") { return false }
+            var m: String = match (e) { MethodCall(o, mm, a) => mm   _ => "" }
+            if (m != "set") { return false }
+            var recv: AST.Expr = match (e) { MethodCall(o, mm, a) => o   _ => AST.Expr.NilLit }
+            if (this.get_variable_name(recv) != "__map") { return false }
+            var margs: List<AST.Expr> = match (e) { MethodCall(o, mm, a) => a   _ => [] }
+            if (margs.length() != 2) { return false }
+            i = i + 1
+        }
+        return true
+    }
+
+    // Emit a recognised map literal as SSA: one __map_new, then one __map_set
+    // per entry against that same temporary.
+    //
+    // Key and value are emitted by the ordinary expression path, so a nested
+    // literal in either position recurses through gen_block_expr and lands here
+    // again with its own fresh temporary — which is what makes arbitrary nesting
+    // and sibling nested maps work.
+    //
+    // Keys are passed NaN-boxed, deliberately: __map_key_cmp reads the tag to
+    // tell a string key from a numeric one, matching Map.set in methods_body.
+    // Nothing is tagged or untagged here.
+    fun gen_map_literal_block(stmts: List<AST.Stmt>): String {
+        var map_val: String = this.fresh_local()
+        if (this.use_llvm_lib) {
+            this.emit_indent(this.lib_call(map_val, "i64", "__map_new", ""))
+        } else {
+            this.emit_indent(map_val + " = call i64 @__map_new()")
+        }
+        // Accumulate the entry types the same way refine_map_entry_type does, so
+        // a literal still infers Map<K, V> instead of erasing to Map<String, Any>.
+        var known_k: String = "Any"
+        var known_v: String = "Any"
+        var i: Float = 1
+        while (i < stmts.length()) {
+            var e: AST.Expr = match (stmts[i]) { ExprStmt(x) => x   _ => AST.Expr.NilLit }
+            var margs: List<AST.Expr> = match (e) { MethodCall(o, mm, a) => a   _ => [] }
+            var key_val: String = this.gen_arg_value(margs[0])
+            var key_type: String = this.type_to_string(this.last_type)
+            var val_val: String = this.gen_arg_value(margs[1])
+            var val_type: String = this.type_to_string(this.last_type)
+            var discard: String = this.fresh_local()
+            if (this.use_llvm_lib) {
+                this.emit_indent(this.lib_call(discard, "i64", "__map_set", "i64 " + map_val + ", i64 " + key_val + ", i64 " + val_val))
+            } else {
+                this.emit_indent(discard + " = call i64 @__map_set(i64 " + map_val + ", i64 " + key_val + ", i64 " + val_val + ")")
+            }
+            known_k = this.merge_entry_type(known_k, key_type)
+            known_v = this.merge_entry_type(known_v, val_type)
+            i = i + 1
+        }
+        this.last_type = this.make_generic_type("Map", [this.str_to_type(known_k), this.str_to_type(known_v)])
+        return map_val
     }
 
     fun gen_yield(value: AST.Expr): String {
@@ -1421,8 +1515,7 @@
             var be_value: AST.Expr = match (expr) { BlockExpr(s, v) => v
                 _ => AST.Expr.NilLit
             }
-            this.gen_stmts(be_stmts)
-            return this.gen_arg_value(be_value)
+            return this.gen_block_expr(be_stmts, be_value)
         }
         if (expr_kind == "get_field") {
             var gf_obj: AST.Expr = match (expr) { GetField(o, f) => o
@@ -1648,6 +1741,35 @@
                 this.last_type = this.str_to_type(this.get_field_type(fb_resolved, m_field))
                 return result
             }
+            // Nothing above could establish a class for the receiver, so the
+            // field's offset is unknown, and this path answers with the integer
+            // zero — emitting no load at all.
+            //
+            // That is how `f(1).v` read 0 (BUGS #56): `Fun` carries no return
+            // type, so an indirect call's result has no recoverable class, and
+            // codegen handed back a plausible-looking constant instead of
+            // admitting it did not know. The object was constructed correctly
+            // the whole time; only this fallback was wrong.
+            //
+            // Report it — but *only* for that shape. This fallback is also the
+            // normal, working route for several unrelated things (a module
+            // constant like `Math.PI`, reflective field reads), which return 0
+            // here legitimately or are resolved by a later stage; erroring
+            // unconditionally broke `pass/math` and `test_reflect`, trading one
+            // silent wrong answer for a batch of false rejections. Narrow the
+            // diagnostic to a receiver that really is a call, which is the case
+            // that is genuinely unknowable rather than merely unresolved here.
+            //
+            // The proper fix is a return type on `Fun`, a language change beyond
+            // this repair; M2 in docs/design/compiler-rewrite.md ("unknown is
+            // never spelled as something concrete") is why this reports instead
+            // of guessing an offset.
+            var fb_obj_kind: String = this.classify_expr(m_obj)
+            if (fb_obj_kind == "call") {
+                IO.println("[codegen] Error: cannot determine the type of the receiver of '." + m_field + "': an indirect call through 'Fun' has no known return type, so the field's offset is unknown. Annotate the result first, e.g. 'var x: T = f(...)' then use 'x." + m_field + "'.")
+                this.has_errors = true
+            }
+            this.last_type = AST.Type.AnyType
             return "0"
         }
 
@@ -2670,6 +2792,32 @@
             var ic_res: LLVMTypes.Value = this.llvm_block_builder.call("__indirect_call", LLVMTypes.Type.I64, [])
             this.llvm_values.set(local, ic_res)
         }
+        // The result type of an indirect call is genuinely unknown: `Fun` carries
+        // no return type, so there is nothing here to derive one from. Say so.
+        //
+        // This function used to leave `last_type` holding whatever the last
+        // sub-expression happened to set — usually the type of the final
+        // *argument*, or of the callee itself. Callers read that stale value as
+        // if it described the result, which is how a field access on a call
+        // result silently resolved to offset 0 (BUGS #56): `f(1).v` looked up
+        // field `v` on a class inferred from leftover state, and
+        // `get_field_index` answered 0 for a name it could not find. The same
+        // staleness made a Float returned through a closure read as an Int and
+        // print 0 (the float half of BUGS #51) — `to_string` keys off
+        // `last_type`, so it untagged a double as an integer.
+        //
+        // AnyType is the honest answer and is already the "unknown" spelling the
+        // rest of codegen understands: it routes through the runtime dispatch
+        // helpers, which inspect the actual tag instead of trusting a static
+        // guess. That turns both silent wrong answers into correct behaviour for
+        // to_string/arithmetic, and turns the field case into a diagnostic
+        // rather than a wrong offset. (I2/M1 in docs/design/compiler-rewrite.md:
+        // unknown is distinct, and codegen must not re-derive a type it lacks.)
+        //
+        // Annotating the binding (`var x: Box = f(1)`) remains the way to supply
+        // the type; the real fix is a return type on `Fun`, which is a language
+        // change and out of scope here.
+        this.last_type = AST.Type.AnyType
         return local
     }
 
