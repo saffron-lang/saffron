@@ -301,10 +301,10 @@ const imports = { env: new Proxy({
             body,
         }).then(r => r.text()).then(txt => {
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, writeCString(txt));
+            if (fn) fn(callbackId, writeCStringI64(txt));
         }).catch((err) => {
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, writeCString(JSON.stringify({
+            if (fn) fn(callbackId, writeCStringI64(JSON.stringify({
                 ok: false,
                 diagnostics: 'could not reach the compile service: ' + err.message,
             })));
@@ -314,10 +314,10 @@ const imports = { env: new Proxy({
         const url = readCString(urlPtr);
         fetch(url).then(r => r.text()).then(txt => {
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, writeCString(txt));
+            if (fn) fn(callbackId, writeCStringI64(txt));
         }).catch(() => {
             const fn = _findExport('__on_fetch_complete');
-            if (fn) fn(callbackId, writeCString('{"examples":[]}'));
+            if (fn) fn(callbackId, writeCStringI64('{"examples":[]}'));
         });
     },
     js_run_wasm: (b64Ptr, callbackId) => {
@@ -326,7 +326,7 @@ const imports = { env: new Proxy({
         setTimeout(() => {
             runUserModule(b64, (out) => {
                 const fn = _findExport('__on_run_complete');
-                if (fn) fn(callbackId, writeCString(out));
+                if (fn) fn(callbackId, writeCStringI64(out));
             });
         }, 0);
     },
@@ -336,13 +336,15 @@ const imports = { env: new Proxy({
         // (including non-ASCII in strings or comments) round-trips.
         location.hash = 'src=' + btoa(unescape(encodeURIComponent(src)));
     },
+    // Declared `i64 js_get_hash_source()` in api.sf, so it must hand back a
+    // BigInt even though the wasm32 pointer itself is 32-bit.
     js_get_hash_source: () => {
         const m = location.hash.match(/src=([^&]+)/);
-        if (!m) return writeCString('');
+        if (!m) return writeCStringI64('');
         try {
-            return writeCString(decodeURIComponent(escape(atob(m[1]))));
+            return writeCStringI64(decodeURIComponent(escape(atob(m[1]))));
         } catch (e) {
-            return writeCString('');
+            return writeCStringI64('');
         }
     },
     js_set_timeout: (callbackId, ms) => {
@@ -357,21 +359,53 @@ const imports = { env: new Proxy({
     __builtin_trap: () => { throw new Error("Saffron: exit/trap"); },
 }, { get(t, p) { return t[p] || ((...args) => 0n); } }) };
 
+// Allocate a NUL-terminated string in the module's memory and return the pointer.
+//
+// Pointer width matters here, twice over. On wasm32 `malloc` is `i8* (i64)`:
+// the *argument* is an i64 (so it must be passed as a BigInt) but the *return*
+// is a 32-bit pointer, which arrives as a plain JS Number. Returning that
+// Number straight back to an import declared `-> i64` (js_get_hash_source is
+// one) throws "Cannot convert <n> to a BigInt" and kills _start before the app
+// mounts. Normalise in both directions: BigInt going in, Number for indexing,
+// and let each caller widen as its own signature requires.
+function mallocPtr(byteLength) {
+    return Number(instance.exports.malloc(BigInt(byteLength)));
+}
+
 function writeCString(str) {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str + '\0');
-    const ptrBig = instance.exports.malloc(BigInt(bytes.length));
-    const mem = new Uint8Array(instance.exports.memory.buffer);
-    mem.set(bytes, Number(ptrBig));
-    return ptrBig;
+    const bytes = new TextEncoder().encode(str + '\0');
+    const ptr = mallocPtr(bytes.length);
+    new Uint8Array(instance.exports.memory.buffer).set(bytes, ptr);
+    return ptr;
+}
+
+// Same string, widened for an import whose declared return type is i64.
+function writeCStringI64(str) {
+    return BigInt(writeCString(str));
 }
 
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
-const response = await fetch('./app.wasm');
-const wasmBytes = await response.arrayBuffer();
+// Load the UI module from /api/app_wasm (base64), not /app.wasm (raw bytes).
+//
+// The Saffron service cannot serve the raw file: `IO.read_file` returns a
+// NUL-terminated string and a wasm module starts with `\0asm`, so the body comes
+// back empty with `Content-Length: 0` (BUGS.md #66). The base64 endpoint is the
+// same workaround the compile path uses for user modules. Fall back to the raw
+// path so a plain static file server (`python3 -m http.server` in build/) still
+// works for frontend-only development.
+async function loadUiModule() {
+    const b64Response = await fetch('./api/app_wasm');
+    if (b64Response.ok) {
+        const text = (await b64Response.text()).trim();
+        if (text.length > 0 && text[0] !== '{') return base64ToBytes(text);
+    }
+    return await (await fetch('./app.wasm')).arrayBuffer();
+}
+
+const wasmBytes = await loadUiModule();
 const result = await WebAssembly.instantiate(wasmBytes, imports);
 instance = result.instance;
 

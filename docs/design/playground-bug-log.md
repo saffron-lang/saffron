@@ -8,10 +8,16 @@ Status legend: **FIXED** (patched in repo) / **WORKED AROUND** / **OPEN** (still
 against `build/saffronc` and the ones that still reproduce were filed in
 `BUGS.md` as #50–#57 with the mapping below. A later pass the same day added
 entries 31–34, revised Bug 28 with its actual root cause (the GC, not the request
-parser), added entry 35, and filed the newly reproducing ones as #60–#64. This file is kept for the
-narrative — the repros, the measurements, the workarounds each bug forced on the
-playground, and the debugging notes — but `BUGS.md` is the tracker of record.
-The numbering here is local to this log and does not match `BUGS.md`.
+parser), added entry 35, and filed the newly reproducing ones as #60–#64. A final
+pass added entries 36–39, from getting the Run button working end to end; #75 is
+the one new compiler bug out of that. This file is kept for the narrative — the
+repros, the measurements, the workarounds each bug forced on the playground, and
+the debugging notes — but `BUGS.md` is the tracker of record. The numbering here
+is local to this log and does not match `BUGS.md`.
+
+**The playground now works end to end** as of the last entry: page loads, examples
+load, Run compiles and executes with correct output. Entries 36–39 are what stood
+between the state the earlier entries describe and that.
 
 | here | `BUGS.md` | note |
 |---|---|---|
@@ -31,6 +37,10 @@ The numbering here is local to this log and does not match `BUGS.md`.
 | Bug 33 | #50 | same bug as Bug 12 — inherited `this.foo()` binds to the base |
 | Bug 34 | #61 | `x is SomeClass` folded to `false` when the static type is `Any` |
 | Bug 35 | #64 | >35 KB body kills the server; the source size cap is unreachable |
+| Bug 36 | #75 | **new** — a value re-entering wasm from JS is untagged, so it never matches its own `Map` key |
+| Bug 37 | — | not a compiler bug: string `+` in a loop is quadratic and blew the wasm heap on an 11 KB field |
+| Bug 38 | #66 | third instance of the NUL truncation — worked around for the UI module too |
+| Bug 39 | #63 | the GC bug measured at 23 requests, not 85; `__gc_disable()` applied after all |
 
 Bugs 26 and 27 are **stale as written**: they describe the `Number` → `FloatType`
 mapping as committed and actively regressing `@http/server` route dispatch. That
@@ -1847,5 +1857,156 @@ requests to reach a GC cycle, this needs one 40 KB POST.
 A correct fix is a read loop: read until the headers are complete, parse
 `Content-Length`, refuse anything over a server-level maximum *before* reading the
 body, then read exactly that many bytes.
+
+---
+## Bug 36 — a value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under — **FIXED in the playground** (filed as `BUGS.md` #75)
+
+The third and last of the three bugs stacked behind "the Run button does nothing".
+With Bug 37 (below) and `BUGS.md` #71 out of the way, the request went out
+correctly and the response came back correctly — and still nothing happened. No
+console error, no status change, no trap.
+
+`api.sf` handed JS an opaque callback id and expected it back on completion:
+
+```saffron
+var _next_id: Float = 0
+var _callbacks: Map<Float, (String) => Nil> = {}
+
+fun _register(callback: (String) => Nil): Float {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _callbacks.set(id, callback)
+    return id
+}
+
+fun _resolve(id: Float, payload: String) {
+    if (_callbacks.has(id)) { ... }        // always false
+}
+```
+
+`has()` was false for every id. Narrowed with a 20-line program (in `BUGS.md` #75)
+that stores one entry, hands the id out through an `@extern`, and takes it
+straight back in through an exported function: `MISSING`. Passing the *bit pattern
+of 1.0* instead prints `FOUND`, which pins it exactly:
+
+| Path | Value reaching `__map_key_cmp` |
+|---|---|
+| stored by `_register` | `0x3FF0000000000000` — f64 bit pattern of 1.0 |
+| arriving from JS | `0x0000000000000001` — bare machine integer |
+
+Nothing re-tags an exported function's parameters, and `__map_key_cmp`
+(`src/runtime/runtime.sf:287`) compares non-string keys by exact bit pattern. So
+the two "1"s are different keys.
+
+Worth recording how much this cost to find, because the search was misdirected
+twice:
+
+- `Map.has()` looked broken on wasm32 in general: a test printing
+  `m.has(k).to_string()` returned `false` for all key types. It was **`Bool`
+  printing** that was wrong — `true.to_string()` prints `"false"` on wasm32, while
+  `if (t)` branches correctly. A version that branched instead of printing showed
+  the Map was fine. That is a separate unfiled bug, and it will mislead anyone
+  debugging in this area.
+- `json_field` was suspected next, since the callback never completed and
+  `json_field` was the first thing in it. It works correctly in isolation.
+
+**Fix:** a `List` index instead of a `Map` key — an index only has to compare
+numerically, which survives the representation change. Turmeric's own
+`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based for
+exactly this reason, but the reason was not written down anywhere, so the Map
+version looks perfectly reasonable until you try it.
+
+---
+
+## Bug 37 — `json_field` exhausted the wasm heap on an 11 KB field, because string `+` in a loop is quadratic — **FIXED**
+
+Immediately after Bug 36 was fixed, the callback finally ran and died:
+
+```
+RuntimeError: memory access out of bounds
+    at app.wasm.strcpy
+    at app.wasm.api_json_field
+    at app.wasm.__lambda_1697
+    at app.wasm.api__resolve
+    at app.wasm.api___on_fetch_complete
+```
+
+`json_field` accumulated the value a character at a time (`out = out + ch`).
+Saffron strings are immutable, so every `+` mallocs a fresh copy of everything so
+far: for the 11 KB base64 `wasm` field that is ~11000 allocations averaging 5.5 KB,
+about 60 MB of garbage. Native has the headroom to absorb it; wasm32 linear memory
+does not.
+
+Not a compiler bug — the semantics are what they say — but a sharp edge worth
+logging, because the natural way to write a scanner in Saffron is accidentally
+quadratic and the failure only shows up on wasm32 and only at size. A native test
+with a short field passes happily.
+
+**Fix:** scan for the closing quote to find the end index, then take a single
+`slice`. Escapes are expanded in a second pass, only for fields that actually
+contain a backslash — which in practice means `diagnostics`, never the base64
+payload, whose alphabet has nothing escapable in it.
+
+---
+
+## Bug 38 — `IO.read_file` NUL truncation, again: it also makes the UI module unservable, not just user modules — **WORKED AROUND** (same defect as Bug 2 / `BUGS.md` #66)
+
+Third appearance of the same underlying defect. Bug 2 hit it encoding *user*
+modules and worked around it with `base64(1)`. `BUGS.md` #66 filed it as the
+general defect after it resurfaced serving `/app.wasm`. This is the instance that
+had to be resolved for the playground to load in a browser at all:
+`Http.static_files` reads with `IO.read_file`, a wasm module's magic number is
+`\0asm`, and so the very first byte terminates the string. `GET /app.wasm` is a
+well-formed `200` with `Content-Length: 0`.
+
+Confirmed the file itself is fine, so the loss is purely in the representation:
+
+```saffron
+var c: String = IO.read_file("playground/static/app.wasm")
+IO.println("length = " + c.length().to_string())     // length = 0
+var h: String = IO.read_file("playground/static/index.html")
+IO.println("html length = " + h.length().to_string())  // html length = 387
+```
+
+**Worked around** by serving the UI module base64-encoded from the service's own
+endpoint (`GET /api/app_wasm`), decoded with `atob` in the loader before
+instantiating — the same dodge as Bug 2, now factored into
+`Compile.encode_file_base64` and shared by both paths. Verified byte-identical:
+47555 bytes out, 47555 bytes decoded, `cmp` clean. Costs a 33% larger transfer
+once per page load. The loader falls back to `./app.wasm` so a plain static file
+server still works for frontend-only development.
+
+This does *not* fix the general defect, and `BUGS.md` #66 stays open: a proper fix
+needs a byte-length-carrying body type through `Response`, since `Response.body`
+is `String` and `Content-Length` is emitted from `.length()`.
+
+---
+
+## Bug 39 — the GC bug had to be worked around after all; measured at 23 requests, not 85 — **WORKED AROUND** (`BUGS.md` #63)
+
+Bug 28 concluded that `__gc_disable()` "trades the crash for an unbounded heap, so
+it is deliberately not applied". That position did not survive contact with actual
+use. Measured on the playground service:
+
+| Endpoint | Requests before the process died |
+|---|---|
+| `/style.css` | 23 |
+| `/api/health` | 60 |
+
+Bug 28's figure of ~85 was for a 10-byte response; anything that allocates more
+reaches the 65536-byte collection threshold sooner. At 23 requests the server
+cannot survive a single page load plus a couple of Run clicks — it died three
+times mid-verification during this session, each time producing a "connection
+refused" that reads as a client or routing fault rather than a crash.
+
+`__gc_disable()` is now called at the top of `main()`, taking it from 23 to 400+
+requests clean. The trade-off is real and is documented at the call site and in
+both the "Known issues" and "What is NOT contained" sections of the README: the
+heap is now unbounded, so sustained traffic alone is a denial-of-service. That is
+acceptable for a local dev playground and is not acceptable for a public
+deployment, which the README already says this must not be.
+
+The fix still belongs in making the shadow stack coroutine-aware; nothing here
+changes that analysis.
 
 ---

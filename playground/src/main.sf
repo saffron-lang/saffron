@@ -19,6 +19,25 @@ import "@os" as OS
 import "./compile.sf" as Compile
 import "./examples.sf" as Examples
 
+// Turn the garbage collector off for the lifetime of the process.
+//
+// Not a preference — without it this server is unusable. Every connection is
+// handled in a spawned task, so `_handle`'s allocation happens inside a coroutine
+// frame, and the collector roots locals by the address of a stack `alloca` that
+// the coroutine frame can move. It therefore frees live objects and the process
+// segfaults after a few dozen requests (BUGS.md #63 — measured here at 23
+// requests for `/style.css` and 60 for `/api/health`, with no log line, so from
+// the client it looks like a network fault).
+//
+// The trade is an unbounded heap: nothing is ever reclaimed, so a long-lived
+// instance grows without limit. Acceptable for a local dev playground that is
+// restarted freely, and strictly better than crashing mid-session. It is NOT
+// acceptable for a public deployment — see the sandboxing section of README.md,
+// which already says this must not face untrusted traffic as it stands. Remove
+// this line once the shadow stack is coroutine-aware.
+@extern("i64 __gc_disable()")
+fun _gc_disable(): Int
+
 fun read_port(): Int {
     var port_str: String = OS.env("PLAYGROUND_PORT")
     if (port_str.length() > 0) {
@@ -71,7 +90,32 @@ fun handle_health(req: Http.Request): Http.Response {
     return Http.json(JSON.to_string(payload))
 }
 
+/// GET /api/app_wasm — the UI module itself, base64-encoded.
+///
+/// This exists because `Http.static_files` cannot serve a wasm binary at all.
+/// `IO.read_file` returns a NUL-terminated Saffron string and a wasm module's
+/// magic number is literally `\0asm`, so the very first byte terminates it:
+/// `length()` is 0, the response carries `Content-Length: 0`, and the browser
+/// gets an empty body for a file that is perfectly fine on disk (BUGS.md #66).
+/// Nothing in the response path is at fault — the string was already empty
+/// before it got there.
+///
+/// Base64 is the same dodge `compile.sf` already uses for the user's module: its
+/// alphabet is pure ASCII, so it survives a Saffron string intact. The loader
+/// decodes it with `atob` before instantiating. Costs a 33% larger transfer for
+/// the UI module, once per page load.
+fun handle_app_wasm(req: Http.Request): Http.Response {
+    var encoded: String = Compile.encode_file_base64("static/app.wasm")
+    if (encoded.length() == 0) {
+        return Http.json("{\"ok\":false,\"diagnostics\":\"static/app.wasm is missing — build the frontend first\"}")
+            .status_code(404)
+    }
+    return Http.file(encoded, "text/plain; charset=utf-8")
+}
+
 fun main() {
+    _gc_disable()
+
     var port: Int = read_port()
     var app = Http.server(port)
 
@@ -81,6 +125,7 @@ fun main() {
     app.post("/api/compile", handle_compile)
     app.get("/api/examples", handle_examples)
     app.get("/api/health", handle_health)
+    app.get("/api/app_wasm", handle_app_wasm)
 
     // Static frontend last, so it never shadows the API routes.
     app.use(Http.static_files("/", "static"))

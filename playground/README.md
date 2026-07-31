@@ -8,25 +8,44 @@ for the framework and the wasm backend.
 ## Quick start
 
 ```bash
-# 1. build the frontend (Turmeric -> wasm32), from playground/frontend
+# from playground/
+
+# 1. build the frontend (Turmeric -> wasm32)
 cd frontend && .pantry/bin/turmeric-build && cd ..
 
-# 2. start the compile service, from playground/
+# 2. publish it to where the service serves from
+cp frontend/build/app.wasm frontend/build/app.js frontend/build/index.html \
+   frontend/build/style.css static/
+
+# 3. start the compile service
 ../tools/saffron run src/main.sf
 ```
 
+Give step 3 about 15 seconds: it compiles and links the service before listening,
+and a redirected stdout is block-buffered, so the banner appears late.
+
 Then open **<http://127.0.0.1:8080>**.
 
-Three known defects currently limit this (all in "Known issues" below, with
-detail). The blocking one: **the UI does not load in a browser at all**, because
-`/app.wasm` is served as 0 bytes (`BUGS.md` #66). Beyond that, **the server dies
-after roughly 85 requests** because of a garbage collector bug, so expect to
-restart it. The Run button's dead `js_fetch_post` / `js_run_wasm` imports are
-**fixed** (#71) — that was a `main` symbol collision, not the export-list problem
-this file used to claim. Routing works too; the earlier 404s on `/` and
-`/api/examples` were fixed upstream by retiring the `Number` type annotation.
+**This now works end to end**: the page loads, the editor is populated, the
+example buttons load programs, and Run compiles and executes them with output in
+the right-hand pane. All seven bundled examples were driven through the real
+shipped loader and produce correct output, as does the compile-error path.
 
-The **compile service works end-to-end** and can be driven directly:
+Getting there closed the three defects this file used to list as blocking:
+
+- `/app.wasm` served as 0 bytes (`BUGS.md` #66) — the UI module is now served
+  base64-encoded from `GET /api/app_wasm`, because a Saffron `String` cannot hold
+  a wasm binary at all (its magic number is `\0asm`, and the first byte terminates
+  the string). Verified byte-identical end to end.
+- The Run button never reaching the service — two separate bugs stacked: a `main`
+  symbol collision (`BUGS.md` #71) and then a callback registry that could never
+  find its own entries (`BUGS.md` #75).
+- Death after a few dozen requests (`BUGS.md` #63) — `__gc_disable()` is now
+  applied at startup, with the trade-off documented at the call site and below.
+
+See "Known issues" for what remains.
+
+The compile service can also be driven directly:
 
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' \
@@ -95,10 +114,21 @@ captured output string, so a user program cannot reach into the UI's heap.
 | `src/compile.sf` | The compile sandbox: temp dir, timeout, size cap, base64 |
 | `src/examples.sf` | Serves the bundled examples as JSON |
 | `frontend/src/main.sf` | The UI, in Turmeric (editor, run button, output pane) |
-| `frontend/src/api.sf` | `fetch` wrapper for `/api/compile` |
+| `frontend/src/api.sf` | `fetch` wrapper, callback registry, minimal JSON |
 | `frontend/public/app.js` | wasm loader glue: host imports, output capture, `__sched_pump` |
-| `static/` | Build output served to the browser (`app.wasm` + copied assets) |
+| `static/` | What the service serves. Copied from `frontend/build/` |
 | `examples/*.sf` | The bundled example programs |
+
+`frontend/public/app.js` is the **source of truth** for the loader;
+`turmeric-build` copies it into `frontend/build/`, and from there it must be copied
+to `static/`. Editing `static/app.js` directly works until the next build silently
+reverts it.
+
+```bash
+cd frontend && .pantry/bin/turmeric-build && cd ..
+cp frontend/build/app.wasm frontend/build/app.js frontend/build/index.html \
+   frontend/build/style.css static/
+```
 
 The seven examples are `hello` (strings, interpolation, inference), `fizzbuzz`
 (loops, conditionals), `collections` (lists, maps, destructuring, named imports),
@@ -113,6 +143,7 @@ correct output.
 - `GET /` — the frontend
 - `GET /api/health` — liveness + whether the wasm toolchain is usable
 - `GET /api/examples` — the bundled examples
+- `GET /api/app_wasm` — the UI module itself, base64-encoded (see #66 below)
 - `POST /api/compile` — `{"source": "..."}` → `{"ok", "wasm", "diagnostics"}`
 
 ## Sandboxing: what is and is not contained
@@ -136,7 +167,7 @@ Also in place:
   `timeout(1)`), so a compiler hang cannot wedge a worker.
 - **Source size cap** (`MAX_SOURCE_BYTES = 64000`), checked before a process is
   spawned — but see the note below: it is currently **unreachable**, because the
-  server dies on a body well under the limit.
+  server dies on a body well under the limit (`BUGS.md` #64).
 - **`rm -rf` target guard** — cleanup refuses any path not beginning with
   `/tmp/saffron_playground_`.
 - **Host paths stripped from diagnostics**, so temp directory names are not
@@ -160,6 +191,10 @@ Also in place:
 - **No CPU, memory, or disk limits.** There is a wall-clock timeout, but no
   `rlimit`. A program that makes the compiler allocate without bound can exhaust
   host memory well inside 20 seconds.
+- **The service's own heap is unbounded**, because the garbage collector is
+  disabled to work around `BUGS.md` #63 (see "Known issues"). Memory grows for the
+  life of the process, so an attacker does not need to find an allocation bug in
+  the compiler — ordinary sustained traffic is enough.
 - **No rate limiting and no authentication.** Every request spawns a compiler
   process; a trivial loop is a denial-of-service.
 - **No network egress restrictions** on the compiler process.
@@ -179,45 +214,31 @@ it is.
 ## Known issues
 
 A running log of the Saffron and Turmeric bugs found while building this is at
-`docs/design/playground-bug-log.md` (35 entries), and the ones that still
-reproduce are filed in `BUGS.md`. The ones that affect the playground right
-now, worst first:
+`docs/design/playground-bug-log.md`, and the ones that still reproduce are filed
+in `BUGS.md`. What still affects the playground, worst first:
 
-- **`/app.wasm` is served as 0 bytes, so the UI never loads** (`BUGS.md` #66).
-  `static_files` reads with `IO.read_file`, and a Saffron `String` is
-  NUL-terminated — a wasm module's magic is `\0asm`, so the read stops on the very
-  first byte and returns `""`. The response is a well-formed `200` with
-  `Content-Length: 0`. Serving it properly needs a byte-length-carrying body
-  through `Response`, not just a fixed read: `Response.body` is `String` and
-  `Content-Length` comes from `.length()`. Until then the frontend can only be
-  loaded by a server that does not go through `static_files`, and the compile
-  service must be driven with `curl`.
+- **The garbage collector is switched off** (`BUGS.md` #63). `@http/server`
+  handles each connection in a spawned task, so its allocations live in a
+  coroutine frame; the GC's shadow stack roots locals by the address of a stack
+  `alloca`, which is not where a coroutine's locals live after a suspend. The
+  collector frees live objects and the process exits silently — the last log line
+  is still `Listening on ...`, which makes it look like a network fault rather
+  than a crash. Measured here: dead after **23** requests to `/style.css`, or 60
+  to `/api/health`. `main()` therefore calls `__gc_disable()`, which takes it to
+  400+ requests clean. **The trade is an unbounded heap** — nothing is ever
+  reclaimed, so a long-lived instance grows without limit. Fine for a local
+  playground you restart freely; another reason this must not face untrusted
+  traffic as it stands. Affects every Saffron HTTP server, not just this one.
 - **A request body over ~35 KB kills the server outright** (`BUGS.md` #64).
   `@http/server` reads with a single `conn.read(8192)` and never checks for a
   short read, so a large body is parsed truncated and the process exits silently.
   This is also why the playground's own 64 KB source cap can never fire.
-- **The server dies after roughly 85 requests** (`BUGS.md` #63). This is a garbage
-  collector bug, not a playground bug, and it affects *every* Saffron HTTP
-  server. `@http/server` handles each connection in a spawned task, so its
-  allocations live in a coroutine frame; the GC's shadow stack roots locals by
-  the address of a stack `alloca`, which is not where a coroutine's locals live
-  after a suspend. The collector frees live objects and the process exits
-  silently — the last log line is still `Listening on ...`, which makes it look
-  like a network fault rather than a crash. Ten-line repro and the full analysis
-  are in the bug log. `__gc_disable()` at startup makes it go away (399 requests
-  clean instead of 84), but that trades the crash for an unbounded heap, so it is
-  deliberately *not* applied here. **Just restart the server when it goes quiet.**
-- ~~**The UI's Run button cannot reach the service**~~ — **fixed** (`BUGS.md` #71).
-  The dropped `js_fetch_post` / `js_run_wasm` imports were a *symptom*, and the
-  original diagnosis here (the wasm32 export list being applied after `-O2` had
-  stripped callback-reachable externs) was wrong. The real cause: codegen renamed
-  every function named `main` to `__saffron_main` regardless of module, so the
-  frontend's `main` collided with Turmeric's `<main>` element builder
-  (`turmeric/src/prelude.sf`). The entry point silently called the *library's*
-  function with the wrong arity, the user's `main` became unreachable, and `-O2`
-  then stripped everything only it reached — including those two imports (7
-  instead of 16). With the rename scoped to the entry module, the linked module
-  carries all 16 imports again.
+- **`static_files` still cannot serve a binary** (`BUGS.md` #66). Routed around
+  rather than fixed: the UI module goes out base64-encoded via `/api/app_wasm`.
+  The general defect stands — `Response.body` is `String`-typed and
+  `Content-Length` comes from `.length()`, so serving binary assets needs a
+  byte-length-carrying body type threaded through `Response`. Any other Saffron
+  program serving a binary asset will hit this.
 - **The frontend build needs an absolute `--lib-path`** (`BUGS.md` #57). A relative one
   makes the Turmeric prelude compile twice (`redefinition of global
   '@__g_turmeric_prelude__tc_event'`) because the compiler's module-dedup map is
@@ -225,16 +246,56 @@ now, worst first:
 - `fmod` and `js_time_now` are missing from the shared
   `turmeric/runtime/app_template.js` and are patched locally in
   `frontend/public/app.js` (log Bug 15).
+- The frontend build logs `[checker] Warning: cannot infer type` and
+  `[codegen] Warning: dispatching '<method>' on untyped value` in quantity. They
+  are noise here, but they are also how a silently-dropped call presents, so they
+  are worth reading rather than filtering.
 
-### Fixed upstream since this was written
+### Fixed while getting the Run button working
+
+Three bugs stacked up behind one symptom — a Run button that did nothing at all,
+with no error anywhere. Each was invisible until the one in front of it was fixed:
+
+1. **A `main` symbol collision** (`BUGS.md` #71). Codegen renamed *every* function
+   named `main` to `__saffron_main` regardless of module, so the frontend's `main`
+   collided with Turmeric's `<main>` element builder (`turmeric/src/prelude.sf`).
+   The entry point silently called the *library's* function with the wrong arity,
+   the user's `main` became unreachable, and `-O2` then legitimately stripped
+   everything only it reached — including `js_fetch_post` and `js_run_wasm` (7
+   imports instead of 16). The missing imports were the symptom; the original
+   diagnosis in this file (an export-list ordering problem) was wrong. Fixed in
+   `output_body.sf` and `expr_body.sf`; the entry point here is now `start()`,
+   deliberately not `main`, since this file imports `main` from the prelude.
+2. **A callback registry that could never find its own entries** (`BUGS.md` #75).
+   `api.sf` kept pending callbacks in a `Map<Float, ...>` keyed by an id handed out
+   to JS. A value that re-enters wasm from JS is a *bare machine integer*, but the
+   id was stored as the f64 bit pattern of the same number, and map keys are
+   compared by exact bit pattern — so every lookup missed and every completion
+   handler was silently dropped. Now a `List` index, which only has to compare
+   numerically. This is why Turmeric's own `__dispatch_event` is List-based.
+3. **`json_field` blew the wasm heap on an 11 KB field.** It accumulated the value
+   one character at a time, and Saffron strings are immutable, so each `+`
+   reallocated everything so far — ~60 MB of garbage for the base64 `wasm` field,
+   dying with `memory access out of bounds` inside `strcpy`. Now it scans for the
+   closing quote and takes one `slice`, expanding escapes only for fields that
+   actually contain a backslash.
+
+Also fixed, and affecting every Turmeric app rather than just this one: the
+bundler rewrote each app's `index.html` into N copies of its first line, because
+`turmeric/tools/build.sf` used `var li: Float` as a list index and a `Float`-typed
+index silently reads element 0 (`BUGS.md` #52). It presented as
+"`StringBuilder.append` repeats its first argument". Two real wasm32
+pointer-width bugs in `frontend/public/app.js` were also fixed — on wasm32
+`malloc` takes an i64 but returns a 32-bit pointer, and handing that plain JS
+Number to an import declared `-> i64` throws before the app can mount.
+
+### Fixed upstream, before this work
 
 - **Route dispatch** (`BUGS.md` #49) — `@http/server` used `var i: Number = 0` as a
   list index, which evaluated to `nan` and read the wrong route. Resolved by
   retiring the `Number` spelling from the stdlib (`485830a` and friends) rather
-  than by changing what `Number` maps to. All six routes now *dispatch* to the
-  right handler, re-verified this session — but `/app.wasm` dispatches correctly
-  and then returns an empty body, see #66 above. Health, `/api/examples`, `/` and
-  the 404 path return correct content.
+  than by changing what `Number` maps to. All routes now dispatch to the right
+  handler.
 
 ### Compromises in the examples
 

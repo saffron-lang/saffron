@@ -9,6 +9,51 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 77. On wasm32 only, `true.to_string()` returns `"false"` — `__bool_to_string` untags a value codegen already untagged
+
+Branching on the same value is correct, which is what makes this so misleading: an
+`if` takes the right arm while `to_string()` on the identical variable prints the
+opposite. It cost real debugging time during the playground work by making a
+correctly-functioning `Map` look broken.
+
+```saffron
+var t: Bool = true
+IO.println(t.to_string())        // "false" on wasm32, "true" on native
+if (t) { IO.println("taken") }   // "taken" — correct on both
+```
+
+Reproduced by building for wasm32 and running the module under Node: output is
+`false`, `false`, `taken`. The same program on native prints `true`, `false`,
+`taken`.
+
+**Cause — a double untag, and `wasm_base_32.ll` is the only base that does it.**
+Codegen untags before the call (`src/compiler/codegen/methods_body.sf:2426`):
+
+```saffron
+var raw: String = this.emit_untag_bool(obj)
+this.emit_indent(local + " = call i64 @__bool_to_string(i64 " + raw + ")")
+```
+
+so `__bool_to_string` receives a plain 0/1. Three of the four IR bases test that
+directly with `icmp ne i64 %b, 0` — `base.ll:125`, `base_nanbox.ll:132`,
+`wasm_base.ll:709`. But `wasm_base_32.ll:912` untags a *second* time:
+
+```llvm
+%raw = call i64 @__val_untag_bool(i64 %b)
+%is_true = icmp ne i64 %raw, 0
+```
+
+and `__val_untag_bool` (`wasm_base_32.ll:788-793`) is `icmp eq i64 %v, 9221683186994511873`
+— a comparison against the fully tagged `true` pattern. Given the already-reduced
+`1` it yields 0, so every `true` formats as `"false"`. `false` also formats as
+`"false"`, which is why the bug hides: half the cases look right by accident.
+
+The fix is to drop the extra `__val_untag_bool` call so wasm32 matches the other
+three bases. This is exactly the hazard `CLAUDE.md` states as a rule — tagging and
+untagging happen in one place, "never in codegen, and never in both" — so it is
+worth checking the other `wasm_base_32.ll` `to_string` helpers for the same
+duplicated-untag shape rather than fixing only this one.
+
 ### 76. The type checker never descends into class method bodies — every check is silently skipped inside a method
 
 `check_stmt`'s `ClassDecl` arm (`src/compiler/checker.sf:1023`) registers the
@@ -820,6 +865,13 @@ Response size only sets the timing, by reaching `@__gc_threshold` (65536 bytes,
 20000B responses -> died on request 4    (cumulative 60000)
 10B    responses -> died on request 85   (cumulative 840)
 ```
+
+A later measurement against the playground put the death at **request 23**, not
+85. That is not a contradiction of this entry but a confirmation of the mechanism
+above: the playground's responses (JSON with a base64 wasm payload) are far larger
+than 10 bytes, so the cumulative-byte threshold arrives sooner. **Quote a request
+count only together with the response size** — the count alone is meaningless, and
+"~85" in this entry's title is specifically the 10-byte case.
 
 The GC is not broken in general — straight-line allocation is fine:
 
