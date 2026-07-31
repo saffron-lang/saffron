@@ -98,13 +98,13 @@
 <header>
   <p class="eyebrow">Learn X in Y minutes</p>
   <h1>Learn <span class="lang">Saffron</span> in Y minutes</h1>
-  <p class="lede">Saffron is a small statically typed scripting language implemented in C17 and self-hosted
-  in itself. Source compiles to bytecode for a stack VM, or through LLVM to a native binary. It borrows
+  <p class="lede">Saffron is a small statically typed scripting language with a self-hosted compiler
+  written in Saffron. Source compiles through LLVM to a native binary or a wasm32 module. It borrows
   algebraic data types and exhaustive matching from the ML family, classes and interfaces from the
   object-oriented tradition, and cooperative tasks plus actors for concurrency.</p>
   <ul class="meta">
     <li>Statically typed</li>
-    <li>Bytecode VM + LLVM backend</li>
+    <li>LLVM backend, native + wasm32</li>
     <li>Self-hosted compiler</li>
     <li>Mark-sweep GC</li>
     <li>Cooperative async</li>
@@ -112,9 +112,9 @@
   </ul>
 </header>
 
-<pre><code><span class="c">// Saffron is a small statically typed scripting language. It compiles to</span>
-<span class="c">// bytecode for a VM, or through LLVM to a native binary. Everything below</span>
-<span class="c">// is the whole language — it fits in one file on purpose.</span>
+<pre><code><span class="c">// Saffron is a small statically typed scripting language. It compiles through</span>
+<span class="c">// LLVM to a native binary or a wasm32 module. Everything below is the whole</span>
+<span class="c">// language — it fits in one file on purpose.</span>
 
 <span class="c">// Single-line comments start with two slashes.</span>
 
@@ -236,10 +236,9 @@
     <span class="t">IO</span>.println(<span class="s">"for </span><span class="i">${j}</span><span class="s">"</span>)
 }
 
-<span class="c">// for-in walks anything implementing the iterator protocol — that is,</span>
-<span class="c">// anything with an .iter() that returns an object with .has_next() and</span>
-<span class="c">// .next(). Lists, strings, and maps all do. `break` and `continue`</span>
-<span class="c">// behave as you&#x27;d expect.</span>
+<span class="c">// for-in is index-based: it desugars to length() + [i], so it walks Lists</span>
+<span class="c">// and Strings. There is no iterator protocol, so a custom type is a compile</span>
+<span class="c">// error and a Map segfaults. `break` and `continue` behave as you&#x27;d expect.</span>
 <span class="k">for</span> (x <span class="k">in</span> [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>]) {
     <span class="k">if</span> (x == <span class="n">3</span>) <span class="k">continue</span>
     <span class="k">if</span> (x == <span class="n">5</span>) <span class="k">break</span>
@@ -266,16 +265,20 @@ nums.sort()
 <span class="k">var</span> copy = nums.copy()
 
 <span class="c">// Maps are written with braces. Keys and values are both typed.</span>
-<span class="k">var</span> ages: <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">Number</span>&gt; = {<span class="s">"ada"</span>: <span class="n">36</span>, <span class="s">"alan"</span>: <span class="n">41</span>}
+<span class="k">var</span> ages: <span class="t">Map</span>&lt;<span class="t">String</span>, <span class="t">Int</span>&gt; = {<span class="s">"ada"</span>: <span class="n">36</span>, <span class="s">"alan"</span>: <span class="n">41</span>}
 ages.set(<span class="s">"grace"</span>, <span class="n">45</span>)
 <span class="t">IO</span>.println(ages.get(<span class="s">"ada"</span>))   <span class="c">// 36</span>
 <span class="t">IO</span>.println(ages.has(<span class="s">"alan"</span>))  <span class="c">// true</span>
 <span class="t">IO</span>.println(ages.keys())       <span class="c">// [&quot;ada&quot;, &quot;alan&quot;, &quot;grace&quot;]</span>
 <span class="t">IO</span>.println(ages.values())     <span class="c">// [36, 41, 45]</span>
 
-<span class="c">// Iterating a map yields [key, value] pairs.</span>
-<span class="k">for</span> (entry <span class="k">in</span> ages) {
-    <span class="t">IO</span>.println(<span class="s">"</span><span class="i">${entry[0]}</span><span class="s"> is </span><span class="i">${entry[1]}</span><span class="s">"</span>)
+<span class="c">// `for (entry in ages)` segfaults — for-in is index-based and a Map has no</span>
+<span class="c">// integer indexing. keys() and values() are consistently ordered, so pair them</span>
+<span class="c">// up by index instead.</span>
+<span class="k">var</span> who: <span class="t">List</span>&lt;<span class="t">String</span>&gt; = ages.keys()
+<span class="k">var</span> how_old: <span class="t">List</span>&lt;<span class="t">Int</span>&gt; = ages.values()
+<span class="k">for</span> (i = <span class="n">0</span>; i &lt; who.length(); i = i + <span class="n">1</span>) {
+    <span class="t">IO</span>.println(<span class="s">"</span><span class="i">${who[i]}</span><span class="s"> is </span><span class="i">${how_old[i]}</span><span class="s">"</span>)
 }
 
 <span class="c">////////////////////////////////////////////////</span>
@@ -515,29 +518,27 @@ each([<span class="s">"trailing"</span>, <span class="s">"closure"</span>]) { it
 <span class="t">IO</span>.println(name_of(Square()))   <span class="c">// square</span>
 
 <span class="c">////////////////////////////////////////////////</span>
-<span class="c">// 11. Custom iterators</span>
+<span class="c">// 11. Custom sequences</span>
 <span class="c">////////////////////////////////////////////////</span>
 
-<span class="c">// Give a type an .iter() returning an object with .has_next() and .next()</span>
-<span class="c">// and for-in works on it.</span>
+<span class="c">// There is no iterator protocol yet. `for-in` desugars to length() + [i], so</span>
+<span class="c">// it walks Lists and Strings only: a custom type is a compile error, and a Map</span>
+<span class="c">// segfaults. Expose a List and iterate that.</span>
 <span class="k">class</span> Countdown {
-    <span class="k">var</span> <span class="k">from</span>: <span class="t">Number</span>
-    <span class="k">fun</span> init(<span class="k">from</span>: <span class="t">Number</span>) { <span class="k">this</span>.<span class="k">from</span> = <span class="k">from</span> }
-    <span class="k">fun</span> iter(): CountdownIter { <span class="k">return</span> CountdownIter(<span class="k">this</span>.<span class="k">from</span>) }
-}
-
-<span class="k">class</span> CountdownIter {
-    <span class="k">var</span> current: <span class="t">Number</span>
-    <span class="k">fun</span> init(current: <span class="t">Number</span>) { <span class="k">this</span>.current = current }
-    <span class="k">fun</span> has_next(): <span class="t">Bool</span> { <span class="k">return</span> <span class="k">this</span>.current &gt; <span class="n">0</span> }
-    <span class="k">fun</span> next(): <span class="t">Number</span> {
-        <span class="k">var</span> value = <span class="k">this</span>.current
-        <span class="k">this</span>.current = <span class="k">this</span>.current - <span class="n">1</span>
-        <span class="k">return</span> value
+    <span class="k">var</span> <span class="k">from</span>: <span class="t">Int</span>
+    <span class="k">fun</span> init(<span class="k">from</span>: <span class="t">Int</span>) { <span class="k">this</span>.<span class="k">from</span> = <span class="k">from</span> }
+    <span class="k">fun</span> to_list(): <span class="t">List</span>&lt;<span class="t">Int</span>&gt; {
+        <span class="k">var</span> out: <span class="t">List</span>&lt;<span class="t">Int</span>&gt; = []
+        <span class="k">var</span> i: <span class="t">Int</span> = <span class="k">this</span>.<span class="k">from</span>
+        <span class="k">while</span> (i &gt; <span class="n">0</span>) {
+            out.push(i)
+            i = i - <span class="n">1</span>
+        }
+        <span class="k">return</span> out
     }
 }
 
-<span class="k">for</span> (t <span class="k">in</span> Countdown(<span class="n">3</span>)) {
+<span class="k">for</span> (t <span class="k">in</span> Countdown(<span class="n">3</span>).to_list()) {
     <span class="t">IO</span>.println(t)   <span class="c">// 3, 2, 1</span>
 }
 

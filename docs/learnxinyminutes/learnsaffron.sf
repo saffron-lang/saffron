@@ -1,6 +1,6 @@
-// Saffron is a small statically typed scripting language. It compiles to
-// bytecode for a VM, or through LLVM to a native binary. Everything below
-// is the whole language — it fits in one file on purpose.
+// Saffron is a small statically typed scripting language. It compiles through
+// LLVM to a native binary or a wasm32 module. Everything below is the whole
+// language — it fits in one file on purpose.
 
 // Single-line comments start with two slashes.
 
@@ -122,10 +122,9 @@ for (var j = 0; j < 3; j = j + 1) {
     IO.println("for ${j}")
 }
 
-// for-in walks anything implementing the iterator protocol — that is,
-// anything with an .iter() that returns an object with .has_next() and
-// .next(). Lists, strings, and maps all do. `break` and `continue`
-// behave as you'd expect.
+// for-in is index-based: it desugars to length() + [i], so it walks Lists
+// and Strings. There is no iterator protocol, so a custom type is a compile
+// error and a Map segfaults. `break` and `continue` behave as you'd expect.
 for (x in [1, 2, 3, 4, 5]) {
     if (x == 3) continue
     if (x == 5) break
