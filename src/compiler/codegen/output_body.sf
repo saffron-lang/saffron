@@ -671,6 +671,20 @@
                         if (this.current_prefix.length() > 0 and !this.str_in_list(this.known_functions,pr_name)) {
                             this.known_functions.push(pr_name)
                         }
+                        // An @extern must have its C signature registered here,
+                        // not only when its own decl is lowered below. A call
+                        // reached earlier in the body pass finds extern_sigs empty
+                        // otherwise and emits an i64 call against, e.g., `declare
+                        // double @sqrt(double)` — the BUGS #55 symbol mismatch.
+                        // Codegen.generate runs this pass, not prescan_fun_decl,
+                        // so the single-file path depends on this write. Idempotent
+                        // with stmts_body.sf:64-69: same key, same value.
+                        if (pr_doc.starts_with("@extern:")) {
+                            this.extern_sigs.set(pr_emit, pr_doc.slice(8, pr_doc.length()))
+                            if (pr_ret.length() > 0) {
+                                this.func_ret_types.set(pr_emit, this.str_to_type(pr_ret))
+                            }
+                        }
                     }
                 }
                 ClassDecl(pr_cname, pr_parent, pr_fields, pr_methods, pr_doc) => {
