@@ -9,6 +9,169 @@ entry below was re-verified against `build/saffronc` on 2026-07-30 before being
 filed here — the log also contains entries that no longer reproduce, which are
 noted there rather than carried forward.
 
+### 76. The type checker never descends into class method bodies — every check is silently skipped inside a method
+
+`check_stmt`'s `ClassDecl` arm (`src/compiler/checker.sf:1023`) registers the
+class's fields and parent and then stops. It never walks `methods`. So **no
+statement inside any class method is type-checked at all** — not the nullability
+analysis the checker exists for, not scalar mismatches, not return types, not
+exhaustiveness, not undefined variables.
+
+```saffron
+class K {
+    fun init() {}
+    fun m(): Int {
+        var s: String = 1       // not reported
+        var n: Int = nil        // not reported
+        return "not an int"     // not reported
+    }
+}
+```
+
+Compiles silently. The identical statements in a *free function* are all caught:
+
+```
+ERROR: s: cannot assign Int to String
+ERROR: n: cannot assign nil to non-nullable Int
+```
+
+That contrast is the whole bug: the checks work, they are just never reached.
+Same for exhaustiveness — a `match` missing a variant inside a method is
+accepted, while the same match in a free function is rejected with
+`non-exhaustive match on S: missing variants C, D`. Verified with both a local
+enum and one imported across a module boundary; the module boundary is
+irrelevant, the class boundary is what matters.
+
+Only codegen's own late `undefined variable` check (`expr_body.sf:97`) still
+fires inside methods, which is why this hasn't been more visible: the loudest
+class of mistake is caught by a different pass, one that reports at codegen time
+without a source span.
+
+**Scale.** This is most of the language's surface in practice, and nearly all of
+the compiler's own source: `checker.sf` has 126 methods and 4 top-level
+functions, so ~97% of its own bodies are in the blind spot. The compiler
+bootstraps *because* it is unchecked, not because it is clean — running the
+checker over its own source currently reports zero diagnostics, which should be
+read as "no checks ran," not "no problems."
+
+**Fix.** Recurse into `methods` from the `ClassDecl` arm, with `current_class`
+set and a scope holding `this` plus the field names. Expect this to surface a
+large pile of latent diagnostics in the compiler and stdlib — that is the point,
+and it is the same "measure first" situation as stage 1 of
+`docs/design/compiler-rewrite.md`, which should probably absorb this. Do not
+land the recursion and the resulting fixes in one commit.
+
+Note the related shape: the `match (stmt)` at `checker.sf:837-848` and
+`check_stmt` itself both cover 14 of `Stmt`'s 15 variants — `TypeAlias` has no
+arm in either — and this does not fail the build, because exhaustiveness
+checking is one of the things that does not run inside a method. The checker's
+own blind spot hides a hole in the checker.
+
+### 75. A value that re-enters wasm from JS is untagged, so it can never match a `Map` key it was stored under
+
+**Reproduction** (wasm32; `t.sf`):
+
+```saffron
+@extern("void js_note(i64)")
+fun _note(id: Float)
+
+var _next_id: Float = 0
+var _cb: Map<Float, String> = {}
+
+fun reg(payload: String): Float {
+    _next_id = _next_id + 1
+    var id: Float = _next_id
+    _cb.set(id, payload)
+    return id
+}
+
+fun kick() { _note(reg("HELLO")) }
+
+// Exported to JS (the `__on_` prefix is what tools/saffron:392 exports).
+fun __on_back(id: Float) {
+    if (_cb.has(id)) { IO.println("FOUND " + _cb.get(id)) }
+    else { IO.println("MISSING") }
+}
+
+kick()
+```
+
+Build with `tools/saffron build t.sf --target wasm32 -o t.wasm`, then from JS call
+`_start()` (which invokes `js_note` and hands you the id) and pass that exact id
+straight back to `__on_back`:
+
+```
+js_note got id = 1n
+MISSING
+```
+
+The id makes a round trip and stops being findable. Handing the *bit pattern of
+1.0* back instead prints `FOUND HELLO`, which localizes it exactly:
+
+```js
+const bb = new ArrayBuffer(8); new Float64Array(bb)[0] = 1.0;
+inst.exports.__on_back(new BigInt64Array(bb)[0]);   // FOUND HELLO
+```
+
+So the two representations of "1" involved are:
+
+| Path | Value seen by `__map_key_cmp` |
+|---|---|
+| stored by `reg()` | `0x3FF0000000000000` — the f64 bit pattern of 1.0 |
+| arriving from JS | `0x0000000000000001` — a bare machine integer |
+
+An exported wasm function's `i64` parameter is whatever JS passed; nothing on the
+boundary re-tags it into the NaN-boxed form the module uses internally. And
+`__map_key_cmp` (`src/runtime/runtime.sf:287`) compares non-string keys by exact
+bit pattern — correctly, for its own purposes — so the lookup misses. Note
+`__val_untag_float` (`src/runtime/wasm_base_32.ll:763`) would convert `1` to `1.0`
+happily; it is simply never called, because a `Map` key is compared as an opaque
+i64 and never untagged at all.
+
+**Why it is nastier than a plain type-mismatch:** every symptom is silent. There
+is no diagnostic at compile time, no trap at runtime, and `has()` returning false
+is a legitimate result, so the callback is *dropped* rather than failing. In the
+playground this meant the Run button POSTed correctly, the service replied
+correctly, and then nothing happened at all — no error in the console, no status
+change. The pattern it breaks (hand JS an opaque id, get it back later) is the
+only way to do asynchronous work across the wasm boundary, so any callback
+registry written the obvious way is affected.
+
+Also note `Bool.to_string()` on wasm32 prints `"false"` for `true` — a separate,
+unfiled printing bug (the branch `if (t)` is taken correctly). It matters here
+because it made an early `IO.println(_cb.has(id).to_string())` read as a Map
+failure in cases where the Map was fine, and it will mislead anyone debugging this
+by printing booleans.
+
+**Workaround (in use):** index a `List` instead of keying a `Map`. An index only
+has to compare numerically, which survives the representation change:
+
+```saffron
+var _callbacks: List<(String) => Nil> = []
+fun _register(cb: (String) => Nil): Float {
+    _callbacks.push(cb)
+    return _callbacks.length() - 1
+}
+fun _resolve(id: Float, payload: String) {
+    if (id >= 0 and id < _callbacks.length()) {
+        var cb: (String) => Nil = _callbacks[id]
+        cb(payload)
+    }
+}
+```
+
+Applied at `playground/frontend/src/api.sf`. This is also why Turmeric's own
+`__dispatch_event` (`turmeric/src/prelude/03_callbacks.sf:27`) is List-based —
+it works, but the reason was not written down, so the Map version looks fine
+until you try it.
+
+The real fix is to normalise incoming values at the export boundary: codegen knows
+each exported function's declared parameter types, so a `Float` parameter on an
+exported function should be re-tagged (`__val_tag_float` on the integer, or a
+tagged-vs-raw check like `__val_untag_int` already does) in the function prologue.
+Until then, no NaN-boxed value should be used as a `Map` key if it crosses the JS
+boundary.
+
 ### 74. Builtin-namespace calls (`GC.*`) pass NaN-boxed arguments straight into `@extern` functions, and the matching getter re-masks the corruption so it reads back correct
 
 Found while wiring `GC.set_max_memory()` for the `--max-memory` work. It is not
@@ -502,6 +665,21 @@ independent instance of it, so it is filed here as the general defect.
 `/app.wasm` among "All 6 routes correct". That claim does not hold — the route
 returns 200 with an empty body.
 
+**Status: still open as a stdlib defect; routed around in the playground.** The
+underlying defect is unchanged — `static_files` still cannot serve a wasm module,
+and `Response.body` is still String-typed — but the playground no longer depends
+on it. It serves the UI module base64-encoded from its own endpoint
+(`GET /api/app_wasm`, `playground/src/main.sf`), which the loader decodes with
+`atob` before instantiating; base64's alphabet is pure ASCII, so it survives a
+Saffron string intact. This is the same dodge the compile endpoint already used
+for user modules, now factored into `Compile.encode_file_base64`. Verified
+byte-identical: the 47555-byte module round-trips through the endpoint and the
+frontend loads and runs. Costs a 33% larger transfer once per page load.
+
+That does not fix the general case — any Saffron program serving a binary asset
+still hits this — so the byte-length-carrying body type described above is still
+the work that needs doing.
+
 ### 65. Runtime errors are fatal, not catchable — four docs promised the opposite
 
 `try`/`catch` works correctly for `throw`. It does **not** catch runtime faults:
@@ -954,6 +1132,34 @@ main()
 *Reading* a captured variable works; only writes are lost, in both directions —
 the closure never sees its own increment, and the enclosing scope never sees the
 write.
+
+**Re-verified 2026-07-30, and the entry as filed was conflating two independent
+defects.** The repro above still fails exactly as written, but only because it
+uses `Float`. Separating the factors:
+
+| shape | result |
+|---|---|
+| `Int` capture, closure at **module top level** | `1`, `2`, `count = 2` — **fully correct** |
+| `Int` capture, closure **inside a `fun`** | `1`, `2`, `count = 0` — closure sees its own writes; enclosing scope does not |
+| `Int` capture, closure returned from a factory | `1`, `2` — **correct**, independent instances |
+| `Float` capture, either scope | `0` every time — nothing works |
+
+So there is no single "captures are by value" bug:
+
+1. **A `Float`-typed capture is broken outright**, in any scope, and this is the
+   more severe half. It is not a closure bug at all — plain `Float` arithmetic
+   without any closure (`var c: Float = 5.0; c + 1`) correctly gives `6`, so the
+   breakage is specific to a `Float` crossing the capture boundary. This is very
+   likely the same float-tag/untag confusion as #52 and #54 rather than the
+   by-value hoisting described below, and should be investigated with them.
+2. **The by-value hoisting is real but narrower than filed**: with `Int` it only
+   loses the write-back to an enclosing *function's* frame. The closure's own
+   view of its counter is correct, and top-level captures are fully correct — so
+   the `output_body.sf` analysis below explains the third row only.
+
+The practical consequence for the docs is unchanged: `CLAUDE.md`'s mutable-counter
+pattern still does not work as shown if the counter is a `Float` or the closure
+is nested in a function.
 
 `src/compiler/codegen/output_body.sf:26-85` hoists nested functions to top level
 with their free variables appended as ordinary by-value `i64` parameters
